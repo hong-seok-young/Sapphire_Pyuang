@@ -61,6 +61,9 @@ export interface Monster {
   respawn?: string;
   skill?: string;
   note?: string;
+  /** 헌팅그라운드처럼 단계가 둘인 몬스터: ['34', '49'] / ['2,050', '5,800'] */
+  levels?: string[];
+  hps?: string[];
 }
 
 export interface EquipInfo {
@@ -80,7 +83,8 @@ export interface EquipTable {
   slot: string;
   post: string;
   headers: string[];
-  rows: { name: string; icon: Pic | null; cells: string[] }[];
+  /** h: 이 줄의 표가 글의 첫 표와 칸이 다를 때 그 표의 머리줄 */
+  rows: { name: string; icon: Pic | null; cells: string[]; h?: string[]; jobIcon?: Pic | null }[];
 }
 
 export interface Meta {

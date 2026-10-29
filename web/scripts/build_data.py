@@ -327,10 +327,25 @@ def split_top(s: str) -> list[str]:
 
 
 def item_key(name: str) -> str:
-    """'펫 크리스탈(*1)' / '거미줄(*1~7)' -> '펫 크리스탈' / '거미줄'."""
+    """'펫 크리스탈(*1)' / '거미줄(*1~7)' / '영광의팬던트 (처치 시 …)' -> '펫 크리스탈' / '거미줄' / '영광의팬던트'."""
     name = re.sub(r"\(\s*\*[\d~\-]+\s*\)$", "", name).strip()
     name = re.sub(r"\(\s*\)$", "", name).strip()
+    name = re.sub(r"\s+\([^)]*\s[^)]*\)$", "", name).strip()  # a note in brackets, not part of the name
     return name
+
+
+def drop_names(text: str) -> list[str]:
+    """Drop cell text -> item names. Commas and line breaks (' / ') separate items; line breaks also split the
+    two tiers of a 헌팅그라운드 monster. Where the author forgot a comma, the gap left by the icon (two spaces)
+    does. A line that is only a note in brackets is not an item."""
+    names = []
+    for line in text.split(" / "):
+        for part in split_top(line):
+            for piece in re.split(r"\s{2,}", part):
+                k = item_key(piece)
+                if k and len(k) <= 25 and not k.startswith("(") and k != ")":
+                    names.append(k)
+    return list(dict.fromkeys(names))
 
 
 def first_picture(td: Tag) -> dict | None:
@@ -338,55 +353,79 @@ def first_picture(td: Tag) -> dict | None:
     return picture_of(img) if img is not None else None
 
 
+HP_CELL = re.compile(r"HP\s*[\d,\-?]+")  # match on get_text("") : some posts split H and P into two pieces
+
+
 def parse_monsters(aid: str, box: Tag, place: dict) -> list[dict]:
+    """A monster is an 'HP | drops' row, then the name row with (Lv.), then an optional respawn/skill row.
+    One table can hold several monsters in a row (인던25's 다크임프 and 매직임프), so walk every row."""
     mons = []
     for table in box.find_all("table"):
         rows = rows_of(table)
         if len(rows) < 2 or "(Lv." not in table.get_text():
             continue
-        r0 = rows[0].find_all(["td", "th"], recursive=False)
-        if len(r0) < 2 or not re.search(r"HP\s*[\d,\-?]+", r0[0].get_text(" ")):
-            continue
-        name_row = next((r for r in rows[1:] if "(Lv." in r.get_text()), None)
-        if name_row is None:
-            continue
-        name_lines = [plain([l]) for l in lines_of(name_row.find(["td", "th"]))]
-        name_lines = [x for x in name_lines if x]
-        if not name_lines:
-            continue
-        name = name_lines[0]
-        whole = " ".join(name_lines)
-        lv = re.search(r"Lv\.?\s*(\d+)", whole)
-        hp = re.search(r"HP\s*([\d,]+)", r0[0].get_text(" "))
-        drops_text = plain(lines_of(r0[1])).replace(" / ", " ")
-        drops = []
-        for d in split_top(drops_text):
-            k = item_key(d)
-            if k and len(k) <= 25 and "★" not in k:
-                drops.append(k)
-        mon = {
-            "key": f"{name}@{aid}",
-            "name": name,
-            "level": int(lv.group(1)) if lv else None,
-            "hp": int(hp.group(1).replace(",", "")) if hp else None,
-            "traits": " · ".join(x.replace("｜", " · ") for x in name_lines[1:] if "Lv." not in x),
-            "drops": list(dict.fromkeys(drops)),
-            "place": aid,
-            "img": first_picture(r0[0]),
-        }
-        third = rows[rows.index(name_row) + 1] if rows.index(name_row) + 1 < len(rows) else None
-        if third is not None:
-            c = third.find_all(["td", "th"], recursive=False)
-            first = plain(lines_of(c[0])).replace(" / ", " ") if c else ""
-            rest = " / ".join(plain(lines_of(x)) for x in c[1:] if plain(lines_of(x)) not in ("", "-"))
-            if first.startswith("재부활"):
-                mon["respawn"] = first.split(":", 1)[-1].strip()
-            elif first and first != "스킬 없음":
-                mon["skill"] = first
-            if rest:
-                mon["note"] = rest
-        mons.append(mon)
+        for i, row in enumerate(rows[:-1]):
+            r0 = row.find_all(["td", "th"], recursive=False)
+            if len(r0) < 2 or not HP_CELL.search(r0[0].get_text("")) or "(Lv." not in rows[i + 1].get_text():
+                continue
+            mon = monster_from_rows(aid, r0, rows[i + 1], rows[i + 2] if i + 2 < len(rows) else None)
+            if mon:
+                mons.append(mon)
     return mons
+
+
+def monster_from_rows(aid: str, r0: list[Tag], name_row: Tag, third: Tag | None) -> dict | None:
+    name_lines = [plain([l]) for l in lines_of(name_row.find(["td", "th"]))]
+    name_lines = [x for x in name_lines if x]
+    if not name_lines:
+        return None
+    if name_lines[0].startswith("("):
+        return None  # 길드던전 boss parts: '(Lv.35) / ① 오른팔 / HP …' rows, not a monster block
+    # the name can run over two lines ('한에 서린 / 레버넌트'); it ends where the level starts
+    name_parts = []
+    for line in name_lines:
+        if line.startswith("(Lv") or "｜" in line:
+            break
+        name_parts.append(line)
+    name = re.sub(r"^[①-⑳]\s*", "", " ".join(name_parts) or name_lines[0])  # guild dungeon parts are numbered ①~⑤
+    whole = " ".join(name_lines)
+    lv = re.search(r"Lv\.?\s*(\d+)", whole)
+    hp = re.search(r"HP\s*([\d,]+)", r0[0].get_text(""))
+    drop_text = plain(lines_of(r0[1]))
+    # 리에티 (boss skills) and 옛 앨프의 수정 (buffs ⑴~⑺): the drop cell describes effects, not items
+    boss_skills = bool(re.search(r"[★❗⑴]", drop_text))
+    drops = [] if boss_skills else drop_names(drop_text)
+    mon = {
+        "key": f"{name}@{aid}",
+        "name": name,
+        "level": int(lv.group(1)) if lv else None,
+        "hp": int(hp.group(1).replace(",", "")) if hp else None,
+        "traits": " · ".join(x.replace("｜", " · ") for x in name_lines[len(name_parts or [0]):] if "Lv." not in x),
+        "drops": drops,
+        "place": aid,
+        "img": first_picture(r0[0]),
+    }
+    if boss_skills:
+        mon["skill"] = drop_text
+    # 헌팅그라운드 monsters come in two tiers: '(Lv.34) / (Lv.49)', 'HP 2,050 / HP 5,800'
+    levels = re.findall(r"Lv\.?\s*(\d+|-)", whole)
+    hps = re.findall(r"HP\s*([\d,]+|-)", r0[0].get_text(""))
+    if len(levels) > 1:
+        mon["levels"] = levels
+    if len(hps) > 1:
+        mon["hps"] = hps
+    # the row after the name holds respawn time or boss skills, unless it already starts the next monster
+    if third is not None and not HP_CELL.search(third.get_text("")[:20]):
+        c = third.find_all(["td", "th"], recursive=False)
+        first = plain(lines_of(c[0])).replace(" / ", " ") if c else ""
+        rest = " / ".join(plain(lines_of(x)) for x in c[1:] if plain(lines_of(x)) not in ("", "-"))
+        if first.startswith("재부활"):
+            mon["respawn"] = first.split(":", 1)[-1].strip()
+        elif first and first != "스킬 없음" and "skill" not in mon:
+            mon["skill"] = first
+        if rest:
+            mon["note"] = rest
+    return mon
 
 
 def index_buttons() -> tuple[dict, dict]:
@@ -433,6 +472,8 @@ def parse_equipment(aid: str, title: str, box: Tag) -> dict | None:
             if not name:
                 continue
             row = {"name": name, "icon": first_picture(tds[0]), "cells": cells}
+            if h != headers:  # one post can hold tables with different columns (보조 장비: 방패 / 마법 / 정밀)
+                row["h"] = h
             # the 직업 column is a job emblem picture, not text; name_jobs() turns it into a job name
             if "직업" in h and h.index("직업") < len(tds) and not cells[h.index("직업")]:
                 row["jobIcon"] = first_picture(tds[h.index("직업")])
@@ -457,8 +498,9 @@ def name_jobs(equipment: list[dict]) -> None:
         best = max(counts, key=counts.get)
         names[src] = "공용" if len(counts) >= 3 else best
     for eq in equipment:
-        col = eq["headers"].index("직업") if "직업" in eq["headers"] else -1
         for row in eq["rows"]:
+            h = row.get("h") or eq["headers"]
+            col = h.index("직업") if "직업" in h else -1
             icon = row.get("jobIcon")
             if col >= 0 and icon and icon["src"] in names and col < len(row["cells"]):
                 row["cells"][col] = names[icon["src"]]
@@ -478,6 +520,22 @@ MENU = [
     ("퀘스트 · 지도", None, ["342566", "1064", "343200", "343201", "343203", "343205", "342858",
                          "342865", "343019", "331777", "344012", "345738"]),
 ]
+# 목차 글에는 없고 헌팅그라운드 글(테멘 거점)에서만 이어지는 사냥터
+EXTRA_PLACES = {"월드 서버 컨텐츠": [{"이름": "시나르 평야", "글": 345514}, {"이름": "비툼 습지", "글": 345526}]}
+
+
+def first_banner(post: dict | None) -> dict | None:
+    """The map label picture at the top of a hunting-ground post (about 159x60)."""
+    for b in (post or {}).get("blocks", [])[:3]:
+        cells = [c for row in b.get("rows", []) for c in row] if b["k"] == "table" else [{"l": [b["r"]]}]
+        for c in cells:
+            for line in c["l"]:
+                for r in line:
+                    if "src" in r and r["w"] >= 120:
+                        return {k: r[k] for k in ("src", "w", "h")}
+    return None
+
+
 EQUIP_ORDER = ["전사 무기", "레인저 무기", "마법사 무기", "무도가 무기", "보조 장비", "투구", "갑옷", "장갑",
                "신발", "망토", "벨트", "목걸이", "반지"]
 
@@ -497,7 +555,7 @@ def main():
     regions, places, monsters = [], {}, {}
     for region in index["지역"]:
         ids = []
-        for p in region["장소"]:
+        for p in region["장소"] + EXTRA_PLACES.get(region["이름"], []):
             aid = str(p["글"])
             ids.append(aid)
             mons = parse_monsters(aid, boxes[aid], p) if aid in boxes else []
@@ -511,10 +569,14 @@ def main():
                             text = plain(cell["l"])
                             if "《" in text:
                                 info = text
+            levels = [m["level"] for m in mons if m["level"]]
             places[aid] = {
                 "id": aid, "name": p["이름"], "title": posts.get(aid, {}).get("title", p["이름"]),
-                "region": region["이름"], "level": p.get("레벨"), "desc": p.get("설명"),
-                "banner": banners.get(aid), "monsters": [m["key"] for m in mons], "info": info,
+                "region": region["이름"],
+                "level": p.get("레벨") or ([min(levels), max(levels)] if levels else None),
+                "desc": p.get("설명"),
+                "banner": banners.get(aid) or first_banner(posts.get(aid)),
+                "monsters": [m["key"] for m in mons], "info": info,
             }
         regions.append({"name": region["이름"], "pic": region_pics.get(region["이름"]), "places": ids})
 
@@ -544,12 +606,13 @@ def main():
         for row in eq["rows"]:
             it = item(row["name"])
             it["equip"].append({"slot": eq["slot"], "post": eq["post"],
-                                "info": dict(zip(eq["headers"], row["cells"]))})
+                                "info": dict(zip(row.get("h") or eq["headers"], row["cells"]))})
             if row["icon"] and not it["icon"]:
                 it["icon"] = row["icon"]
     for name, it in items.items():
         if not it["icon"]:
-            rel = icon_index.get("아이템", {}).get(name) or icon_index.get("아이템", {}).get(name.replace(" ", ""))
+            named = icon_index.get("아이템", {})
+            rel = named.get(name) or named.get(name.replace(" ", "")) or named.get(name.split(":")[0])
             if rel:
                 it["icon"] = export_picture(SRC / "이미지" / rel)
 

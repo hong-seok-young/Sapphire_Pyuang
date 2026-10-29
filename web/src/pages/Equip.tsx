@@ -28,17 +28,17 @@ export function EquipSlot({ wiki, slot }: { wiki: Wiki; slot: string }) {
   const [job, setJob] = useState("전체");
   const table = wiki.equipment.find((e) => e.slot === slot);
   if (!table) return <NotFound what="장비" />;
-  const col = (name: string) => table.headers.indexOf(name);
-  const jobCol = col("직업");
-  const shown = table.rows.filter((r) => job === "전체" || jobCol < 0 || (r.cells[jobCol] ?? "").includes(job));
-  const statCols = table.headers
-    .map((h, i) => [h, i] as const)
-    .filter(([h]) => !["이미지", "아이템명", "직업", "옵션", "획득처", "레벨제한"].includes(h));
+  // 한 글 안에서도 표마다 칸이 다를 수 있어서 (보조 장비: 방패 / 마법 / 정밀) 줄마다 자기 머리줄로 읽는다
+  const fieldsOf = (r: (typeof table.rows)[number]) =>
+    Object.fromEntries((r.h ?? table.headers).map((h, i) => [h, r.cells[i] ?? ""])) as Record<string, string>;
+  const hasJob = table.headers.includes("직업");
+  const shown = table.rows.filter((r) => job === "전체" || !hasJob || (fieldsOf(r)["직업"] ?? "").includes(job));
+  const HIDDEN = ["이미지", "아이템명", "직업", "옵션", "획득처", "레벨제한"];
 
   return (
     <>
       <TopBar title={slot} />
-      {jobCol >= 0 && (
+      {hasJob && (
         <div className="filter">
           {JOBS.map((j) => (
             <button key={j} className={"pill" + (j === job ? " pill-on" : "")} onClick={() => setJob(j)}>
@@ -48,28 +48,32 @@ export function EquipSlot({ wiki, slot }: { wiki: Wiki; slot: string }) {
         </div>
       )}
       <ul className="equip-list">
-        {shown.map((r, i) => (
-          <li key={r.name + i}>
-            <a className="equip card" href={"#/item/" + encodeURIComponent(r.name)}>
-              <span className="equip-icon">
-                <PicImg pic={r.icon ?? wiki.items[r.name]?.icon} fit={40} />
-              </span>
-              <span className="equip-main">
-                <span className="equip-name">
-                  {r.name} {col("레벨제한") >= 0 && <span className="lv">Lv.{r.cells[col("레벨제한")]}</span>}
+        {shown.map((r, i) => {
+          const f = fieldsOf(r);
+          const shownValue = (v: string | undefined) => v && v !== "-";
+          return (
+            <li key={r.name + i}>
+              <a className="equip card" href={"#/item/" + encodeURIComponent(r.name)}>
+                <span className="equip-icon">
+                  <PicImg pic={r.icon ?? wiki.items[r.name]?.icon} fit={40} />
                 </span>
-                <span className="equip-stats">
-                  {statCols.map(([h, i]) => r.cells[i] && r.cells[i] !== "-" && <span key={h}>{h} {r.cells[i]}</span>)}
-                  {jobCol >= 0 && <span>{r.cells[jobCol]}</span>}
+                <span className="equip-main">
+                  <span className="equip-name">
+                    {r.name} {shownValue(f["레벨제한"]) && <span className="lv">Lv.{f["레벨제한"]}</span>}
+                  </span>
+                  <span className="equip-stats">
+                    {Object.entries(f)
+                      .filter(([h, v]) => !HIDDEN.includes(h) && shownValue(v))
+                      .map(([h, v]) => <span key={h}>{h} {v}</span>)}
+                    {shownValue(f["직업"]) && <span>{f["직업"]}</span>}
+                  </span>
+                  {shownValue(f["옵션"]) && <span className="equip-opt">{f["옵션"]}</span>}
+                  {shownValue(f["획득처"]) && <span className="equip-from">📍 {f["획득처"]}</span>}
                 </span>
-                {col("옵션") >= 0 && r.cells[col("옵션")] && r.cells[col("옵션")] !== "-" && (
-                  <span className="equip-opt">{r.cells[col("옵션")]}</span>
-                )}
-                {col("획득처") >= 0 && r.cells[col("획득처")] && <span className="equip-from">📍 {r.cells[col("획득처")]}</span>}
-              </span>
-            </a>
-          </li>
-        ))}
+              </a>
+            </li>
+          );
+        })}
       </ul>
       <div className="links">
         <a className="btn" href={"#/post/" + table.post}>원글 표 그대로 보기</a>
