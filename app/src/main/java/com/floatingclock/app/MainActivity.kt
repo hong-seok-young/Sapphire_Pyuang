@@ -27,6 +27,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.android.material.materialswitch.MaterialSwitch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 
@@ -122,17 +123,14 @@ class MainActivity : AppCompatActivity() {
 
         setupControls()
         setupGameSection()
-        findViewById<Button>(R.id.btn_open_watch).setOnClickListener {
-            startActivity(Intent(this, ScreenWatchActivity::class.java))
-        }
         setupUpdate()
+        removeOldScreenWatchData()
         updatePreview()
         askNotificationPermissionIfNeeded()
     }
 
     override fun onResume() {
         super.onResume()
-        UiState.resumed++
         refreshState()
         syncPositionSliders()
         if (!autoDetectTried && prefs.gameOnly && prefs.targetPackage == null) {
@@ -149,7 +147,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        UiState.resumed--
         handler.removeCallbacks(previewTick)
         super.onPause()
     }
@@ -453,6 +450,16 @@ class MainActivity : AppCompatActivity() {
         override fun onProgressChanged(sb: SeekBar, p: Int, fromUser: Boolean) = onChange(p)
         override fun onStartTrackingTouch(sb: SeekBar) {}
         override fun onStopTrackingTouch(sb: SeekBar) {}
+    }
+
+    /**
+     * v1.5 에 잠깐 있던 화면 인식 기능을 없앴으므로, 그때 폰에 남은 캡처 그림, 규칙, 설정값을 지운다.
+     * 아이모 운영 정책상 게임 화면을 읽는 기능은 넣지 않는다. (CLAUDE.md 참고)
+     */
+    private fun removeOldScreenWatchData() {
+        runCatching { File(filesDir, "snapshot.png").delete() }
+        runCatching { deleteSharedPreferences("screen_rules") }
+        prefs.removeLegacyKeys()
     }
 
     // ---------- 업데이트 ----------
