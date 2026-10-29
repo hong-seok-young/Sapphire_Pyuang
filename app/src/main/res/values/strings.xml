@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">플로팅 시계</string>
+    <string name="app_name">Sapphire</string>
     <string name="app_desc">게임 등 다른 앱 위에 초 단위 시계를 띄워줍니다.</string>
 
     <string name="section_perm">권한</string>
     <string name="perm_granted">✔ 다른 앱 위에 표시 권한 허용됨</string>
     <string name="perm_missing">✖ 다른 앱 위에 표시 권한이 필요합니다</string>
     <string name="grant_perm">권한 설정 열기</string>
-    <string name="toast_allow_overlay">목록에서 \'플로팅 시계\'를 찾아 허용해 주세요</string>
+    <string name="toast_allow_overlay">목록에서 \'Sapphire\'를 찾아 허용해 주세요</string>
 
     <string name="start_clock">시계 켜기</string>
     <string name="stop_clock">시계 끄기</string>
@@ -23,7 +23,7 @@
     <string name="usage_granted">✔ 게임 감지 권한(사용 정보 접근) 허용됨</string>
     <string name="usage_missing">✖ 게임을 감지하려면 \'사용 정보 접근\' 허용이 필요합니다 (지금은 항상 표시)</string>
     <string name="grant_usage">사용 정보 접근 허용하기</string>
-    <string name="toast_allow_usage">목록에서 \'플로팅 시계\'를 찾아 허용해 주세요</string>
+    <string name="toast_allow_usage">목록에서 \'Sapphire\'를 찾아 허용해 주세요</string>
     <string name="toast_game_found">%1$s 을(를) 자동으로 찾았어요</string>
     <string name="toast_game_mode_started">%1$s 을(를) 켜면 시계가 나타나요</string>
     <string name="cancel">취소</string>
@@ -73,17 +73,28 @@
     <string name="save">저장</string>
     <string name="delete">삭제</string>
     <string name="delete_confirm_fmt">%1$s 을(를) 지울까요?</string>
-    <string name="panel_no_presets">타이머가 없어요. 플로팅 시계 앱의 타이머 설정에서 추가하세요</string>
+    <string name="panel_no_presets">타이머가 없어요. Sapphire 앱의 타이머 설정에서 추가하세요</string>
     <string name="panel_start_fmt">▶ %1$s %2$s</string>
     <string name="panel_cancel_fmt">✕ %1$s 취소</string>
     <string name="panel_close">닫기</string>
     <string name="chip_done_fmt">%1$s 지금! +%2$s</string>
     <string name="alert_channel">타이머 알림</string>
     <string name="alert_title_fmt">%1$s 시간이에요</string>
-    <string name="alert_text">플로팅 시계 타이머</string>
+    <string name="alert_text">Sapphire 타이머</string>
     <string name="dur_h_fmt">%1$d시간</string>
     <string name="dur_m_fmt">%1$d분</string>
     <string name="dur_s_fmt">%1$d초</string>
+
+    <string name="section_noti">알림 숨기기</string>
+    <string name="noti_hide_desc">알림창에 뜨는 \'시계 실행 중\'과 \'다른 앱 위에 표시 중\' 알림은 꺼도 시계가 그대로 보여요. 게임 밖에서 타이머가 끝나면 오는 \'타이머 알림\'은 켜 두세요. 알림을 끄면 알림의 \'끄기\' 버튼도 사라지니, 시계는 이 화면에서 꺼 주세요.</string>
+    <string name="hide_running_noti">\'시계 실행 중\' 알림 끄기</string>
+    <string name="hide_overlay_noti">\'다른 앱 위에 표시 중\' 알림 끄기</string>
+    <string name="toast_hide_running">\'알림 표시\'를 끄면 돼요. 꺼도 시계는 계속 보여요</string>
+    <string name="overlay_noti_title">\'다른 앱 위에 표시 중\' 알림</string>
+    <string name="overlay_noti_msg">이 알림은 안드로이드가 직접 띄우는 거라 앱이 없앨 수 없어요.\n\n알림창에서 그 알림을 길게 누른 뒤 끄면 돼요. 이 앱 알림만 꺼지고, 시계는 그대로 보여요.\n\n\'설정 열기\'를 누르면 그 알림 설정으로 바로 가는 폰도 있어요. 아무것도 안 뜨면 길게 누르는 방법을 써 주세요.</string>
+    <string name="open_settings">설정 열기</string>
+    <string name="ok">확인</string>
+    <string name="toast_overlay_long_press">알림창에서 그 알림을 길게 눌러 꺼 주세요</string>
 
     <string name="section_position">위치</string>
     <string name="position_hint">시계를 직접 끌어도 되고, 상태바에 가려 안 잡히면 여기서 옮기세요. 시계가 켜져 있으면 옮기는 동안 화면에 잠깐 떠서 위치를 볼 수 있어요.</string>
@@ -104,7 +115,7 @@
     <string name="use_24h">24시간제</string>
     <string name="show_date">날짜도 표시 (월/일 요일)</string>
 
-    <string name="tip">팁: 게임 중에 터치가 시계에 막히면 \'위치 고정\'을 켜 두세요. 시계가 안 보이면 설정 → 앱 → 플로팅 시계 → 배터리를 \'제한 없음\'으로 바꿔 주세요.</string>
+    <string name="tip">팁: 게임 중에 터치가 시계에 막히면 \'위치 고정\'을 켜 두세요. 시계가 안 보이면 설정 → 앱 → Sapphire → 배터리를 \'제한 없음\'으로 바꿔 주세요.</string>
 
     <string name="section_update">업데이트</string>
     <string name="version_fmt">현재 버전: v%1$s</string>
@@ -123,8 +134,8 @@
 
     <string name="credits">제작: 퓨앙 (Sapphire)</string>
 
-    <string name="noti_channel">플로팅 시계</string>
-    <string name="noti_title">플로팅 시계 실행 중</string>
+    <string name="noti_channel">시계 실행 중</string>
+    <string name="noti_title">Sapphire 시계 실행 중</string>
     <string name="noti_text">시계가 화면 위에 표시되고 있어요</string>
     <string name="noti_text_game">%1$s 실행 중에만 시계를 보여줘요</string>
     <string name="noti_text_need_setup">게임 감지 설정이 필요해요 (지금은 항상 표시)</string>

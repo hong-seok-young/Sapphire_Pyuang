@@ -9,3 +9,6 @@ keystore/
 keystore.properties
 # built apks
 *.apk
+
+# 위키 자료 원본 (카페에서 저장한 글). 작성자 허락 범위가 정해지기 전까지 공개 저장소에 올리지 않는다
+자료/

@@ -1,0 +1,15 @@
+{
+  "name": "Sapphire 아이모 위키",
+  "short_name": "Sapphire",
+  "description": "아이모 길드 Sapphire 위키: 사냥터, 몬스터 드랍, 장비, 육성 공략",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#141831",
+  "theme_color": "#141831",
+  "lang": "ko",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
