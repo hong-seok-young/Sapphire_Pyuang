@@ -15,7 +15,7 @@
 
     <string name="section_game">게임 연동</string>
     <string name="game_only">게임 실행 중에만 표시</string>
-    <string name="game_only_hint">켜 두면 고른 게임이 화면에 떠 있을 때만 시계가 보여요. 위치를 맞출 수 있게 이 설정 화면에서도 보여요.</string>
+    <string name="game_only_hint">켜 두면 고른 게임이 화면 앞에 있을 때만 시계가 보이고, 게임을 끄면 사라져요. 이 앱에서 위치나 모양을 바꿀 때만 확인할 수 있게 잠깐 보여요.</string>
     <string name="game_target_fmt">대상 게임: %1$s</string>
     <string name="game_target_none">대상 게임: 아직 선택 안 됨 (지금은 항상 표시)</string>
     <string name="pick_game">게임 선택</string>
@@ -29,6 +29,15 @@
     <string name="cancel">취소</string>
     <string name="usage_restricted_hint">스위치가 회색으로 막혀 있으면: 아래 \'앱 정보 열기\' → 오른쪽 위 ⋮ → \'제한된 설정 허용\'을 누른 뒤 다시 켜 주세요. 메뉴가 안 보이면 회색 스위치를 한 번 눌러 본 뒤 다시 확인하세요.</string>
     <string name="open_app_info">앱 정보 열기</string>
+    <string name="guide_game_title">시계를 띄울 게임을 골라 주세요</string>
+    <string name="guide_game_msg">게임을 고르면 그 게임이 화면 앞에 있을 때만 시계가 보이고, 게임을 끄면 사라져요. 고르기 전에는 시계가 항상 떠 있어요.</string>
+    <string name="guide_usage_title">게임 감지 권한이 필요해요</string>
+    <string name="guide_usage_msg">%1$s 을(를) 끄면 시계도 사라지게 하려면 \'사용 정보 접근\'을 허용해야 해요. 허용하기 전에는 게임이 꺼져 있어도 시계가 항상 떠 있어요.</string>
+    <string name="guide_usage_restricted">스위치가 회색으로 막혀 있으면: 그 스위치를 한 번 눌러 본 뒤 이 앱으로 돌아와서 \'앱 정보 열기\' → 오른쪽 위 ⋮ → \'제한된 설정 허용\'을 누르고 다시 켜 주세요.</string>
+    <string name="guide_always_hint">게임과 상관없이 항상 띄우려면 \'게임 실행 중에만 표시\'를 꺼 두세요.</string>
+    <string name="guide_usage_go">허용하러 가기</string>
+    <string name="start_anyway">그냥 켜기</string>
+    <string name="default_game_name">게임</string>
 
     <string name="section_timer">타이머</string>
     <string name="timer_entry_desc">시계를 누르면 내가 정한 타이머를 바로 시작할 수 있어요. 매일 정해진 시각 알림도 있어요.</string>
@@ -77,7 +86,7 @@
     <string name="dur_s_fmt">%1$d초</string>
 
     <string name="section_position">위치</string>
-    <string name="position_hint">시계를 직접 끌어도 되고, 상태바에 가려 안 잡히면 여기서 옮기세요.</string>
+    <string name="position_hint">시계를 직접 끌어도 되고, 상태바에 가려 안 잡히면 여기서 옮기세요. 시계가 켜져 있으면 옮기는 동안 화면에 잠깐 떠서 위치를 볼 수 있어요.</string>
     <string name="pos_x_fmt">가로 (가운데 기준): %1$d</string>
     <string name="pos_y_fmt">위에서부터: %1$d</string>
     <string name="lock_position">위치 고정 (드래그 잠금)</string>

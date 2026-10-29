@@ -33,6 +33,11 @@ import java.util.Date
 
 class MainActivity : AppCompatActivity() {
 
+    companion object {
+        /** 게임 감지 안내는 앱이 살아 있는 동안 한 번만 저절로 띄운다 */
+        private var detectionGuideShown = false
+    }
+
     private lateinit var prefs: Prefs
 
     private lateinit var permState: TextView
@@ -72,6 +77,9 @@ class MainActivity : AppCompatActivity() {
     private var syncingSliders = false
     private var checkedOnce = false
     private var autoDetectTried = false
+
+    /** '시계 켜기'에서 권한을 허용하러 갔다면, 허용하고 돌아왔을 때 시계를 바로 켠다 */
+    private var startWhenReady = false
 
     private val handler = Handler(Looper.getMainLooper())
     private var previewFmt: SimpleDateFormat? = null
@@ -142,6 +150,13 @@ class MainActivity : AppCompatActivity() {
         }
         refreshGameSection()
         refreshClock() // 권한을 허용하고 돌아왔을 때 알림 문구와 표시 여부를 바로 갱신
+        if (startWhenReady && detectionReady()) {
+            startWhenReady = false
+            launchClockService()
+        } else if (!detectionGuideShown && prefs.gameOnly && FloatingClockService.isRunning && !detectionReady()) {
+            // 시계는 켜져 있는데 게임을 알아볼 수 없으면 게임을 꺼도 시계가 남는다. 한 번 안내한다.
+            showDetectionGuide(fromStartButton = false)
+        }
         handler.post(previewTick)
         if (!checkedOnce) {
             checkedOnce = true
@@ -181,36 +196,107 @@ class MainActivity : AppCompatActivity() {
     // ---------- 서비스 시작/정지 ----------
 
     private fun startClock() {
+        startWhenReady = false
         if (!hasOverlayPermission()) {
             openOverlaySettings()
             return
         }
+        // 게임을 알아볼 수 없으면 게임이 꺼져 있어도 시계가 항상 뜨므로, 켜기 전에 해결 방법을 알려 준다
+        if (prefs.gameOnly && !detectionReady()) {
+            showDetectionGuide(fromStartButton = true)
+            return
+        }
+        launchClockService()
+    }
+
+    private fun launchClockService() {
         val i = Intent(this, FloatingClockService::class.java).setAction(FloatingClockService.ACTION_START)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(i) else startService(i)
         val label = prefs.targetLabel
-        if (prefs.gameOnly && prefs.targetPackage != null && label != null && GameDetector.hasUsageAccess(this)) {
+        if (prefs.gameOnly && label != null && detectionReady()) {
             Toast.makeText(this, getString(R.string.toast_game_mode_started, label), Toast.LENGTH_LONG).show()
         }
-        refreshState()
+        showToggleAs(running = true)
     }
 
     private fun stopClock() {
+        startWhenReady = false
         startService(Intent(this, FloatingClockService::class.java).setAction(FloatingClockService.ACTION_STOP))
         prefs.running = false
-        refreshState()
+        showToggleAs(running = false)
     }
 
-    /** 설정이 바뀌면 떠 있는 시계에 즉시 반영 */
-    private fun refreshClock() {
+    /** 서비스는 조금 뒤에 실제로 켜지고 꺼지므로, 버튼 글자를 먼저 바꾸고 잠시 뒤 실제 상태로 다시 맞춘다 */
+    private fun showToggleAs(running: Boolean) {
+        btnToggle.text = getString(if (running) R.string.stop_clock else R.string.start_clock)
+        handler.postDelayed({ refreshState() }, 600)
+    }
+
+    /** 고른 게임이 있고 '사용 정보 접근'도 허용되어서, 게임이 화면 앞에 있는지 알 수 있는지 */
+    private fun detectionReady(): Boolean =
+        prefs.targetPackage != null && GameDetector.hasUsageAccess(this)
+
+    /**
+     * 게임을 알아볼 수 없을 때(게임을 안 골랐거나 '사용 정보 접근'이 없을 때) 해결 방법 안내.
+     * 이때는 게임이 꺼져 있어도 시계가 항상 뜬다.
+     * '시계 켜기'에서 왔으면 감지 없이 '그냥 켜기'도 고를 수 있다.
+     */
+    private fun showDetectionGuide(fromStartButton: Boolean) {
+        detectionGuideShown = true
+        val builder = AlertDialog.Builder(this)
+        if (prefs.targetPackage == null) {
+            builder.setTitle(R.string.guide_game_title)
+                .setMessage(getString(R.string.guide_game_msg) + "\n\n" + getString(R.string.guide_always_hint))
+                .setPositiveButton(R.string.pick_game) { _, _ ->
+                    showGamePicker {
+                        if (fromStartButton) startClock()
+                        else if (!detectionReady()) showDetectionGuide(fromStartButton = false)
+                    }
+                }
+        } else {
+            val label = prefs.targetLabel ?: getString(R.string.default_game_name)
+            val msg = buildString {
+                append(getString(R.string.guide_usage_msg, label))
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    append("\n\n").append(getString(R.string.guide_usage_restricted))
+                }
+                append("\n\n").append(getString(R.string.guide_always_hint))
+            }
+            builder.setTitle(R.string.guide_usage_title)
+                .setMessage(msg)
+                .setPositiveButton(R.string.guide_usage_go) { _, _ ->
+                    startWhenReady = fromStartButton
+                    Toast.makeText(this, R.string.toast_allow_usage, Toast.LENGTH_LONG).show()
+                    GameDetector.openUsageAccessSettings(this)
+                }
+        }
+        if (fromStartButton) {
+            builder.setNeutralButton(R.string.start_anyway) { _, _ -> launchClockService() }
+            builder.setNegativeButton(R.string.cancel, null)
+        } else {
+            builder.setNegativeButton(R.string.later, null)
+        }
+        builder.show()
+    }
+
+    /**
+     * 설정이 바뀌면 떠 있는 시계에 즉시 반영.
+     * preview 면 이 앱 화면 위에서도 잠깐 보여 줘서 위치와 모양을 확인할 수 있게 한다.
+     */
+    private fun refreshClock(preview: Boolean = false) {
         if (FloatingClockService.isRunning) {
-            startService(Intent(this, FloatingClockService::class.java).setAction(FloatingClockService.ACTION_REFRESH))
+            startService(
+                Intent(this, FloatingClockService::class.java)
+                    .setAction(FloatingClockService.ACTION_REFRESH)
+                    .putExtra(FloatingClockService.EXTRA_PREVIEW, preview)
+            )
         }
     }
 
     /** 모양 설정이 바뀌면 미리보기와 떠 있는 시계 둘 다 갱신 */
     private fun onStyleChanged() {
         updatePreview()
-        refreshClock()
+        refreshClock(preview = true)
     }
 
     private fun updatePreview() {
@@ -280,8 +366,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** 설치된 앱 목록에서 게임 고르기 (아이모로 보이는 앱을 맨 위에) */
-    private fun showGamePicker() {
+    /** 설치된 앱 목록에서 게임 고르기 (아이모로 보이는 앱을 맨 위에). 고르면 onPicked 실행 */
+    private fun showGamePicker(onPicked: () -> Unit = {}) {
         val apps = GameDetector.launchableApps(this).sortedByDescending { GameDetector.looksLikeImo(it) }
         if (apps.isEmpty()) return
         val pm = packageManager
@@ -308,6 +394,7 @@ class MainActivity : AppCompatActivity() {
                 prefs.targetLabel = app.label
                 refreshGameSection()
                 refreshClock()
+                onPicked()
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
@@ -361,20 +448,20 @@ class MainActivity : AppCompatActivity() {
             if (syncingSliders) return@simpleSeek
             prefs.posX = p - screenW / 2
             posXLabel.text = getString(R.string.pos_x_fmt, pxToDp(prefs.posX))
-            refreshClock()
+            refreshClock(preview = true)
         })
         seekPosY.setOnSeekBarChangeListener(simpleSeek { p ->
             if (syncingSliders) return@simpleSeek
             prefs.posY = p
             posYLabel.text = getString(R.string.pos_y_fmt, pxToDp(p))
-            refreshClock()
+            refreshClock(preview = true)
         })
 
         btnResetPos.setOnClickListener {
             prefs.posX = 0
             prefs.posY = Prefs.POS_AUTO
             syncPositionSliders()
-            refreshClock()
+            refreshClock(preview = true)
             Toast.makeText(this, R.string.toast_pos_reset, Toast.LENGTH_SHORT).show()
         }
     }
