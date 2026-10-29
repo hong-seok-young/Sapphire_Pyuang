@@ -19,16 +19,16 @@ if "%VER%"=="" (
 set APK=FloatingClock-v%VER%.apk
 copy /y app\build\outputs\apk\release\app-release.apk "%APK%" >nul
 REM Fixed-name copy so the share link never changes:
-REM https://github.com/hong-seok-young/floating-clock/releases/latest/download/FloatingClock.apk
+REM https://github.com/hong-seok-young/Sapphire_Pyuang/releases/latest/download/FloatingClock.apk
 copy /y app\build\outputs\apk\release\app-release.apk FloatingClock.apk >nul
 
 set NOTES=%*
 if "%NOTES%"=="" set NOTES=v%VER%
 
 echo Publishing %APK% as release v%VER% ...
-gh release create "v%VER%" "%APK%" FloatingClock.apk --repo hong-seok-young/floating-clock --title "v%VER%" --notes "%NOTES%"
+gh release create "v%VER%" "%APK%" FloatingClock.apk --repo hong-seok-young/Sapphire_Pyuang --title "v%VER%" --notes "%NOTES%"
 if errorlevel 1 (
     echo Release failed. Is the repo created and gh logged in?
     exit /b 1
 )
-echo Done: https://github.com/hong-seok-young/floating-clock/releases/tag/v%VER%
+echo Done: https://github.com/hong-seok-young/Sapphire_Pyuang/releases/tag/v%VER%

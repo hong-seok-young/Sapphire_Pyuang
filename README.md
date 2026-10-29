@@ -24,7 +24,7 @@
 2. `publish.cmd "변경 내용"` 실행 → 빌드 후 GitHub 릴리스 `v1.2` 가 만들어지고 APK 가 첨부됩니다
 3. 폰에서 앱을 열면 "새 버전 v1.2" 안내가 뜹니다
 
-배포 저장소: `https://github.com/hong-seok-young/floating-clock` (`UpdateChecker.REPO`). 공개 저장소여야 폰이 로그인 없이 APK를 받을 수 있습니다.
+배포 저장소: `https://github.com/hong-seok-young/Sapphire_Pyuang` (`UpdateChecker.REPO`). 공개 저장소여야 폰이 로그인 없이 APK를 받을 수 있습니다.
 
 ### 서명 키 주의
 업데이트는 **같은 서명 키**로 만든 APK만 덮어쓰기 설치가 됩니다.

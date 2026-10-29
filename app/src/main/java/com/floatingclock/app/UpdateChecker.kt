@@ -22,7 +22,7 @@ import kotlin.concurrent.thread
  */
 object UpdateChecker {
 
-    const val REPO = "hong-seok-young/floating-clock"
+    const val REPO = "hong-seok-young/Sapphire_Pyuang"
     private const val LATEST_API = "https://api.github.com/repos/$REPO/releases/latest"
 
     data class Release(val version: String, val apkUrl: String, val notes: String)
