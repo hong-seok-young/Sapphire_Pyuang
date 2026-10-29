@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">플로팅 시계</string>
+    <string name="app_desc">게임 등 다른 앱 위에 초 단위 시계를 띄워줍니다.</string>
+
+    <string name="section_perm">권한</string>
+    <string name="perm_granted">✔ 다른 앱 위에 표시 권한 허용됨</string>
+    <string name="perm_missing">✖ 다른 앱 위에 표시 권한이 필요합니다</string>
+    <string name="grant_perm">권한 설정 열기</string>
+    <string name="toast_allow_overlay">목록에서 \'플로팅 시계\'를 찾아 허용해 주세요</string>
+
+    <string name="start_clock">시계 켜기</string>
+    <string name="stop_clock">시계 끄기</string>
+    <string name="stop">끄기</string>
+
+    <string name="section_position">위치</string>
+    <string name="position_hint">시계를 직접 끌어도 되고, 상태바에 가려 안 잡히면 여기서 옮기세요.</string>
+    <string name="pos_x_fmt">가로 (가운데 기준): %1$d</string>
+    <string name="pos_y_fmt">위에서부터: %1$d</string>
+    <string name="lock_position">위치 고정 (드래그 잠금)</string>
+    <string name="reset_position">위치 초기화 (상태바 바로 아래 가운데)</string>
+    <string name="toast_pos_reset">위치를 초기화했습니다</string>
+
+    <string name="section_style">모양</string>
+    <string name="size_fmt">글자 크기: %1$d</string>
+    <string name="alpha_fmt">배경 진하기: %1$d%%</string>
+    <string name="alpha_none">배경 없음 (글자만 표시)</string>
+    <string name="text_color">글자 색</string>
+    <string name="c_white">흰색</string>
+    <string name="c_yellow">노랑</string>
+    <string name="c_green">초록</string>
+    <string name="c_cyan">하늘</string>
+    <string name="c_red">빨강</string>
+    <string name="use_24h">24시간제</string>
+    <string name="show_date">날짜도 표시 (월/일 요일)</string>
+
+    <string name="tip">팁: 게임 중에 터치가 시계에 막히면 \'위치 고정\'을 켜 두세요. 시계가 안 보이면 설정 → 앱 → 플로팅 시계 → 배터리를 \'제한 없음\'으로 바꿔 주세요.</string>
+
+    <string name="section_update">업데이트</string>
+    <string name="version_fmt">현재 버전: v%1$s</string>
+    <string name="check_update">업데이트 확인</string>
+    <string name="update_checking">확인 중…</string>
+    <string name="update_check_failed">확인 실패 (인터넷 연결 또는 배포 서버를 확인하세요)</string>
+    <string name="update_latest">최신 버전입니다</string>
+    <string name="update_available">새 버전 v%1$s 이 있습니다</string>
+    <string name="update_title">새 버전 v%1$s</string>
+    <string name="update_no_notes">변경 내용 없음</string>
+    <string name="update_now">업데이트</string>
+    <string name="later">나중에</string>
+    <string name="update_downloading">다운로드 중</string>
+    <string name="update_failed">업데이트 실패: %1$s</string>
+    <string name="toast_allow_install">\'이 출처 허용\'을 켠 뒤 다시 업데이트를 눌러주세요</string>
+
+    <string name="credits">제작: 퓨앙 (Sapphire)</string>
+
+    <string name="noti_channel">플로팅 시계</string>
+    <string name="noti_title">플로팅 시계 실행 중</string>
+    <string name="noti_text">시계가 화면 위에 표시되고 있어요</string>
+</resources>

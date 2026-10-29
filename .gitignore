@@ -1,0 +1,11 @@
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+.kotlin/
+# signing key - never commit
+keystore/
+keystore.properties
+# built apks
+*.apk

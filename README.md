@@ -1,0 +1,61 @@
+# 플로팅 시계 (Floating Clock)
+
+게임(아이모 등) 위에 **초 단위 시계**를 띄워 주는 안드로이드 앱입니다.
+제작: 퓨앙 (Sapphire)
+
+## 기능
+- 다른 앱 위에 `HH:mm:ss` 시계 오버레이 (초가 바뀌는 순간에 맞춰 갱신)
+- 기본은 배경 없이 작은 글자만 표시 (그림자로 가독성 확보). 원하면 배경 진하기를 올릴 수 있음
+- 시계를 끌어서 이동 + 설정 화면의 가로/세로 슬라이더로 이동 (상태바에 가려 드래그가 안 될 때)
+- 기본 위치는 상태바 바로 아래 가운데 (상태바와 겹치면 터치가 상태바에 먹힘)
+- 글자 크기 / 글자 색 / 24시간제 / 날짜 표시 옵션, 위치 고정(드래그 잠금)
+- 포그라운드 서비스로 동작해서 게임 중에도 안 꺼짐 (알림에서 바로 끄기)
+- **앱 내 업데이트**: 앱을 열면 GitHub 릴리스에서 새 버전을 확인하고, 받아서 설치까지 진행
+
+## 설치
+1. `FloatingClock-v1.x.apk` 를 폰에 복사해서 설치 (출처를 알 수 없는 앱 설치 허용 필요)
+2. 앱 실행 → **권한 설정 열기** → "다른 앱 위에 표시" 허용
+3. **시계 켜기** → 홈으로 나가서 게임 실행
+
+처음 업데이트할 때 한 번 "이 출처의 앱 설치 허용"을 켜 달라는 화면이 뜹니다. 허용 후 다시 업데이트를 누르면 됩니다.
+
+## 업데이트 배포 (개발자용)
+1. `app/build.gradle.kts` 에서 `versionCode` 를 1 올리고 `versionName` 을 바꿉니다 (예: 1.2)
+2. `publish.cmd "변경 내용"` 실행 → 빌드 후 GitHub 릴리스 `v1.2` 가 만들어지고 APK 가 첨부됩니다
+3. 폰에서 앱을 열면 "새 버전 v1.2" 안내가 뜹니다
+
+배포 저장소: `https://github.com/hong-seok-young/floating-clock` (`UpdateChecker.REPO`). 공개 저장소여야 폰이 로그인 없이 APK를 받을 수 있습니다.
+
+### 서명 키 주의
+업데이트는 **같은 서명 키**로 만든 APK만 덮어쓰기 설치가 됩니다.
+키는 `keystore/floatingclock.jks` + `keystore.properties` 에 있고 `.gitignore` 로 커밋에서 제외됩니다. **백업해 두세요.** 잃어버리면 기존 사용자는 앱을 지우고 다시 설치해야 합니다.
+
+## 빌드 (Windows)
+JDK 17 과 Android SDK 가 `C:\Users\Administrator\android-dev` 에 포터블로 설치되어 있습니다.
+
+```bat
+build.cmd
+```
+
+> 다른 PC에서 빌드할 때는 `local.properties` 의 `sdk.dir` 을 그 PC의 SDK 경로로 바꾸세요.
+> 안드로이드 스튜디오로 폴더를 열어도 바로 빌드됩니다.
+
+### 이 PC에서 Gradle 8.4 / AGP 8.3.2 를 쓰는 이유
+이 PC의 보안 프로그램(AhnLab V3 등)이 새로 만들어진 jar 파일을 한참 잡고 있어서,
+Gradle 8.5 이상이 쓰는 "임시 폴더 → 캐시 폴더 이동(rename)" 방식이
+`Could not move temporary workspace ... AccessDeniedException` 으로 실패합니다.
+Gradle 8.4 는 폴더 이동 없이 캐시에 바로 쓰기 때문에 문제가 없습니다.
+백신 실시간 검사 예외에 `C:\Users\Administrator\android-dev` 를 추가할 수 있다면 최신 Gradle/AGP 로 올려도 됩니다.
+
+## 구조
+```
+app/src/main/java/com/floatingclock/app/
+  MainActivity.kt          설정 화면 (권한, 켜기/끄기, 위치, 모양, 업데이트)
+  FloatingClockService.kt  오버레이 시계 포그라운드 서비스 (드래그, 1초 갱신)
+  UpdateChecker.kt         GitHub 릴리스 확인 / APK 다운로드 / 설치 실행
+  Prefs.kt                 설정 저장 (SharedPreferences)
+```
+
+## 참고
+- iOS 는 다른 앱 위에 뜨는 오버레이를 허용하지 않아서 안드로이드 전용입니다.
+- 시계가 사라지면 설정 → 앱 → 플로팅 시계 → 배터리 → **제한 없음** 으로 바꿔 주세요.
