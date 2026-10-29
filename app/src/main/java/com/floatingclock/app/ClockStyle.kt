@@ -54,9 +54,9 @@ object ClockStyle {
         tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, prefs.textSizeSp.toFloat())
         tv.setTextColor(prefs.textColor)
 
-        // 어두운 글자는 밝은 그림자, 밝은 글자는 어두운 그림자 -> 어떤 화면 위에서도 읽힘
+        // 그림자 없이 글자만 (사용자 요청). 배경을 켜면 글자색에 맞춰 밝은/어두운 배경을 쓴다.
+        tv.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
         val darkText = ColorUtils.calculateLuminance(prefs.textColor) < 0.35
-        tv.setShadowLayer(dp(2f), 0f, dp(0.5f), if (darkText) Color.WHITE else Color.BLACK)
 
         if (prefs.bgAlpha <= 0) {
             // 배경 없음: 좌우 여백을 거의 0으로

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- 다른 앱 위에 표시 -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -11,6 +12,20 @@
     <!-- 앱 내 업데이트: 새 버전 확인/다운로드 및 설치 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- 게임 감지: 지금 화면 앞에 떠 있는 앱 확인 ('사용 정보 접근', 사용자가 설정에서 직접 허용) -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <!-- 재부팅/업데이트 뒤 켜 두었던 시계 자동 재시작 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- 게임 선택 목록: 홈 화면 아이콘이 있는 앱만 조회 -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="true"
@@ -37,6 +52,16 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="floating clock overlay shown over other apps" />
         </service>
+
+        <!-- 재부팅/업데이트 뒤 자동 재시작 (시스템만 보낼 수 있는 방송) -->
+        <receiver
+            android:name=".StartupReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!-- 다운로드한 업데이트 APK를 설치 프로그램에 넘기기 위한 FileProvider -->
         <provider

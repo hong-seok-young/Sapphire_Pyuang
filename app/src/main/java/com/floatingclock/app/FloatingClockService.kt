@@ -7,10 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.graphics.Color
 import android.graphics.PixelFormat
-import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -31,6 +28,7 @@ import kotlin.math.abs
 /**
  * 다른 앱(게임) 위에 시계를 띄우는 포그라운드 서비스.
  * 초가 바뀌는 순간마다 갱신하며, 드래그로 위치를 옮길 수 있다.
+ * '게임 실행 중에만 표시'가 켜져 있으면 고른 게임이 화면 앞에 있을 때만 보인다.
  */
 class FloatingClockService : Service() {
 
@@ -40,6 +38,9 @@ class FloatingClockService : Service() {
         const val ACTION_REFRESH = "com.floatingclock.app.REFRESH" // 설정 변경 반영
         private const val CHANNEL_ID = "floating_clock"
         private const val NOTI_ID = 1
+
+        /** 화면 앞에 떠 있는 앱을 확인하는 간격 */
+        private const val WATCH_INTERVAL_MS = 500L
 
         @Volatile
         var isRunning = false
@@ -52,6 +53,8 @@ class FloatingClockService : Service() {
     private var params: WindowManager.LayoutParams? = null
     private val handler = Handler(Looper.getMainLooper())
     private var fmt: SimpleDateFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+    private var tracker: GameDetector.ForegroundTracker? = null
+    private var shown = true
 
     private val tick = object : Runnable {
         override fun run() {
@@ -59,6 +62,13 @@ class FloatingClockService : Service() {
             // 다음 초가 시작되는 시점에 맞춰 예약 -> 초가 바뀌는 순간 바로 갱신
             val now = System.currentTimeMillis()
             handler.postAtTime(this, SystemClock.uptimeMillis() + (1000 - now % 1000))
+        }
+    }
+
+    private val watch = object : Runnable {
+        override fun run() {
+            updateVisibility()
+            handler.postDelayed(this, WATCH_INTERVAL_MS)
         }
     }
 
@@ -82,6 +92,8 @@ class FloatingClockService : Service() {
                 if (clockView != null) {
                     applyStyle()
                     applyPosition()
+                    updateVisibility()
+                    refreshNotification()
                     return START_STICKY
                 }
             }
@@ -95,6 +107,7 @@ class FloatingClockService : Service() {
 
     override fun onDestroy() {
         handler.removeCallbacks(tick)
+        handler.removeCallbacks(watch)
         clockView?.let { runCatching { wm.removeView(it) } }
         clockView = null
         isRunning = false
@@ -133,8 +146,12 @@ class FloatingClockService : Service() {
         params = lp
         applyStyle()
         tv.setOnTouchListener(DragListener())
+        // 처음부터 보일지 정해 두어야 게임이 아닌 화면에서 잠깐 번쩍이지 않는다
+        shown = shouldShow()
+        tv.visibility = if (shown) View.VISIBLE else View.GONE
         wm.addView(tv, lp)
         handler.post(tick)
+        handler.postDelayed(watch, WATCH_INTERVAL_MS)
     }
 
     private fun applyStyle() {
@@ -164,6 +181,31 @@ class FloatingClockService : Service() {
 
     private fun dp(v: Int): Int =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
+
+    // ---------- 게임 실행 중에만 표시 ----------
+
+    /**
+     * 지금 시계를 보여야 하는지.
+     * 게임을 아직 안 골랐거나 감지 권한이 없으면 감지를 할 수 없으니 항상 보여 준다.
+     */
+    private fun shouldShow(): Boolean {
+        if (!prefs.gameOnly) return true
+        val target = prefs.targetPackage ?: return true
+        if (!GameDetector.hasUsageAccess(this)) return true
+        val t = tracker ?: GameDetector.ForegroundTracker(this).also { tracker = it }
+        val front = t.update() ?: return false
+        // 이 앱 설정 화면이 앞에 있을 때도 보여야 위치와 모양을 맞출 수 있다
+        return front == target || front == packageName
+    }
+
+    private fun updateVisibility() {
+        val tv = clockView ?: return
+        val show = shouldShow()
+        if (show == shown) return
+        shown = show
+        if (show) tv.text = fmt.format(Date())
+        tv.visibility = if (show) View.VISIBLE else View.GONE
+    }
 
     /** 손가락으로 끌어서 위치 이동. 짧게 탭하는 건 무시한다. */
     private inner class DragListener : View.OnTouchListener {
@@ -220,7 +262,16 @@ class FloatingClockService : Service() {
         }
     }
 
-    private fun startAsForeground() {
+    private fun notificationText(): String {
+        if (!prefs.gameOnly) return getString(R.string.noti_text)
+        val label = prefs.targetLabel
+        return if (prefs.targetPackage != null && label != null && GameDetector.hasUsageAccess(this))
+            getString(R.string.noti_text_game, label)
+        else
+            getString(R.string.noti_text_need_setup)
+    }
+
+    private fun buildNotification(): Notification {
         val openIntent = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -229,16 +280,26 @@ class FloatingClockService : Service() {
             this, 1, Intent(this, FloatingClockService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        val noti: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_clock)
             .setContentTitle(getString(R.string.noti_title))
-            .setContentText(getString(R.string.noti_text))
+            .setContentText(notificationText())
             .setContentIntent(openIntent)
             .addAction(0, getString(R.string.stop), stopIntent)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
+    }
 
+    private fun refreshNotification() {
+        runCatching {
+            getSystemService(NotificationManager::class.java).notify(NOTI_ID, buildNotification())
+        }
+    }
+
+    private fun startAsForeground() {
+        val noti = buildNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(NOTI_ID, noti, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {

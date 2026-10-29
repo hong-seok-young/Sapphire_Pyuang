@@ -13,6 +13,21 @@
     <string name="stop_clock">시계 끄기</string>
     <string name="stop">끄기</string>
 
+    <string name="section_game">게임 연동</string>
+    <string name="game_only">게임 실행 중에만 표시</string>
+    <string name="game_only_hint">켜 두면 고른 게임이 화면에 떠 있을 때만 시계가 보여요. 위치를 맞출 수 있게 이 설정 화면에서도 보여요.</string>
+    <string name="game_target_fmt">대상 게임: %1$s</string>
+    <string name="game_target_none">대상 게임: 아직 선택 안 됨 (지금은 항상 표시)</string>
+    <string name="pick_game">게임 선택</string>
+    <string name="pick_game_title">시계를 띄울 게임 선택</string>
+    <string name="usage_granted">✔ 게임 감지 권한(사용 정보 접근) 허용됨</string>
+    <string name="usage_missing">✖ 게임을 감지하려면 \'사용 정보 접근\' 허용이 필요합니다 (지금은 항상 표시)</string>
+    <string name="grant_usage">사용 정보 접근 허용하기</string>
+    <string name="toast_allow_usage">목록에서 \'플로팅 시계\'를 찾아 허용해 주세요</string>
+    <string name="toast_game_found">%1$s 을(를) 자동으로 찾았어요</string>
+    <string name="toast_game_mode_started">%1$s 을(를) 켜면 시계가 나타나요</string>
+    <string name="cancel">취소</string>
+
     <string name="section_position">위치</string>
     <string name="position_hint">시계를 직접 끌어도 되고, 상태바에 가려 안 잡히면 여기서 옮기세요.</string>
     <string name="pos_x_fmt">가로 (가운데 기준): %1$d</string>
@@ -54,4 +69,6 @@
     <string name="noti_channel">플로팅 시계</string>
     <string name="noti_title">플로팅 시계 실행 중</string>
     <string name="noti_text">시계가 화면 위에 표시되고 있어요</string>
+    <string name="noti_text_game">%1$s 실행 중에만 시계를 보여줘요</string>
+    <string name="noti_text_need_setup">게임 감지 설정이 필요해요 (지금은 항상 표시)</string>
 </resources>

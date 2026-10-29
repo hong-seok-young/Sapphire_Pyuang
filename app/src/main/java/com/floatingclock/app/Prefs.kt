@@ -56,4 +56,17 @@ class Prefs(context: Context) {
     var running: Boolean
         get() = sp.getBoolean("running", false)
         set(v) = sp.edit().putBoolean("running", v).apply()
+
+    /** 고른 게임이 화면 앞에 있을 때만 시계 표시 */
+    var gameOnly: Boolean
+        get() = sp.getBoolean("game_only", true)
+        set(v) = sp.edit().putBoolean("game_only", v).apply()
+
+    /** 시계를 띄울 게임의 패키지 이름과 표시 이름 (null 이면 아직 안 고름) */
+    var targetPackage: String?
+        get() = sp.getString("target_pkg", null)
+        set(v) = sp.edit().putString("target_pkg", v).apply()
+    var targetLabel: String?
+        get() = sp.getString("target_label", null)
+        set(v) = sp.edit().putString("target_label", v).apply()
 }

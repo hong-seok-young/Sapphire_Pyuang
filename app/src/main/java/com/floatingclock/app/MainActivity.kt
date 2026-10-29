@@ -17,6 +17,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -36,6 +37,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var permState: TextView
     private lateinit var btnPerm: Button
     private lateinit var btnToggle: Button
+    private lateinit var swGameOnly: MaterialSwitch
+    private lateinit var gameGroup: LinearLayout
+    private lateinit var gameTarget: TextView
+    private lateinit var btnPickGame: Button
+    private lateinit var usageState: TextView
+    private lateinit var btnUsagePerm: Button
     private lateinit var preview: TextView
     private lateinit var seekSize: SeekBar
     private lateinit var btnSizeMinus: Button
@@ -61,6 +68,7 @@ class MainActivity : AppCompatActivity() {
     /** 위치 슬라이더를 코드로 맞추는 동안 리스너가 설정을 덮어쓰지 않게 */
     private var syncingSliders = false
     private var checkedOnce = false
+    private var autoDetectTried = false
 
     private val handler = Handler(Looper.getMainLooper())
     private var previewFmt: SimpleDateFormat? = null
@@ -82,6 +90,12 @@ class MainActivity : AppCompatActivity() {
         permState = findViewById(R.id.perm_state)
         btnPerm = findViewById(R.id.btn_perm)
         btnToggle = findViewById(R.id.btn_toggle)
+        swGameOnly = findViewById(R.id.sw_game_only)
+        gameGroup = findViewById(R.id.game_group)
+        gameTarget = findViewById(R.id.game_target)
+        btnPickGame = findViewById(R.id.btn_pick_game)
+        usageState = findViewById(R.id.usage_state)
+        btnUsagePerm = findViewById(R.id.btn_usage_perm)
         preview = findViewById(R.id.clock_preview)
         seekSize = findViewById(R.id.seek_size)
         btnSizeMinus = findViewById(R.id.btn_size_minus)
@@ -103,6 +117,7 @@ class MainActivity : AppCompatActivity() {
         btnUpdate = findViewById(R.id.btn_update)
 
         setupControls()
+        setupGameSection()
         setupUpdate()
         updatePreview()
         askNotificationPermissionIfNeeded()
@@ -112,6 +127,12 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         refreshState()
         syncPositionSliders()
+        if (!autoDetectTried && prefs.gameOnly && prefs.targetPackage == null) {
+            autoDetectTried = true // 설치된 앱을 훑는 작업이라 화면을 열 때 한 번만
+            autoDetectGame(showToast = false)
+        }
+        refreshGameSection()
+        refreshClock() // 권한을 허용하고 돌아왔을 때 알림 문구와 표시 여부를 바로 갱신
         handler.post(previewTick)
         if (!checkedOnce) {
             checkedOnce = true
@@ -157,6 +178,10 @@ class MainActivity : AppCompatActivity() {
         }
         val i = Intent(this, FloatingClockService::class.java).setAction(FloatingClockService.ACTION_START)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(i) else startService(i)
+        val label = prefs.targetLabel
+        if (prefs.gameOnly && prefs.targetPackage != null && label != null && GameDetector.hasUsageAccess(this)) {
+            Toast.makeText(this, getString(R.string.toast_game_mode_started, label), Toast.LENGTH_LONG).show()
+        }
         refreshState()
     }
 
@@ -195,6 +220,79 @@ class MainActivity : AppCompatActivity() {
         val running = FloatingClockService.isRunning
         btnToggle.text = getString(if (running) R.string.stop_clock else R.string.start_clock)
         btnToggle.setOnClickListener { if (FloatingClockService.isRunning) stopClock() else startClock() }
+    }
+
+    // ---------- 게임 연동 ----------
+
+    private fun setupGameSection() {
+        swGameOnly.isChecked = prefs.gameOnly
+        swGameOnly.setOnCheckedChangeListener { _, on ->
+            prefs.gameOnly = on
+            if (on && prefs.targetPackage == null) autoDetectGame(showToast = true)
+            refreshGameSection()
+            refreshClock()
+        }
+        btnPickGame.setOnClickListener { showGamePicker() }
+        btnUsagePerm.setOnClickListener {
+            Toast.makeText(this, R.string.toast_allow_usage, Toast.LENGTH_LONG).show()
+            GameDetector.openUsageAccessSettings(this)
+        }
+    }
+
+    private fun refreshGameSection() {
+        gameGroup.visibility = if (prefs.gameOnly) View.VISIBLE else View.GONE
+        val label = prefs.targetLabel
+        gameTarget.text = if (prefs.targetPackage != null && label != null)
+            getString(R.string.game_target_fmt, label)
+        else
+            getString(R.string.game_target_none)
+        val access = GameDetector.hasUsageAccess(this)
+        usageState.text = getString(if (access) R.string.usage_granted else R.string.usage_missing)
+        usageState.setTextColor(if (access) Color.parseColor("#2E7D32") else Color.parseColor("#C62828"))
+        btnUsagePerm.visibility = if (access) View.GONE else View.VISIBLE
+    }
+
+    /** 설치된 앱 중에서 아이모를 찾아 대상 게임으로 지정 */
+    private fun autoDetectGame(showToast: Boolean) {
+        val found = GameDetector.findImo(this) ?: return
+        prefs.targetPackage = found.packageName
+        prefs.targetLabel = found.label
+        if (showToast) {
+            Toast.makeText(this, getString(R.string.toast_game_found, found.label), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** 설치된 앱 목록에서 게임 고르기 (아이모로 보이는 앱을 맨 위에) */
+    private fun showGamePicker() {
+        val apps = GameDetector.launchableApps(this).sortedByDescending { GameDetector.looksLikeImo(it) }
+        if (apps.isEmpty()) return
+        val pm = packageManager
+        val iconSize = dp(32)
+        val adapter = object : ArrayAdapter<GameDetector.AppEntry>(
+            this, android.R.layout.select_dialog_item, android.R.id.text1, apps
+        ) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val v = super.getView(position, convertView, parent) as TextView
+                val app = apps[position]
+                v.text = app.label
+                val icon = runCatching { pm.getApplicationIcon(app.packageName) }.getOrNull()
+                icon?.setBounds(0, 0, iconSize, iconSize)
+                v.setCompoundDrawablesRelative(icon, null, null, null)
+                v.compoundDrawablePadding = dp(12)
+                return v
+            }
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.pick_game_title)
+            .setAdapter(adapter) { _, which ->
+                val app = apps[which]
+                prefs.targetPackage = app.packageName
+                prefs.targetLabel = app.label
+                refreshGameSection()
+                refreshClock()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     // ---------- 설정 UI ----------
