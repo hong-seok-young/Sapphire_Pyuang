@@ -18,6 +18,9 @@
         tools:ignore="ProtectedPermissions" />
     <!-- 재부팅/업데이트 뒤 켜 두었던 시계 자동 재시작 -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- 화면 인식: 화면 녹화 포그라운드 서비스, 알림 진동 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- 게임 선택 목록: 홈 화면 아이콘이 있는 앱만 조회 -->
     <queries>
@@ -43,6 +46,24 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".ScreenWatchActivity"
+            android:exported="false"
+            android:label="@string/watch_title" />
+
+        <activity
+            android:name=".RuleEditorActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:exported="false"
+            android:label="@string/editor_title"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- 화면 인식: 화면 녹화로 게임 화면을 보고 알림/화살표 표시 -->
+        <service
+            android:name=".ScreenWatchService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
 
         <service
             android:name=".FloatingClockService"

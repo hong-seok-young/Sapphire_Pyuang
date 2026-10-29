@@ -43,6 +43,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnPickGame: Button
     private lateinit var usageState: TextView
     private lateinit var btnUsagePerm: Button
+    private lateinit var usageRestrictedHint: TextView
+    private lateinit var btnAppInfo: Button
     private lateinit var preview: TextView
     private lateinit var seekSize: SeekBar
     private lateinit var btnSizeMinus: Button
@@ -96,6 +98,8 @@ class MainActivity : AppCompatActivity() {
         btnPickGame = findViewById(R.id.btn_pick_game)
         usageState = findViewById(R.id.usage_state)
         btnUsagePerm = findViewById(R.id.btn_usage_perm)
+        usageRestrictedHint = findViewById(R.id.usage_restricted_hint)
+        btnAppInfo = findViewById(R.id.btn_app_info)
         preview = findViewById(R.id.clock_preview)
         seekSize = findViewById(R.id.seek_size)
         btnSizeMinus = findViewById(R.id.btn_size_minus)
@@ -118,6 +122,9 @@ class MainActivity : AppCompatActivity() {
 
         setupControls()
         setupGameSection()
+        findViewById<Button>(R.id.btn_open_watch).setOnClickListener {
+            startActivity(Intent(this, ScreenWatchActivity::class.java))
+        }
         setupUpdate()
         updatePreview()
         askNotificationPermissionIfNeeded()
@@ -125,6 +132,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        UiState.resumed++
         refreshState()
         syncPositionSliders()
         if (!autoDetectTried && prefs.gameOnly && prefs.targetPackage == null) {
@@ -141,6 +149,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        UiState.resumed--
         handler.removeCallbacks(previewTick)
         super.onPause()
     }
@@ -237,6 +246,11 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, R.string.toast_allow_usage, Toast.LENGTH_LONG).show()
             GameDetector.openUsageAccessSettings(this)
         }
+        btnAppInfo.setOnClickListener {
+            runCatching {
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+            }
+        }
     }
 
     private fun refreshGameSection() {
@@ -250,6 +264,10 @@ class MainActivity : AppCompatActivity() {
         usageState.text = getString(if (access) R.string.usage_granted else R.string.usage_missing)
         usageState.setTextColor(if (access) Color.parseColor("#2E7D32") else Color.parseColor("#C62828"))
         btnUsagePerm.visibility = if (access) View.GONE else View.VISIBLE
+        // 안드로이드 13부터 스토어 밖에서 설치한 앱은 '제한된 설정'으로 스위치가 막혀 있을 수 있다
+        val restricted = !access && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+        usageRestrictedHint.visibility = if (restricted) View.VISIBLE else View.GONE
+        btnAppInfo.visibility = if (restricted) View.VISIBLE else View.GONE
     }
 
     /** 설치된 앱 중에서 아이모를 찾아 대상 게임으로 지정 */

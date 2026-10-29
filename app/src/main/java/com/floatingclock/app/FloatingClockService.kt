@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
@@ -41,6 +42,9 @@ class FloatingClockService : Service() {
 
         /** 화면 앞에 떠 있는 앱을 확인하는 간격 */
         private const val WATCH_INTERVAL_MS = 500L
+
+        /** 화면 인식이 시계를 게임 화면으로 착각하지 않게 위치를 알릴 때 쓰는 이름 */
+        private const val OVERLAY_KEY = "clock"
 
         @Volatile
         var isRunning = false
@@ -111,7 +115,14 @@ class FloatingClockService : Service() {
         clockView?.let { runCatching { wm.removeView(it) } }
         clockView = null
         isRunning = false
+        OverlayRegistry.clear(OVERLAY_KEY)
         super.onDestroy()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // 화면이 돌아가면 시계의 화면 대비 위치도 바뀐다
+        clockView?.post { publishClockRect() }
     }
 
     // ---------- 오버레이 뷰 ----------
@@ -152,6 +163,7 @@ class FloatingClockService : Service() {
         wm.addView(tv, lp)
         handler.post(tick)
         handler.postDelayed(watch, WATCH_INTERVAL_MS)
+        tv.post { publishClockRect() }
     }
 
     private fun applyStyle() {
@@ -159,6 +171,7 @@ class FloatingClockService : Service() {
         fmt = ClockStyle.formatter(prefs)
         ClockStyle.apply(tv, prefs)
         tv.text = fmt.format(Date())
+        tv.post { publishClockRect() }
     }
 
     /** 설정 화면에서 바꾼 위치를 떠 있는 시계에 반영 */
@@ -168,6 +181,24 @@ class FloatingClockService : Service() {
         lp.x = prefs.posX
         lp.y = resolvedPosY()
         runCatching { wm.updateViewLayout(tv, lp) }
+        tv.post { publishClockRect() }
+    }
+
+    /** 화면 인식이 시계를 게임 화면으로 착각하지 않도록 시계 위치(화면 대비 비율)를 알려 둔다 */
+    private fun publishClockRect() {
+        val tv = clockView
+        val lp = params
+        if (tv == null || lp == null || !shown || tv.width == 0) {
+            OverlayRegistry.clear(OVERLAY_KEY)
+            return
+        }
+        val size = ScreenUtil.realSize(this)
+        val left = (size.x - tv.width) / 2f + lp.x
+        val top = lp.y.toFloat()
+        OverlayRegistry.set(
+            OVERLAY_KEY,
+            listOf(ScreenUtil.fraction(size, left, top, left + tv.width, top + tv.height, dp(4).toFloat())),
+        )
     }
 
     /** 저장된 y가 없으면(POS_AUTO) 상태바 바로 아래. 상태바와 겹치면 터치가 상태바에 먹혀 드래그가 안 된다. */
@@ -205,6 +236,7 @@ class FloatingClockService : Service() {
         shown = show
         if (show) tv.text = fmt.format(Date())
         tv.visibility = if (show) View.VISIBLE else View.GONE
+        tv.post { publishClockRect() }
     }
 
     /** 손가락으로 끌어서 위치 이동. 짧게 탭하는 건 무시한다. */
@@ -235,6 +267,7 @@ class FloatingClockService : Service() {
                     lp.x = startX + dx
                     lp.y = (startY + dy).coerceAtLeast(0)
                     runCatching { wm.updateViewLayout(v, lp) }
+                    publishClockRect()
                     return true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {

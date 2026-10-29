@@ -69,4 +69,17 @@ class Prefs(context: Context) {
     var targetLabel: String?
         get() = sp.getString("target_label", null)
         set(v) = sp.edit().putString("target_label", v).apply()
+
+    /** 화면 인식 중 게임 화면에 📷 캡처 버튼 표시 */
+    var showCaptureButton: Boolean
+        get() = sp.getBoolean("show_capture_btn", true)
+        set(v) = sp.edit().putBoolean("show_capture_btn", v).apply()
+
+    /** 📷 버튼 위치 (px). -1 이면 기본 위치(왼쪽 가운데) */
+    var capBtnX: Int
+        get() = sp.getInt("cap_btn_x", -1)
+        set(v) = sp.edit().putInt("cap_btn_x", v).apply()
+    var capBtnY: Int
+        get() = sp.getInt("cap_btn_y", -1)
+        set(v) = sp.edit().putInt("cap_btn_y", v).apply()
 }
