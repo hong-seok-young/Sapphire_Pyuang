@@ -1,0 +1,581 @@
+"""위키 자료 만들기: ../자료 (카페에서 저장한 글과 그림) -> public/data/*.json, public/img/*
+
+준비: 자료/ 폴더가 있어야 한다 (git에 없다. CLAUDE.md '위키 자료' 참고).
+실행: python scripts/build_data.py   (필요: pip install -r scripts/requirements.txt)
+
+만드는 것
+  posts.json      글마다 제목과 본문 블록(문단, 표). 그림과 다른 글 링크도 들어 있다
+  menu.json       홈 화면 메뉴 (육성 공략, 스킬, 장비, 조합책, 기타)
+  regions.json    지역 -> 사냥터 목록
+  places.json     사냥터: 레벨, 배너 그림, 몬스터, 안내
+  monsters.json   몬스터: 레벨, HP, 특징, 드랍, 재부활, 스킬, 그림
+  items.json      아이템: 아이콘, 떨구는 몬스터, 장비 정보
+  equipment.json  부위별 장비 표
+  meta.json       출처, 만든 날짜
+"""
+from __future__ import annotations
+
+import base64
+import datetime
+import hashlib
+import html
+import io
+import json
+import re
+import sys
+from pathlib import Path
+from urllib.parse import unquote
+
+from bs4 import BeautifulSoup, NavigableString, Tag
+from PIL import Image
+
+sys.stdout.reconfigure(encoding="utf-8")
+ROOT = Path(__file__).resolve().parents[2]
+SRC = ROOT / "자료"
+OUT = ROOT / "web" / "public"
+POST_DIRS = [SRC / "드랍표_원본" / "글", SRC / "드랍표_원본" / "글2"]
+INDEX_PAGE = SRC / "드랍표_원본" / "page.html"
+INDEX_FILES = SRC / "드랍표_원본" / "files"
+ORIG_DIR = SRC / "이미지" / "원본"
+MANIFEST = json.loads((ORIG_DIR / "목록.json").read_text(encoding="utf-8"))
+CAFE = "https://cafe.naver.com/iphoneimo/"
+SOURCE = {"제목": "아이모 원클릭 드랍표", "작성자": "iOS", "글": CAFE + "333636", "패치": "2026.10.24"}
+
+BIG_IMAGE = 300_000  # bytes; bigger still pictures are re-encoded as WebP
+MAX_SIDE = 1600      # px; huge guide pictures are scaled down to this for phones
+
+# ---------------------------------------------------------------- pictures
+
+_exported: dict[str, dict] = {}
+
+
+def export_picture(path: Path) -> dict | None:
+    """Copy a picture into public/img under a short content-hash name. Returns {src, w, h}."""
+    key = str(path)
+    if key in _exported:
+        return _exported[key]
+    if not path.exists():
+        return None
+    data = path.read_bytes()
+    try:
+        im = Image.open(io.BytesIO(data))
+        w, h = im.size
+        animated = getattr(im, "is_animated", False)
+    except Exception:
+        return None
+    ext = {"PNG": ".png", "GIF": ".gif", "JPEG": ".jpg", "WEBP": ".webp"}.get(im.format, ".png")
+    if len(data) > BIG_IMAGE and not animated:
+        im = im.convert("RGBA" if im.mode in ("RGBA", "LA", "P") else "RGB")
+        if max(w, h) > MAX_SIDE:
+            im.thumbnail((MAX_SIDE, MAX_SIDE), Image.LANCZOS)
+            w, h = im.size
+        buf = io.BytesIO()
+        im.save(buf, "WEBP", quality=85, method=6)
+        data, ext = buf.getvalue(), ".webp"
+    name = hashlib.sha1(data).hexdigest()[:12] + ext
+    target = OUT / "img" / name
+    if not target.exists():
+        target.write_bytes(data)
+    info = {"src": "img/" + name, "w": w, "h": h}
+    _exported[key] = info
+    return info
+
+
+def linkdata(tag: Tag | None) -> dict:
+    if tag is None or not tag.get("data-linkdata"):
+        return {}
+    try:
+        return json.loads(html.unescape(tag["data-linkdata"]))
+    except ValueError:
+        return {}
+
+
+def picture_of(img: Tag) -> dict | None:
+    """The picture behind an <img>: original download if known, else the embedded bytes, else a local file."""
+    a = img.find_parent("a")
+    url = linkdata(a).get("src", "")
+    if url in MANIFEST:
+        return export_picture(ORIG_DIR / MANIFEST[url])
+    src = img.get("src") or ""
+    m = re.match(r"data:image/(png|gif|jpe?g|webp);base64,(.+)", src, re.S)
+    if m:
+        raw = base64.b64decode(m.group(2))
+        cached = ORIG_DIR / ("emb_" + hashlib.sha1(raw).hexdigest()[:16] + "." + m.group(1).replace("jpeg", "jpg"))
+        if not cached.exists():
+            cached.write_bytes(raw)
+        return export_picture(cached)
+    if src and not src.startswith("data:"):
+        local = INDEX_FILES / unquote(src.split("/")[-1])
+        if local.exists():
+            return export_picture(local)
+    return None
+
+
+# ---------------------------------------------------------------- post bodies -> blocks
+
+def article_id(link: str) -> str | None:
+    m = re.search(r"cafe\.naver\.com/(?:iphoneimo/|ca-fe/web/cafes/(?:iphoneimo|20603221)/articles/)(\d+)", link or "")
+    return m.group(1) if m else None
+
+
+DEFAULT_COLORS = {"#000000", "#141414", "#333333", "#222222", "#111111"}
+
+
+def runs_of(node: Tag) -> list:
+    """Inline content -> runs: {t, b?, c?} text, {img, w, h, to?} picture, {t, to} link."""
+    out: list = []
+
+    def walk(el, bold=False, color=None, link=None):
+        if isinstance(el, NavigableString):
+            t = re.sub(r"\s+", " ", str(el).replace("​", ""))  # source line breaks are not real breaks
+            if t.strip() or (t and out):
+                run = {"t": t}
+                if bold:
+                    run["b"] = 1
+                if color:
+                    run["c"] = color
+                if link:
+                    run["to"] = link
+                out.append(run)
+            return
+        if not isinstance(el, Tag) or el.name in ("script", "style", "noscript"):
+            return
+        if el.name == "img":
+            pic = picture_of(el)
+            if pic:
+                run = dict(pic)
+                if link:
+                    run["to"] = link
+                out.append(run)
+            return
+        if el.name == "br":
+            out.append({"t": "\n"})
+            return
+        b = bold or el.name in ("b", "strong")
+        c = color
+        m = re.search(r"(?<![-\w])color\s*:\s*(#[0-9a-fA-F]{6})", el.get("style") or "")
+        if m and m.group(1).lower() not in DEFAULT_COLORS:
+            c = m.group(1).lower()
+        lk = link
+        if el.name == "a":
+            target = linkdata(el).get("link") or el.get("href") or ""
+            aid = article_id(target)
+            if aid:
+                lk = "post:" + aid
+            elif target.startswith("http") and "cafe.naver.com" not in target:
+                lk = target
+        for child in el.children:
+            walk(child, b, c, lk)
+
+    walk(node)
+    # merge neighbouring text runs with the same style
+    merged: list = []
+    for r in out:
+        if merged and "t" in r and "t" in merged[-1] and "src" not in merged[-1] and \
+                {k: v for k, v in r.items() if k != "t"} == {k: v for k, v in merged[-1].items() if k != "t"}:
+            merged[-1]["t"] += r["t"]
+        else:
+            merged.append(r)
+    for r in merged:
+        if "t" in r:
+            r["t"] = re.sub(r"[ \t\xa0]+", " ", r["t"])
+    while merged and "t" in merged[-1] and not merged[-1]["t"].strip() and "src" not in merged[-1]:
+        merged.pop()
+    return merged
+
+
+def lines_of(container: Tag) -> list[list]:
+    """A cell or text component -> list of lines (each a run list), one per paragraph."""
+    paras = [p for p in container.find_all("p") if p.find_parent(["td", "th"]) is container.find_parent(["td", "th"])
+             or container.name in ("td", "th") and p.find_parent(["td", "th"]) is container]
+    if not paras:
+        r = runs_of(container)
+        return [r] if r else []
+    lines = []
+    for p in paras:
+        if p.find_parent("table") is not container.find_parent("table") and container.name not in ("td", "th"):
+            continue
+        r = runs_of(p)
+        lines.append(r)
+    while lines and not lines[-1]:
+        lines.pop()
+    while lines and not lines[0]:
+        lines.pop(0)
+    return lines
+
+
+def rows_of(table: Tag) -> list[Tag]:
+    rows = []
+    for child in table.children:
+        if isinstance(child, Tag) and child.name in ("tbody", "thead", "tfoot"):
+            rows += child.find_all("tr", recursive=False)
+        elif isinstance(child, Tag) and child.name == "tr":
+            rows.append(child)
+    return rows
+
+
+def table_block(table: Tag) -> dict:
+    rows = []
+    for tr in rows_of(table):
+        cells = []
+        for td in tr.find_all(["td", "th"], recursive=False):
+            cell: dict = {"l": lines_of(td)}
+            cs, rs = int(td.get("colspan") or 1), int(td.get("rowspan") or 1)
+            if cs > 1:
+                cell["cs"] = cs
+            if rs > 1:
+                cell["rs"] = rs
+            m = re.search(r"background-color\s*:\s*(#[0-9a-fA-F]{6})", td.get("style") or "")
+            if m and m.group(1).lower() not in ("#ffffff",):
+                cell["bg"] = m.group(1).lower()
+            cells.append(cell)
+        if cells:
+            rows.append(cells)
+    return {"k": "table", "rows": rows}
+
+
+def body_blocks(box: Tag) -> list[dict]:
+    blocks: list[dict] = []
+    seen_tables = set()
+    for el in box.find_all(["table", "p", "img"]):
+        if el.find_parent("table") is not None:
+            continue
+        if el.name == "table":
+            if id(el) in seen_tables:
+                continue
+            seen_tables.add(id(el))
+            b = table_block(el)
+            if b["rows"]:
+                blocks.append(b)
+        elif el.name == "p":
+            r = runs_of(el)
+            if r:
+                blocks.append({"k": "p", "r": r})
+        elif el.name == "img" and el.find_parent("p") is None:
+            pic = picture_of(el)
+            if pic:
+                blocks.append({"k": "p", "r": [pic]})
+    # drop the cafe's trailing boilerplate
+    while blocks and blocks[-1]["k"] == "p" and "투표는 표시되지 않습니다" in "".join(r.get("t", "") for r in blocks[-1]["r"]):
+        blocks.pop()
+    return blocks
+
+
+def plain(lines: list[list]) -> str:
+    return " / ".join("".join(r.get("t", "") for r in line).strip() for line in lines if line).strip(" /")
+
+
+# ---------------------------------------------------------------- read every saved post
+
+GROUPED = re.compile(r'--sf-img-(\d+)\s*:\s*url\("?(data:image/(?:png|gif|jpe?g|webp)[^")]*)"?\)')
+
+
+def restore_grouped_images(soup: BeautifulSoup, raw: str) -> None:
+    """SingleFile keeps a picture used many times once, as a style variable (--sf-img-N), and leaves an
+    empty SVG in each <img> with background-image:var(--sf-img-N). Put the real picture back into src."""
+    pictures = {m.group(1): m.group(2) for m in GROUPED.finditer(raw)}
+    if not pictures:
+        return
+    for img in soup.find_all("img"):
+        if not (img.get("src") or "").startswith("data:image/svg"):
+            continue
+        m = re.search(r"var\(--sf-img-(\d+)\)", img.get("style") or "")
+        if m and m.group(1) in pictures:
+            img["src"] = pictures[m.group(1)]
+
+
+def load_posts() -> tuple[dict, dict]:
+    posts, soups = {}, {}
+    for d in POST_DIRS:
+        titles = {}
+        lst = d / "목록.tsv"
+        if lst.exists():
+            for line in lst.read_text(encoding="utf-8").splitlines():
+                aid, title, _ = line.split("\t")
+                titles[aid] = title
+        for f in sorted(d.glob("*.html")):
+            aid = f.stem
+            raw = f.read_text(encoding="utf-8", errors="replace")
+            soup = BeautifulSoup(raw, "lxml")
+            restore_grouped_images(soup, raw)
+            box = soup.select_one("div.post_cont")
+            if box is None:
+                continue
+            title = titles.get(aid) or (soup.title.get_text().split(" : ")[0] if soup.title else aid)
+            posts[aid] = {"id": aid, "title": title.strip(), "blocks": body_blocks(box)}
+            soups[aid] = box
+            print(f"  글 {aid} {title[:30]}")
+    return posts, soups
+
+
+# ---------------------------------------------------------------- hunting grounds, monsters, drops
+
+def split_top(s: str) -> list[str]:
+    out, depth, cur = [], 0, ""
+    for ch in s:
+        if ch in "(（[":
+            depth += 1
+        elif ch in ")）]":
+            depth = max(0, depth - 1)
+        if ch == "," and depth == 0:
+            out.append(cur)
+            cur = ""
+        else:
+            cur += ch
+    out.append(cur)
+    return [x.strip(" /") for x in out if x.strip(" /")]
+
+
+def item_key(name: str) -> str:
+    """'펫 크리스탈(*1)' / '거미줄(*1~7)' -> '펫 크리스탈' / '거미줄'."""
+    name = re.sub(r"\(\s*\*[\d~\-]+\s*\)$", "", name).strip()
+    name = re.sub(r"\(\s*\)$", "", name).strip()
+    return name
+
+
+def first_picture(td: Tag) -> dict | None:
+    img = td.find("img")
+    return picture_of(img) if img is not None else None
+
+
+def parse_monsters(aid: str, box: Tag, place: dict) -> list[dict]:
+    mons = []
+    for table in box.find_all("table"):
+        rows = rows_of(table)
+        if len(rows) < 2 or "(Lv." not in table.get_text():
+            continue
+        r0 = rows[0].find_all(["td", "th"], recursive=False)
+        if len(r0) < 2 or not re.search(r"HP\s*[\d,\-?]+", r0[0].get_text(" ")):
+            continue
+        name_row = next((r for r in rows[1:] if "(Lv." in r.get_text()), None)
+        if name_row is None:
+            continue
+        name_lines = [plain([l]) for l in lines_of(name_row.find(["td", "th"]))]
+        name_lines = [x for x in name_lines if x]
+        if not name_lines:
+            continue
+        name = name_lines[0]
+        whole = " ".join(name_lines)
+        lv = re.search(r"Lv\.?\s*(\d+)", whole)
+        hp = re.search(r"HP\s*([\d,]+)", r0[0].get_text(" "))
+        drops_text = plain(lines_of(r0[1])).replace(" / ", " ")
+        drops = []
+        for d in split_top(drops_text):
+            k = item_key(d)
+            if k and len(k) <= 25 and "★" not in k:
+                drops.append(k)
+        mon = {
+            "key": f"{name}@{aid}",
+            "name": name,
+            "level": int(lv.group(1)) if lv else None,
+            "hp": int(hp.group(1).replace(",", "")) if hp else None,
+            "traits": " · ".join(x.replace("｜", " · ") for x in name_lines[1:] if "Lv." not in x),
+            "drops": list(dict.fromkeys(drops)),
+            "place": aid,
+            "img": first_picture(r0[0]),
+        }
+        third = rows[rows.index(name_row) + 1] if rows.index(name_row) + 1 < len(rows) else None
+        if third is not None:
+            c = third.find_all(["td", "th"], recursive=False)
+            first = plain(lines_of(c[0])).replace(" / ", " ") if c else ""
+            rest = " / ".join(plain(lines_of(x)) for x in c[1:] if plain(lines_of(x)) not in ("", "-"))
+            if first.startswith("재부활"):
+                mon["respawn"] = first.split(":", 1)[-1].strip()
+            elif first and first != "스킬 없음":
+                mon["skill"] = first
+            if rest:
+                mon["note"] = rest
+        mons.append(mon)
+    return mons
+
+
+def index_buttons() -> tuple[dict, dict]:
+    """From the saved index post: article id -> banner picture, region name -> region picture."""
+    soup = BeautifulSoup(INDEX_PAGE.read_text(encoding="utf-8"), "lxml")
+    box = soup.select_one("div.se-main-container")
+    banners = {}
+    for a in box.find_all("a"):
+        ld = linkdata(a)
+        aid = article_id(ld.get("link", ""))
+        img = a.find("img")
+        if aid and img is not None:
+            pic = picture_of(img)
+            if pic:
+                banners[aid] = pic
+    region_pics = {}
+    for name, file in [("윙프릴 섬", "윙프릴의섬.png"), ("이노티아 대륙", "이노티아.png"),
+                       ("하늘성채", "하늘성채.png"), ("크라운락 주둔지", "크라운락.png")]:
+        pic = export_picture(INDEX_FILES / file)
+        if pic:
+            region_pics[name] = pic
+    return banners, region_pics
+
+
+# ---------------------------------------------------------------- equipment tables
+
+def parse_equipment(aid: str, title: str, box: Tag) -> dict | None:
+    slot = re.sub(r"\(.*$", "", title).strip()
+    headers, rows = None, []
+    for table in box.find_all("table"):
+        trs = rows_of(table)
+        if not trs or "템명" not in trs[0].get_text():  # one post spells it 아아템명
+            continue
+        h = [plain(lines_of(td)) for td in trs[0].find_all(["td", "th"], recursive=False)]
+        h = ["아이템명" if "템명" in x else x for x in h]
+        headers = headers or h
+        name_col = h.index("아이템명")
+        for tr in trs[1:]:
+            tds = tr.find_all(["td", "th"], recursive=False)
+            if len(tds) <= name_col:
+                continue
+            cells = [plain(lines_of(td)) for td in tds]
+            name = cells[name_col]
+            if not name:
+                continue
+            row = {"name": name, "icon": first_picture(tds[0]), "cells": cells}
+            # the 직업 column is a job emblem picture, not text; name_jobs() turns it into a job name
+            if "직업" in h and h.index("직업") < len(tds) and not cells[h.index("직업")]:
+                row["jobIcon"] = first_picture(tds[h.index("직업")])
+            rows.append(row)
+    if not rows:
+        return None
+    return {"slot": slot, "post": aid, "headers": headers, "rows": rows}
+
+
+def name_jobs(equipment: list[dict]) -> None:
+    """Learn which emblem means which job from the weapon tables ('전사 무기' rows carry the 전사 emblem),
+    then write the job name into every row's 직업 cell. An emblem seen across all weapon tables is 공용."""
+    seen: dict[str, dict[str, int]] = {}
+    for eq in equipment:
+        job = eq["slot"].replace(" 무기", "") if eq["slot"].endswith(" 무기") else None
+        for row in eq["rows"]:
+            if job and row.get("jobIcon"):
+                counts = seen.setdefault(row["jobIcon"]["src"], {})
+                counts[job] = counts.get(job, 0) + 1
+    names = {}
+    for src, counts in seen.items():
+        best = max(counts, key=counts.get)
+        names[src] = "공용" if len(counts) >= 3 else best
+    for eq in equipment:
+        col = eq["headers"].index("직업") if "직업" in eq["headers"] else -1
+        for row in eq["rows"]:
+            icon = row.get("jobIcon")
+            if col >= 0 and icon and icon["src"] in names and col < len(row["cells"]):
+                row["cells"][col] = names[icon["src"]]
+
+
+# ---------------------------------------------------------------- menu
+
+JOBS = ["전사", "레인저", "마법사", "무도가"]
+MENU = [
+    ("육성 공략", "343711", ["343732", "343699", "343720", "343710"]),
+    ("직업별 스킬", "345532", ["345735", "344229", "344246", "342010"]),
+    ("조합책", "206149", ["206306", "206152", "206312", "213714", "214770"]),
+    ("강화 · 보석 · 성장", None, ["331665", "343765", "345584", "343078"]),
+    ("인던 · 길드던전", None, ["342349", "343758", "332071", "343692", "338047", "338050",
+                          "282820", "282821", "282822", "282823", "282824"]),
+    ("전장 · 헌팅그라운드", None, ["345990", "346203", "345516", "345514", "345526"]),
+    ("퀘스트 · 지도", None, ["342566", "1064", "343200", "343201", "343203", "343205", "342858",
+                         "342865", "343019", "331777", "344012", "345738"]),
+]
+EQUIP_ORDER = ["전사 무기", "레인저 무기", "마법사 무기", "무도가 무기", "보조 장비", "투구", "갑옷", "장갑",
+               "신발", "망토", "벨트", "목걸이", "반지"]
+
+
+def main():
+    (OUT / "data").mkdir(parents=True, exist_ok=True)
+    for old in (OUT / "data").glob("*.json"):
+        old.unlink()
+    (OUT / "img").mkdir(parents=True, exist_ok=True)  # kept between runs; unused files are removed at the end
+
+    print("글 읽는 중")
+    posts, boxes = load_posts()
+    index = json.loads((SRC / "정리" / "지도_목록.json").read_text(encoding="utf-8"))
+    banners, region_pics = index_buttons()
+
+    print("사냥터, 몬스터")
+    regions, places, monsters = [], {}, {}
+    for region in index["지역"]:
+        ids = []
+        for p in region["장소"]:
+            aid = str(p["글"])
+            ids.append(aid)
+            mons = parse_monsters(aid, boxes[aid], p) if aid in boxes else []
+            for m in mons:
+                monsters[m["key"]] = m
+            info = ""
+            for b in posts.get(aid, {}).get("blocks", []):
+                if b["k"] == "table":
+                    for row in b["rows"]:
+                        for cell in row:
+                            text = plain(cell["l"])
+                            if "《" in text:
+                                info = text
+            places[aid] = {
+                "id": aid, "name": p["이름"], "title": posts.get(aid, {}).get("title", p["이름"]),
+                "region": region["이름"], "level": p.get("레벨"), "desc": p.get("설명"),
+                "banner": banners.get(aid), "monsters": [m["key"] for m in mons], "info": info,
+            }
+        regions.append({"name": region["이름"], "pic": region_pics.get(region["이름"]), "places": ids})
+
+    print("장비")
+    equipment = []
+    for aid, post in posts.items():
+        if re.search(r"\(20\d\d\.\d\d\.\d\d\)$", post["title"]) and "스킬" not in post["title"]:
+            eq = parse_equipment(aid, post["title"], boxes[aid])
+            if eq:
+                equipment.append(eq)
+    equipment.sort(key=lambda e: EQUIP_ORDER.index(e["slot"]) if e["slot"] in EQUIP_ORDER else 99)
+    name_jobs(equipment)
+
+    print("아이템")
+    icon_index = json.loads((SRC / "이미지" / "이미지_목록.json").read_text(encoding="utf-8"))
+    items: dict[str, dict] = {}
+
+    def item(name):
+        if name not in items:
+            items[name] = {"name": name, "icon": None, "from": [], "equip": []}
+        return items[name]
+
+    for m in monsters.values():
+        for d in m["drops"]:
+            item(d)["from"].append(m["key"])
+    for eq in equipment:
+        for row in eq["rows"]:
+            it = item(row["name"])
+            it["equip"].append({"slot": eq["slot"], "post": eq["post"],
+                                "info": dict(zip(eq["headers"], row["cells"]))})
+            if row["icon"] and not it["icon"]:
+                it["icon"] = row["icon"]
+    for name, it in items.items():
+        if not it["icon"]:
+            rel = icon_index.get("아이템", {}).get(name) or icon_index.get("아이템", {}).get(name.replace(" ", ""))
+            if rel:
+                it["icon"] = export_picture(SRC / "이미지" / rel)
+
+    menu = []
+    for title, index_post, ids in MENU:
+        menu.append({"title": title, "index": index_post,
+                     "posts": [{"id": i, "title": posts[i]["title"]} for i in ids if i in posts]})
+    menu.insert(2, {"title": "장비", "equip": True,
+                    "posts": [{"id": e["post"], "title": e["slot"]} for e in equipment]})
+
+    used = {info["src"].split("/")[-1] for info in _exported.values()}
+    for f in (OUT / "img").iterdir():
+        if f.name not in used:
+            f.unlink()
+
+    meta = {"source": SOURCE, "built": datetime.date.today().isoformat(),
+            "counts": {"posts": len(posts), "places": len(places), "monsters": len(monsters),
+                       "items": len(items), "images": len(list((OUT / "img").iterdir()))}}
+    data = {"posts": posts, "menu": menu, "regions": regions, "places": places, "monsters": monsters,
+            "items": items, "equipment": equipment, "meta": meta}
+    for name, value in data.items():
+        (OUT / "data" / f"{name}.json").write_text(json.dumps(value, ensure_ascii=False, separators=(",", ":")),
+                                                   encoding="utf-8")
+    size = sum(f.stat().st_size for f in (OUT / "img").iterdir())
+    print("완료", meta["counts"], f"그림 {size / 1e6:.1f}MB")
+
+
+if __name__ == "__main__":
+    main()

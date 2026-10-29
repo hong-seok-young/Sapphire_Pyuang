@@ -1,0 +1,9 @@
+// Cloudflare 배포 설정: dist/ 의 웹앱을 그대로 올린다 (npm run deploy).
+// 나중에 챗봇 중계 서버도 이 Worker 에 "main" 으로 붙인다.
+{
+  "name": "sapphire-imo",
+  "compatibility_date": "2026-10-23",
+  "assets": {
+    "directory": "./dist"
+  }
+}
