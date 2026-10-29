@@ -55,6 +55,106 @@
             android:text="@string/start_clock"
             android:textSize="18sp" />
 
+        <!-- 모양 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/section_style"
+            android:textStyle="bold" />
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/preview_bg"
+            android:contentDescription="@string/preview">
+
+            <TextView
+                android:id="@+id/clock_preview"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/size_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/size_fmt" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_size_minus"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:minWidth="0dp"
+                android:padding="0dp"
+                android:text="@string/minus"
+                android:textSize="22sp" />
+
+            <SeekBar
+                android:id="@+id/seek_size"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <Button
+                android:id="@+id/btn_size_plus"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:minWidth="0dp"
+                android:padding="0dp"
+                android:text="@string/plus"
+                android:textSize="22sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/text_color" />
+
+        <!-- 색 견본 (코드에서 채움) -->
+        <LinearLayout
+            android:id="@+id/color_swatches"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <TextView
+            android:id="@+id/alpha_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/alpha_none" />
+
+        <SeekBar
+            android:id="@+id/seek_alpha"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/sw_24h"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/use_24h" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/sw_date"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/show_date" />
+
         <!-- 위치 -->
         <TextView
             android:layout_width="match_parent"
@@ -106,99 +206,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/reset_position" />
-
-        <!-- 모양 설정 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/section_style"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/size_label"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/size_fmt" />
-
-        <SeekBar
-            android:id="@+id/seek_size"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
-        <TextView
-            android:id="@+id/alpha_label"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/alpha_none" />
-
-        <SeekBar
-            android:id="@+id/seek_alpha"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/text_color" />
-
-        <RadioGroup
-            android:id="@+id/color_group"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <RadioButton
-                android:id="@+id/color_white"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/c_white" />
-
-            <RadioButton
-                android:id="@+id/color_yellow"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/c_yellow" />
-
-            <RadioButton
-                android:id="@+id/color_green"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/c_green" />
-
-            <RadioButton
-                android:id="@+id/color_cyan"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/c_cyan" />
-
-            <RadioButton
-                android:id="@+id/color_red"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/c_red" />
-        </RadioGroup>
-
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/sw_24h"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/use_24h" />
-
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/sw_date"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/show_date" />
 
         <TextView
             android:layout_width="match_parent"

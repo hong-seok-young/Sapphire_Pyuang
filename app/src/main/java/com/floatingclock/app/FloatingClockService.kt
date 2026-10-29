@@ -104,11 +104,7 @@ class FloatingClockService : Service() {
     // ---------- 오버레이 뷰 ----------
 
     private fun addClockView() {
-        val tv = TextView(this).apply {
-            typeface = Typeface.MONOSPACE
-            includeFontPadding = false
-            setShadowLayer(4f, 0f, 1f, Color.BLACK)
-        }
+        val tv = TextView(this)
         clockView = tv
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -143,27 +139,8 @@ class FloatingClockService : Service() {
 
     private fun applyStyle() {
         val tv = clockView ?: return
-        val pattern = buildString {
-            if (prefs.showDate) append("MM/dd(E) ")
-            append(if (prefs.use24h) "HH:mm:ss" else "a hh:mm:ss")
-        }
-        fmt = SimpleDateFormat(pattern, Locale.getDefault())
-
-        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, prefs.textSizeSp.toFloat())
-        tv.setTextColor(prefs.textColor)
-        if (prefs.bgAlpha <= 0) {
-            // 배경 없이 글자만: 공간을 최소로 차지. 그림자로 밝은 배경에서도 읽히게 함.
-            tv.setPadding(dp(2), 0, dp(2), 0)
-            tv.background = null
-        } else {
-            val padH = dp(6)
-            val padV = dp(2)
-            tv.setPadding(padH, padV, padH, padV)
-            tv.background = GradientDrawable().apply {
-                cornerRadius = dp(6).toFloat()
-                setColor(Color.argb(prefs.bgAlpha, 0, 0, 0))
-            }
-        }
+        fmt = ClockStyle.formatter(prefs)
+        ClockStyle.apply(tv, prefs)
         tv.text = fmt.format(Date())
     }
 

@@ -6,19 +6,28 @@ import android.app.ProgressDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.util.TypedValue
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
-import android.widget.RadioGroup
+import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.android.material.materialswitch.MaterialSwitch
+import java.text.SimpleDateFormat
+import java.util.Date
 
 class MainActivity : AppCompatActivity() {
 
@@ -27,11 +36,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var permState: TextView
     private lateinit var btnPerm: Button
     private lateinit var btnToggle: Button
+    private lateinit var preview: TextView
     private lateinit var seekSize: SeekBar
+    private lateinit var btnSizeMinus: Button
+    private lateinit var btnSizePlus: Button
     private lateinit var seekAlpha: SeekBar
     private lateinit var sizeLabel: TextView
     private lateinit var alphaLabel: TextView
-    private lateinit var colorGroup: RadioGroup
+    private lateinit var swatchContainer: LinearLayout
     private lateinit var sw24h: MaterialSwitch
     private lateinit var swDate: MaterialSwitch
     private lateinit var swLock: MaterialSwitch
@@ -44,19 +56,19 @@ class MainActivity : AppCompatActivity() {
     private lateinit var updateState: TextView
     private lateinit var btnUpdate: Button
 
+    private val swatchViews = mutableListOf<View>()
+
     /** 위치 슬라이더를 코드로 맞추는 동안 리스너가 설정을 덮어쓰지 않게 */
     private var syncingSliders = false
     private var checkedOnce = false
 
-    // 색상 라디오 버튼 id -> 색
-    private val colorMap by lazy {
-        linkedMapOf(
-            R.id.color_white to Color.WHITE,
-            R.id.color_yellow to Color.parseColor("#FFEB3B"),
-            R.id.color_green to Color.parseColor("#69F0AE"),
-            R.id.color_cyan to Color.parseColor("#40C4FF"),
-            R.id.color_red to Color.parseColor("#FF5252"),
-        )
+    private val handler = Handler(Looper.getMainLooper())
+    private var previewFmt: SimpleDateFormat? = null
+    private val previewTick = object : Runnable {
+        override fun run() {
+            previewFmt?.let { preview.text = it.format(Date()) }
+            handler.postDelayed(this, 1000 - System.currentTimeMillis() % 1000)
+        }
     }
 
     private val screenW get() = resources.displayMetrics.widthPixels
@@ -70,11 +82,14 @@ class MainActivity : AppCompatActivity() {
         permState = findViewById(R.id.perm_state)
         btnPerm = findViewById(R.id.btn_perm)
         btnToggle = findViewById(R.id.btn_toggle)
+        preview = findViewById(R.id.clock_preview)
         seekSize = findViewById(R.id.seek_size)
+        btnSizeMinus = findViewById(R.id.btn_size_minus)
+        btnSizePlus = findViewById(R.id.btn_size_plus)
         seekAlpha = findViewById(R.id.seek_alpha)
         sizeLabel = findViewById(R.id.size_label)
         alphaLabel = findViewById(R.id.alpha_label)
-        colorGroup = findViewById(R.id.color_group)
+        swatchContainer = findViewById(R.id.color_swatches)
         sw24h = findViewById(R.id.sw_24h)
         swDate = findViewById(R.id.sw_date)
         swLock = findViewById(R.id.sw_lock)
@@ -89,6 +104,7 @@ class MainActivity : AppCompatActivity() {
 
         setupControls()
         setupUpdate()
+        updatePreview()
         askNotificationPermissionIfNeeded()
     }
 
@@ -96,10 +112,16 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         refreshState()
         syncPositionSliders()
+        handler.post(previewTick)
         if (!checkedOnce) {
             checkedOnce = true
             checkUpdate(silent = true)
         }
+    }
+
+    override fun onPause() {
+        handler.removeCallbacks(previewTick)
+        super.onPause()
     }
 
     // ---------- 권한 ----------
@@ -151,6 +173,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** 모양 설정이 바뀌면 미리보기와 떠 있는 시계 둘 다 갱신 */
+    private fun onStyleChanged() {
+        updatePreview()
+        refreshClock()
+    }
+
+    private fun updatePreview() {
+        ClockStyle.apply(preview, prefs)
+        val fmt = ClockStyle.formatter(prefs)
+        previewFmt = fmt
+        preview.text = fmt.format(Date())
+    }
+
     private fun refreshState() {
         val perm = hasOverlayPermission()
         permState.text = getString(if (perm) R.string.perm_granted else R.string.perm_missing)
@@ -167,16 +202,22 @@ class MainActivity : AppCompatActivity() {
     private fun setupControls() {
         btnPerm.setOnClickListener { openOverlaySettings() }
 
-        // 글자 크기 8~40sp
-        seekSize.max = 32
-        seekSize.progress = (prefs.textSizeSp - 8).coerceIn(0, 32)
+        // 글자 크기: 슬라이더 + 1씩 조절 버튼
+        seekSize.max = ClockStyle.MAX_SIZE - ClockStyle.MIN_SIZE
+        seekSize.progress = (prefs.textSizeSp - ClockStyle.MIN_SIZE).coerceIn(0, seekSize.max)
         sizeLabel.text = getString(R.string.size_fmt, prefs.textSizeSp)
         seekSize.setOnSeekBarChangeListener(simpleSeek { p ->
-            val sp = p + 8
+            val sp = p + ClockStyle.MIN_SIZE
+            if (sp == prefs.textSizeSp) return@simpleSeek
             prefs.textSizeSp = sp
             sizeLabel.text = getString(R.string.size_fmt, sp)
-            refreshClock()
+            onStyleChanged()
         })
+        btnSizeMinus.setOnClickListener { seekSize.progress = (seekSize.progress - 1).coerceAtLeast(0) }
+        btnSizePlus.setOnClickListener { seekSize.progress = (seekSize.progress + 1).coerceAtMost(seekSize.max) }
+
+        // 글자 색: 색 견본
+        buildSwatches()
 
         // 배경 불투명도 0~255 (0 = 배경 없음)
         seekAlpha.max = 255
@@ -185,24 +226,14 @@ class MainActivity : AppCompatActivity() {
         seekAlpha.setOnSeekBarChangeListener(simpleSeek { p ->
             prefs.bgAlpha = p
             alphaLabel.text = alphaText(p)
-            refreshClock()
+            onStyleChanged()
         })
 
-        // 글자 색
-        val currentId = colorMap.entries.firstOrNull { it.value == prefs.textColor }?.key ?: R.id.color_white
-        colorGroup.check(currentId)
-        colorGroup.setOnCheckedChangeListener { _, id ->
-            colorMap[id]?.let {
-                prefs.textColor = it
-                refreshClock()
-            }
-        }
-
         sw24h.isChecked = prefs.use24h
-        sw24h.setOnCheckedChangeListener { _, on -> prefs.use24h = on; refreshClock() }
+        sw24h.setOnCheckedChangeListener { _, on -> prefs.use24h = on; onStyleChanged() }
 
         swDate.isChecked = prefs.showDate
-        swDate.setOnCheckedChangeListener { _, on -> prefs.showDate = on; refreshClock() }
+        swDate.setOnCheckedChangeListener { _, on -> prefs.showDate = on; onStyleChanged() }
 
         swLock.isChecked = prefs.lockPosition
         swLock.setOnCheckedChangeListener { _, on -> prefs.lockPosition = on }
@@ -229,6 +260,52 @@ class MainActivity : AppCompatActivity() {
             syncPositionSliders()
             refreshClock()
             Toast.makeText(this, R.string.toast_pos_reset, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** 동그란 색 견본을 6개씩 줄 지어 만든다 */
+    private fun buildSwatches() {
+        swatchContainer.removeAllViews()
+        swatchViews.clear()
+        ClockStyle.COLORS.toList().chunked(6).forEach { rowColors ->
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            rowColors.forEach { color ->
+                val dot = View(this).apply {
+                    tag = color
+                    isClickable = true
+                    contentDescription = String.format("#%06X", 0xFFFFFF and color)
+                    setOnClickListener {
+                        prefs.textColor = color
+                        updateSwatchSelection()
+                        onStyleChanged()
+                    }
+                }
+                val cell = FrameLayout(this)
+                cell.addView(dot, FrameLayout.LayoutParams(dp(34), dp(34), Gravity.CENTER))
+                row.addView(cell, LinearLayout.LayoutParams(0, dp(46), 1f))
+                swatchViews += dot
+            }
+            swatchContainer.addView(
+                row,
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            )
+        }
+        updateSwatchSelection()
+    }
+
+    private fun updateSwatchSelection() {
+        val ring = Color.parseColor("#1E88E5")
+        val edge = Color.parseColor("#9E9E9E")
+        swatchViews.forEach { v ->
+            val c = v.tag as Int
+            val selected = c == prefs.textColor
+            v.background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(c)
+                if (selected) setStroke(dp(4), ring) else setStroke(dp(1), edge)
+            }
+            v.scaleX = if (selected) 1.1f else 1f
+            v.scaleY = if (selected) 1.1f else 1f
         }
     }
 

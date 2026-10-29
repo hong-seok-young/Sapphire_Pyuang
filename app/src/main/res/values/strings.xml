@@ -26,11 +26,9 @@
     <string name="alpha_fmt">배경 진하기: %1$d%%</string>
     <string name="alpha_none">배경 없음 (글자만 표시)</string>
     <string name="text_color">글자 색</string>
-    <string name="c_white">흰색</string>
-    <string name="c_yellow">노랑</string>
-    <string name="c_green">초록</string>
-    <string name="c_cyan">하늘</string>
-    <string name="c_red">빨강</string>
+    <string name="preview">미리보기</string>
+    <string name="minus">−</string>
+    <string name="plus">+</string>
     <string name="use_24h">24시간제</string>
     <string name="show_date">날짜도 표시 (월/일 요일)</string>
 
