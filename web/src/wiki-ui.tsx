@@ -31,10 +31,10 @@ export function MonsterCard({ wiki, m, showPlace = false, link = true }: {
       </div>
       <div className="mon-head">
         <div className="mon-name">
-          {m.name} <span className="lv">Lv.{m.level ?? "?"}</span>
+          {m.name} <span className="lv">Lv.{m.levels ? m.levels.join(" / ") : m.level ?? "-"}</span>
         </div>
         <div className="mon-stats">
-          HP {num(m.hp)} · {m.traits}
+          HP {m.hps ? m.hps.join(" / ") : num(m.hp)} · {m.traits}
         </div>
         {showPlace && place && <div className="mon-place">📍 {place.name}</div>}
         {m.respawn && <div className="mon-sub">⏱ 재부활 {m.respawn}</div>}

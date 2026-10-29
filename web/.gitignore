@@ -6,3 +6,4 @@ public/img/
 .wrangler/
 __pycache__/
 *.tsbuildinfo
+.vite/
