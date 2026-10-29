@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.Color
@@ -57,7 +58,9 @@ class FloatingClockService : Service() {
 
         /** 위치나 모양을 바꾼 뒤 이 앱 화면 위에 시계를 보여 주는 시간 */
         private const val PREVIEW_MS = 4000L
-        private const val CHANNEL_ID = "floating_clock"
+
+        /** '시계 실행 중' 알림 채널. 설정 화면의 '알림 끄기' 버튼이 이 채널 설정을 연다 */
+        const val CHANNEL_ID = "floating_clock"
         private const val ALERT_CHANNEL_ID = "timer_alert"
         private const val NOTI_ID = 1
         private const val ALERT_NOTI_BASE = 1000
@@ -80,6 +83,16 @@ class FloatingClockService : Service() {
         @Volatile
         var isRunning = false
             private set
+
+        /** 시계를 한 번도 안 켠 폰에서도 알림 설정을 열 수 있게 설정 화면에서도 부른다 */
+        fun createChannel(ctx: Context) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val ch = NotificationChannel(
+                    CHANNEL_ID, ctx.getString(R.string.noti_channel), NotificationManager.IMPORTANCE_LOW
+                ).apply { setShowBadge(false) }
+                ctx.getSystemService(NotificationManager::class.java).createNotificationChannel(ch)
+            }
+        }
     }
 
     /** 시계 아래 한 줄. state: 0 보통, 1 곧 끝남, 2 끝남 */
@@ -132,7 +145,7 @@ class FloatingClockService : Service() {
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
         prefs = Prefs(this)
         TimerStore.ensureLoaded(this)
-        createChannel()
+        createChannel(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -625,15 +638,6 @@ class FloatingClockService : Service() {
     }
 
     // ---------- 포그라운드 알림 ----------
-
-    private fun createChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val ch = NotificationChannel(
-                CHANNEL_ID, getString(R.string.noti_channel), NotificationManager.IMPORTANCE_LOW
-            ).apply { setShowBadge(false) }
-            getSystemService(NotificationManager::class.java).createNotificationChannel(ch)
-        }
-    }
 
     private fun notificationText(): String {
         if (!prefs.gameOnly) return getString(R.string.noti_text)

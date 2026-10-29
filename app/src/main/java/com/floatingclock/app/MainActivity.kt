@@ -36,6 +36,9 @@ class MainActivity : AppCompatActivity() {
     companion object {
         /** 게임 감지 안내는 앱이 살아 있는 동안 한 번만 저절로 띄운다 */
         private var detectionGuideShown = false
+
+        /** 안드로이드가 '다른 앱 위에 표시 중' 알림에 앱마다 따로 만드는 채널 (이름 뒤에 패키지 이름이 붙는다) */
+        private const val OVERLAY_NOTI_CHANNEL_PREFIX = "com.android.server.wm.AlertWindowNotification - "
     }
 
     private lateinit var prefs: Prefs
@@ -134,6 +137,8 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btn_open_timer).setOnClickListener {
             startActivity(Intent(this, TimerActivity::class.java))
         }
+        findViewById<Button>(R.id.btn_hide_running).setOnClickListener { openRunningNotificationSettings() }
+        findViewById<Button>(R.id.btn_hide_overlay).setOnClickListener { showOverlayNotificationGuide() }
         setupUpdate()
         removeOldScreenWatchData()
         updatePreview()
@@ -191,6 +196,44 @@ class MainActivity : AppCompatActivity() {
                 requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
             }
         }
+    }
+
+    // ---------- 알림 숨기기 ----------
+    // 두 알림 모두 안드로이드 규칙이라 앱이 직접 없앨 수는 없고, 사용자가 끌 수 있는 설정 화면으로 보내 준다.
+    // 꺼도 시계는 계속 돈다.
+
+    /** '시계 실행 중' 알림 채널 설정을 연다. '타이머 알림' 채널은 그대로 둔다. */
+    private fun openRunningNotificationSettings() {
+        FloatingClockService.createChannel(this) // 시계를 한 번도 안 켰으면 채널이 아직 없다
+        val channel = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+            .putExtra(Settings.EXTRA_CHANNEL_ID, FloatingClockService.CHANNEL_ID)
+        if (runCatching { startActivity(channel) }.isFailure) {
+            val app = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+            runCatching { startActivity(app) }
+        }
+        Toast.makeText(this, R.string.toast_hide_running, Toast.LENGTH_LONG).show()
+    }
+
+    /**
+     * '다른 앱 위에 표시 중' 알림은 안드로이드 시스템이 띄운다.
+     * 그 채널 설정으로 바로 가는 게 안 되는 폰도 있어서, 알림을 길게 눌러 끄는 방법을 먼저 알려 준다.
+     */
+    private fun showOverlayNotificationGuide() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.overlay_noti_title)
+            .setMessage(R.string.overlay_noti_msg)
+            .setPositiveButton(R.string.open_settings) { _, _ ->
+                val intent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, "android")
+                    .putExtra(Settings.EXTRA_CHANNEL_ID, OVERLAY_NOTI_CHANNEL_PREFIX + packageName)
+                if (runCatching { startActivity(intent) }.isFailure) {
+                    Toast.makeText(this, R.string.toast_overlay_long_press, Toast.LENGTH_LONG).show()
+                }
+            }
+            .setNegativeButton(R.string.ok, null)
+            .show()
     }
 
     // ---------- 서비스 시작/정지 ----------

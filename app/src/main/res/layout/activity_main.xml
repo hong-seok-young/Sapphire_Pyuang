@@ -148,6 +148,35 @@
             android:layout_height="wrap_content"
             android:text="@string/open_timer" />
 
+        <!-- 알림 숨기기 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/section_noti"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="@string/noti_hide_desc"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btn_hide_running"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/hide_running_noti" />
+
+        <Button
+            android:id="@+id/btn_hide_overlay"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/hide_overlay_noti" />
+
         <!-- 모양 -->
         <TextView
             android:layout_width="match_parent"
