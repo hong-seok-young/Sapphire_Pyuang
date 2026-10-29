@@ -70,6 +70,29 @@ class Prefs(context: Context) {
         get() = sp.getString("target_label", null)
         set(v) = sp.edit().putString("target_label", v).apply()
 
+    /** 시계를 누르면 타이머 목록 열기 */
+    var timerTapOpens: Boolean
+        get() = sp.getBoolean("timer_tap_opens", true)
+        set(v) = sp.edit().putBoolean("timer_tap_opens", v).apply()
+
+    /** 타이머/시각 알림 때 진동, 소리 */
+    var timerVibrate: Boolean
+        get() = sp.getBoolean("timer_vibrate", true)
+        set(v) = sp.edit().putBoolean("timer_vibrate", v).apply()
+    var timerSound: Boolean
+        get() = sp.getBoolean("timer_sound", false)
+        set(v) = sp.edit().putBoolean("timer_sound", v).apply()
+
+    /** 타이머가 끝나기 몇 초 전에 미리 알릴지 (0 = 끄기) */
+    var timerPreAlertSec: Int
+        get() = sp.getInt("timer_pre_alert_sec", 60)
+        set(v) = sp.edit().putInt("timer_pre_alert_sec", v).apply()
+
+    /** 정해진 시각 알림: 몇 분 전부터 남은 시간을 보여 줄지 (0 = 안 보여 줌) */
+    var reminderLeadMin: Int
+        get() = sp.getInt("reminder_lead_min", 5)
+        set(v) = sp.edit().putInt("reminder_lead_min", v).apply()
+
     /** 없앤 기능(v1.5 화면 인식)이 남긴 설정값 정리 */
     fun removeLegacyKeys() {
         sp.edit().remove("show_capture_btn").remove("cap_btn_x").remove("cap_btn_y").apply()

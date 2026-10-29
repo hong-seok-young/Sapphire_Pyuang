@@ -123,6 +123,9 @@ class MainActivity : AppCompatActivity() {
 
         setupControls()
         setupGameSection()
+        findViewById<Button>(R.id.btn_open_timer).setOnClickListener {
+            startActivity(Intent(this, TimerActivity::class.java))
+        }
         setupUpdate()
         removeOldScreenWatchData()
         updatePreview()
