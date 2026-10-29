@@ -75,7 +75,7 @@ app/src/main/java/com/floatingclock/app/
 ```
 
 ## 웹앱 (web/)
-아이폰, 안드로이드 모두 쓰는 위키 웹앱입니다. 사냥터, 몬스터 드랍, 아이템 검색(초성 검색 포함), 장비, 육성 공략, 스킬, 조합책 등.
+아이폰, 안드로이드 모두 쓰는 위키 웹앱입니다. 주소: **https://sapphire-guild.pages.dev** (Cloudflare Pages, `npm run deploy`). 사냥터, 몬스터 드랍, 아이템 검색(초성 검색 포함), 장비, 육성 공략, 스킬, 조합책 등.
 안드로이드 앱은 정보, 챗봇 화면으로 이 웹앱을 그대로 띄웁니다 (두 앱을 같이 고치는 규칙은 [CLAUDE.md](CLAUDE.md)).
 
 ```bash
@@ -85,6 +85,7 @@ pip install -r scripts/requirements.txt   # 처음 한 번
 python scripts/build_data.py              # ../자료 -> public/data, public/img (3~4분)
 npm run dev                               # http://localhost:5173
 npm run build                             # 배포용 dist/
+npm run deploy                            # 빌드 + Cloudflare Pages(sapphire-guild)에 올리기 (처음엔 npx wrangler login)
 ```
 
 - 위키 자료(`자료/`, `web/public/data`, `web/public/img`)는 git에 올리지 않습니다. 자료 출처: 아이모 원클릭 드랍표 (Made by iOS).

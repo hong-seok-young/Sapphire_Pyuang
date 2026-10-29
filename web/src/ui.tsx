@@ -1,15 +1,30 @@
 import type { ReactNode } from "react";
 import type { Pic } from "./types";
 
-/** 픽셀 그림. 작은 아이콘은 scale 배로 키워도 흐려지지 않게 그린다 */
-export function PicImg({ pic, scale = 1, max, alt = "", className }: {
+/**
+ * 픽셀 그림. 작은 아이콘은 scale 배로 키워도 흐려지지 않게 그린다.
+ * fit 을 주면 원본 크기와 상관없이 긴 쪽을 fit 픽셀에 맞춘다 (같은 아이템이 드랍표에선 12px,
+ * 장비표에선 30px 로 저장돼 있어서, 아이템 아이콘은 fit 으로 크기를 맞춘다)
+ */
+export function PicImg({ pic, scale = 1, max, fit, alt = "", className }: {
   pic: Pic | null | undefined;
   scale?: number;
   max?: number;
+  fit?: number;
   alt?: string;
   className?: string;
 }) {
-  if (!pic) return <span className={"pic-empty " + (className ?? "")} aria-hidden />;
+  if (!pic) {
+    const style = fit ? { width: fit, height: fit } : undefined;
+    return <span className={"pic-empty " + (className ?? "")} style={style} aria-hidden />;
+  }
+  if (fit) {
+    const k = fit / Math.max(pic.w, pic.h);
+    return (
+      <img className={"pic " + (className ?? "")} src={pic.src} width={Math.round(pic.w * k)} height={Math.round(pic.h * k)}
+        alt={alt} loading="lazy" decoding="async" />
+    );
+  }
   let w = pic.w * scale;
   let h = pic.h * scale;
   if (max && Math.max(w, h) > max) {

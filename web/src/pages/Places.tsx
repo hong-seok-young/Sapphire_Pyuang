@@ -3,11 +3,30 @@ import { PicImg, TopBar, levelText, NotFound } from "../ui";
 import { MonsterCard, PlaceInfo } from "../wiki-ui";
 import { cafeUrl } from "../data";
 
-export function Places({ wiki }: { wiki: Wiki }) {
+/** 지역 버튼에 쓰는 짧은 이름 */
+const SHORT: Record<string, string> = {
+  "월드 서버 컨텐츠": "월드 서버",
+  "인스턴스 던전 (매주 목요일 초기화)": "인스턴스 던전",
+  "삭제된 컨텐츠": "삭제됨",
+};
+
+export function Places({ wiki, region }: { wiki: Wiki; region: string }) {
+  const current = wiki.regions.find((r) => r.name === region) ?? wiki.regions[0];
   return (
     <>
       <TopBar title="사냥터" />
-      {wiki.regions.map((r) => (
+      <nav className="filter region-tabs">
+        {wiki.regions.map((r) => (
+          <a
+            key={r.name}
+            className={"pill" + (r === current ? " pill-on" : "")}
+            href={"#/places?r=" + encodeURIComponent(r.name)}
+          >
+            {SHORT[r.name] ?? r.name}
+          </a>
+        ))}
+      </nav>
+      {[current].map((r) => (
         <section key={r.name} className="region">
           <h2 className="region-title">{r.name}</h2>
           <div className="place-grid">

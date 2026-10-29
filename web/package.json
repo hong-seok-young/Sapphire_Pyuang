@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler pages deploy dist --project-name sapphire-guild --branch main --commit-dirty=true"
   },
   "dependencies": {
     "galmuri": "2.40.3",

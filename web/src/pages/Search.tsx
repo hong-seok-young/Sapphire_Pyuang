@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Wiki } from "../types";
 import { search } from "../search";
 import { go } from "../router";
@@ -10,6 +10,9 @@ const KIND = { item: "아이템", monster: "몬스터", place: "사냥터" } as 
 export function Search({ wiki, q }: { wiki: Wiki; q: string }) {
   const hits = useMemo(() => search(wiki, q), [wiki, q]);
   const byName = useMemo(() => monstersByName(wiki), [wiki]);
+  // 입력칸 글자는 주소(q)를 따라간다. 뒤로 가기나 다른 링크로 주소가 바뀌어도 칸이 옛 글자로 남지 않게
+  const [text, setText] = useState(q);
+  useEffect(() => setText((t) => (t === q ? t : q)), [q]);
 
   return (
     <>
@@ -19,8 +22,11 @@ export function Search({ wiki, q }: { wiki: Wiki; q: string }) {
           autoFocus
           type="search"
           placeholder="예: 현인의장갑, 다크주노, ㅎㅇㅇㅈㄱ"
-          defaultValue={q}
-          onChange={(e) => go("#/search?q=" + encodeURIComponent(e.target.value), true)}
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            go("#/search?q=" + encodeURIComponent(e.target.value), true);
+          }}
         />
       </div>
       {q && !hits.length && <div className="empty">"{q}" 검색 결과가 없어요.</div>}
@@ -38,7 +44,7 @@ export function Search({ wiki, q }: { wiki: Wiki; q: string }) {
             <li key={h.kind + h.name}>
               <a className="row" href={h.to}>
                 <span className="row-pic">
-                  {h.kind === "place" ? "🗺️" : <PicImg pic={pic} scale={h.kind === "item" ? 2 : 1} max={36} />}
+                  {h.kind === "place" ? "🗺️" : h.kind === "item" ? <PicImg pic={pic} fit={32} /> : <PicImg pic={pic} max={36} />}
                 </span>
                 <span className="row-main">
                   <span className="row-title">{h.name}</span>

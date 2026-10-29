@@ -8,7 +8,7 @@ export function DropChips({ wiki, names }: { wiki: Wiki; names: string[] }) {
       {names.map((n) => (
         <li key={n}>
           <a className="chip" href={"#/item/" + encodeURIComponent(n)}>
-            <PicImg pic={wiki.items[n]?.icon} scale={2} max={30} />
+            <PicImg pic={wiki.items[n]?.icon} fit={22} />
             <span>{n}</span>
           </a>
         </li>

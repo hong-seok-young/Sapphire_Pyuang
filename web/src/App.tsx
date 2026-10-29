@@ -26,7 +26,7 @@ export function App() {
   if (!wiki) body = <Loading error={error} />;
   else if (page === "") body = <Home wiki={wiki} />;
   else if (page === "search") body = <Search wiki={wiki} q={route.query.get("q") ?? ""} />;
-  else if (page === "places") body = <Places wiki={wiki} />;
+  else if (page === "places") body = <Places wiki={wiki} region={route.query.get("r") ?? ""} />;
   else if (page === "place") body = <PlacePage wiki={wiki} id={arg} />;
   else if (page === "monster") body = <MonsterPage wiki={wiki} name={arg} />;
   else if (page === "item") body = <ItemPage wiki={wiki} name={arg} />;

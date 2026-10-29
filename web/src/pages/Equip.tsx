@@ -11,7 +11,7 @@ export function EquipSlots({ wiki }: { wiki: Wiki }) {
         {wiki.equipment.map((e) => (
           <a key={e.slot} className="tile" href={"#/equip/" + encodeURIComponent(e.slot)}>
             <span className="tile-icon">
-              <PicImg pic={e.rows.find((r) => r.icon)?.icon} scale={2} max={32} />
+              <PicImg pic={e.rows.find((r) => r.icon)?.icon} fit={32} />
             </span>
             <span className="tile-title">{e.slot}</span>
             <span className="tile-count">{e.rows.length}</span>
@@ -52,7 +52,7 @@ export function EquipSlot({ wiki, slot }: { wiki: Wiki; slot: string }) {
           <li key={r.name + i}>
             <a className="equip card" href={"#/item/" + encodeURIComponent(r.name)}>
               <span className="equip-icon">
-                <PicImg pic={r.icon ?? wiki.items[r.name]?.icon} scale={2} max={48} />
+                <PicImg pic={r.icon ?? wiki.items[r.name]?.icon} fit={40} />
               </span>
               <span className="equip-main">
                 <span className="equip-name">

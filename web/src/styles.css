@@ -139,6 +139,8 @@ button { font: inherit; color: inherit; }
 
 /* places */
 .region { margin-bottom: 18px; }
+.region-tabs { position: sticky; top: calc(56px + env(safe-area-inset-top)); z-index: 4; margin: -4px -12px 6px; padding: 6px 12px 8px;
+  background: rgba(20, 24, 49, 0.94); }
 .region-title { margin: 6px 2px 8px; font-size: 15px; color: var(--gold); text-shadow: 1px 1px 0 var(--edge); }
 .place-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .place-card { display: flex; flex-direction: column; padding: 4px; background: var(--night-2); }

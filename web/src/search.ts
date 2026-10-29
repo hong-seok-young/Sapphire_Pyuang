@@ -25,9 +25,10 @@ export interface Hit {
 function score(name: string, q: string): number {
   const n = norm(name);
   if (onlyCho(q)) {
-    const c = chosung(n);
-    if (c.startsWith(q)) return 3;
-    return c.includes(q) ? 1 : 0;
+    // 초성은 이름이나 낱말의 처음부터만 맞춘다. 중간까지 보면 'ㄷㅋ'에 레드크랩, '언더 크라운 전장'까지 걸린다
+    if (chosung(n).startsWith(q)) return 3;
+    const words = name.split(/[\s_()[\]·,:：/]+/).filter(Boolean);
+    return words.some((w) => chosung(w).startsWith(q)) ? 2 : 0;
   }
   if (n === q) return 5;
   if (n.startsWith(q)) return 3;

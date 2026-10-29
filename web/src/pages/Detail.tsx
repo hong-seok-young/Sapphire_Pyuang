@@ -32,7 +32,7 @@ export function ItemPage({ wiki, name }: { wiki: Wiki; name: string }) {
     <>
       <TopBar title={name} />
       <div className="detail-hero">
-        <PicImg pic={it.icon} scale={5} max={96} alt={name} />
+        <PicImg pic={it.icon} fit={80} alt={name} />
         <div className="detail-name">{name}</div>
       </div>
 
