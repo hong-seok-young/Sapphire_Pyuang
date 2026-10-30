@@ -1,7 +1,7 @@
 // GET  /api/users              -> 계정 목록 (오피서 이상)
-// POST /api/users { id, role } -> 계정 만들기. 임시 비밀번호를 한 번만 돌려준다
+// POST /api/users { id, role, password? } -> 계정 만들기. 처음 비밀번호(정한 것이나 임시)를 한 번만 돌려준다
 import {
-  FORBIDDEN, NEED_LOGIN, RANK, canManage, currentUser, isRole, json, passwordFields, readJson, tempPassword, validId,
+  FORBIDDEN, NEED_LOGIN, RANK, canManage, currentUser, firstPassword, isRole, json, passwordFields, readJson, validId,
 } from "../../../server/auth";
 import type { Env, Role } from "../../../server/auth";
 
@@ -21,7 +21,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  const body = await readJson<{ id: string; role: string }>(request);
+  const body = await readJson<{ id: string; role: string; password: string }>(request);
   const id = typeof body.id === "string" ? body.id.trim() : "";
   const role = body.role ?? "member";
   if (!validId(id)) return json({ error: "아이디는 한글, 영문, 숫자로 20자까지 써 주세요" }, 400);
@@ -30,7 +30,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const exists = await env.DB.prepare("SELECT 1 FROM users WHERE id = ?").bind(id).first();
   if (exists) return json({ error: "이미 있는 아이디예요" }, 409);
 
-  const temp = tempPassword();
+  const temp = firstPassword(body.password);
+  if (temp === null) return json({ error: "처음 비밀번호는 6자 이상으로 해 주세요" }, 400);
   const pw = await passwordFields(temp);
   await env.DB.prepare(
     "INSERT INTO users (id, role, pw_hash, pw_salt, pw_iter, must_change, created_at, created_by) VALUES (?, ?, ?, ?, ?, 1, ?, ?)",

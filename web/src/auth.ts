@@ -63,13 +63,14 @@ export const changePassword = (current: string, next: string) =>
   api<{ ok: boolean }>("/api/password", "POST", { current, next });
 
 export const listAccounts = () => api<Account[]>("/api/users");
-export const createAccount = (id: string, role: Role) =>
-  api<{ id: string; role: Role; tempPassword: string }>("/api/users", "POST", { id, role });
+export const createAccount = (id: string, role: Role, password?: string) =>
+  api<{ id: string; role: Role; tempPassword: string }>("/api/users", "POST", { id, role, password });
 export const deleteAccount = (id: string) => api<{ ok: boolean }>(`/api/users/${encodeURIComponent(id)}`, "DELETE");
 export const setRole = (id: string, role: Role) =>
   api<{ id: string; role: Role }>(`/api/users/${encodeURIComponent(id)}`, "PATCH", { role });
-export const resetPassword = (id: string) =>
-  api<{ id: string; tempPassword: string }>(`/api/users/${encodeURIComponent(id)}/reset`, "POST");
+/** password: 관리자가 정한 처음 비밀번호. 비우면 서버가 임시 비밀번호를 만든다 */
+export const resetPassword = (id: string, password?: string) =>
+  api<{ id: string; tempPassword: string }>(`/api/users/${encodeURIComponent(id)}/reset`, "POST", { password });
 
 export function errorText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);

@@ -1,5 +1,8 @@
-// POST /api/users/:id/reset -> 비밀번호를 새 임시 비밀번호로 (자기보다 낮은 역할만). 그 사람의 로그인은 모두 끝낸다
-import { FORBIDDEN, NEED_LOGIN, canManage, currentUser, json, paramId, passwordFields, tempPassword } from "../../../../server/auth";
+// POST /api/users/:id/reset { password? } -> 비밀번호를 처음 비밀번호(정한 것이나 임시)로 (자기보다 낮은 역할만).
+// 그 사람의 로그인은 모두 끝내고, 다음 로그인 때 비밀번호를 바꾸게 한다
+import {
+  FORBIDDEN, NEED_LOGIN, canManage, currentUser, firstPassword, json, paramId, passwordFields, readJson,
+} from "../../../../server/auth";
 import type { Env, Role } from "../../../../server/auth";
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
@@ -10,7 +13,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   if (!user) return json({ error: "없는 아이디예요" }, 404);
   if (user.id === me.id || !canManage(me.role, user.role)) return FORBIDDEN();
 
-  const temp = tempPassword();
+  const body = await readJson<{ password: string }>(request);
+  const temp = firstPassword(body.password);
+  if (temp === null) return json({ error: "처음 비밀번호는 6자 이상으로 해 주세요" }, 400);
   const pw = await passwordFields(temp);
   await env.DB.batch([
     env.DB.prepare("UPDATE users SET pw_hash = ?, pw_salt = ?, pw_iter = ?, must_change = 1 WHERE id = ?")

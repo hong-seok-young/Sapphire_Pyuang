@@ -12,6 +12,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!row || typeof body.current !== "string" || !(await verifyPassword(body.current, row))) {
     return json({ error: "지금 비밀번호가 맞지 않아요" }, 400);
   }
+  if (body.next === body.current) return json({ error: "지금 비밀번호와 다른 비밀번호로 해 주세요" }, 400);
   const pw = await passwordFields(body.next);
   await env.DB.prepare("UPDATE users SET pw_hash = ?, pw_salt = ?, pw_iter = ?, must_change = 0 WHERE id = ?")
     .bind(pw.pw_hash, pw.pw_salt, pw.pw_iter, me.id)

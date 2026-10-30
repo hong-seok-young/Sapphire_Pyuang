@@ -96,6 +96,15 @@ export function tempPassword(length = 8): string {
   return Array.from(rnd, (x) => chars[x % chars.length]).join("");
 }
 
+/**
+ * 새 계정과 비밀번호 초기화에 쓸 처음 비밀번호. 관리자가 정했으면(123123 등) 그것, 비웠으면 임시 비밀번호를 만든다.
+ * 정했는데 규칙에 안 맞으면 null. 어느 쪽이든 처음 로그인하면 바꾸게 한다(must_change).
+ */
+export function firstPassword(chosen: unknown): string | null {
+  if (chosen === undefined || chosen === null || chosen === "") return tempPassword();
+  return validPassword(chosen) ? chosen : null;
+}
+
 export function validPassword(pw: unknown): pw is string {
   return typeof pw === "string" && pw.length >= 6 && pw.length <= 64;
 }
