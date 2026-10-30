@@ -23,7 +23,7 @@
     <string name="start_clock">시계 켜기</string>
     <string name="stop_clock">시계 끄기</string>
     <string name="stop">끄기</string>
-    <string name="clock_always_hint">시계는 켜 두는 동안 어디서나 보여요. 게임을 마치면 여기서 끄거나 알림창의 \'끄기\'를 눌러 주세요. 빠른 설정에 시계 버튼을 넣어 두면 알림창에서 한 번 눌러 켜고 끌 수 있어요.</string>
+    <string name="tile_hint">빠른 설정에 시계 버튼을 넣어 두면 알림창에서 한 번 눌러 시계를 켜고 끌 수 있어요.</string>
     <string name="add_tile">빠른 설정에 시계 버튼 넣기</string>
     <string name="tile_label">Sapphire 시계</string>
     <string name="tile_label_short">시계</string>
@@ -33,7 +33,31 @@
     <string name="tile_already">이미 빠른 설정에 시계 버튼이 있어요</string>
     <string name="tile_guide_msg">알림창을 끝까지 내린 뒤 버튼 편집(연필 모양, 삼성은 오른쪽 위 ⋮ 안의 \'버튼 편집\')을 누르세요. \'Sapphire 시계\'를 위쪽 버튼 자리로 끌어다 놓으면 돼요. 그다음부터는 알림창에서 한 번 눌러 시계를 켜고 끌 수 있어요.</string>
 
+    <string name="section_game">게임 연동</string>
+    <string name="game_only">게임 실행 중에만 표시</string>
+    <string name="game_only_hint">켜 두면 고른 게임이 화면 앞에 있을 때만 시계가 보이고, 게임을 끄면 사라져요. 이 앱에서 위치나 모양을 바꿀 때만 확인할 수 있게 잠깐 보여요.</string>
+    <string name="game_target_fmt">대상 게임: %1$s</string>
+    <string name="game_target_none">대상 게임: 아직 선택 안 됨 (지금은 항상 표시)</string>
+    <string name="pick_game">게임 선택</string>
+    <string name="pick_game_title">시계를 띄울 게임 선택</string>
+    <string name="usage_granted">✔ 게임 감지 권한(사용 정보 접근) 허용됨</string>
+    <string name="usage_missing">✖ 게임을 감지하려면 \'사용 정보 접근\' 허용이 필요합니다 (지금은 항상 표시)</string>
+    <string name="grant_usage">사용 정보 접근 허용하기</string>
+    <string name="toast_allow_usage">목록에서 \'Sapphire\'를 찾아 허용해 주세요</string>
+    <string name="toast_game_found">%1$s 을(를) 자동으로 찾았어요</string>
+    <string name="toast_game_mode_started">%1$s 을(를) 켜면 시계가 나타나요</string>
     <string name="cancel">취소</string>
+    <string name="usage_restricted_hint">스위치가 회색으로 막혀 있으면: 아래 \'앱 정보 열기\' → 오른쪽 위 ⋮ → \'제한된 설정 허용\'을 누른 뒤 다시 켜 주세요. 메뉴가 안 보이면 회색 스위치를 한 번 눌러 본 뒤 다시 확인하세요.</string>
+    <string name="open_app_info">앱 정보 열기</string>
+    <string name="guide_game_title">시계를 띄울 게임을 골라 주세요</string>
+    <string name="guide_game_msg">게임을 고르면 그 게임이 화면 앞에 있을 때만 시계가 보이고, 게임을 끄면 사라져요. 고르기 전에는 시계가 항상 떠 있어요.</string>
+    <string name="guide_usage_title">게임 감지 권한이 필요해요</string>
+    <string name="guide_usage_msg">%1$s 을(를) 끄면 시계도 사라지게 하려면 \'사용 정보 접근\'을 허용해야 해요. 허용하기 전에는 게임이 꺼져 있어도 시계가 항상 떠 있어요.</string>
+    <string name="guide_usage_restricted">스위치가 회색으로 막혀 있으면: 그 스위치를 한 번 눌러 본 뒤 이 앱으로 돌아와서 \'앱 정보 열기\' → 오른쪽 위 ⋮ → \'제한된 설정 허용\'을 누르고 다시 켜 주세요.</string>
+    <string name="guide_always_hint">게임과 상관없이 항상 띄우려면 \'게임 실행 중에만 표시\'를 꺼 두세요.</string>
+    <string name="guide_usage_go">허용하러 가기</string>
+    <string name="start_anyway">그냥 켜기</string>
+    <string name="default_game_name">게임</string>
 
     <string name="section_timer">타이머</string>
     <string name="timer_entry_desc">시계를 누르면 내가 정한 타이머를 바로 시작할 수 있어요. 매일 정해진 시각 알림도 있어요.</string>
@@ -57,7 +81,7 @@
     <string name="pre_alert_fmt">끝나기 %1$s 전에 미리 알림</string>
     <string name="lead_off">시각 알림 전 남은 시간: 표시 안 함</string>
     <string name="lead_fmt">시각 알림 %1$d분 전부터 남은 시간 표시</string>
-    <string name="timer_hint">시계가 켜져 있을 때만 동작해요. 화면이 꺼져 있을 때 시간이 되면 폰 알림으로 알려 줘요. 남은 시간은 시계 아래에 뜨고, 곧 끝나면 주황색, 끝나면 빨간색으로 깜빡여요.</string>
+    <string name="timer_hint">시계가 켜져 있을 때만 동작해요. 게임 밖에 있을 때는 시간이 되면 폰 알림으로 알려 줘요. 남은 시간은 시계 아래에 뜨고, 곧 끝나면 주황색, 끝나면 빨간색으로 깜빡여요.</string>
     <string name="preset_name_hint">이름 (예: 보스)</string>
     <string name="preset_duration_hint">시간 (예: 30)</string>
     <string name="preset_duration_help">30 은 30분, 5:30 은 5분 30초, 1:00:00 은 1시간이에요.</string>
@@ -100,7 +124,7 @@
     <string name="dur_s_fmt">%1$d초</string>
 
     <string name="section_noti">알림 숨기기</string>
-    <string name="noti_hide_desc">알림창에 뜨는 \'시계 실행 중\'과 \'다른 앱 위에 표시 중\' 알림은 꺼도 시계가 그대로 보여요. 화면이 꺼져 있을 때 타이머가 끝나면 오는 \'타이머 알림\'은 켜 두세요. 알림을 끄면 알림의 \'끄기\' 버튼도 사라지니, 시계는 이 화면에서 꺼 주세요.</string>
+    <string name="noti_hide_desc">알림창에 뜨는 \'시계 실행 중\'과 \'다른 앱 위에 표시 중\' 알림은 꺼도 시계가 그대로 보여요. 게임 밖에서 타이머가 끝나면 오는 \'타이머 알림\'은 켜 두세요. 알림을 끄면 알림의 \'끄기\' 버튼도 사라지니, 시계는 이 화면에서 꺼 주세요.</string>
     <string name="hide_running_noti">\'시계 실행 중\' 알림 끄기</string>
     <string name="hide_overlay_noti">\'다른 앱 위에 표시 중\' 알림 끄기</string>
     <string name="toast_hide_running">\'알림 표시\'를 끄면 돼요. 꺼도 시계는 계속 보여요</string>
@@ -111,7 +135,7 @@
     <string name="toast_overlay_long_press">알림창에서 그 알림을 길게 눌러 꺼 주세요</string>
 
     <string name="section_position">위치</string>
-    <string name="position_hint">시계를 직접 끌어도 되고, 상태바에 가려 안 잡히면 여기서 옮기세요.</string>
+    <string name="position_hint">시계를 직접 끌어도 되고, 상태바에 가려 안 잡히면 여기서 옮기세요. 시계가 켜져 있으면 옮기는 동안 화면에 잠깐 떠서 위치를 볼 수 있어요.</string>
     <string name="pos_x_fmt">가로 (가운데 기준): %1$d</string>
     <string name="pos_y_fmt">위에서부터: %1$d</string>
     <string name="lock_position">위치 고정 (드래그 잠금)</string>
@@ -151,4 +175,6 @@
     <string name="noti_channel">시계 실행 중</string>
     <string name="noti_title">Sapphire 시계 실행 중</string>
     <string name="noti_text">시계가 화면 위에 표시되고 있어요</string>
+    <string name="noti_text_game">%1$s 실행 중에만 시계를 보여줘요</string>
+    <string name="noti_text_need_setup">게임 감지 설정이 필요해요 (지금은 항상 표시)</string>
 </resources>

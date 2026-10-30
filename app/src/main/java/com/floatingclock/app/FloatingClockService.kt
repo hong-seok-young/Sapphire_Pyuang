@@ -17,7 +17,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.os.PowerManager
 import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -45,8 +44,9 @@ import kotlin.math.min
 
 /**
  * 다른 앱(게임) 위에 시계를 띄우는 포그라운드 서비스.
- * 초가 바뀌는 순간마다 갱신하며, 드래그로 위치를 옮길 수 있다. 켜 두는 동안 어디서나 보인다.
- * (어떤 앱이 앞에 있는지 알아보는 게임 감지 기능은 제작자 요청으로 v1.12 에서 뺐다.)
+ * 초가 바뀌는 순간마다 갱신하며, 드래그로 위치를 옮길 수 있다.
+ * '게임 실행 중에만 표시'가 켜져 있으면 고른 게임이 화면 앞에 있을 때만 보인다.
+ * 이 앱 화면 위에서는 위치나 모양을 바꾸는 동안만 확인용으로 잠깐 보인다.
  * 시계를 누르면 타이머 목록이 뜨고, 돌아가는 타이머와 다가오는 시각 알림이 시계 아래에 보인다.
  *
  * 게임 화면을 읽거나, 게임에 입력을 보내거나, 게임 파일/메모리/통신에 손대지 않는다.
@@ -59,11 +59,20 @@ class FloatingClockService : Service() {
         const val ACTION_STOP = "com.floatingclock.app.STOP"
         const val ACTION_REFRESH = "com.floatingclock.app.REFRESH" // 설정 변경 반영
 
+        /** ACTION_REFRESH 에 붙이면 이 앱 화면 위에서도 시계를 잠깐 보여 준다 (위치, 모양 확인용) */
+        const val EXTRA_PREVIEW = "preview"
+
+        /** 위치나 모양을 바꾼 뒤 이 앱 화면 위에 시계를 보여 주는 시간 */
+        private const val PREVIEW_MS = 4000L
+
         /** '시계 실행 중' 알림 채널. 설정 화면의 '알림 끄기' 버튼이 이 채널 설정을 연다 */
         const val CHANNEL_ID = "floating_clock"
         private const val ALERT_CHANNEL_ID = "timer_alert"
         private const val NOTI_ID = 1
         private const val ALERT_NOTI_BASE = 1000
+
+        /** 화면 앞에 떠 있는 앱을 확인하는 간격 */
+        private const val WATCH_INTERVAL_MS = 500L
 
         /**
          * 타이머 목록 창이 저절로 닫히는 시간. 창에 손이 닿을 때마다 다시 센다.
@@ -114,6 +123,10 @@ class FloatingClockService : Service() {
     private var openPlaceHeader: View? = null
     private val handler = Handler(Looper.getMainLooper())
     private var fmt: SimpleDateFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+    private var tracker: GameDetector.ForegroundTracker? = null
+    private var shown = true
+    /** 이 시각(uptime)까지는 이 앱 화면 위에서도 시계를 보여 준다 */
+    private var previewUntil = 0L
     private var blinkOn = true
     private var tone: ToneGenerator? = null
 
@@ -128,6 +141,13 @@ class FloatingClockService : Service() {
             // 다음 초가 시작되는 시점에 맞춰 예약 -> 초가 바뀌는 순간 바로 갱신
             val now = System.currentTimeMillis()
             handler.postAtTime(this, SystemClock.uptimeMillis() + (1000 - now % 1000))
+        }
+    }
+
+    private val watch = object : Runnable {
+        override fun run() {
+            updateVisibility()
+            handler.postDelayed(this, WATCH_INTERVAL_MS)
         }
     }
 
@@ -152,9 +172,13 @@ class FloatingClockService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_REFRESH -> {
+                if (intent?.getBooleanExtra(EXTRA_PREVIEW, false) == true) {
+                    previewUntil = SystemClock.uptimeMillis() + PREVIEW_MS
+                }
                 if (container != null) {
                     applyStyle()
                     applyPosition()
+                    updateVisibility()
                     updateTimers()
                     refreshNotification()
                     return START_STICKY
@@ -171,6 +195,7 @@ class FloatingClockService : Service() {
 
     override fun onDestroy() {
         handler.removeCallbacks(tick)
+        handler.removeCallbacks(watch)
         closePanel()
         container?.let { runCatching { wm.removeView(it) } }
         container = null
@@ -236,8 +261,12 @@ class FloatingClockService : Service() {
         params = lp
         applyStyle()
         box.setOnTouchListener(DragListener())
+        // 처음부터 보일지 정해 두어야 게임이 아닌 화면에서 잠깐 번쩍이지 않는다
+        shown = shouldShow()
+        box.visibility = if (shown) View.VISIBLE else View.GONE
         wm.addView(box, lp)
         handler.post(tick)
+        handler.postDelayed(watch, WATCH_INTERVAL_MS)
     }
 
     private fun applyStyle() {
@@ -276,6 +305,35 @@ class FloatingClockService : Service() {
 
     private fun dp(v: Int): Int =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
+
+    // ---------- 게임 실행 중에만 표시 ----------
+
+    /**
+     * 지금 시계를 보여야 하는지.
+     * 게임을 아직 안 골랐거나 감지 권한이 없으면 감지를 할 수 없으니 항상 보여 준다.
+     * 안드로이드에 '지금 맨 앞 앱이 무엇인지'만 묻고, 게임 안은 보지 않는다.
+     */
+    private fun shouldShow(): Boolean {
+        if (!prefs.gameOnly) return true
+        val target = prefs.targetPackage ?: return true
+        if (!GameDetector.hasUsageAccess(this)) return true
+        val t = tracker ?: GameDetector.ForegroundTracker(this).also { tracker = it }
+        val front = t.update() ?: return false
+        if (front == target) return true
+        // 이 앱 화면 위에서는 위치나 모양을 바꾸는 동안만 잠깐 보여 준다.
+        // '시계 켜기'만 눌렀는데 게임이 꺼져 있는데도 시계가 뜨면 헷갈리기 때문이다.
+        return front == packageName && SystemClock.uptimeMillis() < previewUntil
+    }
+
+    private fun updateVisibility() {
+        val box = container ?: return
+        val show = shouldShow()
+        if (show == shown) return
+        shown = show
+        if (show) clockText?.text = fmt.format(Date())
+        box.visibility = if (show) View.VISIBLE else View.GONE
+        if (!show) closePanel()
+    }
 
     /** 손가락으로 끌어서 위치 이동, 짧게 누르면 타이머 목록 */
     private inner class DragListener : View.OnTouchListener {
@@ -637,19 +695,16 @@ class FloatingClockService : Service() {
         col.visibility = if (chips.isEmpty()) View.GONE else View.VISIBLE
     }
 
-    /** 화면이 켜져 있는지. 켜져 있으면 시계 아래 줄이 보이니 진동/소리로, 꺼져 있으면 폰 알림으로 알린다 */
-    private fun screenOn(): Boolean = getSystemService(PowerManager::class.java)?.isInteractive != false
-
-    /** 곧 끝남: 화면이 켜져 있으면 짧게 진동/소리. 꺼져 있으면 조용히 넘긴다. */
+    /** 곧 끝남: 게임 중이면 짧게 진동/소리. 게임 밖이면 조용히 넘긴다. */
     private fun preAlert() {
-        if (!screenOn()) return
+        if (!shown) return
         if (prefs.timerVibrate) vibrate(longArrayOf(0, 150))
         if (prefs.timerSound) beep(150)
     }
 
-    /** 시간 됨: 화면이 켜져 있으면 진동/소리 (시계 아래에 '지금!'이 깜빡임), 꺼져 있으면 폰 알림 */
+    /** 시간 됨: 게임 중이면 진동/소리 (시계 아래에 '지금!'이 깜빡임), 게임 밖이면 폰 알림 */
     private fun mainAlert(name: String, id: String) {
-        if (screenOn()) {
+        if (shown) {
             if (prefs.timerVibrate) vibrate(longArrayOf(0, 300, 150, 300))
             if (prefs.timerSound) beep(400)
         } else {
@@ -705,6 +760,15 @@ class FloatingClockService : Service() {
 
     // ---------- 포그라운드 알림 ----------
 
+    private fun notificationText(): String {
+        if (!prefs.gameOnly) return getString(R.string.noti_text)
+        val label = prefs.targetLabel
+        return if (prefs.targetPackage != null && label != null && GameDetector.hasUsageAccess(this))
+            getString(R.string.noti_text_game, label)
+        else
+            getString(R.string.noti_text_need_setup)
+    }
+
     private fun buildNotification(): Notification {
         val openIntent = PendingIntent.getActivity(
             this, 0, Intent(this, ClockActivity::class.java),
@@ -717,7 +781,7 @@ class FloatingClockService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_clock)
             .setContentTitle(getString(R.string.noti_title))
-            .setContentText(getString(R.string.noti_text))
+            .setContentText(notificationText())
             .setContentIntent(openIntent)
             .addAction(0, getString(R.string.stop), stopIntent)
             .setOngoing(true)
