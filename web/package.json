@@ -13,6 +13,7 @@
     "dev:accounts": "vite build && wrangler pages dev dist --port 8788 --ip 127.0.0.1"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.3.0",
     "galmuri": "2.40.3",
     "react": "18.3.1",
     "react-dom": "18.3.1"

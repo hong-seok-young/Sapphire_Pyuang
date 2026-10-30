@@ -10,3 +10,6 @@ __pycache__/
 
 # 처음 계정을 넣는 SQL (임시 비밀번호 해시가 들어 있다). 넣은 뒤 지운다
 accounts-seed.sql
+
+# wrangler pages dev 가 읽는 로컬 비밀값 (API 키 등). 올리지 않는다
+.dev.vars

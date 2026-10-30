@@ -38,25 +38,3 @@ export function PostPage({ wiki, id }: { wiki: Wiki; id: string }) {
     </>
   );
 }
-
-export function Soon({ what }: { what: "chat" | "timer" }) {
-  const text =
-    what === "chat"
-      ? {
-          title: "AI 챗봇",
-          body: "위키 자료로 육성법, 장비, 드랍 질문에 답하고, 갤러리에서 고른 게임 스샷을 보고 조언해 주는 챗봇이에요. 중계 서버와 API 키를 준비하면 열려요.",
-        }
-      : {
-          title: "타이머",
-          body: "보스 타이머와 매일 정해진 시각 알림이 들어올 자리예요. 안드로이드 앱에서는 게임 위 시계와 함께 쓸 수 있어요.",
-        };
-  return (
-    <>
-      <TopBar title={text.title} />
-      <div className="soon">
-        <div className="soon-badge">준비 중</div>
-        <p>{text.body}</p>
-      </div>
-    </>
-  );
-}

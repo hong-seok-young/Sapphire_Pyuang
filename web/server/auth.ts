@@ -11,6 +11,8 @@
 
 export interface Env {
   DB: D1Database;
+  /** 챗봇(functions/api/chat.ts)이 쓰는 Claude API 키. Cloudflare Pages 비밀값 (자동 배포가 넣는다) */
+  ANTHROPIC_API_KEY?: string;
 }
 
 export type Role = "developer" | "master" | "officer" | "member";

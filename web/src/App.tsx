@@ -7,7 +7,8 @@ import { Search } from "./pages/Search";
 import { Places, PlacePage } from "./pages/Places";
 import { ItemPage, MonsterPage } from "./pages/Detail";
 import { EquipSlot, EquipSlots } from "./pages/Equip";
-import { MenuPage, PostPage, Soon } from "./pages/Posts";
+import { MenuPage, PostPage } from "./pages/Posts";
+import { ChatPage } from "./pages/Chat";
 import { AppPage } from "./pages/AppPage";
 import { LoginPage, PasswordPage } from "./pages/Login";
 import { AdminPage } from "./pages/Admin";
@@ -47,7 +48,9 @@ export function App() {
     );
   }
   if (me === null) return <LoginPage onLogin={setMe} />;
-  if (me.mustChange) return <PasswordPage forced onDone={() => setMe({ ...me, mustChange: false })} />;
+  if (me.mustChange) {
+    return <PasswordPage forced onDone={() => setMe({ ...me, mustChange: false })} onBack={() => setMe(null)} />;
+  }
   return <Wiki me={me} onLogout={() => setMe(null)} />;
 }
 
@@ -75,7 +78,7 @@ function Wiki({ me, onLogout }: { me: Me; onLogout: () => void }) {
   else if (page === "equip") body = arg ? <EquipSlot wiki={wiki} slot={arg} /> : <EquipSlots wiki={wiki} />;
   else if (page === "menu") body = <MenuPage wiki={wiki} title={arg} />;
   else if (page === "post") body = <PostPage wiki={wiki} id={arg} />;
-  else if (page === "chat") body = <Soon what="chat" />;
+  else if (page === "chat") body = <ChatPage wiki={wiki} />;
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
   else if (page === "app" || page === "timer") body = <AppPage />;
   else body = <Home me={me} onLogout={onLogout} />;

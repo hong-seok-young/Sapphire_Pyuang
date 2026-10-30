@@ -7,6 +7,8 @@
 #   DATA_REPO_TOKEN        비공개 자료 저장소(sapphire-imo-data)를 읽기만 하는 GitHub 토큰
 #                          (fine-grained, 그 저장소만, Contents: Read-only). 대신 읽기 전용 배포 키 DATA_DEPLOY_KEY 도 된다
 #   DEV_PASSWORD           계정이 하나도 없을 때 만드는 앱개발자(퓨앙) 계정의 첫 비밀번호 (web/scripts/ci-d1.mjs)
+#   ANTHROPIC_API_KEY      챗봇이 쓰는 Claude API 키 (없으면 챗봇만 '준비 중')
+#   FIRST_PASSWORD         시작 계정(길드마스터, 오피서)의 처음 비밀번호. 있으면 그 계정들을 한 번만 만든다
 # Cloudflare 비밀값이 아직 없으면 배포를 건너뛴다 (실패로 표시하지 않는다).
 # 공개 저장소라 실행 기록은 누구나 볼 수 있다. 비밀번호나 비밀값을 화면에 찍는 단계를 넣지 않는다.
 name: Deploy wiki
@@ -92,7 +94,21 @@ jobs:
         working-directory: web
         env:
           DEV_PASSWORD: ${{ secrets.DEV_PASSWORD }}
+          FIRST_PASSWORD: ${{ secrets.FIRST_PASSWORD }}
         run: node scripts/ci-d1.mjs
+
+      # 챗봇(functions/api/chat.ts)의 Claude API 키를 Cloudflare Pages 비밀값으로 넣는다. 없으면 챗봇은 '준비 중'이라고 답한다
+      - name: Chatbot API key
+        working-directory: web
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            printf '%s' "$ANTHROPIC_API_KEY" | npx wrangler pages secret put ANTHROPIC_API_KEY --project-name sapphire-guild > /dev/null
+            echo "챗봇 API 키를 넣었어요"
+          else
+            echo "::notice::ANTHROPIC_API_KEY 비밀값이 없어서 챗봇은 준비 중으로 보여요"
+          fi
 
       - name: Deploy to Cloudflare Pages
         working-directory: web

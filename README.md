@@ -109,6 +109,14 @@ npm run deploy                            # 빌드 + Cloudflare Pages(sapphire-g
 - 위키 자료(`자료/`, `web/public/data`, `web/public/img`)는 git에 올리지 않습니다. 자료 출처: 아이모 원클릭 드랍표 (Made by iOS).
 - 글꼴: [갈무리](https://github.com/quiple/galmuri) (SIL OFL 1.1)
 
+### AI 챗봇
+위키의 '💬 챗봇'(`#/chat`)에서 육성법, 장비, 드랍, 사냥터를 물어보면 Claude 가 위키 자료를 보고 답합니다.
+
+- 질문에 나온 아이템, 몬스터, 사냥터와 제목이 맞는 글(육성 공략 등), 사냥터 목록을 화면이 골라 함께 보냅니다 (`src/chat.ts`).
+- 📷 로 갤러리에서 직접 고른 게임 스샷(2장까지)을 보내면 보고 조언합니다. 앱은 화면을 캡처하지 않고, 답은 읽는 글로만 보여 줍니다. 게임 위 위키 창에서는 사진 버튼이 없습니다.
+- 서버(`functions/api/chat.ts`)가 로그인과 하루 질문 수(한 사람 20번)를 확인하고 답을 조금씩 흘려보냅니다. 모델은 그 파일의 `MODEL` 한 줄(기본 Claude Opus 5.5)입니다.
+- 필요한 것: 저장소 비밀값 `ANTHROPIC_API_KEY` (아래 자동 배포 표). 질문 하나에 대략 몇십 원(스샷이 있으면 조금 더)이 듭니다.
+
 ### 길드 계정 (로그인)
 위키는 길드원만 로그인해서 봅니다. 로그인 전에는 로그인 화면만 보이고, 위키 자료(`data/*.json`)도 서버가 로그인한 사람에게만 줍니다.
 
@@ -133,8 +141,11 @@ npm run deploy                            # 빌드 + Cloudflare Pages(sapphire-g
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 계정 ID (로그인한 대시보드 주소 `dash.cloudflare.com/<계정 ID>/...`) |
 | `DATA_REPO_TOKEN` | GitHub > Settings > Developer settings > Fine-grained tokens. Repository access: `sapphire-imo-data` 만, Permissions: Contents Read-only |
 | `DEV_PASSWORD` | 계정이 하나도 없을 때 만드는 퓨앙 계정의 첫 비밀번호 (6자 이상). 처음 로그인하면 바꾸게 됨 |
+| `FIRST_PASSWORD` | (있으면) 시작 계정 마을모금함(길드마스터)과 오피서 다섯 명을 이 비밀번호로 한 번만 만듦. 처음 로그인하면 바꾸게 됨 |
+| `ANTHROPIC_API_KEY` | (있으면) 챗봇이 쓰는 Claude API 키. console.anthropic.com 에서 결제 수단을 넣고 만든다. 없으면 챗봇은 '준비 중' |
 
 - 계정 DB(D1 `sapphire-accounts`)가 없으면 첫 배포가 아시아(apac)에 만들고 표(`schema.sql`)를 넣습니다.
+- 임시 비밀번호로 처음 들어오면 비밀번호 바꾸기 화면만 보입니다. 다른 아이디로 잘못 들어왔으면 '◀ 다른 아이디로 로그인'이나 폰의 뒤로 가기로 로그인 화면으로 돌아갑니다.
 - 첫 계정은 퓨앙 하나만 만듭니다. 마을모금함과 오피서 다섯 명은 퓨앙이 위키 '👥 길드원 관리'에서 만들고, 화면에 한 번 보이는 임시 비밀번호를 각자에게 따로 알려 줍니다. (공개 저장소라 실행 기록에 비밀번호를 찍을 수 없어서)
 
 **PC에서 직접 배포 (자동 배포를 못 쓸 때, 위키 자료가 있는 PC에서)** (Cloudflare 로그인 필요)
