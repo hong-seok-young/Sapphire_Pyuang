@@ -21,12 +21,17 @@ import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import java.text.SimpleDateFormat
@@ -35,6 +40,7 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 
 /**
  * 다른 앱(게임) 위에 시계를 띄우는 포그라운드 서비스.
@@ -68,8 +74,11 @@ class FloatingClockService : Service() {
         /** 화면 앞에 떠 있는 앱을 확인하는 간격 */
         private const val WATCH_INTERVAL_MS = 500L
 
-        /** 타이머 목록 창이 저절로 닫히는 시간 */
-        private const val PANEL_AUTO_HIDE_MS = 6000L
+        /** 타이머 목록 창이 저절로 닫히는 시간. 창에 손이 닿을 때마다 다시 센다 */
+        private const val PANEL_AUTO_HIDE_MS = 8000L
+
+        /** 목록 창의 사냥터 이름 색 */
+        private val PLACE_COLOR = Color.parseColor("#9FC5FF")
 
         /** 끝난 타이머를 '지금!'으로 보여 주는 시간 */
         private const val DONE_SHOW_MS = 3 * 60 * 1000L
@@ -104,8 +113,11 @@ class FloatingClockService : Service() {
     private var clockText: TextView? = null
     private var chipsColumn: LinearLayout? = null
     private var params: WindowManager.LayoutParams? = null
-    private var panel: LinearLayout? = null
+    private var panel: View? = null
     private var panelClosedAt = 0L
+
+    /** 목록 창에서 펼친 사냥터의 이름 줄 (펼치면 그 줄이 맨 위에 오게 스크롤한다) */
+    private var openPlaceHeader: View? = null
     private val handler = Handler(Looper.getMainLooper())
     private var fmt: SimpleDateFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
     private var tracker: GameDetector.ForegroundTracker? = null
@@ -145,6 +157,7 @@ class FloatingClockService : Service() {
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
         prefs = Prefs(this)
         TimerStore.ensureLoaded(this)
+        WikiTimers.refresh(this, force = false) // 보스·네임드 젠 시간 (몇 시간에 한 번, 바뀐 것만 받는다)
         createChannel(this)
     }
 
@@ -378,42 +391,26 @@ class FloatingClockService : Service() {
     private fun openPanel() {
         val anchor = container ?: return
         val anchorLp = params ?: return
+        // 시계 아래와 위 중 넉넉한 쪽에 띄우고, 그보다 길면 스크롤한다
+        val screenH = resources.displayMetrics.heightPixels
+        val belowY = anchorLp.y + anchor.height + dp(4)
+        val spaceBelow = screenH - belowY - dp(8)
+        val spaceAbove = anchorLp.y - dp(8)
+        val placeBelow = spaceBelow >= dp(240) || spaceBelow >= spaceAbove
+        val maxH = min(if (placeBelow) spaceBelow else spaceAbove, (screenH * 0.7f).toInt()).coerceAtLeast(dp(120))
+
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(4), dp(4), dp(4), dp(4))
+        }
+        val scroll = PanelScroll(maxH).apply {
             background = GradientDrawable().apply {
                 cornerRadius = dp(10).toFloat()
                 setColor(Color.argb(230, 25, 25, 25))
             }
+            addView(box)
         }
-        if (TimerStore.presets.isEmpty()) {
-            box.addView(panelItem(getString(R.string.panel_no_presets), null))
-        }
-        for (p in TimerStore.presets) {
-            box.addView(panelItem(getString(R.string.panel_start_fmt, p.name, TimeFmt.label(this, p.durationSec))) {
-                TimerStore.startTimer(this, p)
-                closePanel()
-                updateTimers()
-            })
-        }
-        for (t in TimerStore.running.toList()) {
-            box.addView(panelItem(getString(R.string.panel_cancel_fmt, t.name)) {
-                TimerStore.cancelTimer(this, t.id)
-                closePanel()
-                updateTimers()
-            })
-        }
-        box.addView(panelItem(getString(R.string.panel_close)) { closePanel() })
-        // 목록 바깥을 누르면 닫는다 (그 터치는 게임에도 그대로 전달된다)
-        box.setOnTouchListener { _, e ->
-            if (e.actionMasked == MotionEvent.ACTION_OUTSIDE) {
-                closePanel()
-                panelClosedAt = SystemClock.uptimeMillis()
-                true
-            } else {
-                false
-            }
-        }
+        fillPanel(box)
 
         val plp = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -427,35 +424,153 @@ class FloatingClockService : Service() {
         ).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             x = anchorLp.x
-            y = anchorLp.y + anchor.height + dp(4)
+            y = if (placeBelow) belowY else max(0, anchorLp.y - maxH - dp(4))
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
         }
-        if (runCatching { wm.addView(box, plp) }.isFailure) return
-        panel = box
-        handler.postDelayed(panelAutoHide, PANEL_AUTO_HIDE_MS)
-        // 화면 아래로 넘치면 시계 위쪽으로 옮긴다
-        box.post {
-            if (panel !== box) return@post
-            val screenH = resources.displayMetrics.heightPixels
-            if (plp.y + box.height > screenH) {
-                plp.y = max(0, anchorLp.y - box.height - dp(4))
-                runCatching { wm.updateViewLayout(box, plp) }
+        if (!placeBelow) {
+            // 시계 위쪽에 둘 때는 창 높이가 바뀔 때마다(사냥터를 펼치고 접을 때) 아래 끝을 시계 바로 위에 맞춘다
+            scroll.addOnLayoutChangeListener { v, _, top, _, bottom, _, _, _, _ ->
+                if (panel !== v) return@addOnLayoutChangeListener
+                val y = max(0, anchorLp.y - (bottom - top) - dp(4))
+                if (plp.y != y) {
+                    plp.y = y
+                    runCatching { wm.updateViewLayout(v, plp) }
+                }
             }
+        }
+        if (runCatching { wm.addView(scroll, plp) }.isFailure) return
+        panel = scroll
+        handler.postDelayed(panelAutoHide, PANEL_AUTO_HIDE_MS)
+        scrollToOpenPlace(scroll, smooth = false)
+    }
+
+    /**
+     * 목록 창 내용: 돌아가는 타이머 취소, 내가 만든 타이머, 위키 보스·네임드(사냥터를 누르면 펼침), 닫기.
+     * 사냥터를 펼치고 접을 때 다시 부른다.
+     */
+    private fun fillPanel(box: LinearLayout) {
+        box.removeAllViews()
+        openPlaceHeader = null
+        for (t in TimerStore.running.toList()) {
+            box.addView(panelItem(getString(R.string.panel_cancel_fmt, t.name)) {
+                TimerStore.cancelTimer(this, t.id)
+                closePanel()
+                updateTimers()
+            })
+        }
+        for (p in TimerStore.presets) {
+            box.addView(panelItem(getString(R.string.panel_start_fmt, p.name, TimeFmt.label(this, p.durationSec))) {
+                TimerStore.startTimer(this, p)
+                closePanel()
+                updateTimers()
+            })
+        }
+
+        val wikiOn = prefs.wikiInPanel
+        val wiki = if (wikiOn) WikiTimers.get(this) else null
+        val hidden = prefs.wikiHiddenPlaces
+        val places = wiki?.places.orEmpty().filter { it.id !in hidden }
+        if (wikiOn && wiki == null) {
+            box.addView(panelItem(getString(R.string.panel_wiki_loading), onClick = null))
+            WikiTimers.refresh(this, force = false)
+        } else if (places.isEmpty() && TimerStore.presets.isEmpty()) {
+            box.addView(panelItem(getString(R.string.panel_no_presets), onClick = null))
+        }
+        if (places.isNotEmpty()) {
+            box.addView(panelHeader(getString(R.string.panel_wiki_header)))
+            val openId = prefs.wikiOpenPlace
+            for (place in places) {
+                val isOpen = place.id == openId
+                val header = panelItem((if (isOpen) "▾ " else "▸ ") + place.name, color = PLACE_COLOR) {
+                    prefs.wikiOpenPlace = if (isOpen) null else place.id
+                    fillPanel(box)
+                    (panel as? ScrollView)?.let { if (!isOpen) scrollToOpenPlace(it, smooth = true) }
+                }
+                box.addView(header)
+                if (isOpen) {
+                    openPlaceHeader = header
+                    for (m in place.mobs) box.addView(mobItem(m))
+                }
+            }
+        }
+        box.addView(panelItem(getString(R.string.panel_close)) { closePanel() })
+    }
+
+    /** 펼친 사냥터 이름 줄이 창 맨 위에 오게 스크롤 */
+    private fun scrollToOpenPlace(scroll: ScrollView, smooth: Boolean) {
+        scroll.post {
+            val target = openPlaceHeader ?: return@post
+            if (smooth) scroll.smoothScrollTo(0, target.top) else scroll.scrollTo(0, target.top)
         }
     }
 
-    private fun panelItem(text: String, onClick: (() -> Unit)?): TextView = TextView(this).apply {
+    /** 보스·네임드 한 줄: "▶ 탱크 58분 20초". 위키 글에 값이 여럿이거나 설명이 있으면 아래에 작게 */
+    private fun mobItem(m: WikiTimers.Mob): TextView {
+        val text = SpannableStringBuilder(getString(R.string.panel_start_fmt, m.name, m.label(this)))
+        m.note?.let { note ->
+            val start = text.length
+            text.append('\n').append(note)
+            text.setSpan(RelativeSizeSpan(0.75f), start, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            text.setSpan(ForegroundColorSpan(Color.LTGRAY), start, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        return panelItem(text, indent = true) { startWikiTimer(m) }
+    }
+
+    /** 위키 보스·네임드 타이머 시작. 정해진 시각에 나오는 몬스터는 다음 등장 시각까지 센다 */
+    private fun startWikiTimer(m: WikiTimers.Mob) {
+        val end = m.nextAt(System.currentTimeMillis()) ?: return
+        TimerStore.startRunning(this, "wiki:" + m.key, m.name, end)
+        closePanel()
+        updateTimers()
+    }
+
+    private fun panelItem(
+        text: CharSequence,
+        indent: Boolean = false,
+        color: Int? = null,
+        onClick: (() -> Unit)?,
+    ): TextView = TextView(this).apply {
         this.text = text
-        setTextColor(if (onClick != null) Color.WHITE else Color.LTGRAY)
+        setTextColor(color ?: if (onClick != null) Color.WHITE else Color.LTGRAY)
         textSize = 15f
         minWidth = dp(160)
-        setPadding(dp(14), dp(10), dp(14), dp(10))
+        maxWidth = dp(300)
+        setPadding(dp(if (indent) 28 else 14), dp(10), dp(14), dp(10))
         if (onClick != null) {
             isClickable = true
             setOnClickListener { onClick() }
+        }
+    }
+
+    /** 목록 창 안의 작은 제목 줄 */
+    private fun panelHeader(text: String): TextView = TextView(this).apply {
+        this.text = text
+        setTextColor(Color.LTGRAY)
+        textSize = 12f
+        setPadding(dp(14), dp(12), dp(14), dp(2))
+    }
+
+    /**
+     * 목록 창 틀: 너무 길면 스크롤하고, 손이 닿을 때마다 저절로 닫히는 시간을 다시 센다.
+     * 창 바깥을 누르면 닫는다 (그 터치는 게임에도 그대로 전달된다).
+     */
+    private inner class PanelScroll(private val maxH: Int) : ScrollView(this@FloatingClockService) {
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(maxH, MeasureSpec.AT_MOST))
+        }
+
+        override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+            if (ev.actionMasked == MotionEvent.ACTION_OUTSIDE) {
+                closePanel()
+                panelClosedAt = SystemClock.uptimeMillis()
+                return true
+            }
+            handler.removeCallbacks(panelAutoHide)
+            handler.postDelayed(panelAutoHide, PANEL_AUTO_HIDE_MS)
+            return super.dispatchTouchEvent(ev)
         }
     }
 
@@ -463,6 +578,7 @@ class FloatingClockService : Service() {
         handler.removeCallbacks(panelAutoHide)
         panel?.let { runCatching { wm.removeView(it) } }
         panel = null
+        openPlaceHeader = null
     }
 
     // ---------- 타이머와 시각 알림 ----------

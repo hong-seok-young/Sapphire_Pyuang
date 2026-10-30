@@ -20,8 +20,8 @@ android {
         applicationId = "com.floatingclock.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 10
-        versionName = "1.9"
+        versionCode = 11
+        versionName = "1.10"
     }
 
     signingConfigs {
@@ -52,10 +52,22 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    // 단위 테스트에서 안드로이드 함수는 기본값만 돌려주게 (WikiTimers 의 Handler 등)
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+}
+
+// 위키 자료로 하는 테스트: 자료는 공개 저장소에 없으므로 -PwikiDataDir=폴더 를 줄 때만 돈다
+tasks.withType<Test>().configureEach {
+    systemProperty("wikiDataDir", (project.findProperty("wikiDataDir") ?: "").toString())
 }
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303") // 안드로이드의 org.json 은 테스트에서 비어 있다
 }

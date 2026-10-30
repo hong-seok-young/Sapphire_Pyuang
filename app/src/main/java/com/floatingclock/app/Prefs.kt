@@ -93,6 +93,21 @@ class Prefs(context: Context) {
         get() = sp.getInt("reminder_lead_min", 5)
         set(v) = sp.edit().putInt("reminder_lead_min", v).apply()
 
+    /** 시계를 누르면 위키의 보스·네임드 젠 타이머도 보여 줄지 */
+    var wikiInPanel: Boolean
+        get() = sp.getBoolean("wiki_in_panel", true)
+        set(v) = sp.edit().putBoolean("wiki_in_panel", v).apply()
+
+    /** 목록에서 뺀 사냥터(위키 사냥터 id). 위키에 새로 생긴 사냥터는 기본으로 보인다 */
+    var wikiHiddenPlaces: Set<String>
+        get() = sp.getStringSet("wiki_hidden_places", null)?.toSet() ?: emptySet()
+        set(v) = sp.edit().putStringSet("wiki_hidden_places", HashSet(v)).apply()
+
+    /** 목록에서 마지막으로 펼친 사냥터. 다음에 목록을 열 때 바로 펼쳐 준다 */
+    var wikiOpenPlace: String?
+        get() = sp.getString("wiki_open_place", null)
+        set(v) = sp.edit().putString("wiki_open_place", v).apply()
+
     /** 없앤 기능(v1.5 화면 인식)이 남긴 설정값 정리 */
     fun removeLegacyKeys() {
         sp.edit().remove("show_capture_btn").remove("cap_btn_x").remove("cap_btn_y").apply()

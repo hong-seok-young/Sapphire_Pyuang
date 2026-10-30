@@ -30,6 +30,9 @@ class TimerActivity : AppCompatActivity() {
     private lateinit var reminderEmpty: TextView
     private lateinit var preAlertLabel: TextView
     private lateinit var leadLabel: TextView
+    private lateinit var wikiState: TextView
+    private lateinit var wikiSource: TextView
+    private lateinit var wikiButtons: List<View>
 
     /** 미리 알림 단계 (초): 끄기, 10초, 30초, 1분, 3분, 5분 */
     private val preAlertSteps = intArrayOf(0, 10, 30, 60, 180, 300)
@@ -84,6 +87,104 @@ class TimerActivity : AppCompatActivity() {
         findViewById<View>(R.id.btn_add_preset).setOnClickListener { showPresetDialog(null) }
         findViewById<View>(R.id.btn_add_reminder).setOnClickListener { showReminderDialog(null) }
         refreshLists()
+        setupWiki()
+    }
+
+    // ---------- 위키 보스·네임드 젠 시간 ----------
+    // 자료는 위키 사이트에서 받아 쓴다 (WikiTimers). 앱에 따로 넣지 않는다.
+
+    private fun setupWiki() {
+        wikiState = findViewById(R.id.wiki_state)
+        wikiSource = findViewById(R.id.wiki_source)
+        findViewById<MaterialSwitch>(R.id.sw_wiki_in_panel).apply {
+            isChecked = prefs.wikiInPanel
+            setOnCheckedChangeListener { _, on -> prefs.wikiInPanel = on }
+        }
+        val places = findViewById<View>(R.id.btn_wiki_places).apply { setOnClickListener { showWikiPlaces() } }
+        val list = findViewById<View>(R.id.btn_wiki_list).apply { setOnClickListener { showWikiList() } }
+        wikiButtons = listOf(places, list)
+        findViewById<View>(R.id.btn_wiki_refresh).setOnClickListener { refreshWiki(force = true) }
+        refreshWiki(force = false)
+    }
+
+    private fun refreshWiki(force: Boolean) {
+        updateWikiState(loading = true)
+        WikiTimers.refresh(this, force) { ok ->
+            if (isFinishing || isDestroyed) return@refresh
+            updateWikiState(loading = false)
+            if (force) {
+                Toast.makeText(this, if (ok) R.string.wiki_refreshed else R.string.wiki_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun updateWikiState(loading: Boolean) {
+        val d = WikiTimers.get(this)
+        wikiState.text = when {
+            d != null -> {
+                val hidden = prefs.wikiHiddenPlaces
+                getString(R.string.wiki_state_fmt, d.places.size, d.places.count { it.id !in hidden }, d.mobCount)
+            }
+            loading -> getString(R.string.wiki_loading)
+            else -> getString(R.string.wiki_failed)
+        }
+        wikiSource.text = if (d != null) {
+            val patch = if (d.patch.isNotEmpty()) getString(R.string.wiki_patch_fmt, d.patch) else ""
+            getString(R.string.wiki_source_fmt, d.sourceTitle, d.author, patch)
+        } else {
+            getString(R.string.wiki_source_default)
+        }
+        wikiButtons.forEach { it.isEnabled = d != null }
+    }
+
+    /** 시계 목록에 보일 사냥터 고르기. 체크를 뺀 사냥터만 저장해서, 위키에 새로 생긴 곳은 기본으로 보인다 */
+    private fun showWikiPlaces() {
+        val d = WikiTimers.get(this) ?: return
+        val hidden = prefs.wikiHiddenPlaces
+        val labels = d.places.map { getString(R.string.wiki_place_fmt, it.region, it.name, it.mobs.size) }.toTypedArray()
+        val checked = BooleanArray(d.places.size) { d.places[it].id !in hidden }
+        val dlg = AlertDialog.Builder(this)
+            .setTitle(R.string.wiki_pick_places)
+            .setMultiChoiceItems(labels, checked) { _, which, on -> checked[which] = on }
+            .setPositiveButton(R.string.save) { _, _ ->
+                prefs.wikiHiddenPlaces = d.places.filterIndexed { i, _ -> !checked[i] }.map { it.id }.toSet()
+                updateWikiState(loading = false)
+            }
+            .setNeutralButton(R.string.wiki_select_all, null)
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+        dlg.setOnShowListener {
+            // '모두 선택/해제'는 창을 닫지 않고 체크만 바꾼다
+            dlg.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                val value = !checked.all { it }
+                for (i in checked.indices) {
+                    checked[i] = value
+                    dlg.listView.setItemChecked(i, value)
+                }
+            }
+        }
+        dlg.show()
+    }
+
+    /** 들어 있는 보스·네임드와 젠 시간을 사냥터별로 보여 준다 (위키에 적힌 글도 함께) */
+    private fun showWikiList() {
+        val d = WikiTimers.get(this) ?: return
+        val text = buildString {
+            for (place in d.places) {
+                if (isNotEmpty()) append("\n")
+                append("[").append(place.region).append("] ").append(place.name).append("\n")
+                for (m in place.mobs) {
+                    append("  ").append(m.name).append("  ").append(m.label(this@TimerActivity))
+                    m.note?.let { append("\n      ").append(it) }
+                    append("\n")
+                }
+            }
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.wiki_list_title)
+            .setMessage(text)
+            .setPositiveButton(R.string.ok, null)
+            .show()
     }
 
     private fun updateLabels() {

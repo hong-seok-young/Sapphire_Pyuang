@@ -102,12 +102,16 @@ object TimerStore {
 
     /** 타이머 시작. 같은 타이머가 이미 돌고 있으면 처음부터 다시. */
     fun startTimer(ctx: Context, preset: TimerPreset) {
-        running.removeAll { it.presetId == preset.id }
-        running += RunningTimer(
-            presetId = preset.id,
-            name = preset.name,
-            endAt = System.currentTimeMillis() + preset.durationSec * 1000L,
-        )
+        startRunning(ctx, preset.id, preset.name, System.currentTimeMillis() + preset.durationSec * 1000L)
+    }
+
+    /**
+     * 끝나는 시각을 정해서 타이머 시작. 위키 보스·네임드 타이머도 이걸 쓴다 (id 는 "wiki:몬스터").
+     * 같은 id 가 이미 돌고 있으면 처음부터 다시.
+     */
+    fun startRunning(ctx: Context, presetId: String, name: String, endAt: Long) {
+        running.removeAll { it.presetId == presetId }
+        running += RunningTimer(presetId = presetId, name = name, endAt = endAt)
         save(ctx)
     }
 

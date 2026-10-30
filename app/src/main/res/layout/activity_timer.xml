@@ -60,6 +60,63 @@
             android:layout_height="wrap_content"
             android:text="@string/add_preset" />
 
+        <!-- 위키 보스·네임드 젠 시간 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/wiki_title"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/wiki_desc"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/wiki_state"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/wiki_loading"
+            android:textSize="13sp" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/sw_wiki_in_panel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/wiki_in_panel" />
+
+        <Button
+            android:id="@+id/btn_wiki_places"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/wiki_pick_places" />
+
+        <Button
+            android:id="@+id/btn_wiki_list"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/wiki_show_list" />
+
+        <Button
+            android:id="@+id/btn_wiki_refresh"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/wiki_refresh" />
+
+        <TextView
+            android:id="@+id/wiki_source"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/wiki_source_default"
+            android:textSize="12sp" />
+
         <!-- 정해진 시각 알림 -->
         <TextView
             android:layout_width="match_parent"
