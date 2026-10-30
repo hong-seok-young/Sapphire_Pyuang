@@ -1,6 +1,9 @@
+import { useCallback } from "react";
 import type { Wiki } from "../types";
-import { PicImg, TopBar, levelText, NotFound } from "../ui";
-import { MonsterCard, PlaceInfo } from "../wiki-ui";
+import { PicImg, TopBar, levelText, Loading, NotFound } from "../ui";
+import { MonsterCard } from "../wiki-ui";
+import { Blocks } from "../Blocks";
+import { loadPosts, postLink, useAsync } from "../data";
 
 /** 지역 버튼에 쓰는 짧은 이름 */
 const SHORT: Record<string, string> = {
@@ -45,10 +48,20 @@ export function Places({ wiki, region }: { wiki: Wiki; region: string }) {
   );
 }
 
+/**
+ * 사냥터 화면: 몬스터는 카드로, 나머지(옆 사냥터로 가는 길, 지도, 퀘스트, NPC, 참고, 보상)는 원글 칸을 그대로 그린다.
+ * 원글을 따로 열지 않아도 원글의 정보가 모두 보이게 한다. 어떤 칸을 그릴지는 build_data.py 의 post_parts 가 정한다.
+ */
 export function PlacePage({ wiki, id }: { wiki: Wiki; id: string }) {
+  // 원글 칸은 글 본문 자료(posts.json)에 있어서 따로 불러온다
+  const { data: posts, error } = useAsync(useCallback(() => loadPosts(), []));
   const p = wiki.places[id];
   if (!p) return <NotFound what="사냥터" />;
   const mons = p.monsters.map((k) => wiki.monsters[k]).filter(Boolean);
+  const post = posts?.[id];
+  const link = posts ? postLink(wiki, posts) : () => null;
+  const part = (idx: number[]) =>
+    post && idx.length > 0 && <Blocks blocks={idx.map((i) => post.blocks[i])} link={link} />;
   return (
     <>
       <TopBar title={p.name} />
@@ -61,10 +74,11 @@ export function PlacePage({ wiki, id }: { wiki: Wiki; id: string }) {
           </div>
         </div>
       </div>
+      {part(p.above)}
       {mons.map((m) => (
         <MonsterCard key={m.key} wiki={wiki} m={m} />
       ))}
-      {p.info && <PlaceInfo text={p.info} />}
+      {posts ? part(p.below) : p.above.length + p.below.length > 0 && <Loading error={error} />}
     </>
   );
 }

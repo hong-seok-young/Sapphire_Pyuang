@@ -61,30 +61,3 @@ export function MonsterCard({ wiki, m, showPlace = false, link = true }: {
     </article>
   );
 }
-
-/** '《 이동 》 / 1. 석상 ... / 《 퀘스트 》 / ...' -> 제목별 목록 */
-export function PlaceInfo({ text }: { text: string }) {
-  const sections: { title: string; lines: string[] }[] = [];
-  for (const part of text.split(" / ")) {
-    const t = part.trim();
-    if (!t) continue;
-    const m = t.match(/^《\s*(.+?)\s*》$/);
-    if (m) sections.push({ title: m[1], lines: [] });
-    else if (sections.length) sections[sections.length - 1].lines.push(t);
-  }
-  if (!sections.length) return null;
-  return (
-    <div className="place-info">
-      {sections.map((s) => (
-        <div key={s.title} className="place-info-sec">
-          <h3>{s.title}</h3>
-          <ul>
-            {s.lines.map((l, i) => (
-              <li key={i}>{l}</li>
-            ))}
-          </ul>
-        </div>
-      ))}
-    </div>
-  );
-}

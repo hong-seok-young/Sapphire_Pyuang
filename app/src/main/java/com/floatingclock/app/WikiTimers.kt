@@ -72,7 +72,8 @@ object WikiTimers {
 
     class Place(val id: String, val name: String, val region: String, val mobs: List<Mob>)
 
-    class Data(val places: List<Place>, val sourceTitle: String, val author: String, val patch: String) {
+    /** patch: 재부활 시간이 어느 패치 기준인지 (위키 meta.source.패치) */
+    class Data(val places: List<Place>, val patch: String) {
         val mobCount: Int get() = places.sumOf { it.mobs.size }
     }
 
@@ -152,7 +153,7 @@ object WikiTimers {
     }
 
     /** 바뀐 것이 없을 때 download 가 돌려주는 표시 */
-    private val NOT_CHANGED = Data(emptyList(), "", "", "")
+    private val NOT_CHANGED = Data(emptyList(), "")
 
     /**
      * 네 파일을 받아서, 바뀐 것이 있으면 새 자료를 만들어 저장하고 돌려준다.
@@ -244,12 +245,7 @@ object WikiTimers {
                 if (mobs.isNotEmpty()) out += Place(pid, p.optString("name", pid), region, mobs)
             }
         }
-        return Data(
-            out,
-            source?.optString("제목").orEmpty().ifEmpty { "아이모 원클릭 드랍표" },
-            source?.optString("작성자").orEmpty().ifEmpty { "iOS" },
-            source?.optString("패치").orEmpty(),
-        )
+        return Data(out, source?.optString("패치").orEmpty())
     }
 
     private fun parseMob(key: String, m: JSONObject): Mob? {

@@ -31,7 +31,7 @@ class TimerActivity : AppCompatActivity() {
     private lateinit var preAlertLabel: TextView
     private lateinit var leadLabel: TextView
     private lateinit var wikiState: TextView
-    private lateinit var wikiSource: TextView
+    private lateinit var wikiPatch: TextView
     private lateinit var wikiButtons: List<View>
 
     /** 미리 알림 단계 (초): 끄기, 10초, 30초, 1분, 3분, 5분 */
@@ -95,7 +95,7 @@ class TimerActivity : AppCompatActivity() {
 
     private fun setupWiki() {
         wikiState = findViewById(R.id.wiki_state)
-        wikiSource = findViewById(R.id.wiki_source)
+        wikiPatch = findViewById(R.id.wiki_patch)
         findViewById<MaterialSwitch>(R.id.sw_wiki_in_panel).apply {
             isChecked = prefs.wikiInPanel
             setOnCheckedChangeListener { _, on -> prefs.wikiInPanel = on }
@@ -129,12 +129,10 @@ class TimerActivity : AppCompatActivity() {
             WikiTimers.needsLogin -> getString(R.string.wiki_login_needed)
             else -> getString(R.string.wiki_failed)
         }
-        wikiSource.text = if (d != null) {
-            val patch = if (d.patch.isNotEmpty()) getString(R.string.wiki_patch_fmt, d.patch) else ""
-            getString(R.string.wiki_source_fmt, d.sourceTitle, d.author, patch)
-        } else {
-            getString(R.string.wiki_source_default)
-        }
+        // 재부활 시간이 어느 패치 기준인지만 적는다 (출처 글은 제작자 요청으로 뺐다)
+        val patch = d?.patch.orEmpty()
+        wikiPatch.text = if (patch.isNotEmpty()) getString(R.string.wiki_patch_fmt, patch) else ""
+        wikiPatch.visibility = if (patch.isNotEmpty()) View.VISIBLE else View.GONE
         wikiButtons.forEach { it.isEnabled = d != null }
     }
 

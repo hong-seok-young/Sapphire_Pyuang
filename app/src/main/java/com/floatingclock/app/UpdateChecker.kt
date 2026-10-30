@@ -15,7 +15,7 @@ import java.net.URL
 import kotlin.concurrent.thread
 
 /**
- * GitHub 릴리스에서 새 버전을 확인하고 APK를 받아 설치 화면을 띄운다.
+ * GitHub 릴리스에서 새 버전을 확인하고 APK를 받아 설치한다 (안드로이드 12 이상은 확인 없이, UpdateInstaller).
  *
  * 배포 방법: 저장소에 태그 v1.2 같은 릴리스를 만들고 APK 파일을 첨부하면 끝.
  * (프로젝트의 publish.cmd 가 빌드 + 릴리스 생성을 한 번에 해준다.)
@@ -87,14 +87,14 @@ object UpdateChecker {
     }
 
     /**
-     * APK 다운로드 후 설치 화면 실행.
-     * onProgress(0~100), onDone(성공 여부, 오류 메시지) 는 메인 스레드에서 호출.
+     * APK 다운로드.
+     * onProgress(0~100), onDone(받은 파일, 오류 메시지) 는 메인 스레드에서 호출. 못 받으면 파일은 null.
      */
-    fun downloadAndInstall(
+    fun download(
         ctx: Context,
         apkUrl: String,
         onProgress: (Int) -> Unit,
-        onDone: (Boolean, String?) -> Unit
+        onDone: (File?, String?) -> Unit
     ) {
         thread(name = "update-download") {
             val file = File(ctx.cacheDir, "update.apk")
@@ -133,15 +133,25 @@ object UpdateChecker {
                 }
             }
             main.post {
-                if (ok.isSuccess) {
-                    runCatching { launchInstaller(ctx, file) }
-                        .onSuccess { onDone(true, null) }
-                        .onFailure { onDone(false, it.message) }
-                } else {
-                    onDone(false, ok.exceptionOrNull()?.message)
-                }
+                if (ok.isSuccess) onDone(file, null) else onDone(null, ok.exceptionOrNull()?.message)
             }
         }
+    }
+
+    /**
+     * 받은 APK 설치. 안드로이드 12 이상이면 확인 창 없이 바로 설치하고(UpdateInstaller),
+     * 다른 폰이거나 바로 설치가 안 되면 안드로이드 설치 화면을 띄운다.
+     * 확인 없이 설치를 시작했으면 true: 곧 앱이 닫혔다가 새 버전으로 열린다.
+     */
+    fun install(ctx: Context, apk: File, version: String): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && UpdateInstaller.canInstallSilently(ctx)) {
+            if (runCatching { UpdateInstaller.install(ctx, apk, version) }.isSuccess) {
+                apk.delete() // 설치 프로그램이 이미 복사해 갔다
+                return true
+            }
+        }
+        launchInstaller(ctx, apk)
+        return false
     }
 
     private fun launchInstaller(ctx: Context, apk: File) {

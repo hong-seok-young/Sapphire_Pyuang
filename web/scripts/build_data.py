@@ -7,7 +7,7 @@
   posts.json      글마다 제목과 본문 블록(문단, 표). 그림과 다른 글 링크도 들어 있다
   menu.json       홈 화면 메뉴 (육성 공략, 스킬, 장비, 조합책, 기타)
   regions.json    지역 -> 사냥터 목록
-  places.json     사냥터: 레벨, 배너 그림, 몬스터, 안내
+  places.json     사냥터: 레벨, 배너 그림, 몬스터, 원글에서 그대로 그릴 칸 (지도, 이동, 퀘스트, 참고)
   monsters.json   몬스터: 레벨, HP, 특징, 드랍, 재부활, 스킬, 그림
   items.json      아이템: 아이콘, 떨구는 몬스터, 장비 정보
   equipment.json  부위별 장비 표
@@ -40,6 +40,15 @@ ORIG_DIR = SRC / "이미지" / "원본"
 MANIFEST = json.loads((ORIG_DIR / "목록.json").read_text(encoding="utf-8"))
 CAFE = "https://cafe.naver.com/iphoneimo/"
 SOURCE = {"제목": "아이모 원클릭 드랍표", "작성자": "iOS", "글": CAFE + "333636", "패치": "2026.10.24"}
+# naver.me short links in the posts all lead to cafe posts. Resolved once (2026-10-30, curl -I) so the wiki
+# can open its own page for that post instead of sending people out to the cafe.
+NAVER_ME = {
+    "GSQvdJiK": "342972", "xpj8ckdY": "342707", "xdMZgsl8": "186770", "GzdnqaiT": "332500",
+    "GJZsjaN9": "343049", "56Xp79Zn": "343051", "5ulXbdwE": "185599", "xdM52aZl": "343049",
+    "x3cLq0yL": "342999", "5wrDuSeE": "343068", "FbVQJ6YG": "343069", "Gi0bL3bU": "230264",
+    "xHEkfGp7": "246455", "GkIDBMzl": "332634", "551H1hJY": "335677", "xEXYoYRU": "336975",
+    "FgEfwPck": "247242", "xLNaqi3w": "244701", "FUiQeq3R": "244690", "GIIGQIwH": "244749",
+}
 
 BIG_IMAGE = 300_000  # bytes; bigger still pictures are re-encoded as WebP
 MAX_SIDE = 1600      # px; huge guide pictures are scaled down to this for phones
@@ -115,7 +124,10 @@ def picture_of(img: Tag) -> dict | None:
 
 def article_id(link: str) -> str | None:
     m = re.search(r"cafe\.naver\.com/(?:iphoneimo/|ca-fe/web/cafes/(?:iphoneimo|20603221)/articles/)(\d+)", link or "")
-    return m.group(1) if m else None
+    if m:
+        return m.group(1)
+    m = re.search(r"naver\.me/(\w+)", link or "")
+    return NAVER_ME.get(m.group(1)) if m else None
 
 
 DEFAULT_COLORS = {"#000000", "#141414", "#333333", "#222222", "#111111"}
@@ -162,7 +174,7 @@ def runs_of(node: Tag) -> list:
             aid = article_id(target)
             if aid:
                 lk = "post:" + aid
-            elif target.startswith("http") and "cafe.naver.com" not in target:
+            elif target.startswith("http") and "cafe.naver.com" not in target and "naver.me" not in target:
                 lk = target
         for child in el.children:
             walk(child, b, c, lk)
@@ -450,6 +462,71 @@ def index_buttons() -> tuple[dict, dict]:
     return banners, region_pics
 
 
+
+# ---------------------------------------------------------------- the rest of a hunting-ground post
+
+def run_list(b: dict) -> list:
+    """Every run (text or picture) of a posts.json block."""
+    if b["k"] == "p":
+        return b["r"]
+    return [r for row in b["rows"] for cell in row for line in cell["l"] for r in line]
+
+
+def block_text(b: dict) -> str:
+    return "".join(r.get("t", "") for r in run_list(b)).strip()
+
+
+def row_text(row: list[dict]) -> str:
+    """A posts.json table row as text without separators, like Tag.get_text("")."""
+    return "".join(r.get("t", "") for cell in row for line in cell["l"] for r in line)
+
+
+def monster_rows(rows: list[list[dict]]) -> tuple[set[int], int]:
+    """The monster blocks parse_monsters() finds, read again from a posts.json table:
+    which rows they take up and how many monsters there are."""
+    used, count = set(), 0
+    for i in range(len(rows) - 1):
+        r0, name_row = rows[i], rows[i + 1]
+        if len(r0) < 2 or not HP_CELL.search(row_text(r0[:1])) or "(Lv." not in row_text(name_row):
+            continue
+        names = [x for x in (plain([line]) for line in name_row[0]["l"]) if x] if name_row else []
+        if not names or names[0].startswith("("):
+            continue  # not a monster block (see monster_from_rows)
+        used |= {i, i + 1}
+        count += 1
+        if i + 2 < len(rows) and not HP_CELL.search(row_text(rows[i + 2])[:20]):
+            used.add(i + 2)
+    return used, count
+
+
+def post_parts(aid: str, post: dict | None, monster_count: int) -> tuple[list[int], list[int]]:
+    """Which blocks of a hunting-ground post the place page draws as they are, above and below the monster cards:
+    maps, links to the next grounds, quests, NPCs, notes, rewards. Left out: the monster tables (shown as cards),
+    the title box at the top (the page shows the place banner) and the cafe's '◀ 메뉴이동' links."""
+    if not post:
+        return [], []
+    kinds, found = [], 0
+    for i, b in enumerate(post["blocks"]):
+        if b["k"] == "table":
+            used, n = monster_rows(b["rows"])
+            if n and len(used) == len(b["rows"]):
+                kinds.append("monster")
+                found += n
+                continue
+        pics = [r for r in run_list(b) if "src" in r]
+        title_box = i < 2 and pics and all(r["w"] >= 2.4 * r["h"] for r in pics) and len(block_text(b)) <= 80
+        if title_box or block_text(b) in ("◀ 메뉴이동", "◀️이전으로 돌아가기") or not (pics or block_text(b)):
+            kinds.append("skip")
+        else:
+            kinds.append("show")
+    if found != monster_count:
+        # the cards and the tables disagree: draw the monster tables as well so nothing goes missing
+        print(f"  사냥터 글 {aid}: 몬스터 표 {found}, 카드 {monster_count} -> 표도 그대로 보여 줌")
+        kinds = ["show" if k == "monster" else k for k in kinds]
+    first = kinds.index("monster") if "monster" in kinds else len(kinds)
+    shown = [i for i, k in enumerate(kinds) if k == "show"]
+    return [i for i in shown if i < first], [i for i in shown if i > first]
+
 # ---------------------------------------------------------------- equipment tables
 
 def parse_equipment(aid: str, title: str, box: Tag) -> dict | None:
@@ -561,14 +638,7 @@ def main():
             mons = parse_monsters(aid, boxes[aid], p) if aid in boxes else []
             for m in mons:
                 monsters[m["key"]] = m
-            info = ""
-            for b in posts.get(aid, {}).get("blocks", []):
-                if b["k"] == "table":
-                    for row in b["rows"]:
-                        for cell in row:
-                            text = plain(cell["l"])
-                            if "《" in text:
-                                info = text
+            above, below = post_parts(aid, posts.get(aid), len(mons))
             levels = [m["level"] for m in mons if m["level"]]
             places[aid] = {
                 "id": aid, "name": p["이름"], "title": posts.get(aid, {}).get("title", p["이름"]),
@@ -576,7 +646,7 @@ def main():
                 "level": p.get("레벨") or ([min(levels), max(levels)] if levels else None),
                 "desc": p.get("설명"),
                 "banner": banners.get(aid) or first_banner(posts.get(aid)),
-                "monsters": [m["key"] for m in mons], "info": info,
+                "monsters": [m["key"] for m in mons], "above": above, "below": below,
             }
         regions.append({"name": region["이름"], "pic": region_pics.get(region["이름"]), "places": ids})
 

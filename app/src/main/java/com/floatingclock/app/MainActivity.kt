@@ -39,6 +39,9 @@ class MainActivity : AppCompatActivity() {
 
         /** 위키의 '앱' 탭 버튼 주소 (sapphire://clock 등). 웹앱 src/pages/AppPage.tsx 와 맞춘다 */
         private const val APP_SCHEME = "sapphire"
+
+        /** 스스로 업데이트한 뒤 새 버전으로 다시 열렸다는 표시 (StartupReceiver) */
+        const val EXTRA_UPDATED = "com.floatingclock.app.extra.UPDATED"
     }
 
     private lateinit var web: WebView
@@ -70,6 +73,9 @@ class MainActivity : AppCompatActivity() {
             domStorageEnabled = true // 웹앱이 보던 화면 같은 상태를 저장한다
             // 웹앱이 이 앱 안에서 열렸는지 알 수 있게 표시한다 (앱에서만 보일 기능을 웹앱에 넣을 때 쓴다)
             userAgentString = "$userAgentString SapphireApp/${BuildConfig.VERSION_NAME}"
+            // 지도 같은 큰 그림을 손가락으로 벌려 크게 볼 수 있게 한다 (브라우저와 같게). 확대 버튼은 숨긴다
+            builtInZoomControls = true
+            displayZoomControls = false
         }
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
@@ -131,6 +137,9 @@ class MainActivity : AppCompatActivity() {
         })
         if (savedInstanceState == null || web.restoreState(savedInstanceState) == null) {
             web.loadUrl(WEB_URL)
+        }
+        if (savedInstanceState == null && intent.getBooleanExtra(EXTRA_UPDATED, false)) {
+            Toast.makeText(this, getString(R.string.update_done, BuildConfig.VERSION_NAME), Toast.LENGTH_LONG).show()
         }
     }
 

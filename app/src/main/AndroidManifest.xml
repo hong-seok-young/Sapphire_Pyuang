@@ -12,6 +12,8 @@
     <!-- 앱 내 업데이트: 새 버전 확인/다운로드 및 설치 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- 안드로이드 12+: 이 앱이 자기 자신을 업데이트할 때는 설치 확인 창 없이 (UpdateInstaller) -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
     <!-- 게임 감지: 지금 화면 앞에 떠 있는 앱 확인 ('사용 정보 접근', 사용자가 설정에서 직접 허용) -->
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
@@ -94,6 +96,11 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <!-- 업데이트 설치 결과 (안드로이드 설치 프로그램이 이 앱의 PendingIntent 로 보낸다) -->
+        <receiver
+            android:name=".UpdateResultReceiver"
+            android:exported="false" />
 
         <!-- 다운로드한 업데이트 APK를 설치 프로그램에 넘기기 위한 FileProvider -->
         <provider

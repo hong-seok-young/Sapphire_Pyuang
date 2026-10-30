@@ -165,10 +165,6 @@ button { font: inherit; color: inherit; }
 .chip { display: flex; align-items: center; gap: 4px; padding: 3px 7px 3px 4px; font-size: 12px; background: var(--night-2); }
 .chip .pic { flex: none; }
 
-.place-info { display: grid; gap: 8px; margin: 4px 0 12px; }
-.place-info-sec { padding: 10px; background: var(--panel); border: var(--px) solid var(--edge); }
-.place-info-sec h3 { margin: 0 0 4px; font-size: 13px; color: var(--gold); }
-.place-info-sec ul { margin: 0; padding-left: 16px; font-size: 12px; }
 
 /* detail */
 .detail-hero { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 0 14px; }

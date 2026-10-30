@@ -115,6 +115,8 @@ class WikiWindow(private val ctx: Context) {
         val view = WebView(ContextThemeWrapper(ctx, R.style.Theme_FloatingClock)).apply {
             settings.javaScriptEnabled = true // 위키는 자바스크립트로 그리는 웹앱이다
             settings.domStorageEnabled = true
+            settings.builtInZoomControls = true // 지도를 손가락으로 벌려 크게 본다 (확대 버튼은 숨긴다)
+            settings.displayZoomControls = false
             // SapphireFloat: 위키가 이 창 안에서는 '앱' 탭을 숨긴다 (다른 화면을 열면 게임에서 빠져나가서)
             settings.userAgentString = settings.userAgentString + " SapphireApp/" + BuildConfig.VERSION_NAME + " SapphireFloat"
             webViewClient = object : WebViewClient() {

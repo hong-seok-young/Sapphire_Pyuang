@@ -30,6 +30,11 @@ export function loadWiki(): Promise<Wiki> {
   return wikiPromise;
 }
 
+/** 원글 속 다른 글 링크가 갈 곳. 사냥터 글이면 사냥터 화면, 위키에 있는 글이면 그 글, 없으면 null (글자만 보인다) */
+export function postLink(wiki: Wiki, posts: Record<string, Post>): (postId: string) => string | null {
+  return (id) => (wiki.places[id] ? "#/place/" + id : id in posts ? "#/post/" + id : null);
+}
+
 let postsPromise: Promise<Record<string, Post>> | null = null;
 export function loadPosts(): Promise<Record<string, Post>> {
   postsPromise ??= getJson<Record<string, Post>>("posts").catch((e) => {

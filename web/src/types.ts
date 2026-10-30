@@ -46,7 +46,9 @@ export interface Place {
   desc: string | null;
   banner: Pic | null;
   monsters: string[];
-  info: string;
+  /** 원글(posts.json)에서 그대로 그릴 칸 번호. above 는 몬스터 위(옆 사냥터로 가는 길), below 는 아래(지도, 퀘스트, 참고 등) */
+  above: number[];
+  below: number[];
 }
 
 export interface Monster {

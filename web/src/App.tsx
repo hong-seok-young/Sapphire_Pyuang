@@ -74,7 +74,7 @@ function Wiki({ me, onLogout }: { me: Me; onLogout: () => void }) {
   else if (page === "item") body = <ItemPage wiki={wiki} name={arg} />;
   else if (page === "equip") body = arg ? <EquipSlot wiki={wiki} slot={arg} /> : <EquipSlots wiki={wiki} />;
   else if (page === "menu") body = <MenuPage wiki={wiki} title={arg} />;
-  else if (page === "post") body = <PostPage id={arg} />;
+  else if (page === "post") body = <PostPage wiki={wiki} id={arg} />;
   else if (page === "chat") body = <Soon what="chat" />;
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
   else if (page === "app" || page === "timer") body = <AppPage />;

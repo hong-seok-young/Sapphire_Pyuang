@@ -108,6 +108,19 @@ class Prefs(context: Context) {
         get() = sp.getString("wiki_open_place", null)
         set(v) = sp.edit().putString("wiki_open_place", v).apply()
 
+    /** 앱이 스스로 업데이트하느라 닫힐 때 새 버전에서 첫 화면을 다시 열지 (StartupReceiver).
+     *  설치가 시작되면 앱이 바로 닫히므로 바로 저장한다(commit) */
+    var reopenAfterUpdate: Boolean
+        get() = sp.getBoolean("reopen_after_update", false)
+        set(v) {
+            sp.edit().putBoolean("reopen_after_update", v).commit()
+        }
+
+    /** 확인 없이 설치하다 안 된 버전. 그 버전은 다음부터 업데이트 창으로 받는다 */
+    var autoUpdateFailed: String?
+        get() = sp.getString("auto_update_failed", null)
+        set(v) = sp.edit().putString("auto_update_failed", v).apply()
+
     /** 없앤 기능(v1.5 화면 인식)이 남긴 설정값 정리 */
     fun removeLegacyKeys() {
         sp.edit().remove("show_capture_btn").remove("cap_btn_x").remove("cap_btn_y").apply()

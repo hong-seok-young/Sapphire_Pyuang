@@ -93,7 +93,7 @@ class WikiTimersTest {
         val data = WikiTimers.build(texts)
         assertNotNull(data)
         data!!
-        println("wiki places=${data.places.size} mobs=${data.mobCount} source=${data.sourceTitle}/${data.author}/${data.patch}")
+        println("wiki places=${data.places.size} mobs=${data.mobCount} patch=${data.patch}")
         assertTrue(data.places.isNotEmpty())
         for (place in data.places) {
             assertTrue(place.region, !place.region.contains("삭제"))

@@ -110,12 +110,13 @@
             android:layout_height="wrap_content"
             android:text="@string/wiki_refresh" />
 
+        <!-- 재부활 시간이 어느 패치 기준인지 (TimerActivity) -->
         <TextView
-            android:id="@+id/wiki_source"
+            android:id="@+id/wiki_patch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/wiki_source_default"
-            android:textSize="12sp" />
+            android:textSize="12sp"
+            android:visibility="gone" />
 
         <!-- 정해진 시각 알림 -->
         <TextView
