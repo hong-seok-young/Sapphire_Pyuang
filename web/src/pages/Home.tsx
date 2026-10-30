@@ -1,8 +1,20 @@
 import type { Wiki } from "../types";
 import { inApp, isAndroid } from "../platform";
+import { ROLE_NAME, RANK, logout } from "../auth";
+import type { Me } from "../auth";
 
-/** androidOnly: 안드로이드 폰 브라우저에서만 보인다 (앱 안, 아이폰에서는 숨김) */
-const TILES: { title: string; to: string; icon: string; soon?: boolean; androidOnly?: boolean }[] = [
+interface Tile {
+  title: string;
+  to: string;
+  icon: string;
+  soon?: boolean;
+  /** 안드로이드 폰 브라우저에서만 보인다 (앱 안, 아이폰에서는 숨김) */
+  androidOnly?: boolean;
+  /** 오피서 이상에게만 보인다 */
+  managers?: boolean;
+}
+
+const TILES: Tile[] = [
   { title: "사냥터", to: "#/places", icon: "🗺️" },
   { title: "장비", to: "#/equip", icon: "🛡️" },
   { title: "육성 공략", to: "#/menu/육성 공략", icon: "📈" },
@@ -15,11 +27,19 @@ const TILES: { title: string; to: string; icon: string; soon?: boolean; androidO
   { title: "AI 챗봇", to: "#/chat", icon: "💬", soon: true },
   // 시계와 보스 타이머는 안드로이드 앱에만 있다. 웹앱은 위키와 챗봇만 맡는다
   { title: "안드로이드 앱 받기", to: "#/app", icon: "📲", androidOnly: true },
+  { title: "길드원 관리", to: "#/admin", icon: "👥", managers: true },
 ];
 
-const SHOWN = TILES.filter((t) => !t.androidOnly || (isAndroid && !inApp));
+export function Home({ wiki, me, onLogout }: { wiki: Wiki; me: Me; onLogout: () => void }) {
+  const shown = TILES.filter(
+    (t) => (!t.androidOnly || (isAndroid && !inApp)) && (!t.managers || RANK[me.role] >= 1),
+  );
 
-export function Home({ wiki }: { wiki: Wiki }) {
+  async function signOut() {
+    await logout().catch(() => undefined);
+    onLogout();
+  }
+
   return (
     <div className="home">
       <header className="hero">
@@ -35,7 +55,7 @@ export function Home({ wiki }: { wiki: Wiki }) {
       </a>
 
       <nav className="tiles">
-        {SHOWN.map((t) => (
+        {shown.map((t) => (
           <a key={t.title} className={"tile" + (t.soon ? " tile-soon" : "")} href={t.to}>
             <span className="tile-icon">{t.icon}</span>
             <span className="tile-title">{t.title}</span>
@@ -43,6 +63,14 @@ export function Home({ wiki }: { wiki: Wiki }) {
           </a>
         ))}
       </nav>
+
+      <div className="me-line">
+        <span>
+          {me.id} · {ROLE_NAME[me.role]}
+        </span>
+        <a href="#/password">비밀번호 바꾸기</a>
+        <button type="button" onClick={signOut}>로그아웃</button>
+      </div>
 
       <footer className="credit">
         자료 출처: <a href={wiki.meta.source.글} target="_blank" rel="noreferrer">{wiki.meta.source.제목}</a> (Made by{" "}

@@ -239,3 +239,28 @@ button { font: inherit; color: inherit; }
 /* app download page */
 .app-list { margin: 0; padding-left: 18px; line-height: 1.9; }
 .app-note { margin: 0; line-height: 1.7; }
+
+/* login, password, member admin */
+.form { display: flex; flex-direction: column; gap: 10px; }
+.form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.form input {
+  font: inherit; font-size: 15px; color: var(--text); background: var(--night-2); padding: 10px;
+  border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 var(--lo); border-radius: 0;
+}
+.form .btn { flex: none; }
+.btn:disabled, .pill:disabled { opacity: 0.5; }
+.form-error { margin: 8px 4px; color: var(--red); font-size: 13px; }
+.form-note { margin: 10px 4px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.role-pick { display: flex; gap: 6px; flex-wrap: wrap; }
+.account { display: flex; flex-direction: column; gap: 8px; margin-bottom: 0; }
+.account-head { display: flex; align-items: center; gap: 6px; }
+.account-id { flex: 1; font-size: 15px; font-weight: 700; }
+.role-badge { font-size: 11px; padding: 1px 6px; border: 1px solid var(--edge); background: var(--panel-2); color: var(--gold); }
+.role-badge.muted { color: var(--muted); }
+.account-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.account-actions .pill { font-size: 12px; padding: 5px 9px; }
+.pill-danger { background: var(--red); color: var(--edge); }
+.temp-pw { font-size: 18px; letter-spacing: 1px; color: var(--gold); user-select: all; }
+.notice { border-color: var(--gold); }
+.me-line { margin: 18px 4px 0; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 12px; color: var(--muted); }
+.me-line a, .me-line button { color: var(--gold); text-decoration: underline; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }

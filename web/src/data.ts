@@ -3,27 +3,39 @@ import type { Monster, Post, Wiki } from "./types";
 
 const BASE = "data/";
 
+/** 위키 자료는 로그인한 길드원에게만 온다 (functions/data/_middleware.ts). 로그인이 풀리면 이 오류가 난다 */
+export const NEED_LOGIN = "NeedLogin";
+
 async function getJson<T>(name: string): Promise<T> {
   const res = await fetch(BASE + name + ".json");
+  if (res.status === 401) throw new Error(NEED_LOGIN);
   if (!res.ok) throw new Error(`${name}.json: ${res.status}`);
   return res.json();
 }
 
 let wikiPromise: Promise<Wiki> | null = null;
 
-/** 첫 화면에 필요한 자료 (글 본문은 크니까 따로 불러온다) */
+/** 첫 화면에 필요한 자료 (글 본문은 크니까 따로 불러온다). 실패하면 다음에 다시 받는다 */
 export function loadWiki(): Promise<Wiki> {
   wikiPromise ??= Promise.all(
     ["menu", "regions", "places", "monsters", "items", "equipment", "meta"].map((n) => getJson<unknown>(n)),
-  ).then(([menu, regions, places, monsters, items, equipment, meta]) => ({
-    menu, regions, places, monsters, items, equipment, meta,
-  }) as Wiki);
+  )
+    .then(([menu, regions, places, monsters, items, equipment, meta]) => ({
+      menu, regions, places, monsters, items, equipment, meta,
+    }) as Wiki)
+    .catch((e) => {
+      wikiPromise = null;
+      throw e;
+    });
   return wikiPromise;
 }
 
 let postsPromise: Promise<Record<string, Post>> | null = null;
 export function loadPosts(): Promise<Record<string, Post>> {
-  postsPromise ??= getJson<Record<string, Post>>("posts");
+  postsPromise ??= getJson<Record<string, Post>>("posts").catch((e) => {
+    postsPromise = null;
+    throw e;
+  });
   return postsPromise;
 }
 

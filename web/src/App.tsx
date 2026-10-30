@@ -1,7 +1,7 @@
-import { useCallback } from "react";
-import { loadWiki, useAsync } from "./data";
+import { useCallback, useEffect, useState } from "react";
+import { NEED_LOGIN, loadWiki, useAsync } from "./data";
 import { useRoute } from "./router";
-import { Loading } from "./ui";
+import { Loading, NotFound } from "./ui";
 import { Home } from "./pages/Home";
 import { Search } from "./pages/Search";
 import { Places, PlacePage } from "./pages/Places";
@@ -9,6 +9,10 @@ import { ItemPage, MonsterPage } from "./pages/Detail";
 import { EquipSlot, EquipSlots } from "./pages/Equip";
 import { MenuPage, PostPage, Soon } from "./pages/Posts";
 import { AppPage } from "./pages/AppPage";
+import { LoginPage, PasswordPage } from "./pages/Login";
+import { AdminPage } from "./pages/Admin";
+import { RANK, fetchMe } from "./auth";
+import type { Me } from "./auth";
 
 const TABS = [
   { to: "#/", label: "홈", icon: "🏠", match: "" },
@@ -18,14 +22,46 @@ const TABS = [
   { to: "#/chat", label: "챗봇", icon: "💬", match: "chat" },
 ];
 
+/**
+ * 위키는 길드원만 본다. 로그인 전에는 로그인 화면, 임시 비밀번호로 들어오면 비밀번호 바꾸기 화면만 보인다.
+ * (위키 자료 data/*.json 은 서버에서도 로그인한 사람에게만 준다: functions/data/_middleware.ts)
+ */
 export function App() {
+  const [me, setMe] = useState<Me | null | undefined>(undefined); // undefined = 확인 중
+  useEffect(() => {
+    fetchMe().then(setMe, () => setMe(null));
+  }, []);
+
+  if (me === undefined) {
+    return (
+      <div className="app">
+        <main className="page">
+          <Loading />
+        </main>
+      </div>
+    );
+  }
+  if (me === null) return <LoginPage onLogin={setMe} />;
+  if (me.mustChange) return <PasswordPage forced onDone={() => setMe({ ...me, mustChange: false })} />;
+  return <Wiki me={me} onLogout={() => setMe(null)} />;
+}
+
+function Wiki({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const route = useRoute();
   const { data: wiki, error } = useAsync(useCallback(() => loadWiki(), []));
   const [page = "", arg = ""] = route.parts;
 
+  // 다른 기기에서 비밀번호가 초기화되는 등으로 로그인이 풀리면 로그인 화면으로
+  const loggedOut = error?.includes(NEED_LOGIN) ?? false;
+  useEffect(() => {
+    if (loggedOut) onLogout();
+  }, [loggedOut, onLogout]);
+
   let body;
-  if (!wiki) body = <Loading error={error} />;
-  else if (page === "") body = <Home wiki={wiki} />;
+  if (page === "password") body = <PasswordPage onDone={() => (location.hash = "#/")} />;
+  else if (page === "admin") body = RANK[me.role] >= 1 ? <AdminPage me={me} /> : <NotFound what="페이지" />;
+  else if (!wiki) body = <Loading error={loggedOut ? undefined : error} />;
+  else if (page === "") body = <Home wiki={wiki} me={me} onLogout={onLogout} />;
   else if (page === "search") body = <Search wiki={wiki} q={route.query.get("q") ?? ""} />;
   else if (page === "places") body = <Places wiki={wiki} region={route.query.get("r") ?? ""} />;
   else if (page === "place") body = <PlacePage wiki={wiki} id={arg} />;
@@ -37,7 +73,7 @@ export function App() {
   else if (page === "chat") body = <Soon what="chat" />;
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
   else if (page === "app" || page === "timer") body = <AppPage />;
-  else body = <Home wiki={wiki} />;
+  else body = <Home wiki={wiki} me={me} onLogout={onLogout} />;
 
   return (
     <div className="app">

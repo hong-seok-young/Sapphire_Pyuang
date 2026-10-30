@@ -103,10 +103,54 @@ npm run deploy                            # 빌드 + Cloudflare Pages(sapphire-g
 - 위키 자료(`자료/`, `web/public/data`, `web/public/img`)는 git에 올리지 않습니다. 자료 출처: 아이모 원클릭 드랍표 (Made by iOS).
 - 글꼴: [갈무리](https://github.com/quiple/galmuri) (SIL OFL 1.1)
 
+### 길드 계정 (로그인)
+위키는 길드원만 로그인해서 봅니다. 로그인 전에는 로그인 화면만 보이고, 위키 자료(`data/*.json`)도 서버가 로그인한 사람에게만 줍니다.
+
+| 역할 | 누구 | 할 수 있는 일 |
+| --- | --- | --- |
+| 앱개발자 | 퓨앙 | 길드마스터, 오피서, 길드원 계정 모두 |
+| 길드마스터 | 마을모금함 | 오피서 임명과 해제, 오피서와 길드원 계정 만들기, 지우기, 비밀번호 초기화 |
+| 오피서 | 멍멍, 유어아너, 아홀로틀, 정서, 향단 | 길드원 계정 만들기, 지우기, 비밀번호 초기화 |
+| 길드원 | 나머지 | 자기 비밀번호 바꾸기 |
+
+- 계정은 첫 화면의 '👥 길드원 관리'에서 만듭니다. 만들거나 초기화하면 임시 비밀번호가 한 번만 보이고, 그 사람은 처음 로그인할 때 비밀번호를 바꿉니다.
+- 비밀번호는 원문을 저장하지 않고 해시만 저장합니다. 로그인은 30일 유지됩니다.
+- 안드로이드 앱(v1.15 이상)은 앱 안 위키에서 로그인하면 보스 목록과 게임 위 위키 창도 같이 로그인됩니다.
+
+**처음 한 번만, 위키 자료가 있는 PC에서** (Cloudflare 로그인 필요)
+
+```bash
+git pull
+cd web
+npm install
+npx wrangler d1 create sapphire-accounts
+```
+
+위 명령이 보여 주는 `database_id` 를 `web/wrangler.toml` 의 `database_id` 자리에 넣은 뒤 이어서:
+
+```bash
+npx wrangler d1 execute sapphire-accounts --remote --file=schema.sql
+npm run accounts
+npx wrangler d1 execute sapphire-accounts --remote --file=accounts-seed.sql
+del accounts-seed.sql
+npm run deploy
+```
+
+- `npm run accounts` 는 퓨앙, 마을모금함, 오피서 다섯 명의 임시 비밀번호를 화면에 보여 줍니다. 각자에게 따로 알려 주세요.
+- `accounts-seed.sql` 은 공개 저장소에 올리지 않습니다(.gitignore). 넣은 뒤 지웁니다.
+- `wrangler.toml` 의 `database_id` 는 비밀이 아니라서 바꾼 채로 커밋해도 됩니다.
+- 로컬에서 로그인까지 시험: `npm run dev:accounts` (로컬 전용 D1, 실제 계정과 별개)
+
 ```
 web/
   scripts/build_data.py  저장한 카페 글 -> 글 본문 블록, 사냥터, 몬스터, 아이템, 장비 JSON + 그림
-  src/App.tsx            화면 전환 (해시 주소), 아래 탭
+  scripts/make-accounts.mjs  처음 계정(앱개발자, 길드마스터, 오피서) 임시 비밀번호와 SQL 만들기
+  functions/             로그인 서버 (Cloudflare Pages Functions): api/login, me, password, users, data/_middleware
+  server/auth.ts         비밀번호 해시, 세션, 역할별 권한 (functions 가 같이 씀)
+  schema.sql, wrangler.toml  계정 DB(D1) 표와 연결 설정
+  src/App.tsx            로그인 확인, 화면 전환 (해시 주소), 아래 탭
+  src/auth.ts            로그인, 길드원 관리 API 부르기
+  src/pages/Login.tsx, Admin.tsx  로그인, 비밀번호 바꾸기, 길드원 관리 화면
   src/pages/             홈, 검색, 사냥터, 몬스터/아이템, 장비, 메뉴/글 보기
   src/Blocks.tsx         원글 표를 종이색 바탕에 그대로 그리기
   src/search.ts          이름, 초성 검색

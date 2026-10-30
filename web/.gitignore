@@ -7,3 +7,6 @@ public/img/
 __pycache__/
 *.tsbuildinfo
 .vite/
+
+# 처음 계정을 넣는 SQL (임시 비밀번호 해시가 들어 있다). 넣은 뒤 지운다
+accounts-seed.sql
