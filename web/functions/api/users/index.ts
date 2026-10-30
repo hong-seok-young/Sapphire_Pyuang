@@ -1,4 +1,4 @@
-// GET  /api/users              -> 계정 목록 (오피서 이상)
+// GET  /api/users              -> 계정 목록 (오피서 이상). 직업, 레벨, 캐릭터 그림을 올린 때
 // POST /api/users { id, role, password? } -> 계정 만들기. 처음 비밀번호(정한 것이나 임시)를 한 번만 돌려준다
 import {
   FORBIDDEN, NEED_LOGIN, RANK, canManage, currentUser, firstPassword, isRole, json, passwordFields, readJson, validId,
@@ -11,14 +11,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (RANK[me.role] < 1) return FORBIDDEN();
   const { results } = await env.DB.prepare(
     "SELECT u.id AS id, u.role AS role, u.must_change AS must_change, u.created_at AS created_at, u.created_by AS created_by, " +
-      "p.job AS job, p.level AS level FROM users u LEFT JOIN profiles p ON p.user_id = u.id",
+      "p.job AS job, p.level AS level, a.updated_at AS avatar FROM users u LEFT JOIN profiles p ON p.user_id = u.id " +
+      "LEFT JOIN avatars a ON a.user_id = u.id",
   ).all<{
     id: string; role: Role; must_change: number; created_at: number; created_by: string | null; job: Job | null; level: number | null;
+    avatar: number | null;
   }>();
   const users = results
     .map((u) => ({
       id: u.id, role: u.role, mustChange: u.must_change === 1, createdAt: u.created_at, createdBy: u.created_by,
-      job: u.job, level: u.level,
+      job: u.job, level: u.level, avatar: u.avatar,
     }))
     .sort((a, b) => RANK[b.role] - RANK[a.role] || a.id.localeCompare(b.id, "ko"));
   return json(users);

@@ -16,7 +16,7 @@ import { MePage, ProfileSetupPage } from "./pages/Profile";
 import { RankingPage } from "./pages/Ranking";
 import { RANK, fetchMe } from "./auth";
 import { appMenu } from "./platform";
-import type { Job, Me } from "./auth";
+import type { Me } from "./auth";
 
 const TABS = [
   { to: "#/", label: "홈", icon: "🏠", match: "" },
@@ -60,7 +60,7 @@ export function App() {
   return <Wiki me={me} onMe={(p) => setMe({ ...me, ...p })} onLogout={() => setMe(null)} />;
 }
 
-function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: { job: Job; level: number }) => void; onLogout: () => void }) {
+function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; onLogout: () => void }) {
   const route = useRoute();
   const { data: wiki, error } = useAsync(useCallback(() => loadWiki(), []));
   const [page = "", arg = ""] = route.parts;

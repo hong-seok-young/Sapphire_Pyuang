@@ -10,6 +10,7 @@
   places.json     사냥터: 레벨, 배너 그림, 몬스터, 원글에서 그대로 그릴 칸 (지도, 이동, 퀘스트, 참고)
   monsters.json   몬스터: 레벨, HP, 특징, 드랍, 재부활, 스킬, 그림
   items.json      아이템: 아이콘, 떨구는 몬스터, 장비 정보
+  rank/*.png      길드 랭킹 화면 그림 (자료/이미지/랭킹 을 그대로 복사)
   equipment.json  부위별 장비 표
   meta.json       출처, 만든 날짜
 """
@@ -22,6 +23,7 @@ import html
 import io
 import json
 import re
+import shutil
 import sys
 from pathlib import Path
 from urllib.parse import unquote
@@ -708,6 +710,20 @@ def main():
                                                    encoding="utf-8")
     size = sum(f.stat().st_size for f in (OUT / "img").iterdir())
     print("완료", meta["counts"], f"그림 {size / 1e6:.1f}MB")
+    copy_rank_pictures()
+
+
+def copy_rank_pictures():
+    """길드 랭킹 화면 그림 (게임 랭킹 스샷에서 자른 엠블럼, 메달, 버튼, 시상대: 자료/scripts/make_rank_marks.py).
+    data/ 아래에 두어 위키 자료처럼 로그인한 길드원에게만 보인다 (functions/data/_middleware.ts)."""
+    rank = OUT / "data" / "rank"
+    if rank.exists():
+        shutil.rmtree(rank)
+    rank.mkdir(parents=True)
+    pics = sorted((SRC / "이미지" / "랭킹").glob("*.png"))
+    for f in pics:
+        shutil.copy2(f, rank / f.name)
+    print("랭킹 그림", len(pics))
 
 
 if __name__ == "__main__":

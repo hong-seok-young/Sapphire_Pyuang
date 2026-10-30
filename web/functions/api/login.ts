@@ -1,6 +1,6 @@
-// POST /api/login  { id, password } -> 로그인 쿠키와 내 정보 { id, role, mustChange, job, level } (/api/me 와 같은 모양)
-import { createSession, hashPassword, json, readJson, sessionCookie, verifyPassword } from "../../server/auth";
-import type { Env, Job, UserRow } from "../../server/auth";
+// POST /api/login  { id, password } -> 로그인 쿠키와 내 정보 { id, role, mustChange, job, level, exp, avatar } (/api/me 와 같은 모양)
+import { createSession, hashPassword, json, meInfo, readJson, sessionCookie, verifyPassword } from "../../server/auth";
+import type { Env, UserRow } from "../../server/auth";
 
 const DUMMY_SALT = new Uint8Array(16);
 
@@ -19,9 +19,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   await env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(Date.now()).run(); // 끝난 세션 정리
   const token = await createSession(env, row.id);
-  const p = await env.DB.prepare("SELECT job, level FROM profiles WHERE user_id = ?").bind(row.id).first<{ job: Job; level: number }>();
-  const me = { id: row.id, role: row.role, mustChange: row.must_change === 1, job: p?.job ?? null, level: p?.level ?? null };
-  return json(me, 200, {
+  return json(await meInfo(env, row), 200, {
     "set-cookie": sessionCookie(token),
   });
 };

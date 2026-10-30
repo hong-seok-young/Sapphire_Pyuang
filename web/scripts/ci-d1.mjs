@@ -1,7 +1,7 @@
 // 자동 배포(.github/workflows/deploy-web.yml)에서 계정 DB(D1)를 준비한다.
 //  1. sapphire-accounts DB 가 없으면 아시아(apac)에 만들고, 그 database_id 를 wrangler.toml 에 넣는다
 //     (배포하는 서버의 작업 폴더에서만 바꾸고 커밋하지 않는다)
-//  2. schema.sql 을 넣는다 (CREATE TABLE IF NOT EXISTS 라 몇 번을 해도 된다)
+//  2. schema.sql 을 넣는다 (CREATE TABLE IF NOT EXISTS 라 몇 번을 해도 된다). 이미 있는 표에 나중에 더한 칸은 ALTER TABLE 로 넣는다
 //  3. 계정이 하나도 없을 때만 앱개발자 계정(퓨앙)을 저장소 비밀값 DEV_PASSWORD 로 만든다.
 //  4. 저장소 비밀값 FIRST_PASSWORD 가 있으면 시작 계정(길드마스터, 오피서)을 한 번만 만든다 (제작자 요청).
 //     이미 있는 아이디는 그대로 두고, 한 번 만든 뒤에는 다시 만들지 않는다 (지운 계정이 배포 때 되살아나지 않게).
@@ -72,6 +72,16 @@ const toml = readFileSync("wrangler.toml", "utf8");
 writeFileSync("wrangler.toml", toml.replace(/^database_id = ".*"$/m, `database_id = "${id}"`));
 
 wrangler("d1", "execute", DB, "--remote", "--yes", "--file=schema.sql");
+
+/** schema.sql 은 이미 있는 표를 바꾸지 않는다. 나중에 더한 칸: [표, 칸, 종류] */
+const ADDED_COLUMNS = [["profiles", "exp", "INTEGER"]];
+for (const [table, column, type] of ADDED_COLUMNS) {
+  const columns = parseJson(wrangler("d1", "execute", DB, "--remote", "--json", "--command", `PRAGMA table_info(${table})`))[0]?.results ?? [];
+  if (!columns.some((c) => c.name === column)) {
+    wrangler("d1", "execute", DB, "--remote", "--yes", "--command", `ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+    console.log(`${table} 표에 ${column} 칸을 더했어요`);
+  }
+}
 
 const count = Number(queryFirst("SELECT COUNT(*) AS n FROM users")?.n ?? 0);
 if (count > 0) {

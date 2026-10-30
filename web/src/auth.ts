@@ -21,6 +21,13 @@ export type Job = "warrior" | "ranger" | "mage" | "monk";
 export const JOBS: Job[] = ["warrior", "ranger", "mage", "monk"];
 export const JOB_NAME: Record<Job, string> = { warrior: "전사", ranger: "레인저", mage: "마법사", monk: "무도가" };
 export const MAX_LEVEL = 99;
+/** 경험치 %는 1000을 곱한 정수 (12.345% -> 12345). 서버 server/auth.ts 와 같다 */
+export const EXP_MAX = 99_999;
+
+/** 12345 -> "12.345%" */
+export function expText(exp: number): string {
+  return (exp / 1000).toFixed(3) + "%";
+}
 
 export interface Me {
   id: string;
@@ -29,6 +36,10 @@ export interface Me {
   /** 아직 안 정했으면 null: 처음 정하는 창이 뜬다 */
   job: Job | null;
   level: number | null;
+  /** 경험치 % x 1000. 안 적었으면 null. 본인만 본다 */
+  exp: number | null;
+  /** 캐릭터 그림을 올린 때. 없으면 null */
+  avatar: number | null;
 }
 
 export interface RankEntry {
@@ -40,6 +51,10 @@ export interface RankEntry {
   prevLevel: number | null;
   /** 레벨이 마지막으로 바뀐 때 (ms) */
   levelAt: number;
+  /** 캐릭터 그림을 올린 때. 없으면 null */
+  avatar: number | null;
+  /** 경험치 % x 1000. 내 줄에만 온다 */
+  exp?: number | null;
 }
 
 export interface Account {
@@ -50,6 +65,7 @@ export interface Account {
   createdBy: string | null;
   job: Job | null;
   level: number | null;
+  avatar: number | null;
 }
 
 export class ApiError extends Error {
@@ -98,8 +114,31 @@ export function errorText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-export const saveMyProfile = (job: Job, level: number) => api<{ job: Job; level: number }>("/api/profile", "PUT", { job, level });
+export const saveMyProfile = (job: Job, level: number, exp: number | null) =>
+  api<{ job: Job; level: number; exp: number | null }>("/api/profile", "PUT", { job, level, exp });
 /** 오피서 이상: 다른 사람이 잘못 고른 직업, 레벨 고치기 */
 export const saveProfileOf = (id: string, job: Job, level: number) =>
   api<{ id: string; job: Job; level: number }>(`/api/users/${encodeURIComponent(id)}/profile`, "PUT", { job, level });
 export const fetchRanking = () => api<RankEntry[]>("/api/ranking");
+
+/** 캐릭터 그림 주소. 올린 때를 붙여서 그림이 바뀌면 새로 받는다 */
+export function avatarUrl(id: string, avatar: number): string {
+  return `/api/avatar/${encodeURIComponent(id)}?v=${avatar}`;
+}
+
+/** 내 캐릭터 그림 올리기 (PNG). 올린 때를 돌려준다 */
+export async function uploadAvatar(png: Blob): Promise<number> {
+  let res: Response;
+  try {
+    res = await fetch("/api/avatar", { method: "PUT", credentials: "same-origin", headers: { "content-type": "image/png" }, body: png });
+  } catch {
+    throw new ApiError(0, "인터넷 연결을 확인해 주세요");
+  }
+  const data = (await res.json().catch(() => ({}))) as { error?: string; avatar?: number };
+  if (!res.ok || typeof data.avatar !== "number") throw new ApiError(res.status, data.error ?? `문제가 생겼어요 (${res.status})`);
+  return data.avatar;
+}
+
+export const deleteMyAvatar = () => api<{ ok: boolean }>("/api/avatar", "DELETE");
+/** 오피서 이상: 캐릭터가 아닌 그림이 올라왔을 때 내리기 */
+export const deleteAvatarOf = (id: string) => api<{ ok: boolean }>(`/api/users/${encodeURIComponent(id)}/avatar`, "DELETE");

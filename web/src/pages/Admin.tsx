@@ -4,7 +4,7 @@ import {
   ROLE_NAME, RANK, canManage, createAccount, deleteAccount, errorText, listAccounts, resetPassword, setRole,
 } from "../auth";
 import type { Account, Me, Role } from "../auth";
-import { JOB_NAME, saveProfileOf } from "../auth";
+import { JOB_NAME, avatarUrl, deleteAvatarOf, saveProfileOf } from "../auth";
 import { JobEmblem } from "../emblems";
 import { ProfileForm } from "./Profile";
 import { Loading, Panel, TopBar } from "../ui";
@@ -25,7 +25,8 @@ function toRoleText(name: string): string {
  * 앱개발자: 길드마스터까지 모두. 처음 비밀번호는 만들 때 한 번만 보여 준다.
  * '처음 비밀번호'를 정하면(예: 123123) 새 계정과 비밀번호 초기화에 그걸 쓰고, 비우면 임시 비밀번호를 만든다.
  * 어느 쪽이든 그 사람은 처음 로그인할 때 비밀번호를 바꾼다.
- * 오피서 이상은 누구든 잘못 고른 직업과 레벨을 고칠 수 있다 (길드 랭킹).
+ * 오피서 이상은 누구든 잘못 고른 직업과 레벨을 고치고, 캐릭터가 아닌 사진이 올라왔으면 내릴 수 있다 (길드 랭킹).
+ * 경험치 %는 본인만 아는 값이라 여기에 보이지 않는다.
  */
 export function AdminPage({ me }: { me: Me }) {
   const [accounts, setAccounts] = useState<Account[] | null>(null);
@@ -160,6 +161,7 @@ function AccountRow({
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [photoError, setPhotoError] = useState("");
   const manageable = account.id !== me.id && canManage(me.role, account.role);
   // 역할 바꾸기는 길드마스터 이상만 (오피서 임명/해제)
   const roleTargets = RANK[me.role] >= 2 ? ASSIGNABLE.filter((r) => r !== account.role && canManage(me.role, r)) : [];
@@ -168,6 +170,7 @@ function AccountRow({
     <li className="panel account">
       <div className="account-head">
         {account.job && account.level ? <JobEmblem job={account.job} level={account.level} size={30} /> : null}
+        {account.avatar && <img className="account-avatar" src={avatarUrl(account.id, account.avatar)} alt="" />}
         <span className="account-id">{account.id}</span>
         {account.mustChange && <span className="role-badge muted">임시 비밀번호</span>}
         <span className="role-badge">{ROLE_NAME[account.role]}</span>
@@ -176,10 +179,30 @@ function AccountRow({
         <span className="muted">
           {account.job && account.level ? `Lv.${account.level} ${JOB_NAME[account.job]}` : "직업, 레벨 아직 안 정함"}
         </span>
-        <button className="pill" disabled={busy} onClick={() => setEditing((e) => !e)}>
-          {editing ? "닫기" : "레벨·직업 고치기"}
-        </button>
+        <span className="account-sub-actions">
+          {account.avatar && (
+            <button
+              className="pill"
+              disabled={busy}
+              onClick={async () => {
+                setPhotoError("");
+                try {
+                  await deleteAvatarOf(account.id);
+                  onChanged();
+                } catch (x) {
+                  setPhotoError(errorText(x));
+                }
+              }}
+            >
+              사진 내리기
+            </button>
+          )}
+          <button className="pill" disabled={busy} onClick={() => setEditing((e) => !e)}>
+            {editing ? "닫기" : "레벨·직업 고치기"}
+          </button>
+        </span>
       </div>
+      {photoError && <p className="form-error">{photoError}</p>}
       {editing && (
         <ProfileForm
           job={account.job}

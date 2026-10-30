@@ -131,22 +131,89 @@ export function validLevel(n: unknown): n is number {
   return Number.isInteger(n) && (n as number) >= 1 && (n as number) <= MAX_LEVEL;
 }
 
-/** 직업과 레벨 저장. 레벨이 바뀌면 바로 전 레벨과 바뀐 때를 남긴다 */
-export async function saveProfile(env: Env, userId: string, job: Job, level: number, by: string): Promise<void> {
+/**
+ * 경험치 %. 게임처럼 소수점 3자리까지라 1000을 곱한 정수로 둔다 (12.345% -> 12345, 0 ~ 99999).
+ * 본인만 알고 본인만 적는다 (제작자 요청). 랭킹에서 같은 레벨이면 높은 쪽이 위이고, 숫자는 본인에게만 보인다.
+ */
+export const EXP_MAX = 99_999;
+
+export function validExp(n: unknown): n is number {
+  return Number.isInteger(n) && (n as number) >= 0 && (n as number) <= EXP_MAX;
+}
+
+/**
+ * 직업과 레벨(과 경험치) 저장. 레벨이 바뀌면 바로 전 레벨과 바뀐 때를 남긴다.
+ * exp 를 안 주면(오피서가 남의 것을 고칠 때) 경험치는 그대로 둔다.
+ */
+export async function saveProfile(
+  env: Env, userId: string, job: Job, level: number, by: string, exp?: number | null,
+): Promise<void> {
+  const keepExp = exp === undefined;
   await env.DB.prepare(
-    "INSERT INTO profiles (user_id, job, level, prev_level, level_at, updated_by) VALUES (?, ?, ?, NULL, ?, ?) " +
+    "INSERT INTO profiles (user_id, job, level, prev_level, level_at, updated_by, exp) VALUES (?, ?, ?, NULL, ?, ?, ?) " +
       "ON CONFLICT (user_id) DO UPDATE SET " +
       "prev_level = CASE WHEN excluded.level != profiles.level THEN profiles.level ELSE profiles.prev_level END, " +
       "level_at = CASE WHEN excluded.level != profiles.level THEN excluded.level_at ELSE profiles.level_at END, " +
-      "job = excluded.job, level = excluded.level, updated_by = excluded.updated_by",
+      "job = excluded.job, level = excluded.level, updated_by = excluded.updated_by" +
+      (keepExp ? "" : ", exp = excluded.exp"),
   )
-    .bind(userId, job, level, Date.now(), by)
+    .bind(userId, job, level, Date.now(), by, keepExp ? null : exp)
     .run();
 }
 
-/** 화면이 보낸 { job, level } 을 검사한다. 맞지 않으면 null */
-export function readProfile(body: { job?: unknown; level?: unknown }): { job: Job; level: number } | null {
-  return isJob(body.job) && validLevel(body.level) ? { job: body.job, level: body.level } : null;
+/**
+ * 화면이 보낸 { job, level, exp? } 를 검사한다. 맞지 않으면 null.
+ * exp 를 안 보냈으면 결과에도 없고(그대로 둔다), 비웠으면 null.
+ */
+export function readProfile(body: {
+  job?: unknown; level?: unknown; exp?: unknown;
+}): { job: Job; level: number; exp?: number | null } | null {
+  if (!isJob(body.job) || !validLevel(body.level)) return null;
+  if (body.exp === undefined) return { job: body.job, level: body.level };
+  if (body.exp === null || validExp(body.exp)) return { job: body.job, level: body.level, exp: body.exp };
+  return null;
+}
+
+/** 로그인한 사람의 정보 (/api/me, /api/login 이 같은 모양으로 준다). exp, avatar 는 본인 것이라 여기서만 준다 */
+export async function meInfo(env: Env, user: User) {
+  const p = await env.DB.prepare(
+    "SELECT p.job AS job, p.level AS level, p.exp AS exp, a.updated_at AS avatar FROM users u " +
+      "LEFT JOIN profiles p ON p.user_id = u.id LEFT JOIN avatars a ON a.user_id = u.id WHERE u.id = ?",
+  )
+    .bind(user.id)
+    .first<{ job: Job | null; level: number | null; exp: number | null; avatar: number | null }>();
+  return {
+    id: user.id, role: user.role, mustChange: user.must_change === 1,
+    job: p?.job ?? null, level: p?.level ?? null, exp: p?.exp ?? null, avatar: p?.avatar ?? null,
+  };
+}
+
+// ---------- 캐릭터 그림 (랭킹 시상대) ----------
+// 길드원이 '내 정보'에서 직접 고른 자기 캐릭터 스샷을 화면에서 잘라 PNG 로 올린다.
+// 앱은 화면을 찍지 않고 게임에 아무것도 보내지 않는다 (CLAUDE.md 게임 안전 규칙, 챗봇 스샷과 같은 조건).
+
+/** 올리는 그림은 PNG, 300KB, 가로세로 640 까지 (화면이 잘라 줄여서 보낸다) */
+export const AVATAR_MAX_BYTES = 300_000;
+const AVATAR_MAX_SIDE = 640;
+
+/** PNG 인지, 크기가 맞는지. 맞으면 null, 아니면 이유 */
+export function checkPng(bytes: Uint8Array): string | null {
+  const sig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (bytes.length < 33 || sig.some((b, i) => bytes[i] !== b)) return "PNG 그림만 올릴 수 있어요";
+  if (String.fromCharCode(...bytes.subarray(12, 16)) !== "IHDR") return "PNG 그림만 올릴 수 있어요";
+  if (bytes.length > AVATAR_MAX_BYTES) return "그림이 너무 커요";
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const w = view.getUint32(16);
+  const h = view.getUint32(20);
+  if (!w || !h || w > AVATAR_MAX_SIDE || h > AVATAR_MAX_SIDE) return "그림이 너무 커요";
+  return null;
+}
+
+/** D1 이 돌려준 BLOB (ArrayBuffer, 바이트 배열, 숫자 배열) -> 바이트 */
+export function blobBytes(v: unknown): Uint8Array {
+  if (v instanceof Uint8Array) return v;
+  if (v instanceof ArrayBuffer) return new Uint8Array(v);
+  return Uint8Array.from(v as number[]);
 }
 
 export function isRole(r: unknown): r is Role {
