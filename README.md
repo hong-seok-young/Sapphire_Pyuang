@@ -123,7 +123,7 @@ npm run deploy                            # 빌드 + Cloudflare Pages(sapphire-g
 
 **처음 한 번만, 위키 자료가 있는 PC에서** (Cloudflare 로그인 필요)
 
-`자료/`가 없으면 먼저 비공개 저장소를 받아 위키 자료를 만든다 (자료 없이 배포하면 사이트 자료가 빠진다):
+배포 전에는 위키 자료를 새로 만든다 (`npm run deploy` 가 자료가 없거나 예전 모양이면 멈춘다). `자료/`가 없으면 먼저 비공개 저장소를 받는다:
 
 ```bash
 git clone https://github.com/hong-seok-young/sapphire-imo-data.git 자료
