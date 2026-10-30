@@ -554,3 +554,5 @@ button { font: inherit; color: inherit; }
 .mk-opt .mk-input { height: 36px; text-align: center; }
 .mk-opt small { font-size: 11px; color: var(--muted); }
 .mk-opt small.mk-opt-off { color: var(--red); }
+.mk-fixed-cat { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 15px; color: var(--gold); }
+.mk-fixed-cat small { font-size: 11px; color: var(--muted); }

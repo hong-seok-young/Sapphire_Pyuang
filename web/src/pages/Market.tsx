@@ -4,7 +4,7 @@ import { RANK, errorText } from "../auth";
 import type { Me } from "../auth";
 import { useAsync } from "../data";
 import {
-  CATEGORIES, ENCHANTS, ENCHANT_CATEGORIES, ENHANCE_CATEGORIES, MARKET_PIC, MAX_ENHANCE, MAX_NOTE, MAX_PRICE, MAX_QTY, ago, categoryOf, categoryPic, createListing,
+  CATEGORIES, ENCHANTS, ENCHANT_CATEGORIES, ENHANCE_CATEGORIES, MARKET_PIC, OTHER_CATEGORIES, MAX_ENHANCE, MAX_NOTE, MAX_PRICE, MAX_QTY, ago, categoryOf, categoryPic, createListing,
   deleteListing, enchantText, fetchMarket, goldText, goldWords, inRoll, itemFacts, listingName, rollHint, unwantListing,
   updateListing, wantListing, wikiItem,
 } from "../market";
@@ -265,7 +265,11 @@ function Rows({ wiki, me, list, onChanged, empty }: {
 /** 이름 찾기: 띄어쓰기 상관없이 */
 const squash = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 
-/** 팔기: 아이템 이름을 치면 위키 아이템이 그림과 함께 뜬다. 강화는 갑옷~신발, 속성부여는 벨트~반지만 적는다 */
+/**
+ * 팔기: 아이템 이름을 치면 위키 아이템이 그림과 함께 뜬다. 위키 장비는 부위로 종류가 저절로 정해지고(무기는 주장비),
+ * 위키에 없는 아이템은 이름을 그대로 적고 종류를 직접 고른다 (나중에 위키 자료에 넣으면 그림이 붙는다).
+ * 강화는 갑옷~신발, 속성부여는 벨트~반지만 적는다.
+ */
 function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
   const [item, setItem] = useState("");
   const [typing, setTyping] = useState(false);
@@ -286,7 +290,11 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
   const facts = itemFacts(known);
   const rolls = facts.options.rolls;
   const noTrade = facts.options.notes.includes("거래불가");
-  const cat = category ?? categoryOf(known) ?? null;
+  // 위키 장비: 부위로 정해진 종류. 위키에 있지만 장비가 아님: 장비가 아닌 종류 중에서 (처음엔 기타).
+  // 위키에 없음: 직접 고른 종류
+  const wikiCat = categoryOf(known);
+  const choices: readonly Category[] = known ? OTHER_CATEGORIES : CATEGORIES;
+  const cat = wikiCat ?? (category && choices.includes(category) ? category : known ? "기타" : null);
   const enhanceOk = cat !== null && ENHANCE_CATEGORIES.includes(cat) && !facts.options.notes.includes("강화불가");
   const enchantOk = cat !== null && ENCHANT_CATEGORIES.includes(cat);
   const priceN = Number(price) || 0;
@@ -362,6 +370,9 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
           ))}
         </ul>
       )}
+      {name && !known && !(typing && suggestions.length > 0) && (
+        <p className="mk-meta">위키에 없는 아이템이에요. 적은 이름 그대로 올라가고, 종류는 직접 골라 주세요. 위키 자료에 넣으면 그림이 붙어요.</p>
+      )}
       {known && (
         <div className="mk-picked">
           <Slot wiki={wiki} l={{ item: known.name, enhance: enhanceOk ? enhance : 0, qty: qtyN > 1 ? qtyN : 1 }} size={40} />
@@ -409,14 +420,23 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
       )}
 
       <div className="mk-field">
-        <span>종류{known && categoryOf(known) ? " (위키에서 골랐어요)" : ""}</span>
-        <div className="mk-chips">
-          {CATEGORIES.map((c) => (
-            <button key={c} type="button" className={"pill mk-chip" + (cat === c ? " pill-on" : "")} onClick={() => setCategory(c)}>
-              <MaskIcon src={categoryPic(c)} size={16} /> {c}
-            </button>
-          ))}
-        </div>
+        <span>종류</span>
+        {wikiCat && known ? (
+          <p className="mk-fixed-cat">
+            <MaskIcon src={categoryPic(wikiCat)} size={16} /> {wikiCat}
+            <small>
+              ({known.equip[0]?.slot}, 위키에서 정해져요)
+            </small>
+          </p>
+        ) : (
+          <div className="mk-chips">
+            {choices.map((c) => (
+              <button key={c} type="button" className={"pill mk-chip" + (cat === c ? " pill-on" : "")} onClick={() => setCategory(c)}>
+                <MaskIcon src={categoryPic(c)} size={16} /> {c}
+              </button>
+            ))}
+          </div>
+        )}
         {cat !== null && (
           <p className="mk-meta">
             {enhanceOk ? "강화만 되는 종류예요." : enchantOk ? "속성부여만 되는 종류예요." : "강화와 속성부여가 없는 종류예요."}

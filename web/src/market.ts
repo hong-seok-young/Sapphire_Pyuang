@@ -22,6 +22,8 @@ export const ENCHANTS: { key: Enchant; name: string; values: number[] }[] = [
 /** 강화(+N)만 되는 종류와 속성부여만 되는 종류 (게임 규칙, 제작자가 알려 줌). 나머지는 둘 다 안 된다. 서버 server/market.ts 와 같다 */
 export const ENHANCE_CATEGORIES: Category[] = ["갑옷", "주장비", "투구", "보조장비", "장갑", "신발"];
 export const ENCHANT_CATEGORIES: Category[] = ["벨트", "망토", "목걸이", "반지"];
+/** 위키 장비가 아닌 것의 종류 (위키 장비는 부위로 종류가 정해진다: 무기는 주장비, 보조 장비는 보조장비 ...) */
+export const OTHER_CATEGORIES: Category[] = ["가방", "소모품", "인챈트", "기타", "스킬북", "펫", "코스튬"];
 export const ENCHANT_NAME = Object.fromEntries(ENCHANTS.map((e) => [e.key, e.name])) as Record<Enchant, string>;
 export const MAX_ENHANCE = 20;
 export const MAX_QTY = 9999;
