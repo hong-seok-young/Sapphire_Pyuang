@@ -45,6 +45,42 @@ CREATE TABLE IF NOT EXISTS profiles (
 );
 -- 나중에 더한 칸(exp)은 이미 있던 DB 에 scripts/ci-d1.mjs 가 ALTER TABLE 로 넣는다
 
+-- 레벨, 경험치를 적을 때마다 남기는 기록 (성장 랭킹: 오늘, 이번 주, 이번 달에 오른 만큼). server/auth.ts saveProfile
+CREATE TABLE IF NOT EXISTS level_log (
+  user_id TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  level INTEGER NOT NULL,
+  exp INTEGER,                            -- 경험치 % x 1000. 안 적었으면 null (0 으로 센다)
+  PRIMARY KEY (user_id, at)
+);
+
+-- 사파이어 중개인: 길드원끼리 파는 물건 (게임 밖의 약속, 실제 거래는 게임 안에서). server/market.ts
+CREATE TABLE IF NOT EXISTS listings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  seller TEXT NOT NULL,                   -- 올린 길드원
+  item TEXT NOT NULL,                     -- 아이템 이름 (위키에 있는 이름이면 화면이 그림과 정보를 붙인다)
+  category TEXT NOT NULL,                 -- 갑옷, 주장비, ... 기타 (게임 거래소 종류)
+  enhance INTEGER NOT NULL DEFAULT 0,     -- 강화 +N (0 = 없음)
+  enchant TEXT,                           -- 속성부여: str 힘 | dex 민첩 | int 지능 | hp 체력 | mp 마나
+  enchant_value INTEGER,                  -- 힘/민첩/지능 1~3, 체력/마나 10/20/30
+  qty INTEGER NOT NULL DEFAULT 1,
+  price INTEGER NOT NULL,                 -- 골드 (올린 수량 전체 값)
+  note TEXT,                              -- 한마디
+  status TEXT NOT NULL DEFAULT 'selling', -- selling 판매 중 | sold 거래 완료 (30일 뒤 지운다)
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS listings_seller ON listings (seller, status);
+
+-- '살래요'를 누른 길드원 (이름과 한마디는 판 사람에게만 보인다)
+CREATE TABLE IF NOT EXISTS listing_wants (
+  listing_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  note TEXT,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (listing_id, user_id)
+);
+
 -- 길드원이 직접 올린 자기 캐릭터 그림 (랭킹 시상대에 선다). '내 정보'에서 사용자가 고른 스샷을 잘라 만든 PNG
 CREATE TABLE IF NOT EXISTS avatars (
   user_id TEXT PRIMARY KEY,

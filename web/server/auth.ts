@@ -144,21 +144,30 @@ export function validExp(n: unknown): n is number {
 /**
  * 직업과 레벨(과 경험치) 저장. 레벨이 바뀌면 바로 전 레벨과 바뀐 때를 남긴다.
  * exp 를 안 주면(오피서가 남의 것을 고칠 때) 경험치는 그대로 둔다.
+ * 저장할 때마다 level_log 에 레벨과 경험치를 남긴다 (성장 랭킹). 기록이 처음이면 저장 전 상태도 먼저 남긴다.
  */
 export async function saveProfile(
   env: Env, userId: string, job: Job, level: number, by: string, exp?: number | null,
 ): Promise<void> {
   const keepExp = exp === undefined;
-  await env.DB.prepare(
-    "INSERT INTO profiles (user_id, job, level, prev_level, level_at, updated_by, exp) VALUES (?, ?, ?, NULL, ?, ?, ?) " +
-      "ON CONFLICT (user_id) DO UPDATE SET " +
-      "prev_level = CASE WHEN excluded.level != profiles.level THEN profiles.level ELSE profiles.prev_level END, " +
-      "level_at = CASE WHEN excluded.level != profiles.level THEN excluded.level_at ELSE profiles.level_at END, " +
-      "job = excluded.job, level = excluded.level, updated_by = excluded.updated_by" +
-      (keepExp ? "" : ", exp = excluded.exp"),
-  )
-    .bind(userId, job, level, Date.now(), by, keepExp ? null : exp)
-    .run();
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare(
+      "INSERT OR IGNORE INTO level_log (user_id, at, level, exp) SELECT user_id, level_at, level, exp FROM profiles " +
+        "WHERE user_id = ? AND NOT EXISTS (SELECT 1 FROM level_log WHERE user_id = ?)",
+    ).bind(userId, userId),
+    env.DB.prepare(
+      "INSERT INTO profiles (user_id, job, level, prev_level, level_at, updated_by, exp) VALUES (?, ?, ?, NULL, ?, ?, ?) " +
+        "ON CONFLICT (user_id) DO UPDATE SET " +
+        "prev_level = CASE WHEN excluded.level != profiles.level THEN profiles.level ELSE profiles.prev_level END, " +
+        "level_at = CASE WHEN excluded.level != profiles.level THEN excluded.level_at ELSE profiles.level_at END, " +
+        "job = excluded.job, level = excluded.level, updated_by = excluded.updated_by" +
+        (keepExp ? "" : ", exp = excluded.exp"),
+    ).bind(userId, job, level, now, by, keepExp ? null : exp),
+    env.DB.prepare(
+      "INSERT OR REPLACE INTO level_log (user_id, at, level, exp) SELECT user_id, ?, level, exp FROM profiles WHERE user_id = ?",
+    ).bind(now, userId),
+  ]);
 }
 
 /**

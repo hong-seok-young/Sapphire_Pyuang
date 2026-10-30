@@ -4,7 +4,7 @@ import {
   EXP_MAX, JOBS, JOB_NAME, MAX_LEVEL, ROLE_NAME, avatarUrl, deleteMyAvatar, errorText, expText, logout, saveMyProfile,
 } from "../auth";
 import type { Job, Me } from "../auth";
-import { JobEmblem, JobTab } from "../emblems";
+import { JobEmblem, JobGlyph } from "../emblems";
 import { HeroTitle, TopBar } from "../ui";
 import { AvatarMaker } from "./AvatarMaker";
 import { useBackToLogin } from "./Login";
@@ -18,7 +18,7 @@ function parseExp(text: string): number | null | undefined {
 }
 
 /**
- * 직업과 레벨 고르기 (처음 정하는 창, 내 정보, 길드원 관리가 같이 쓴다). 직업 단추는 게임 랭킹의 직업 필터 그림.
+ * 직업과 레벨 고르기 (처음 정하는 창, 내 정보, 길드원 관리가 같이 쓴다). 직업 단추에는 게임의 직업 문양을 넣는다.
  * withExp 이면 경험치 %도 적는다 (본인만: 처음 정하는 창과 내 정보. 오피서가 남의 것을 고칠 때는 없다).
  * 브라우저 고르기 창(<select>)은 게임 위 위키 창에서 안 열려서 단추로 고른다 (CLAUDE.md).
  */
@@ -66,7 +66,7 @@ export function ProfileForm({
       <div className="job-pick">
         {JOBS.map((j) => (
           <button key={j} type="button" className={"job-btn" + (job === j ? " job-on" : "")} onClick={() => setJob(j)}>
-            <JobTab job={j} on={job === j} />
+            <JobGlyph job={j} size={30} />
             <span>{JOB_NAME[j]}</span>
           </button>
         ))}
@@ -159,7 +159,7 @@ export function ProfileSetupPage({
   );
 }
 
-/** 내 캐릭터 사진: 랭킹 시상대에 선다. 스샷에서 직접 잘라 올린다 (AvatarMaker) */
+/** 내 캐릭터 사진: 성장 랭킹에 나온다 (1등이면 크게). 스샷에서 직접 잘라 올린다 (AvatarMaker) */
 function AvatarPanel({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
   const [making, setMaking] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -177,10 +177,10 @@ function AvatarPanel({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
         />
       ) : (
         <>
-          <p className="form-note">길드 랭킹 1~3등이 되면 시상대에 내 캐릭터가 서요. 게임 스샷에서 내 캐릭터만 잘라 올려요.</p>
+          <p className="form-note">길드 랭킹의 성장 랭킹에 내 캐릭터가 나와요 (1등이면 크게). 게임 스샷에서 내 캐릭터만 잘라 올려요.</p>
           {me.avatar && (
             <div className="avatar-current">
-              <img className="podium-avatar" src={avatarUrl(me.id, me.avatar)} alt="내 캐릭터" />
+              <img className="growth-face" src={avatarUrl(me.id, me.avatar)} alt="내 캐릭터" />
             </div>
           )}
           {error && <p className="form-error">{error}</p>}

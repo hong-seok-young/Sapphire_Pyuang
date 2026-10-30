@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 import { errorText, uploadAvatar } from "../auth";
-import { PODIUM_PIC } from "../emblems";
 
 /**
  * 캐릭터 사진 만들기 ('내 정보'). 길드원이 갤러리에서 직접 고른 자기 캐릭터 스샷에서
  *  1. 끌고 벌려서(확대) 캐릭터를 네모 안에 넣고 자른다
  *  2. 가장자리에 이어진 배경을 저절로 지우고, 남은 배경은 눌러서 지운다 (잘못 지운 곳은 '되살리기')
- *  3. 시상대에 세워 보고 올린다
+ *  3. 성장 랭킹 1등 카드에 넣어 보고 올린다
  * 모두 폰 안에서 하고, 자른 캐릭터 그림만 서버에 올라간다. 앱은 화면을 찍지 않고 게임에 아무것도 보내지 않는다
  * (CLAUDE.md 게임 안전 규칙: 사용자가 고른 스샷만 쓰는 챗봇과 같은 조건).
  */
@@ -101,11 +100,12 @@ export function AvatarMaker({ onSaved, onCancel }: { onSaved: (avatar: number) =
       )}
       {step === "check" && png && (
         <>
-          <p className="form-note">시상대에 이렇게 서요.</p>
-          <div className="podium avatar-preview" style={{ backgroundImage: `url(${PODIUM_PIC})` }}>
-            <div className="podium-char" style={{ left: "35.3%", width: "27.7%", top: "29.4%", height: "28.4%" }}>
-              <img className="podium-avatar" src={png.url} alt="내 캐릭터" />
-            </div>
+          <p className="form-note">성장 랭킹 1등이 되면 이렇게 나와요.</p>
+          <div className="growth-hero avatar-preview">
+            <span className="growth-crown">👑 이번 주의 성장왕</span>
+            <span className="growth-hero-face">
+              <img className="growth-face" src={png.url} alt="내 캐릭터" style={{ maxWidth: 96, maxHeight: 96 }} />
+            </span>
           </div>
           <div className="avatar-actions">
             <button type="button" className="btn btn-ghost" onClick={() => setStep("erase")} disabled={busy}>

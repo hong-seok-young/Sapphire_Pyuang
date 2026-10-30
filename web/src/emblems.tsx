@@ -1,11 +1,11 @@
 // 길드 랭킹에 쓰는 마크: 제작자가 찍어 준 게임 경험치 랭킹 화면 스샷에서 그대로 잘라 낸 그림이다
-// (직업 엠블럼, 1~3위 메달, 직업 필터 단추, '내순위' 말풍선, 시상대. 자료/scripts/make_rank_marks.py).
+// (직업 엠블럼, 직업 문양, 1~3위 메달, '내순위' 말풍선. 자료/scripts/make_rank_marks.py).
 // 그림은 비공개 자료 저장소에 두고 build_data.py 가 public/data/rank 로 복사한다 (로그인한 길드원에게만 보인다).
+// 단추는 이 앱 디자인으로 그리고 게임 그림은 직업 문양만 쓴다 (제작자 요청).
 import type { Job, Role } from "./auth";
 import { JOB_NAME, ROLE_NAME } from "./auth";
 
 const PIC = "/data/rank/";
-export const PODIUM_PIC = PIC + "podium.png";
 export const MINE_TAG_PIC = PIC + "mine_tag.png";
 
 /** 게임처럼 1~20위는 보라 엠블럼, 21위부터는 금색 */
@@ -31,14 +31,15 @@ export function RankMedal({ rank }: { rank: number }) {
   return <img className="medal" src={`${PIC}medal${rank}.png`} alt={`${rank}위`} draggable={false} />;
 }
 
-/** 직업 필터 단추 그림 (켜짐, 꺼짐). 직업 고르기 단추에도 쓴다 */
-export function JobTab({ job, on }: { job: Job | "all"; on: boolean }) {
+/** 직업 문양 (게임 엠블럼의 흰 마크). 글자 색(currentColor)으로 칠해서 단추가 켜지고 꺼질 때 색이 따라간다 */
+export function JobGlyph({ job, size = 20 }: { job: Job; size?: number }) {
+  const mask = `url(${PIC}job_${job}.png)`;
   return (
-    <img
-      className="job-tab"
-      src={`${PIC}tab_${job}_${on ? "on" : "off"}.png`}
-      alt={job === "all" ? "전체" : JOB_NAME[job]}
-      draggable={false}
+    <span
+      className="job-glyph"
+      role="img"
+      aria-label={JOB_NAME[job]}
+      style={{ width: size, height: size, WebkitMaskImage: mask, maskImage: mask }}
     />
   );
 }

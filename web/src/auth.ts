@@ -77,7 +77,8 @@ export class ApiError extends Error {
   }
 }
 
-async function api<T>(path: string, method = "GET", body?: unknown): Promise<T> {
+/** 서버 API (JSON). 실패하면 서버가 준 이유로 ApiError */
+export async function api<T>(path: string, method = "GET", body?: unknown): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
@@ -120,6 +121,33 @@ export const saveMyProfile = (job: Job, level: number, exp: number | null) =>
 export const saveProfileOf = (id: string, job: Job, level: number) =>
   api<{ id: string; job: Job; level: number }>(`/api/users/${encodeURIComponent(id)}/profile`, "PUT", { job, level });
 export const fetchRanking = () => api<RankEntry[]>("/api/ranking");
+
+/** 성장 랭킹 기간: 오늘, 이번 주(월요일부터), 이번 달 (한국 시간 0시 기준) */
+export type GrowthPeriod = "day" | "week" | "month";
+
+export interface GrowthEntry {
+  id: string;
+  role: Role;
+  job: Job;
+  level: number;
+  /** 기간이 시작할 때 레벨 */
+  fromLevel: number;
+  /** 오른 양: 경험치 % x 1000 (레벨 1 = 100000) */
+  growth: number;
+  avatar: number | null;
+  updatedAt: number;
+}
+
+export const fetchGrowth = (period: GrowthPeriod) =>
+  api<{ period: GrowthPeriod; start: number; entries: GrowthEntry[] }>(`/api/growth?period=${period}`);
+
+/** 91000 -> "+91.000%", 123456 -> "+1레벨 23.456%" */
+export function growthText(g: number): string {
+  const levels = Math.floor(g / 100_000);
+  const rest = g % 100_000;
+  if (levels && !rest) return `+${levels}레벨`;
+  return "+" + (levels ? `${levels}레벨 ` : "") + (rest / 1000).toFixed(3) + "%";
+}
 
 /** 캐릭터 그림 주소. 올린 때를 붙여서 그림이 바뀌면 새로 받는다 */
 export function avatarUrl(id: string, avatar: number): string {
