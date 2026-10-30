@@ -55,76 +55,12 @@
             android:text="@string/start_clock"
             android:textSize="18sp" />
 
-        <!-- 게임 연동 -->
         <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="@string/section_game"
-            android:textStyle="bold" />
-
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/sw_game_only"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="@string/game_only" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/game_only_hint"
+            android:text="@string/clock_always_hint"
             android:textSize="12sp" />
-
-        <LinearLayout
-            android:id="@+id/game_group"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/game_target"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="@string/game_target_none" />
-
-            <Button
-                android:id="@+id/btn_pick_game"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/pick_game" />
-
-            <TextView
-                android:id="@+id/usage_state"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/usage_missing" />
-
-            <Button
-                android:id="@+id/btn_usage_perm"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/grant_usage" />
-
-            <TextView
-                android:id="@+id/usage_restricted_hint"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="@string/usage_restricted_hint"
-                android:textSize="12sp" />
-
-            <Button
-                android:id="@+id/btn_app_info"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/open_app_info" />
-        </LinearLayout>
 
         <!-- 타이머 -->
         <TextView

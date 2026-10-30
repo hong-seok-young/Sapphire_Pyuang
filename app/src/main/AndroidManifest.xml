@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- 다른 앱 위에 표시 -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -12,22 +11,11 @@
     <!-- 앱 내 업데이트: 새 버전 확인/다운로드 및 설치 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- 게임 감지: 지금 화면 앞에 떠 있는 앱 확인 ('사용 정보 접근', 사용자가 설정에서 직접 허용) -->
-    <uses-permission
-        android:name="android.permission.PACKAGE_USAGE_STATS"
-        tools:ignore="ProtectedPermissions" />
+    <!-- 게임 감지('사용 정보 접근'으로 맨 앞 앱 확인)와 설치된 앱 목록 조회는 v1.12 에서 뺐다 -->
     <!-- 재부팅/업데이트 뒤 켜 두었던 시계 자동 재시작 -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- 타이머 알림 진동 -->
     <uses-permission android:name="android.permission.VIBRATE" />
-
-    <!-- 게임 선택 목록: 홈 화면 아이콘이 있는 앱만 조회 -->
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.category.LAUNCHER" />
-        </intent>
-    </queries>
 
     <application
         android:allowBackup="true"

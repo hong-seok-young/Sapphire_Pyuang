@@ -57,19 +57,6 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("running", false)
         set(v) = sp.edit().putBoolean("running", v).apply()
 
-    /** 고른 게임이 화면 앞에 있을 때만 시계 표시 */
-    var gameOnly: Boolean
-        get() = sp.getBoolean("game_only", true)
-        set(v) = sp.edit().putBoolean("game_only", v).apply()
-
-    /** 시계를 띄울 게임의 패키지 이름과 표시 이름 (null 이면 아직 안 고름) */
-    var targetPackage: String?
-        get() = sp.getString("target_pkg", null)
-        set(v) = sp.edit().putString("target_pkg", v).apply()
-    var targetLabel: String?
-        get() = sp.getString("target_label", null)
-        set(v) = sp.edit().putString("target_label", v).apply()
-
     /** 시계를 누르면 타이머 목록 열기 */
     var timerTapOpens: Boolean
         get() = sp.getBoolean("timer_tap_opens", true)
@@ -108,8 +95,11 @@ class Prefs(context: Context) {
         get() = sp.getString("wiki_open_place", null)
         set(v) = sp.edit().putString("wiki_open_place", v).apply()
 
-    /** 없앤 기능(v1.5 화면 인식)이 남긴 설정값 정리 */
+    /** 없앤 기능(v1.5 화면 인식, v1.12 게임 감지)이 남긴 설정값 정리 */
     fun removeLegacyKeys() {
-        sp.edit().remove("show_capture_btn").remove("cap_btn_x").remove("cap_btn_y").apply()
+        sp.edit()
+            .remove("show_capture_btn").remove("cap_btn_x").remove("cap_btn_y")
+            .remove("game_only").remove("target_pkg").remove("target_label")
+            .apply()
     }
 }

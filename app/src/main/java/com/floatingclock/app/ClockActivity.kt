@@ -16,7 +16,6 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -31,15 +30,13 @@ import java.text.SimpleDateFormat
 import java.util.Date
 
 /**
- * 시계 설정 화면: 권한, 시계 켜기/끄기, 게임 연동, 타이머, 알림 숨기기, 모양, 위치, 업데이트.
+ * 시계 설정 화면: 권한, 시계 켜기/끄기, 타이머, 알림 숨기기, 모양, 위치, 업데이트.
  * 앱 첫 화면은 길드 위키(MainActivity)이고, 이 화면은 위키 위쪽 메뉴의 '⏰ 시계'로 연다.
+ * 게임 감지(맨 앞 앱 확인)는 제작자 요청으로 v1.12 에서 뺐다. 시계는 켜 두는 동안 어디서나 보인다.
  */
 class ClockActivity : AppCompatActivity() {
 
     companion object {
-        /** 게임 감지 안내는 앱이 살아 있는 동안 한 번만 저절로 띄운다 */
-        private var detectionGuideShown = false
-
         /** 안드로이드가 '다른 앱 위에 표시 중' 알림에 앱마다 따로 만드는 채널 (이름 뒤에 패키지 이름이 붙는다) */
         private const val OVERLAY_NOTI_CHANNEL_PREFIX = "com.android.server.wm.AlertWindowNotification - "
     }
@@ -49,14 +46,6 @@ class ClockActivity : AppCompatActivity() {
     private lateinit var permState: TextView
     private lateinit var btnPerm: Button
     private lateinit var btnToggle: Button
-    private lateinit var swGameOnly: MaterialSwitch
-    private lateinit var gameGroup: LinearLayout
-    private lateinit var gameTarget: TextView
-    private lateinit var btnPickGame: Button
-    private lateinit var usageState: TextView
-    private lateinit var btnUsagePerm: Button
-    private lateinit var usageRestrictedHint: TextView
-    private lateinit var btnAppInfo: Button
     private lateinit var preview: TextView
     private lateinit var seekSize: SeekBar
     private lateinit var btnSizeMinus: Button
@@ -81,10 +70,6 @@ class ClockActivity : AppCompatActivity() {
 
     /** 위치 슬라이더를 코드로 맞추는 동안 리스너가 설정을 덮어쓰지 않게 */
     private var syncingSliders = false
-    private var autoDetectTried = false
-
-    /** '시계 켜기'에서 권한을 허용하러 갔다면, 허용하고 돌아왔을 때 시계를 바로 켠다 */
-    private var startWhenReady = false
 
     private val handler = Handler(Looper.getMainLooper())
     private var previewFmt: SimpleDateFormat? = null
@@ -106,14 +91,6 @@ class ClockActivity : AppCompatActivity() {
         permState = findViewById(R.id.perm_state)
         btnPerm = findViewById(R.id.btn_perm)
         btnToggle = findViewById(R.id.btn_toggle)
-        swGameOnly = findViewById(R.id.sw_game_only)
-        gameGroup = findViewById(R.id.game_group)
-        gameTarget = findViewById(R.id.game_target)
-        btnPickGame = findViewById(R.id.btn_pick_game)
-        usageState = findViewById(R.id.usage_state)
-        btnUsagePerm = findViewById(R.id.btn_usage_perm)
-        usageRestrictedHint = findViewById(R.id.usage_restricted_hint)
-        btnAppInfo = findViewById(R.id.btn_app_info)
         preview = findViewById(R.id.clock_preview)
         seekSize = findViewById(R.id.seek_size)
         btnSizeMinus = findViewById(R.id.btn_size_minus)
@@ -135,7 +112,6 @@ class ClockActivity : AppCompatActivity() {
         btnUpdate = findViewById(R.id.btn_update)
 
         setupControls()
-        setupGameSection()
         findViewById<Button>(R.id.btn_open_timer).setOnClickListener {
             startActivity(Intent(this, TimerActivity::class.java))
         }
@@ -151,19 +127,6 @@ class ClockActivity : AppCompatActivity() {
         super.onResume()
         refreshState()
         syncPositionSliders()
-        if (!autoDetectTried && prefs.gameOnly && prefs.targetPackage == null) {
-            autoDetectTried = true // 설치된 앱을 훑는 작업이라 화면을 열 때 한 번만
-            autoDetectGame(showToast = false)
-        }
-        refreshGameSection()
-        refreshClock() // 권한을 허용하고 돌아왔을 때 알림 문구와 표시 여부를 바로 갱신
-        if (startWhenReady && detectionReady()) {
-            startWhenReady = false
-            launchClockService()
-        } else if (!detectionGuideShown && prefs.gameOnly && FloatingClockService.isRunning && !detectionReady()) {
-            // 시계는 켜져 있는데 게임을 알아볼 수 없으면 게임을 꺼도 시계가 남는다. 한 번 안내한다.
-            showDetectionGuide(fromStartButton = false)
-        }
         handler.post(previewTick)
         // 첫 화면에서 이미 확인했으면 그 결과만 보여 준다 (알림에서 바로 이 화면을 연 경우에는 여기서 확인)
         UpdateUi.checkOnce(this) { updateState.text = it }
@@ -239,31 +202,16 @@ class ClockActivity : AppCompatActivity() {
     // ---------- 서비스 시작/정지 ----------
 
     private fun startClock() {
-        startWhenReady = false
         if (!hasOverlayPermission()) {
             openOverlaySettings()
             return
         }
-        // 게임을 알아볼 수 없으면 게임이 꺼져 있어도 시계가 항상 뜨므로, 켜기 전에 해결 방법을 알려 준다
-        if (prefs.gameOnly && !detectionReady()) {
-            showDetectionGuide(fromStartButton = true)
-            return
-        }
-        launchClockService()
-    }
-
-    private fun launchClockService() {
         val i = Intent(this, FloatingClockService::class.java).setAction(FloatingClockService.ACTION_START)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(i) else startService(i)
-        val label = prefs.targetLabel
-        if (prefs.gameOnly && label != null && detectionReady()) {
-            Toast.makeText(this, getString(R.string.toast_game_mode_started, label), Toast.LENGTH_LONG).show()
-        }
         showToggleAs(running = true)
     }
 
     private fun stopClock() {
-        startWhenReady = false
         startService(Intent(this, FloatingClockService::class.java).setAction(FloatingClockService.ACTION_STOP))
         prefs.running = false
         showToggleAs(running = false)
@@ -275,71 +223,17 @@ class ClockActivity : AppCompatActivity() {
         handler.postDelayed({ refreshState() }, 600)
     }
 
-    /** 고른 게임이 있고 '사용 정보 접근'도 허용되어서, 게임이 화면 앞에 있는지 알 수 있는지 */
-    private fun detectionReady(): Boolean =
-        prefs.targetPackage != null && GameDetector.hasUsageAccess(this)
-
-    /**
-     * 게임을 알아볼 수 없을 때(게임을 안 골랐거나 '사용 정보 접근'이 없을 때) 해결 방법 안내.
-     * 이때는 게임이 꺼져 있어도 시계가 항상 뜬다.
-     * '시계 켜기'에서 왔으면 감지 없이 '그냥 켜기'도 고를 수 있다.
-     */
-    private fun showDetectionGuide(fromStartButton: Boolean) {
-        detectionGuideShown = true
-        val builder = AlertDialog.Builder(this)
-        if (prefs.targetPackage == null) {
-            builder.setTitle(R.string.guide_game_title)
-                .setMessage(getString(R.string.guide_game_msg) + "\n\n" + getString(R.string.guide_always_hint))
-                .setPositiveButton(R.string.pick_game) { _, _ ->
-                    showGamePicker {
-                        if (fromStartButton) startClock()
-                        else if (!detectionReady()) showDetectionGuide(fromStartButton = false)
-                    }
-                }
-        } else {
-            val label = prefs.targetLabel ?: getString(R.string.default_game_name)
-            val msg = buildString {
-                append(getString(R.string.guide_usage_msg, label))
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    append("\n\n").append(getString(R.string.guide_usage_restricted))
-                }
-                append("\n\n").append(getString(R.string.guide_always_hint))
-            }
-            builder.setTitle(R.string.guide_usage_title)
-                .setMessage(msg)
-                .setPositiveButton(R.string.guide_usage_go) { _, _ ->
-                    startWhenReady = fromStartButton
-                    Toast.makeText(this, R.string.toast_allow_usage, Toast.LENGTH_LONG).show()
-                    GameDetector.openUsageAccessSettings(this)
-                }
-        }
-        if (fromStartButton) {
-            builder.setNeutralButton(R.string.start_anyway) { _, _ -> launchClockService() }
-            builder.setNegativeButton(R.string.cancel, null)
-        } else {
-            builder.setNegativeButton(R.string.later, null)
-        }
-        builder.show()
-    }
-
-    /**
-     * 설정이 바뀌면 떠 있는 시계에 즉시 반영.
-     * preview 면 이 앱 화면 위에서도 잠깐 보여 줘서 위치와 모양을 확인할 수 있게 한다.
-     */
-    private fun refreshClock(preview: Boolean = false) {
+    /** 설정이 바뀌면 떠 있는 시계에 즉시 반영 */
+    private fun refreshClock() {
         if (FloatingClockService.isRunning) {
-            startService(
-                Intent(this, FloatingClockService::class.java)
-                    .setAction(FloatingClockService.ACTION_REFRESH)
-                    .putExtra(FloatingClockService.EXTRA_PREVIEW, preview)
-            )
+            startService(Intent(this, FloatingClockService::class.java).setAction(FloatingClockService.ACTION_REFRESH))
         }
     }
 
     /** 모양 설정이 바뀌면 미리보기와 떠 있는 시계 둘 다 갱신 */
     private fun onStyleChanged() {
         updatePreview()
-        refreshClock(preview = true)
+        refreshClock()
     }
 
     private fun updatePreview() {
@@ -358,89 +252,6 @@ class ClockActivity : AppCompatActivity() {
         val running = FloatingClockService.isRunning
         btnToggle.text = getString(if (running) R.string.stop_clock else R.string.start_clock)
         btnToggle.setOnClickListener { if (FloatingClockService.isRunning) stopClock() else startClock() }
-    }
-
-    // ---------- 게임 연동 ----------
-
-    private fun setupGameSection() {
-        swGameOnly.isChecked = prefs.gameOnly
-        swGameOnly.setOnCheckedChangeListener { _, on ->
-            prefs.gameOnly = on
-            if (on && prefs.targetPackage == null) autoDetectGame(showToast = true)
-            refreshGameSection()
-            refreshClock()
-        }
-        btnPickGame.setOnClickListener { showGamePicker() }
-        btnUsagePerm.setOnClickListener {
-            Toast.makeText(this, R.string.toast_allow_usage, Toast.LENGTH_LONG).show()
-            GameDetector.openUsageAccessSettings(this)
-        }
-        btnAppInfo.setOnClickListener {
-            runCatching {
-                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
-            }
-        }
-    }
-
-    private fun refreshGameSection() {
-        gameGroup.visibility = if (prefs.gameOnly) View.VISIBLE else View.GONE
-        val label = prefs.targetLabel
-        gameTarget.text = if (prefs.targetPackage != null && label != null)
-            getString(R.string.game_target_fmt, label)
-        else
-            getString(R.string.game_target_none)
-        val access = GameDetector.hasUsageAccess(this)
-        usageState.text = getString(if (access) R.string.usage_granted else R.string.usage_missing)
-        usageState.setTextColor(if (access) Color.parseColor("#2E7D32") else Color.parseColor("#C62828"))
-        btnUsagePerm.visibility = if (access) View.GONE else View.VISIBLE
-        // 안드로이드 13부터 스토어 밖에서 설치한 앱은 '제한된 설정'으로 스위치가 막혀 있을 수 있다
-        val restricted = !access && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-        usageRestrictedHint.visibility = if (restricted) View.VISIBLE else View.GONE
-        btnAppInfo.visibility = if (restricted) View.VISIBLE else View.GONE
-    }
-
-    /** 설치된 앱 중에서 아이모를 찾아 대상 게임으로 지정 */
-    private fun autoDetectGame(showToast: Boolean) {
-        val found = GameDetector.findImo(this) ?: return
-        prefs.targetPackage = found.packageName
-        prefs.targetLabel = found.label
-        if (showToast) {
-            Toast.makeText(this, getString(R.string.toast_game_found, found.label), Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    /** 설치된 앱 목록에서 게임 고르기 (아이모로 보이는 앱을 맨 위에). 고르면 onPicked 실행 */
-    private fun showGamePicker(onPicked: () -> Unit = {}) {
-        val apps = GameDetector.launchableApps(this).sortedByDescending { GameDetector.looksLikeImo(it) }
-        if (apps.isEmpty()) return
-        val pm = packageManager
-        val iconSize = dp(32)
-        val adapter = object : ArrayAdapter<GameDetector.AppEntry>(
-            this, android.R.layout.select_dialog_item, android.R.id.text1, apps
-        ) {
-            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                val v = super.getView(position, convertView, parent) as TextView
-                val app = apps[position]
-                v.text = app.label
-                val icon = runCatching { pm.getApplicationIcon(app.packageName) }.getOrNull()
-                icon?.setBounds(0, 0, iconSize, iconSize)
-                v.setCompoundDrawablesRelative(icon, null, null, null)
-                v.compoundDrawablePadding = dp(12)
-                return v
-            }
-        }
-        AlertDialog.Builder(this)
-            .setTitle(R.string.pick_game_title)
-            .setAdapter(adapter) { _, which ->
-                val app = apps[which]
-                prefs.targetPackage = app.packageName
-                prefs.targetLabel = app.label
-                refreshGameSection()
-                refreshClock()
-                onPicked()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
     }
 
     // ---------- 설정 UI ----------
@@ -491,20 +302,20 @@ class ClockActivity : AppCompatActivity() {
             if (syncingSliders) return@simpleSeek
             prefs.posX = p - screenW / 2
             posXLabel.text = getString(R.string.pos_x_fmt, pxToDp(prefs.posX))
-            refreshClock(preview = true)
+            refreshClock()
         })
         seekPosY.setOnSeekBarChangeListener(simpleSeek { p ->
             if (syncingSliders) return@simpleSeek
             prefs.posY = p
             posYLabel.text = getString(R.string.pos_y_fmt, pxToDp(p))
-            refreshClock(preview = true)
+            refreshClock()
         })
 
         btnResetPos.setOnClickListener {
             prefs.posX = 0
             prefs.posY = Prefs.POS_AUTO
             syncPositionSliders()
-            refreshClock(preview = true)
+            refreshClock()
             Toast.makeText(this, R.string.toast_pos_reset, Toast.LENGTH_SHORT).show()
         }
     }
