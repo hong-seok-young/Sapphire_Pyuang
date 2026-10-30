@@ -25,6 +25,7 @@ const TILES: Tile[] = [
   { title: "전장 · 헌팅그라운드", to: "#/menu/전장 · 헌팅그라운드", icon: "🚩" },
   { title: "퀘스트 · 지도", to: "#/menu/퀘스트 · 지도", icon: "📜" },
   { title: "AI 챗봇", to: "#/chat", icon: "💬" },
+  { title: "길드 랭킹", to: "#/ranking", icon: "🏆" },
   // 시계와 보스 타이머는 안드로이드 앱에만 있다. 웹앱은 위키와 챗봇만 맡는다
   { title: "안드로이드 앱 받기", to: "#/app", icon: "📲", androidOnly: true },
   { title: "길드원 관리", to: "#/admin", icon: "👥", managers: true },
@@ -68,7 +69,7 @@ export function Home({ me, onLogout }: { me: Me; onLogout: () => void }) {
         <span>
           {me.id} · {ROLE_NAME[me.role]}
         </span>
-        <a href="#/password">비밀번호 바꾸기</a>
+        <a href="#/me">내 정보</a>
         <button type="button" onClick={signOut}>로그아웃</button>
       </div>
     </div>

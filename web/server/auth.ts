@@ -116,6 +116,39 @@ export function validId(id: unknown): id is string {
   return typeof id === "string" && /^[\p{L}\p{N}_.-]{1,20}$/u.test(id);
 }
 
+// ---------- 직업과 레벨 (길드 랭킹) ----------
+
+export type Job = "warrior" | "ranger" | "mage" | "monk";
+export const JOBS: Job[] = ["warrior", "ranger", "mage", "monk"];
+/** 레벨 범위. 아이모 만렙이 올라도 그대로 쓸 수 있게 넉넉히 */
+export const MAX_LEVEL = 99;
+
+export function isJob(j: unknown): j is Job {
+  return typeof j === "string" && (JOBS as string[]).includes(j);
+}
+
+export function validLevel(n: unknown): n is number {
+  return Number.isInteger(n) && (n as number) >= 1 && (n as number) <= MAX_LEVEL;
+}
+
+/** 직업과 레벨 저장. 레벨이 바뀌면 바로 전 레벨과 바뀐 때를 남긴다 */
+export async function saveProfile(env: Env, userId: string, job: Job, level: number, by: string): Promise<void> {
+  await env.DB.prepare(
+    "INSERT INTO profiles (user_id, job, level, prev_level, level_at, updated_by) VALUES (?, ?, ?, NULL, ?, ?) " +
+      "ON CONFLICT (user_id) DO UPDATE SET " +
+      "prev_level = CASE WHEN excluded.level != profiles.level THEN profiles.level ELSE profiles.prev_level END, " +
+      "level_at = CASE WHEN excluded.level != profiles.level THEN excluded.level_at ELSE profiles.level_at END, " +
+      "job = excluded.job, level = excluded.level, updated_by = excluded.updated_by",
+  )
+    .bind(userId, job, level, Date.now(), by)
+    .run();
+}
+
+/** 화면이 보낸 { job, level } 을 검사한다. 맞지 않으면 null */
+export function readProfile(body: { job?: unknown; level?: unknown }): { job: Job; level: number } | null {
+  return isJob(body.job) && validLevel(body.level) ? { job: body.job, level: body.level } : null;
+}
+
 export function isRole(r: unknown): r is Role {
   return typeof r === "string" && (ROLES as string[]).includes(r);
 }

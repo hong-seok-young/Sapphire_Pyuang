@@ -16,10 +16,30 @@ export function canManage(actor: Role, target: Role): boolean {
   return RANK[actor] >= 1 && RANK[actor] > RANK[target];
 }
 
+/** 직업 (길드 랭킹). 서버 server/auth.ts 와 같다 */
+export type Job = "warrior" | "ranger" | "mage" | "monk";
+export const JOBS: Job[] = ["warrior", "ranger", "mage", "monk"];
+export const JOB_NAME: Record<Job, string> = { warrior: "전사", ranger: "레인저", mage: "마법사", monk: "무도가" };
+export const MAX_LEVEL = 99;
+
 export interface Me {
   id: string;
   role: Role;
   mustChange: boolean;
+  /** 아직 안 정했으면 null: 처음 정하는 창이 뜬다 */
+  job: Job | null;
+  level: number | null;
+}
+
+export interface RankEntry {
+  id: string;
+  role: Role;
+  job: Job;
+  level: number;
+  /** 레벨이 바뀌기 바로 전 레벨 */
+  prevLevel: number | null;
+  /** 레벨이 마지막으로 바뀐 때 (ms) */
+  levelAt: number;
 }
 
 export interface Account {
@@ -28,6 +48,8 @@ export interface Account {
   mustChange: boolean;
   createdAt: number;
   createdBy: string | null;
+  job: Job | null;
+  level: number | null;
 }
 
 export class ApiError extends Error {
@@ -75,3 +97,9 @@ export const resetPassword = (id: string, password?: string) =>
 export function errorText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
+
+export const saveMyProfile = (job: Job, level: number) => api<{ job: Job; level: number }>("/api/profile", "PUT", { job, level });
+/** 오피서 이상: 다른 사람이 잘못 고른 직업, 레벨 고치기 */
+export const saveProfileOf = (id: string, job: Job, level: number) =>
+  api<{ id: string; job: Job; level: number }>(`/api/users/${encodeURIComponent(id)}/profile`, "PUT", { job, level });
+export const fetchRanking = () => api<RankEntry[]>("/api/ranking");

@@ -69,6 +69,27 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
 }
 
 /**
+ * 로그인 바로 뒤의 화면(비밀번호 바꾸기, 직업과 레벨 정하기)에서 로그인 화면으로 돌아가는 길.
+ * 화면의 '◀ 다른 아이디로 로그인'(history.back())과 폰의 뒤로 가기 모두: 기록을 하나 넣어 두고,
+ * 뒤로 가서 그 기록이 빠지면(popstate) 로그아웃한 뒤 onBack 을 부른다.
+ */
+export function useBackToLogin(active: boolean, onBack?: () => void) {
+  const backRef = useRef(onBack);
+  backRef.current = onBack;
+  useEffect(() => {
+    if (!active) return;
+    history.pushState({ backToLogin: true }, "");
+    const onPop = () => {
+      void logout()
+        .catch(() => undefined)
+        .then(() => backRef.current?.());
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [active]);
+}
+
+/**
  * 비밀번호 바꾸기. forced 면 임시 비밀번호로 처음 로그인한 뒤라 이 화면만 보인다.
  * forced 일 때 '◀ 다른 아이디로 로그인'이나 폰의 뒤로 가기는 로그아웃하고 로그인 화면으로 돌아간다
  * (다른 아이디로 잘못 들어왔을 때). 비밀번호를 안 바꾸고 위키로 들어가는 길은 아니다.
@@ -79,21 +100,7 @@ export function PasswordPage({ forced = false, onDone, onBack }: { forced?: bool
   const [again, setAgain] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const backRef = useRef(onBack);
-  backRef.current = onBack;
-
-  // 폰의 뒤로 가기도 받는다: 기록을 하나 넣어 두고, 뒤로 가서 그 기록이 빠지면(popstate) 로그아웃한다
-  useEffect(() => {
-    if (!forced) return;
-    history.pushState({ passwordBack: true }, "");
-    const onPop = () => {
-      void logout()
-        .catch(() => undefined)
-        .then(() => backRef.current?.());
-    };
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, [forced]);
+  useBackToLogin(forced, onBack);
 
   async function submit(e: FormEvent) {
     e.preventDefault();

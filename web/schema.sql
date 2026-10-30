@@ -32,3 +32,13 @@ CREATE TABLE IF NOT EXISTS setup (
   key TEXT PRIMARY KEY,
   done_at INTEGER NOT NULL
 );
+
+-- 길드원 직업과 레벨 (길드 랭킹). 본인이 '내 정보'에서 정하고, 오피서 이상은 다른 사람 것도 고친다
+CREATE TABLE IF NOT EXISTS profiles (
+  user_id TEXT PRIMARY KEY,
+  job TEXT NOT NULL,                      -- warrior 전사 | ranger 레인저 | mage 마법사 | monk 무도가
+  level INTEGER NOT NULL,
+  prev_level INTEGER,                     -- 레벨이 바뀌기 바로 전 레벨 (랭킹의 레벨업 표시)
+  level_at INTEGER NOT NULL,              -- 레벨이 마지막으로 바뀐 때 (같은 레벨이면 먼저 오른 사람이 위)
+  updated_by TEXT
+);

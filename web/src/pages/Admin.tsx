@@ -4,6 +4,9 @@ import {
   ROLE_NAME, RANK, canManage, createAccount, deleteAccount, errorText, listAccounts, resetPassword, setRole,
 } from "../auth";
 import type { Account, Me, Role } from "../auth";
+import { JOB_NAME, saveProfileOf } from "../auth";
+import { JobEmblem } from "../emblems";
+import { ProfileForm } from "./Profile";
 import { Loading, Panel, TopBar } from "../ui";
 
 /** 이 역할로 만들거나 바꿀 수 있는 역할 (높은 것부터) */
@@ -22,6 +25,7 @@ function toRoleText(name: string): string {
  * 앱개발자: 길드마스터까지 모두. 처음 비밀번호는 만들 때 한 번만 보여 준다.
  * '처음 비밀번호'를 정하면(예: 123123) 새 계정과 비밀번호 초기화에 그걸 쓰고, 비우면 임시 비밀번호를 만든다.
  * 어느 쪽이든 그 사람은 처음 로그인할 때 비밀번호를 바꾼다.
+ * 오피서 이상은 누구든 잘못 고른 직업과 레벨을 고칠 수 있다 (길드 랭킹).
  */
 export function AdminPage({ me }: { me: Me }) {
   const [accounts, setAccounts] = useState<Account[] | null>(null);
@@ -134,6 +138,7 @@ export function AdminPage({ me }: { me: Me }) {
               }
               onRole={(role) => run(async () => void (await setRole(a.id, role)))}
               onDelete={() => run(async () => void (await deleteAccount(a.id)))}
+              onChanged={reload}
             />
           ))}
         </ul>
@@ -143,7 +148,7 @@ export function AdminPage({ me }: { me: Me }) {
 }
 
 function AccountRow({
-  account, me, busy, onReset, onRole, onDelete,
+  account, me, busy, onReset, onRole, onDelete, onChanged,
 }: {
   account: Account;
   me: Me;
@@ -151,8 +156,10 @@ function AccountRow({
   onReset: () => void;
   onRole: (role: Role) => void;
   onDelete: () => void;
+  onChanged: () => void;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editing, setEditing] = useState(false);
   const manageable = account.id !== me.id && canManage(me.role, account.role);
   // 역할 바꾸기는 길드마스터 이상만 (오피서 임명/해제)
   const roleTargets = RANK[me.role] >= 2 ? ASSIGNABLE.filter((r) => r !== account.role && canManage(me.role, r)) : [];
@@ -160,10 +167,31 @@ function AccountRow({
   return (
     <li className="panel account">
       <div className="account-head">
+        {account.job && account.level ? <JobEmblem job={account.job} level={account.level} size={30} /> : null}
         <span className="account-id">{account.id}</span>
         {account.mustChange && <span className="role-badge muted">임시 비밀번호</span>}
         <span className="role-badge">{ROLE_NAME[account.role]}</span>
       </div>
+      <div className="account-sub">
+        <span className="muted">
+          {account.job && account.level ? `Lv.${account.level} ${JOB_NAME[account.job]}` : "직업, 레벨 아직 안 정함"}
+        </span>
+        <button className="pill" disabled={busy} onClick={() => setEditing((e) => !e)}>
+          {editing ? "닫기" : "레벨·직업 고치기"}
+        </button>
+      </div>
+      {editing && (
+        <ProfileForm
+          job={account.job}
+          level={account.level}
+          submitLabel={`${account.id} 저장`}
+          onSave={async (job, level) => {
+            await saveProfileOf(account.id, job, level);
+            setEditing(false);
+            onChanged();
+          }}
+        />
+      )}
       {manageable && (
         <div className="account-actions">
           {roleTargets.map((r) => (

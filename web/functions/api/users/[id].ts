@@ -16,6 +16,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
   if (user.id === me.id || !canManage(me.role, user.role)) return FORBIDDEN();
   await env.DB.batch([
     env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM profiles WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM users WHERE id = ?").bind(user.id),
   ]);
   return json({ ok: true });
