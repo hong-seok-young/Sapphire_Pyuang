@@ -1,0 +1,99 @@
+# 위키 웹앱 자동 배포: main 에 web/ 이 바뀌어 올라오면 GitHub 서버가 위키 자료를 만들고 Cloudflare Pages 에 올린다.
+# PC 에서 wrangler 로그인을 하지 않아도 되고, 폰으로 말만 해도 푸시하면 배포된다. Actions 탭에서 직접 다시 돌릴 수도 있다.
+#
+# 저장소 비밀값 (Settings > Secrets and variables > Actions)
+#   CLOUDFLARE_API_TOKEN   Cloudflare API 토큰 (권한: Account > Cloudflare Pages > Edit, Account > D1 > Edit)
+#   CLOUDFLARE_ACCOUNT_ID  Cloudflare 계정 ID
+#   DATA_REPO_TOKEN        비공개 자료 저장소(sapphire-imo-data)를 읽기만 하는 GitHub 토큰
+#                          (fine-grained, 그 저장소만, Contents: Read-only). 대신 읽기 전용 배포 키 DATA_DEPLOY_KEY 도 된다
+#   DEV_PASSWORD           계정이 하나도 없을 때 만드는 앱개발자(퓨앙) 계정의 첫 비밀번호 (web/scripts/ci-d1.mjs)
+# Cloudflare 비밀값이 아직 없으면 배포를 건너뛴다 (실패로 표시하지 않는다).
+# 공개 저장소라 실행 기록은 누구나 볼 수 있다. 비밀번호나 비밀값을 화면에 찍는 단계를 넣지 않는다.
+name: Deploy wiki
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/deploy-web.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-wiki
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.secrets.outputs.ready }}
+    steps:
+      - id: secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATA_ACCESS: ${{ secrets.DATA_REPO_TOKEN || secrets.DATA_DEPLOY_KEY }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$DATA_ACCESS" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::배포에 필요한 비밀값이 아직 없어서 건너뜀 (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, DATA_REPO_TOKEN)"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    needs: check
+    if: needs.check.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      # 위키 원본 자료는 비공개 저장소에 있다 (CLAUDE.md '위키 자료'). 앱 저장소의 자료/ 자리에 받는다
+      - name: Wiki source data
+        uses: actions/checkout@v4
+        with:
+          repository: hong-seok-young/sapphire-imo-data
+          token: ${{ secrets.DATA_REPO_TOKEN || github.token }}
+          ssh-key: ${{ secrets.DATA_DEPLOY_KEY }}
+          path: 자료
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build wiki data
+        run: |
+          pip install --quiet -r web/scripts/requirements.txt
+          python web/scripts/build_data.py > build-data.log
+          tail -n 3 build-data.log
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        working-directory: web
+        run: npm ci
+
+      - name: Accounts database
+        working-directory: web
+        env:
+          DEV_PASSWORD: ${{ secrets.DEV_PASSWORD }}
+        run: node scripts/ci-d1.mjs
+
+      - name: Deploy to Cloudflare Pages
+        working-directory: web
+        run: npm run deploy

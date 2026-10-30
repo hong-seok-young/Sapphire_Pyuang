@@ -79,10 +79,14 @@
   - 자기 계정, 그리고 자기와 같거나 높은 역할은 다루지 못한다. 규칙은 `web/server/auth.ts` 의 `canManage` 하나로 정한다.
 - 비밀번호 원문은 저장하지 않는다(PBKDF2 해시). 새 계정과 초기화는 임시 비밀번호를 한 번만 보여 주고, 처음 로그인하면 바꾸게 한다.
 - 서버는 Cloudflare Pages Functions(`web/functions`, 공통 코드 `web/server/auth.ts`), 계정 DB는 D1 `sapphire-accounts`
-  (`web/schema.sql`, `web/wrangler.toml`). 시작 계정은 `web/scripts/make-accounts.mjs` 로 만들고, 만든 SQL은 공개 저장소에 올리지 않는다.
+  (`web/schema.sql`, `web/wrangler.toml`). 자동 배포는 계정이 하나도 없을 때 퓨앙 계정만 만들고(`web/scripts/ci-d1.mjs`),
+  나머지는 '길드원 관리'에서 만든다. 직접 배포할 때 시작 계정은 `web/scripts/make-accounts.mjs` 로 만들고, 만든 SQL은 공개 저장소에 올리지 않는다.
 - 안드로이드 앱은 WebView 로그인 쿠키를 같이 써서 보스 목록(`WikiTimers`)과 게임 위 위키 창도 로그인 상태가 된다.
 - 웹앱 화면에서 `<select>`, `confirm()` 같은 브라우저 대화상자는 쓰지 않는다. 게임 위 위키 창(서비스 안 WebView)에서 열리지 않는다.
-- 배포 전에는 `자료/` 로 `build_data.py` 를 돌려 위키 자료를 만든다. 자료 없이 배포하면 사이트 자료가 빠진다.
+- 배포는 자동이다: `main` 에 `web/` 이 바뀌어 올라오면 GitHub Actions(`.github/workflows/deploy-web.yml`)가 비공개 자료 저장소를
+  받아 위키 자료를 만들고 배포한다. 저장소 비밀값(CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, DATA_REPO_TOKEN, DEV_PASSWORD)은
+  제작자가 GitHub 설정에서 넣는다. 공개 저장소라 실행 기록을 누구나 보므로 비밀번호나 비밀값을 화면에 찍는 단계를 넣지 않는다.
+- PC에서 직접 배포할 때는 `자료/` 로 `build_data.py` 를 돌려 위키 자료를 만든 뒤 `npm run deploy` (자료가 없거나 예전 모양이면 멈춘다).
   `자료/` 가 없으면 비공개 저장소를 클론한다. 처음 설정 순서는 README '길드 계정'.
 
 ## 기록
@@ -107,3 +111,5 @@
   맨 위 제목에 app/web 을 붙여 홈 화면의 두 아이콘을 구분하고, 예전 위키일 때만 보이는 윗줄 메뉴는 어두운 색으로 맞췄다.
   웹에서는 출처 글과 원글, 카페 버튼을 빼고, 원글의 지도와 안내는 사냥터 화면에 그대로 옮겼다.
   앱은 안드로이드 12 이상에서 업데이트를 묻지 않고 설치하고(앱 자체 업데이트라 위 규칙에 맞는다), 위키를 손가락으로 확대할 수 있다.
+- 2026-10-30: 폰에서도 배포할 수 있게 GitHub Actions 자동 배포를 넣었다. 제작자가 비밀값 네 개를 넣으면 첫 배포가
+  계정 DB를 만들고 퓨앙 계정을 만든다. 마을모금함과 오피서 계정은 퓨앙이 '길드원 관리'에서 만든다.

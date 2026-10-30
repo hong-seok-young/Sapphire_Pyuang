@@ -104,6 +104,8 @@ npm run build                             # 배포용 dist/
 npm run deploy                            # 빌드 + Cloudflare Pages(sapphire-guild)에 올리기 (처음엔 npx wrangler login)
 ```
 
+보통은 직접 배포하지 않아도 됩니다. `main` 에 `web/` 이 바뀌어 올라오면 GitHub Actions 가 자동으로 배포합니다 (아래 '길드 계정'의 자동 배포).
+
 - 위키 자료(`자료/`, `web/public/data`, `web/public/img`)는 git에 올리지 않습니다. 자료 출처: 아이모 원클릭 드랍표 (Made by iOS).
 - 글꼴: [갈무리](https://github.com/quiple/galmuri) (SIL OFL 1.1)
 
@@ -121,7 +123,21 @@ npm run deploy                            # 빌드 + Cloudflare Pages(sapphire-g
 - 비밀번호는 원문을 저장하지 않고 해시만 저장합니다. 로그인은 30일 유지됩니다.
 - 안드로이드 앱(v1.15 이상)은 앱 안 위키에서 로그인하면 보스 목록과 게임 위 위키 창도 같이 로그인됩니다.
 
-**처음 한 번만, 위키 자료가 있는 PC에서** (Cloudflare 로그인 필요)
+**자동 배포 (GitHub Actions)**
+
+`main` 에 `web/` 이 바뀌어 올라오면 `.github/workflows/deploy-web.yml` 이 GitHub 서버에서 비공개 자료 저장소를 받아 위키 자료를 만들고(`build_data.py`), 계정 DB를 준비하고(`scripts/ci-d1.mjs`), Cloudflare Pages 에 올립니다. PC에서 wrangler 로그인을 하지 않아도 되고, 저장소 Actions 탭의 'Run workflow' 로 다시 돌릴 수 있습니다. 저장소 비밀값(Settings > Secrets and variables > Actions) 네 개가 있어야 돌고, 없으면 배포를 건너뜁니다.
+
+| 비밀값 | 내용 |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare > My Profile > API Tokens > Create Custom Token. 권한: Account > Cloudflare Pages > Edit, Account > D1 > Edit |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 계정 ID (로그인한 대시보드 주소 `dash.cloudflare.com/<계정 ID>/...`) |
+| `DATA_REPO_TOKEN` | GitHub > Settings > Developer settings > Fine-grained tokens. Repository access: `sapphire-imo-data` 만, Permissions: Contents Read-only |
+| `DEV_PASSWORD` | 계정이 하나도 없을 때 만드는 퓨앙 계정의 첫 비밀번호 (6자 이상). 처음 로그인하면 바꾸게 됨 |
+
+- 계정 DB(D1 `sapphire-accounts`)가 없으면 첫 배포가 아시아(apac)에 만들고 표(`schema.sql`)를 넣습니다.
+- 첫 계정은 퓨앙 하나만 만듭니다. 마을모금함과 오피서 다섯 명은 퓨앙이 위키 '👥 길드원 관리'에서 만들고, 화면에 한 번 보이는 임시 비밀번호를 각자에게 따로 알려 줍니다. (공개 저장소라 실행 기록에 비밀번호를 찍을 수 없어서)
+
+**PC에서 직접 배포 (자동 배포를 못 쓸 때, 위키 자료가 있는 PC에서)** (Cloudflare 로그인 필요)
 
 배포 전에는 위키 자료를 새로 만든다 (`npm run deploy` 가 자료가 없거나 예전 모양이면 멈춘다). `자료/`가 없으면 먼저 비공개 저장소를 받는다:
 
