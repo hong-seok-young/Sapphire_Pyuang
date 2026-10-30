@@ -165,6 +165,7 @@ class FloatingClockService : Service() {
         if (container == null) addClockView()
         isRunning = true
         prefs.running = true
+        ClockTileService.refresh(this) // 빠른 설정 버튼을 '켜짐'으로
         return START_STICKY
     }
 
@@ -178,6 +179,7 @@ class FloatingClockService : Service() {
         runCatching { tone?.release() }
         tone = null
         isRunning = false
+        ClockTileService.refresh(this) // 빠른 설정 버튼을 '꺼짐'으로
         super.onDestroy()
     }
 

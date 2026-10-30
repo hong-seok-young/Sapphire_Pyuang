@@ -23,7 +23,15 @@
     <string name="start_clock">시계 켜기</string>
     <string name="stop_clock">시계 끄기</string>
     <string name="stop">끄기</string>
-    <string name="clock_always_hint">시계는 켜 두는 동안 어디서나 보여요. 게임을 마치면 여기서 끄거나 알림창의 \'끄기\'를 눌러 주세요.</string>
+    <string name="clock_always_hint">시계는 켜 두는 동안 어디서나 보여요. 게임을 마치면 여기서 끄거나 알림창의 \'끄기\'를 눌러 주세요. 빠른 설정에 시계 버튼을 넣어 두면 알림창에서 한 번 눌러 켜고 끌 수 있어요.</string>
+    <string name="add_tile">빠른 설정에 시계 버튼 넣기</string>
+    <string name="tile_label">Sapphire 시계</string>
+    <string name="tile_label_short">시계</string>
+    <string name="tile_on">켜짐</string>
+    <string name="tile_off">꺼짐</string>
+    <string name="tile_added">빠른 설정에 시계 버튼을 넣었어요</string>
+    <string name="tile_already">이미 빠른 설정에 시계 버튼이 있어요</string>
+    <string name="tile_guide_msg">알림창을 끝까지 내린 뒤 버튼 편집(연필 모양, 삼성은 오른쪽 위 ⋮ 안의 \'버튼 편집\')을 누르세요. \'Sapphire 시계\'를 위쪽 버튼 자리로 끌어다 놓으면 돼요. 그다음부터는 알림창에서 한 번 눌러 시계를 켜고 끌 수 있어요.</string>
 
     <string name="cancel">취소</string>
 

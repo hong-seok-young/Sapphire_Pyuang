@@ -58,6 +58,21 @@
                 android:value="floating clock overlay shown over other apps" />
         </service>
 
+        <!-- 알림창 빠른 설정의 '시계' 켜기/끄기 버튼 (시스템 화면만 연결할 수 있다) -->
+        <service
+            android:name=".ClockTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_clock"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
+        </service>
+
         <!-- 재부팅/업데이트 뒤 자동 재시작 (시스템만 보낼 수 있는 방송) -->
         <receiver
             android:name=".StartupReceiver"

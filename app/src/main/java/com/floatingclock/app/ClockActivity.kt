@@ -2,10 +2,13 @@ package com.floatingclock.app
 
 import android.Manifest
 import android.app.AlertDialog
+import android.app.StatusBarManager
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -115,6 +118,7 @@ class ClockActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btn_open_timer).setOnClickListener {
             startActivity(Intent(this, TimerActivity::class.java))
         }
+        findViewById<Button>(R.id.btn_add_tile).setOnClickListener { addQuickSettingsTile() }
         findViewById<Button>(R.id.btn_hide_running).setOnClickListener { openRunningNotificationSettings() }
         findViewById<Button>(R.id.btn_hide_overlay).setOnClickListener { showOverlayNotificationGuide() }
         setupUpdate()
@@ -159,6 +163,48 @@ class ClockActivity : AppCompatActivity() {
                 requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
             }
         }
+    }
+
+    // ---------- 빠른 설정 버튼 ----------
+
+    /**
+     * 알림창 빠른 설정에 '시계' 켜기/끄기 버튼 넣기.
+     * 안드로이드 13 부터는 시스템이 '추가할까요?' 창을 띄워 주고, 그 전이나 안 되는 폰은 직접 넣는 방법을 알려 준다.
+     */
+    private fun addQuickSettingsTile() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            showTileGuide()
+            return
+        }
+        val sbm = getSystemService(StatusBarManager::class.java)
+        if (sbm == null) {
+            showTileGuide()
+            return
+        }
+        sbm.requestAddTileService(
+            ComponentName(this, ClockTileService::class.java),
+            getString(R.string.tile_label),
+            Icon.createWithResource(this, R.drawable.ic_clock),
+            mainExecutor,
+        ) { result ->
+            if (isFinishing || isDestroyed) return@requestAddTileService
+            when (result) {
+                StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED ->
+                    Toast.makeText(this, R.string.tile_added, Toast.LENGTH_SHORT).show()
+                StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED ->
+                    Toast.makeText(this, R.string.tile_already, Toast.LENGTH_SHORT).show()
+                StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_NOT_ADDED -> Unit // 사용자가 '추가 안 함'을 눌렀다
+                else -> showTileGuide() // 이 폰에서는 추가 창을 못 띄움
+            }
+        }
+    }
+
+    private fun showTileGuide() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.add_tile)
+            .setMessage(R.string.tile_guide_msg)
+            .setPositiveButton(R.string.ok, null)
+            .show()
     }
 
     // ---------- 알림 숨기기 ----------

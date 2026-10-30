@@ -62,6 +62,13 @@
             android:text="@string/clock_always_hint"
             android:textSize="12sp" />
 
+        <Button
+            android:id="@+id/btn_add_tile"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/add_tile" />
+
         <!-- 타이머 -->
         <TextView
             android:layout_width="match_parent"
