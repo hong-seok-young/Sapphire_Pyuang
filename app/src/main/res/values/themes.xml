@@ -13,4 +13,13 @@
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
     </style>
+
+    <!-- 윗줄 ⋮ 메뉴: 위키 패널과 같은 남보라 바탕에 밝은 글씨 (밝은 기본 바탕에 흰 글씨로 떠서 안 보였다) -->
+    <style name="ThemeOverlay.Sapphire.Menu" parent="ThemeOverlay.Material3.Dark">
+        <item name="colorSurface">@color/web_panel</item>
+        <item name="colorSurfaceContainer">@color/web_panel</item>
+        <item name="colorOnSurface">@color/web_text</item>
+        <item name="android:colorBackground">@color/web_panel</item>
+        <item name="android:textColorPrimary">@color/web_text</item>
+    </style>
 </resources>

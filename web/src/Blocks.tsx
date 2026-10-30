@@ -1,5 +1,4 @@
 import type { Block, Cell, Run } from "./types";
-import { cafeUrl } from "./data";
 
 /** 원글의 문단과 표를 그대로 보여 준다. 글쓴이가 쓴 색이 살도록 종이색 바탕 위에 그린다 */
 export function Blocks({ blocks, known }: { blocks: Block[]; known: (postId: string) => boolean }) {
@@ -42,10 +41,11 @@ function CellView({ cell, known }: { cell: Cell; known: (postId: string) => bool
   );
 }
 
-function href(to: string, known: (postId: string) => boolean): { href: string; external: boolean } {
+/** 원글 속 링크. 위키에 있는 글이면 그 글로 가고, 위키에 없는 카페 글은 글자만 보인다 (카페로 나가지 않는다) */
+function href(to: string, known: (postId: string) => boolean): { href: string; external: boolean } | null {
   if (to.startsWith("post:")) {
     const id = to.slice(5);
-    return known(id) ? { href: "#/post/" + id, external: false } : { href: cafeUrl(id), external: true };
+    return known(id) ? { href: "#/post/" + id, external: false } : null;
   }
   return { href: to, external: true };
 }
@@ -72,8 +72,8 @@ export function Runs({ runs, known }: { runs: Run[]; known: (postId: string) => 
           const style = r.c ? { color: r.c } : undefined;
           node = r.b ? <b style={style}>{r.t}</b> : style ? <span style={style}>{r.t}</span> : r.t;
         }
-        if (!r.to) return <span key={i}>{node}</span>;
-        const link = href(r.to, known);
+        const link = r.to ? href(r.to, known) : null;
+        if (!link) return <span key={i}>{node}</span>;
         return (
           <a key={i} href={link.href} target={link.external ? "_blank" : undefined} rel={link.external ? "noreferrer" : undefined}>
             {node}

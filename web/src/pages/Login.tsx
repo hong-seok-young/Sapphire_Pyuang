@@ -2,7 +2,8 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { changePassword, errorText, login } from "../auth";
 import type { Me } from "../auth";
-import { TopBar } from "../ui";
+import { HeroTitle, TopBar } from "../ui";
+import { appMenu } from "../platform";
 
 /** 길드원 로그인. 아이디는 길드마스터나 오피서가 만들어 준다 */
 export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
@@ -30,7 +31,7 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
         <header className="hero">
           <img className="hero-mark" src="icon-192.png" alt="" width={72} height={72} />
           <div>
-            <h1 className="hero-title">Sapphire</h1>
+            <HeroTitle />
             <p className="hero-sub">길드원 로그인</p>
           </div>
         </header>
@@ -56,6 +57,12 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
         <p className="form-note">
           이 위키는 길드 Sapphire 길드원만 볼 수 있어요. 아이디는 길드마스터나 오피서에게 받으세요.
         </p>
+        {appMenu && (
+          // 시계는 위키 로그인과 상관없이 쓴다 (안드로이드 앱이 sapphire:// 주소를 받아 시계 설정을 연다)
+          <div className="links">
+            <a className="btn btn-ghost" href="sapphire://clock">⏰ 시계 설정은 로그인 없이 쓸 수 있어요</a>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -121,7 +128,7 @@ export function PasswordPage({ forced = false, onDone }: { forced?: boolean; onD
         <header className="hero">
           <img className="hero-mark" src="icon-192.png" alt="" width={72} height={72} />
           <div>
-            <h1 className="hero-title">Sapphire</h1>
+            <HeroTitle />
             <p className="hero-sub">비밀번호 바꾸기</p>
           </div>
         </header>

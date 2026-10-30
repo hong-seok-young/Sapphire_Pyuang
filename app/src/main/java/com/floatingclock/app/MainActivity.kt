@@ -36,11 +36,15 @@ class MainActivity : AppCompatActivity() {
     companion object {
         /** 길드 위키 웹앱 주소. 아이폰 길드원은 이 주소를 홈 화면에 추가해서 쓴다 */
         const val WEB_URL = WikiTimers.SITE
+
+        /** 위키의 '앱' 탭 버튼 주소 (sapphire://clock 등). 웹앱 src/pages/AppPage.tsx 와 맞춘다 */
+        private const val APP_SCHEME = "sapphire"
     }
 
     private lateinit var web: WebView
     private lateinit var offline: View
     private lateinit var progress: ProgressBar
+    private lateinit var toolbar: MaterialToolbar
     private val webHost: String? = Uri.parse(WEB_URL).host
 
     /** 웹앱이 그림 고르기를 열었을 때 결과를 돌려줄 곳. 사용자가 갤러리에서 직접 고른 그림만 넘긴다 */
@@ -54,7 +58,8 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        setSupportActionBar(findViewById<MaterialToolbar>(R.id.toolbar))
+        toolbar = findViewById(R.id.toolbar)
+        setSupportActionBar(toolbar)
         web = findViewById(R.id.web)
         offline = findViewById(R.id.offline)
         progress = findViewById(R.id.web_progress)
@@ -69,6 +74,10 @@ class MainActivity : AppCompatActivity() {
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val uri = request.url
+                if (uri.scheme == APP_SCHEME) {
+                    runAppAction(uri.host) // 위키 아래 탭 '앱'의 버튼
+                    return true
+                }
                 if (uri.host == webHost) return false // 위키 안에서 이동
                 openOutside(uri) // 카페 원글 같은 바깥 주소는 브라우저로 연다
                 return true
@@ -78,8 +87,18 @@ class MainActivity : AppCompatActivity() {
                 offline.visibility = View.GONE
             }
 
+            override fun onPageFinished(view: WebView, url: String?) {
+                // 새 위키는 아래 탭 '앱'에 앱 기능이 있어서 윗줄을 숨긴다. 예전 위키면 윗줄 메뉴를 보여 준다
+                view.evaluateJavascript("window.__sapphireAppMenu === true") { result ->
+                    toolbar.visibility = if (result == "true") View.GONE else View.VISIBLE
+                }
+            }
+
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-                if (request.isForMainFrame) offline.visibility = View.VISIBLE
+                if (request.isForMainFrame) {
+                    offline.visibility = View.VISIBLE
+                    toolbar.visibility = View.VISIBLE // 위키가 안 열려도 시계 설정에는 갈 수 있게
+                }
             }
         }
         web.webChromeClient = object : WebChromeClient() {
@@ -183,6 +202,17 @@ class MainActivity : AppCompatActivity() {
         ContextCompat.startForegroundService(this, open)
         Toast.makeText(this, R.string.toast_float_wiki, Toast.LENGTH_LONG).show()
         moveTaskToBack(true)
+    }
+
+    /** 위키 아래 탭 '앱'의 버튼 (윗줄 메뉴와 같은 기능) */
+    private fun runAppAction(action: String?) {
+        when (action) {
+            "clock" -> startActivity(Intent(this, ClockActivity::class.java))
+            "float" -> floatOverGame()
+            "timer" -> startActivity(Intent(this, TimerActivity::class.java))
+            "share" -> shareWebLink()
+            "reload" -> reload()
+        }
     }
 
     private fun reload() {

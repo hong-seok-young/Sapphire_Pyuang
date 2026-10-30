@@ -13,8 +13,12 @@
         android:layout_height="48dp"
         android:background="@color/web_bar"
         android:theme="@style/ThemeOverlay.Material3.Dark.ActionBar"
-        app:title="@string/app_name"
+        android:visibility="gone"
+        app:popupTheme="@style/ThemeOverlay.Sapphire.Menu"
+        app:title="@string/main_title"
         app:titleTextColor="#FFFFFF" />
+    <!-- 윗줄은 평소 숨긴다. 앱 기능은 위키 아래 탭 '앱'에 있다.
+         예전 위키(앱 탭이 없는 버전)이거나 인터넷이 안 될 때만 보인다 (MainActivity) -->
 
     <FrameLayout
         android:layout_width="match_parent"

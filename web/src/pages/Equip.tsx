@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { Wiki } from "../types";
 import { PicImg, TopBar, NotFound } from "../ui";
-import { cafeUrl } from "../data";
 
 export function EquipSlots({ wiki }: { wiki: Wiki }) {
   return (
@@ -75,10 +74,6 @@ export function EquipSlot({ wiki, slot }: { wiki: Wiki; slot: string }) {
           );
         })}
       </ul>
-      <div className="links">
-        <a className="btn" href={"#/post/" + table.post}>원글 표 그대로 보기</a>
-        <a className="btn btn-ghost" href={cafeUrl(table.post)} target="_blank" rel="noreferrer">카페에서 보기</a>
-      </div>
     </>
   );
 }

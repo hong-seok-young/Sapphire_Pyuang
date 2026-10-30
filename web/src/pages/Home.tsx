@@ -1,7 +1,7 @@
-import type { Wiki } from "../types";
 import { inApp, isAndroid } from "../platform";
 import { ROLE_NAME, RANK, logout } from "../auth";
 import type { Me } from "../auth";
+import { HeroTitle } from "../ui";
 
 interface Tile {
   title: string;
@@ -30,7 +30,7 @@ const TILES: Tile[] = [
   { title: "길드원 관리", to: "#/admin", icon: "👥", managers: true },
 ];
 
-export function Home({ wiki, me, onLogout }: { wiki: Wiki; me: Me; onLogout: () => void }) {
+export function Home({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const shown = TILES.filter(
     (t) => (!t.androidOnly || (isAndroid && !inApp)) && (!t.managers || RANK[me.role] >= 1),
   );
@@ -45,7 +45,7 @@ export function Home({ wiki, me, onLogout }: { wiki: Wiki; me: Me; onLogout: () 
       <header className="hero">
         <img className="hero-mark" src="icon-192.png" alt="" width={72} height={72} />
         <div>
-          <h1 className="hero-title">Sapphire</h1>
+          <HeroTitle />
           <p className="hero-sub">아이모 길드 위키</p>
         </div>
       </header>
@@ -71,13 +71,6 @@ export function Home({ wiki, me, onLogout }: { wiki: Wiki; me: Me; onLogout: () 
         <a href="#/password">비밀번호 바꾸기</a>
         <button type="button" onClick={signOut}>로그아웃</button>
       </div>
-
-      <footer className="credit">
-        자료 출처: <a href={wiki.meta.source.글} target="_blank" rel="noreferrer">{wiki.meta.source.제목}</a> (Made by{" "}
-        {wiki.meta.source.작성자}) · {wiki.meta.source.패치} 패치
-        <br />
-        몬스터 {wiki.meta.counts.monsters} · 아이템 {wiki.meta.counts.items} · 사냥터 {wiki.meta.counts.places}
-      </footer>
     </div>
   );
 }

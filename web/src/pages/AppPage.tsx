@@ -1,11 +1,45 @@
 import { Panel, TopBar } from "../ui";
-import { APK_URL, inApp, isAndroid } from "../platform";
+import { APK_URL, appMenu, isAndroid } from "../platform";
 
 /**
- * 안드로이드 앱 받기. 웹앱은 위키와 챗봇만 맡고, 게임 위에 뜨는 기능은 안드로이드 앱에만 있다.
+ * 앱 안에서 누르는 앱 기능. sapphire:// 주소는 안드로이드 앱(MainActivity)이 받아서 그 기능을 연다.
+ * 앱의 맨 윗줄 메뉴를 없애고 아래 탭 '앱'으로 옮겼다.
+ */
+const APP_ACTIONS = [
+  { href: "sapphire://clock", icon: "⏰", title: "시계 설정", sub: "시계 켜기, 게임 연동, 모양, 위치" },
+  { href: "sapphire://float", icon: "📖", title: "게임 위에 띄우기", sub: "게임을 끄지 않고 위키를 작은 창으로 봐요" },
+  { href: "sapphire://timer", icon: "⏱️", title: "타이머 설정", sub: "보스·네임드 목록, 내가 만든 타이머, 시각 알림" },
+  { href: "sapphire://share", icon: "🔗", title: "웹앱 링크 보내기", sub: "카톡 등으로 길드원에게 위키 주소 보내기" },
+  { href: "sapphire://reload", icon: "🔄", title: "새로고침", sub: "위키를 다시 불러와요" },
+];
+
+/**
+ * 앱 안에서는 앱 기능 목록, 브라우저에서는 안드로이드 앱 받기.
+ * 웹앱은 위키와 챗봇만 맡고, 게임 위에 뜨는 기능은 안드로이드 앱에만 있다.
  * 웹앱만 쓰는 사람은 폰에 아무것도 깔지 않는다. (CLAUDE.md 앱 구성)
  */
 export function AppPage() {
+  if (appMenu) {
+    return (
+      <>
+        <TopBar title="앱 기능" />
+        <ul className="list">
+          {APP_ACTIONS.map((a) => (
+            <li key={a.href}>
+              <a className="row" href={a.href}>
+                <span className="row-pic">{a.icon}</span>
+                <span className="row-main">
+                  <span className="row-title">{a.title}</span>
+                  <span className="row-sub">{a.sub}</span>
+                </span>
+                <span className="row-arrow">▶</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </>
+    );
+  }
   return (
     <>
       <TopBar title="안드로이드 앱" />
@@ -23,11 +57,7 @@ export function AppPage() {
           따로 그릴 뿐이에요. 그래도 걱정되면 이 웹앱만 쓰면 돼요.
         </p>
       </Panel>
-      {inApp ? (
-        <div className="soon">
-          <p>지금 앱으로 보고 있어요. 위쪽 ⏰ 시계 메뉴에서 시계와 타이머를 쓸 수 있어요.</p>
-        </div>
-      ) : isAndroid ? (
+      {isAndroid ? (
         <>
           <div className="links">
             <a className="btn" href={APK_URL}>📲 앱 받기</a>

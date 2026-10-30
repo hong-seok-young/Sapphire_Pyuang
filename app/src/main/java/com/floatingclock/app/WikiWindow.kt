@@ -115,7 +115,8 @@ class WikiWindow(private val ctx: Context) {
         val view = WebView(ContextThemeWrapper(ctx, R.style.Theme_FloatingClock)).apply {
             settings.javaScriptEnabled = true // 위키는 자바스크립트로 그리는 웹앱이다
             settings.domStorageEnabled = true
-            settings.userAgentString = settings.userAgentString + " SapphireApp/" + BuildConfig.VERSION_NAME
+            // SapphireFloat: 위키가 이 창 안에서는 '앱' 탭을 숨긴다 (다른 화면을 열면 게임에서 빠져나가서)
+            settings.userAgentString = settings.userAgentString + " SapphireApp/" + BuildConfig.VERSION_NAME + " SapphireFloat"
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                     // 카페 원글 같은 바깥 주소도 이 창 안에서 연다. 다른 앱으로 넘어가면 아이모 접속이 끊긴다

@@ -3,6 +3,7 @@
     <string name="app_name">Sapphire</string>
     <string name="app_desc">게임 등 다른 앱 위에 초 단위 시계를 띄워줍니다.</string>
 
+    <string name="main_title">Sapphire app</string>
     <string name="clock_title">시계 설정</string>
     <string name="menu_clock">⏰ 시계</string>
     <string name="menu_timer">타이머 설정</string>

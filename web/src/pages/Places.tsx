@@ -1,7 +1,6 @@
 import type { Wiki } from "../types";
 import { PicImg, TopBar, levelText, NotFound } from "../ui";
 import { MonsterCard, PlaceInfo } from "../wiki-ui";
-import { cafeUrl } from "../data";
 
 /** 지역 버튼에 쓰는 짧은 이름 */
 const SHORT: Record<string, string> = {
@@ -66,10 +65,6 @@ export function PlacePage({ wiki, id }: { wiki: Wiki; id: string }) {
         <MonsterCard key={m.key} wiki={wiki} m={m} />
       ))}
       {p.info && <PlaceInfo text={p.info} />}
-      <div className="links">
-        <a className="btn" href={"#/post/" + id}>원글 표 그대로 보기</a>
-        <a className="btn btn-ghost" href={cafeUrl(id)} target="_blank" rel="noreferrer">카페에서 보기</a>
-      </div>
     </>
   );
 }

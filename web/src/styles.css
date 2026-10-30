@@ -111,8 +111,6 @@ button { font: inherit; color: inherit; }
   position: absolute; top: 4px; right: 4px; font-size: 10px; padding: 0 4px;
   background: var(--sunset); color: var(--edge); border: 1px solid var(--edge);
 }
-.credit { margin: 20px 4px 0; font-size: 11px; color: var(--muted); line-height: 1.7; }
-.credit a { color: var(--gold); text-decoration: underline; }
 
 /* lists */
 .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
@@ -264,3 +262,4 @@ button { font: inherit; color: inherit; }
 .notice { border-color: var(--gold); }
 .me-line { margin: 18px 4px 0; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 12px; color: var(--muted); }
 .me-line a, .me-line button { color: var(--gold); text-decoration: underline; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+.hero-edition { font-size: 15px; letter-spacing: 0; color: var(--sapphire); text-shadow: 1px 1px 0 var(--edge); }

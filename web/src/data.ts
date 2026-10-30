@@ -61,7 +61,3 @@ export function monstersByName(wiki: Wiki): Map<string, Monster[]> {
   }
   return map;
 }
-
-export function cafeUrl(postId: string): string {
-  return "https://cafe.naver.com/iphoneimo/" + postId;
-}

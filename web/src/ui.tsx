@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { EDITION } from "./platform";
 import type { Pic } from "./types";
 
 /**
@@ -79,4 +80,13 @@ export function levelText(level: [number, number] | null | undefined): string {
 
 export function num(n: number | null | undefined): string {
   return n == null ? "-" : n.toLocaleString("ko-KR");
+}
+
+/** 맨 위 제목. 안드로이드 앱 안에서는 'Sapphire app', 브라우저와 홈 화면 웹앱에서는 'Sapphire web' */
+export function HeroTitle() {
+  return (
+    <h1 className="hero-title">
+      Sapphire <span className="hero-edition">{EDITION}</span>
+    </h1>
+  );
 }

@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import type { Wiki } from "../types";
 import { TopBar, Loading, NotFound } from "../ui";
 import { Blocks } from "../Blocks";
-import { cafeUrl, loadPosts, useAsync } from "../data";
+import { loadPosts, useAsync } from "../data";
 
 export function MenuPage({ wiki, title }: { wiki: Wiki; title: string }) {
   const sec = wiki.menu.find((m) => m.title === title);
@@ -35,9 +35,6 @@ export function PostPage({ id }: { id: string }) {
     <>
       <TopBar title={post.title.replace(/\s*_ReMAKE$/, "")} />
       <Blocks blocks={post.blocks} known={(pid) => pid in posts} />
-      <div className="links">
-        <a className="btn btn-ghost" href={cafeUrl(id)} target="_blank" rel="noreferrer">카페에서 원글 보기</a>
-      </div>
     </>
   );
 }
