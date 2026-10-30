@@ -14,6 +14,7 @@ import { LoginPage, PasswordPage } from "./pages/Login";
 import { AdminPage } from "./pages/Admin";
 import { MePage, ProfileSetupPage } from "./pages/Profile";
 import { RankingPage } from "./pages/Ranking";
+import { MarketPage } from "./pages/Market";
 import { RANK, fetchMe } from "./auth";
 import { appMenu } from "./platform";
 import type { Me } from "./auth";
@@ -87,6 +88,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "menu") body = <MenuPage wiki={wiki} title={arg} />;
   else if (page === "post") body = <PostPage wiki={wiki} id={arg} />;
   else if (page === "chat") body = <ChatPage wiki={wiki} />;
+  else if (page === "market") body = <MarketPage wiki={wiki} me={me} />;
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
   else if (page === "app" || page === "timer") body = <AppPage />;
   else body = <Home me={me} onLogout={onLogout} />;
