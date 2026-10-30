@@ -22,6 +22,15 @@ export const MAX_NOTE = 60;
 export const MAX_SELLING = 20;
 /** 거래 완료한 글은 이만큼 지나면 지운다 */
 export const KEEP_SOLD_MS = 30 * 86_400_000;
+/** 옵션이 범위에서 뜨는 아이템(헌터보우: 명중 0~11 / 민첩 0~8)은 판 사람이 뜬 값을 적는다. 한 글에 이만큼까지 */
+export const MAX_OPTIONS = 8;
+
+/** 판 사람이 적은 옵션 하나 (예: 명중 5, 이동속도 3%) */
+export interface ListingOption {
+  name: string;
+  value: number;
+  unit: "" | "%";
+}
 
 export interface ListingInput {
   item: string;
@@ -32,6 +41,7 @@ export interface ListingInput {
   qty: number;
   price: number;
   note: string | null;
+  options: ListingOption[] | null;
 }
 
 const ITEM_NAME = /^[\p{L}\p{N} ()[\]:+\-.,'·~!&]{1,30}$/u;
@@ -47,6 +57,24 @@ export function readNote(v: unknown): string | null | undefined {
   const t = v.trim();
   if (!t) return null;
   return t.length <= MAX_NOTE ? t : undefined;
+}
+
+const OPTION_NAME = /^[\p{L}& ]{1,16}$/u;
+
+/** 옵션 값들: 안 보냈으면 null, 맞지 않으면 이유(문자열) */
+export function readOptions(v: unknown): ListingOption[] | null | string {
+  if (v === undefined || v === null) return null;
+  if (!Array.isArray(v) || v.length > MAX_OPTIONS) return "옵션이 맞지 않아요";
+  const out: ListingOption[] = [];
+  for (const o of v) {
+    if (!o || typeof o !== "object") return "옵션이 맞지 않아요";
+    const { name, value, unit } = o as Record<string, unknown>;
+    if (typeof name !== "string" || !OPTION_NAME.test(name.trim())) return "옵션 이름이 맞지 않아요";
+    if (!Number.isInteger(value) || (value as number) < 0 || (value as number) > 99_999) return "옵션 값은 0 이상의 정수로 적어 주세요";
+    if (unit !== undefined && unit !== "" && unit !== "%") return "옵션이 맞지 않아요";
+    out.push({ name: name.trim(), value: value as number, unit: unit === "%" ? "%" : "" });
+  }
+  return out.length ? out : null;
 }
 
 /** 화면이 보낸 판매 글을 검사한다. 맞으면 ListingInput, 아니면 이유 */
@@ -72,7 +100,9 @@ export function readListing(b: Record<string, unknown>): ListingInput | string {
   if (!validPrice(b.price)) return "가격을 골드로 적어 주세요";
   const note = readNote(b.note);
   if (note === undefined) return `한마디는 ${MAX_NOTE}자까지예요`;
-  return { item, category, enhance: enhance as number, enchant, enchantValue, qty: qty as number, price: b.price, note };
+  const options = readOptions(b.options);
+  if (typeof options === "string") return options;
+  return { item, category, enhance: enhance as number, enchant, enchantValue, qty: qty as number, price: b.price, note, options };
 }
 
 export interface ListingRow {
@@ -86,16 +116,27 @@ export interface ListingRow {
   qty: number;
   price: number;
   note: string | null;
+  /** ListingOption[] 의 JSON */
+  options: string | null;
   status: "selling" | "sold";
   created_at: number;
   updated_at: number;
+}
+
+function parseOptions(json: string | null): ListingOption[] | null {
+  if (!json) return null;
+  try {
+    return JSON.parse(json) as ListingOption[];
+  } catch {
+    return null;
+  }
 }
 
 /** 화면에 주는 모양 */
 export function listingOut(r: ListingRow) {
   return {
     id: r.id, seller: r.seller, item: r.item, category: r.category, enhance: r.enhance, enchant: r.enchant,
-    enchantValue: r.enchant_value, qty: r.qty, price: r.price, note: r.note, status: r.status,
+    enchantValue: r.enchant_value, qty: r.qty, price: r.price, note: r.note, options: parseOptions(r.options), status: r.status,
     createdAt: r.created_at, updatedAt: r.updated_at,
   };
 }

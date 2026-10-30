@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS listings (
   price INTEGER NOT NULL,                 -- 골드 (올린 수량 전체 값)
   note TEXT,                              -- 한마디
   status TEXT NOT NULL DEFAULT 'selling', -- selling 판매 중 | sold 거래 완료 (30일 뒤 지운다)
+  options TEXT,                           -- 판 사람이 적은 옵션 값 JSON [{name, value, unit}] (옵션이 범위에서 뜨는 아이템)
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );

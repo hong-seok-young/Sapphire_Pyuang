@@ -549,3 +549,8 @@ button { font: inherit; color: inherit; }
 .mk-picked > span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .mk-picked b { font-weight: 400; font-size: 15px; }
 .mk-picked small { font-size: 11px; color: var(--muted); }
+.mk-opt { display: grid; grid-template-columns: 72px 90px 1fr; align-items: center; gap: 8px; }
+.mk-opt b { font-weight: 400; font-size: 14px; }
+.mk-opt .mk-input { height: 36px; text-align: center; }
+.mk-opt small { font-size: 11px; color: var(--muted); }
+.mk-opt small.mk-opt-off { color: var(--red); }

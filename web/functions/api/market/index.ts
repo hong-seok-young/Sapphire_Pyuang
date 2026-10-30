@@ -1,6 +1,7 @@
 // GET  /api/market -> 사파이어 중개인: 판매 중인 글 전부와 내 글(거래 완료 포함).
 //      글마다 '살래요' 수와 내가 눌렀는지. 내 글에는 누른 사람 명단(wanters)도 준다 (명단은 판 사람에게만)
-// POST /api/market { item, category, enhance, enchant, enchantValue, qty, price, note } -> 팔 물건 올리기
+// POST /api/market { item, category, enhance, enchant, enchantValue, qty, price, note, options } -> 팔 물건 올리기
+//      options: 옵션이 범위에서 뜨는 아이템이면 판 사람이 적은 값 [{ name, value, unit }]
 import { NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { KEEP_SOLD_MS, MAX_SELLING, listingOut, readListing } from "../../../server/market";
@@ -54,10 +55,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .first<{ n: number }>();
   if ((selling?.n ?? 0) >= MAX_SELLING) return json({ error: `한 사람이 ${MAX_SELLING}개까지 팔 수 있어요. 다 판 것은 '거래 완료'를 눌러 주세요` }, 409);
   const row = await env.DB.prepare(
-    "INSERT INTO listings (seller, item, category, enhance, enchant, enchant_value, qty, price, note, status, created_at, updated_at) " +
-      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'selling', ?, ?) RETURNING *",
+    "INSERT INTO listings (seller, item, category, enhance, enchant, enchant_value, qty, price, note, options, status, created_at, updated_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'selling', ?, ?) RETURNING *",
   )
-    .bind(me.id, input.item, input.category, input.enhance, input.enchant, input.enchantValue, input.qty, input.price, input.note, now, now)
+    .bind(
+      me.id, input.item, input.category, input.enhance, input.enchant, input.enchantValue, input.qty, input.price, input.note,
+      input.options ? JSON.stringify(input.options) : null, now, now,
+    )
     .first<ListingRow>();
   if (!row) return json({ error: "올리지 못했어요" }, 500);
   return json({ ...listingOut(row), wants: 0, wanted: false, wanters: [] }, 201);

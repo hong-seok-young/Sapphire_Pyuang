@@ -39,6 +39,13 @@ const CATEGORY_FILE: Record<Category | "전체", string> = {
 };
 export const categoryPic = (c: Category | "전체") => `${MARKET_PIC}cat_${CATEGORY_FILE[c]}.png`;
 
+/** 판 사람이 적은 옵션 하나 (예: 명중 5, 이동속도 3%) */
+export interface ListingOption {
+  name: string;
+  value: number;
+  unit: "" | "%";
+}
+
 export interface Wanter {
   id: string;
   note: string | null;
@@ -56,6 +63,8 @@ export interface Listing {
   qty: number;
   price: number;
   note: string | null;
+  /** 옵션이 범위에서 뜨는 아이템이면 판 사람이 적은 값 */
+  options: ListingOption[] | null;
   status: "selling" | "sold";
   createdAt: number;
   updatedAt: number;
@@ -74,6 +83,7 @@ export interface ListingInput {
   qty: number;
   price: number;
   note: string | null;
+  options: ListingOption[] | null;
 }
 
 export const fetchMarket = () => api<{ listings: Listing[] }>("/api/market").then((r) => r.listings);
@@ -122,14 +132,86 @@ export function categoryOf(item: Item | undefined): Category | undefined {
   return slot ? SLOT_CATEGORY[slot] : undefined;
 }
 
-/** 위키 장비 정보에서 정보창에 보일 줄 (요구 레벨, 공격/방어, 직업, 기본 옵션) */
-export function itemFacts(item: Item | undefined): { level?: string; stats: string[]; job?: string; option?: string } {
+/** 범위에서 뜨는 옵션 (헌터보우의 명중 0~11, 워소드의 힘 0 & 2~10 처럼 '0 아니면 2~10') */
+export interface OptionRoll {
+  name: string;
+  /** 뜰 수 있는 값들: [작은 값, 큰 값] 묶음 */
+  ranges: [number, number][];
+  unit: "" | "%";
+  /** 위키에 ? 가 붙은 값 (정확하지 않음) */
+  unsure: boolean;
+}
+
+/** 위키 '옵션' 칸을 나눈 것 */
+export interface ItemOptions {
+  /** 판 사람이 뜬 값을 적어야 하는 옵션 */
+  rolls: OptionRoll[];
+  /** 값이 정해진 옵션 ("크리티컬 1", "데미지 증가 +10%") */
+  fixed: string[];
+  /** 세트 효과 ("[2세트] 체력 35") */
+  sets: string[];
+  /** 강화불가, 거래불가, 기간제 같은 안내 */
+  notes: string[];
+}
+
+/** 위키 '옵션' 칸 ("명중 0~11 / 민첩 0~8", "힘 0 & 3~11", "크리티컬 1 / 강화불가") 을 나눈다 */
+export function parseItemOptions(text: string | undefined): ItemOptions {
+  const out: ItemOptions = { rolls: [], fixed: [], sets: [], notes: [] };
+  const raw = (text ?? "").trim();
+  if (!raw || raw === "-") return out;
+  let inSet = false;
+  for (const piece of raw.split("/").map((p) => p.trim()).filter(Boolean)) {
+    if (piece.includes("세트]")) inSet = true;
+    if (inSet) {
+      // "[2세트]" 다음 조각은 그 세트의 내용
+      const last = out.sets.length - 1;
+      if (last >= 0 && /^\[\d+세트\]$/.test(out.sets[last])) out.sets[last] += " " + piece;
+      else out.sets.push(piece);
+      continue;
+    }
+    const unsure = piece.endsWith("?");
+    const part = piece.replace(/\?+$/, "").trim();
+    const m = /^([^\d+-]*[^\d\s+-])\s*([+-]?\d.*)$/.exec(part);
+    if (!m) {
+      if (!/^\d+$/.test(part)) out.notes.push(part);
+      continue;
+    }
+    const name = m[1].trim();
+    const spec = m[2].replace(/\s+/g, "");
+    const ranges: [number, number][] = [];
+    for (const alt of spec.replace(/%/g, "").split("&")) {
+      const r = /^([+-]?\d+(?:\.\d+)?)(?:[~-](\d+(?:\.\d+)?))?$/.exec(alt); // 0~11, 0-3 둘 다
+      if (!r) {
+        ranges.length = 0;
+        break;
+      }
+      ranges.push([Number(r[1]), Number(r[2] ?? r[1])]);
+    }
+    if (!ranges.length) out.notes.push(part);
+    else if (ranges.length === 1 && ranges[0][0] === ranges[0][1]) out.fixed.push(`${name} ${m[2].trim()}`);
+    else out.rolls.push({ name, ranges, unit: spec.includes("%") ? "%" : "", unsure });
+  }
+  return out;
+}
+
+/** "0~11", "0 또는 3~11", "5~8%" */
+export function rollHint(r: OptionRoll): string {
+  return r.ranges.map(([a, b]) => (a === b ? `${a}` : `${a}~${b}`)).join(" 또는 ") + r.unit;
+}
+
+/** 위키 범위 안의 값인지 (0 은 언제나 될 수 있다) */
+export function inRoll(r: OptionRoll, v: number): boolean {
+  return v === 0 || r.ranges.some(([a, b]) => v >= a && v <= b);
+}
+
+/** 위키 장비 정보에서 정보창에 보일 것 (요구 레벨, 공격/방어, 직업, 옵션) */
+export function itemFacts(item: Item | undefined): { level?: string; stats: string[]; job?: string; options: ItemOptions } {
   const info = item?.equip[0]?.info;
-  if (!info) return { stats: [] };
+  if (!info) return { stats: [], options: parseItemOptions(undefined) };
   const stats = ["공격", "속도", "방어력", "막기", "정밀", "마법 / 데미지"]
     .filter((k) => info[k])
     .map((k) => `${k} ${info[k]}`);
-  return { level: info["레벨제한"] || undefined, stats, job: info["직업"] || undefined, option: info["옵션"] || undefined };
+  return { level: info["레벨제한"] || undefined, stats, job: info["직업"] || undefined, options: parseItemOptions(info["옵션"]) };
 }
 
 /** "방금", "3시간 전", "2일 전" */

@@ -5,10 +5,10 @@ import type { Me } from "../auth";
 import { useAsync } from "../data";
 import {
   CATEGORIES, ENCHANTS, ENCHANT_CATEGORIES, ENHANCE_CATEGORIES, MARKET_PIC, MAX_ENHANCE, MAX_NOTE, MAX_PRICE, MAX_QTY, ago, categoryOf, categoryPic, createListing,
-  deleteListing, enchantText, fetchMarket, goldText, goldWords, itemFacts, listingName, unwantListing, updateListing,
-  wantListing, wikiItem,
+  deleteListing, enchantText, fetchMarket, goldText, goldWords, inRoll, itemFacts, listingName, rollHint, unwantListing,
+  updateListing, wantListing, wikiItem,
 } from "../market";
-import type { Category, Enchant, Listing } from "../market";
+import type { Category, Enchant, Listing, ListingOption } from "../market";
 import type { Wiki } from "../types";
 import { Loading, PicImg, TopBar } from "../ui";
 
@@ -42,6 +42,7 @@ function Slot({ wiki, l, size = 36 }: { wiki: Wiki; l: { item: string; enhance: 
 /** 누른 글의 정보창과 할 일 (살래요, 거래 완료, 가격 바꾸기, 내리기) */
 function Detail({ wiki, me, l, onChanged }: { wiki: Wiki; me: Me; l: Listing; onChanged: (next: Listing | null) => void }) {
   const facts = itemFacts(wikiItem(wiki, l.item));
+  const rolled = new Map((l.options ?? []).map((o) => [o.name, o]));
   const mine = l.seller === me.id;
   const manager = RANK[me.role] >= 1;
   const [busy, setBusy] = useState(false);
@@ -71,10 +72,40 @@ function Detail({ wiki, me, l, onChanged }: { wiki: Wiki; me: Me; l: Listing; on
         {facts.stats.map((s) => (
           <p key={s}>{s}</p>
         ))}
+        {/* 옵션은 한 줄에 하나씩: 판 사람이 적은 값, 위키의 정해진 값, 속성부여(주황), 세트 효과 */}
+        {facts.options.rolls.map((r) => {
+          const o = rolled.get(r.name);
+          return o ? (
+            <p key={r.name}>
+              {r.name} {o.value}
+              {o.unit}
+            </p>
+          ) : (
+            <p key={r.name} className="mk-tip-dim">
+              {r.name} {rollHint(r)}
+            </p>
+          );
+        })}
+        {(l.options ?? [])
+          .filter((o) => !facts.options.rolls.some((r) => r.name === o.name))
+          .map((o) => (
+            <p key={"own-" + o.name}>
+              {o.name} {o.value}
+              {o.unit}
+            </p>
+          ))}
+        {facts.options.fixed.map((f) => (
+          <p key={f}>{f}</p>
+        ))}
         {l.enchant && <p className="mk-tip-ench">{enchantText(l)}</p>}
-        {facts.option && <p className="mk-tip-dim">기본 옵션 {facts.option}</p>}
+        {facts.options.sets.map((s) => (
+          <p key={s} className="mk-tip-dim">
+            {s}
+          </p>
+        ))}
+        {facts.options.notes.length > 0 && <p className="mk-tip-dim">{facts.options.notes.join(" · ")}</p>}
         {facts.job && <p className="mk-tip-dim">직업 {facts.job}</p>}
-        {!facts.level && !facts.stats.length && <p className="mk-tip-dim">{l.category}</p>}
+        {!facts.level && !facts.stats.length && !l.options?.length && <p className="mk-tip-dim">{l.category}</p>}
       </div>
       {l.note && <p className="mk-note">“{l.note}”</p>}
       <p className="mk-meta">
@@ -245,13 +276,18 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
   const [qty, setQty] = useState("1");
   const [price, setPrice] = useState("");
   const [note, setNote] = useState("");
+  /** 범위에서 뜨는 옵션에 적은 값 (옵션 이름 -> 글자) */
+  const [optionText, setOptionText] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const name = item.trim();
   const known = name ? wikiItem(wiki, name) : undefined;
+  const facts = itemFacts(known);
+  const rolls = facts.options.rolls;
+  const noTrade = facts.options.notes.includes("거래불가");
   const cat = category ?? categoryOf(known) ?? null;
-  const enhanceOk = cat !== null && ENHANCE_CATEGORIES.includes(cat);
+  const enhanceOk = cat !== null && ENHANCE_CATEGORIES.includes(cat) && !facts.options.notes.includes("강화불가");
   const enchantOk = cat !== null && ENCHANT_CATEGORIES.includes(cat);
   const priceN = Number(price) || 0;
   const qtyN = Number(qty);
@@ -263,9 +299,13 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
       .sort((a, b) => Number(!squash(a.name).startsWith(q)) - Number(!squash(b.name).startsWith(q)) || a.name.length - b.name.length)
       .slice(0, 12);
   }, [wiki, name]);
+  const optionsFilled = rolls.every((r) => (optionText[r.name] ?? "") !== "");
   const ok =
     name.length > 0 && cat !== null && priceN >= 1 && priceN <= MAX_PRICE && Number.isInteger(qtyN) && qtyN >= 1 && qtyN <= MAX_QTY &&
-    (!enchantOk || !enchant || enchantValue !== null);
+    (!enchantOk || !enchant || enchantValue !== null) && optionsFilled;
+  const options: ListingOption[] | null = rolls.length
+    ? rolls.map((r) => ({ name: r.name, value: Number(optionText[r.name]), unit: r.unit }))
+    : null;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -275,7 +315,7 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
     try {
       await createListing({
         item: name, category: cat, enhance: enhanceOk ? enhance : 0, enchant: enchantOk ? enchant : null,
-        enchantValue: enchantOk && enchant ? enchantValue : null, qty: qtyN, price: priceN, note: note.trim() || null,
+        enchantValue: enchantOk && enchant ? enchantValue : null, qty: qtyN, price: priceN, note: note.trim() || null, options,
       });
       onDone();
     } catch (x) {
@@ -295,6 +335,7 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
           onChange={(e) => {
             setItem(e.target.value.slice(0, 30));
             setCategory(null);
+            setOptionText({});
             setTyping(true);
           }}
           placeholder="예: 고대의반지"
@@ -309,6 +350,7 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
                 onClick={() => {
                   setItem(it.name);
                   setCategory(null);
+                  setOptionText({});
                   setTyping(false);
                 }}
               >
@@ -326,10 +368,44 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
           <span>
             <b>{(enhanceOk && enhance > 0 ? `+${enhance}` : "") + known.name}</b>
             <small>
-              {[itemFacts(known).level && `요구 레벨 ${itemFacts(known).level}`, itemFacts(known).job].filter(Boolean).join(" · ") || "위키 아이템"}
+              {[facts.level && `요구 레벨 ${facts.level}`, facts.job].filter(Boolean).join(" · ") || "위키 아이템"}
             </small>
           </span>
         </div>
+      )}
+      {noTrade && <p className="form-error">위키에 '거래불가'로 나온 아이템이에요. 게임에서 거래가 되는지 확인해 주세요.</p>}
+      {rolls.length > 0 && (
+        <div className="mk-field">
+          <span>옵션 (이 아이템은 옵션이 범위에서 떠요. 내 아이템에 뜬 값을 적어 주세요. 0도 돼요)</span>
+          {rolls.map((r) => {
+            const text = optionText[r.name] ?? "";
+            const off = text !== "" && !inRoll(r, Number(text));
+            return (
+              <label key={r.name} className="mk-opt">
+                <b>
+                  {r.name}
+                  {r.unit && " (%)"}
+                </b>
+                <input
+                  className="mk-input"
+                  inputMode="numeric"
+                  value={text}
+                  onChange={(e) => setOptionText((t) => ({ ...t, [r.name]: e.target.value.replace(/\D/g, "").slice(0, 5) }))}
+                  placeholder="0"
+                  aria-label={r.name}
+                />
+                <small className={off ? "mk-opt-off" : ""}>
+                  {off ? `위키 범위(${rollHint(r)})와 달라요` : `위키 ${rollHint(r)}${r.unsure ? " (정확하지 않음)" : ""}`}
+                </small>
+              </label>
+            );
+          })}
+        </div>
+      )}
+      {known && (facts.options.fixed.length > 0 || facts.options.sets.length > 0) && (
+        <p className="mk-meta">
+          정해진 옵션: {[...facts.options.fixed, ...facts.options.sets].join(" · ")}
+        </p>
       )}
 
       <div className="mk-field">
