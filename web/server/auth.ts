@@ -31,7 +31,11 @@ export interface UserRow extends User {
 
 /** Workers 무료 요금제의 요청당 CPU 시간 안에 들어가는 반복 횟수. 바꾸면 scripts/make-accounts.mjs 도 같이 */
 export const PBKDF2_ITER = 10000;
-const SESSION_DAYS = 30;
+/**
+ * 로그인은 직접 로그아웃하기 전까지 이어진다. 브라우저가 쿠키를 400일보다 길게 두지 않아서(크롬)
+ * 세션과 쿠키를 400일로 주고, 위키에 들어올 때마다(/api/me) 다시 400일로 늘린다 (renewSession).
+ */
+const SESSION_DAYS = 400;
 const COOKIE = "sid";
 const enc = new TextEncoder();
 
@@ -151,6 +155,20 @@ export async function currentUser(env: Env, request: Request): Promise<User | nu
     .first<User & { expires_at: number }>();
   if (!row || row.expires_at < Date.now()) return null;
   return { id: row.id, role: row.role, must_change: row.must_change };
+}
+
+/**
+ * 로그인을 이어 준다: 세션이 끝나는 날과 쿠키를 다시 400일 뒤로 미룬다. DB 에는 하루에 한 번까지만 쓴다.
+ * 늘렸으면 새 Set-Cookie 값, 아니면 null.
+ */
+export async function renewSession(env: Env, request: Request): Promise<string | null> {
+  const token = readCookie(request, COOKIE);
+  if (!token) return null;
+  const expires = Date.now() + SESSION_DAYS * 86_400_000;
+  const res = await env.DB.prepare("UPDATE sessions SET expires_at = ? WHERE token_hash = ? AND expires_at < ?")
+    .bind(expires, await sha256(token), expires - 86_400_000)
+    .run();
+  return res.meta.changes > 0 ? sessionCookie(token) : null;
 }
 
 export function sessionCookie(token: string): string {

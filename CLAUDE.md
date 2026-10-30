@@ -78,6 +78,8 @@
   - 앱개발자: 길드마스터까지 모두 관리한다.
   - 자기 계정, 그리고 자기와 같거나 높은 역할은 다루지 못한다. 규칙은 `web/server/auth.ts` 의 `canManage` 하나로 정한다.
 - 비밀번호 원문은 저장하지 않는다(PBKDF2 해시). 새 계정과 초기화는 임시 비밀번호를 한 번만 보여 주고, 처음 로그인하면 바꾸게 한다.
+- 로그인은 직접 로그아웃하기 전까지 유지한다 (제작자 요청). 세션과 쿠키는 400일(브라우저 한도)이고 `/api/me` 가 들어올 때마다 늘린다.
+  비밀번호 초기화나 계정 삭제는 그 사람의 세션을 지운다.
 - 서버는 Cloudflare Pages Functions(`web/functions`, 공통 코드 `web/server/auth.ts`), 계정 DB는 D1 `sapphire-accounts`
   (`web/schema.sql`, `web/wrangler.toml`). 자동 배포는 계정이 하나도 없을 때 퓨앙 계정만 만들고(`web/scripts/ci-d1.mjs`),
   나머지는 '길드원 관리'에서 만든다. 직접 배포할 때 시작 계정은 `web/scripts/make-accounts.mjs` 로 만들고, 만든 SQL은 공개 저장소에 올리지 않는다.
