@@ -11,6 +11,9 @@ export const CATEGORIES = [
 export const ENCHANT_VALUES: Record<string, number[]> = {
   str: [1, 2, 3], dex: [1, 2, 3], int: [1, 2, 3], hp: [10, 20, 30], mp: [10, 20, 30],
 };
+/** 강화(+N)만 되는 종류와 속성부여만 되는 종류 (게임 규칙, 제작자가 알려 줌). 나머지는 둘 다 안 된다. 화면 src/market.ts 와 같다 */
+export const ENHANCE_CATEGORIES = ["갑옷", "주장비", "투구", "보조장비", "장갑", "신발"];
+export const ENCHANT_CATEGORIES = ["벨트", "망토", "목걸이", "반지"];
 export const MAX_ENHANCE = 20;
 export const MAX_QTY = 9999;
 export const MAX_PRICE = 99_999_999_999;
@@ -62,6 +65,8 @@ export function readListing(b: Record<string, unknown>): ListingInput | string {
     enchant = b.enchant as string;
     enchantValue = b.enchantValue as number;
   }
+  if ((enhance as number) > 0 && !ENHANCE_CATEGORIES.includes(category)) return "강화는 갑옷, 주장비, 투구, 보조장비, 장갑, 신발만 돼요";
+  if (enchant && !ENCHANT_CATEGORIES.includes(category)) return "속성부여는 벨트, 망토, 목걸이, 반지만 돼요";
   const qty = b.qty ?? 1;
   if (!Number.isInteger(qty) || (qty as number) < 1 || (qty as number) > MAX_QTY) return `수량은 1~${MAX_QTY} 로 적어 주세요`;
   if (!validPrice(b.price)) return "가격을 골드로 적어 주세요";

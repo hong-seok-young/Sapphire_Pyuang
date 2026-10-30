@@ -4,7 +4,7 @@ import { RANK, errorText } from "../auth";
 import type { Me } from "../auth";
 import { useAsync } from "../data";
 import {
-  CATEGORIES, ENCHANTS, MARKET_PIC, MAX_ENHANCE, MAX_NOTE, MAX_PRICE, MAX_QTY, ago, categoryOf, categoryPic, createListing,
+  CATEGORIES, ENCHANTS, ENCHANT_CATEGORIES, ENHANCE_CATEGORIES, MARKET_PIC, MAX_ENHANCE, MAX_NOTE, MAX_PRICE, MAX_QTY, ago, categoryOf, categoryPic, createListing,
   deleteListing, enchantText, fetchMarket, goldText, goldWords, itemFacts, listingName, unwantListing, updateListing,
   wantListing, wikiItem,
 } from "../market";
@@ -18,8 +18,6 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "mine", label: "내 판매" },
   { key: "sell", label: "팔기" },
 ];
-/** 강화와 속성부여를 적는 종류 (장비) */
-const GEAR: Category[] = ["갑옷", "주장비", "투구", "보조장비", "장갑", "신발", "벨트", "망토", "목걸이", "반지"];
 
 /** 게임 거래소의 흰 그림을 글자 색으로 칠한다 (종류 그림) */
 function MaskIcon({ src, size }: { src: string; size: number }) {
@@ -236,7 +234,7 @@ function Rows({ wiki, me, list, onChanged, empty }: {
 /** 이름 찾기: 띄어쓰기 상관없이 */
 const squash = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 
-/** 팔기: 아이템 이름을 치면 위키 아이템이 그림과 함께 뜬다. 장비면 강화, 속성부여도 적는다 */
+/** 팔기: 아이템 이름을 치면 위키 아이템이 그림과 함께 뜬다. 강화는 갑옷~신발, 속성부여는 벨트~반지만 적는다 */
 function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
   const [item, setItem] = useState("");
   const [typing, setTyping] = useState(false);
@@ -253,7 +251,8 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
   const name = item.trim();
   const known = name ? wikiItem(wiki, name) : undefined;
   const cat = category ?? categoryOf(known) ?? null;
-  const gear = cat !== null && GEAR.includes(cat);
+  const enhanceOk = cat !== null && ENHANCE_CATEGORIES.includes(cat);
+  const enchantOk = cat !== null && ENCHANT_CATEGORIES.includes(cat);
   const priceN = Number(price) || 0;
   const qtyN = Number(qty);
   const suggestions = useMemo(() => {
@@ -266,7 +265,7 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
   }, [wiki, name]);
   const ok =
     name.length > 0 && cat !== null && priceN >= 1 && priceN <= MAX_PRICE && Number.isInteger(qtyN) && qtyN >= 1 && qtyN <= MAX_QTY &&
-    (!enchant || enchantValue !== null);
+    (!enchantOk || !enchant || enchantValue !== null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -275,8 +274,8 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
     setError("");
     try {
       await createListing({
-        item: name, category: cat, enhance: gear ? enhance : 0, enchant: gear ? enchant : null,
-        enchantValue: gear && enchant ? enchantValue : null, qty: qtyN, price: priceN, note: note.trim() || null,
+        item: name, category: cat, enhance: enhanceOk ? enhance : 0, enchant: enchantOk ? enchant : null,
+        enchantValue: enchantOk && enchant ? enchantValue : null, qty: qtyN, price: priceN, note: note.trim() || null,
       });
       onDone();
     } catch (x) {
@@ -323,9 +322,9 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
       )}
       {known && (
         <div className="mk-picked">
-          <Slot wiki={wiki} l={{ item: known.name, enhance: gear ? enhance : 0, qty: qtyN > 1 ? qtyN : 1 }} size={40} />
+          <Slot wiki={wiki} l={{ item: known.name, enhance: enhanceOk ? enhance : 0, qty: qtyN > 1 ? qtyN : 1 }} size={40} />
           <span>
-            <b>{(gear && enhance > 0 ? `+${enhance}` : "") + known.name}</b>
+            <b>{(enhanceOk && enhance > 0 ? `+${enhance}` : "") + known.name}</b>
             <small>
               {[itemFacts(known).level && `요구 레벨 ${itemFacts(known).level}`, itemFacts(known).job].filter(Boolean).join(" · ") || "위키 아이템"}
             </small>
@@ -342,53 +341,58 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
             </button>
           ))}
         </div>
+        {cat !== null && (
+          <p className="mk-meta">
+            {enhanceOk ? "강화만 되는 종류예요." : enchantOk ? "속성부여만 되는 종류예요." : "강화와 속성부여가 없는 종류예요."}
+          </p>
+        )}
       </div>
 
-      {gear && (
-        <>
-          <div className="mk-field">
-            <span>강화</span>
-            <div className="level-row">
-              <button type="button" className="pill level-step" onClick={() => setEnhance((v) => Math.max(0, v - 1))} aria-label="강화 내리기">
-                −
-              </button>
-              <span className="mk-enhance">{enhance > 0 ? `+${enhance}` : "없음"}</span>
-              <button type="button" className="pill level-step" onClick={() => setEnhance((v) => Math.min(MAX_ENHANCE, v + 1))} aria-label="강화 올리기">
-                +
-              </button>
-            </div>
+      {enhanceOk && (
+        <div className="mk-field">
+          <span>강화</span>
+          <div className="level-row">
+            <button type="button" className="pill level-step" onClick={() => setEnhance((v) => Math.max(0, v - 1))} aria-label="강화 내리기">
+              −
+            </button>
+            <span className="mk-enhance">{enhance > 0 ? `+${enhance}` : "없음"}</span>
+            <button type="button" className="pill level-step" onClick={() => setEnhance((v) => Math.min(MAX_ENHANCE, v + 1))} aria-label="강화 올리기">
+              +
+            </button>
           </div>
-          <div className="mk-field">
-            <span>속성부여</span>
-            <div className="mk-chips">
-              <button type="button" className={"pill" + (enchant === null ? " pill-on" : "")} onClick={() => { setEnchant(null); setEnchantValue(null); }}>
-                없음
+        </div>
+      )}
+      {enchantOk && (
+        <div className="mk-field">
+          <span>속성부여</span>
+          <div className="mk-chips">
+            <button type="button" className={"pill" + (enchant === null ? " pill-on" : "")} onClick={() => { setEnchant(null); setEnchantValue(null); }}>
+              없음
+            </button>
+            {ENCHANTS.map((e) => (
+              <button
+                key={e.key}
+                type="button"
+                className={"pill" + (enchant === e.key ? " pill-on" : "")}
+                onClick={() => {
+                  setEnchant(e.key);
+                  setEnchantValue(null);
+                }}
+              >
+                {e.name}
               </button>
-              {ENCHANTS.map((e) => (
-                <button
-                  key={e.key}
-                  type="button"
-                  className={"pill" + (enchant === e.key ? " pill-on" : "")}
-                  onClick={() => {
-                    setEnchant(e.key);
-                    setEnchantValue(null);
-                  }}
-                >
-                  {e.name}
+            ))}
+          </div>
+          {enchant && (
+            <div className="mk-chips">
+              {ENCHANTS.find((e) => e.key === enchant)!.values.map((v) => (
+                <button key={v} type="button" className={"pill mk-ench-pill" + (enchantValue === v ? " pill-on" : "")} onClick={() => setEnchantValue(v)}>
+                  {ENCHANTS.find((e) => e.key === enchant)!.name} {v}
                 </button>
               ))}
             </div>
-            {enchant && (
-              <div className="mk-chips">
-                {ENCHANTS.find((e) => e.key === enchant)!.values.map((v) => (
-                  <button key={v} type="button" className={"pill mk-ench-pill" + (enchantValue === v ? " pill-on" : "")} onClick={() => setEnchantValue(v)}>
-                    {ENCHANTS.find((e) => e.key === enchant)!.name} {v}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </>
+          )}
+        </div>
       )}
 
       <div className="mk-field mk-two">

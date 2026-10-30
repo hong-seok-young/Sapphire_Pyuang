@@ -19,6 +19,9 @@ export const ENCHANTS: { key: Enchant; name: string; values: number[] }[] = [
   { key: "hp", name: "체력", values: [10, 20, 30] },
   { key: "mp", name: "마나", values: [10, 20, 30] },
 ];
+/** 강화(+N)만 되는 종류와 속성부여만 되는 종류 (게임 규칙, 제작자가 알려 줌). 나머지는 둘 다 안 된다. 서버 server/market.ts 와 같다 */
+export const ENHANCE_CATEGORIES: Category[] = ["갑옷", "주장비", "투구", "보조장비", "장갑", "신발"];
+export const ENCHANT_CATEGORIES: Category[] = ["벨트", "망토", "목걸이", "반지"];
 export const ENCHANT_NAME = Object.fromEntries(ENCHANTS.map((e) => [e.key, e.name])) as Record<Enchant, string>;
 export const MAX_ENHANCE = 20;
 export const MAX_QTY = 9999;
