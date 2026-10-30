@@ -1,7 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <style name="Theme.FloatingClock" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">#1E88E5</item>
         <item name="colorOnPrimary">#FFFFFF</item>
+    </style>
+
+    <!-- 첫 화면(위키): 웹앱과 같은 어두운 색으로 상태바, 아래 버튼 줄까지 맞춘다 -->
+    <style name="Theme.Sapphire.Web" parent="Theme.FloatingClock">
+        <item name="android:windowBackground">@color/web_night</item>
+        <item name="android:statusBarColor">@color/web_bar</item>
+        <item name="android:navigationBarColor">@color/web_bar</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
     </style>
 </resources>

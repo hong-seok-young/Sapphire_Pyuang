@@ -36,15 +36,25 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FloatingClock">
 
+        <!-- 첫 화면: 길드 위키 웹앱. 홈 화면 아이콘이 가리키는 이름이라 바꾸지 않는다 -->
         <activity
             android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
             android:exported="true"
-            android:launchMode="singleTop">
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.Sapphire.Web">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 시계 설정 (첫 화면 위쪽 메뉴의 '⏰ 시계', 시계 알림을 누를 때) -->
+        <activity
+            android:name=".ClockActivity"
+            android:exported="false"
+            android:label="@string/clock_title"
+            android:launchMode="singleTop" />
 
         <activity
             android:name=".TimerActivity"

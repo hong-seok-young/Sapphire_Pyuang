@@ -74,8 +74,11 @@ class FloatingClockService : Service() {
         /** 화면 앞에 떠 있는 앱을 확인하는 간격 */
         private const val WATCH_INTERVAL_MS = 500L
 
-        /** 타이머 목록 창이 저절로 닫히는 시간. 창에 손이 닿을 때마다 다시 센다 */
-        private const val PANEL_AUTO_HIDE_MS = 8000L
+        /**
+         * 타이머 목록 창이 저절로 닫히는 시간. 창에 손이 닿을 때마다 다시 센다.
+         * 목록을 읽는 중에 닫히지 않게 넉넉히 둔다. 보통은 바깥(게임)을 누르거나 고르면 바로 닫힌다.
+         */
+        private const val PANEL_AUTO_HIDE_MS = 60_000L
 
         /** 목록 창의 사냥터 이름 색 */
         private val PLACE_COLOR = Color.parseColor("#9FC5FF")
@@ -737,7 +740,7 @@ class FloatingClockService : Service() {
                 )
             }
             val open = PendingIntent.getActivity(
-                this, 0, Intent(this, MainActivity::class.java),
+                this, 0, Intent(this, ClockActivity::class.java),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
             val n = NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
@@ -766,7 +769,7 @@ class FloatingClockService : Service() {
 
     private fun buildNotification(): Notification {
         val openIntent = PendingIntent.getActivity(
-            this, 0, Intent(this, MainActivity::class.java),
+            this, 0, Intent(this, ClockActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val stopIntent = PendingIntent.getService(

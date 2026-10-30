@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 첫 화면(위키) 위쪽 메뉴: 시계는 늘 보이게, 나머지는 ⋮ 안에 -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/menu_clock"
+        android:title="@string/menu_clock"
+        app:showAsAction="always|withText" />
+
+    <item
+        android:id="@+id/menu_timer"
+        android:title="@string/menu_timer"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_share"
+        android:title="@string/menu_share_web"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_reload"
+        android:title="@string/menu_reload"
+        app:showAsAction="never" />
+</menu>

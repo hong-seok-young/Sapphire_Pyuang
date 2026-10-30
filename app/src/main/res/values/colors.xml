@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#25162D</color>
+    <!-- 위키 웹앱과 같은 밤하늘 색 (web/src/styles.css 의 night 색과 탭 바 배경) -->
+    <color name="web_night">#141831</color>
+    <color name="web_bar">#0E1026</color>
 </resources>

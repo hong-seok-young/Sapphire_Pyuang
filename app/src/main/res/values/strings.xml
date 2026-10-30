@@ -3,6 +3,17 @@
     <string name="app_name">Sapphire</string>
     <string name="app_desc">게임 등 다른 앱 위에 초 단위 시계를 띄워줍니다.</string>
 
+    <string name="clock_title">시계 설정</string>
+    <string name="menu_clock">⏰ 시계</string>
+    <string name="menu_timer">타이머 설정</string>
+    <string name="menu_share_web">웹앱 링크 보내기</string>
+    <string name="menu_reload">새로고침</string>
+    <string name="share_web_text">Sapphire 아이모 위키 %1$s\n아이폰은 Safari, 안드로이드는 Chrome에서 열고 \'홈 화면에 추가\'를 누르면 앱처럼 쓸 수 있어요.</string>
+    <string name="offline_title">위키를 열지 못했어요</string>
+    <string name="offline_msg">인터넷 연결을 확인하고 다시 시도해 주세요. 시계와 타이머는 위쪽 \'⏰ 시계\' 메뉴에서 그대로 쓸 수 있어요.</string>
+    <string name="retry">다시 시도</string>
+    <string name="toast_no_browser">이 주소를 열 앱이 없어요</string>
+
     <string name="section_perm">권한</string>
     <string name="perm_granted">✔ 다른 앱 위에 표시 권한 허용됨</string>
     <string name="perm_missing">✖ 다른 앱 위에 표시 권한이 필요합니다</string>
