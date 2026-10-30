@@ -9,6 +9,11 @@
         app:showAsAction="always|withText" />
 
     <item
+        android:id="@+id/menu_float"
+        android:title="@string/menu_float_wiki"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_timer"
         android:title="@string/menu_timer"
         app:showAsAction="never" />

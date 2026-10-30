@@ -59,6 +59,9 @@ class FloatingClockService : Service() {
         const val ACTION_STOP = "com.floatingclock.app.STOP"
         const val ACTION_REFRESH = "com.floatingclock.app.REFRESH" // 설정 변경 반영
 
+        /** 게임 위에 위키 창 띄우기 (앱 메뉴의 '게임 위에 띄우기'). 시계가 꺼져 있으면 같이 켠다 */
+        const val ACTION_OPEN_WIKI = "com.floatingclock.app.OPEN_WIKI"
+
         /** ACTION_REFRESH 에 붙이면 이 앱 화면 위에서도 시계를 잠깐 보여 준다 (위치, 모양 확인용) */
         const val EXTRA_PREVIEW = "preview"
 
@@ -118,6 +121,11 @@ class FloatingClockService : Service() {
     private var params: WindowManager.LayoutParams? = null
     private var panel: View? = null
     private var panelClosedAt = 0L
+
+    /** 게임 위 위키 창 (처음 열 때 만든다) */
+    private var wikiWindow: WikiWindow? = null
+
+    private fun wiki(): WikiWindow = wikiWindow ?: WikiWindow(this).also { wikiWindow = it }
 
     /** 목록 창에서 펼친 사냥터의 이름 줄 (펼치면 그 줄이 맨 위에 오게 스크롤한다) */
     private var openPlaceHeader: View? = null
@@ -190,6 +198,7 @@ class FloatingClockService : Service() {
         isRunning = true
         prefs.running = true
         ClockTileService.refresh(this) // 빠른 설정 버튼을 '켜짐'으로
+        if (intent?.action == ACTION_OPEN_WIKI) wiki().show()
         return START_STICKY
     }
 
@@ -197,6 +206,8 @@ class FloatingClockService : Service() {
         handler.removeCallbacks(tick)
         handler.removeCallbacks(watch)
         closePanel()
+        wikiWindow?.destroy()
+        wikiWindow = null
         container?.let { runCatching { wm.removeView(it) } }
         container = null
         clockText = null
@@ -333,6 +344,7 @@ class FloatingClockService : Service() {
         if (show) clockText?.text = fmt.format(Date())
         box.visibility = if (show) View.VISIBLE else View.GONE
         if (!show) closePanel()
+        wikiWindow?.followGame(show) // 위키 창도 게임이 뒤로 가면 숨었다가 돌아오면 다시 보인다
     }
 
     /** 손가락으로 끌어서 위치 이동, 짧게 누르면 타이머 목록 */
@@ -453,12 +465,18 @@ class FloatingClockService : Service() {
     }
 
     /**
-     * 목록 창 내용: 돌아가는 타이머 취소, 내가 만든 타이머, 위키 보스·네임드(사냥터를 누르면 펼침), 닫기.
-     * 사냥터를 펼치고 접을 때 다시 부른다.
+     * 목록 창 내용: 위키 창 열기/숨기기, 돌아가는 타이머 취소, 내가 만든 타이머,
+     * 위키 보스·네임드(사냥터를 누르면 펼침), 닫기. 사냥터를 펼치고 접을 때 다시 부른다.
      */
     private fun fillPanel(box: LinearLayout) {
         box.removeAllViews()
         openPlaceHeader = null
+        // 게임을 끄지 않고 위키 보기 (다른 앱으로 넘어가면 아이모 접속이 끊긴다)
+        val wikiOpen = wikiWindow?.isShowing == true
+        box.addView(panelItem(getString(if (wikiOpen) R.string.panel_hide_wiki else R.string.panel_open_wiki)) {
+            closePanel()
+            if (wikiOpen) wiki().hide() else wiki().show()
+        })
         for (t in TimerStore.running.toList()) {
             box.addView(panelItem(getString(R.string.panel_cancel_fmt, t.name)) {
                 TimerStore.cancelTimer(this, t.id)
@@ -479,7 +497,7 @@ class FloatingClockService : Service() {
         val hidden = prefs.wikiHiddenPlaces
         val places = wiki?.places.orEmpty().filter { it.id !in hidden }
         if (wikiOn && wiki == null) {
-            box.addView(panelItem(getString(R.string.panel_wiki_loading), onClick = null))
+            box.addView(panelItem(getString(if (WikiTimers.needsLogin) R.string.panel_wiki_login else R.string.panel_wiki_loading), onClick = null))
             WikiTimers.refresh(this, force = false)
         } else if (places.isEmpty() && TimerStore.presets.isEmpty()) {
             box.addView(panelItem(getString(R.string.panel_no_presets), onClick = null))

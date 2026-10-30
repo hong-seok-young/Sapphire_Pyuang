@@ -113,7 +113,7 @@ class TimerActivity : AppCompatActivity() {
             if (isFinishing || isDestroyed) return@refresh
             updateWikiState(loading = false)
             if (force) {
-                Toast.makeText(this, if (ok) R.string.wiki_refreshed else R.string.wiki_failed, Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, if (ok) R.string.wiki_refreshed else if (WikiTimers.needsLogin) R.string.wiki_login_needed else R.string.wiki_failed, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -126,6 +126,7 @@ class TimerActivity : AppCompatActivity() {
                 getString(R.string.wiki_state_fmt, d.places.size, d.places.count { it.id !in hidden }, d.mobCount)
             }
             loading -> getString(R.string.wiki_loading)
+            WikiTimers.needsLogin -> getString(R.string.wiki_login_needed)
             else -> getString(R.string.wiki_failed)
         }
         wikiSource.text = if (d != null) {

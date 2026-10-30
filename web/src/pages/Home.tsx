@@ -1,6 +1,8 @@
 import type { Wiki } from "../types";
+import { inApp, isAndroid } from "../platform";
 
-const TILES: { title: string; to: string; icon: string; soon?: boolean }[] = [
+/** androidOnly: 안드로이드 폰 브라우저에서만 보인다 (앱 안, 아이폰에서는 숨김) */
+const TILES: { title: string; to: string; icon: string; soon?: boolean; androidOnly?: boolean }[] = [
   { title: "사냥터", to: "#/places", icon: "🗺️" },
   { title: "장비", to: "#/equip", icon: "🛡️" },
   { title: "육성 공략", to: "#/menu/육성 공략", icon: "📈" },
@@ -11,8 +13,11 @@ const TILES: { title: string; to: string; icon: string; soon?: boolean }[] = [
   { title: "전장 · 헌팅그라운드", to: "#/menu/전장 · 헌팅그라운드", icon: "🚩" },
   { title: "퀘스트 · 지도", to: "#/menu/퀘스트 · 지도", icon: "📜" },
   { title: "AI 챗봇", to: "#/chat", icon: "💬", soon: true },
-  { title: "타이머", to: "#/timer", icon: "⏰", soon: true },
+  // 시계와 보스 타이머는 안드로이드 앱에만 있다. 웹앱은 위키와 챗봇만 맡는다
+  { title: "안드로이드 앱 받기", to: "#/app", icon: "📲", androidOnly: true },
 ];
+
+const SHOWN = TILES.filter((t) => !t.androidOnly || (isAndroid && !inApp));
 
 export function Home({ wiki }: { wiki: Wiki }) {
   return (
@@ -30,7 +35,7 @@ export function Home({ wiki }: { wiki: Wiki }) {
       </a>
 
       <nav className="tiles">
-        {TILES.map((t) => (
+        {SHOWN.map((t) => (
           <a key={t.title} className={"tile" + (t.soon ? " tile-soon" : "")} href={t.to}>
             <span className="tile-icon">{t.icon}</span>
             <span className="tile-title">{t.title}</span>

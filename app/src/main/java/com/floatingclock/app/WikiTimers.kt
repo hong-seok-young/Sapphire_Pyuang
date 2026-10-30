@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
+import android.webkit.CookieManager
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -90,6 +91,16 @@ object WikiTimers {
     /** 받는 중에 들어온 요청. 받기가 끝나면 같이 알려 준다 */
     private val waiting = ArrayList<(Boolean) -> Unit>()
 
+    /**
+     * 위키가 길드원 로그인을 요구해서 자료를 못 받았는지.
+     * 로그인은 앱 첫 화면(위키)에서 하고, 그 쿠키를 같이 보내서 자료를 받는다.
+     */
+    @Volatile
+    var needsLogin = false
+        private set
+
+    private class LoginNeeded : Exception()
+
     /** 받아 둔 자료. 한 번도 못 받았으면 null. 메인 스레드에서 부른다. */
     fun get(ctx: Context): Data? {
         if (!loadedFromDisk) {
@@ -118,10 +129,13 @@ object WikiTimers {
         }
         refreshing = true
         done?.let { waiting += it }
+        // 위키 로그인 쿠키 (앱 첫 화면이나 게임 위 창에서 로그인하면 생긴다)
+        val cookie = runCatching { CookieManager.getInstance().getCookie(SITE) }.getOrNull()
         thread(name = "wiki-timers") {
-            val result = runCatching { download(app, sp) }
+            val result = runCatching { download(app, sp, cookie) }
             main.post {
                 refreshing = false
+                needsLogin = result.exceptionOrNull() is LoginNeeded
                 result.getOrNull()?.let { fresh ->
                     if (fresh !== NOT_CHANGED) {
                         data = fresh
@@ -144,7 +158,7 @@ object WikiTimers {
      * 네 파일을 받아서, 바뀐 것이 있으면 새 자료를 만들어 저장하고 돌려준다.
      * 받은 글로 자료를 만들 수 없으면 저장하지 않고 예외를 낸다.
      */
-    private fun download(ctx: Context, sp: SharedPreferences): Data {
+    private fun download(ctx: Context, sp: SharedPreferences, cookie: String?): Data {
         val dir = dir(ctx)
         val fresh = HashMap<String, Pair<String, String?>>()
         for (name in FILES) {
@@ -153,7 +167,9 @@ object WikiTimers {
             val conn = (URL("${SITE}data/$name.json").openConnection() as HttpURLConnection).apply {
                 connectTimeout = 8000
                 readTimeout = 15000
+                instanceFollowRedirects = false // 로그인 화면으로 돌려보내면 그대로 알아챈다
                 setRequestProperty("User-Agent", "Sapphire-Android")
+                if (!cookie.isNullOrEmpty()) setRequestProperty("Cookie", cookie)
                 if (etag != null) setRequestProperty("If-None-Match", etag)
             }
             try {
@@ -162,6 +178,8 @@ object WikiTimers {
                     HttpURLConnection.HTTP_OK ->
                         fresh[name] = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() } to
                             conn.getHeaderField("ETag")
+                    HttpURLConnection.HTTP_UNAUTHORIZED, HttpURLConnection.HTTP_FORBIDDEN,
+                    HttpURLConnection.HTTP_MOVED_TEMP, HttpURLConnection.HTTP_SEE_OTHER -> throw LoginNeeded()
                     else -> error("HTTP $code")
                 }
             } finally {

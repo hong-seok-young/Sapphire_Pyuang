@@ -6,10 +6,12 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.CookieManager
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -21,6 +23,7 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.google.android.material.appbar.MaterialToolbar
 
 /**
@@ -120,6 +123,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         web.onPause()
+        CookieManager.getInstance().flush() // 로그인 쿠키를 저장해서 보스 목록 받기와 게임 위 창이 같이 쓴다
         super.onPause()
     }
 
@@ -146,6 +150,10 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, ClockActivity::class.java))
             true
         }
+        R.id.menu_float -> {
+            floatOverGame()
+            true
+        }
         R.id.menu_timer -> {
             startActivity(Intent(this, TimerActivity::class.java))
             true
@@ -159,6 +167,22 @@ class MainActivity : AppCompatActivity() {
             true
         }
         else -> super.onOptionsItemSelected(item)
+    }
+
+    /**
+     * 위키를 게임 위 작은 창으로 띄우고 이 화면은 뒤로 보낸다.
+     * 아이모는 다른 앱으로 넘어가면 접속이 끊겨서, 게임 중에는 이 창으로 위키를 본다. 시계도 같이 켜진다.
+     */
+    private fun floatOverGame() {
+        if (!Settings.canDrawOverlays(this)) {
+            startActivity(Intent(this, ClockActivity::class.java)) // '다른 앱 위에 표시' 권한부터
+            return
+        }
+        CookieManager.getInstance().flush() // 로그인 상태를 창과 같이 쓰도록 저장
+        val open = Intent(this, FloatingClockService::class.java).setAction(FloatingClockService.ACTION_OPEN_WIKI)
+        ContextCompat.startForegroundService(this, open)
+        Toast.makeText(this, R.string.toast_float_wiki, Toast.LENGTH_LONG).show()
+        moveTaskToBack(true)
     }
 
     private fun reload() {

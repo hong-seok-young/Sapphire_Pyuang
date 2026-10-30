@@ -8,6 +8,7 @@ import { Places, PlacePage } from "./pages/Places";
 import { ItemPage, MonsterPage } from "./pages/Detail";
 import { EquipSlot, EquipSlots } from "./pages/Equip";
 import { MenuPage, PostPage, Soon } from "./pages/Posts";
+import { AppPage } from "./pages/AppPage";
 
 const TABS = [
   { to: "#/", label: "홈", icon: "🏠", match: "" },
@@ -33,7 +34,9 @@ export function App() {
   else if (page === "equip") body = arg ? <EquipSlot wiki={wiki} slot={arg} /> : <EquipSlots wiki={wiki} />;
   else if (page === "menu") body = <MenuPage wiki={wiki} title={arg} />;
   else if (page === "post") body = <PostPage id={arg} />;
-  else if (page === "chat" || page === "timer") body = <Soon what={page} />;
+  else if (page === "chat") body = <Soon what="chat" />;
+  // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
+  else if (page === "app" || page === "timer") body = <AppPage />;
   else body = <Home wiki={wiki} />;
 
   return (
