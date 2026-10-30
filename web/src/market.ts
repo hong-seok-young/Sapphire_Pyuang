@@ -1,6 +1,7 @@
 // 사파이어 중개인 (서버: functions/api/market, server/market.ts). 길드원끼리 파는 물건 게시판.
 // 실제 거래는 게임 안에서 한다. 이 화면은 무엇을 얼마에 파는지, 누가 사고 싶은지만 모은다.
-import { api } from "./auth";
+import { JOBS, JOB_NAME, api } from "./auth";
+import type { Job } from "./auth";
 import type { Item, Wiki } from "./types";
 
 /** 게임 거래소의 종류 (코스튬은 하나로 묶었다). 서버 server/market.ts 와 같다 */
@@ -214,6 +215,12 @@ export function itemFacts(item: Item | undefined): { level?: string; stats: stri
     .filter((k) => info[k])
     .map((k) => `${k} ${info[k]}`);
   return { level: info["레벨제한"] || undefined, stats, job: info["직업"] || undefined, options: parseItemOptions(info["옵션"]) };
+}
+
+/** 위키 '직업' 칸 -> 정보창 직업 그림 순서 (전사, 레인저, 마법사, 무도가. 공용이면 넷 다) */
+export function jobsFor(text: string | undefined): Job[] {
+  if (!text) return [];
+  return text.includes("공용") ? [...JOBS] : JOBS.filter((j) => text.includes(JOB_NAME[j]));
 }
 
 /** "방금", "3시간 전", "2일 전" */

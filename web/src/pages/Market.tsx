@@ -1,22 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { RANK, errorText } from "../auth";
+import { JOB_NAME, RANK, errorText } from "../auth";
 import type { Me } from "../auth";
 import { useAsync } from "../data";
 import {
   CATEGORIES, ENCHANTS, ENCHANT_CATEGORIES, ENHANCE_CATEGORIES, MARKET_PIC, OTHER_CATEGORIES, MAX_ENHANCE, MAX_NOTE, MAX_PRICE, MAX_QTY, ago, categoryOf, categoryPic, createListing,
-  deleteListing, enchantText, fetchMarket, goldText, goldWords, inRoll, itemFacts, listingName, rollHint, unwantListing,
+  deleteListing, enchantText, fetchMarket, goldText, goldWords, inRoll, itemFacts, jobsFor, listingName, rollHint, unwantListing,
   updateListing, wantListing, wikiItem,
 } from "../market";
 import type { Category, Enchant, Listing, ListingOption } from "../market";
 import type { Wiki } from "../types";
 import { Loading, PicImg, TopBar } from "../ui";
+import { GoldBoard } from "./GoldBoard";
 
-type Tab = "buy" | "mine" | "sell";
+type Tab = "buy" | "mine" | "sell" | "gold";
 const TABS: { key: Tab; label: string }[] = [
   { key: "buy", label: "사기" },
   { key: "mine", label: "내 판매" },
   { key: "sell", label: "팔기" },
+  { key: "gold", label: "골드" },
 ];
 
 /** 게임 거래소의 흰 그림을 글자 색으로 칠한다 (종류 그림) */
@@ -104,7 +106,13 @@ function Detail({ wiki, me, l, onChanged }: { wiki: Wiki; me: Me; l: Listing; on
           </p>
         ))}
         {facts.options.notes.length > 0 && <p className="mk-tip-dim">{facts.options.notes.join(" · ")}</p>}
-        {facts.job && <p className="mk-tip-dim">직업 {facts.job}</p>}
+        {facts.job && (
+          <div className="mk-tip-jobs" aria-label={`직업 ${facts.job}`}>
+            {jobsFor(facts.job).map((j) => (
+              <img key={j} src={`${MARKET_PIC}job_${j}.png`} alt={JOB_NAME[j]} title={JOB_NAME[j]} />
+            ))}
+          </div>
+        )}
         {!facts.level && !facts.stats.length && !l.options?.length && <p className="mk-tip-dim">{l.category}</p>}
       </div>
       {l.note && <p className="mk-note">“{l.note}”</p>}
@@ -522,7 +530,7 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
 }
 
 /**
- * 사파이어 중개인: 길드원끼리 무엇을 얼마에 파는지 올리고, 사고 싶은 사람이 '살래요'를 누른다.
+ * 사파이어 중개인: 길드원끼리 무엇을 얼마에 파는지 올리고, 사고 싶은 사람이 '살래요'를 누른다. '골드' 칸은 골드 거래 (GoldBoard).
  * 실제 거래는 게임 안에서 한다 (이 화면은 게임에 아무것도 보내지 않는다). 이 앱 디자인으로 그리고,
  * 게임 거래소 스샷에서는 동전, 종류 그림, 단추 그림만 잘라 쓴다 (자료/scripts/make_market_marks.py).
  */
@@ -562,14 +570,16 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
       <div className="mk-tabs" role="tablist">
         {TABS.map((t) => (
           <button key={t.key} role="tab" aria-selected={tab === t.key} className={"pill mk-tab" + (tab === t.key ? " pill-on" : "")} onClick={() => setTab(t.key)}>
-            <img src={`${MARKET_PIC}tab_${t.key}_${tab === t.key ? "on" : "off"}.png`} alt="" />
+            <img src={t.key === "gold" ? `${MARKET_PIC}coin.png` : `${MARKET_PIC}tab_${t.key}_${tab === t.key ? "on" : "off"}.png`} alt="" />
             {t.label}
             {t.key === "mine" && wantsOnMine > 0 && <span className="mk-badge">♥{wantsOnMine}</span>}
           </button>
         ))}
       </div>
 
-      {!listings ? (
+      {tab === "gold" ? (
+        <GoldBoard me={me} />
+      ) : !listings ? (
         <Loading error={error} />
       ) : tab === "buy" ? (
         <>
@@ -614,7 +624,7 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
           }}
         />
       )}
-      <p className="mk-hint">거래는 게임 안에서 직접 해요. 현금 거래는 계정이 정지될 수 있으니 하지 마세요.</p>
+      {tab !== "gold" && <p className="mk-hint">물건 거래는 게임 안에서 직접 해요.</p>}
     </>
   );
 }

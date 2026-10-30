@@ -82,6 +82,30 @@ CREATE TABLE IF NOT EXISTS listing_wants (
   PRIMARY KEY (listing_id, user_id)
 );
 
+-- 골드 거래: 게임 골드를 원화로 사고팔려는 글 (server/gold.ts). 현금거래 위험을 알린 뒤 제작자가 만들라고 했다.
+-- 앱은 돈을 받거나 보내지 않는다
+CREATE TABLE IF NOT EXISTS gold_offers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  owner TEXT NOT NULL,                    -- 올린 길드원
+  side TEXT NOT NULL,                     -- sell 골드 팝니다 | buy 골드 삽니다
+  gold INTEGER NOT NULL,                  -- 만 골드 단위 (750 = 750만 골드)
+  rate INTEGER NOT NULL,                  -- 시세: 1만 원에 몇 만 골드 (75 = 75:1)
+  note TEXT,
+  status TEXT NOT NULL DEFAULT 'open',    -- open 올라와 있음 | done 거래 완료 (30일 뒤 지운다)
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS gold_offers_owner ON gold_offers (owner, status);
+
+-- 골드 글에 '거래할래요'를 누른 길드원 (이름과 한마디는 올린 사람에게만 보인다)
+CREATE TABLE IF NOT EXISTS gold_wants (
+  offer_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  note TEXT,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (offer_id, user_id)
+);
+
 -- 길드원이 직접 올린 자기 캐릭터 그림 (랭킹 시상대에 선다). '내 정보'에서 사용자가 고른 스샷을 잘라 만든 PNG
 CREATE TABLE IF NOT EXISTS avatars (
   user_id TEXT PRIMARY KEY,
