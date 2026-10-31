@@ -10,8 +10,8 @@ import { JobEmblem } from "../emblems";
 import { ProfileForm } from "./Profile";
 import { Loading, Panel, TopBar } from "../ui";
 
-/** '처음 비밀번호'를 비워 두고 초기화하면 쓰는 비밀번호 (제작자 요청). 다음 로그인 때 바꾸게 한다 */
-const RESET_PASSWORD = "123123";
+/** 새 계정과 비밀번호 초기화의 처음 비밀번호 (제작자 요청: 칸 없이 늘 123123). 다음 로그인 때 바꾸게 한다 */
+const FIRST_PASSWORD = "123123";
 
 /** 길드원이 몇백 명이어도 처음엔 이만큼만 그리고 '더 보기' */
 const PAGE_SIZE = 50;
@@ -47,7 +47,6 @@ export function AdminPage({ me }: { me: Me }) {
   const [notice, setNotice] = useState<{ title: string; id: string; password: string } | null>(null);
   const [newId, setNewId] = useState("");
   const [newRole, setNewRole] = useState<Role>("member");
-  const [firstPw, setFirstPw] = useState("");
   const [busy, setBusy] = useState(false);
 
   const creatable = ASSIGNABLE.filter((r) => canManage(me.role, r));
@@ -63,12 +62,6 @@ export function AdminPage({ me }: { me: Me }) {
     listAccounts().then(setAccounts, (e) => setError(errorText(e)));
   }, []);
   useEffect(reload, [reload]);
-
-  /** 정한 처음 비밀번호 (비웠으면 undefined: 서버가 임시 비밀번호를 만든다) */
-  function chosenPassword(): string | undefined {
-    if (firstPw && firstPw.length < 6) throw new Error("처음 비밀번호는 6자 이상으로 해 주세요");
-    return firstPw || undefined;
-  }
 
   async function run(action: () => Promise<void>) {
     setBusy(true);
@@ -87,7 +80,7 @@ export function AdminPage({ me }: { me: Me }) {
     e.preventDefault();
     const id = newId.trim();
     run(async () => {
-      const made = await createAccount(id, newRole, chosenPassword());
+      const made = await createAccount(id, newRole, FIRST_PASSWORD);
       setNotice({ title: `${ROLE_NAME[made.role]} 계정을 만들었어요`, id: made.id, password: made.tempPassword });
       setNewId("");
     });
@@ -118,13 +111,6 @@ export function AdminPage({ me }: { me: Me }) {
           아이디 (게임 닉네임)
           <input value={newId} onChange={(e) => setNewId(e.target.value)} autoCapitalize="off" />
         </label>
-        <label>
-          처음 비밀번호 (비워 두면 자동으로 만들어요)
-          <input value={firstPw} onChange={(e) => setFirstPw(e.target.value)} autoCapitalize="off" autoComplete="off" />
-        </label>
-        <p className="form-note">
-          정하면 새 계정과 비밀번호 초기화에 이 비밀번호를 써요 (6자 이상). 비워 두면 새 계정은 임시 비밀번호, 초기화는 123123 이에요. 받은 사람은 처음 로그인할 때 자기 비밀번호로 바꿔요.
-        </p>
         {creatable.length > 1 && (
           <div className="role-pick">
             {creatable.map((r) => (
@@ -167,7 +153,7 @@ export function AdminPage({ me }: { me: Me }) {
                 onOpen={() => setOpen(open === a.id ? null : a.id)}
                 onReset={() =>
                   run(async () => {
-                    const r = await resetPassword(a.id, chosenPassword() ?? RESET_PASSWORD);
+                    const r = await resetPassword(a.id, FIRST_PASSWORD);
                     setNotice({ title: "비밀번호를 초기화했어요", id: r.id, password: r.tempPassword });
                   })
                 }
