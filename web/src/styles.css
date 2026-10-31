@@ -1063,3 +1063,14 @@ button { font: inherit; color: inherit; }
 .guide-steps { margin: 4px 0 0; padding: 10px 12px 10px 30px; max-width: 320px; text-align: left; font-size: 14px; line-height: 1.7; color: var(--text);
   background: var(--panel); border: var(--px) solid var(--edge); }
 
+/* level/EXP change: real growth or typo fix (ui.tsx ChangeAsk) */
+.change-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.change-ask-q { flex-basis: 100%; font-size: 13px; color: var(--gold); }
+.change-ask .pill { font-size: 12px; }
+.change-ask-compact { flex-wrap: nowrap; gap: 3px; }
+.change-ask-compact .pill { padding: 2px 5px; font-size: 10px; }
+.lv-log { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 3px; font-size: 12px; }
+.lv-log li { display: flex; align-items: center; gap: 6px; padding: 3px 6px; background: var(--night-2); border: 1px solid var(--edge); }
+.lv-log li span { flex: 1; }
+.lv-log button { padding: 0 6px; font-size: 11px; color: var(--muted); background: none; border: 0; cursor: pointer; }
+

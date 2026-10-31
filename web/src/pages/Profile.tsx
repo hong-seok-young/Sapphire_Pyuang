@@ -4,9 +4,9 @@ import {
   EXP_MAX, GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, MAX_LEVEL, ROLE_NAME, avatarUrl, deleteMyAvatar, errorText, expText,
   TEST_IDS, logout, positionOf, renameAccount, saveMyProfile, switchAccount,
 } from "../auth";
-import type { Guild, Job, Me } from "../auth";
+import type { ChangeKind, Guild, Job, Me } from "../auth";
 import { JobEmblem, JobGlyph } from "../emblems";
-import { HeroTitle, TopBar } from "../ui";
+import { ChangeAsk, HeroTitle, TopBar } from "../ui";
 import { AvatarMaker } from "./AvatarMaker";
 import { useBackToLogin } from "./Login";
 
@@ -30,6 +30,7 @@ export function ProfileForm({
   level: startLevel,
   exp: startExp = null,
   withExp = false,
+  askChange = false,
   submitLabel,
   onSave,
 }: {
@@ -38,8 +39,10 @@ export function ProfileForm({
   level: number | null;
   exp?: number | null;
   withExp?: boolean;
+  /** 레벨·경험치가 바뀌면 실제 성장인지 오타 수정인지 묻는다 (이미 정해 둔 값을 고칠 때) */
+  askChange?: boolean;
   submitLabel: string;
-  onSave: (job: Job, level: number, exp: number | null, guild: Guild) => Promise<void>;
+  onSave: (job: Job, level: number, exp: number | null, guild: Guild, change?: ChangeKind) => Promise<void>;
 }) {
   const [guild, setGuild] = useState<Guild | null>(startGuild);
   const [job, setJob] = useState<Job | null>(startJob);
@@ -47,22 +50,32 @@ export function ProfileForm({
   const [exp, setExp] = useState(startExp !== null ? (startExp / 1000).toFixed(3) : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [asking, setAsking] = useState(false);
   const n = Number(level);
   const expValue = withExp ? parseExp(exp) : null;
   const ok = guild !== null && job !== null && Number.isInteger(n) && n >= 1 && n <= MAX_LEVEL && expValue !== undefined;
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
+  async function save(change?: ChangeKind) {
     if (!ok || expValue === undefined || guild === null) return;
     setBusy(true);
     setError("");
     try {
-      await onSave(job, n, expValue, guild);
+      await onSave(job, n, expValue, guild, change);
+      setAsking(false);
     } catch (x) {
       setError(errorText(x));
     } finally {
       setBusy(false);
     }
+  }
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!ok) return;
+    // 이미 있던 레벨·경험치를 바꾸면 먼저 묻는다 (제작자 요청: 잘못 쓴 것을 고친 게 레벨업으로 잡히지 않게)
+    const changed = startLevel !== null && (n !== startLevel || (withExp && expValue !== startExp));
+    if (askChange && changed) setAsking(true);
+    else save();
   }
 
   const step = (d: number) => setLevel(String(Math.min(MAX_LEVEL, Math.max(1, (Number(level) || 0) + d))));
@@ -120,9 +133,13 @@ export function ProfileForm({
       </div>
       {withExp && expValue === undefined && <p className="form-error">경험치는 0 ~ 99.999 사이로, 소수점 3자리까지 적어 주세요.</p>}
       {error && <p className="form-error">{error}</p>}
-      <button className="btn" disabled={busy || !ok}>
-        {busy ? "저장하는 중…" : submitLabel}
-      </button>
+      {asking ? (
+        <ChangeAsk busy={busy} onPick={(c) => save(c)} onCancel={() => setAsking(false)} />
+      ) : (
+        <button className="btn" disabled={busy || !ok}>
+          {busy ? "저장하는 중…" : submitLabel}
+        </button>
+      )}
     </form>
   );
 }
@@ -260,9 +277,10 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
           level={me.level}
           exp={me.exp}
           withExp
+          askChange
           submitLabel="저장"
-          onSave={async (job, level, exp, guild) => {
-            await saveMyProfile(job, level, exp, guild);
+          onSave={async (job, level, exp, guild, change) => {
+            await saveMyProfile(job, level, exp, guild, change);
             onMe({ job, level, exp, guild });
             setSaved(true);
           }}

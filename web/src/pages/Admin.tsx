@@ -5,7 +5,8 @@ import {
   setRole,
 } from "../auth";
 import type { Account, Me, Role } from "../auth";
-import { GUILD_NAME, GUILD_TIER, JOB_NAME, deleteAvatarOf, saveProfileOf, setHighSpec } from "../auth";
+import { GUILD_NAME, GUILD_TIER, JOB_NAME, clearLevelBadge, deleteAvatarOf, deleteLevelLog, expText, fetchLevelLog, saveProfileOf, setHighSpec } from "../auth";
+import type { LevelLogEntry } from "../auth";
 import { JobEmblem } from "../emblems";
 import { ProfileForm } from "./Profile";
 import { Loading, Panel, TopBar } from "../ui";
@@ -197,6 +198,7 @@ function AccountRow({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
   const [photoError, setPhotoError] = useState("");
+  const [growthLog, setGrowthLog] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [newId, setNewId] = useState("");
   const manageable = account.id !== me.id && canManage(me.role, account.role);
@@ -247,6 +249,11 @@ function AccountRow({
             <button className="pill" disabled={busy} onClick={() => setEditing((e) => !e)}>
               {editing ? "닫기" : "정보 수정"}
             </button>
+            {account.level && (
+              <button className={"pill" + (growthLog ? " pill-on" : "")} disabled={busy} onClick={() => setGrowthLog((g) => !g)}>
+                성장 기록
+              </button>
+            )}
             {/* 고스펙 표시: 랭킹에 '고스펙', 플래티넘 상점에서 고스펙 할인가 (제작자 요청) */}
             <button
               className={"pill" + (account.highSpec ? " pill-on" : "")}
@@ -334,14 +341,16 @@ function AccountRow({
             </div>
           )}
           {photoError && <p className="form-error">{photoError}</p>}
+          {growthLog && <GrowthLog id={account.id} onChanged={onChanged} />}
           {editing && (
             <ProfileForm
               guild={account.guild}
               job={account.job}
               level={account.level}
+              askChange
               submitLabel={`${account.id} 저장`}
-              onSave={async (job, level, _exp, guild) => {
-                await saveProfileOf(account.id, job, level, guild);
+              onSave={async (job, level, _exp, guild, change) => {
+                await saveProfileOf(account.id, job, level, guild, change);
                 setEditing(false);
                 onChanged();
               }}
@@ -352,3 +361,71 @@ function AccountRow({
     </li>
   );
 }
+
+const stamp = (t: number) => {
+  const d = new Date(t);
+  return `${d.getMonth() + 1}/${d.getDate()} ${d.toTimeString().slice(0, 5)}`;
+};
+
+/**
+ * 성장 기록 바로잡기 (제작자 요청: 잘못 쓴 것을 고쳤는데 레벨업·경험치 오름으로 잡힌 기록).
+ * 레벨·경험치를 저장한 기록을 최근 것부터 보이고, 잘못 들어간 기록을 지우면 성장 랭킹이 다시 계산된다. 레벨업 ▲ 표시도 지울 수 있다
+ */
+function GrowthLog({ id, onChanged }: { id: string; onChanged: () => void }) {
+  const [log, setLog] = useState<LevelLogEntry[] | null>(null);
+  const [badge, setBadge] = useState<number | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => {
+    fetchLevelLog(id).then(
+      (r) => {
+        setLog(r.log);
+        setBadge(r.profile && r.profile.prevLevel !== null && r.profile.prevLevel < r.profile.level ? r.profile.level - r.profile.prevLevel : null);
+      },
+      (x) => setError(errorText(x)),
+    );
+  }, [id]);
+  useEffect(load, [load]);
+
+  async function run(fn: () => Promise<unknown>) {
+    setBusy(true);
+    setError("");
+    try {
+      await fn();
+      load();
+      onChanged();
+    } catch (x) {
+      setError(errorText(x));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!log) return <Loading error={error} />;
+  return (
+    <div className="growth-log">
+      {badge !== null && (
+        <button className="pill" disabled={busy} onClick={() => run(() => clearLevelBadge(id))}>
+          ▲{badge} 표시 삭제
+        </button>
+      )}
+      <ul className="lv-log">
+        {log.map((e, i) => (
+          <li key={e.at}>
+            <span>
+              {stamp(e.at)} · Lv.{e.level} {e.exp !== null ? expText(e.exp) : ""}
+              {i === 0 && " (지금)"}
+            </span>
+            {i > 0 && (
+              <button disabled={busy} onClick={() => run(() => deleteLevelLog(id, e.at))} aria-label="이 기록 삭제">
+                ✕
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {error && <p className="form-error">{error}</p>}
+    </div>
+  );
+}
+

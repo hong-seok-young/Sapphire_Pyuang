@@ -166,10 +166,39 @@ export interface ProfileInput {
  * exp, guild 를 안 주면(예전 화면, 오피서가 남의 경험치는 못 고침) 그대로 둔다.
  * 저장할 때마다 level_log 에 레벨과 경험치를 남긴다 (성장 랭킹). 기록이 처음이면 저장 전 상태도 먼저 남긴다.
  */
-export async function saveProfile(env: Env, userId: string, by: string, p: ProfileInput): Promise<void> {
+/**
+ * 레벨·경험치를 바꾼 까닭 (제작자 요청: 저장할 때 묻는다).
+ * grow: 실제로 오르거나 내림 -> 새 기록을 남기고(성장 랭킹), 레벨이 오르면 ▲ 표시.
+ * fix: 잘못 쓴 것을 고침 -> 새 기록 대신 마지막 기록을 고친 값으로 바꾸고, ▲ 표시는 늘리지 않는다
+ *      (고친 레벨이 표시의 이전 레벨 이하이면 표시를 지운다). 오르든 내리든 성장 랭킹이 움직이지 않는다
+ */
+export type ChangeKind = "grow" | "fix";
+export const readChange = (v: unknown): ChangeKind => (v === "fix" ? "fix" : "grow");
+
+export async function saveProfile(env: Env, userId: string, by: string, p: ProfileInput, change: ChangeKind = "grow"): Promise<void> {
   const keepExp = p.exp === undefined;
   const keepGuild = p.guild === undefined;
   const now = Date.now();
+  if (change === "fix") {
+    await env.DB.batch([
+      env.DB.prepare(
+        "INSERT OR IGNORE INTO level_log (user_id, at, level, exp) SELECT user_id, level_at, level, exp FROM profiles " +
+          "WHERE user_id = ? AND NOT EXISTS (SELECT 1 FROM level_log WHERE user_id = ?)",
+      ).bind(userId, userId),
+      env.DB.prepare(
+        "UPDATE profiles SET job = ?, level = ?, updated_by = ?" +
+          ", prev_level = CASE WHEN prev_level IS NOT NULL AND ? <= prev_level THEN NULL ELSE prev_level END" +
+          (keepExp ? "" : ", exp = ?") +
+          (keepGuild ? "" : ", guild = ?") +
+          " WHERE user_id = ?",
+      ).bind(p.job, p.level, by, p.level, ...(keepExp ? [] : [p.exp]), ...(keepGuild ? [] : [p.guild]), userId),
+      env.DB.prepare(
+        "UPDATE level_log SET level = (SELECT level FROM profiles WHERE user_id = ?1), exp = (SELECT exp FROM profiles WHERE user_id = ?1) " +
+          "WHERE user_id = ?1 AND at = (SELECT MAX(at) FROM level_log WHERE user_id = ?1)",
+      ).bind(userId),
+    ]);
+    return;
+  }
   await env.DB.batch([
     env.DB.prepare(
       "INSERT OR IGNORE INTO level_log (user_id, at, level, exp) SELECT user_id, level_at, level, exp FROM profiles " +

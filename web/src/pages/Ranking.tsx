@@ -2,10 +2,10 @@ import { useCallback, useState } from "react";
 import {
   GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, avatarUrl, errorText, expText, fetchGrowth, fetchRanking, growthText, saveMyProfile,
 } from "../auth";
-import type { GrowthEntry, GrowthPeriod, Guild, Job, Me, RankEntry } from "../auth";
+import type { ChangeKind, GrowthEntry, GrowthPeriod, Guild, Job, Me, RankEntry } from "../auth";
 import { useAsync } from "../data";
 import { JobEmblem, JobGlyph, MINE_TAG_PIC, RankMedal, RoleBadge } from "../emblems";
-import { FitLine, Loading, TopBar } from "../ui";
+import { ChangeAsk, FitLine, Loading, TopBar } from "../ui";
 
 /** 최근 레벨업 표시 기간 */
 const RECENT_MS = 7 * 86_400_000;
@@ -110,15 +110,22 @@ function ExpBar({ r, mine }: { r: Ranked; mine: boolean }) {
   const [text, setText] = useState(r.exp != null ? (r.exp / 1000).toFixed(3) : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [asking, setAsking] = useState(false);
   const valid = /^\d{1,2}(\.\d{1,3})?$/.test(text.trim());
 
-  async function save() {
+  async function save(change?: ChangeKind) {
     if (!valid || !r.guild) return;
     const value = Math.round(Number(text) * 1000);
+    // 이미 적은 경험치를 바꾸면 실제로 오른 것인지 잘못 쓴 것을 고친 것인지 먼저 묻는다 (제작자 요청)
+    if (!change && exp !== null && value !== exp) {
+      setAsking(true);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      await saveMyProfile(r.job, r.level, value, r.guild);
+      await saveMyProfile(r.job, r.level, value, r.guild, change);
+      setAsking(false);
       setExp(value);
       setEditing(false);
     } catch (x) {
@@ -140,10 +147,16 @@ function ExpBar({ r, mine }: { r: Ranked; mine: boolean }) {
           autoFocus
         />
         <b>%</b>
-        <button disabled={busy || !valid} onClick={save}>
-          저장
-        </button>
-        <button onClick={() => setEditing(false)}>취소</button>
+        {asking ? (
+          <ChangeAsk compact busy={busy} onPick={(c) => save(c)} onCancel={() => setAsking(false)} />
+        ) : (
+          <>
+            <button disabled={busy || !valid} onClick={() => save()}>
+              저장
+            </button>
+            <button onClick={() => setEditing(false)}>취소</button>
+          </>
+        )}
         {error && <small className="rank-exp-error">{error}</small>}
       </span>
     );

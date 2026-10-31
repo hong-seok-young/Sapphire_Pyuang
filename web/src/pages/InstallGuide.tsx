@@ -28,12 +28,12 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-function CopyAddress() {
+function CopyAddress({ url = WEB_URL }: { url?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="guide-url">
       <b>{WEB_URL.replace(/^https:\/\//, "")}</b>
-      <button className="pill" onClick={async () => setCopied(await copyText(WEB_URL))}>
+      <button className="pill" onClick={async () => setCopied(await copyText(url))}>
         {copied ? "복사됨" : "주소 복사"}
       </button>
     </div>
@@ -146,6 +146,8 @@ export function InstallGuide({ onLater }: { onLater: () => void }) {
 }
 
 const ICON_LATER = "sapphire-icon-later";
+/** '재설치 완료'를 누른 판 (이 폰에서는 다시 안 뜬다) */
+const ICON_DONE = "sapphire.iconReinstalled";
 
 /**
  * 홈 화면 아이콘이 바뀌었으니 지우고 다시 설치하라는 안내를 보일지 (제작자 요청: 다시 깐 사람에게는 안 뜨고, 안 깐 사람에게는 계속).
@@ -164,6 +166,7 @@ export function iconNoticeNeeded(): boolean {
   }
   if (fresh) return false;
   try {
+    if (localStorage.getItem(ICON_DONE) === ICON_VERSION) return false;
     if (sessionStorage.getItem(ICON_LATER)) return false;
   } catch {
     // 못 읽으면 안내를 보인다
@@ -180,6 +183,15 @@ export function IconChangedPage({ onDone }: { onDone: () => void }) {
     }
     onDone();
   };
+  // 다시 깔았는데도 안내가 뜨면 (삼성 인터넷 바로가기 등) 눌러서 이 폰에서는 끈다 (제작자 요청)
+  const reinstalled = () => {
+    try {
+      localStorage.setItem(ICON_DONE, ICON_VERSION);
+    } catch {
+      // 못 적어도 이번에는 닫힌다
+    }
+    onDone();
+  };
   return (
     <div className="guide">
       <img className="guide-icon" src="icon-192.png" alt="" width={84} height={84} />
@@ -190,9 +202,12 @@ export function IconChangedPage({ onDone }: { onDone: () => void }) {
         <li>{isIOS ? "사파리" : "크롬이나 삼성 인터넷"}에서 아래 주소 열기</li>
         <li>{isIOS ? "공유 버튼(□↑) → '홈 화면에 추가'" : "메뉴 → '홈 화면에 추가'(또는 '앱 설치')"}</li>
       </ol>
-      <CopyAddress />
+      <CopyAddress url={`${WEB_URL}/?icon=${ICON_VERSION}`} />
       {isIOS && <p className="guide-text">다시 설치하면 로그인을 한 번 더 해야 할 수 있어요.</p>}
       <div className="guide-buttons">
+        <button className="btn" onClick={reinstalled}>
+          재설치 완료
+        </button>
         <button className="btn btn-ghost" onClick={later}>
           나중에
         </button>

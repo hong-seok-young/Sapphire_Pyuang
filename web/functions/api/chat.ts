@@ -11,8 +11,8 @@ import type { Env } from "../../server/auth";
 
 /** 챗봇 모델. 바꾸려면 이 줄만 고친다 (더 싸게: "claude-sonnet-5-5", 가장 싸게: "claude-haiku-5-5") */
 const MODEL = "claude-opus-5-5";
-/** 한 사람이 하루에 할 수 있는 질문 수 */
-const DAILY_LIMIT = 20;
+/** 한 사람이 하루에 할 수 있는 질문 수. null 이면 제한 없음 (제작자 요청 2026-10-31: API 월 300달러 한도라 막 써도 된다) */
+const DAILY_LIMIT: number | null = null;
 const MAX_TURNS = 10; // 앞 대화는 최근 10개 말까지만
 const MAX_TEXT = 2000; // 말 하나의 글자 수
 const MAX_CONTEXT = 12000; // 위키 자료 글자 수
@@ -112,7 +112,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const count = used?.count ?? 1;
   const refund = () =>
     env.DB.prepare("UPDATE chat_usage SET count = count - 1 WHERE user_id = ? AND day = ? AND count > 0").bind(me.id, day).run();
-  if (count > DAILY_LIMIT) {
+  if (DAILY_LIMIT !== null && count > DAILY_LIMIT) {
     await refund();
     return json({ error: `오늘 질문 ${DAILY_LIMIT}번을 다 썼어요. 내일 다시 물어봐 주세요` }, 429);
   }
@@ -171,7 +171,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     headers: {
       "content-type": "text/plain; charset=utf-8",
       "cache-control": "no-store",
-      "x-chat-left": String(Math.max(0, DAILY_LIMIT - count)),
+      ...(DAILY_LIMIT !== null ? { "x-chat-left": String(Math.max(0, DAILY_LIMIT - count)) } : {}),
     },
   });
 };

@@ -281,3 +281,29 @@ export function UpdateBar() {
   );
 }
 
+/**
+ * 레벨·경험치가 바뀌었을 때 까닭을 묻는다 (제작자 요청): 실제로 오르내린 것인지, 잘못 쓴 것을 고친 것인지.
+ * 오타 수정은 성장 랭킹과 레벨업 표시에 들어가지 않는다. 화면을 가리지 않고 그 자리에 뜬다
+ */
+export function ChangeAsk({ onPick, onCancel, busy, compact }: {
+  onPick: (change: "grow" | "fix") => void;
+  onCancel: () => void;
+  busy?: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <span className={"change-ask" + (compact ? " change-ask-compact" : "")}>
+      {!compact && <span className="change-ask-q">레벨이나 경험치가 바뀌었어요. 어떤 변경이에요?</span>}
+      <button type="button" className="pill" disabled={busy} onClick={() => onPick("grow")}>
+        📈 실제 성장
+      </button>
+      <button type="button" className="pill" disabled={busy} onClick={() => onPick("fix")}>
+        ✏️ 오타 수정
+      </button>
+      <button type="button" className="pill" disabled={busy} onClick={onCancel}>
+        취소
+      </button>
+    </span>
+  );
+}
+

@@ -152,11 +152,27 @@ export function errorText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-export const saveMyProfile = (job: Job, level: number, exp: number | null, guild: Guild) =>
-  api<{ job: Job; level: number; exp: number | null; guild: Guild }>("/api/profile", "PUT", { job, level, exp, guild });
+/** 레벨·경험치를 바꾼 까닭: 실제 성장 / 잘못 쓴 것 고침 (고침은 성장 랭킹과 레벨업 표시에 들어가지 않는다) */
+export type ChangeKind = "grow" | "fix";
+
+export const saveMyProfile = (job: Job, level: number, exp: number | null, guild: Guild, change: ChangeKind = "grow") =>
+  api<{ job: Job; level: number; exp: number | null; guild: Guild }>("/api/profile", "PUT", { job, level, exp, guild, change });
+
+export interface LevelLogEntry {
+  at: number;
+  level: number;
+  exp: number | null;
+}
+/** 성장 기록 바로잡기 (오피서 이상): 기록 보기, 하나 지우기, 레벨업 표시 지우기 */
+export const fetchLevelLog = (id: string) =>
+  api<{ log: LevelLogEntry[]; profile: { level: number; exp: number | null; prevLevel: number | null; levelAt: number } | null }>(
+    `/api/users/${encodeURIComponent(id)}/levellog`,
+  );
+export const deleteLevelLog = (id: string, at: number) => api<{ ok: boolean }>(`/api/users/${encodeURIComponent(id)}/levellog?at=${at}`, "DELETE");
+export const clearLevelBadge = (id: string) => api<{ ok: boolean }>(`/api/users/${encodeURIComponent(id)}/levellog`, "PATCH", { clearBadge: true });
 /** 오피서 이상: 다른 사람이 잘못 고른 직업, 레벨 고치기 */
-export const saveProfileOf = (id: string, job: Job, level: number, guild: Guild) =>
-  api<{ id: string; job: Job; level: number; guild: Guild }>(`/api/users/${encodeURIComponent(id)}/profile`, "PUT", { job, level, guild });
+export const saveProfileOf = (id: string, job: Job, level: number, guild: Guild, change: ChangeKind = "fix") =>
+  api<{ id: string; job: Job; level: number; guild: Guild }>(`/api/users/${encodeURIComponent(id)}/profile`, "PUT", { job, level, guild, change });
 export const fetchRanking = () => api<RankEntry[]>("/api/ranking");
 
 /** 성장 랭킹 기간: 오늘, 이번 주(월요일부터), 이번 달 (한국 시간 0시 기준) */
