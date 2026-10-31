@@ -90,7 +90,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const read = (schema: boolean) =>
     client.messages.create({
       model: PEEK_MODEL,
-      max_tokens: 400,
+      // 400 이면 답이 이름 목록 중간에서 잘려 빈 값이 됐다. 생각은 끄고 넉넉히
+      max_tokens: 1500,
+      thinking: { type: "disabled" },
       ...(schema ? { output_config: { format: { type: "json_schema" as const, schema: SEEN_SCHEMA } } } : {}),
       messages: [
         {
@@ -117,7 +119,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
     const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
     const seen = parseSeen(text);
-    if (!seen.job && !seen.level && !seen.names.length) console.error("chat peek empty", text.slice(0, 300));
+    if (!seen.job && !seen.level && !seen.names.length) console.error("chat peek empty", res.stop_reason, text.slice(0, 300));
     return json(seen);
   } catch (e) {
     console.error("chat peek failed", e instanceof Anthropic.APIError ? e.status : e);
