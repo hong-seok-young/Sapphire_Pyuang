@@ -9,6 +9,10 @@ interface Tile {
   icon: string;
   /** 이모지 대신 그림 (게임 스샷에서 자른 아이콘) */
   iconPic?: string;
+  /** 칸 왼쪽 위 작은 띠 (예: 1군 전용) */
+  ribbon?: string;
+  /** 특정 사람만 들어가는 칸: 테두리에 빛이 돈다 (gold 1군 전용, blue 운영진, purple 개발자) */
+  ring?: "gold" | "blue" | "purple";
   soon?: boolean;
   /** 안드로이드 폰 브라우저에서만 보인다 (앱 안, 아이폰에서는 숨김) */
   androidOnly?: boolean;
@@ -20,7 +24,8 @@ interface Tile {
 
 const TILES: Tile[] = [
   // 사냥터는 아래 탭에 있어서, 이 자리는 1군 전용 플래티넘 할인 상점 (제작자 요청). 아이콘은 게임 첫 화면의 상점 그림
-  { title: "1군 전용 플래티넘 할인 상점", to: "#/shop", icon: "🏪", iconPic: "/data/shop/shop_icon.png" },
+  // 제목이 길지 않게 '1군 전용'은 왼쪽 위 띠로 (제작자 요청)
+  { title: "플래티넘 할인 상점", to: "#/shop", icon: "🏪", iconPic: "/data/shop/shop_icon.png", ribbon: "1군 전용", ring: "gold" },
   { title: "장비", to: "#/equip", icon: "🛡️" },
   { title: "육성 공략", to: "#/menu/육성 공략", icon: "📈" },
   { title: "직업별 스킬", to: "#/menu/직업별 스킬", icon: "✨" },
@@ -35,8 +40,8 @@ const TILES: Tile[] = [
   { title: "길드원 의뢰소", to: "#/requests", icon: "📋" },
   // 시계와 보스 타이머는 안드로이드 앱에만 있다. 웹앱은 위키와 챗봇만 맡는다
   { title: "안드로이드 앱 받기", to: "#/app", icon: "📲", androidOnly: true },
-  { title: "길드원 관리", to: "#/admin", icon: "👥", managers: true },
-  { title: "사용 기록", to: "#/log", icon: "📊", developer: true },
+  { title: "길드원 관리", to: "#/admin", icon: "👥", managers: true, ribbon: "운영진", ring: "blue" },
+  { title: "사용 기록", to: "#/log", icon: "📊", developer: true, ribbon: "개발자", ring: "purple" },
 ];
 
 export function Home({ me }: { me: Me }) {
@@ -73,7 +78,8 @@ export function Home({ me }: { me: Me }) {
 
       <nav className="tiles">
         {shown.map((t) => (
-          <a key={t.title} className={"tile" + (t.soon ? " tile-soon" : "")} href={t.to}>
+          <a key={t.title} className={"tile" + (t.soon ? " tile-soon" : "") + (t.ring ? ` tile-ring tile-ring-${t.ring}` : "")} href={t.to}>
+            {t.ribbon && <span className="tile-ribbon">{t.ribbon}</span>}
             <span className="tile-icon">{t.iconPic ? <img className="tile-pic" src={t.iconPic} alt="" /> : t.icon}</span>
             {/* 이름은 한 줄에 맞추고, 안 되면 낱말 사이에서만 줄을 바꾼다 ('성장'이 '성/장'으로 갈리지 않게) */}
             <FitLine className="tile-title" text={t.title} />
