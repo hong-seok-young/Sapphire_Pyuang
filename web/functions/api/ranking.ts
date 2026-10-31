@@ -4,9 +4,36 @@
 import { NEED_LOGIN, currentUser, json } from "../../server/auth";
 import type { Env, Guild, Job, Role } from "../../server/auth";
 
+const RECENT_MS = 7 * 86_400_000;
+
+/**
+ * 최근 7일 안에 경험치만 오른 만큼 (% x 1000, 제작자 요청: 레벨업 ▲ 처럼 '+2%'). 성장 기록(level_log)의 마지막 기록과
+ * 그 앞의 다른 값 기록을 비교한다. '오타 수정'은 새 기록 대신 마지막 기록을 고치므로 여기에 잡히지 않는다. 레벨이 바뀌었으면 ▲ 가 맡는다
+ */
+async function expUps(env: Env): Promise<Map<string, number>> {
+  const { results } = await env.DB.prepare(
+    "SELECT user_id, at, level, exp FROM (SELECT user_id, at, level, exp, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY at DESC) AS rn FROM level_log) " +
+      "WHERE rn <= 8 ORDER BY user_id, at DESC",
+  ).all<{ user_id: string; at: number; level: number; exp: number | null }>();
+  const ups = new Map<string, number>();
+  const now = Date.now();
+  let i = 0;
+  while (i < results.length) {
+    const user = results[i].user_id;
+    const rows: typeof results = [];
+    while (i < results.length && results[i].user_id === user) rows.push(results[i++]);
+    const last = rows[0];
+    if (now - last.at > RECENT_MS) continue;
+    const before = rows.find((r) => r.level !== last.level || (r.exp ?? 0) !== (last.exp ?? 0));
+    if (before && before.level === last.level && (last.exp ?? 0) > (before.exp ?? 0)) ups.set(user, (last.exp ?? 0) - (before.exp ?? 0));
+  }
+  return ups;
+}
+
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
+  const ups = await expUps(env);
   const { results } = await env.DB.prepare(
     "SELECT u.id AS id, u.role AS role, p.job AS job, p.level AS level, p.prev_level AS prev_level, p.level_at AS level_at, " +
       "p.exp AS exp, p.guild AS guild, u.high_spec AS high_spec, a.updated_at AS avatar FROM profiles p JOIN users u ON u.id = p.user_id AND u.id NOT IN ('테스트1', '테스트2') " +
@@ -20,6 +47,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       id: r.id, role: r.role, job: r.job, level: r.level, prevLevel: r.prev_level, levelAt: r.level_at, guild: r.guild, avatar: r.avatar,
       highSpec: r.high_spec === 1,
       exp: r.exp, // 모두에게 보인다 (제작자 요청: 성장 순위 보상 이벤트를 확인하려고)
+      expUp: ups.get(r.id) ?? 0,
     })),
   );
 };

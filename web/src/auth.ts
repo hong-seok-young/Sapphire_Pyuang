@@ -74,6 +74,8 @@ export interface RankEntry {
   exp?: number | null;
   /** 고스펙 길드원 (길드마스터, 오피서가 표시) */
   highSpec?: boolean;
+  /** 최근 7일 안에 경험치만 오른 만큼 (% x 1000). 레벨이 바뀌었으면 0 */
+  expUp?: number;
 }
 
 export interface Account {

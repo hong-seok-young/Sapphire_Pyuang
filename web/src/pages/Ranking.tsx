@@ -66,6 +66,14 @@ interface Ranked extends RankEntry {
   overall: number;
 }
 
+/** 경험치 오른 만큼: 2 / 0.5 / 0.12 처럼 짧게 (자리가 좁다) */
+function expUpText(v: number): string {
+  const pct = v / 1000;
+  if (pct >= 10) return String(Math.round(pct));
+  if (pct >= 1) return String(Math.round(pct * 10) / 10);
+  return String(Math.max(0.01, Math.round(pct * 100) / 100));
+}
+
 /** 최근 7일 안에 오른 레벨 수 (없으면 0) */
 function recentUp(r: RankEntry, now: number): number {
   return r.prevLevel !== null && r.level > r.prevLevel && now - r.levelAt < RECENT_MS ? r.level - r.prevLevel : 0;
@@ -93,7 +101,12 @@ function Row({ r, me, now }: { r: Ranked; me: Me; now: number }) {
       </span>
       {/* 레벨업 표시 자리는 늘 비워 두어서 표시가 떠도 닉네임이 밀리지 않는다 */}
       <span className="rank-up-slot">
-        {up > 0 && <span className="rank-up">▲{up}</span>}
+        {up > 0 ? (
+          <span className="rank-up">▲{up}</span>
+        ) : (
+          // 경험치만 올랐으면 '+2%' (제작자 요청, 실제 성장으로 저장한 것만)
+          !!r.expUp && <span className="rank-up rank-exp-up">+{expUpText(r.expUp)}%</span>
+        )}
       </span>
       <RoleBadge role={r.role} />
     </li>
