@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { errorText } from "../auth";
 import { ago, goldText, goldWords } from "../market";
-import { SHOP_PIC, actOrder, budget, discount, fetchShop, orderItem, saveShopItem, saveShopSettings } from "../platshop";
+import { SHOP_PIC, actOrder, budget, discount, fetchShop, goldOf, orderItem, saveShopItem, saveShopSettings } from "../platshop";
 import type { ShopData, ShopItem, ShopOrder, ShopSettings, Wallet } from "../platshop";
 import { Loading, TopBar } from "../ui";
 import { WEEK } from "../week";
@@ -327,8 +327,9 @@ function ShopSettingsPanel({ settings, items, busy, run }: {
     <>
       <section className="panel ps-settings">
         <h2 className="panel-title">통 설정</h2>
+        <p className="form-note">비율은 플래티넘 100을 몇 만 골드에 넘기는지예요. 길마가 원스토어 할인으로 결제할 돈은 '예산'에서 계산해요.</p>
         <label>
-          할인 <input inputMode="decimal" value={s.ratio} onChange={(e) => setS({ ...s, ratio: num(e.target.value) })} /> : 100
+          1군 <input inputMode="decimal" value={s.ratio} onChange={(e) => setS({ ...s, ratio: num(e.target.value) })} /> : 100
         </label>
         <label>
           고스펙 <input inputMode="decimal" value={s.highRatio} onChange={(e) => setS({ ...s, highRatio: num(e.target.value) })} /> : 100
@@ -336,7 +337,7 @@ function ShopSettingsPanel({ settings, items, busy, run }: {
         <label>
           시중 <input inputMode="decimal" value={s.market} onChange={(e) => setS({ ...s, market: num(e.target.value) })} /> : 100
         </label>
-        {/* 매주 지급하는 가상 플래티넘 (제작자 요청: 1군 300, 고스펙은 길드 자금을 보고 따로) */}
+        {/* 매주 지급하는 가상 플래티넘 (제작자 요청: 1군 300, 고스펙은 따로). 길마가 결제할 돈은 '예산'에서 본다 */}
         <label>
           주당 지급 1군 <input inputMode="numeric" value={s.weekPlat} onChange={(e) => setS({ ...s, weekPlat: num(e.target.value) })} /> · 고스펙
           <input inputMode="numeric" value={s.highWeekPlat} onChange={(e) => setS({ ...s, highWeekPlat: num(e.target.value) })} /> 플래티넘
@@ -447,29 +448,50 @@ function ItemRule({ it, settings, busy, run }: {
   );
 }
 
+/** 원스토어 할인율 빠른 고르기 (그때그때 달라서 직접 적을 수도 있다) */
+const STORE_OFFS = [18, 20, 30];
+const OFF_KEY = "sapphire-store-off";
+const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
+
+function savedOff(): string {
+  try {
+    return localStorage.getItem(OFF_KEY) ?? "20";
+  } catch {
+    return "20";
+  }
+}
+
 /**
- * 예산 (오피서 이상, 제작자 요청): 길드 자금이 얼마나 들지 미리 본다. 1군, 고스펙 인원과 기간을 적으면
- * 모두 주당 플래티넘을 다 쓴다고 치고, 길드가 내는 몫(시중가 - 할인가)과 자금이 몇 주 버티는지 보인다
+ * 예산 (오피서 이상, 제작자 요청 2026-10-31): 길마가 원스토어 할인으로 아이모 플래티넘을 결제하고, 그 플래티넘으로 산 물건을
+ * 1군과 고스펙에게 할인된 골드로 넘긴다. 인원, 기간, 이번 할인율(그때그때 다르다, 이 폰에 마지막 값을 기억)을 적으면
+ * 모두 주당 플래티넘을 다 쓴다고 치고 결제할 돈, 사는 상품 묶음, 받는 골드, 1만 골드당 원가를 보인다
  */
 function BudgetPanel({ settings }: { settings: ShopSettings }) {
-  const [fund, setFund] = useState("");
   const [n, setN] = useState("20");
   const [h, setH] = useState("3");
   const [weeks, setWeeks] = useState("4");
+  const [off, setOff] = useState(savedOff);
   const int = (v: string) => Math.max(0, Math.floor(Number(v) || 0));
-  const b = budget(settings, int(n), int(h), Math.max(1, int(weeks)));
-  const fundGold = int(fund) * 10_000;
-  const lasts = b.perWeek > 0 && fundGold > 0 ? fundGold / b.perWeek : null;
+  const w = Math.max(1, int(weeks));
+  const b = budget(settings, int(n), int(h), w);
+  const rate = Math.min(90, Math.max(0, Number(off) || 0));
+  const paid = Math.round(b.buy.won * (1 - rate / 100));
+  const gem = <img src={SHOP_PIC + "plat.png"} alt="" />;
+  function pickOff(v: string) {
+    setOff(v);
+    try {
+      localStorage.setItem(OFF_KEY, v);
+    } catch {
+      // 못 적어도 지금 화면에서는 그대로 쓴다
+    }
+  }
   return (
     <>
       <section className="panel ps-settings">
-        <h2 className="panel-title">예산 계산</h2>
+        <h2 className="panel-title">길마 결제 계산</h2>
         <p className="form-note">
-          시중가 100만 골드 물건을 80만 골드에 넘기면 80만 골드는 길드에 다시 들어와요. 그래서 길드 자금에서 줄어드는 건 차액 20만 골드뿐이고, 아래 부담은 이 차액만 더한 값이에요.
+          길마가 원스토어 할인으로 플래티넘을 결제하고, 그 플래티넘으로 산 물건을 1군과 고스펙에게 할인된 골드로 넘겨요. 모두 주당 플래티넘을 다 쓴다고 쳐요.
         </p>
-        <label>
-          길드 자금 <input className="ps-wide" inputMode="numeric" value={fund} onChange={(e) => setFund(e.target.value.replace(/\D/g, ""))} placeholder="5000" /> 만 골드
-        </label>
         <label>
           1군 <input inputMode="numeric" value={n} onChange={(e) => setN(e.target.value.replace(/\D/g, ""))} /> 명 · 고스펙
           <input inputMode="numeric" value={h} onChange={(e) => setH(e.target.value.replace(/\D/g, ""))} /> 명
@@ -477,20 +499,46 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
         <label>
           기간 <input inputMode="numeric" value={weeks} onChange={(e) => setWeeks(e.target.value.replace(/\D/g, ""))} /> 주
         </label>
+        <label>
+          원스토어 할인 <input inputMode="decimal" value={off} onChange={(e) => pickOff(e.target.value.replace(/[^\d.]/g, "").slice(0, 4))} /> %
+        </label>
+        <div className="mk-chips">
+          {STORE_OFFS.map((v) => (
+            <button key={v} className={"pill" + (rate === v ? " pill-on" : "")} onClick={() => pickOff(String(v))}>
+              {v}%
+            </button>
+          ))}
+        </div>
       </section>
+      <div className="panel ps-pay">
+        <b>
+          {w}주 동안 결제할 돈 (원스토어 {rate}% 할인)
+        </b>
+        <span className="ps-pay-won">{won(paid)}</span>
+        {/* 정가 막대: 채운 만큼 내고, 빗금은 할인으로 아끼는 돈 */}
+        <span className="ps-pay-bar" role="img" aria-label={`정가의 ${100 - rate}%를 내요`}>
+          <i style={{ width: `${100 - rate}%` }} />
+        </span>
+        <small>
+          정가 {won(b.buy.won)} · 할인 {won(b.buy.won - paid)} · 주당 {won(Math.round(paid / w))}
+        </small>
+      </div>
       <div className="ps-ledger">
         <div className="panel">
-          <b>{int(weeks) || 1}주 동안 길드 부담 (차액)</b>
-          <span className="ps-gold">{gold(b.cost)}</span>
-          <small>시중가로 {gold(b.market)} - 받는 골드 {gold(b.gold)}</small>
-          <small>주당 {gold(Math.round(b.perWeek))}</small>
+          <b>사는 플래티넘</b>
+          <span>
+            {gem} {b.buy.plat.toLocaleString("ko-KR")}
+          </span>
+          <small>{b.buy.packs.map((k) => `${k.plat.toLocaleString("ko-KR")}${k.count > 1 ? ` ×${k.count}` : ""}`).join(" · ") || "-"}</small>
+          <small>
+            필요 {b.plat.toLocaleString("ko-KR")} · 남는 것 {(b.buy.plat - b.plat).toLocaleString("ko-KR")}
+          </small>
         </div>
         <div className="panel">
-          <b>자금이 버티는 기간</b>
-          <span className="ps-gold">{lasts === null ? "-" : `${lasts >= 100 ? "100주 넘게" : `${lasts.toFixed(1)}주`}`}</span>
-          <small>
-            쓰는 플래티넘 <img src={SHOP_PIC + "plat.png"} alt="" /> {b.plat.toLocaleString("ko-KR")}
-          </small>
+          <b>받는 골드</b>
+          <span className="ps-gold">{gold(b.gold)}</span>
+          <small>1만 골드당 {b.gold > 0 ? won(Math.round(paid / (b.gold / 10_000))) : "-"}</small>
+          <small>길드원은 시중가보다 {gold(b.market - b.gold)} 덜 내요</small>
         </div>
       </div>
       <ul className="ps-orders">
@@ -501,13 +549,12 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
                 {r.name} {r.people}명
               </b>
               <small>
-                한 사람 주당 <img src={SHOP_PIC + "plat.png"} alt="" /> {r.weekPlat.toLocaleString("ko-KR")} · {r.ratio}:100 (시중 {settings.market}:100)
+                한 사람 주당 {gem} {r.weekPlat.toLocaleString("ko-KR")} · {r.ratio}:100 (시중 {settings.market}:100) · 한 사람 주당 {gold(goldOf(r.weekPlat, r.ratio))}
               </small>
               <small>
-                받는 골드 {goldWords(r.gold)} · 시중가 {goldWords(r.market)}
+                {gem} {r.plat.toLocaleString("ko-KR")} → 받는 골드 {goldWords(r.gold)} (시중가 {goldWords(r.market)})
               </small>
             </span>
-            <span className="ps-gold">-{gold(Math.round(r.cost))}</span>
           </li>
         ))}
       </ul>

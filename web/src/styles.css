@@ -1321,3 +1321,15 @@ button { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .gc, .gc-area, .gc-line, .gc-rest, .gc-dot, .gc-up { animation: none; opacity: 1; transform: none; stroke-dashoffset: 0; }
 }
+
+/* platinum shop budget (PlatShop.tsx BudgetPanel, 제작자 요청): what the guild master pays with this time's store
+   discount. The bar is the list price: the filled part is paid, the stripes are the discount */
+.ps-pay { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 0 0 8px; text-align: center; }
+.ps-pay > b { font-size: 13px; font-weight: 700; }
+.ps-pay-won { font-size: 22px; font-weight: 700; color: var(--gold); }
+.ps-pay small { font-size: 11px; font-weight: 700; color: var(--muted); }
+.ps-pay-bar { display: block; width: 100%; height: 10px; background: repeating-linear-gradient(45deg, #3e3878 0 4px, #2a2459 4px 8px); border: var(--px) solid var(--edge); }
+.ps-pay-bar i { display: block; height: 100%; background: var(--gold); transition: width 0.4s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .ps-pay-bar i { transition: none; }
+}
