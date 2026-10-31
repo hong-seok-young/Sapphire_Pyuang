@@ -27,7 +27,6 @@ export function CafeLink({ postId, what, title }: { postId: string; what: string
         <span className="cafe-link-icon">{what === "지도" ? "🗺️" : what === "공략" ? "📜" : "🖼️"}</span>
         <span className="cafe-link-text">
           <b>{title ?? what}</b>
-          <small>아이모 카페 원글에서 봐요</small>
         </span>
         {!asking && (
           <button className="pill" onClick={() => setAsking(true)}>
