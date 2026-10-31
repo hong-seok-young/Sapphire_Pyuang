@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { JOB_NAME, RANK, ROLE_NAME, errorText, positionOf } from "../auth";
 import type { Me } from "../auth";
@@ -452,12 +452,20 @@ function Rows({ wiki, me, list, rate, onChanged, empty }: {
   empty: ReactNode;
 }) {
   const [open, setOpen] = useState<number | null>(null);
+  // 가격(경매는 최고가)이 바뀐 줄만 숫자를 한 번 반짝인다
+  const seen = useRef(new Map<number, number>());
+  useEffect(() => {
+    for (const l of list) seen.current.set(l.id, l.mode === "auction" ? currentPrice(l) : l.price);
+  });
   if (!list.length) return <div className="empty">{empty}</div>;
   return (
     <ul className="mk-list">
       {list.map((l) => {
         const auction = l.mode === "auction";
         const shownPrice = auction ? currentPrice(l) : l.price;
+        const before = seen.current.get(l.id);
+        const changed = before !== undefined && before !== shownPrice;
+        const ending = auction && !auctionOver(l) && l.endsAt !== null && l.endsAt - Date.now() < 3_600_000;
         return (
           <li key={l.id} className={"mk-item" + (open === l.id ? " mk-open" : "") + (l.status === "sold" ? " mk-done" : "")}>
             <button className="mk-row" onClick={() => setOpen(open === l.id ? null : l.id)}>
@@ -465,7 +473,7 @@ function Rows({ wiki, me, list, rate, onChanged, empty }: {
               <span className="mk-name">
                 <b>{listingName(l)}</b>
                 <small>
-                  {auction && <span className="mk-auction-tag">🔨 경매{auctionOver(l) ? " 끝" : l.endsAt ? ` ${timeLeft(l.endsAt)}` : ""}</span>}
+                  {auction && <span className={"mk-auction-tag" + (ending ? " mk-ending" : "")}>🔨 경매{auctionOver(l) ? " 끝" : l.endsAt ? ` ${timeLeft(l.endsAt)}` : ""}</span>}
                   {l.enchant && <span className="mk-ench">{enchantText(l)}</span>}
                   {auction ? l.bidCount > 0 && <span>입찰 {l.bidCount}</span> : l.wants > 0 && <span className={"mk-wants" + (l.wanted ? " mk-wants-me" : "")}>♥ {l.wants}</span>}
                   {l.talkCount > 0 && <span className="mk-talk-count">💬 {l.talkCount}</span>}
@@ -475,7 +483,7 @@ function Rows({ wiki, me, list, rate, onChanged, empty }: {
               </span>
               <span className="mk-price">
                 <small>{l.seller}</small>
-                <b>
+                <b key={shownPrice} className={changed ? "mk-flash" : undefined}>
                   <Coin /> {goldText(shownPrice)}
                 </b>
                 <small className="mk-cash">{cashText(shownPrice, rate)}</small>

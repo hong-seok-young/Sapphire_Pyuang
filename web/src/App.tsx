@@ -117,7 +117,10 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
 
   return (
     <div className="app">
-      <main className="page">{body}</main>
+      {/* 화면이 바뀔 때 0.16초 안에 살짝 떠오른다 (주소의 ? 뒤만 바뀌면 그대로) */}
+      <main className="page" key={route.parts.join("/")}>
+        {body}
+      </main>
       <nav className="tabbar">
         {SHOWN_TABS.map((t) => (
           <a key={t.to} href={t.to} className={"tab" + (page === t.match ? " tab-on" : "")}>

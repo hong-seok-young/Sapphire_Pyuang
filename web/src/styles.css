@@ -758,3 +758,18 @@ button { font: inherit; color: inherit; }
 .mk-talk-del { padding: 0 4px; font-size: 11px; color: var(--muted); background: none; border: 0; cursor: pointer; }
 .mk-talk-form { display: flex; gap: 6px; }
 .mk-talk-form .mk-input { flex: 1; min-width: 0; height: 34px; }
+
+/* more snappy motion: page enter, price flash, auction ending, growth leader shine */
+.page { animation: page-in 0.16s ease-out; }
+@keyframes page-in { from { opacity: 0.35; transform: translateY(4px); } }
+.mk-flash { animation: price-flash 0.6s ease-out; }
+@keyframes price-flash { 0% { color: #fff; text-shadow: 0 0 8px var(--gold); transform: scale(1.12); } }
+.mk-ending { color: #ff7a6b; animation: ending 1s ease-in-out infinite; }
+@keyframes ending { 50% { opacity: 0.45; } }
+.growth-hero { position: relative; overflow: hidden; }
+.growth-hero::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.28) 50%, transparent 65%);
+  transform: translateX(-110%); animation: shine 1.1s ease-out 0.15s 1;
+}
+@keyframes shine { to { transform: translateX(110%); } }
