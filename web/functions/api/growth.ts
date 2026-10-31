@@ -40,7 +40,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     env.DB.prepare(
       "SELECT u.id AS id, u.role AS role, p.job AS job, p.level AS level, p.exp AS exp, p.guild AS guild, a.updated_at AS avatar, " +
         "(SELECT MAX(at) FROM level_log l WHERE l.user_id = p.user_id) AS last_at " +
-        "FROM profiles p JOIN users u ON u.id = p.user_id LEFT JOIN avatars a ON a.user_id = p.user_id",
+        "FROM profiles p JOIN users u ON u.id = p.user_id AND u.id NOT IN ('테스트1', '테스트2') LEFT JOIN avatars a ON a.user_id = p.user_id",
     ),
   ]);
   const base = new Map<string, Point>();

@@ -9,7 +9,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (!me) return NEED_LOGIN();
   const { results } = await env.DB.prepare(
     "SELECT u.id AS id, u.role AS role, p.job AS job, p.level AS level, p.prev_level AS prev_level, p.level_at AS level_at, " +
-      "p.exp AS exp, p.guild AS guild, a.updated_at AS avatar FROM profiles p JOIN users u ON u.id = p.user_id " +
+      "p.exp AS exp, p.guild AS guild, a.updated_at AS avatar FROM profiles p JOIN users u ON u.id = p.user_id AND u.id NOT IN ('테스트1', '테스트2') " +
       "LEFT JOIN avatars a ON a.user_id = p.user_id ORDER BY p.level DESC, p.exp DESC, p.level_at ASC, u.id ASC",
   ).all<{
     id: string; role: Role; job: Job; level: number; prev_level: number | null; level_at: number; exp: number | null;

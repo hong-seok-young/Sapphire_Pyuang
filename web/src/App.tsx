@@ -19,7 +19,7 @@ import { RequestsPage } from "./pages/Requests";
 import { ActivityLogPage } from "./pages/ActivityLog";
 import { AlertsPage } from "./pages/Alerts";
 import { forgetView, reportView } from "./activity";
-import { RANK, fetchMe } from "./auth";
+import { RANK, TEST_IDS, fetchMe, switchAccount } from "./auth";
 import { appMenu } from "./platform";
 import type { Me } from "./auth";
 
@@ -117,6 +117,21 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
 
   return (
     <div className="app">
+      {/* 테스트 계정으로 보는 중이면 맨 위에 '내 계정' (앱개발자로 돌아가기) */}
+      {TEST_IDS.includes(me.id) && (
+        <div className="test-banner">
+          🧪 {me.id}
+          <button
+            className="pill"
+            onClick={async () => {
+              await switchAccount("back").catch(() => undefined);
+              location.reload();
+            }}
+          >
+            내 계정
+          </button>
+        </div>
+      )}
       {/* 화면이 바뀔 때 0.16초 안에 살짝 떠오른다 (주소의 ? 뒤만 바뀌면 그대로) */}
       <main className="page" key={route.parts.join("/")}>
         {body}

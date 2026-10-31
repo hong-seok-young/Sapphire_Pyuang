@@ -77,6 +77,7 @@ wrangler("d1", "execute", DB, "--remote", "--yes", "--file=schema.sql");
 const ADDED_COLUMNS = [
   ["profiles", "exp", "INTEGER"], ["listings", "options", "TEXT"], ["profiles", "guild", "TEXT"],
   ["listings", "mode", "TEXT NOT NULL DEFAULT 'sale'"], ["listings", "ends_at", "INTEGER"], ["listing_wants", "offer", "INTEGER"],
+  ["listing_talk", "parent_id", "INTEGER"],
 ];
 for (const [table, column, type] of ADDED_COLUMNS) {
   const columns = parseJson(wrangler("d1", "execute", DB, "--remote", "--json", "--command", `PRAGMA table_info(${table})`))[0]?.results ?? [];

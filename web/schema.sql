@@ -183,6 +183,7 @@ CREATE TABLE IF NOT EXISTS listing_talk (
   listing_id INTEGER NOT NULL,
   user_id TEXT NOT NULL,
   text TEXT NOT NULL,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  parent_id INTEGER                       -- 답글이면 원래 글 (한 단계만)
 );
 CREATE INDEX IF NOT EXISTS listing_talk_listing ON listing_talk (listing_id, id);

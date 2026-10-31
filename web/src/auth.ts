@@ -11,6 +11,11 @@ export const ROLE_NAME: Record<Role, string> = {
 
 export const RANK: Record<Role, number> = { developer: 3, master: 2, officer: 1, member: 0 };
 
+/** 앱개발자가 혼자 시험할 때 바꿔 들어가는 테스트 계정 (서버 server/auth.ts 와 같다) */
+export const TEST_IDS = ["테스트1", "테스트2"];
+/** 테스트 계정으로 바꾸기, "back" 이면 앱개발자 계정으로 돌아가기 */
+export const switchAccount = (to: string) => api<Me>("/api/dev/switch", "POST", { to });
+
 /** 길드 안의 직책 (랭킹 마크, 내 정보, 길드원 관리). 앱개발자는 앱을 관리하는 권한일 뿐 길드 직책이 아니라서 길드원으로 보인다 (제작자 요청) */
 export const positionOf = (role: Role): Role => (role === "developer" ? "member" : role);
 

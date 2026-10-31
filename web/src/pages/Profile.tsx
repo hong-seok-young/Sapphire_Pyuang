@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import {
   EXP_MAX, GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, MAX_LEVEL, ROLE_NAME, avatarUrl, deleteMyAvatar, errorText, expText,
-  logout, positionOf, renameAccount, saveMyProfile,
+  TEST_IDS, logout, positionOf, renameAccount, saveMyProfile, switchAccount,
 } from "../auth";
 import type { Guild, Job, Me } from "../auth";
 import { JobEmblem, JobGlyph } from "../emblems";
@@ -271,6 +271,27 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
       </section>
       <AvatarPanel me={me} onMe={onMe} />
       <RenamePanel me={me} onMe={onMe} />
+      {/* 앱개발자만: 테스트 계정으로 바꿔서 상대방 쪽 화면과 알림을 혼자 시험한다 (제작자 요청) */}
+      {me.role === "developer" && (
+        <section className="panel profile-panel">
+          <h2 className="panel-title">테스트 계정</h2>
+          <div className="mk-chips">
+            {TEST_IDS.map((id) => (
+              <button
+                key={id}
+                className="pill"
+                onClick={async () => {
+                  await switchAccount(id);
+                  location.hash = "#/";
+                  location.reload();
+                }}
+              >
+                🧪 {id}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
       <div className="links">
         <a className="btn btn-ghost" href="#/ranking">🏆 길드 랭킹</a>
         <a className="btn btn-ghost" href="#/password">비밀번호 변경</a>

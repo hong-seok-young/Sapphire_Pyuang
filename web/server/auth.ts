@@ -255,6 +255,9 @@ export function canManage(actor: Role, target: Role): boolean {
   return RANK[actor] >= 1 && RANK[actor] > RANK[target];
 }
 
+/** 앱개발자가 혼자 시험할 때 바꿔 들어가는 테스트 계정 (functions/api/dev/switch.ts). 랭킹과 성장 랭킹에는 나오지 않는다 */
+export const TEST_IDS = ["테스트1", "테스트2"];
+
 // ---------- 세션 ----------
 
 async function sha256(s: string): Promise<string> {
@@ -275,7 +278,7 @@ export async function deleteSession(env: Env, request: Request): Promise<void> {
   if (token) await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256(token)).run();
 }
 
-function readCookie(request: Request, name: string): string | null {
+export function readCookie(request: Request, name: string): string | null {
   const header = request.headers.get("cookie") ?? "";
   for (const part of header.split(";")) {
     const i = part.indexOf("=");
@@ -287,7 +290,11 @@ function readCookie(request: Request, name: string): string | null {
 /** 로그인한 사람. 로그인 안 했거나 세션이 끝났으면 null */
 export async function currentUser(env: Env, request: Request): Promise<User | null> {
   const token = readCookie(request, COOKIE);
-  if (!token) return null;
+  return token ? userOfToken(env, token) : null;
+}
+
+/** 세션 토큰의 사람 (테스트 계정 전환에서 앱개발자 세션을 되돌릴 때도 쓴다) */
+export async function userOfToken(env: Env, token: string): Promise<User | null> {
   const row = await env.DB.prepare(
     "SELECT u.id AS id, u.role AS role, u.must_change AS must_change, s.expires_at AS expires_at " +
       "FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?",

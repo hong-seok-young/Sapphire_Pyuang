@@ -11,6 +11,6 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
     : null;
   if (!row) return json({ error: "없는 글이에요" }, 404);
   if (row.user_id !== me.id && RANK[me.role] < 1) return FORBIDDEN();
-  await env.DB.prepare("DELETE FROM listing_talk WHERE id = ?").bind(talkId).run();
+  await env.DB.prepare("DELETE FROM listing_talk WHERE id = ? OR parent_id = ?").bind(talkId, talkId).run(); // 답글도 같이
   return json({ ok: true });
 };

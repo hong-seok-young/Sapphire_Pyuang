@@ -137,13 +137,15 @@ export const bidListing = (id: number, amount: number) =>
 /** 종목 토론방 글 한 줄 */
 export interface TalkLine {
   id: number;
+  /** 답글이면 원래 글 */
+  parent: number | null;
   user: string;
   role: Role | null;
   text: string;
   at: number;
 }
 export const fetchTalk = (id: number) => api<{ talk: TalkLine[] }>(`/api/market/${id}/talk`).then((r) => r.talk);
-export const postTalk = (id: number, text: string) => api<TalkLine>(`/api/market/${id}/talk`, "POST", { text });
+export const postTalk = (id: number, text: string, parent: number | null) => api<TalkLine>(`/api/market/${id}/talk`, "POST", { text, parent });
 export const deleteTalk = (id: number, talkId: number) => api<{ ok: boolean }>(`/api/market/${id}/talk/${talkId}`, "DELETE");
 export const unwantListing = (id: number) => api<{ wants: number; wanted: boolean }>(`/api/market/${id}/want`, "DELETE");
 

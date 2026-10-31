@@ -62,6 +62,12 @@ function Detail({ wiki, me, l, rate, onChanged }: {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [talkOpen, setTalkOpen] = useState(false);
   const [talkCount, setTalkCount] = useState(l.talkCount);
+  // 종목 토론방 단추: 할 일 단추와 같은 줄 오른쪽 끝에 작은 말풍선으로 (제작자 요청: 줄을 따로 만들지 않게)
+  const talkButton = (
+    <button className={"mk-talk-btn" + (talkOpen ? " mk-talk-on" : "")} onClick={() => setTalkOpen((v) => !v)} aria-expanded={talkOpen}>
+      💬 토론방{talkCount > 0 && <b>{talkCount}</b>}
+    </button>
+  );
 
   async function run(fn: () => Promise<void>) {
     setBusy(true);
@@ -75,6 +81,8 @@ function Detail({ wiki, me, l, rate, onChanged }: {
     }
   }
   const newPrice = price === null ? 0 : Number(price.replace(/\D/g, ""));
+  /** 할 일 단추 줄이 보이는지 (토론방 단추를 그 줄 끝에 둔다) */
+  const actionRow = mine ? price === null : l.status === "selling";
   const offerN = Number(offer) || 0;
   const bidN = Number(bid) || 0;
   const remove = () =>
@@ -236,6 +244,7 @@ function Detail({ wiki, me, l, rate, onChanged }: {
                   삭제
                 </button>
               )}
+              {talkButton}
             </div>
           )}
         </>
@@ -330,16 +339,13 @@ function Detail({ wiki, me, l, rate, onChanged }: {
                   삭제(관리)
                 </button>
               ))}
+            {talkButton}
           </div>
         )
       )}
       {error && <p className="form-error">{error}</p>}
-      {/* 종목 토론방: 정보창 오른쪽 아래 작은 말풍선 하나 (제작자 요청: 단추가 덕지덕지 붙지 않게) */}
-      <div className="mk-talk-bar">
-        <button className={"mk-talk-btn" + (talkOpen ? " mk-talk-on" : "")} onClick={() => setTalkOpen((v) => !v)} aria-expanded={talkOpen}>
-          💬 토론방{talkCount > 0 && <b>{talkCount}</b>}
-        </button>
-      </div>
+      {/* 할 일 줄이 없을 때(가격 변경 중, 거래 끝난 글)만 토론방 단추를 따로 둔다 */}
+      {!actionRow && <div className="mk-talk-bar">{talkButton}</div>}
       {talkOpen && <Talk l={l} me={me} onCount={setTalkCount} />}
     </div>
   );
@@ -353,12 +359,13 @@ function talkTime(t: number): string {
 }
 
 /**
- * 종목 토론방 (제작자 요청): 이 물건에 대해 한 줄씩 쓰는 방. 판 사람 글에는 '판매자', 길드마스터와 오피서는 표시를 붙이고
+ * 종목 토론방 (제작자 요청): 이 물건에 대해 댓글처럼 쓰는 방. 글마다 '답글'(한 단계)을 달면 원래 글쓴이에게 알림이 간다. 판 사람 글에는 '판매자', 길드마스터와 오피서는 표시를 붙이고
  * 쓴 시각을 보인다. 열려 있는 동안 20초마다 새 글을 본다. 자기 글은 지우고, 오피서 이상은 남의 글도 지운다
  */
 function Talk({ l, me, onCount }: { l: Listing; me: Me; onCount: (n: number) => void }) {
   const [talk, setTalk] = useState<TalkLine[] | null>(null);
   const [text, setText] = useState("");
+  const [replyTo, setReplyTo] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const load = useCallback(
@@ -384,14 +391,54 @@ function Talk({ l, me, onCount }: { l: Listing; me: Me; onCount: (n: number) => 
     setBusy(true);
     setError("");
     try {
-      await postTalk(l.id, text.trim());
+      await postTalk(l.id, text.trim(), replyTo);
       setText("");
+      setReplyTo(null);
       await load();
     } catch (x) {
       setError(errorText(x));
     } finally {
       setBusy(false);
     }
+  }
+
+  const tops = (talk ?? []).filter((t) => t.parent === null);
+  const repliesOf = (id: number) => (talk ?? []).filter((t) => t.parent === id);
+  const replyName = talk?.find((t) => t.id === replyTo)?.user;
+
+  function line(t: TalkLine, reply: boolean) {
+    const position = t.role ? positionOf(t.role) : "member";
+    return (
+      <li key={t.id} className={(reply ? "mk-talk-reply" : "") + (t.user === l.seller ? " mk-talk-seller" : "")}>
+        {reply && <span className="mk-talk-arrow">↳</span>}
+        <b>{t.user}</b>
+        {t.user === l.seller && <span className="mk-talk-tag">판매자</span>}
+        {position !== "member" && <span className="mk-talk-tag mk-talk-staff">{ROLE_NAME[position]}</span>}
+        <span className="mk-talk-text">{t.text}</span>
+        <time>{talkTime(t.at)}</time>
+        {!reply && (
+          <button className="mk-talk-act" onClick={() => setReplyTo(t.id)}>
+            답글
+          </button>
+        )}
+        {(t.user === me.id || RANK[me.role] >= 1) && (
+          <button
+            className="mk-talk-act"
+            aria-label="삭제"
+            onClick={async () => {
+              try {
+                await deleteTalk(l.id, t.id);
+                await load();
+              } catch (x) {
+                setError(errorText(x));
+              }
+            }}
+          >
+            ✕
+          </button>
+        )}
+      </li>
+    );
   }
 
   return (
@@ -401,39 +448,24 @@ function Talk({ l, me, onCount }: { l: Listing; me: Me; onCount: (n: number) => 
       ) : talk.length === 0 ? (
         <p className="mk-meta">아직 글이 없어요.</p>
       ) : (
-        <ul className="mk-talk-list">
-          {talk.map((t) => {
-            const position = t.role ? positionOf(t.role) : "member";
-            return (
-              <li key={t.id} className={t.user === l.seller ? "mk-talk-seller" : undefined}>
-                <b>{t.user}</b>
-                {t.user === l.seller && <span className="mk-talk-tag">판매자</span>}
-                {position !== "member" && <span className="mk-talk-tag mk-talk-staff">{ROLE_NAME[position]}</span>}
-                <span className="mk-talk-text">{t.text}</span>
-                <time>{talkTime(t.at)}</time>
-                {(t.user === me.id || RANK[me.role] >= 1) && (
-                  <button
-                    className="mk-talk-del"
-                    aria-label="삭제"
-                    onClick={async () => {
-                      try {
-                        await deleteTalk(l.id, t.id);
-                        await load();
-                      } catch (x) {
-                        setError(errorText(x));
-                      }
-                    }}
-                  >
-                    ✕
-                  </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <ul className="mk-talk-list">{tops.flatMap((t) => [line(t, false), ...repliesOf(t.id).map((r) => line(r, true))])}</ul>
+      )}
+      {replyTo !== null && (
+        <p className="mk-talk-replying">
+          ↳ {replyName}에게 답글
+          <button className="mk-talk-act" onClick={() => setReplyTo(null)} aria-label="답글 취소">
+            ✕
+          </button>
+        </p>
       )}
       <form className="mk-talk-form" onSubmit={send}>
-        <input className="mk-input" value={text} onChange={(e) => setText(e.target.value.slice(0, 200))} placeholder="글 쓰기" aria-label="토론방 글" />
+        <input
+          className="mk-input"
+          value={text}
+          onChange={(e) => setText(e.target.value.slice(0, 200))}
+          placeholder={replyTo !== null ? "답글 쓰기" : "글 쓰기"}
+          aria-label="토론방 글"
+        />
         <button className="pill" disabled={busy || !text.trim()}>
           등록
         </button>
