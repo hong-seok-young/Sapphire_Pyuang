@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import { errorText } from "../auth";
 import { ago, goldText, goldWords } from "../market";
-import { PLAT_PACKS, SHOP_PIC, actOrder, budget, discount, fetchShop, goldOf, orderItem, packsFor, packsOf, packsWithin, saveShopItem, saveShopSettings } from "../platshop";
-import type { ShopData, ShopItem, ShopOrder, ShopSettings, Wallet } from "../platshop";
+import { PLAT_PACKS, SHOP_PIC, actOrder, adviseShop, budget, discount, fetchShop, goldOf, orderItem, packsFor, packsOf, packsWithin, saveShopItem, saveShopSettings } from "../platshop";
+import type { ShopData, ShopItem, ShopOption, ShopOrder, ShopSettings, Wallet } from "../platshop";
 import { Loading, TopBar } from "../ui";
 import { WEEK } from "../week";
 
@@ -285,7 +285,7 @@ export function PlatShopPage() {
         <ShopSettingsPanel settings={s} items={items} busy={busy} run={run} />
       )}
 
-      {tab === "budget" && data.manage && <BudgetPanel settings={s} />}
+      {tab === "budget" && data.manage && <BudgetPanel settings={s} busy={busy} run={run} />}
     </>
   );
 }
@@ -516,9 +516,9 @@ function Gain({ v, className = "" }: { v: number; className?: string }) {
  * 상점 상품마다 충전 비율이 달라서 현금이면 그 돈 안에서 플래티넘이 가장 많은 상품 조합(packsWithin), 개수면 그만큼을 가장 싸게(packsFor).
  * 비우면 길드원이 사 갈 만큼. 원스토어 할인(그때그때 다르다)은 실제 결제액에만 든다. 1군과 고스펙이 지금 설정대로 주당 플래티넘을 다 사 가면:
  * 구매(플래티넘, 쓴 돈) | 판매(들어오는 골드, 남는 플래티넘은 1군 비율로 골드로) | 손익(쓴 돈을 1원 = 75골드처럼 골드로 바꿔 견준다).
- * 할인율과 골드 비율은 이 폰에 기억한다
+ * 할인율과 골드 비율은 이 폰에 기억한다. 아래 AI 도우미에게 상황을 말하면 통 설정 안을 몇 개 내고, 고르면 상점이 그대로 설정된다
  */
-function BudgetPanel({ settings }: { settings: ShopSettings }) {
+function BudgetPanel({ settings, busy, run }: { settings: ShopSettings; busy: boolean; run: (fn: () => Promise<unknown>, done?: string) => void }) {
   const [n, setN] = useState("20");
   const [h, setH] = useState("3");
   const [weeks, setWeeks] = useState("4");
@@ -528,27 +528,57 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
   const [mode, setMode] = useState<"won" | "pick">("won");
   const [amount, setAmount] = useState("");
   const [counts, setCounts] = useState<number[]>(() => PLAT_PACKS.map(() => 0));
+  /** AI 도우미 (제작자 요청): 물은 글, 받은 조언과 안 */
+  const [question, setQuestion] = useState("");
+  const [advice, setAdvice] = useState<{ answer: string; options: ShopOption[] } | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [askError, setAskError] = useState("");
   const int = (v: string) => Math.max(0, Math.floor(Number(v) || 0));
-  const b = budget(settings, int(n), int(h), Math.max(1, int(weeks)));
+  const w = Math.max(1, int(weeks));
   const rate = Math.min(90, Math.max(0, Number(off) || 0));
   const perWon = Math.max(0, Number(goldRate) || 0);
   const want = int(amount);
-  const buy = mode === "pick" ? packsOf(counts) : want > 0 ? packsWithin(want) : packsFor(b.plat);
+  /** 통 설정 하나로 셈한 결과 (지금 설정, 그리고 AI 안마다 같은 셈) */
+  const review = (st: ShopSettings) => {
+    const bb = budget(st, int(n), int(h), w);
+    const by = mode === "pick" ? packsOf(counts) : want > 0 ? packsWithin(want) : packsFor(bb.plat);
+    const pd = Math.round(by.won * (1 - rate / 100));
+    const sd = Math.min(by.plat, bb.plat);
+    const part = bb.plat > 0 ? sd / bb.plat : 0;
+    const lg = goldOf(by.plat - sd, st.ratio);
+    return { b: bb, buy: by, paid: pd, spentGold: pd * perWon, sold: sd, soldPart: part, left: by.plat - sd, leftGold: lg, inGold: bb.gold * part + lg };
+  };
+  const now = review(settings);
+  const b = now.b;
+  const buy = now.buy;
   /** 상품 고르기로 넘어가면 지금 조합의 개수를 그대로 가져와 거기서 손본다 */
   const pick = () => {
     setCounts(PLAT_PACKS.map((k) => buy.packs.find((p) => p.plat === k.plat)?.count ?? 0));
     setMode("pick");
   };
   const step = (i: number, d: number) => setCounts(counts.map((c, j) => (j === i ? Math.max(0, Math.min(99, c + d)) : c)));
-  const paid = Math.round(buy.won * (1 - rate / 100));
-  /** 쓴 돈을 골드로 */
-  const spentGold = paid * perWon;
-  /** 길드원이 사 가는 만큼 (산 것보다 많이는 못 산다)과 남는 플래티넘. 남는 것은 1군 비율로 골드로 친다 (제작자 요청) */
-  const sold = Math.min(buy.plat, b.plat);
-  const soldPart = b.plat > 0 ? sold / b.plat : 0;
-  const left = buy.plat - sold;
-  const leftGold = goldOf(left, settings.ratio);
-  const inGold = b.gold * soldPart + leftGold;
+  /** 쓴 돈과 그 골드, 길드원이 사 가는 만큼(산 것보다 많이는 못 산다)과 남는 플래티넘(1군 비율로 골드로, 제작자 요청) */
+  const { paid, spentGold, soldPart, left, leftGold, inGold } = now;
+  const optionSettings = (o: ShopOption): ShopSettings => ({ ...settings, ratio: o.ratio, highRatio: o.highRatio, weekPlat: o.weekPlat, highWeekPlat: o.highWeekPlat });
+  const isNow = (o: ShopOption) =>
+    o.ratio === settings.ratio && o.highRatio === settings.highRatio && o.weekPlat === settings.weekPlat && o.highWeekPlat === settings.highWeekPlat;
+  async function ask() {
+    setAsking(true);
+    setAskError("");
+    try {
+      setAdvice(
+        await adviseShop(question, {
+          일군_인원: int(n), 고스펙_인원: int(h), 기간_주: w, 원스토어_할인_퍼센트: rate, 현금1원당_골드: perWon,
+          사는_플래티넘: buy.plat, 정가_원: buy.won, 결제액_원: paid, 길드원이_사_갈_플래티넘: b.plat, 남는_플래티넘: left,
+          들어오는_골드: Math.round(inGold), 쓴_돈_골드: spentGold, 손익_골드: Math.round(inGold - spentGold),
+        }),
+      );
+    } catch (x) {
+      setAskError(errorText(x));
+    } finally {
+      setAsking(false);
+    }
+  }
   /** 1군, 고스펙 따로: 쓴 돈을 산 플래티넘 중 그쪽이 사 간 만큼으로 나눠 친다 */
   const share = (plat: number) => (buy.plat > 0 ? (paid * plat) / buy.plat : 0);
   const gem = <img src={SHOP_PIC + "plat.png"} alt="" />;
@@ -716,6 +746,53 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
             </li>
           ))}
         </ul>
+      </section>
+      {/* AI 도우미 (제작자 요청): 상황을 말하면 설정 안을 몇 개 내고, 고르면 상점이 그대로 설정된다. 손익은 화면이 같은 셈으로 다시 계산 */}
+      <section className="panel ps-ai">
+        <h3>AI 도우미</h3>
+        <textarea
+          className="mk-input ps-ai-q"
+          value={question}
+          onChange={(e) => setQuestion(e.target.value.slice(0, 1000))}
+          placeholder="예: 이번에 현금 60만 원 결제하고 플래티넘이 3,000개 남아 있어요. 고스펙 혜택은 늘리되 손해는 안 보게 맞춰 줘"
+        />
+        <button className="pill pill-on" disabled={asking || !question.trim()} onClick={ask}>
+          {asking ? "생각하는 중…" : "물어보기"}
+        </button>
+        {askError && <p className="form-error">{askError}</p>}
+        {advice && (
+          <>
+            <p className="ps-ai-answer">{advice.answer}</p>
+            <ul className="ps-ai-options">
+              {advice.options.map((o, i) => {
+                const r = review(optionSettings(o));
+                const current = isNow(o);
+                return (
+                  <li key={i} className={"panel" + (current ? " ps-ai-now" : "")}>
+                    <b>{o.label}</b>
+                    <span>
+                      1군 {o.ratio}:100 · 고스펙 {o.highRatio}:100
+                    </span>
+                    <span>
+                      주당 {gem}
+                      {o.weekPlat.toLocaleString("ko-KR")} · 고스펙 {gem}
+                      {o.highWeekPlat.toLocaleString("ko-KR")}
+                    </span>
+                    <Gain v={r.inGold - r.spentGold} />
+                    <small>{o.reason}</small>
+                    <button
+                      className="pill pill-on"
+                      disabled={busy || current}
+                      onClick={() => run(() => saveShopSettings(optionSettings(o)), `'${o.label}' 안으로 상점을 설정했어요.`)}
+                    >
+                      {current ? "지금 설정" : "이 안으로 설정"}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
       </section>
       <ul className="ps-review-groups">
         {b.rows.map((r) => (
