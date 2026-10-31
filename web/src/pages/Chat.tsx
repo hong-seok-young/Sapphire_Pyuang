@@ -525,7 +525,7 @@ export function ChatPage({ wiki, arg, query }: { wiki: Wiki; arg: string; query:
           </button>
         )}
       </div>
-      <p className="chat-note">위키와 웹 자료로 답해서 틀릴 수도 있어요{left !== null ? ` · 오늘 남은 질문 ${left}번` : ""}</p>
+      <p className="chat-note">아이모 자료와 웹을 찾아 답해서 틀릴 수도 있어요{left !== null ? ` · 오늘 남은 질문 ${left}번` : ""}</p>
     </form>
   );
 
@@ -629,7 +629,7 @@ function Steps({ t, thinkingSecs }: { t: Shown; thinkingSecs: number | null }) {
     <div className="chat-steps">
       {t.resuming && <div className="chat-step chat-think-live">⏳ 답을 마저 받는 중…</div>}
       {t.found !== undefined && (
-        <div className="chat-step">📚 {t.found.length ? `위키에서 찾음: ${t.found.slice(0, 6).join(" · ")}` : "위키 목록 확인"}</div>
+        <div className="chat-step">📚 {t.found.length ? `아이모 자료 둘러봄: ${t.found.slice(0, 6).join(" · ")}` : "아이모 자료 둘러봄"}</div>
       )}
       {t.steps?.map((st, i) => (
         <div key={i} className="chat-step">
@@ -693,8 +693,8 @@ function Intro({ onPick }: { onPick: (q: string) => void }) {
   return (
     <section className="panel chat-intro">
       <p>
-        길드 위키 자료를 보고 답해요. 육성법, 장비, 드랍, 사냥터를 물어보세요.
-        {!inFloat && " 📷 로 갤러리의 게임 스샷을 골라 보내면 보고 조언해 줘요."}
+        아이모 관련 사이트 자료를 먼저 둘러보고, 없으면 웹을 찾아 답해요. 육성법, 장비, 드랍, 사냥터, 무엇이든 물어보세요.
+        {!inFloat && " 📎 로 게임 스샷이나 파일을 보내면 보고 답해요."}
       </p>
       <div className="chat-examples">
         {EXAMPLES.map((x) => (

@@ -9,7 +9,9 @@ CREATE TABLE IF NOT EXISTS users (
   must_change INTEGER NOT NULL DEFAULT 1, -- 임시 비밀번호면 1. 로그인하면 먼저 바꾸게 한다
   created_at INTEGER NOT NULL,
   created_by TEXT,
-  high_spec INTEGER NOT NULL DEFAULT 0    -- 고스펙 길드원 (길드마스터, 오피서가 표시. 플래티넘 상점에서 더 할인)
+  high_spec INTEGER NOT NULL DEFAULT 0,   -- 고스펙 길드원 (길드마스터, 오피서가 표시. 플래티넘 상점에서 더 할인)
+  push_perm TEXT,                         -- 폰 알림 허용 상태 (functions/api/alerts/device.ts): on / app_off / denied / ask / none
+  push_at INTEGER                         -- 그 상태를 마지막으로 확인한 때
 );
 
 CREATE TABLE IF NOT EXISTS sessions (

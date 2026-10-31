@@ -183,7 +183,7 @@ export function ChatAnswer({ wiki, text, done, onAsk }: { wiki: Wiki; text: stri
           ))}
         </div>
       )}
-      {done && /\[\[모름:/.test(text) && <div className="ans-gap">📝 잘 모르는 부분은 개발자에게 알렸어요. 고치면 알려 드릴게요</div>}
+      {done && /\[\[모름:/.test(text) && <div className="ans-gap">📝 자료가 모자란 부분은 개발자에게 알렸어요. 고치면 알려 드릴게요</div>}
       {done && asks.length > 0 && (
         <div className="ans-asks">
           {asks.slice(0, 3).map((q) => (

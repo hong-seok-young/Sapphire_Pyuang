@@ -1249,4 +1249,7 @@ button { font: inherit; color: inherit; }
 .chat-sources ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
 .chat-sources a { color: #8fd0ff; word-break: break-all; }
 .ans-card-mons { max-width: 100%; overflow: hidden; }
+/* phone notification permission in member admin */
+.push-mark { font-size: 12px; line-height: 1; }
+.account-push { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
 

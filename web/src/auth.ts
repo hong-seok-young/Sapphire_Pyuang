@@ -90,6 +90,9 @@ export interface Account {
   avatar: number | null;
   /** 고스펙 길드원 */
   highSpec: boolean;
+  /** 폰 알림 허용 상태 (앱을 열 때 확인): on / app_off / denied / ask / none. 아직 모르면 null */
+  push: "on" | "app_off" | "denied" | "ask" | "none" | null;
+  pushAt: number | null;
 }
 
 export class ApiError extends Error {

@@ -17,7 +17,7 @@ const FIRST_PASSWORD = "123123";
 /** 길드원이 몇백 명이어도 처음엔 이만큼만 그리고 '더 보기' */
 const PAGE_SIZE = 50;
 
-type FilterKey = "all" | "main" | "second" | "staff" | "pw" | "noprofile";
+type FilterKey = "all" | "main" | "second" | "staff" | "pw" | "noprofile" | "pushon" | "pushoff";
 /** 목록 거르기 칩 (제작자 요청: 길드원이 많아지면 찾기) */
 const FILTERS: { key: FilterKey; label: string; test: (a: Account) => boolean }[] = [
   { key: "all", label: "전체", test: () => true },
@@ -26,7 +26,20 @@ const FILTERS: { key: FilterKey; label: string; test: (a: Account) => boolean }[
   { key: "staff", label: "오피서 이상", test: (a) => a.role === "master" || a.role === "officer" },
   { key: "pw", label: "비밀번호 바꾸기 전", test: (a) => a.mustChange },
   { key: "noprofile", label: "직업·레벨 안 정함", test: (a) => !a.job || !a.level || !a.guild },
+  // 폰(갤럭시, 아이폰) 설정의 이 웹 알림 (제작자 요청: 누가 켰는지 껐는지)
+  { key: "pushon", label: "🔔 폰 알림 켬", test: (a) => a.push === "on" },
+  // 아직 새 버전을 열지 않아 모르는 사람은 빼고
+  { key: "pushoff", label: "🔕 폰 알림 꺼짐", test: (a) => a.push !== null && a.push !== "on" },
 ];
+
+/** 폰 알림 상태: 줄에는 그림만, 펼치면 글로 */
+const PUSH_MARK: Record<NonNullable<Account["push"]>, { icon: string; text: string }> = {
+  on: { icon: "🔔", text: "폰 알림 켬" },
+  app_off: { icon: "🔕", text: "폰은 허용, 앱 알림함에서 폰 알림을 끔" },
+  denied: { icon: "🔕", text: "폰 설정에서 이 웹 알림을 차단함" },
+  ask: { icon: "❔", text: "아직 알림 허용을 묻지 않음" },
+  none: { icon: "📵", text: "이 폰(브라우저)은 폰 알림이 안 됨 (아이폰은 홈 화면에 추가해야 됨)" },
+};
 
 /** 이 역할로 만들거나 바꿀 수 있는 역할 (높은 것부터) */
 const ASSIGNABLE: Role[] = ["master", "officer", "member"];
@@ -221,6 +234,11 @@ function AccountRow({
           {/* 앱개발자는 길드 직책이 아니라서 길드원으로 보이고, 앱 관리 권한은 따로 적는다 */}
           <span className="role-badge">{ROLE_NAME[positionOf(account.role)]}</span>
           {account.role === "developer" && <span className="role-badge muted">앱 관리</span>}
+          {account.push && (
+            <span className="push-mark" title={PUSH_MARK[account.push].text} aria-label={PUSH_MARK[account.push].text}>
+              {PUSH_MARK[account.push].icon}
+            </span>
+          )}
         </span>
         <span className="account-more" aria-hidden="true">
           {open ? "▴" : "▾"}
@@ -228,6 +246,11 @@ function AccountRow({
       </button>
       {open && (
         <div className="account-panel">
+          <div className="account-push">
+            {account.push
+              ? `${PUSH_MARK[account.push].icon} ${PUSH_MARK[account.push].text}` + (account.pushAt ? ` · ${new Date(account.pushAt).toLocaleDateString("ko-KR")} 확인` : "")
+              : "폰 알림: 아직 모름 (새 버전을 연 적이 없음)"}
+          </div>
           {canRole && (
             <div className="account-field">
               <span>역할</span>

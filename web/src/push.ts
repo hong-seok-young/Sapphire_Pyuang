@@ -94,3 +94,34 @@ export async function ensurePush(): Promise<void> {
 /** 홈에 '폰 알림 켜기' 카드를 띄울지: 아직 허락을 묻지 않았고(브라우저가 '물어보기' 상태), 카드를 닫은 적이 없을 때 */
 export const shouldAskPush = () => supported() && Notification.permission === "default" && !getFlag(ASKED_KEY) && !getFlag(OFF_KEY);
 
+const REPORT_KEY = "sapphire.pushReported";
+
+/**
+ * 이 폰의 알림 허용 상태를 서버에 알린다 (제작자 요청: 누가 폰 설정에서 이 웹 알림을 켰는지 껐는지 '길드원 관리'에서 보게).
+ * 바뀌었거나 하루가 지났을 때만 보낸다
+ */
+export async function reportPush(userId: string, force = false): Promise<void> {
+  try {
+    const s = await pushState();
+    const state =
+      s === "on" ? "on" : s === "denied" ? "denied" : s === "off" ? (Notification.permission === "granted" ? "app_off" : "ask") : "none";
+    const key = `${userId}:${state}`;
+    type Last = { key: string; at: number } | null;
+    let last: Last;
+    try {
+      last = JSON.parse(localStorage.getItem(REPORT_KEY) ?? "null") as Last;
+    } catch {
+      last = null;
+    }
+    if (!force && last && last.key === key && Date.now() - last.at < 86_400_000) return;
+    await api("/api/alerts/device", "PUT", { state });
+    try {
+      localStorage.setItem(REPORT_KEY, JSON.stringify({ key, at: Date.now() }));
+    } catch {
+      // 못 적으면 다음에 또 보낸다
+    }
+  } catch {
+    // 다음에 앱을 열 때 다시
+  }
+}
+
