@@ -841,13 +841,6 @@ button { font: inherit; color: inherit; }
 .ps-grid > li { min-width: 0; }
 .ps-tile { position: relative; display: block; }
 .ps-card .ps-tile > img { display: block; width: 100%; max-width: 100%; height: auto; }
-/* strike through the platinum price printed on the tile picture (its price bar is the bottom ~13%) */
-.ps-strike { position: absolute; left: 24%; right: 24%; top: 91.5%; height: 2px; background: #ff3b3b; transform: rotate(-7deg); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6); }
-.ps-worth {
-  position: absolute; right: 3px; bottom: 15%; display: flex; align-items: center; gap: 1px; padding: 0 3px;
-  font-size: 10px; font-weight: 700; line-height: 14px; color: var(--edge); background: #ffd34d; border: 1px solid var(--edge);
-}
-.ps-worth img { width: 9px; height: auto; }
 .ps-picked { box-shadow: 0 0 0 2px var(--sunset); }
 .ps-off { opacity: 0.45; }
 /* every line under a shop card in one font (제작자 요청): the same size and bold weight, only the colour differs.
@@ -1260,14 +1253,24 @@ button { font: inherit; color: inherit; }
 .mk-convert { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; padding: 8px 10px; background: rgba(255, 195, 92, 0.1); border-left: 3px solid var(--gold); }
 .mk-convert b { font-weight: 400; color: var(--gold); }
 .pill-gold { background: var(--gold); color: var(--edge); }
-/* platinum shop: this week's platinum (PlatShop.tsx) */
-.ps-week { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; padding: 8px 10px; background: var(--panel); border: var(--px) solid var(--edge); }
-.ps-week span { display: flex; align-items: center; gap: 4px; font-size: 14px; }
-.ps-week span img { width: 18px; height: 18px; image-rendering: pixelated; }
-.ps-week b { color: var(--gold); font-weight: 400; font-size: 16px; }
-.ps-week small { font-size: 11px; color: var(--muted); }
-.ps-week-bar { display: block; height: 8px; background: var(--night-2); border: 1px solid var(--edge); }
-.ps-week-bar i { display: block; height: 100%; background: linear-gradient(90deg, #7fd8ff, #b58cff); }
+/* platinum shop wallet (PlatShop.tsx WalletBox, 제작자 요청): balance, then a bar that fills toward the next +300
+   on Thursday 10:00 with the time left under it */
+.ps-week { display: flex; flex-direction: column; gap: 6px; margin: 0 0 10px; padding: 8px 10px; background: var(--panel); border: var(--px) solid var(--edge); }
+.ps-week img { width: 18px; height: 18px; image-rendering: pixelated; }
+.ps-week-top { display: flex; align-items: center; gap: 4px; font-size: 14px; }
+.ps-week-balance { color: var(--gold); font-size: 18px; font-weight: 700; }
+.ps-week-tag { margin-left: auto; padding: 0 5px; font-style: normal; font-size: 11px; line-height: 16px; color: var(--edge); background: #ffd34d; border: 1px solid var(--edge); }
+.ps-week-next { display: flex; align-items: center; gap: 6px; }
+.ps-week-bar { flex: 1; min-width: 0; height: 12px; background: var(--night-2); border: var(--px) solid var(--edge); overflow: hidden; }
+.ps-week-bar i { display: block; height: 100%; background: linear-gradient(90deg, #7fd8ff, #b58cff); transition: width 0.6s ease-out; animation: ps-fill 0.8s ease-out; }
+.ps-week-gift { flex: none; display: flex; align-items: center; gap: 2px; font-size: 13px; font-weight: 700; color: var(--gold); }
+.ps-week-gift img { width: 14px; height: 14px; }
+.ps-week-left { font-size: 12px; font-weight: 700; color: var(--muted); }
+.ps-week-left b { color: var(--text); }
+@keyframes ps-fill { from { width: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .ps-week-bar i { animation: none; transition: none; }
+}
 .ps-order-main small img { width: 14px; height: 14px; vertical-align: -2px; image-rendering: pixelated; }
 /* IMO-style icons (제작자 요청): pixel sprites and game item pictures stay crisp */
 .px-icon { image-rendering: pixelated; vertical-align: middle; }

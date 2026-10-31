@@ -2,15 +2,68 @@ import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { errorText } from "../auth";
 import { ago, goldText, goldWords } from "../market";
-import { SHOP_PIC, actOrder, budget, discount, fetchShop, orderItem, platWorth, saveShopItem, saveShopSettings } from "../platshop";
-import type { ShopData, ShopItem, ShopOrder, ShopSettings } from "../platshop";
+import { SHOP_PIC, actOrder, budget, discount, fetchShop, orderItem, saveShopItem, saveShopSettings } from "../platshop";
+import type { ShopData, ShopItem, ShopOrder, ShopSettings, Wallet } from "../platshop";
 import { Loading, TopBar } from "../ui";
+import { WEEK } from "../week";
 
 type Tab = "shop" | "mine" | "pending" | "ledger" | "settings" | "budget";
 const STATUS: Record<ShopOrder["status"], string> = { requested: "신청함", done: "거래 완료", cancelled: "취소" };
 
 /** 25만 골드처럼 (만 골드 아래는 반올림) */
 const gold = (n: number) => `${goldWords(Math.round(n / 10_000) * 10_000)} 골드`;
+
+/** 남은 때: '3일 13시간 20분' (1분 아래는 '곧') */
+function leftText(ms: number): string {
+  const m = Math.ceil(ms / 60_000);
+  if (m <= 0) return "곧";
+  const parts = [[Math.floor(m / 1440), "일"], [Math.floor((m % 1440) / 60), "시간"], [m % 60, "분"]] as const;
+  return parts.filter(([n]) => n > 0).map(([n, unit]) => `${n}${unit}`).join(" ");
+}
+
+/**
+ * 내 플래티넘 지갑 (제작자 요청: 말 대신 눈으로). 남은 플래티넘, 그리고 다음 지급(목요일 오전 10시)까지 지난 만큼 차는 막대와
+ * '3일 13시간 20분 뒤 +300'. 30초마다 다시 세고, 지급 때가 지나면 상점을 다시 불러 늘어난 플래티넘을 보인다
+ */
+function WalletBox({ wallet, high, onDue }: { wallet: Wallet; high: boolean; onDue: () => void }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t >= wallet.nextAt) onDue();
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [wallet.nextAt, onDue]);
+  const left = wallet.nextAt - now;
+  const done = Math.min(1, Math.max(0, 1 - left / WEEK));
+  const gem = <img src={SHOP_PIC + "plat.png"} alt="플래티넘" />;
+  return (
+    <div className="ps-week">
+      <span className="ps-week-top">
+        내 플래티넘 {gem} <b className="ps-week-balance">{wallet.balance.toLocaleString("ko-KR")}</b>
+        {high && <em className="ps-week-tag">고스펙</em>}
+      </span>
+      {wallet.weekly > 0 ? (
+        <>
+          <span className="ps-week-next">
+            <span className="ps-week-bar" role="progressbar" aria-label="다음 지급까지" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(done * 100)}>
+              <i style={{ width: `${done * 100}%` }} />
+            </span>
+            <b className="ps-week-gift">
+              {gem}+{wallet.weekly.toLocaleString("ko-KR")}
+            </b>
+          </span>
+          <small className="ps-week-left">
+            <b>{leftText(left)}</b> 뒤 +{wallet.weekly.toLocaleString("ko-KR")} · 목요일 오전 10시
+          </small>
+        </>
+      ) : (
+        <small className="ps-week-left">1군 길드원에게 매주 목요일 오전 10시에 지급돼요</small>
+      )}
+    </div>
+  );
+}
 
 /**
  * 1군 전용 플래티넘 할인 상점 (제작자 요청). 게임 상점의 물건 칸(스샷에서 자른 그림)을 세로 화면에 3칸씩 놓고,
@@ -69,7 +122,6 @@ export function PlatShopPage() {
   const high = !!data.highSpec;
   /** 내가 사는 값: 고스펙이면 고스펙 할인가 */
   const myGold = (it: ShopItem) => (high ? it.highGold : it.gold);
-  const myRatio = (it: ShopItem) => (high ? it.highRatio : it.ratio);
   const pending = data.manage?.pending.length ?? 0;
   const tabs: { key: Tab; label: string }[] = [
     { key: "shop", label: "상점" },
@@ -97,19 +149,7 @@ export function PlatShopPage() {
         <span className={high ? "ps-strong" : "ps-dim"}>고스펙 {s.highRatio}만</span>
       </p>
       {/* 내 플래티넘 지갑 (제작자 요청: 1군에게 매주 300씩 가상 플래티넘을 지급하고 쌓인다. 고스펙은 따로) */}
-      {data.wallet && (
-        <div className="ps-week">
-          <span>
-            내 플래티넘 <img src={SHOP_PIC + "plat.png"} alt="플래티넘" /> <b>{data.wallet.balance.toLocaleString("ko-KR")}</b>
-            {high && " · 고스펙"}
-          </span>
-          <small>
-            {data.wallet.weekly > 0
-              ? `매주 목요일 오전 10시에 +${data.wallet.weekly.toLocaleString("ko-KR")} · 지금까지 받은 것 ${data.wallet.granted.toLocaleString("ko-KR")}, 쓴 것 ${data.wallet.spent.toLocaleString("ko-KR")}`
-              : "1군 길드원에게 매주 지급돼요"}
-          </small>
-        </div>
-      )}
+      {data.wallet && <WalletBox wallet={data.wallet} high={high} onDue={load} />}
       <div className="filter ps-tabs">
         {tabs.map((t) => (
           <button key={t.key} className={"pill" + (tab === t.key ? " pill-on" : "")} onClick={() => setTab(t.key)}>
@@ -127,14 +167,9 @@ export function PlatShopPage() {
             {items.filter((it) => it.enabled).map((it) => (
               <li key={it.id}>
                 <button className={"ps-card" + (picked === it.id ? " ps-picked" : "")} onClick={() => setPicked(picked === it.id ? null : it.id)}>
-                  {/* 그림 속 플래티넘 값에 줄을 긋고, 할인가를 시중 비율로 친 플래티넘을 위에 붙인다 (제작자 요청) */}
+                  {/* 플래티넘은 그림에 적힌 값 그대로 지갑에서 빠지고 게임에서는 할인된 골드만 내서, 그림 값은 그대로 둔다 (제작자 요청) */}
                   <span className="ps-tile">
                     <img src={SHOP_PIC + it.tile} alt={it.name} loading="lazy" />
-                    <i className="ps-strike" />
-                    <b className="ps-worth">
-                      <img src={SHOP_PIC + "plat.png"} alt="" />
-                      {platWorth({ plat: it.plat, ratio: myRatio(it) }, s.market).toLocaleString("ko-KR")}
-                    </b>
                   </span>
                   {/* 시중가에 줄, 1군 할인가와 고스펙 할인가. 내게 맞는 값만 진하게 (제작자 요청) */}
                   <span className="ps-price">
@@ -172,8 +207,7 @@ export function PlatShopPage() {
                   {item.count > 1 && ` ×${item.count}`}
                 </b>
                 <small>
-                  플래티넘 <s>{item.plat.toLocaleString("ko-KR")}</s> → {platWorth({ plat: item.plat, ratio: myRatio(item) }, s.market).toLocaleString("ko-KR")} 어치 ·{" "}
-                  <s>{gold(item.marketGold)}</s> → <b>{goldText(myGold(item))} 골드</b>
+                  플래티넘 {item.plat.toLocaleString("ko-KR")} · <s>{gold(item.marketGold)}</s> → <b>{goldText(myGold(item))} 골드</b>
                   {high && " (고스펙)"}
                 </small>
                 {data.wallet && (

@@ -83,8 +83,6 @@ export const saveShopSettings = (s: ShopSettings) => api<ShopSettings>("/api/sho
 export const saveShopItem = (id: string, r: { enabled: boolean; ratio: number | null; highRatio: number | null }) =>
   api<{ ok: boolean }>(`/api/shop/items/${id}`, "PUT", { ...r, limitCount: null, limitWeeks: null });
 
-/** 할인가를 시중 비율로 치면 몇 플래티넘어치인지: 500 플래티넘을 5:100 (시중 7:100)으로 사면 357 */
-export const platWorth = (it: Pick<ShopItem, "plat" | "ratio">, market: number) => Math.round((it.plat * it.ratio) / market);
 
 /** 할인율 (시중가 대비) */
 export const discount = (gold: number, marketGold: number) => (marketGold > 0 ? Math.round((1 - gold / marketGold) * 100) : 0);
