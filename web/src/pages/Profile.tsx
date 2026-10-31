@@ -145,7 +145,7 @@ export function ProfileSetupPage({
     <div className="app">
       <main className="page">
         <header className="hero">
-          <img className="hero-mark" src="icon-192.png" alt="" width={72} height={72} />
+          <img className="hero-mark" src="guild-mark.png" alt="" width={72} height={72} />
           <div>
             <HeroTitle />
             <p className="hero-sub">길드와 직업, 레벨 정하기</p>

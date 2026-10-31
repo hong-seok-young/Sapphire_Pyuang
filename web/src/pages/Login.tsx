@@ -29,7 +29,7 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
     <div className="app">
       <main className="page">
         <header className="hero">
-          <img className="hero-mark" src="icon-192.png" alt="" width={72} height={72} />
+          <img className="hero-mark" src="guild-mark.png" alt="" width={72} height={72} />
           <div>
             <HeroTitle />
             <p className="hero-sub">길드원 로그인</p>
@@ -152,7 +152,7 @@ export function PasswordPage({ forced = false, onDone, onBack }: { forced?: bool
     <div className="app">
       <main className="page">
         <header className="hero">
-          <img className="hero-mark" src="icon-192.png" alt="" width={72} height={72} />
+          <img className="hero-mark" src="guild-mark.png" alt="" width={72} height={72} />
           <div>
             <HeroTitle />
             <p className="hero-sub">비밀번호 변경</p>

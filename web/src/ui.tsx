@@ -47,7 +47,7 @@ export function TopBar({ title, back = true, right }: { title: ReactNode; back?:
           ◀
         </button>
       ) : (
-        <img className="topbar-logo" src="icon-192.png" alt="" />
+        <img className="topbar-logo" src="guild-mark.png" alt="" />
       )}
       <h1 className="topbar-title">{typeof title === "string" ? <FitLine text={title} shrink={2} /> : title}</h1>
       {right ?? (

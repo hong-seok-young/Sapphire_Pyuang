@@ -53,7 +53,8 @@ export function Home({ me }: { me: Me }) {
   return (
     <div className="home">
       <header className="hero">
-        <img className="hero-mark" src="icon-192.png" alt="" width={72} height={72} />
+        {/* 앱 안에서는 게임 속 1군 길드마크 (12칸 그대로), 폰 홈 화면 아이콘은 고화질 원본 (제작자 요청) */}
+        <img className="hero-mark" src="guild-mark.png" alt="" width={72} height={72} />
         <div>
           <HeroTitle />
           <p className="hero-sub">
