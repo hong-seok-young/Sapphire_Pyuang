@@ -167,7 +167,16 @@ export function iconNoticeNeeded(): boolean {
     }
     return false;
   }
-  if (fresh) return false;
+  // 새 판으로 깐 웹앱이 한 번 열리면 이 폰에 적어 둔다. 그 뒤 링크(카톡 등)로 주소에 ?icon= 없이 열려도 다시 묻지 않는다
+  // (제작자: 아이콘 안 바꿨는데 '바뀌었다'가 떴다)
+  if (fresh) {
+    try {
+      localStorage.setItem(ICON_DONE, ICON_VERSION);
+    } catch {
+      // 못 적으면 다음에 링크로 열 때 한 번 더 물을 수 있다
+    }
+    return false;
+  }
   try {
     if (localStorage.getItem(ICON_DONE) === ICON_VERSION) return false;
     if (sessionStorage.getItem(ICON_LATER)) return false;
