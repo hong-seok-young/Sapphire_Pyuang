@@ -1,8 +1,8 @@
-// POST /api/shop/orders { itemId } -> 구매 신청 (1군만, 판매 중인 물건, 이번 주 플래티넘 한도 안). 오피서 이상에게 알림이 간다
+// POST /api/shop/orders { itemId } -> 구매 신청 (1군만, 판매 중인 물건, 내 플래티넘 지갑 안에서). 오피서 이상에게 알림이 간다
 import { NEED_LOGIN, RANK, currentUser, json, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
 import { notify } from "../../../../server/alerts";
-import { effective, loadCatalog, loadRules, loadSettings, weekUse } from "../../../../server/platshop";
+import { effective, loadCatalog, loadRules, loadSettings, wallet } from "../../../../server/platshop";
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
@@ -18,10 +18,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const e = effective(item, settings, rules.get(item.id));
   if (!e.enabled) return json({ error: "지금은 팔지 않는 물건이에요" }, 409);
   const now = Date.now();
-  // 이번 주 플래티넘 한도 (제작자 요청: 1군 주당 300, 고스펙은 따로)
-  const week = await weekUse(env, me.id, high, settings, now);
-  if (item.plat > week.left) {
-    return json({ error: `이번 주 플래티넘이 모자라요 (남은 ${week.left.toLocaleString("ko-KR")} / 이 물건 ${item.plat.toLocaleString("ko-KR")})` }, 409);
+  // 내 플래티넘 지갑 (제작자 요청: 매주 300씩 지급되고 쌓인다. 고스펙은 따로)
+  const w = await wallet(env, me.id, true, high, settings, now);
+  if (item.plat > w.balance) {
+    return json({ error: `플래티넘이 모자라요 (가진 것 ${w.balance.toLocaleString("ko-KR")} / 이 물건 ${item.plat.toLocaleString("ko-KR")})` }, 409);
   }
   const row = await env.DB.prepare(
     "INSERT INTO plat_orders (user_id, item_id, item_name, plat, gold, ratio, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'requested', ?) RETURNING id",

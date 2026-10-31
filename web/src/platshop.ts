@@ -9,19 +9,22 @@ export interface ShopSettings {
   market: number;
   limitCount: number;
   limitWeeks: number;
-  /** 1군 한 사람의 주당 플래티넘 (제작자 요청: 처음 300) */
+  /** 1군 한 사람에게 매주 지급하는 가상 플래티넘 (제작자 요청: 처음 300, 쌓인다) */
   weekPlat: number;
-  /** 고스펙 한 사람의 주당 플래티넘 */
+  /** 고스펙 한 사람의 주당 지급 */
   highWeekPlat: number;
   open: boolean;
 }
 
-/** 이번 주(월요일 0시부터) 내 플래티넘 한도 */
-export interface WeekUse {
-  allowance: number;
-  used: number;
-  left: number;
-  resetAt: number;
+/** 내 플래티넘 지갑: 매주(월요일 0시) 지급되고 쌓인다. 신청하면 빠지고 취소하면 돌아온다 */
+export interface Wallet {
+  balance: number;
+  granted: number;
+  spent: number;
+  /** 매주 받는 양 (1군이 아니면 0) */
+  weekly: number;
+  /** 다음 지급 때 */
+  nextAt: number;
 }
 
 export interface ShopItem {
@@ -70,7 +73,7 @@ export interface ShopData {
   highSpec?: boolean;
   manager?: boolean;
   manage?: { pending: ShopOrder[]; recent: ShopOrder[]; total: Ledger; month: Ledger } | null;
-  week?: WeekUse;
+  wallet?: Wallet;
 }
 
 export const fetchShop = () => api<ShopData>("/api/shop");

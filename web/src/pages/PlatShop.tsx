@@ -96,17 +96,18 @@ export function PlatShopPage() {
         <img src={SHOP_PIC + "plat.png"} alt="플래티넘" /> 100 = <s>{s.market}만</s> <span className={high ? "ps-dim" : "ps-strong"}>1군 {s.ratio}만</span>{" "}
         <span className={high ? "ps-strong" : "ps-dim"}>고스펙 {s.highRatio}만</span>
       </p>
-      {/* 이번 주 플래티넘 (제작자 요청: 1군 주당 300 안에서 산다. 고스펙은 따로) */}
-      {data.week && (
+      {/* 내 플래티넘 지갑 (제작자 요청: 1군에게 매주 300씩 가상 플래티넘을 지급하고 쌓인다. 고스펙은 따로) */}
+      {data.wallet && (
         <div className="ps-week">
           <span>
-            이번 주 <img src={SHOP_PIC + "plat.png"} alt="플래티넘" /> <b>{data.week.left.toLocaleString("ko-KR")}</b> / {data.week.allowance.toLocaleString("ko-KR")}
+            내 플래티넘 <img src={SHOP_PIC + "plat.png"} alt="플래티넘" /> <b>{data.wallet.balance.toLocaleString("ko-KR")}</b>
             {high && " · 고스펙"}
           </span>
-          <i className="ps-week-bar">
-            <i style={{ width: `${data.week.allowance ? Math.min(100, (data.week.used / data.week.allowance) * 100) : 100}%` }} />
-          </i>
-          <small>월요일 0시에 다시 채워져요</small>
+          <small>
+            {data.wallet.weekly > 0
+              ? `매주 월요일 0시에 +${data.wallet.weekly.toLocaleString("ko-KR")} · 지금까지 받은 것 ${data.wallet.granted.toLocaleString("ko-KR")}, 쓴 것 ${data.wallet.spent.toLocaleString("ko-KR")}`
+              : "1군 길드원에게 매주 지급돼요"}
+          </small>
         </div>
       )}
       <div className="filter ps-tabs">
@@ -142,7 +143,7 @@ export function PlatShopPage() {
                   </span>
                   <span className={"ps-price-row" + (high ? " ps-dim" : " ps-strong")}>1군 {goldWords(it.gold)}</span>
                   <span className={"ps-price-row" + (high ? " ps-strong" : " ps-dim")}>고스펙 {goldWords(it.highGold)}</span>
-                  {data.week && it.plat > data.week.left && <small className="ps-limit">이번 주 플래티넘 부족</small>}
+                  {data.wallet && it.plat > data.wallet.balance && <small className="ps-limit">플래티넘 부족</small>}
                 </button>
               </li>
             ))}
@@ -175,18 +176,18 @@ export function PlatShopPage() {
                   <s>{gold(item.marketGold)}</s> → <b>{goldText(myGold(item))} 골드</b>
                   {high && " (고스펙)"}
                 </small>
-                {data.week && (
+                {data.wallet && (
                   <small>
-                    이번 주 남은 플래티넘 {data.week.left.toLocaleString("ko-KR")} → 사면 {Math.max(0, data.week.left - item.plat).toLocaleString("ko-KR")}
+                    내 플래티넘 {data.wallet.balance.toLocaleString("ko-KR")} → 사면 {Math.max(0, data.wallet.balance - item.plat).toLocaleString("ko-KR")}
                   </small>
                 )}
               </span>
               <button
                 className="pill pill-on"
-                disabled={busy || !data.main || !item.enabled || (!!data.week && item.plat > data.week.left)}
+                disabled={busy || !data.main || !item.enabled || (!!data.wallet && item.plat > data.wallet.balance)}
                 onClick={() => run(() => orderItem(item.id), "구매 신청했어요. 오피서가 게임에서 거래해 줄 거예요.")}
               >
-                {!data.main ? "1군 전용" : data.week && item.plat > data.week.left ? "플래티넘 부족" : "구매 신청"}
+                {!data.main ? "1군 전용" : data.wallet && item.plat > data.wallet.balance ? "플래티넘 부족" : "구매 신청"}
               </button>
               </div>
             </div>
@@ -301,9 +302,9 @@ function ShopSettingsPanel({ settings, items, busy, run }: {
         <label>
           시중 <input inputMode="decimal" value={s.market} onChange={(e) => setS({ ...s, market: num(e.target.value) })} /> : 100
         </label>
-        {/* 한 사람이 한 주에 살 수 있는 플래티넘 (제작자 요청: 1군 300, 고스펙은 길드 자금을 보고 따로) */}
+        {/* 매주 지급하는 가상 플래티넘 (제작자 요청: 1군 300, 고스펙은 길드 자금을 보고 따로) */}
         <label>
-          주당 1군 <input inputMode="numeric" value={s.weekPlat} onChange={(e) => setS({ ...s, weekPlat: num(e.target.value) })} /> · 고스펙
+          주당 지급 1군 <input inputMode="numeric" value={s.weekPlat} onChange={(e) => setS({ ...s, weekPlat: num(e.target.value) })} /> · 고스펙
           <input inputMode="numeric" value={s.highWeekPlat} onChange={(e) => setS({ ...s, highWeekPlat: num(e.target.value) })} /> 플래티넘
         </label>
         <div className="mk-chips">

@@ -1,11 +1,11 @@
 // GET /api/shop -> 플래티넘 할인 상점: 설정, 물건(실제 비율, 할인가, 시중가, 한도, 내가 기간 안에 산 수), 내 신청.
 //     오피서 이상에게는 판매하지 않는 물건도, 아직 처리하지 않은 신청과 정산(쓴 플래티넘, 받은 골드)도 준다
 //     열기 전(open 이 아님)에는 길드원에게 { open: false } 만 준다 ('준비 중이에요')
-//     이번 주 내 플래티넘 한도 week { allowance, used, left, resetAt } 도 준다
+//     내 플래티넘 지갑 wallet { balance, granted, spent, weekly, nextAt } 도 준다 (매주 지급되고 쌓인다)
 // PUT /api/shop -> (오피서 이상) 통 설정 { ratio, highRatio, market, weekPlat, highWeekPlat, open }
 import { FORBIDDEN, NEED_LOGIN, RANK, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { effective, loadCatalog, loadRules, loadSettings, validPlat, validRatio, weekUse } from "../../../server/platshop";
+import { effective, loadCatalog, loadRules, loadSettings, validPlat, validRatio, wallet } from "../../../server/platshop";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
@@ -24,7 +24,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const flags = await env.DB.prepare("SELECT high_spec FROM users WHERE id = ?").bind(me.id).first<{ high_spec: number }>();
 
   const items = catalog.map((it) => ({ ...it, ...effective(it, settings, rules.get(it.id)) })).filter((it) => manager || it.enabled);
-  const week = await weekUse(env, me.id, flags?.high_spec === 1, settings, now);
+  const purse = await wallet(env, me.id, guild?.guild === "main", flags?.high_spec === 1, settings, now);
 
   let manage = null;
   if (manager) {
@@ -47,7 +47,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     manage = { pending: pending.results, recent: recent.results, total: total.results[0], month: thisMonth.results[0] };
   }
   return json({
-    open: settings.open, settings, items, orders: mine.results, main: guild?.guild === "main", highSpec: flags?.high_spec === 1, manager, manage, week,
+    open: settings.open, settings, items, orders: mine.results, main: guild?.guild === "main", highSpec: flags?.high_spec === 1, manager, manage, wallet: purse,
   });
 };
 

@@ -1,8 +1,9 @@
 // 1군 전용 플래티넘 할인 상점 (제작자 요청): 길드 관계자가 게임 상점에서 플래티넘 물건을 사서 길드원과 게임 안에서 거래하고,
 // 할인된 비율만큼 골드를 받는다. 비율은 '플래티넘 100당 몇 만 골드' (시중 7:100, 길드 할인 처음 5:100).
 // 물건 목록은 제작자의 게임 상점 스샷에서 잘라 낸 칸과 이름, 플래티넘 값 (비공개 자료 이미지/상점/items.json -> /data/shop/items.json).
-// 한도는 한 사람이 한 주(월요일 0시부터)에 쓸 수 있는 플래티넘 (제작자 요청: 1군 주당 300, 고스펙은 따로).
-// 물건의 플래티넘 값만큼 그 주 한도에서 빠지고, 골드는 할인 비율로 낸다. 오피서 이상이 비율, 주당 플래티넘, 판매 여부를 정한다.
+// 1군 길드원에게 매주(월요일 0시) 가상 플래티넘을 웹 지갑에 지급하고 쌓인다 (제작자 요청: 1군 주당 300, 고스펙은 따로).
+// 구매 신청하면 물건의 플래티넘 값만큼 지갑에서 빠지고(취소하면 돌아온다), 골드는 할인 비율로 낸다.
+// 오피서 이상이 비율, 주당 지급, 판매 여부를 정한다.
 import type { Env } from "./auth";
 
 export interface ShopItem {
@@ -103,17 +104,37 @@ export function weekStart(now = Date.now()): number {
   return Math.floor(kst / DAY) * DAY - sinceMonday * DAY - KST;
 }
 
-/** 이번 주 내 한도와 쓴 플래티넘 (취소한 신청은 빼고, 신청한 것부터 센다) */
-export async function weekUse(env: Env, userId: string, high: boolean, s: ShopSettings, now = Date.now()) {
-  const start = weekStart(now);
-  const row = await env.DB.prepare(
-    "SELECT COALESCE(SUM(plat), 0) AS used FROM plat_orders WHERE user_id = ? AND status != 'cancelled' AND created_at >= ?",
+/**
+ * 내 플래티넘 지갑. 밀린 주의 지급을 먼저 넣는다 (1군일 때만, 그 주의 고스펙 여부로). 처음 열면 이번 주 몫을 바로 준다.
+ * 남은 플래티넘 = 지급 합 - 지갑을 연 뒤 취소하지 않은 신청의 플래티넘 합
+ */
+export async function wallet(env: Env, userId: string, main: boolean, high: boolean, s: ShopSettings, now = Date.now()) {
+  const week = weekStart(now);
+  const weekly = high ? s.highWeekPlat : s.weekPlat;
+  let w = await env.DB.prepare("SELECT granted, granted_until, started_at FROM plat_wallets WHERE user_id = ?")
+    .bind(userId)
+    .first<{ granted: number; granted_until: number; started_at: number }>();
+  if (!w) {
+    w = { granted: main ? weekly : 0, granted_until: week, started_at: now };
+    await env.DB.prepare("INSERT OR IGNORE INTO plat_wallets (user_id, granted, granted_until, started_at) VALUES (?, ?, ?, ?)")
+      .bind(userId, w.granted, w.granted_until, w.started_at)
+      .run();
+  } else if (w.granted_until < week) {
+    const weeks = Math.round((week - w.granted_until) / WEEK);
+    const add = main ? weeks * weekly : 0;
+    // 두 곳에서 동시에 열어도 한 번만 (granted_until 이 그대로일 때만 바꾼다)
+    const res = await env.DB.prepare("UPDATE plat_wallets SET granted = granted + ?, granted_until = ? WHERE user_id = ? AND granted_until = ?")
+      .bind(add, week, userId, w.granted_until)
+      .run();
+    if (res.meta.changes) w = { ...w, granted: w.granted + add, granted_until: week };
+  }
+  const spent = await env.DB.prepare(
+    "SELECT COALESCE(SUM(plat), 0) AS n FROM plat_orders WHERE user_id = ? AND status != 'cancelled' AND created_at >= ?",
   )
-    .bind(userId, start)
-    .first<{ used: number }>();
-  const allowance = high ? s.highWeekPlat : s.weekPlat;
-  const used = row?.used ?? 0;
-  return { allowance, used, left: Math.max(0, allowance - used), resetAt: start + WEEK };
+    .bind(userId, w.started_at)
+    .first<{ n: number }>();
+  const used = spent?.n ?? 0;
+  return { balance: Math.max(0, w.granted - used), granted: w.granted, spent: used, weekly: main ? weekly : 0, nextAt: week + WEEK };
 }
 
 export const validPlat = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 1_000_000;

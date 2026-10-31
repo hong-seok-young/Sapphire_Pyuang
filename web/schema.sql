@@ -205,8 +205,8 @@ CREATE TABLE IF NOT EXISTS plat_settings (
   limit_count INTEGER NOT NULL DEFAULT 1, -- 한 사람이 물건마다 limit_weeks 주에 몇 개
   limit_weeks INTEGER NOT NULL DEFAULT 2,
   open INTEGER NOT NULL DEFAULT 0,        -- 1 이면 길드원에게 연다 (그 전에는 오피서 이상만 들어간다)
-  week_plat INTEGER NOT NULL DEFAULT 300,      -- 1군 한 사람이 한 주(월요일 0시부터)에 살 수 있는 플래티넘 (제작자 요청)
-  high_week_plat INTEGER NOT NULL DEFAULT 300, -- 고스펙 한 사람의 주당 플래티넘 (길드 자금을 보고 오피서가 조정)
+  week_plat INTEGER NOT NULL DEFAULT 300,      -- 1군 한 사람에게 매주(월요일 0시) 지급하는 가상 플래티넘 (제작자 요청, 쌓인다)
+  high_week_plat INTEGER NOT NULL DEFAULT 300, -- 고스펙 한 사람의 주당 지급 (길드 자금을 보고 오피서가 조정)
   updated_by TEXT,
   updated_at INTEGER
 );
@@ -371,4 +371,13 @@ CREATE TABLE IF NOT EXISTS chat_gaps (
   fixed_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS chat_gaps_status ON chat_gaps (status, created_at);
+
+-- 플래티넘 상점 지갑 (제작자 요청 2026-10-31): 1군 길드원에게 매주(한국 시간 월요일 0시) 가상 플래티넘을 지급하고 쌓인다.
+-- 남은 플래티넘 = granted - (started_at 뒤의 취소 안 한 신청의 플래티넘 합). 지급은 들어올 때 밀린 주만큼 한꺼번에 (server/platshop.ts wallet)
+CREATE TABLE IF NOT EXISTS plat_wallets (
+  user_id TEXT PRIMARY KEY,
+  granted INTEGER NOT NULL DEFAULT 0,    -- 지금까지 지급한 가상 플래티넘 합
+  granted_until INTEGER NOT NULL,        -- 이 주(월요일 0시)까지 지급함
+  started_at INTEGER NOT NULL            -- 지갑을 연 때 (이 뒤의 신청만 쓴 것으로 센다)
+);
 
