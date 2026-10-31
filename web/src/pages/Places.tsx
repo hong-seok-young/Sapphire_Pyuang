@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import type { Wiki } from "../types";
 import { FavStar, PicImg, TopBar, levelText, Loading, NotFound } from "../ui";
 import { MonsterCard } from "../wiki-ui";
-import { Blocks } from "../Blocks";
+import { Blocks, OriginalLink } from "../Blocks";
 import { loadPosts, postLink, useAsync } from "../data";
 
 /** 지역 버튼에 쓰는 짧은 이름 */
@@ -74,6 +74,7 @@ export function PlacePage({ wiki, id }: { wiki: Wiki; id: string }) {
           </div>
         </div>
       </div>
+      <OriginalLink postId={id} gifs={post?.gifs} />
       {part(p.above)}
       {mons.map((m) => (
         <MonsterCard key={m.key} wiki={wiki} m={m} />

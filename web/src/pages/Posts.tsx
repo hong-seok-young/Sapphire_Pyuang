@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import type { Wiki } from "../types";
 import { TopBar, Loading, NotFound } from "../ui";
-import { Blocks, CafeLink } from "../Blocks";
+import { Blocks, CafeLink, OriginalLink } from "../Blocks";
 import { loadPosts, postLink, useAsync } from "../data";
 import { isGuidePost } from "../cafe";
 
@@ -23,6 +23,7 @@ export function PostPage({ wiki, id }: { wiki: Wiki; id: string }) {
   return (
     <>
       <TopBar title={title} />
+      <OriginalLink postId={id} gifs={post.gifs} />
       <Blocks blocks={post.blocks} link={postLink(wiki, posts)} postId={id} what={/지도/.test(title) ? "지도" : "그림"} />
     </>
   );

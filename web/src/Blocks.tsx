@@ -59,6 +59,19 @@ const onlyPictureNote = (b: Block) =>
  * 카페 원글로 가는 카드 (제작자 요청: 직접 만든 지도, 스샷, 공략은 원글에서 본다).
  * 누르면 '카페 원글로 이동해요' 안내가 그 자리에 뜨고, '이동'을 누르면 원글이 열린다 (앱과 홈 화면 웹앱은 브라우저나 카페 앱으로)
  */
+/**
+ * 화면 위 '원글 보기' 줄 (제작자 요청 2026-10-31: 게임 정보만 남겨도 원글 링크는 모든 글에). 누르면 바로 카페 원글이 새 창으로.
+ * gifs: 본문에서 뺀 움짤 수 (원글 작성자가 찍은 것이라 원글에서 본다)
+ */
+export function OriginalLink({ postId, gifs }: { postId: string; gifs?: number }) {
+  return (
+    <a className="orig-link" href={cafeUrl(postId)} target="_blank" rel="noopener noreferrer">
+      <span>📄 카페 원글{gifs ? ` · 움짤 ${gifs}개는 원글에서` : ""}</span>
+      <b>원글 보기 ↗</b>
+    </a>
+  );
+}
+
 export function CafeLink({ postId, what, title }: { postId: string; what: string; title?: string }) {
   const [asking, setAsking] = useState(false);
   return (

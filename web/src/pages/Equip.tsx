@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { OriginalLink } from "../Blocks";
 import type { Wiki } from "../types";
 import { PicImg, TopBar, NotFound } from "../ui";
 
@@ -37,6 +38,7 @@ export function EquipSlot({ wiki, slot }: { wiki: Wiki; slot: string }) {
   return (
     <>
       <TopBar title={slot} />
+      <OriginalLink postId={table.post} />
       {hasJob && (
         <div className="filter">
           {JOBS.map((j) => (

@@ -22,6 +22,8 @@ export interface Post {
   id: string;
   title: string;
   blocks: Block[];
+  /** 본문에서 뺀 움짤 수 (원글 작성자가 찍은 것이라 원글에서 본다) */
+  gifs?: number;
 }
 
 export interface MenuSection {

@@ -94,10 +94,12 @@ def cut_white_background(im: Image.Image) -> Image.Image | None:
     return rgba.crop(box) if box else None
 
 
-def export_picture(path: Path) -> dict | None:
-    """Copy a picture into public/img under a short content-hash name. Returns {src, w, h}."""
+def export_picture(path: Path, drop_animation: bool = False) -> dict | None:
+    """Copy a picture into public/img under a short content-hash name. Returns {src, w, h}.
+    drop_animation: a moving picture bigger than an icon is not copied and comes back as {"dropped": True}
+    (글 본문의 움짤, 제작자 요청 2026-10-31: 원글 작성자가 찍은 것이라 원글에서 본다)."""
     key = str(path)
-    if key in _exported:
+    if key in _exported and not drop_animation:
         return _exported[key]
     if not path.exists():
         return None
@@ -108,6 +110,10 @@ def export_picture(path: Path) -> dict | None:
         animated = getattr(im, "is_animated", False)
     except Exception:
         return None
+    if drop_animation and animated and max(w, h) > ICON_SIDE:
+        return {"dropped": True}
+    if key in _exported:
+        return _exported[key]
     ext = {"PNG": ".png", "GIF": ".gif", "JPEG": ".jpg", "WEBP": ".webp"}.get(im.format, ".png")
     if max(w, h) <= ICON_SIDE and not animated:
         cut = cut_white_background(im)
@@ -143,12 +149,12 @@ def linkdata(tag: Tag | None) -> dict:
         return {}
 
 
-def picture_of(img: Tag) -> dict | None:
+def picture_of(img: Tag, drop_animation: bool = False) -> dict | None:
     """The picture behind an <img>: original download if known, else the embedded bytes, else a local file."""
     a = img.find_parent("a")
     url = linkdata(a).get("src", "")
     if url in MANIFEST:
-        return export_picture(ORIG_DIR / MANIFEST[url])
+        return export_picture(ORIG_DIR / MANIFEST[url], drop_animation)
     src = img.get("src") or ""
     m = re.match(r"data:image/(png|gif|jpe?g|webp);base64,(.+)", src, re.S)
     if m:
@@ -156,11 +162,11 @@ def picture_of(img: Tag) -> dict | None:
         cached = ORIG_DIR / ("emb_" + hashlib.sha1(raw).hexdigest()[:16] + "." + m.group(1).replace("jpeg", "jpg"))
         if not cached.exists():
             cached.write_bytes(raw)
-        return export_picture(cached)
+        return export_picture(cached, drop_animation)
     if src and not src.startswith("data:"):
         local = INDEX_FILES / unquote(src.split("/")[-1])
         if local.exists():
-            return export_picture(local)
+            return export_picture(local, drop_animation)
     return None
 
 
@@ -175,6 +181,18 @@ def article_id(link: str) -> str | None:
 
 
 DEFAULT_COLORS = {"#000000", "#141414", "#333333", "#222222", "#111111"}
+
+# 지금 읽는 글에서 뺀 움짤 수 (load_posts 가 글마다 0 으로 돌리고 post["gifs"] 로 남긴다)
+GIFS_DROPPED = [0]
+
+
+def body_picture(img: Tag) -> dict | None:
+    """글 본문의 그림. 움짤(아이콘보다 큰 움직이는 그림)은 빼고 센다 (제작자 요청 2026-10-31, 화면은 원글 보기로 안내)"""
+    pic = picture_of(img, drop_animation=True)
+    if pic and pic.get("dropped"):
+        GIFS_DROPPED[0] += 1
+        return None
+    return pic
 
 
 def runs_of(node: Tag) -> list:
@@ -197,7 +215,7 @@ def runs_of(node: Tag) -> list:
         if not isinstance(el, Tag) or el.name in ("script", "style", "noscript"):
             return
         if el.name == "img":
-            pic = picture_of(el)
+            pic = body_picture(el)
             if pic:
                 run = dict(pic)
                 if link:
@@ -291,6 +309,10 @@ def table_block(table: Tag) -> dict:
 
 
 def body_blocks(box: Tag) -> list[dict]:
+    # 링크 미리보기 상자(카페·공식 공지 링크의 제목, 잘린 요약, 주소)는 뺀다 (제작자 요청 2026-10-31:
+    # '대한민국 모임의 시작, 네이버 카페', 'naver.me', 'hive-fn.qpyou.cn' 같은 줄)
+    for card in box.select(".se-section-oglink, .se-module-oglink"):
+        card.decompose()
     blocks: list[dict] = []
     seen_tables = set()
     for el in box.find_all(["table", "p", "img"]):
@@ -308,7 +330,7 @@ def body_blocks(box: Tag) -> list[dict]:
             if r:
                 blocks.append({"k": "p", "r": r})
         elif el.name == "img" and el.find_parent("p") is None:
-            pic = picture_of(el)
+            pic = body_picture(el)
             if pic:
                 blocks.append({"k": "p", "r": [pic]})
     # drop the cafe's trailing boilerplate
@@ -340,6 +362,28 @@ def restore_grouped_images(soup: BeautifulSoup, raw: str) -> None:
             img["src"] = pictures[m.group(1)]
 
 
+def block_text(b: dict) -> str:
+    if b["k"] == "p":
+        return "".join(r.get("t", "") for r in b["r"]).strip()
+    return " ".join(plain(c["l"]) for row in b["rows"] for c in row).strip()
+
+
+def game_info_only(blocks: list[dict]) -> list[dict]:
+    """강화·보석·성장 글은 게임 정보만 (제작자 요청 2026-10-31): 작성자의 수정 기록('❗[26.09.04→26.09.05] …'),
+    앱에서 못 쓰는 '엑셀 파일 다운로드' 칸부터 끝까지, 뒤에 홀로 남은 '[참조]' 줄을 뺀다. 원글은 화면의 '원글 보기'로."""
+    out: list[dict] = []
+    for b in blocks:
+        t = block_text(b)
+        if b["k"] == "p" and re.search(r"엑셀\s*파일", t):
+            break
+        if b["k"] == "p" and re.match(r"^❗\s*\[\d", t):
+            continue
+        out.append(b)
+    while out and out[-1]["k"] == "p" and re.fullmatch(r"\[?\s*참조\s*\]?", block_text(out[-1])):
+        out.pop()
+    return out
+
+
 def load_posts() -> tuple[dict, dict]:
     posts, soups = {}, {}
     for d in POST_DIRS:
@@ -358,7 +402,13 @@ def load_posts() -> tuple[dict, dict]:
             if box is None:
                 continue
             title = titles.get(aid) or (soup.title.get_text().split(" : ")[0] if soup.title else aid)
-            posts[aid] = {"id": aid, "title": title.strip(), "blocks": body_blocks(box)}
+            GIFS_DROPPED[0] = 0
+            blocks = body_blocks(box)
+            if aid in GAME_INFO_ONLY:
+                blocks = game_info_only(blocks)
+            posts[aid] = {"id": aid, "title": title.strip(), "blocks": blocks}
+            if GIFS_DROPPED[0]:
+                posts[aid]["gifs"] = GIFS_DROPPED[0]
             soups[aid] = box
             print(f"  글 {aid} {title[:30]}")
     return posts, soups
@@ -662,6 +712,8 @@ MENU = [
     ("퀘스트 · 지도", None, ["342566", "1064", "343200", "343201", "343203", "343205", "342858",
                          "342865", "343019", "331777", "344012", "345738"]),
 ]
+# 게임 정보만 남기는 메뉴의 글 (game_info_only)
+GAME_INFO_ONLY = {aid for name, _, ids in MENU if name == "강화 · 보석 · 성장" for aid in ids}
 # 목차 글에는 없고 헌팅그라운드 글(테멘 거점)에서만 이어지는 사냥터
 EXTRA_PLACES = {"월드 서버 컨텐츠": [{"이름": "시나르 평야", "글": 345514}, {"이름": "비툼 습지", "글": 345526}]}
 
