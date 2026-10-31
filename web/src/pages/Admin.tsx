@@ -222,7 +222,7 @@ function AccountRow({
       <button className="account-row" onClick={onOpen} aria-expanded={open}>
         {account.job && account.level ? <JobEmblem job={account.job} level={account.level} size={30} /> : <span className="account-noemblem" />}
         <span className="account-main">
-          <b>{account.id}</b>
+          <b className={account.highSpec ? "hs-nick" : undefined}>{account.id}</b>
           <small>
             {account.guild ? `${GUILD_TIER[account.guild]} ${GUILD_NAME[account.guild]}` : "길드 안 정함"}
             {account.job && account.level ? ` · Lv.${account.level} ${JOB_NAME[account.job]}` : " · 직업·레벨 안 정함"}
@@ -231,7 +231,6 @@ function AccountRow({
         <span className="account-tags">
           {account.mustChange && <span className="role-badge muted">비밀번호 바꾸기 전</span>}
           {/* 앱개발자는 길드 직책이 아니라서 길드원으로 보이고, 앱 관리 권한은 따로 적는다 */}
-          {account.highSpec && <span className="role-badge hs-badge">고스펙</span>}
           <span className="role-badge">{ROLE_NAME[positionOf(account.role)]}</span>
           {account.role === "developer" && <span className="role-badge muted">앱 관리</span>}
         </span>

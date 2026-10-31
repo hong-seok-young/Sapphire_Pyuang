@@ -38,7 +38,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     env.DB.prepare("SELECT user_id, level, exp, MAX(at) AS at FROM level_log WHERE at <= ? GROUP BY user_id").bind(start),
     env.DB.prepare("SELECT user_id, level, exp, MIN(at) AS at FROM level_log WHERE at > ? GROUP BY user_id").bind(start),
     env.DB.prepare(
-      "SELECT u.id AS id, u.role AS role, p.job AS job, p.level AS level, p.exp AS exp, p.guild AS guild, a.updated_at AS avatar, " +
+      "SELECT u.id AS id, u.role AS role, p.job AS job, p.level AS level, p.exp AS exp, p.guild AS guild, a.updated_at AS avatar, u.high_spec AS high_spec, " +
         "(SELECT MAX(at) FROM level_log l WHERE l.user_id = p.user_id) AS last_at " +
         "FROM profiles p JOIN users u ON u.id = p.user_id AND u.id NOT IN ('테스트1', '테스트2') LEFT JOIN avatars a ON a.user_id = p.user_id",
     ),
@@ -47,13 +47,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   for (const p of during.results as Point[]) base.set(p.user_id, p);
   for (const p of before.results as Point[]) base.set(p.user_id, p); // 기간 전 기록이 있으면 그것부터
   const entries = (current.results as {
-    id: string; role: Role; job: Job; level: number; exp: number | null; guild: Guild | null; avatar: number | null; last_at: number | null;
+    id: string; role: Role; job: Job; level: number; exp: number | null; guild: Guild | null; avatar: number | null; last_at: number | null; high_spec: number;
   }[])
     .map((r) => {
       const from = base.get(r.id);
       return {
         id: r.id, role: r.role, job: r.job, level: r.level, guild: r.guild, avatar: r.avatar,
         fromLevel: from?.level ?? r.level, growth: from ? total(r) - total(from) : 0, updatedAt: r.last_at ?? 0,
+        highSpec: r.high_spec === 1,
       };
     })
     .filter((e) => e.growth > 0)

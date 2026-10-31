@@ -174,6 +174,7 @@ export interface GrowthEntry {
   guild: Guild | null;
   avatar: number | null;
   updatedAt: number;
+  highSpec?: boolean;
 }
 
 export const fetchGrowth = (period: GrowthPeriod) =>

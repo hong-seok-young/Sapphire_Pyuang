@@ -82,14 +82,12 @@ function Row({ r, me, now }: { r: Ranked; me: Me; now: number }) {
       <span className="rank-name">
         {/* 작은 글씨도 한 줄에 (넘치면 글자를 줄인다): 줄 높이가 사람마다 달라지지 않게 */}
         <FitLine className="rank-sub" text={`${guildText(r.guild)} · ${JOB_NAME[r.job]}`} wrap={false} />
-        {/* 닉네임은 10글자까지: 넘치면 글자를 줄여서 한 줄에 다 보인다 (자르지 않는다) */}
-        <FitLine className="rank-nick" text={r.id} wrap={false} />
+        {/* 닉네임은 10글자까지: 넘치면 글자를 줄여서 한 줄에 다 보인다 (자르지 않는다). 고스펙은 금색으로 반짝인다 */}
+        <FitLine className={"rank-nick" + (r.highSpec ? " hs-nick" : "")} text={r.id} wrap={false} />
         <ExpBar r={r} mine={r.id === me.id} />
       </span>
       {/* 레벨업 표시 자리는 늘 비워 두어서 표시가 떠도 닉네임이 밀리지 않는다 */}
-      {/* 고스펙 표도 이 칸 위쪽에 둔다 (줄 높이와 닉네임 자리가 그대로이게, 제작자 요청) */}
       <span className="rank-up-slot">
-        {r.highSpec && <span className="hs-badge">고스펙</span>}
         {up > 0 && <span className="rank-up">▲{up}</span>}
       </span>
       <RoleBadge role={r.role} />
@@ -245,7 +243,7 @@ function LevelRanking({ me, data, guild, onGuild }: { me: Me; data: RankEntry[];
         {me.job && me.level ? <JobEmblem job={me.job} level={me.level} rank={overall.get(me.id)} size={50} /> : null}
         <span className="rank-name">
           <small>{me.exp !== null ? `경험치 ${expText(me.exp)}` : hint}</small>
-          <FitLine className="rank-nick" text={me.id} wrap={false} />
+          <FitLine className={"rank-nick" + (mine?.highSpec ? " hs-nick" : "")} text={me.id} wrap={false} />
           {me.exp !== null && <small className="rank-hint">{hint}</small>}
         </span>
         <a className="pill rank-edit" href="#/me">
@@ -299,7 +297,7 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
             <span className="growth-hero-face">
               <Face e={first} size={96} />
             </span>
-            <FitLine className="growth-hero-name" text={first.id} wrap={false} />
+            <FitLine className={"growth-hero-name" + (first.highSpec ? " hs-nick" : "")} text={first.id} wrap={false} />
             <span className="growth-hero-sub">
               {guildText(first.guild)} · {JOB_NAME[first.job]} · Lv.{first.fromLevel}
               {first.level !== first.fromLevel && ` → ${first.level}`}
@@ -315,7 +313,7 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
                     <Face e={e} size={40} />
                   </span>
                   <span className="growth-row-name">
-                    <FitLine className="growth-nick" text={e.id} wrap={false} />
+                    <FitLine className={"growth-nick" + (e.highSpec ? " hs-nick" : "")} text={e.id} wrap={false} />
                     <small>
                       {guildText(e.guild)} · {JOB_NAME[e.job]} · Lv.{e.fromLevel}
                       {e.level !== e.fromLevel && ` → ${e.level}`}
