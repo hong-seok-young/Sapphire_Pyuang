@@ -80,19 +80,6 @@ export const fetchShop = () => api<ShopData>("/api/shop");
 export const orderItem = (itemId: string) => api<{ id: number }>("/api/shop/orders", "POST", { itemId });
 export const actOrder = (id: number, action: "done" | "cancel") => api<{ status: string }>(`/api/shop/orders/${id}`, "PATCH", { action });
 export const saveShopSettings = (s: ShopSettings) => api<ShopSettings>("/api/shop", "PUT", s);
-
-/** 예산 검토 AI 도우미가 낸 통 설정 안 하나 */
-export interface ShopOption {
-  label: string;
-  ratio: number;
-  highRatio: number;
-  weekPlat: number;
-  highWeekPlat: number;
-  reason: string;
-}
-/** (오피서 이상) 상황을 말로 물으면 AI 가 조언과 설정 안 2~4개를 낸다 (서버 functions/api/shop/advise.ts) */
-export const adviseShop = (question: string, plan: Record<string, number>) =>
-  api<{ answer: string; options: ShopOption[] }>("/api/shop/advise", "POST", { question, plan });
 export const saveShopItem = (id: string, r: { enabled: boolean; ratio: number | null; highRatio: number | null }) =>
   api<{ ok: boolean }>(`/api/shop/items/${id}`, "PUT", { ...r, limitCount: null, limitWeeks: null });
 

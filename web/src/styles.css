@@ -1376,17 +1376,3 @@ p.ps-charge { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px;
 .patch-head small { margin-left: auto; font-size: 11px; font-weight: 400; color: var(--muted); }
 .patch-tag { padding: 0 4px; font-size: 10px; line-height: 14px; color: var(--edge); background: var(--gold); border: 1px solid var(--edge); }
 .patch ul { margin: 0; padding-left: 16px; font-size: 12px; line-height: 1.6; }
-
-/* budget review AI helper (PlatShop.tsx BudgetPanel, 제작자 요청): ask in words, get a few setting options, apply one */
-.ps-ai { display: flex; flex-direction: column; gap: 6px; margin: 0 0 8px; padding: 8px; }
-.ps-ai h3 { margin: 0; font-size: 13px; color: var(--gold); }
-.ps-ai-q { width: 100%; min-height: 70px; resize: vertical; font-size: 13px; }
-.ps-ai > .pill { align-self: flex-end; }
-.ps-ai-answer { margin: 2px 0 0; font-size: 12px; line-height: 1.6; }
-.ps-ai-options { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
-.ps-ai-options li { display: flex; flex-direction: column; align-items: center; gap: 3px; margin: 0; padding: 8px 6px; text-align: center; font-size: 12px; font-weight: 700; }
-.ps-ai-options li > b:first-child { font-size: 13px; color: var(--gold); }
-.ps-ai-options img { width: 12px; height: 12px; margin-right: 2px; vertical-align: -1px; image-rendering: pixelated; }
-.ps-ai-options small { font-size: 11px; font-weight: 400; color: var(--muted); line-height: 1.5; }
-.ps-ai-options .pill { margin-top: auto; }
-.ps-ai-now { box-shadow: inset 0 0 0 2px var(--gold); }
