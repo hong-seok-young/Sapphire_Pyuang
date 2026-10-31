@@ -2,6 +2,7 @@ import { inApp, isAndroid } from "../platform";
 import { RANK } from "../auth";
 import type { Me } from "../auth";
 import { Bell, FitLine, HeroTitle } from "../ui";
+import { showUpdate } from "../updates";
 
 interface Tile {
   title: string;
@@ -77,15 +78,24 @@ export function Home({ me }: { me: Me }) {
       </a>
 
       <nav className="tiles">
-        {shown.map((t) => (
-          <a key={t.title} className={"tile" + (t.soon ? " tile-soon" : "") + (t.ring ? ` tile-ring tile-ring-${t.ring}` : "")} href={t.to}>
-            {t.ribbon && <span className="tile-ribbon">{t.ribbon}</span>}
-            <span className="tile-icon">{t.iconPic ? <img className="tile-pic" src={t.iconPic} alt="" /> : t.icon}</span>
-            {/* 이름은 한 줄에 맞추고, 안 되면 낱말 사이에서만 줄을 바꾼다 ('성장'이 '성/장'으로 갈리지 않게) */}
-            <FitLine className="tile-title" text={t.title} />
-            {t.soon && <span className="tile-badge">준비 중</span>}
-          </a>
-        ))}
+        {shown.map((t) => {
+          // 고친 메뉴: 다른 색 테두리와 'UPDATE' (처음 들어간 뒤 하루 동안, updates.ts)
+          const updated = showUpdate(me.id, t.to);
+          return (
+            <a
+              key={t.title}
+              className={"tile" + (t.soon ? " tile-soon" : "") + (t.ring ? ` tile-ring tile-ring-${t.ring}` : "") + (updated ? " tile-new" : "")}
+              href={t.to}
+            >
+              {t.ribbon && <span className="tile-ribbon">{t.ribbon}</span>}
+              {updated && <span className="tile-update">UPDATE</span>}
+              <span className="tile-icon">{t.iconPic ? <img className="tile-pic" src={t.iconPic} alt="" /> : t.icon}</span>
+              {/* 이름은 한 줄에 맞추고, 안 되면 낱말 사이에서만 줄을 바꾼다 ('성장'이 '성/장'으로 갈리지 않게) */}
+              <FitLine className="tile-title" text={t.title} />
+              {t.soon && <span className="tile-badge">준비 중</span>}
+            </a>
+          );
+        })}
       </nav>
 
     </div>

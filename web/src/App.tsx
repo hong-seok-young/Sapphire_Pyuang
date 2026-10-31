@@ -20,6 +20,7 @@ import { ActivityLogPage } from "./pages/ActivityLog";
 import { AlertsPage } from "./pages/Alerts";
 import { PlatShopPage } from "./pages/PlatShop";
 import { forgetView, reportView } from "./activity";
+import { markMenuVisit } from "./updates";
 import { RANK, TEST_IDS, fetchMe, switchAccount } from "./auth";
 import { appMenu } from "./platform";
 import type { Me } from "./auth";
@@ -73,6 +74,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
 
   // 사용 기록: 지금 보는 화면을 보낸다. 5분 넘게 다른 앱에 있다가 돌아오면 같은 화면도 다시 (접속 세기)
   useEffect(() => reportView(location.hash), [route]);
+  // 업데이트된 메뉴에 처음 들어간 때 (홈 칸의 'UPDATE' 가 그때부터 하루 동안 보인다)
+  useEffect(() => markMenuVisit(me.id, location.hash), [route, me.id]);
   useEffect(() => {
     let hiddenAt = 0;
     const onVisible = () => {

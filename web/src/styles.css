@@ -936,3 +936,18 @@ button { font: inherit; color: inherit; }
   .hs-shine { animation: none; }
   .hs-shine::after { animation: none; display: none; }
 }
+
+/* updated menu on home (updates.ts, 제작자 요청): a mint border and an 'UPDATE' tag at the top right for a day after the first visit */
+.tile-new { border-color: #3fe0a0; box-shadow: inset var(--px) var(--px) 0 rgba(63, 224, 160, 0.45), inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--lo), 0 0 6px rgba(63, 224, 160, 0.55); }
+.tile-update {
+  position: absolute; z-index: 3; top: 4px; right: 4px; padding: 0 3px; font-size: 8px; font-weight: 700; line-height: 14px;
+  color: var(--edge); background: #3fe0a0; border: 1px solid var(--edge); animation: update-pop 1.8s ease-in-out infinite;
+}
+@keyframes update-pop { 0%, 70%, 100% { transform: scale(1); } 80% { transform: scale(1.12); } 90% { transform: scale(0.98); } }
+@media (prefers-reduced-motion: reduce) { .tile-update { animation: none; } }
+/* narrow phones: the '1군 전용' ribbon and 'UPDATE' share the top of one tile, so both get a little smaller */
+@media (max-width: 350px) {
+  .tile-new .tile-ribbon { padding: 0 3px; font-size: 9px; }
+  .tile-update { padding: 0 2px; font-size: 7px; }
+}
+
