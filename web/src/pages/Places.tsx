@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type { Wiki } from "../types";
-import { PicImg, TopBar, levelText, Loading, NotFound } from "../ui";
+import { FavStar, PicImg, TopBar, levelText, Loading, NotFound } from "../ui";
 import { MonsterCard } from "../wiki-ui";
 import { Blocks } from "../Blocks";
 import { loadPosts, postLink, useAsync } from "../data";
@@ -64,7 +64,7 @@ export function PlacePage({ wiki, id }: { wiki: Wiki; id: string }) {
     post && idx.length > 0 && <Blocks blocks={idx.map((i) => post.blocks[i])} link={link} />;
   return (
     <>
-      <TopBar title={p.name} />
+      <TopBar title={p.name} star={<FavStar kind="place" fkey={id} name={p.name} className="topbar-me" />} />
       <div className="place-hero">
         <PicImg pic={p.banner} scale={2} max={318} className="place-banner" />
         <div className="place-hero-text">

@@ -964,3 +964,19 @@ button { font: inherit; color: inherit; }
 .guide-later { flex: none; width: 100%; max-width: 280px; margin-top: 4px; }
 .guide-url { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 14px; color: var(--gold); }
 
+/* favorites and recent searches (Search.tsx, FavStar) */
+.hit { display: flex; align-items: stretch; gap: 4px; }
+.hit .row { flex: 1; min-width: 0; }
+.fav-star {
+  flex: none; width: 36px; font-size: 18px; line-height: 1; color: var(--muted); cursor: pointer;
+  background: var(--panel); border: var(--px) solid var(--edge);
+}
+.fav-on { color: var(--gold); }
+.topbar-me.fav-star { width: auto; font-size: 18px; }
+.search-recent .panel-title, .search-recent + section .panel-title { display: flex; align-items: center; justify-content: space-between; }
+.search-recent .panel-title .pill { padding: 3px 8px; font-size: 11px; }
+.search-recent { margin-bottom: 12px; }
+.recent-chip { display: inline-flex; align-items: stretch; }
+.recent-chip .pill { border-right: none; }
+.recent-x { padding: 0 7px; font-size: 11px; color: var(--muted); cursor: pointer; background: var(--night-2); border: var(--px) solid var(--edge); }
+

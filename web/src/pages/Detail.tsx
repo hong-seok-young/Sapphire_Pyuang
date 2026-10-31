@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { Wiki } from "../types";
-import { PicImg, TopBar, NotFound, Panel } from "../ui";
+import { FavStar, PicImg, TopBar, NotFound, Panel } from "../ui";
 import { MonsterCard } from "../wiki-ui";
 import { monstersByName } from "../data";
 
@@ -9,7 +9,7 @@ export function MonsterPage({ wiki, name }: { wiki: Wiki; name: string }) {
   if (!list.length) return <NotFound what="몬스터" />;
   return (
     <>
-      <TopBar title={name} />
+      <TopBar title={name} star={<FavStar kind="monster" fkey={name} name={name} className="topbar-me" />} />
       <div className="detail-hero">
         <PicImg pic={list[0].img} scale={2} max={180} alt={name} />
       </div>
@@ -30,7 +30,7 @@ export function ItemPage({ wiki, name }: { wiki: Wiki; name: string }) {
   if (!it) return <NotFound what="아이템" />;
   return (
     <>
-      <TopBar title={name} />
+      <TopBar title={name} star={<FavStar kind="item" fkey={name} name={name} className="topbar-me" />} />
       <div className="detail-hero">
         <PicImg pic={it.icon} fit={80} alt={name} />
         <div className="detail-name">{name}</div>

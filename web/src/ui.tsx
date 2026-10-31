@@ -1,4 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { isFavorite, toggleFavorite, useFavorites } from "./favorites";
+import type { FavKind } from "./favorites";
 import type { ReactNode } from "react";
 import { EDITION } from "./platform";
 import { useUnread } from "./alerts";
@@ -39,7 +41,7 @@ export function PicImg({ pic, scale = 1, max, fit, alt = "", className }: {
 }
 
 /** 화면 위 줄: 뒤로, 제목, 오른쪽에는 따로 준 것이 없으면 '내 정보' 단추 (내 정보 화면에서는 빼고) */
-export function TopBar({ title, back = true, right }: { title: ReactNode; back?: boolean; right?: ReactNode }) {
+export function TopBar({ title, back = true, right, star }: { title: ReactNode; back?: boolean; right?: ReactNode; star?: ReactNode }) {
   return (
     <header className="topbar">
       {back ? (
@@ -52,6 +54,7 @@ export function TopBar({ title, back = true, right }: { title: ReactNode; back?:
       <h1 className="topbar-title">{typeof title === "string" ? <FitLine text={title} shrink={2} /> : title}</h1>
       {right ?? (
         <span className="topbar-right">
+          {star}
           {!location.hash.startsWith("#/alerts") && <Bell className="topbar-me" />}
           {!location.hash.startsWith("#/me") && (
             <a className="topbar-me" href="#/me" aria-label="내 정보" title="내 정보">
@@ -227,3 +230,30 @@ export function HeroTitle() {
     </h1>
   );
 }
+
+/** 즐겨찾기 별 (제작자 요청): 누르면 달고 다시 누르면 뺀다. 검색 화면 위 '즐겨찾기'에 모인다 */
+export function FavStar({ kind, fkey, name, className }: { kind: FavKind; fkey: string; name: string; className?: string }) {
+  const list = useFavorites();
+  const on = isFavorite(list, kind, fkey);
+  return (
+    <button
+      type="button"
+      className={"fav-star" + (on ? " fav-on" : "") + (className ? " " + className : "")}
+      aria-pressed={on}
+      aria-label={on ? "즐겨찾기 빼기" : "즐겨찾기"}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleFavorite(kind, fkey, name).catch((x) => alertText(x));
+      }}
+    >
+      {on ? "★" : "☆"}
+    </button>
+  );
+}
+
+/** 즐겨찾기를 못 바꿨을 때 (화면은 이미 되돌렸다). 브라우저 대화상자를 쓰지 않으므로 콘솔에만 */
+function alertText(x: unknown) {
+  console.warn("즐겨찾기를 바꾸지 못했어요", x);
+}
+

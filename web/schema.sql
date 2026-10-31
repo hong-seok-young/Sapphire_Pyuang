@@ -230,3 +230,13 @@ CREATE TABLE IF NOT EXISTS plat_orders (
   done_by TEXT
 );
 CREATE INDEX IF NOT EXISTS plat_orders_user ON plat_orders (user_id, item_id, created_at);
+
+-- 즐겨찾기 (제작자 요청, functions/api/favorites.ts): 아이템, 몬스터, 사냥터. 한 사람 200개까지
+CREATE TABLE IF NOT EXISTS favorites (
+  user_id TEXT NOT NULL,
+  kind TEXT NOT NULL,   -- item | monster | place
+  key TEXT NOT NULL,    -- 아이템·몬스터 이름, 사냥터 id
+  name TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, kind, key)
+);

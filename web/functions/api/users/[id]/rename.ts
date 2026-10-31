@@ -10,6 +10,7 @@ const ID_COLUMNS: [string, string][] = [
   ["level_log", "user_id"], ["avatars", "user_id"], ["avatars", "updated_by"], ["listings", "seller"], ["listing_wants", "user_id"],
   ["listing_bids", "user_id"], ["gold_offers", "owner"], ["gold_wants", "user_id"], ["requests", "owner"], ["requests", "accepter"],
   ["activity", "user_id"], ["alerts", "user_id"], ["alert_prefs", "user_id"], ["listing_talk", "user_id"], ["plat_orders", "user_id"],
+  ["favorites", "user_id"],
 ];
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
