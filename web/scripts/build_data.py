@@ -188,11 +188,12 @@ GIFS_DROPPED = [0]
 
 
 def body_picture(img: Tag) -> dict | None:
-    """글 본문의 그림. 움짤(아이콘보다 큰 움직이는 그림)은 빼고 센다 (제작자 요청 2026-10-31, 화면은 원글 보기로 안내)"""
+    """글 본문의 그림. 움짤(아이콘보다 큰 움직이는 그림)은 파일을 만들지 않고 센다 (제작자 요청 2026-10-31).
+    그 자리에는 그림 없는 표시({"gif": 1})를 두고 화면이 '원글 보기' 줄을 단다 (2026-11-01: 원글로 가는 자리는 모두 같은 '원글 보기')"""
     pic = picture_of(img, drop_animation=True)
     if pic and pic.get("dropped"):
         GIFS_DROPPED[0] += 1
-        return None
+        return {"src": "", "w": 0, "h": 0, "gif": 1}
     return pic
 
 

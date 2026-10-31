@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { ReactNode } from "react";
 import type { Block, Cell, Run } from "./types";
 import { cafeUrl, isBigPicture } from "./cafe";
@@ -45,7 +44,9 @@ function navLinks(b: Block, link: PostLink): { left: { label: string; to: string
   const right = side(1);
   return left.length || right.length ? { left, right } : null;
 }
-const hasBigPicture = (b: Block) => runsOf(b).some((r) => "src" in r && isBigPicture(r.w, r.h));
+/** 원글에서 보는 그림: 큰 그림(이어 붙인 지도, 스샷)과 뺀 움짤 자리 */
+const leftToOriginal = (r: Run) => "src" in r && (r.gif === 1 || isBigPicture(r.w, r.h));
+const hasBigPicture = (b: Block) => runsOf(b).some(leftToOriginal);
 /** 그림을 뺀 뒤 남은 글이 그림 안내뿐인지 ('지도 클릭 시 고화질 확대' 같은) */
 const onlyPictureNote = (b: Block) =>
   runsOf(b)
@@ -56,60 +57,24 @@ const onlyPictureNote = (b: Block) =>
     .trim() === "";
 
 /**
- * 카페 원글로 가는 카드 (제작자 요청: 직접 만든 지도, 스샷, 공략은 원글에서 본다).
- * 누르면 '카페 원글로 이동해요' 안내가 그 자리에 뜨고, '이동'을 누르면 원글이 열린다 (앱과 홈 화면 웹앱은 브라우저나 카페 앱으로)
+ * '원글 보기' 줄 (제작자 요청 2026-11-01: '그림은 원글 봐라, 지도는 원글 봐라' 말고 그냥 다 원글 보기로).
+ * 글 맨 위와, 앱에 띄우지 않는 큰 그림(이어 붙인 지도, 스샷)·움짤 자리에 똑같이 단다. 누르면 바로 카페 원글이 새 창으로.
  */
-/**
- * 화면 위 '원글 보기' 줄 (제작자 요청 2026-10-31: 게임 정보만 남겨도 원글 링크는 모든 글에). 누르면 바로 카페 원글이 새 창으로.
- * gifs: 본문에서 뺀 움짤 수 (원글 작성자가 찍은 것이라 원글에서 본다)
- */
-export function OriginalLink({ postId, gifs }: { postId: string; gifs?: number }) {
+export function OriginalLink({ postId, title }: { postId: string; title?: string }) {
   return (
     <a className="orig-link" href={cafeUrl(postId)} target="_blank" rel="noopener noreferrer">
-      <span>📄 카페 원글{gifs ? ` · 움짤 ${gifs}개는 원글에서` : ""}</span>
+      <span>📄 {title ?? "카페 원글"}</span>
       <b>원글 보기 ↗</b>
     </a>
-  );
-}
-
-export function CafeLink({ postId, what, title }: { postId: string; what: string; title?: string }) {
-  const [asking, setAsking] = useState(false);
-  return (
-    <div className="cafe-link">
-      <div className="cafe-link-head">
-        <span className="cafe-link-icon">{what === "지도" ? "🗺️" : what === "공략" ? "📜" : "🖼️"}</span>
-        <span className="cafe-link-text">
-          <b>{title ?? what}</b>
-        </span>
-        {!asking && (
-          <button className="pill" onClick={() => setAsking(true)}>
-            원글 보기
-          </button>
-        )}
-      </div>
-      {asking && (
-        <div className="cafe-link-ask">
-          <p>아이모 카페 원글로 이동해요. 원글의 '{what}' 부분을 보세요.</p>
-          <div className="cafe-link-buttons">
-            <a className="pill pill-on" href={cafeUrl(postId)} target="_blank" rel="noopener noreferrer" onClick={() => setAsking(false)}>
-              이동
-            </a>
-            <button className="pill" onClick={() => setAsking(false)}>
-              취소
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
   );
 }
 
 /**
  * 원글의 문단과 표를 그대로 보여 준다. 글쓴이가 쓴 색이 살도록 종이색 바탕 위에 그린다.
  * link 는 원글 속 다른 글 링크가 갈 위키 주소를 준다 (data.ts postLink).
- * 큰 그림(이어 붙인 지도, 스샷)은 앱에 띄우지 않고 그 자리에 카페 원글 카드를 둔다 (postId 가 있을 때, 제작자 요청)
+ * 큰 그림(이어 붙인 지도, 스샷)은 앱에 띄우지 않고 그 자리에 '원글 보기' 줄을 둔다 (postId 가 있을 때, 제작자 요청)
  */
-export function Blocks({ blocks, link, postId, what = "그림" }: { blocks: Block[]; link: PostLink; postId?: string; what?: string }) {
+export function Blocks({ blocks, link, postId }: { blocks: Block[]; link: PostLink; postId?: string }) {
   return (
     <div className="paper">
       {blocks.map((b, i) => {
@@ -135,7 +100,7 @@ export function Blocks({ blocks, link, postId, what = "그림" }: { blocks: Bloc
           );
         }
         const big = !!postId && hasBigPicture(b);
-        if (big && onlyPictureNote(b)) return <CafeLink key={i} postId={postId!} what={what} />;
+        if (big && onlyPictureNote(b)) return <OriginalLink key={i} postId={postId!} />;
         const body =
           b.k === "p" ? (
             <p className="paper-p" key={i}>
@@ -159,7 +124,7 @@ export function Blocks({ blocks, link, postId, what = "그림" }: { blocks: Bloc
         return big ? (
           <div key={i}>
             {body}
-            <CafeLink postId={postId!} what={what} />
+            <OriginalLink postId={postId!} />
           </div>
         ) : (
           body
@@ -206,7 +171,7 @@ export function Runs({ runs, link, hideBig }: { runs: Run[]; link: PostLink; hid
   for (let i = 0; i < runs.length; i++) {
     const r = runs[i];
     let node: ReactNode;
-    if ("src" in r && hideBig && isBigPicture(r.w, r.h)) continue; // 원글 카드가 대신한다
+    if ("src" in r && (r.gif === 1 || (hideBig && isBigPicture(r.w, r.h)))) continue; // '원글 보기' 줄이 대신한다
     if ("t" in r && hideBig && /지도\s*클릭/.test(r.t)) continue;
     if ("src" in r) {
       const icon = isIcon(r);

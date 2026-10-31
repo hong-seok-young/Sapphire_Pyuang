@@ -4,6 +4,8 @@ export interface Pic {
   src: string;
   w: number;
   h: number;
+  /** 본문에서 뺀 움짤 자리 (그림 파일 없이 화면이 '원글 보기' 줄만 단다) */
+  gif?: 1;
 }
 
 /** 글 본문 조각: 글자 / 그림. to 가 있으면 링크 ("post:123" 은 위키 안의 글, 그 밖에는 바깥 주소) */
