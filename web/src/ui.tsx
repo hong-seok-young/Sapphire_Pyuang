@@ -151,7 +151,10 @@ export function TapTip({ tip, children }: { tip: string; children: ReactNode }) 
     <span
       className="tap-tip-host"
       onClick={() => {
-        if (!hold) show(false);
+        // 떠 있을 때 한 번 더 누르면 끈다 (제작자 요청)
+        if (hold) return;
+        if (shown > 0) hide();
+        else show(false);
       }}
       onPointerEnter={(e) => {
         if (e.pointerType === "mouse") show(true);

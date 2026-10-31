@@ -39,7 +39,7 @@ const ASSIGNABLE: Role[] = ["master", "officer", "member"];
  * 어느 쪽이든 그 사람은 처음 로그인할 때 비밀번호를 바꾼다.
  * 비밀번호 초기화는 '처음 비밀번호'를 비워 두면 123123 으로 한다 (제작자 요청). 그 사람은 다음 로그인 때 바꾼다.
  * 오피서 이상은 누구든 잘못 고른 직업과 레벨을 고치고, 캐릭터가 아닌 사진이 올라왔으면 내릴 수 있다 (길드 랭킹).
- * 경험치 %는 본인만 아는 값이라 여기에 보이지 않는다.
+ * 경험치 %는 랭킹에서 모두에게 보인다 (제작자 요청).
  */
 export function AdminPage({ me }: { me: Me }) {
   const [accounts, setAccounts] = useState<Account[] | null>(null);

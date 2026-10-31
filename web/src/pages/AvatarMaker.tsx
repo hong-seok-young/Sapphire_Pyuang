@@ -100,7 +100,6 @@ export function AvatarMaker({ onSaved, onCancel }: { onSaved: (avatar: number) =
       )}
       {step === "check" && png && (
         <>
-          <p className="form-note">성장 랭킹 1등이 되면 이렇게 나와요.</p>
           <div className="growth-hero avatar-preview">
             <span className="growth-crown">👑 이번 주의 성장왕</span>
             <span className="growth-hero-face">

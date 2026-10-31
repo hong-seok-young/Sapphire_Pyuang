@@ -18,7 +18,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   return json(
     results.map((r) => ({
       id: r.id, role: r.role, job: r.job, level: r.level, prevLevel: r.prev_level, levelAt: r.level_at, guild: r.guild, avatar: r.avatar,
-      ...(r.id === me.id ? { exp: r.exp } : {}),
+      exp: r.exp, // 모두에게 보인다 (제작자 요청: 성장 순위 보상 이벤트를 확인하려고)
     })),
   );
 };

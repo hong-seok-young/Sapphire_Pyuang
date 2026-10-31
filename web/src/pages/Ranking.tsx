@@ -80,6 +80,7 @@ function Row({ r, me, now }: { r: Ranked; me: Me; now: number }) {
       <span className="rank-name">
         <small>
           {guildText(r.guild)} · {JOB_NAME[r.job]}
+          {r.exp != null && ` · ${expText(r.exp)}`}
         </small>
         {/* 닉네임은 10글자까지: 넘치면 글자를 줄여서 한 줄에 다 보인다 (자르지 않는다) */}
         <FitLine className="rank-nick" text={r.id} wrap={false} />
@@ -179,7 +180,7 @@ function LevelRanking({ me, data, guild, onGuild }: { me: Me; data: RankEntry[];
         </a>
       </div>
       <p className="rank-note">
-        레벨, 경험치, 캐릭터 사진은 각자 '내 정보'에서 바꿔요. 경험치 숫자는 본인에게만 보여요. 잘못 적힌 레벨은 오피서에게 말해 주세요.
+        레벨, 경험치, 캐릭터 사진은 각자 '내 정보'에서 바꿔요. 잘못 적힌 레벨은 오피서에게 말해 주세요.
       </p>
     </>
   );

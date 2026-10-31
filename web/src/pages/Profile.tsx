@@ -118,13 +118,7 @@ export function ProfileForm({
           </div>
       )}
       </div>
-      {withExp && (
-        <p className={"form-note" + (expValue === undefined ? " form-error" : "")}>
-          {expValue === undefined
-            ? "경험치는 0 ~ 99.999 사이로, 소수점 3자리까지 적어 주세요."
-            : "경험치 %는 소수점 3자리까지, 안 적어도 돼요. 나만 보고, 같은 레벨이면 높은 쪽이 위예요."}
-        </p>
-      )}
+      {withExp && expValue === undefined && <p className="form-error">경험치는 0 ~ 99.999 사이로, 소수점 3자리까지 적어 주세요.</p>}
       {error && <p className="form-error">{error}</p>}
       <button className="btn" disabled={busy || !ok}>
         {busy ? "저장하는 중…" : submitLabel}
@@ -200,7 +194,6 @@ function AvatarPanel({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
         />
       ) : (
         <>
-          <p className="form-note">길드 랭킹의 성장 랭킹에 내 캐릭터가 나와요 (1등이면 크게). 게임 스샷에서 내 캐릭터만 잘라 올려요.</p>
           {me.avatar && (
             <div className="avatar-current">
               <img className="growth-face" src={avatarUrl(me.id, me.avatar)} alt="내 캐릭터" />
@@ -259,7 +252,7 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
         </div>
       </section>
       <section className="panel profile-panel">
-        <h2 className="panel-title">레벨업 했으면 바꿔 주세요</h2>
+        <h2 className="panel-title">정보 수정</h2>
         <ProfileForm
           key={`${me.guild}-${me.job}-${me.level}-${me.exp}`}
           guild={me.guild}
@@ -274,7 +267,7 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
             setSaved(true);
           }}
         />
-        {saved && <p className="form-note">저장했어요. 길드 랭킹에 바로 보여요.</p>}
+        {saved && <p className="form-note">저장했어요.</p>}
       </section>
       <AvatarPanel me={me} onMe={onMe} />
       <RenamePanel me={me} onMe={onMe} />
@@ -343,7 +336,6 @@ function RenamePanel({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
       </div>
       {switched ? (
         <>
-          <p className="form-note">새 캐릭터의 직업과 레벨을 적어요. 성장 랭킹은 이 레벨부터 새로 세요 (산 캐릭터로 성장이 튀지 않게).</p>
           <ProfileForm
             guild={me.guild}
             job={me.job}
