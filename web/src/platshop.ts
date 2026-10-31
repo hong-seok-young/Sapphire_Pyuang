@@ -124,8 +124,8 @@ export function packsFor(plat: number) {
   return packsOf(counts);
 }
 
-/** 상품마다 산 개수를 묶음으로 */
-function packsOf(counts: number[]) {
+/** 상품마다 산 개수(PLAT_PACKS 순서)를 묶음으로 */
+export function packsOf(counts: number[]) {
   const packs = PLAT_PACKS.map((k, i) => ({ ...k, count: counts[i] })).filter((k) => k.count > 0);
   return { packs, plat: packs.reduce((a, k) => a + k.plat * k.count, 0), won: packs.reduce((a, k) => a + k.won * k.count, 0) };
 }

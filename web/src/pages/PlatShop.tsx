@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import { errorText } from "../auth";
 import { ago, goldText, goldWords } from "../market";
-import { SHOP_PIC, actOrder, budget, discount, fetchShop, goldOf, orderItem, packsFor, packsWithin, saveShopItem, saveShopSettings } from "../platshop";
+import { PLAT_PACKS, SHOP_PIC, actOrder, budget, discount, fetchShop, goldOf, orderItem, packsFor, packsOf, packsWithin, saveShopItem, saveShopSettings } from "../platshop";
 import type { ShopData, ShopItem, ShopOrder, ShopSettings, Wallet } from "../platshop";
 import { Loading, TopBar } from "../ui";
 import { WEEK } from "../week";
@@ -524,15 +524,22 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
   const [weeks, setWeeks] = useState("4");
   const [off, setOff] = useState(() => saved(OFF_KEY, "20"));
   const [goldRate, setGoldRate] = useState(() => saved(RATE_KEY, "75"));
-  /** 충전할 양: 현금(상점 정가) 또는 플래티넘 개수. 비우면 길드원이 사 갈 만큼 */
-  const [mode, setMode] = useState<"won" | "plat">("won");
+  /** 충전할 양: 현금(상점 정가, 비우면 길드원이 사 갈 만큼) 또는 상품마다 − + 로 개수 고르기 (제작자 요청) */
+  const [mode, setMode] = useState<"won" | "pick">("won");
   const [amount, setAmount] = useState("");
+  const [counts, setCounts] = useState<number[]>(() => PLAT_PACKS.map(() => 0));
   const int = (v: string) => Math.max(0, Math.floor(Number(v) || 0));
   const b = budget(settings, int(n), int(h), Math.max(1, int(weeks)));
   const rate = Math.min(90, Math.max(0, Number(off) || 0));
   const perWon = Math.max(0, Number(goldRate) || 0);
   const want = int(amount);
-  const buy = want > 0 ? (mode === "won" ? packsWithin(want) : packsFor(want)) : packsFor(b.plat);
+  const buy = mode === "pick" ? packsOf(counts) : want > 0 ? packsWithin(want) : packsFor(b.plat);
+  /** 상품 고르기로 넘어가면 지금 조합의 개수를 그대로 가져와 거기서 손본다 */
+  const pick = () => {
+    setCounts(PLAT_PACKS.map((k) => buy.packs.find((p) => p.plat === k.plat)?.count ?? 0));
+    setMode("pick");
+  };
+  const step = (i: number, d: number) => setCounts(counts.map((c, j) => (j === i ? Math.max(0, Math.min(99, c + d)) : c)));
   const paid = Math.round(buy.won * (1 - rate / 100));
   /** 쓴 돈을 골드로 */
   const spentGold = paid * perWon;
@@ -549,38 +556,65 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
     <>
       <section className="panel ps-settings">
         <h2 className="panel-title">예산 검토</h2>
-        {/* 충전할 양이 맨 위 (제작자 요청): 현금이면 상점 정가로 얼마어치, 아니면 플래티넘 몇 개 */}
+        {/* 충전할 양이 맨 위 (제작자 요청): 현금으로 얼마어치, 또는 상품마다 개수 고르기 */}
         <div className="mk-chips">
-          {(["won", "plat"] as const).map((m) => (
-            <button
-              key={m}
-              className={"pill" + (mode === m ? " pill-on" : "")}
-              onClick={() => {
-                setMode(m);
-                setAmount("");
-              }}
-            >
-              {m === "won" ? "현금으로 충전" : "플래티넘 개수로"}
-            </button>
-          ))}
+          <button className={"pill" + (mode === "won" ? " pill-on" : "")} onClick={() => setMode("won")}>
+            현금으로 충전
+          </button>
+          <button className={"pill" + (mode === "pick" ? " pill-on" : "")} onClick={pick}>
+            상품 고르기
+          </button>
         </div>
-        <label className="ps-charge">
-          충전
-          <input
-            className="ps-charge-input"
-            inputMode="numeric"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value.replace(/\D/g, "").slice(0, 9))}
-            placeholder={mode === "won" ? "110000" : String(b.plat)}
-          />{" "}
-          {mode === "won" ? "원어치" : "개"}
-          {/* 바로 오른쪽에 원스토어 할인 뒤 실제로 내는 돈 (제작자 요청) */}
-          <b className="ps-charge-paid">→ {won(paid)}</b>
-        </label>
-        <small className="ps-charge-sum">
-          {want > 0 ? `원스토어 ${rate}% 할인 뒤 결제액` : "비우면 길드원이 사 갈 만큼"}
-          {mode === "won" && want > buy.won && ` · 남는 돈 ${won(want - buy.won)}`}
-        </small>
+        {mode === "won" ? (
+          <>
+            <label className="ps-charge">
+              충전
+              <input
+                className="ps-charge-input"
+                inputMode="numeric"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                placeholder="110000"
+              />{" "}
+              원어치
+              {/* 바로 오른쪽에 원스토어 할인 뒤 실제로 내는 돈 (제작자 요청) */}
+              <b className="ps-charge-paid">→ {won(paid)}</b>
+            </label>
+            <small className="ps-charge-sum">
+              {want > 0 ? `원스토어 ${rate}% 할인 뒤 결제액` : "비우면 길드원이 사 갈 만큼"}
+              {want > buy.won && ` · 남는 돈 ${won(want - buy.won)}`}
+            </small>
+          </>
+        ) : (
+          <>
+            {/* 게임 상점 상품마다 − + (제작자 요청) */}
+            <ul className="ps-packs ps-pick">
+              {PLAT_PACKS.map((k, i) => (
+                <li key={k.plat} className={counts[i] ? "ps-pick-on" : ""}>
+                  <span>
+                    {gem}
+                    {k.plat.toLocaleString("ko-KR")}개
+                  </span>
+                  <b>{won(k.won)}</b>
+                  <span className="ps-step">
+                    <button onClick={() => step(i, -1)} disabled={!counts[i]} aria-label={`${k.plat}개 하나 빼기`}>
+                      −
+                    </button>
+                    <em>{counts[i]}</em>
+                    <button onClick={() => step(i, 1)} aria-label={`${k.plat}개 하나 더`}>
+                      +
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="ps-charge">
+              {gem}
+              {buy.plat.toLocaleString("ko-KR")} · 정가 {won(buy.won)}
+              <b className="ps-charge-paid">→ {won(paid)}</b>
+            </p>
+          </>
+        )}
         <label>
           원스토어 할인
           <input

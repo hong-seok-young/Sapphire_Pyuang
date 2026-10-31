@@ -1351,6 +1351,16 @@ button { font: inherit; color: inherit; }
 .ps-packs li em { font-style: normal; font-size: 15px; color: #c0392b; }
 .ps-charge-sum { display: block; margin: -4px 0 10px; font-size: 11px; font-weight: 700; color: var(--muted); }
 .ps-charge-paid { font-size: 16px; color: var(--gold); white-space: nowrap; }
+.ps-charge img { width: 14px; height: 14px; margin-right: 2px; vertical-align: -2px; image-rendering: pixelated; }
+p.ps-charge { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 6px 0 10px; }
+/* pack picker: one tile per game pack with − count + */
+.ps-pick { margin-bottom: 4px; }
+.ps-pick li { opacity: 0.7; }
+.ps-pick li.ps-pick-on { opacity: 1; box-shadow: 0 0 0 2px var(--gold); }
+.ps-step { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 2px; }
+.ps-step button { width: 30px; height: 26px; padding: 0; font: inherit; font-size: 16px; font-weight: 700; color: var(--edge); background: #ffd34d; border: var(--px) solid var(--edge); cursor: pointer; }
+.ps-step button:disabled { opacity: 0.35; cursor: default; }
+.ps-step em { font-style: normal; font-size: 16px; color: #2d4f6a; }
 .ps-buy-packs { margin: 0 0 8px; padding: 8px; }
 .ps-buy-packs h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin: 0 0 6px; font-size: 13px; color: var(--gold); }
 .ps-buy-packs h3 small { font-size: 11px; color: var(--muted); }
