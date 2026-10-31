@@ -5,9 +5,10 @@ import { errorText, uploadAvatar } from "../auth";
 /**
  * 캐릭터 사진 만들기 ('내 정보'). 길드원이 갤러리에서 직접 고른 자기 캐릭터 스샷에서
  *  1. 끌고 벌려서(확대) 캐릭터를 네모 안에 넣고 자른다
- *  2. 가장자리에 이어진 배경을 저절로 지우고, 남은 배경은 눌러서 지운다 (잘못 지운 곳은 '되살리기')
+ *  2. AI 가 배경을 지우고(서버의 Cloudflare 배경 지우기, 제작자 요청), 남은 배경은 눌러서 지운다 (잘못 지운 곳은 '복원').
+ *     AI 가 안 되면 가장자리에 이어진 배경을 저절로 지운다
  *  3. 성장 랭킹 1등 카드에 넣어 보고 올린다
- * 모두 폰 안에서 하고, 자른 캐릭터 그림만 서버에 올라간다. 앱은 화면을 찍지 않고 게임에 아무것도 보내지 않는다
+ * 자르기는 폰 안에서 하고, 자른 그림만 서버에 간다 (AI 지우기, 올리기). 앱은 화면을 찍지 않고 게임에 아무것도 보내지 않는다
  * (CLAUDE.md 게임 안전 규칙: 사용자가 고른 스샷만 쓰는 챗봇과 같은 조건).
  */
 
@@ -304,14 +305,74 @@ function clearEdges(src: ImageData, tol: number, alpha: Uint8Array): Uint8Array 
   return next;
 }
 
-/** 2단계: 배경 지우기. 처음에 가장자리 배경을 지우고, 남은 곳은 눌러서 지우거나 되살린다 */
+/**
+ * AI 지우기: 자른 그림을 서버로 보내 배경을 지운 그림을 받고, 그 투명한 곳을 지운다.
+ * 도트 그림이라 반투명은 두지 않고 반을 넘으면 남긴다
+ */
+async function aiAlpha(src: ImageData): Promise<Uint8Array> {
+  const c = document.createElement("canvas");
+  c.width = src.width;
+  c.height = src.height;
+  c.getContext("2d")!.putImageData(src, 0, 0);
+  const jpeg = await new Promise<Blob | null>((ok) => c.toBlob(ok, "image/jpeg", 0.95));
+  if (!jpeg) throw new Error("그림을 만들지 못했어요");
+  let res: Response;
+  try {
+    res = await fetch("/api/avatar/cutout", { method: "POST", credentials: "same-origin", headers: { "content-type": "image/jpeg" }, body: jpeg });
+  } catch {
+    throw new Error("인터넷 연결을 확인해 주세요");
+  }
+  if (!res.ok) {
+    const d = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(d.error ?? `AI 지우기를 하지 못했어요 (${res.status})`);
+  }
+  const picture = await createImageBitmap(await res.blob());
+  const o = document.createElement("canvas");
+  o.width = src.width;
+  o.height = src.height;
+  const g = o.getContext("2d", { willReadFrequently: true })!;
+  g.drawImage(picture, 0, 0, src.width, src.height);
+  const d = g.getImageData(0, 0, src.width, src.height).data;
+  const a = new Uint8Array(src.width * src.height);
+  for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3] >= 128 ? 255 : 0;
+  if (!a.some((v) => v)) throw new Error("AI 가 캐릭터를 찾지 못했어요. 캐릭터가 꽉 차게 잘라 주세요");
+  return a;
+}
+
+/** 2단계: 배경 지우기. 처음에 AI 가 지우고 (안 되면 가장자리 배경), 남은 곳은 눌러서 지우거나 되살린다 */
 function EraseStep({ source, onBack, onDone }: { source: ImageData; onBack: () => void; onDone: (png: Blob) => void }) {
   const [tol, setTol] = useState(40);
   const [alpha, setAlpha] = useState(() => clearEdges(source, 40, new Uint8Array(source.width * source.height).fill(255)));
   const [undo, setUndo] = useState<Uint8Array[]>([]);
   const [mode, setMode] = useState<"erase" | "keep">("erase");
   const [error, setError] = useState("");
+  const [ai, setAi] = useState(false);
   const canvas = useRef<HTMLCanvasElement>(null);
+  const started = useRef(false);
+  /** AI 가 끝났을 때의 지금 그림 (되돌리기에 넣는다) */
+  const alphaNow = useRef(alpha);
+  alphaNow.current = alpha;
+
+  async function runAi() {
+    setAi(true);
+    setError("");
+    try {
+      const next = await aiAlpha(source);
+      setUndo((u) => [...u.slice(-19), alphaNow.current]);
+      setAlpha(next);
+    } catch (x) {
+      setError(errorText(x));
+    } finally {
+      setAi(false);
+    }
+  }
+  // 이 단계에 들어오면 AI 가 먼저 지운다
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    runAi();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const c = canvas.current;
@@ -351,9 +412,10 @@ function EraseStep({ source, onBack, onDone }: { source: ImageData; onBack: () =
   return (
     <>
       <p className="form-note">
-        {mode === "erase" ? "남은 배경을 눌러서 지워요." : "잘못 지운 곳을 눌러서 되살려요."} 비슷한 색까지 한 번에 바뀌어요.
+        {ai ? "✨ AI 가 배경을 지우는 중…" : mode === "erase" ? "남은 배경을 눌러서 지워요." : "잘못 지운 곳을 눌러서 되살려요."}
+        {!ai && " 비슷한 색까지 한 번에 바뀌어요."}
       </p>
-      <canvas ref={canvas} className="avatar-erase" onPointerDown={tap} />
+      <canvas ref={canvas} className={"avatar-erase" + (ai ? " avatar-ai" : "")} onPointerDown={ai ? undefined : tap} />
       <div className="avatar-modes">
         <button type="button" className={"pill" + (mode === "erase" ? " pill-on" : "")} onClick={() => setMode("erase")}>
           🧽 지우개
@@ -378,6 +440,9 @@ function EraseStep({ source, onBack, onDone }: { source: ImageData; onBack: () =
         <input type="range" min={5} max={120} value={tol} onChange={(e) => setTol(Number(e.target.value))} />
       </label>
       <div className="avatar-modes">
+        <button type="button" className="pill" disabled={ai} onClick={runAi}>
+          ✨ AI 지우기
+        </button>
         <button type="button" className="pill" onClick={() => change(clearEdges(source, tol, alpha))}>
           가장자리 정리
         </button>
@@ -390,7 +455,7 @@ function EraseStep({ source, onBack, onDone }: { source: ImageData; onBack: () =
         <button type="button" className="btn btn-ghost" onClick={onBack}>
           ◀ 이전
         </button>
-        <button type="button" className="btn" onClick={done}>
+        <button type="button" className="btn" disabled={ai} onClick={done}>
           완료
         </button>
       </div>

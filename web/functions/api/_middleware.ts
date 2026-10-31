@@ -5,8 +5,8 @@ import { currentUser } from "../../server/auth";
 import type { Env } from "../../server/auth";
 import { detailOf, record, subjectOf, whereOf } from "../../server/activity";
 
-/** 본문이 JSON 이 아닌 곳: 캐릭터 사진(그림 파일)은 크기만 적는다 */
-const BINARY = /^\/api\/avatar$/;
+/** 본문이 JSON 이 아닌 곳: 캐릭터 사진, AI 지우기(그림 파일)는 크기만 적는다 */
+const BINARY = /^\/api\/avatar(\/cutout)?$/;
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   const { request, env } = context;

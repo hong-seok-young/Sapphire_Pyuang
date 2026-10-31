@@ -979,4 +979,7 @@ button { font: inherit; color: inherit; }
 .recent-chip { display: inline-flex; align-items: stretch; }
 .recent-chip .pill { border-right: none; }
 .recent-x { padding: 0 7px; font-size: 11px; color: var(--muted); cursor: pointer; background: var(--night-2); border: var(--px) solid var(--edge); }
+/* avatar maker: while the AI removes the background the picture pulses */
+.avatar-ai { animation: ai-wait 1.2s ease-in-out infinite; }
+@keyframes ai-wait { 50% { opacity: 0.55; } }
 

@@ -240,3 +240,16 @@ CREATE TABLE IF NOT EXISTS favorites (
   created_at INTEGER NOT NULL,
   PRIMARY KEY (user_id, kind, key)
 );
+
+-- 캐릭터 사진 AI 지우기 (functions/api/avatar/cutout): Cloudflare 이미지 변환이 읽어 가는 동안만 두는 그림, 하루 횟수
+CREATE TABLE IF NOT EXISTS cutout_tmp (
+  id TEXT PRIMARY KEY,
+  img BLOB NOT NULL,
+  type TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS cutout_log (
+  user_id TEXT NOT NULL,
+  at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS cutout_log_user ON cutout_log (user_id, at);
