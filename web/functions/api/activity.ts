@@ -1,9 +1,10 @@
 // POST /api/activity { path } -> 지금 보는 화면을 사용 기록에 남긴다 (로그인한 길드원 누구나, 화면이 알아서 보낸다)
+// POST /api/activity { open: true } -> 접속 하나 (웹이나 앱을 닫았다가 다시 열었을 때 화면이 한 번 보낸다)
 // GET  /api/activity?user=&kind=&before= -> 사용 기록 보기 (앱개발자만, 제작자 요청): 최근 기록과 사람별 요약
 //      (7일, 30일 접속 수, 7일 화면 수와 한 일 수, 마지막으로 쓴 때와 곳). before 를 주면 그보다 앞의 기록만
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../server/auth";
 import type { Env } from "../../server/auth";
-import { KEEP_DAYS, record, whereOf } from "../../server/activity";
+import { record, whereOf } from "../../server/activity";
 
 const PAGE = 150;
 const DAY = 86_400_000;
@@ -11,7 +12,11 @@ const DAY = 86_400_000;
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  const { path } = await readJson<{ path: unknown }>(request);
+  const { path, open } = await readJson<{ path: unknown; open: unknown }>(request);
+  if (open === true) {
+    await record(env, me.id, "visit", "open", null, whereOf(request));
+    return json({ ok: true });
+  }
   if (typeof path !== "string" || !path.startsWith("#/") || path.length > 200) return json({ error: "화면 주소가 맞지 않아요" }, 400);
   await record(env, me.id, "view", path, null, whereOf(request));
   return json({ ok: true });
@@ -60,5 +65,5 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   )
     .bind(now - 7 * DAY, now - 30 * DAY)
     .all();
-  return json({ rows: rows.results, more, people: people.results, keepDays: KEEP_DAYS });
+  return json({ rows: rows.results, more, people: people.results });
 };

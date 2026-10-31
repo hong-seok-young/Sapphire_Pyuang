@@ -46,7 +46,7 @@ export function fetchActivity(q: { user?: string | null; kind?: Kind | null; bef
   if (q.user) p.set("user", q.user);
   if (q.kind) p.set("kind", q.kind);
   if (q.before) p.set("before", String(q.before));
-  return api<{ rows: ActivityRow[]; more: boolean; people?: Person[]; keepDays?: number }>(`/api/activity?${p}`);
+  return api<{ rows: ActivityRow[]; more: boolean; people?: Person[] }>(`/api/activity?${p}`);
 }
 
 let lastSent = "";
@@ -69,9 +69,30 @@ export function reportView(hash: string) {
   }, 1500);
 }
 
-/** 다른 앱에 오래 있다가 돌아오면 같은 화면이라도 다시 보낸다 (접속을 세려고) */
-export function forgetView() {
-  lastSent = "";
+const OPENED = "sapphire-opened";
+let opened = "";
+
+/**
+ * 접속 (제작자 요청): 웹이나 앱을 닫았다가 다시 열었을 때만 하나 센다. 다른 앱에 갔다 오거나, 새로고침,
+ * 업데이트로 다시 뜬 것은 세지 않는다. sessionStorage 는 창(탭)을 닫을 때까지 남아서 이번 열기에 보냈는지 안다.
+ * 로그아웃 뒤 다른 닉네임으로 들어오면 그 사람 접속으로 하나 더 센다.
+ */
+export function reportOpen(userId: string) {
+  if (opened === userId) return;
+  opened = userId;
+  try {
+    if (sessionStorage.getItem(OPENED) === userId) return;
+    sessionStorage.setItem(OPENED, userId);
+  } catch {
+    // 못 적으면 이 페이지가 떠 있는 동안 한 번만 센다
+  }
+  fetch("/api/activity", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ open: true }),
+    keepalive: true,
+  }).catch(() => {});
 }
 
 const PAGE_NAME: Record<string, string> = {

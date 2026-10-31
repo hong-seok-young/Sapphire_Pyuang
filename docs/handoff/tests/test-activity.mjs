@@ -51,13 +51,17 @@ try {
     item: "고대의반지", category: "반지", enhance: 0, enchant: "int", enchantValue: 1, qty: 1, price: 3_000_000, note: "비밀노트",
   }, m, APP_UA);
   await req("PATCH", `/api/market/${made.json?.id}`, { status: "sold" }, m, APP_UA);
+  // 제작자 요청 (2026-10-31): 접속은 웹이나 앱을 새로 열 때 화면이 보내는 { open: true } 로만 센다 (30분 쉬기, /api/me 로는 안 센다)
+  const visits = async () => ((await req("GET", `/api/activity?user=${enc("기록멤버")}&kind=visit`, null, admin)).json?.rows ?? []).length;
+  check("/api/me and actions add no visit", (await visits()) === 0);
+  check("open is recorded", (await req("POST", "/api/activity", { open: true }, m, APP_UA)).status === 200);
   check("member cannot read the log -> 403", (await req("GET", "/api/activity", null, m)).status === 403);
   check("log needs login -> 401", (await req("GET", "/api/activity")).status === 401);
 
   const log = (await req("GET", `/api/activity?user=${enc("기록멤버")}`, null, admin)).json;
   const rows = log?.rows ?? [];
   const kinds = rows.map((r) => r.kind);
-  check("one visit for close calls", kinds.filter((k) => k === "visit").length === 1, kinds.join(","));
+  check("one visit, from the open", kinds.filter((k) => k === "visit").length === 1 && rows.some((r) => r.kind === "visit" && r.what === "open"), kinds.join(","));
   check("view saved with the path", rows.some((r) => r.kind === "view" && r.what === "#/market"));
   check("login, password change, listing and sold are actions", ["POST /api/login", "POST /api/password", "POST /api/market", `PATCH /api/market/${made.json?.id}`]
     .every((w) => rows.some((r) => r.kind === "act" && r.what === w)), rows.map((r) => r.what).join(" | "));

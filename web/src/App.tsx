@@ -23,7 +23,7 @@ import { AlertsPage } from "./pages/Alerts";
 import { ChatGapsPage } from "./pages/ChatGaps";
 import { PlatShopPage } from "./pages/PlatShop";
 import { BoardPage } from "./pages/Board";
-import { forgetView, reportView } from "./activity";
+import { reportOpen, reportView } from "./activity";
 import { markMenuVisit } from "./updates";
 import { ensurePush, reportPush } from "./push";
 import { RANK, TEST_IDS, fetchMe, switchAccount } from "./auth";
@@ -107,25 +107,14 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   const { data: wiki, error } = useAsync(useCallback(() => loadWiki(), []));
   const [page = "", arg = ""] = route.parts;
 
-  // 사용 기록: 지금 보는 화면을 보낸다. 5분 넘게 다른 앱에 있다가 돌아오면 같은 화면도 다시 (접속 세기)
+  // 사용 기록: 웹이나 앱을 새로 열었으면 접속 하나, 그리고 지금 보는 화면
+  useEffect(() => reportOpen(me.id), [me.id]);
   useEffect(() => reportView(location.hash), [route]);
   // 폰이 이미 알림을 허락했으면 폰 알림을 저절로 켠다 (제작자 요청: 기본은 허용)
   // 그 뒤 이 폰의 알림 허용 상태를 알린다 ('길드원 관리'에 보인다)
   useEffect(() => void ensurePush().then(() => reportPush(me.id)), [me.id]);
   // 업데이트된 메뉴에 처음 들어간 때 (홈 칸의 'UPDATE' 가 그때부터 하루 동안 보인다)
   useEffect(() => markMenuVisit(me.id, location.hash), [route, me.id]);
-  useEffect(() => {
-    let hiddenAt = 0;
-    const onVisible = () => {
-      if (document.hidden) hiddenAt = Date.now();
-      else if (hiddenAt && Date.now() - hiddenAt > 5 * 60_000) {
-        forgetView();
-        reportView(location.hash);
-      }
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, []);
 
   // 다른 기기에서 비밀번호가 초기화되는 등으로 로그인이 풀리면 로그인 화면으로
   const loggedOut = error?.includes(NEED_LOGIN) ?? false;

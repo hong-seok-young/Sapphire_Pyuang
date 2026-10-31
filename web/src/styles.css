@@ -677,7 +677,6 @@ button { font: inherit; color: inherit; }
 }
 
 /* activity log (pages/ActivityLog.tsx, developer only) */
-.log-note { margin: 0 0 10px; font-size: 12px; color: var(--muted); }
 .log-search { width: 100%; margin-bottom: 8px; }
 .log-people { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; }
 .log-person {

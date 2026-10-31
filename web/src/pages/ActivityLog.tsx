@@ -25,7 +25,7 @@ const squash = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 
 /**
  * 사용 기록 (앱개발자만, 제작자 요청): 사람별 접속 수와 마지막으로 쓴 때, 그리고 누가 어디서 무엇을 했는지.
- * 사람을 누르면 그 사람 기록만, 칩으로 접속/화면/한 일만 본다. 60일 지난 기록은 서버가 지운다.
+ * 사람을 누르면 그 사람 기록만, 칩으로 접속/화면/한 일만 본다. 기록은 지우지 않는다 (영구 보관).
  */
 export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
   const [user, setUser] = useState<string | null>(null);
@@ -78,10 +78,6 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
   return (
     <>
       <TopBar title="사용 기록" />
-      <p className="log-note">
-        앱개발자에게만 보여요. 60일 동안 남아요. 비밀번호만 빼고 모두 남겨요. 접속은 30분 넘게 쉬었다가 다시 쓰면 한 번으로 세요.
-        위치는 인터넷 주소(IP)로 어림한 값이라 실제 동네가 아니라 통신사망 지역(예: 수원)으로 나올 수 있어요.
-      </p>
 
       <section className="panel">
         <h2 className="panel-title">사람별 (7일)</h2>
