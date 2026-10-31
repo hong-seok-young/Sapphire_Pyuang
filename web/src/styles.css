@@ -802,3 +802,9 @@ button { font: inherit; color: inherit; }
 .mk-talk-arrow { color: var(--muted); }
 .mk-talk-act { padding: 0 4px; font-size: 11px; color: var(--muted); background: none; border: 0; cursor: pointer; }
 .mk-talk-replying { display: flex; align-items: center; gap: 4px; margin: 0; font-size: 12px; color: #9fd3ff; }
+
+/* sell form: price in gold or cash (won) */
+.mk-price-label { display: flex; align-items: center; gap: 6px; }
+.mk-unit { display: inline-flex; border: var(--px) solid var(--edge); }
+.mk-unit button { padding: 1px 6px; font-size: 11px; color: var(--muted); background: var(--panel-2); border: 0; cursor: pointer; }
+.mk-unit .mk-unit-on { color: var(--edge); background: var(--sunset); }

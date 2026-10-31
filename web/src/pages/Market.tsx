@@ -566,7 +566,16 @@ function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: ()
   const cat = wikiCat ?? (category && choices.includes(category) ? category : known ? "기타" : null);
   const enhanceOk = cat !== null && ENHANCE_CATEGORIES.includes(cat) && !facts.options.notes.includes("강화불가");
   const enchantOk = cat !== null && ENCHANT_CATEGORIES.includes(cat);
-  const priceN = Number(price) || 0;
+  // 가격은 골드나 현금(원)으로 적는다 (제작자 요청). 현금이면 시세로 골드를 계산해 골드로 올린다
+  const [unit, setUnit] = useState<"gold" | "won">("gold");
+  const [won, setWon] = useState("");
+  const priceN = unit === "won" ? Math.round((Number(won) || 0) * rate) : Number(price) || 0;
+  function switchUnit(next: "gold" | "won") {
+    if (next === unit) return;
+    if (next === "won") setWon(priceN ? String(Math.round(priceN / rate)) : "");
+    else setPrice(priceN ? String(priceN) : "");
+    setUnit(next);
+  }
   const qtyN = Number(qty);
   const suggestions = useMemo(() => {
     const q = squash(name);
@@ -775,16 +784,37 @@ function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: ()
           <input className="mk-input" inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value.replace(/\D/g, "").slice(0, 4))} />
         </label>
         <label className="mk-field">
-          <span>
-            {mode === "auction" ? "시작가" : "가격"} (골드){priceN > 0 && <b className="mk-words"> {goldWords(priceN)} {cashText(priceN, rate)}</b>}
+          <span className="mk-price-label">
+            {mode === "auction" ? "시작가" : "가격"}
+            <span className="mk-unit">
+              <button type="button" className={unit === "gold" ? "mk-unit-on" : ""} onClick={() => switchUnit("gold")}>
+                골드
+              </button>
+              <button type="button" className={unit === "won" ? "mk-unit-on" : ""} onClick={() => switchUnit("won")}>
+                현금
+              </button>
+            </span>
           </span>
-          <input
-            className="mk-input"
-            inputMode="numeric"
-            value={priceN ? goldText(priceN) : ""}
-            onChange={(e) => setPrice(e.target.value.replace(/\D/g, "").slice(0, 11))}
-            placeholder="3,800,000"
-          />
+          {unit === "gold" ? (
+            <input
+              className="mk-input"
+              inputMode="numeric"
+              value={priceN ? goldText(priceN) : ""}
+              onChange={(e) => setPrice(e.target.value.replace(/\D/g, "").slice(0, 11))}
+              placeholder="3,800,000"
+            />
+          ) : (
+            <input
+              className="mk-input"
+              inputMode="numeric"
+              value={won ? Number(won).toLocaleString("ko-KR") : ""}
+              onChange={(e) => setWon(e.target.value.replace(/\D/g, "").slice(0, 9))}
+              placeholder="50,000 (원)"
+            />
+          )}
+          {priceN > 0 && (
+            <b className="mk-words">{unit === "won" ? `= ${goldWords(priceN)} 골드 (시세 ${rate}:1)` : `${goldWords(priceN)} ${cashText(priceN, rate)}`}</b>
+          )}
         </label>
       </div>
       {mode === "auction" && (
