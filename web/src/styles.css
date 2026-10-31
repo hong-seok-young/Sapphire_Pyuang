@@ -1344,12 +1344,17 @@ button { font: inherit; color: inherit; }
 /* charge amount at the top of the budget review, and the chosen game packs like the game's platinum shop */
 .ps-charge { font-size: 15px; font-weight: 700; }
 .ps-settings .ps-charge-input { width: 120px; height: 34px; font-size: 16px; }
-.ps-packs { list-style: none; margin: 0 0 4px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 4px; }
+.ps-packs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 4px; }
 .ps-packs li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 2px 4px; font-size: 12px; font-weight: 700; background: #d6e2f0; color: #2d4f6a; border: var(--px) solid var(--edge); }
 .ps-packs li img, .ps-charge-sum img { width: 12px; height: 12px; margin-right: 2px; vertical-align: -1px; image-rendering: pixelated; }
 .ps-packs li b { width: 100%; padding: 1px 0; text-align: center; font-size: 11px; color: #fff; background: #4f8fe0; }
-.ps-packs li em { position: absolute; top: 2px; right: 3px; font-style: normal; font-size: 11px; color: #c0392b; }
-.ps-charge-sum { display: block; margin: 0 0 10px; font-size: 11px; font-weight: 700; color: var(--muted); }
+.ps-packs li em { font-style: normal; font-size: 15px; color: #c0392b; }
+.ps-charge-sum { display: block; margin: -4px 0 10px; font-size: 11px; font-weight: 700; color: var(--muted); }
+.ps-charge-paid { font-size: 16px; color: var(--gold); white-space: nowrap; }
+.ps-buy-packs { margin: 0 0 8px; padding: 8px; }
+.ps-buy-packs h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin: 0 0 6px; font-size: 13px; color: var(--gold); }
+.ps-buy-packs h3 small { font-size: 11px; color: var(--muted); }
+.ps-buy-packs h3 img { width: 12px; height: 12px; margin-right: 2px; vertical-align: -1px; image-rendering: pixelated; }
 
 /* closed beta version at the bottom right of home, very small, and the patch notes page (pages/PatchNotes.tsx, 제작자 요청) */
 .home-version { display: block; width: fit-content; margin: 10px 2px 0 auto; font-size: 10px; color: var(--muted); opacity: 0.75; }

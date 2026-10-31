@@ -574,24 +574,11 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
             placeholder={mode === "won" ? "110000" : String(b.plat)}
           />{" "}
           {mode === "won" ? "원어치" : "개"}
+          {/* 바로 오른쪽에 원스토어 할인 뒤 실제로 내는 돈 (제작자 요청) */}
+          <b className="ps-charge-paid">→ {won(paid)}</b>
         </label>
-        {/* 고른 상품 조합: 게임 상점처럼 플래티넘 개수와 정가 */}
-        <ul className="ps-packs">
-          {buy.packs.map((k) => (
-            <li key={k.plat}>
-              <span>
-                {gem}
-                {k.plat.toLocaleString("ko-KR")}
-              </span>
-              <b>{won(k.won)}</b>
-              {k.count > 1 && <em>×{k.count}</em>}
-            </li>
-          ))}
-        </ul>
         <small className="ps-charge-sum">
-          {want > 0 ? "" : "비우면 길드원이 사 갈 만큼 · "}
-          {gem}
-          {buy.plat.toLocaleString("ko-KR")} · 정가 {won(buy.won)}
+          {want > 0 ? `원스토어 ${rate}% 할인 뒤 결제액` : "비우면 길드원이 사 갈 만큼"}
           {mode === "won" && want > buy.won && ` · 남는 돈 ${won(want - buy.won)}`}
         </small>
         <label>
@@ -677,6 +664,25 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
           <small>1원 = {perWon}골드</small>
         </div>
       </div>
+      {/* 사는 상품: 결과 카드 바로 아래, 게임 상점 칸처럼 '13,000개 ×7' (제작자 요청) */}
+      <section className="panel ps-buy-packs">
+        <h3>
+          사는 상품 <small>{gem}
+          {buy.plat.toLocaleString("ko-KR")} · 정가 {won(buy.won)}</small>
+        </h3>
+        <ul className="ps-packs">
+          {buy.packs.map((k) => (
+            <li key={k.plat}>
+              <span>
+                {gem}
+                {k.plat.toLocaleString("ko-KR")}개
+              </span>
+              <b>{won(k.won)}</b>
+              <em>×{k.count}</em>
+            </li>
+          ))}
+        </ul>
+      </section>
       <ul className="ps-review-groups">
         {b.rows.map((r) => (
           <li key={r.name} className="panel">
