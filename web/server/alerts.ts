@@ -9,6 +9,7 @@ export const ALERT_KINDS = {
   market_want: true,
   market_bid: true,
   market_outbid: true,
+  market_auction: true,
   market_new: false,
   gold_want: true,
   request: true,

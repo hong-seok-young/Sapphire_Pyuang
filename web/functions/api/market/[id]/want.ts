@@ -3,7 +3,7 @@
 // DELETE /api/market/:id/want         -> '살래요' 거두기
 import { NEED_LOGIN, currentUser, json, paramId, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
-import { MAX_NOTE, readNote, validPrice } from "../../../../server/market";
+import { MAX_NOTE, WANTS_FOR_AUCTION, readNote, toAuction, validPrice } from "../../../../server/market";
 import { itemName, notify } from "../../../../server/alerts";
 
 export const onRequestPut: PagesFunction<Env> = async ({ request, env, params }) => {
@@ -11,8 +11,8 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
   if (!me) return NEED_LOGIN();
   const id = Number(paramId(params));
   const row = Number.isInteger(id)
-    ? await env.DB.prepare("SELECT seller, status, mode, item, enhance FROM listings WHERE id = ?").bind(id)
-        .first<{ seller: string; status: string; mode: string; item: string; enhance: number }>()
+    ? await env.DB.prepare("SELECT seller, status, mode, item, enhance, auto_auction FROM listings WHERE id = ?").bind(id)
+        .first<{ seller: string; status: string; mode: string; item: string; enhance: number; auto_auction: number | null }>()
     : null;
   if (!row) return json({ error: "없는 글이에요" }, 404);
   if (row.seller === me.id) return json({ error: "내 물건이에요" }, 400);
@@ -30,9 +30,17 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
     .bind(id, me.id, note, offer, Date.now())
     .run();
   const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM listing_wants WHERE listing_id = ?").bind(id).first<{ n: number }>();
+  const wants = n?.n ?? 1;
   const offerText = offer !== null ? ` · 흥정 ${(offer as number).toLocaleString("ko-KR")}골드` : "";
-  await notify(env, [row.seller], "market_want", `${me.id}님이 ${itemName(row)} 살래요${offerText}`, "#/market", me.id);
-  return json({ wants: n?.n ?? 1, wanted: true, myOffer: offer });
+  // '살래요'가 2명 이상이면 경매로 (제작자 요청): 올릴 때 정해 뒀으면 저절로, 아니면 판 사람에게 바꿀지 묻는다 (중개인 화면)
+  if (wants >= WANTS_FOR_AUCTION && row.auto_auction) {
+    await notify(env, [row.seller], "market_want", `${me.id}님이 ${itemName(row)} 살래요${offerText}`, "#/market", me.id);
+    const endsAt = await toAuction(env, id, row.auto_auction, me.id, true);
+    if (endsAt !== null) return json({ wants, wanted: true, myOffer: offer, mode: "auction", endsAt });
+  }
+  const ask = wants >= WANTS_FOR_AUCTION ? ` · 살래요 ${wants}명, 경매로 바꿀 수 있어요` : "";
+  await notify(env, [row.seller], "market_want", `${me.id}님이 ${itemName(row)} 살래요${offerText}${ask}`, "#/market", me.id);
+  return json({ wants, wanted: true, myOffer: offer });
 };
 
 export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params }) => {

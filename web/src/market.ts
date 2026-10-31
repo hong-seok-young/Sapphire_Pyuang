@@ -90,6 +90,8 @@ export interface Listing {
   mode: "sale" | "auction";
   /** 경매가 끝나는 때 */
   endsAt: number | null;
+  /** 바로 판매인데 '살래요'가 2명 이상이면 저절로 이 시간짜리 경매로 */
+  autoAuction: number | null;
   createdAt: number;
   updatedAt: number;
   wants: number;
@@ -120,6 +122,7 @@ export interface ListingInput {
   options: ListingOption[] | null;
   mode: "sale" | "auction";
   hours: number | null;
+  autoAuction: number | null;
 }
 
 /** 글 전부와 골드 시세(1만 원에 몇 만 골드, 현금 환산용) */
@@ -130,7 +133,12 @@ export const updateListing = (id: number, change: { status?: "selling" | "sold";
 export const deleteListing = (id: number) => api<{ ok: boolean }>(`/api/market/${id}`, "DELETE");
 /** '살래요' (offer: 흥정 가격, 판 사람만 본다) */
 export const wantListing = (id: number, note: string | null, offer: number | null) =>
-  api<{ wants: number; wanted: boolean; myOffer: number | null }>(`/api/market/${id}/want`, "PUT", { note, offer });
+  api<{ wants: number; wanted: boolean; myOffer: number | null; mode?: "auction"; endsAt?: number }>(`/api/market/${id}/want`, "PUT", { note, offer });
+/** '살래요'가 이만큼이면 경매로 바꿀 수 있다 (서버 server/market.ts 와 같다) */
+export const WANTS_FOR_AUCTION = 2;
+/** '살래요'가 많은 내 판매 글을 경매로 */
+export const toAuction = (id: number, hours: number) =>
+  api<{ mode: "auction"; endsAt: number; autoAuction: null }>(`/api/market/${id}/auction`, "POST", { hours });
 /** 경매 입찰 */
 export const bidListing = (id: number, amount: number) =>
   api<{ bidCount: number; highestBid: number; myBid: number }>(`/api/market/${id}/bids`, "POST", { amount });

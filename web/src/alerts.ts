@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "./auth";
 
 export type AlertKind =
-  | "market_want" | "market_bid" | "market_outbid" | "market_new" | "gold_want" | "request" | "request_new" | "talk" | "account" | "shop"
+  | "market_want" | "market_bid" | "market_outbid" | "market_auction" | "market_new" | "gold_want" | "request" | "request_new" | "talk" | "account" | "shop"
   | "board" | "board_notice" | "chat_fixed" | "chat_gap" | "chat_done";
 
 export interface Alert {
@@ -21,6 +21,7 @@ export const ALERT_GROUPS: { menu: string; kinds: { kind: AlertKind; name: strin
     menu: "중개인",
     kinds: [
       { kind: "market_want", name: "살래요" }, { kind: "market_bid", name: "입찰" }, { kind: "market_outbid", name: "입찰 밀림" },
+      { kind: "market_auction", name: "경매 전환" },
       { kind: "market_new", name: "새 물건" },
     ],
   },

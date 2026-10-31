@@ -91,12 +91,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .first<{ n: number }>();
   if ((selling?.n ?? 0) >= MAX_SELLING) return json({ error: `한 사람이 ${MAX_SELLING}개까지 팔 수 있어요. 다 판 것은 '거래 완료'를 눌러 주세요` }, 409);
   const row = await env.DB.prepare(
-    "INSERT INTO listings (seller, item, category, enhance, enchant, enchant_value, qty, price, note, options, mode, ends_at, " +
-      "status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'selling', ?, ?) RETURNING *",
+    "INSERT INTO listings (seller, item, category, enhance, enchant, enchant_value, qty, price, note, options, mode, ends_at, auto_auction, " +
+      "status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'selling', ?, ?) RETURNING *",
   )
     .bind(
       me.id, input.item, input.category, input.enhance, input.enchant, input.enchantValue, input.qty, input.price, input.note,
-      input.options ? JSON.stringify(input.options) : null, input.mode, input.hours ? now + input.hours * 3_600_000 : null, now, now,
+      input.options ? JSON.stringify(input.options) : null, input.mode, input.hours ? now + input.hours * 3_600_000 : null, input.autoAuction, now, now,
     )
     .first<ListingRow>();
   if (!row) return json({ error: "올리지 못했어요" }, 500);

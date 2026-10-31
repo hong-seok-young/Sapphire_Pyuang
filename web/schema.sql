@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS listings (
   options TEXT,                           -- 판 사람이 적은 옵션 값 JSON [{name, value, unit}] (옵션이 범위에서 뜨는 아이템)
   mode TEXT NOT NULL DEFAULT 'sale',      -- sale 바로 판매 (흥정은 listing_wants.offer) | auction 경매 (price = 시작가)
   ends_at INTEGER,                        -- 경매가 끝나는 때
+  auto_auction INTEGER,                   -- 바로 판매인데 '살래요'가 2명 이상이면 저절로 이 시간짜리 경매로 (올릴 때 정함)
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );

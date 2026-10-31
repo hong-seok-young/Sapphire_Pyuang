@@ -1,6 +1,8 @@
 // 사파이어 중개인: 길드원끼리 파는 물건을 올리고, 사고 싶은 사람이 '살래요'를 누르는 게시판.
 // 게임 밖의 약속일 뿐이고 실제 거래는 게임 안에서 한다 (게임에 아무것도 보내지 않는다. CLAUDE.md 게임 안전 규칙).
 // 화면 쪽 같은 목록: web/src/market.ts
+import type { Env } from "./auth";
+import { itemName, notify } from "./alerts";
 
 /** 게임 거래소의 종류 (코스튬은 하나로 묶었다) */
 export const CATEGORIES = [
@@ -24,6 +26,8 @@ export const MAX_SELLING = 20;
 export const KEEP_SOLD_MS = 30 * 86_400_000;
 /** 경매 시간 (시간 단위): 12시간, 1일, 2일, 3일 */
 export const AUCTION_HOURS = [12, 24, 48, 72];
+/** '살래요'가 이만큼이면 경매로 바꿀 수 있다 (제작자 요청) */
+export const WANTS_FOR_AUCTION = 2;
 /** 골드 시세(1만 원에 몇 만 골드)를 모를 때 쓰는 값 (제작자가 알려 준 요즘 시세) */
 export const USUAL_GOLD_RATE = 75;
 /** 옵션이 범위에서 뜨는 아이템(헌터보우: 명중 0~11 / 민첩 0~8)은 판 사람이 뜬 값을 적는다. 한 글에 이만큼까지 */
@@ -50,6 +54,8 @@ export interface ListingInput {
   mode: "sale" | "auction";
   /** 경매면 몇 시간 동안 */
   hours: number | null;
+  /** 바로 판매인데 '살래요'가 2명 이상이면 저절로 이 시간짜리 경매로 */
+  autoAuction: number | null;
 }
 
 const ITEM_NAME = /^[\p{L}\p{N} ()[\]:+\-.,'·~!&]{1,30}$/u;
@@ -117,7 +123,12 @@ export function readListing(b: Record<string, unknown>): ListingInput | string {
     if (!AUCTION_HOURS.includes(b.hours as number)) return "경매 시간을 골라 주세요";
     hours = b.hours as number;
   }
-  return { item, category, enhance: enhance as number, enchant, enchantValue, qty: qty as number, price: b.price, note, options, mode, hours };
+  let autoAuction: number | null = null;
+  if (mode === "sale" && b.autoAuction != null) {
+    if (!AUCTION_HOURS.includes(b.autoAuction as number)) return "경매로 바꿀 때의 시간을 골라 주세요";
+    autoAuction = b.autoAuction as number;
+  }
+  return { item, category, enhance: enhance as number, enchant, enchantValue, qty: qty as number, price: b.price, note, options, mode, hours, autoAuction };
 }
 
 export interface ListingRow {
@@ -136,6 +147,8 @@ export interface ListingRow {
   mode: "sale" | "auction";
   /** 경매가 끝나는 때 */
   ends_at: number | null;
+  /** '살래요' 2명 이상이면 저절로 경매로 (시간) */
+  auto_auction: number | null;
   status: "selling" | "sold";
   created_at: number;
   updated_at: number;
@@ -155,6 +168,32 @@ export function listingOut(r: ListingRow) {
   return {
     id: r.id, seller: r.seller, item: r.item, category: r.category, enhance: r.enhance, enchant: r.enchant,
     enchantValue: r.enchant_value, qty: r.qty, price: r.price, note: r.note, options: parseOptions(r.options), status: r.status,
-    mode: r.mode ?? "sale", endsAt: r.ends_at, createdAt: r.created_at, updatedAt: r.updated_at,
+    mode: r.mode ?? "sale", endsAt: r.ends_at, autoAuction: r.auto_auction ?? null, createdAt: r.created_at, updatedAt: r.updated_at,
   };
 }
+
+/**
+ * 바로 판매 글을 경매로 바꾼다 ('살래요'가 2명 이상일 때, 제작자 요청). 가격이 시작가가 되고, '살래요'를 누른 사람들에게
+ * 입찰하라는 알림이 간다. auto 면 올릴 때 정해 둔 대로 저절로 바뀐 것이라 판 사람에게도 알린다. 바꾼 경매가 끝나는 때, 못 바꿨으면 null
+ */
+export async function toAuction(env: Env, id: number, hours: number, by: string, auto: boolean): Promise<number | null> {
+  const now = Date.now();
+  const endsAt = now + hours * 3_600_000;
+  const res = await env.DB.prepare(
+    "UPDATE listings SET mode = 'auction', ends_at = ?, auto_auction = NULL, updated_at = ? WHERE id = ? AND mode = 'sale' AND status = 'selling'",
+  )
+    .bind(endsAt, now, id)
+    .run();
+  if (!res.meta.changes) return null;
+  const row = await env.DB.prepare("SELECT seller, item, enhance, price FROM listings WHERE id = ?")
+    .bind(id)
+    .first<{ seller: string; item: string; enhance: number; price: number }>();
+  if (!row) return endsAt;
+  const wanters = await env.DB.prepare("SELECT user_id FROM listing_wants WHERE listing_id = ?").bind(id).all<{ user_id: string }>();
+  const left = hours % 24 === 0 ? `${hours / 24}일` : `${hours}시간`;
+  const text = `${itemName(row)} 판매가 경매로 바뀌었어요 · 시작가 ${row.price.toLocaleString("ko-KR")}골드, ${left}`;
+  await notify(env, wanters.results.map((w) => w.user_id).filter((u) => u !== row.seller), "market_auction", text + " · 입찰해 주세요", "#/market", by);
+  if (auto) await notify(env, [row.seller], "market_auction", `'살래요'가 ${WANTS_FOR_AUCTION}명이 넘어서 ` + text, "#/market", "");
+  return endsAt;
+}
+

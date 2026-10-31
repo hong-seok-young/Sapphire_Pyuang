@@ -7,7 +7,7 @@ import {
   AUCTION_HOURS, CATEGORIES, ENCHANTS, ENCHANT_CATEGORIES, ENHANCE_CATEGORIES, MARKET_PIC, OTHER_CATEGORIES, auctionOver, bidListing,
   cashText, currentPrice, deleteTalk, fetchTalk, nextBid, postTalk, MAX_ENHANCE, MAX_NOTE, MAX_PRICE, MAX_QTY, ago, categoryOf, categoryPic, createListing,
   deleteListing, enchantText, fetchMarket, goldText, goldWords, inRoll, itemFacts, jobsFor, listingName, rollHint, unwantListing,
-  updateListing, wantListing, wikiItem,
+  updateListing, wantListing, wikiItem, WANTS_FOR_AUCTION, toAuction,
 } from "../market";
 import type { Category, Enchant, Listing, ListingOption, TalkLine } from "../market";
 import type { Wiki } from "../types";
@@ -59,6 +59,7 @@ function Detail({ wiki, me, l, rate, onChanged }: {
   const [offer, setOffer] = useState("");
   const [bid, setBid] = useState(String(nextBid(l)));
   const [price, setPrice] = useState<string | null>(null);
+  const [convHours, setConvHours] = useState(24);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [talkOpen, setTalkOpen] = useState(false);
   const [talkCount, setTalkCount] = useState(l.talkCount);
@@ -193,6 +194,30 @@ function Detail({ wiki, me, l, rate, onChanged }: {
             </ul>
           ) : (
             <p className="mk-meta">아직 '살래요'를 누른 사람이 없어요.</p>
+          )}
+          {/* '살래요'가 여러 명이면 경매로 (제작자 요청): 올릴 때 정해 두지 않았으면 여기서 묻는다 */}
+          {!auction && l.status === "selling" && l.wants >= WANTS_FOR_AUCTION && (
+            <div className="mk-convert">
+              <b>
+                ♥ 살래요 {l.wants}명 · 경매로 바꿀까요?
+              </b>
+              <div className="mk-chips">
+                {AUCTION_HOURS.map((h) => (
+                  <button key={h.hours} type="button" className={"pill" + (convHours === h.hours ? " pill-on" : "")} onClick={() => setConvHours(h.hours)}>
+                    {h.label}
+                  </button>
+                ))}
+                <button className="pill pill-gold" disabled={busy} onClick={() => run(async () => onChanged({ ...l, ...(await toAuction(l.id, convHours)) }))}>
+                  🔨 경매 전환
+                </button>
+              </div>
+              <small className="mk-meta">지금 가격이 시작가가 되고, 살래요 누른 사람들에게 입찰 알림이 가요.</small>
+            </div>
+          )}
+          {!auction && l.status === "selling" && l.autoAuction && l.wants < WANTS_FOR_AUCTION && (
+            <p className="mk-meta">
+              🔨 살래요 {WANTS_FOR_AUCTION}명이 되면 {AUCTION_HOURS.find((h) => h.hours === l.autoAuction)?.label ?? `${l.autoAuction}시간`} 경매로 바뀌어요
+            </p>
           )}
           {price !== null ? (
             <div className="mk-actions">
@@ -541,6 +566,8 @@ const squash = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: () => void }) {
   const [mode, setMode] = useState<"sale" | "auction">("sale");
   const [hours, setHours] = useState(24);
+  /** 바로 판매인데 '살래요'가 2명 이상이면 저절로 경매로 (시간, null 이면 끔. 끄면 그때 판 사람에게 묻는다) */
+  const [autoHours, setAutoHours] = useState<number | null>(null);
   const [item, setItem] = useState("");
   const [typing, setTyping] = useState(false);
   const [category, setCategory] = useState<Category | null>(null);
@@ -603,7 +630,7 @@ function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: ()
       await createListing({
         item: name, category: cat, enhance: enhanceOk ? enhance : 0, enchant: enchantOk ? enchant : null,
         enchantValue: enchantOk && enchant ? enchantValue : null, qty: qtyN, price: priceN, note: note.trim() || null, options,
-        mode, hours: mode === "auction" ? hours : null,
+        mode, hours: mode === "auction" ? hours : null, autoAuction: mode === "sale" ? autoHours : null,
       });
       onDone();
     } catch (x) {
@@ -818,6 +845,21 @@ function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: ()
           )}
         </label>
       </div>
+      {mode === "sale" && (
+        <div className="mk-field">
+          <span>살래요 {WANTS_FOR_AUCTION}명 이상이면 경매로</span>
+          <div className="mk-chips">
+            <button type="button" className={"pill" + (autoHours === null ? " pill-on" : "")} onClick={() => setAutoHours(null)}>
+              끔
+            </button>
+            {AUCTION_HOURS.map((h) => (
+              <button key={h.hours} type="button" className={"pill" + (autoHours === h.hours ? " pill-on" : "")} onClick={() => setAutoHours(h.hours)}>
+                {h.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {mode === "auction" && (
         <div className="mk-field">
           <span>경매 시간 (시작가부터 남들이 점점 높게 불러요. 끝나면 가장 높게 부른 사람에게 팔아요)</span>
