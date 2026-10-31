@@ -18,7 +18,8 @@ type Kind = "아이템" | "몬스터" | "사냥터" | "메뉴" | "화면";
 const SCREENS: Record<string, string> = {
   "길드 랭킹": "#/ranking", 랭킹: "#/ranking", "사파이어 중개인": "#/market", 중개인: "#/market", "길드원 의뢰소": "#/requests",
   의뢰소: "#/requests", 게시판: "#/board", "플래티넘 할인 상점": "#/shop", 상점: "#/shop", 검색: "#/search", "내 정보": "#/me",
-  알림: "#/alerts", 장비: "#/equip", 사냥터: "#/places", 챗봇: "#/chat",
+  알림: "#/alerts", 장비: "#/equip", 사냥터: "#/places", 챗봇: "#/chat", 정보: "#/info", "공식 확률": "#/odds", "패치 내역": "#/patch",
+  "길드원 관리": "#/admin", "사용 기록": "#/log",
 };
 
 interface Target {

@@ -10,6 +10,11 @@ export interface Patch {
 
 export const PATCHES: Patch[] = [
   {
+    version: "1.26",
+    date: "11.01",
+    items: ["챗봇 길드 앱 자료로 답하기 (길드원, 랭킹, 중개인, 골드 거래, 의뢰소, 게시판, 상점)", "챗봇 길드 앱 사용 안내"],
+  },
+  {
     version: "1.25",
     date: "10.31",
     items: [

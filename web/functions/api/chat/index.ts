@@ -1,6 +1,8 @@
 // POST /api/chat { messages, context, thread?, again? } -> 챗봇 답을 Claude API 의 SSE 그대로 흘려보낸다 (text/event-stream)
 //
 // - 위키 자료는 화면(src/chat.ts)이 질문에 맞춰 골라 보낸다. 서버는 길이만 자르고 질문 앞에 붙인다.
+// - 길드 앱 자료(길드원 명단, 랭킹, 중개인, 골드, 의뢰소, 게시판, 상점, 앱개발자면 사용 기록)는 서버가 D1 에서 읽어 붙인다
+//   (server/chatapp.ts, 제작자 요청 2026-11-01: 길드원이 누군지 같은 앱 질문도 답하게). 묻는 사람이 앱에서 볼 수 있는 것만.
 // - 위키에 없으면 길잡이가 웹을 찾아보고 읽는다 (web_search, web_fetch 서버 도구, 제작자 요청: 온라인을 다 뒤지고 출처를 밝히게).
 // - 첨부: 사진(길드원이 갤러리에서 직접 고른 것), PDF, 글 파일. 앱은 화면을 캡처하지 않는다 (CLAUDE.md 게임 안전 규칙).
 // - 답은 사람이 읽는 조언 글로만 돌려준다. 게임에 입력을 보내거나 시계 위에 띄우는 데 쓰지 않는다.
@@ -13,6 +15,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
+import { appContext } from "../../../server/chatapp";
 import { addMsg, finishInBackground, newThread, ownThread, titleOf } from "../../../server/chatlog";
 
 /** 챗봇 모델. 바꾸려면 이 줄만 고친다 (더 싸게: "claude-sonnet-5-5", 가장 싸게: "claude-haiku-5-5") */
@@ -34,6 +37,9 @@ const MAX_TEXT_FILE = 200_000; // 글 파일 하나의 글자 수
 const SYSTEM = `너는 모바일 게임 아이모(IMO: The World of Magic, 컴투스) 길드 Sapphire 의 길잡이 NPC '사파이어 길잡이'야. 길드원(모험가)이 육성법, 장비, 드랍, 사냥터, 퀘스트, 보스, 이벤트, 길드 앱 사용법, 그 밖에 무엇이든 물으면 한국어로 답해. 길드원이 원하는 것을 끝까지 해결해 주는 게 네 일이야.
 
 자료 찾는 순서
+0. 질문 앞의 <길드 앱 자료>는 이 길드 앱(Sapphire web)의 지금 실제 자료야: 길드원 명단(닉네임은 게임 닉네임, 1군 Sapphire / 2군 FairyTale, 길드마스터·오피서, 직업, 레벨, 경험치, 고스펙), 성장 랭킹, 사파이어 중개인 매물, 골드 거래, 길드원 의뢰소, 게시판, 플래티넘 할인 상점, 묻는 사람이 앱개발자면 사용 기록(접속, 화면, 한 일, IP, 위치, 기기)까지.
+   길드원 닉네임, 길드, 길드마스터·오피서, 랭킹, 앱 안의 거래·글·기록을 물으면 이걸로 바로 답해. 웹을 찾지 말고 [[모름]]도 쓰지 마. 닉네임 하나만 물으면 그 사람이 누구인지(길드, 직책, 직업, 레벨, 순위)를 알려 줘.
+   <길드 앱 자료>에 없는 남의 정보(누가 살래요·입찰을 했는지, 흥정 가격, 다른 사람의 사용 기록 등)는 볼 수 없다고 말하고 지어내지 마. 앱개발자 전용 자료는 묻는 사람이 앱개발자일 때만 붙는다.
 1. 질문 앞의 <위키 자료>는 길드 위키(아이모 원클릭 드랍표)에서 질문에 맞춰 뽑은 내용이야. 아이템, 몬스터, 사냥터, 레벨, 드랍은 먼저 이걸 따라.
 2. 위키 자료에 없거나 모자라면 web_search 로 웹을 찾아봐: 아이모 공식 홈페이지와 공지, 공식 커뮤니티, 디시인사이드 아이모 갤러리, 나무위키, 블로그, 유튜브 등. 필요하면 web_fetch 로 글을 열어 읽어. 한국어로 찾고, 안 나오면 영어(IMO The World of Magic)로도 찾아.
 3. 답에서는 <위키 자료>를 '위키'라고 부르지 말고 '아이모 자료'라고 해 (길드원에게는 아이모 관련 사이트 자료를 먼저 둘러본 것으로 보인다).
@@ -51,6 +57,7 @@ const SYSTEM = `너는 모바일 게임 아이모(IMO: The World of Magic, 컴�
 - 소제목은 "## " 로 시작하는 한 줄 (예: "## 추천 사냥터", "## 장비", "## 가는 길"). 답 하나에 소제목 2~4개까지. 소제목 앞 이모지는 없어도 되고, 쓰면 소제목마다 다르게.
 - 목록은 "- ", 순서가 있으면 "1. ". 강조는 **굵게**. 표와 # 하나짜리 제목은 쓰지 마.
 - 위키에 있는 이름은 반드시 이렇게 감싸: [[아이템:이름]], [[몬스터:이름]], [[사냥터:이름]], [[메뉴:이름]]. 이름은 <위키 자료>에 나온 그대로 써 (띄어쓰기까지). 자료에 없는 이름은 감싸지 마. 앱이 그림이 붙은 단추로 바꿔서 누르면 그 위키 화면으로 간다. 그 앞에 🗺️ 같은 이모지를 따로 붙이지 마.
+- 길드 앱 안내: 홈에 길드 랭킹(레벨 랭킹과 오늘·주간·월간 성장 랭킹, 닉네임을 누르면 레벨 그래프), 사파이어 중개인(물건 팔기, 살래요, 흥정, 경매, 골드 거래), 길드원 의뢰소(재료 모아 주기 같은 의뢰를 선착순 수락), 게시판(공지사항, 길드 이벤트, 자유), 플래티넘 할인 상점(1군 전용, 매주 목요일 오전 10시 가상 플래티넘 지급, 신청 뒤 게임 안에서 할인된 골드로 거래), 정보(육성 공략, 직업별 스킬, 조합책, 강화·보석·성장, 인던·길드던전, 전장·헌팅그라운드, 퀘스트·지도, 공식 확률). 위 줄의 🔔 알림, 👤 내 정보(길드, 직업, 레벨, 경험치, 캐릭터 사진, 닉네임·비밀번호 변경). 아래 탭은 홈, 사냥터, 검색, 장비, 챗봇. 실제 거래는 모두 게임 안에서 한다.
 - 길드 앱 화면으로 보낼 때는 [[화면:길드 랭킹]], [[화면:사파이어 중개인]], [[화면:길드원 의뢰소]], [[화면:게시판]], [[화면:플래티넘 할인 상점]], [[화면:검색]] 처럼 써.
 - 가는 길은 "📍 [[사냥터:A]] → [[사냥터:B]]" 처럼 화살표로.
 - 맨 끝에 길드원이 이어서 물어볼 만한 질문 2~3개를 각각 [[질문:짧은 질문]] 으로 한 줄에 써 (예: [[질문:거기 보스는 언제 나와?]]).
@@ -108,7 +115,7 @@ function parseTurns(raw: unknown): ChatTurn[] | null {
   return turns;
 }
 
-function toMessages(turns: ChatTurn[], context: string): Anthropic.Beta.BetaMessageParam[] {
+function toMessages(turns: ChatTurn[], context: string, app: string): Anthropic.Beta.BetaMessageParam[] {
   return turns.map((t, i) => {
     if (i < turns.length - 1) return { role: t.role, content: t.text || "(첨부)" };
     const content: Anthropic.Beta.BetaContentBlockParam[] = [
@@ -123,6 +130,7 @@ function toMessages(turns: ChatTurn[], context: string): Anthropic.Beta.BetaMess
             : { type: "document", title: f.name, source: { type: "text", media_type: "text/plain", data: f.data } },
       ),
     ];
+    if (app) content.push({ type: "text", text: `<길드 앱 자료>\n${app}\n</길드 앱 자료>` });
     if (context) content.push({ type: "text", text: `<위키 자료>\n${context}\n</위키 자료>` });
     content.push({ type: "text", text: t.text.trim() || "첨부한 것을 보고 조언해 줘." });
     return { role: "user", content };
@@ -176,6 +184,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
     return json({ error: `오늘 질문 ${DAILY_LIMIT}번을 다 썼어요. 내일 다시 물어봐 주세요` }, 429);
   }
 
+  // 길드 앱 자료 (앞 질문까지 보고 고른다: '그 사람 레벨은?' 같은 이어 묻기). 못 읽어도 답은 한다
+  const asked = turns.filter((t) => t.role === "user").slice(-2).map((t) => t.text).join("\n");
+  const app = await appContext(env, me, asked).catch((e) => {
+    console.error("chat app context failed", e);
+    return "";
+  });
+
   // 워크스페이스에 묶이지 않은 키는 어느 워크스페이스로 쓸지 헤더로 알려야 한다 (없으면 400 'not scoped to a workspace')
   const workspace = env.ANTHROPIC_WORKSPACE_ID?.trim();
   const client = new Anthropic({
@@ -194,7 +209,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
         output_config: { effort: "medium" }, // 제작자 요청: 답을 더 알차게 (API 월 300달러 한도라 비용보다 품질)
         system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
         ...(web ? { tools: WEB_TOOLS as unknown as Anthropic.Beta.BetaToolUnion[] } : {}),
-        messages: toMessages(turns, context),
+        messages: toMessages(turns, context, app),
         stream: true,
       })
       .asResponse(); // 키, 한도 같은 오류는 답을 흘려보내기 전에 알 수 있다
