@@ -74,7 +74,7 @@ export interface RankEntry {
   exp?: number | null;
   /** 고스펙 길드원 (길드마스터, 오피서가 표시) */
   highSpec?: boolean;
-  /** 최근 7일 안에 경험치만 오른 만큼 (% x 1000). 레벨이 바뀌었으면 0 */
+  /** 이번 주(목요일 오전 10시부터) 경험치만 오른 만큼 (% x 1000). 레벨이 바뀌었으면 0 */
   expUp?: number;
 }
 
@@ -180,7 +180,7 @@ export const saveProfileOf = (id: string, job: Job, level: number, guild: Guild,
   api<{ id: string; job: Job; level: number; guild: Guild }>(`/api/users/${encodeURIComponent(id)}/profile`, "PUT", { job, level, guild, change });
 export const fetchRanking = () => api<RankEntry[]>("/api/ranking");
 
-/** 성장 랭킹 기간: 오늘, 이번 주(월요일부터), 이번 달 (한국 시간 0시 기준) */
+/** 성장 랭킹 기간: 오늘(0시부터), 이번 주(목요일 오전 10시부터), 이번 달(1일 0시부터), 한국 시간 */
 export type GrowthPeriod = "day" | "week" | "month";
 
 export interface GrowthEntry {

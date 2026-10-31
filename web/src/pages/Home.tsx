@@ -123,7 +123,7 @@ export function Home({ me, wiki }: { me: Me; wiki: Wiki }) {
         <div>
           <HeroTitle />
           <p className="hero-sub">
-            아이모 길드 위키
+            시리온 제국 사파이어 길드 포탈
             {/* 로그인한 사람: 초록 점과 닉네임. 닉네임은 10글자까지라 자르지 않고, 자리가 모자라면 다음 줄로 */}
             <span className="hero-user">
               {/* 알림: 닉네임 앞 작은 🔔 (위의 단추 줄은 좁은 폰에서 'web' 과 겹쳐서) */}

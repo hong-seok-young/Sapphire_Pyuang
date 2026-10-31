@@ -6,9 +6,8 @@ import type { ChangeKind, GrowthEntry, GrowthPeriod, Guild, Job, Me, RankEntry }
 import { useAsync } from "../data";
 import { JobEmblem, JobGlyph, MINE_TAG_PIC, RankMedal, RoleBadge } from "../emblems";
 import { ChangeAsk, FitLine, Loading, TopBar } from "../ui";
+import { weekStart } from "../week";
 
-/** 최근 레벨업 표시 기간 */
-const RECENT_MS = 7 * 86_400_000;
 
 type View = "level" | GrowthPeriod;
 const VIEWS: { key: View; label: string }[] = [
@@ -74,9 +73,9 @@ function expUpText(v: number): string {
   return String(Math.max(0.01, Math.round(pct * 100) / 100));
 }
 
-/** 최근 7일 안에 오른 레벨 수 (없으면 0) */
+/** 이번 주(목요일 오전 10시부터, 제작자 요청)에 오른 레벨 수 (없으면 0). 다음 목요일 10시에 표시가 사라진다 */
 function recentUp(r: RankEntry, now: number): number {
-  return r.prevLevel !== null && r.level > r.prevLevel && now - r.levelAt < RECENT_MS ? r.level - r.prevLevel : 0;
+  return r.prevLevel !== null && r.level > r.prevLevel && r.levelAt >= weekStart(now) ? r.level - r.prevLevel : 0;
 }
 
 /** 닉네임. 고스펙은 글자 색은 그대로 두고 글자에만 반짝임이 늘 흐른다 (제작자 요청) */

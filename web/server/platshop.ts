@@ -1,10 +1,11 @@
 // 1군 전용 플래티넘 할인 상점 (제작자 요청): 길드 관계자가 게임 상점에서 플래티넘 물건을 사서 길드원과 게임 안에서 거래하고,
 // 할인된 비율만큼 골드를 받는다. 비율은 '플래티넘 100당 몇 만 골드' (시중 7:100, 길드 할인 처음 5:100).
 // 물건 목록은 제작자의 게임 상점 스샷에서 잘라 낸 칸과 이름, 플래티넘 값 (비공개 자료 이미지/상점/items.json -> /data/shop/items.json).
-// 1군 길드원에게 매주(월요일 0시) 가상 플래티넘을 웹 지갑에 지급하고 쌓인다 (제작자 요청: 1군 주당 300, 고스펙은 따로).
+// 1군 길드원에게 매주(목요일 오전 10시, server/week.ts) 가상 플래티넘을 웹 지갑에 지급하고 쌓인다 (제작자 요청: 1군 주당 300, 고스펙은 따로).
 // 구매 신청하면 물건의 플래티넘 값만큼 지갑에서 빠지고(취소하면 돌아온다), 골드는 할인 비율로 낸다.
 // 오피서 이상이 비율, 주당 지급, 판매 여부를 정한다.
 import type { Env } from "./auth";
+import { WEEK, weekStart } from "./week";
 
 export interface ShopItem {
   id: string;
@@ -91,17 +92,6 @@ export function effective(item: ShopItem, s: ShopSettings, rule: ItemRule | unde
     marketGold: goldOf(item.plat, s.market),
     custom: !!rule && (rule.ratio !== null || rule.highRatio !== null || rule.limitCount !== null || rule.limitWeeks !== null),
   };
-}
-
-export const WEEK = 7 * 86_400_000;
-const DAY = 86_400_000;
-const KST = 9 * 3_600_000;
-
-/** 이번 주가 시작한 때 (한국 시간 월요일 0시) */
-export function weekStart(now = Date.now()): number {
-  const kst = now + KST;
-  const sinceMonday = (new Date(kst).getUTCDay() + 6) % 7;
-  return Math.floor(kst / DAY) * DAY - sinceMonday * DAY - KST;
 }
 
 /**

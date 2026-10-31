@@ -16,7 +16,7 @@ export interface ShopSettings {
   open: boolean;
 }
 
-/** 내 플래티넘 지갑: 매주(월요일 0시) 지급되고 쌓인다. 신청하면 빠지고 취소하면 돌아온다 */
+/** 내 플래티넘 지갑: 매주(목요일 오전 10시) 지급되고 쌓인다. 신청하면 빠지고 취소하면 돌아온다 */
 export interface Wallet {
   balance: number;
   granted: number;

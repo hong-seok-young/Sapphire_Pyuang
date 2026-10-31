@@ -105,7 +105,7 @@ export function PlatShopPage() {
           </span>
           <small>
             {data.wallet.weekly > 0
-              ? `매주 월요일 0시에 +${data.wallet.weekly.toLocaleString("ko-KR")} · 지금까지 받은 것 ${data.wallet.granted.toLocaleString("ko-KR")}, 쓴 것 ${data.wallet.spent.toLocaleString("ko-KR")}`
+              ? `매주 목요일 오전 10시에 +${data.wallet.weekly.toLocaleString("ko-KR")} · 지금까지 받은 것 ${data.wallet.granted.toLocaleString("ko-KR")}, 쓴 것 ${data.wallet.spent.toLocaleString("ko-KR")}`
               : "1군 길드원에게 매주 지급돼요"}
           </small>
         </div>

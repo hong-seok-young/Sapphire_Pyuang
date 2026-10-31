@@ -3,11 +3,10 @@
 // 경험치 숫자는 본인 줄에만 넣는다 (각자만 아는 값). avatar 는 캐릭터 그림을 올린 때 (없으면 null)
 import { NEED_LOGIN, currentUser, json } from "../../server/auth";
 import type { Env, Guild, Job, Role } from "../../server/auth";
-
-const RECENT_MS = 7 * 86_400_000;
+import { weekStart } from "../../server/week";
 
 /**
- * 최근 7일 안에 경험치만 오른 만큼 (% x 1000, 제작자 요청: 레벨업 ▲ 처럼 '+2%'). 성장 기록(level_log)의 마지막 기록과
+ * 이번 주(목요일 오전 10시부터, 제작자 요청) 경험치만 오른 만큼 (% x 1000, 제작자 요청: 레벨업 ▲ 처럼 '+2%'). 성장 기록(level_log)의 마지막 기록과
  * 그 앞의 다른 값 기록을 비교한다. '오타 수정'은 새 기록 대신 마지막 기록을 고치므로 여기에 잡히지 않는다. 레벨이 바뀌었으면 ▲ 가 맡는다
  */
 async function expUps(env: Env): Promise<Map<string, number>> {
@@ -16,14 +15,14 @@ async function expUps(env: Env): Promise<Map<string, number>> {
       "WHERE rn <= 8 ORDER BY user_id, at DESC",
   ).all<{ user_id: string; at: number; level: number; exp: number | null }>();
   const ups = new Map<string, number>();
-  const now = Date.now();
+  const start = weekStart();
   let i = 0;
   while (i < results.length) {
     const user = results[i].user_id;
     const rows: typeof results = [];
     while (i < results.length && results[i].user_id === user) rows.push(results[i++]);
     const last = rows[0];
-    if (now - last.at > RECENT_MS) continue;
+    if (last.at < start) continue;
     const before = rows.find((r) => r.level !== last.level || r.exp !== last.exp);
     // 앞 기록에 경험치가 없었으면(처음 적은 것) 오른 게 아니다
     if (before && before.level === last.level && before.exp !== null && last.exp !== null && last.exp > before.exp) {
