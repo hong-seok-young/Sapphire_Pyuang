@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { errorText } from "../auth";
 import { ago, goldText, goldWords } from "../market";
-import { SHOP_PIC, actOrder, discount, fetchShop, orderItem, saveShopItem, saveShopSettings } from "../platshop";
+import { SHOP_PIC, actOrder, discount, fetchShop, orderItem, platWorth, saveShopItem, saveShopSettings } from "../platshop";
 import type { ShopData, ShopItem, ShopOrder, ShopSettings } from "../platshop";
 import { Loading, TopBar } from "../ui";
 
@@ -103,17 +103,24 @@ export function PlatShopPage() {
       {tab === "shop" && (
         <>
           <ul className="ps-grid">
-            {items.map((it) => (
+            {/* 판매 중지한 물건은 상점에 안 나온다 (설정의 '판매 중지된 물건'에서 다시 판매) */}
+            {items.filter((it) => it.enabled).map((it) => (
               <li key={it.id}>
-                <button className={"ps-card" + (picked === it.id ? " ps-picked" : "") + (it.enabled ? "" : " ps-off")} onClick={() => setPicked(picked === it.id ? null : it.id)}>
-                  <img src={SHOP_PIC + it.tile} alt={it.name} loading="lazy" />
+                <button className={"ps-card" + (picked === it.id ? " ps-picked" : "")} onClick={() => setPicked(picked === it.id ? null : it.id)}>
+                  {/* 그림 속 플래티넘 값에 줄을 긋고, 할인가를 시중 비율로 친 플래티넘을 위에 붙인다 (제작자 요청) */}
+                  <span className="ps-tile">
+                    <img src={SHOP_PIC + it.tile} alt={it.name} loading="lazy" />
+                    <i className="ps-strike" />
+                    <b className="ps-worth">
+                      <img src={SHOP_PIC + "plat.png"} alt="" />
+                      {platWorth(it, s.market).toLocaleString("ko-KR")}
+                    </b>
+                  </span>
                   <span className="ps-price">
                     <s>{goldWords(it.marketGold)}</s> <b>{goldWords(it.gold)}</b>
                     <em>-{discount(it)}%</em>
                   </span>
-                  <small className="ps-limit">
-                    {!it.enabled ? "판매 안 함" : it.used >= it.limitCount ? "한도 다 씀" : `${it.limitWeeks}주 ${it.limitCount}개`}
-                  </small>
+                  <small className="ps-limit">{it.used >= it.limitCount ? "한도 다 씀" : `${it.limitWeeks}주 ${it.limitCount}개`}</small>
                 </button>
               </li>
             ))}
@@ -127,7 +134,8 @@ export function PlatShopPage() {
                   {item.count > 1 && ` ×${item.count}`}
                 </b>
                 <small>
-                  플래티넘 {item.plat.toLocaleString("ko-KR")} · <s>{gold(item.marketGold)}</s> → <b>{goldText(item.gold)} 골드</b>
+                  플래티넘 <s>{item.plat.toLocaleString("ko-KR")}</s> → {platWorth(item, s.market).toLocaleString("ko-KR")} 어치 · <s>{gold(item.marketGold)}</s> →{" "}
+                  <b>{goldText(item.gold)} 골드</b>
                 </small>
                 <small>
                   {item.limitWeeks}주에 {item.limitCount}개 · 남은 {Math.max(0, item.limitCount - item.used)}개
@@ -260,11 +268,46 @@ function ShopSettingsPanel({ settings, items, busy, run }: {
           </button>
         </div>
       </section>
+      <h2 className="panel-title ps-rules-title">판매 중 {items.filter((it) => it.enabled).length}</h2>
       <ul className="ps-item-rules">
-        {items.map((it) => (
-          <ItemRule key={it.id} it={it} settings={settings} busy={busy} run={run} />
-        ))}
+        {items
+          .filter((it) => it.enabled)
+          .map((it) => (
+            <ItemRule key={it.id} it={it} settings={settings} busy={busy} run={run} />
+          ))}
       </ul>
+      {items.some((it) => !it.enabled) && (
+        <>
+          <h2 className="panel-title ps-rules-title">판매 중지 {items.filter((it) => !it.enabled).length}</h2>
+          <ul className="ps-item-rules">
+            {items
+              .filter((it) => !it.enabled)
+              .map((it) => (
+                <li key={it.id} className="panel ps-rule ps-rule-off">
+                  <img src={SHOP_PIC + it.tile} alt="" />
+                  <span className="ps-rule-main">
+                    <b>
+                      {it.name}
+                      {it.count > 1 && ` ×${it.count}`}
+                    </b>
+                  </span>
+                  <button
+                    className="pill pill-on"
+                    disabled={busy}
+                    onClick={() =>
+                      run(
+                        () => saveShopItem(it.id, { enabled: true, ratio: it.custom ? it.ratio : null, limitCount: it.custom ? it.limitCount : null, limitWeeks: it.custom ? it.limitWeeks : null }),
+                        `${it.name} 다시 판매해요.`,
+                      )
+                    }
+                  >
+                    다시 판매
+                  </button>
+                </li>
+              ))}
+          </ul>
+        </>
+      )}
     </>
   );
 }
@@ -275,7 +318,6 @@ function ItemRule({ it, settings, busy, run }: {
   busy: boolean;
   run: (fn: () => Promise<unknown>, done?: string) => void;
 }) {
-  const [enabled, setEnabled] = useState(it.enabled);
   const [ratio, setRatio] = useState(it.ratio !== settings.ratio ? String(it.ratio) : "");
   const [count, setCount] = useState(it.limitCount !== settings.limitCount ? String(it.limitCount) : "");
   const [weeks, setWeeks] = useState(it.limitWeeks !== settings.limitWeeks ? String(it.limitWeeks) : "");
@@ -296,15 +338,19 @@ function ItemRule({ it, settings, busy, run }: {
         </span>
       </span>
       <span className="ps-rule-side">
-        <button className={"pill" + (enabled ? " pill-on" : "")} onClick={() => setEnabled(!enabled)}>
-          {enabled ? "판매" : "판매 안 함"}
+        <button
+          className="pill"
+          disabled={busy}
+          onClick={() => run(() => saveShopItem(it.id, { enabled: true, ratio: opt(ratio), limitCount: opt(count), limitWeeks: opt(weeks) }), `${it.name} 저장했어요.`)}
+        >
+          저장
         </button>
         <button
           className="pill"
           disabled={busy}
-          onClick={() => run(() => saveShopItem(it.id, { enabled, ratio: opt(ratio), limitCount: opt(count), limitWeeks: opt(weeks) }), `${it.name} 저장했어요.`)}
+          onClick={() => run(() => saveShopItem(it.id, { enabled: false, ratio: opt(ratio), limitCount: opt(count), limitWeeks: opt(weeks) }), `${it.name} 판매를 멈췄어요.`)}
         >
-          저장
+          판매 중지
         </button>
       </span>
     </li>

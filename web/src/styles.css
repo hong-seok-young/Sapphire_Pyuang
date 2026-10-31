@@ -824,7 +824,15 @@ button { font: inherit; color: inherit; }
   background: var(--panel); border: var(--px) solid var(--edge);
 }
 .ps-grid > li { min-width: 0; }
-.ps-card img { display: block; width: 100%; max-width: 100%; height: auto; }
+.ps-tile { position: relative; display: block; }
+.ps-card .ps-tile > img { display: block; width: 100%; max-width: 100%; height: auto; }
+/* strike through the platinum price printed on the tile picture (its price bar is the bottom ~13%) */
+.ps-strike { position: absolute; left: 24%; right: 24%; top: 91.5%; height: 2px; background: #ff3b3b; transform: rotate(-7deg); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6); }
+.ps-worth {
+  position: absolute; right: 3px; bottom: 15%; display: flex; align-items: center; gap: 1px; padding: 0 3px;
+  font-size: 10px; font-weight: 700; line-height: 14px; color: var(--edge); background: #ffd34d; border: 1px solid var(--edge);
+}
+.ps-worth img { width: 9px; height: auto; }
 .ps-picked { box-shadow: 0 0 0 2px var(--sunset); }
 .ps-off { opacity: 0.45; }
 .ps-price { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 0 4px; font-size: 12px; }
@@ -886,3 +894,5 @@ button { font: inherit; color: inherit; }
 }
 .tile-ring::after { content: ""; position: absolute; z-index: 1; inset: 3px; background: var(--panel); pointer-events: none; }
 @keyframes ring-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.ps-rules-title { margin: 12px 0 6px; }
+.ps-rule-off { opacity: 0.75; }
