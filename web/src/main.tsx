@@ -24,7 +24,7 @@ function noticeUpdate() {
   toast.className = "update-toast";
   toast.textContent = "✨ 새 버전으로 업데이트됐어요";
   document.body.appendChild(toast);
-  window.setTimeout(() => toast.remove(), 3200);
+  window.setTimeout(() => toast.remove(), 4500);
 }
 noticeUpdate();
 

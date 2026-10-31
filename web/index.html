@@ -22,6 +22,7 @@
       .boot p { margin: 0; font-size: 14px; color: #a9a2cf; line-height: 1.6; }
       .boot .boot-slow { display: none; }
       .boot.slow .boot-slow { display: block; }
+      .boot.updating #boot-msg { color: #ffc35c; }
       @keyframes boot-bob { 50% { transform: translateY(-6px); } }
     </style>
     <script>
@@ -42,10 +43,10 @@
           if (t && (t.tagName === "SCRIPT" || t.tagName === "LINK") && (t.src || t.href || "").indexOf("/assets/") >= 0) retry();
         }, true);
         window.addEventListener("vite:preloadError", function (e) { e.preventDefault(); retry(); });
-        // 앱이 4초 안에 안 뜨면 새 버전을 받는 중이라고 알린다
+        // 앱이 4초 안에 안 뜨면 기다려 달라는 글을 더한다
         setTimeout(function () {
           var boot = document.getElementById("boot");
-          if (boot) boot.className = "boot slow";
+          if (boot) boot.className += " slow";
         }, 4000);
       })();
     </script>
@@ -56,9 +57,27 @@
         <img src="icon-192.png" alt="" />
         <b>Sapphire</b>
         <p id="boot-msg">불러오는 중…</p>
-        <p class="boot-slow">새 버전을 받는 중이에요. 업데이트 뒤 처음 열 때는 조금 더 걸려요.</p>
+        <p class="boot-slow">잠시만 기다려 주세요.</p>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // 첫 화면 글은 처음부터 정한다 (제작자 요청): 코드 파일 이름(빌드마다 바뀜)이 지난번과 다르면 업데이트,
+      // 같으면 새로고침, 처음 여는 거면 '불러오는 중'. 지난번 이름은 main.tsx 의 noticeUpdate 가 적어 둔다
+      (function () {
+        var code = document.querySelector('script[type="module"][src*="/assets/"]');
+        var msg = document.getElementById("boot-msg");
+        var boot = document.getElementById("boot");
+        if (!code || !msg || !boot) return;
+        var before = null;
+        try { before = localStorage.getItem("sapphire-build"); } catch (e) {}
+        if (before && before !== code.src) {
+          msg.textContent = "업데이트가 있어요. 새 버전을 반영하는 중…";
+          boot.className += " updating";
+        } else if (before) {
+          msg.textContent = "새로고침 중…";
+        }
+      })();
+    </script>
   </body>
 </html>

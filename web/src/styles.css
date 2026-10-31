@@ -709,7 +709,7 @@ button { font: inherit; color: inherit; }
   position: fixed; z-index: 50; left: 50%; top: calc(10px + env(safe-area-inset-top)); transform: translateX(-50%);
   padding: 8px 14px; font-size: 13px; white-space: nowrap; color: var(--edge); background: var(--gold);
   border: var(--px) solid var(--edge); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); pointer-events: none;
-  animation: toast 3.2s ease forwards;
+  animation: toast 4.5s ease forwards;
 }
 @keyframes toast {
   0% { opacity: 0; transform: translate(-50%, -12px); }
