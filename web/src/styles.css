@@ -382,6 +382,9 @@ button { font: inherit; color: inherit; }
   box-shadow: inset var(--px) var(--px) 0 var(--hi), inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--lo);
 }
 .job-chip small { font-size: 10px; white-space: nowrap; }
+/* 직업 단추의 평균 레벨: 길드 칸의 '평균 Lv.' 와 같은 금색, 고른 단추는 어두운 글자 (제작자 요청 2026-11-01) */
+.job-chip .job-chip-avg { font-size: 10px; color: var(--gold); }
+.job-chip-on .job-chip-avg { color: var(--edge); }
 .job-chip-all { font-size: 15px; font-weight: 700; line-height: 22px; }
 .job-chip-on { color: var(--edge); background: var(--sunset); box-shadow: inset 2px 2px 0 #ffc35c; }
 @keyframes bob { 50% { transform: translateY(-3px); } }
@@ -1426,7 +1429,12 @@ a.mn-stage:active { transform: translate(1px, 1px); }
    one table per section, folded sections when there are many, the searched rows highlighted */
 .odds-source { margin: 0 0 6px; font-size: 11px; color: var(--muted); text-align: right; }
 .odds-search { width: 100%; margin: 0 0 10px; }
-.odds-found { margin-bottom: 14px; }
+.odds-cats { margin-bottom: 10px; }
+.odds-cats .pill small { margin-left: 2px; opacity: 0.7; font-size: 11px; }
+.odds-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.odds-chip { display: inline-flex; align-items: baseline; gap: 4px; max-width: 100%; white-space: normal; line-height: 1.35; color: var(--text); text-decoration: none; }
+.odds-chip small { font-size: 11px; color: var(--muted); }
+.odds-chip .odds-chip-cat { color: var(--gold); }
 .odds-sec { margin: 0 0 10px; }
 details.odds-sec { padding: 6px 8px; background: var(--panel); border: var(--px) solid var(--edge); }
 details.odds-sec > summary { cursor: pointer; font-size: 13px; }

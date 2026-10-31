@@ -134,7 +134,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "alerts") body = <AlertsPage developer={me.role === "developer"} />;
   else if (page === "shop") body = <PlatShopPage />;
   else if (page === "patch") body = <PatchNotesPage />;
-  else if (page === "odds") body = arg ? <OddsTablePage id={arg} q={route.query.get("q") ?? ""} /> : <OddsPage q={route.query.get("q") ?? ""} />;
+  else if (page === "odds") body = arg ? <OddsTablePage id={arg} q={route.query.get("q") ?? ""} /> : <OddsPage q={route.query.get("q") ?? ""} cat={route.query.get("c") ?? ""} />;
   else if (page === "board") body = <BoardPage me={me} arg={arg} sub={route.parts[2] ?? ""} query={route.query} />;
   else if (!wiki) body = <Loading error={loggedOut ? undefined : error} />;
   else if (page === "") body = <Home me={me} />;

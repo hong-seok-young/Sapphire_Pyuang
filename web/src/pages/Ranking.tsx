@@ -30,6 +30,12 @@ function averageLevel(list: { level: number }[]): number | null {
   return list.length ? Math.round((list.reduce((s, r) => s + r.level, 0) / list.length) * 10) / 10 : null;
 }
 
+/** 길드 칸, 직업 단추의 '평균 Lv.46.5' (아무도 없으면 '-') */
+function avgText(list: { level: number }[]): string {
+  const avg = averageLevel(list);
+  return avg !== null ? `평균 Lv.${avg}` : "-";
+}
+
 /**
  * 통합, 1군, 2군 칸: 사람 수와 평균 레벨을 따로 보여 주고, 누르면 그 길드만 본다.
  * withAverage 가 아니면 (성장 랭킹) 사람 수만.
@@ -41,13 +47,12 @@ function GuildCards({ items, selected, onSelect, withAverage = true }: {
   withAverage?: boolean;
 }) {
   const card = (key: GuildFilter, title: string, sub: string, list: { level: number }[]) => {
-    const avg = averageLevel(list);
     return (
       <button key={key} type="button" className={"guild-stat" + (selected === key ? " guild-stat-on" : "")} aria-pressed={selected === key} onClick={() => onSelect(key)}>
         <b>{title}</b>
         <small>{sub}</small>
         <span>{list.length}명</span>
-        {withAverage && <strong>{avg !== null ? `평균 Lv.${avg}` : "-"}</strong>}
+        {withAverage && <strong>{avgText(list)}</strong>}
       </button>
     );
   };
@@ -244,10 +249,12 @@ function LevelRanking({ me, data, guild, onGuild }: { me: Me; data: RankEntry[];
         )}
       </div>
 
+      {/* 직업마다 사람 수와 평균 레벨 (제작자 요청 2026-11-01, 고른 길드 안에서) */}
       <div className="job-filter" role="tablist" aria-label="직업">
         <button role="tab" aria-selected={filter === "all"} className={"job-chip" + (filter === "all" ? " job-chip-on" : "")} onClick={() => setFilter("all")}>
           <span className="job-chip-all">ALL</span>
           <small>{inGuild.length}</small>
+          <small className="job-chip-avg">{avgText(inGuild)}</small>
         </button>
         {JOBS.map((j) => (
           <button
@@ -261,6 +268,7 @@ function LevelRanking({ me, data, guild, onGuild }: { me: Me; data: RankEntry[];
             <small>
               {JOB_NAME[j]} {inGuild.filter((r) => r.job === j).length}
             </small>
+            <small className="job-chip-avg">{avgText(inGuild.filter((r) => r.job === j))}</small>
           </button>
         ))}
       </div>
@@ -402,6 +410,7 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
  * (게임을 읽지 않는다. CLAUDE.md 게임 안전 규칙). 경험치는 모두에게 보인다 (제작자 요청). 닉네임을 누르면
  * 그 사람의 레벨·경험치 그래프가 그 줄 아래에 펼쳐진다 (GrowthChart).
  */
+
 export function RankingPage({ me }: { me: Me }) {
   const { data, error } = useAsync(useCallback(() => fetchRanking(), []));
   const [view, setView] = useState<View>("level");

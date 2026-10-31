@@ -1,10 +1,11 @@
 // '정보' > '공식 확률' (#/odds, #/odds/<표 번호>). 제작자 요청 2026-10-31: 컴투스 공식 확률 정보를 위키에.
-// 목록은 분류(가챠샵, 랜덤상자, 보석 ...)마다 카드, 위의 찾기 칸은 아이템·상자 이름이 든 표를 고른다.
+// 목록은 위에 분류(가챠샵, 랜덤상자, 보석 ...) 단추, 아래에 고른 분류의 표 단추. 찾기 칸은 아이템·상자 이름이 든 표를 고른다.
 // 표 화면은 섹션마다 표, 섹션이 많으면 접어 두고, 맨 위에 공식 페이지 링크.
 import { useCallback, useState } from "react";
 import { useAsync } from "../data";
 import { loadOdds, matchedSections, oddsMatches, oddsName, oddsPage } from "../odds";
 import type { OddsSection, OddsTable } from "../odds";
+import { go } from "../router";
 import { Loading, NotFound, TopBar } from "../ui";
 
 const CATEGORY_ICON: Record<string, string> = {
@@ -33,9 +34,10 @@ function dateText(iso: string): string {
   return `${d.getFullYear()}.${two(d.getMonth() + 1)}.${two(d.getDate())}`;
 }
 
-export function OddsPage({ q: initial }: { q: string }) {
+export function OddsPage({ q: initial, cat: initialCat }: { q: string; cat: string }) {
   const { data: odds, error } = useAsync(useCallback(() => loadOdds(), []));
   const [q, setQ] = useState(initial);
+  const [cat, setCat] = useState(initialCat);
   if (!odds) {
     return (
       <>
@@ -46,15 +48,19 @@ export function OddsPage({ q: initial }: { q: string }) {
   }
   const found = q.trim() ? odds.tables.filter((t) => oddsMatches(t, q)) : null;
   const groups = [...new Set(odds.tables.map((t) => t.path[0]))];
-  const card = (t: OddsTable) => {
+  const current = groups.includes(cat) ? cat : groups[0];
+  // 고른 분류는 주소에 남겨 표를 보고 돌아와도 그대로 (기록은 늘리지 않는다)
+  const pick = (g: string) => {
+    setCat(g);
+    go(`#/odds?c=${encodeURIComponent(g)}`, true);
+  };
+  const chip = (t: OddsTable) => {
     const hits = found ? matchedSections(t, q).length : 0;
     return (
-      <a key={t.key} className="card mn-card" href={`#/odds/${t.key}${q.trim() ? "?q=" + encodeURIComponent(q.trim()) : ""}`}>
-        <span className="mn-card-icon">{CATEGORY_ICON[t.path[0]] ?? "🎲"}</span>
-        <span className="mn-card-text">
-          <b>{oddsName(t)}</b>
-          <small>{found ? `${t.path[0]} · ${hits}곳` : t.sections.length > 1 ? `${t.sections.length}개` : ""}</small>
-        </span>
+      <a key={t.key} className="pill odds-chip" href={`#/odds/${t.key}${q.trim() ? "?q=" + encodeURIComponent(q.trim()) : ""}`}>
+        {found && <small className="odds-chip-cat">{t.path[0]}</small>}
+        {oddsName(t)}
+        {found ? <small>{hits}곳</small> : t.sections.length > 1 && <small>{t.sections.length}</small>}
       </a>
     );
   };
@@ -65,22 +71,22 @@ export function OddsPage({ q: initial }: { q: string }) {
       <input className="mk-input odds-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 아이템, 상자 이름" aria-label="공식 확률 찾기" />
       {found ? (
         found.length ? (
-          <div className="mn-cards odds-found">{found.map(card)}</div>
+          <div className="odds-chips">{found.map(chip)}</div>
         ) : (
           <div className="empty">'{q}'이 든 표가 없어요.</div>
         )
       ) : (
-        groups.map((g) => {
-          const list = odds.tables.filter((t) => t.path[0] === g);
-          return (
-            <section key={g} className="mn-group">
-              <h2 className="mn-group-head">
-                {CATEGORY_ICON[g] ?? "🎲"} {g} <small>{list.length}</small>
-              </h2>
-              <div className="mn-cards">{list.map(card)}</div>
-            </section>
-          );
-        })
+        <>
+          {/* 분류 단추는 위에 한 번에, 고른 분류의 표만 아래에 짧은 단추로 (제작자 요청 2026-11-01: 길게 늘어뜨리지 말고, 단추도 좌우로 길지 않게) */}
+          <div className="filter odds-cats" role="tablist" aria-label="분류">
+            {groups.map((g) => (
+              <button key={g} role="tab" aria-selected={g === current} className={"pill" + (g === current ? " pill-on" : "")} onClick={() => pick(g)}>
+                {CATEGORY_ICON[g] ?? "🎲"} {g} <small>{odds.tables.filter((t) => t.path[0] === g).length}</small>
+              </button>
+            ))}
+          </div>
+          <div className="odds-chips">{odds.tables.filter((t) => t.path[0] === current).map(chip)}</div>
+        </>
       )}
     </>
   );
