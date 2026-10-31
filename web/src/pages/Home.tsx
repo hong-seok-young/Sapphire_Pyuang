@@ -7,6 +7,8 @@ interface Tile {
   title: string;
   to: string;
   icon: string;
+  /** 이모지 대신 그림 (게임 스샷에서 자른 아이콘) */
+  iconPic?: string;
   soon?: boolean;
   /** 안드로이드 폰 브라우저에서만 보인다 (앱 안, 아이폰에서는 숨김) */
   androidOnly?: boolean;
@@ -17,7 +19,8 @@ interface Tile {
 }
 
 const TILES: Tile[] = [
-  { title: "사냥터", to: "#/places", icon: "🗺️" },
+  // 사냥터는 아래 탭에 있어서, 이 자리는 1군 전용 플래티넘 할인 상점 (제작자 요청). 아이콘은 게임 첫 화면의 상점 그림
+  { title: "1군 전용 플래티넘 할인 상점", to: "#/shop", icon: "🏪", iconPic: "/data/shop/shop_icon.png" },
   { title: "장비", to: "#/equip", icon: "🛡️" },
   { title: "육성 공략", to: "#/menu/육성 공략", icon: "📈" },
   { title: "직업별 스킬", to: "#/menu/직업별 스킬", icon: "✨" },
@@ -71,7 +74,7 @@ export function Home({ me }: { me: Me }) {
       <nav className="tiles">
         {shown.map((t) => (
           <a key={t.title} className={"tile" + (t.soon ? " tile-soon" : "")} href={t.to}>
-            <span className="tile-icon">{t.icon}</span>
+            <span className="tile-icon">{t.iconPic ? <img className="tile-pic" src={t.iconPic} alt="" /> : t.icon}</span>
             {/* 이름은 한 줄에 맞추고, 안 되면 낱말 사이에서만 줄을 바꾼다 ('성장'이 '성/장'으로 갈리지 않게) */}
             <FitLine className="tile-title" text={t.title} />
             {t.soon && <span className="tile-badge">준비 중</span>}

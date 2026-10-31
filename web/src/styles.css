@@ -808,3 +808,60 @@ button { font: inherit; color: inherit; }
 .mk-unit { display: inline-flex; border: var(--px) solid var(--edge); }
 .mk-unit button { padding: 1px 6px; font-size: 11px; color: var(--muted); background: var(--panel-2); border: 0; cursor: pointer; }
 .mk-unit .mk-unit-on { color: var(--edge); background: var(--sunset); }
+
+/* platinum discount shop (pages/PlatShop.tsx): game shop tiles three per row, strikethrough market price */
+.tile-pic { height: 30px; width: auto; image-rendering: auto; }
+.ps-closed { margin: 0 0 6px; text-align: center; font-size: 12px; color: var(--edge); background: #ffd34d; }
+.ps-rate { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 0 0 8px; font-size: 13px; }
+.ps-rate img, .ps-ledger img { width: 16px; height: 16px; }
+.ps-rate b { color: var(--gold); }
+.ps-rate s, .ps-price s, .ps-buy s { color: var(--muted); }
+.ps-grid { list-style: none; margin: 0 0 90px; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.ps-card {
+  width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 0 0 4px; cursor: pointer;
+  background: var(--panel); border: var(--px) solid var(--edge);
+}
+.ps-grid > li { min-width: 0; }
+.ps-card img { display: block; width: 100%; max-width: 100%; height: auto; }
+.ps-picked { box-shadow: 0 0 0 2px var(--sunset); }
+.ps-off { opacity: 0.45; }
+.ps-price { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 0 4px; font-size: 12px; }
+.ps-price b { color: var(--gold); font-weight: 400; }
+.ps-price em { font-style: normal; font-size: 10px; color: #ff7a6b; }
+.ps-limit { text-align: center; font-size: 10px; color: var(--muted); }
+.ps-buy {
+  position: fixed; z-index: 20; left: 50%; transform: translateX(-50%); width: min(616px, calc(100% - 16px));
+  bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 6px);
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--panel-2); border: var(--px) solid var(--edge);
+  box-shadow: 0 -2px 0 rgba(0, 0, 0, 0.25); animation: page-in 0.16s ease-out;
+}
+.ps-buy img { width: 48px; height: auto; flex: none; }
+.ps-buy-name { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 11px; color: var(--muted); }
+.ps-buy-name b { font-size: 13px; font-weight: 400; color: var(--text); }
+.ps-buy-name small b { font-size: 11px; color: var(--gold); }
+.ps-buy .pill { flex: none; }
+.ps-orders { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.ps-order { display: flex; align-items: center; gap: 8px; padding: 8px; margin: 0; }
+.ps-order-main { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 13px; }
+.ps-order-main small { font-size: 11px; color: var(--muted); }
+.ps-order-side { flex: none; display: flex; align-items: center; gap: 4px; }
+.ps-status { font-size: 11px; color: var(--muted); }
+.ps-done .ps-status { color: #8ff0b0; }
+.ps-cancelled { opacity: 0.6; }
+.ps-ledger { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.ps-ledger .panel { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 0; font-size: 13px; }
+.ps-ledger .panel span { display: flex; align-items: center; gap: 4px; }
+.ps-gold { color: var(--gold); }
+.ps-settings label { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 13px; }
+.ps-settings input, .ps-rule-inputs input {
+  width: 48px; height: 28px; text-align: center; color: var(--text); background: var(--panel); border: var(--px) solid var(--edge);
+}
+.ps-item-rules { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.ps-rule { display: flex; align-items: center; gap: 8px; padding: 6px; margin: 0; }
+.ps-rule img { width: 44px; height: auto; flex: none; }
+.ps-rule-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.ps-rule-main b { font-weight: 400; }
+.ps-rule-inputs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; color: var(--muted); }
+.ps-rule-inputs input { width: 40px; height: 24px; font-size: 12px; }
+.ps-rule-side { flex: none; display: flex; flex-direction: column; gap: 4px; }
+.ps-rule-side .pill { font-size: 11px; padding: 4px 8px; }

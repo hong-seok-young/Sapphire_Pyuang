@@ -187,3 +187,40 @@ CREATE TABLE IF NOT EXISTS listing_talk (
   parent_id INTEGER                       -- 답글이면 원래 글 (한 단계만)
 );
 CREATE INDEX IF NOT EXISTS listing_talk_listing ON listing_talk (listing_id, id);
+
+-- 1군 전용 플래티넘 할인 상점 (server/platshop.ts). 통 설정 한 줄: 비율은 '플래티넘 100당 몇 만 골드'
+CREATE TABLE IF NOT EXISTS plat_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  ratio REAL NOT NULL DEFAULT 5,          -- 길드 할인가 (처음 5:100)
+  market REAL NOT NULL DEFAULT 7,         -- 시중가 (줄 그어 보이는 값, 7:100)
+  limit_count INTEGER NOT NULL DEFAULT 1, -- 한 사람이 물건마다 limit_weeks 주에 몇 개
+  limit_weeks INTEGER NOT NULL DEFAULT 2,
+  open INTEGER NOT NULL DEFAULT 0,        -- 1 이면 길드원에게 연다 (그 전에는 오피서 이상만 들어간다)
+  updated_by TEXT,
+  updated_at INTEGER
+);
+
+-- 물건마다 따로 정한 것 (줄이 없으면 판매 중이고 통 설정을 따른다. null 도 통 설정)
+CREATE TABLE IF NOT EXISTS plat_items (
+  item_id TEXT PRIMARY KEY,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  ratio REAL,
+  limit_count INTEGER,
+  limit_weeks INTEGER
+);
+
+-- 구매 신청과 정산 기록 (거래 완료된 것의 플래티넘과 골드를 쌓아 본다. 오피서 이상만 본다)
+CREATE TABLE IF NOT EXISTS plat_orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  item_id TEXT NOT NULL,
+  item_name TEXT NOT NULL,
+  plat INTEGER NOT NULL,                  -- 길드가 쓰는 플래티넘
+  gold INTEGER NOT NULL,                  -- 길드가 받는 골드 (신청 때 비율로)
+  ratio REAL NOT NULL,
+  status TEXT NOT NULL DEFAULT 'requested', -- requested 신청 | done 거래 완료 | cancelled 취소
+  created_at INTEGER NOT NULL,
+  done_at INTEGER,
+  done_by TEXT
+);
+CREATE INDEX IF NOT EXISTS plat_orders_user ON plat_orders (user_id, item_id, created_at);

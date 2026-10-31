@@ -744,7 +744,7 @@ def main():
 def copy_rank_pictures():
     """게임 화면 스샷에서 자른 그림: 길드 랭킹(자료/scripts/make_rank_marks.py), 사파이어 중개인(make_market_marks.py).
     data/ 아래에 두어 위키 자료처럼 로그인한 길드원에게만 보인다 (functions/data/_middleware.ts)."""
-    for src, dst in (("랭킹", "rank"), ("중개인", "market")):
+    for src, dst in (("랭킹", "rank"), ("중개인", "market"), ("상점", "shop")):
         out = OUT / "data" / dst
         if out.exists():
             shutil.rmtree(out)
@@ -752,6 +752,10 @@ def copy_rank_pictures():
         pics = sorted((SRC / "이미지" / src).glob("*.png"))
         for f in pics:
             shutil.copy2(f, out / f.name)
+        # 플래티넘 상점 물건 목록 (이름, 플래티넘, 개수, 칸 그림)
+        items = SRC / "이미지" / src / "items.json"
+        if items.exists():
+            shutil.copy2(items, out / "items.json")
         print(f"{src} 그림", len(pics))
 
 
