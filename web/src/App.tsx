@@ -16,7 +16,7 @@ import { MenuPage } from "./pages/Menus";
 import { ChatPage } from "./pages/Chat";
 import { AppPage } from "./pages/AppPage";
 import { AppClosedPage, IconChangedPage, InstallGuide, iconNoticeNeeded } from "./pages/InstallGuide";
-import { APP_OPEN, inApp, isAndroid, isIOS, standalone } from "./platform";
+import { APP_OPEN, ICON_CHANGED_AT, inApp, isAndroid, isIOS, standalone } from "./platform";
 import { LoginPage, PasswordPage } from "./pages/Login";
 import { AdminPage } from "./pages/Admin";
 import { MePage, ProfileSetupPage } from "./pages/Profile";
@@ -88,9 +88,12 @@ export function App() {
       </div>
     );
   }
-  // 아이콘 다시 설치 안내: 예전 아이콘을 들고 있을 수 있는 사람에게. 앱개발자(퓨앙)는 이미 새 아이콘이라 띄우지 않는다
-  // (제작자 요청 2026-11-01: 나는 최종 아이콘인데 왜 뜨냐, 새로 깔거나 구 아이콘인 사람에게만)
-  if (iconNotice && me?.role !== "developer") return <IconChangedPage onDone={() => setIconNotice(false)} />;
+  // 아이콘 다시 설치 안내 (제작자 요청 2026-11-01: 새 아이콘인 사람에게는 절대 안 뜨게, 로그인한 뒤 판을 보고).
+  // 홈 화면 웹앱이 시작 주소에 지금 아이콘 판(?icon=) 없이 열렸고(iconNoticeNeeded: 재설치 완료나 새 판으로 연 적이 있으면 빠짐),
+  // 아이콘을 바꾸기 전부터 있던 계정일 때만. 그 뒤 만든 계정은 새 아이콘으로 깔았다. 앱개발자는 이미 새 아이콘이라 뺀다
+  if (iconNotice && me && me.role !== "developer" && (me.createdAt ?? 0) < ICON_CHANGED_AT) {
+    return <IconChangedPage onDone={() => setIconNotice(false)} />;
+  }
   // 안드로이드 앱은 검토 후 오픈: 이미 깐 앱 안에서는 웹으로 안내만 한다. 앱개발자(퓨앙)는 그대로 쓴다 (제작자 요청)
   if (inApp && !APP_OPEN && me?.role !== "developer") {
     if (me === null && appLogin) return <LoginPage onLogin={setMe} />;

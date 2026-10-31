@@ -245,14 +245,16 @@ export function readProfile(body: { job?: unknown; level?: unknown; exp?: unknow
 /** 로그인한 사람의 정보 (/api/me, /api/login 이 같은 모양으로 준다). exp, avatar 는 본인 것이라 여기서만 준다 */
 export async function meInfo(env: Env, user: User) {
   const p = await env.DB.prepare(
-    "SELECT p.job AS job, p.level AS level, p.exp AS exp, p.guild AS guild, a.updated_at AS avatar FROM users u " +
+    "SELECT p.job AS job, p.level AS level, p.exp AS exp, p.guild AS guild, a.updated_at AS avatar, u.created_at AS created_at FROM users u " +
       "LEFT JOIN profiles p ON p.user_id = u.id LEFT JOIN avatars a ON a.user_id = u.id WHERE u.id = ?",
   )
     .bind(user.id)
-    .first<{ job: Job | null; level: number | null; exp: number | null; guild: Guild | null; avatar: number | null }>();
+    .first<{ job: Job | null; level: number | null; exp: number | null; guild: Guild | null; avatar: number | null; created_at: number | null }>();
   return {
     id: user.id, role: user.role, mustChange: user.must_change === 1,
     job: p?.job ?? null, level: p?.level ?? null, exp: p?.exp ?? null, guild: p?.guild ?? null, avatar: p?.avatar ?? null,
+    // 계정을 만든 때: 홈 화면 아이콘이 바뀌기 전부터 있던 계정인지 (아이콘 다시 설치 안내, src/App.tsx)
+    createdAt: p?.created_at ?? null,
   };
 }
 

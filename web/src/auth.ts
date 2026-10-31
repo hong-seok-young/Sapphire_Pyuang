@@ -56,6 +56,8 @@ export interface Me {
   guild: Guild | null;
   /** 캐릭터 그림을 올린 때. 없으면 null */
   avatar: number | null;
+  /** 계정을 만든 때 (아이콘 다시 설치 안내: 아이콘이 바뀌기 전부터 있던 계정에만) */
+  createdAt?: number | null;
 }
 
 export interface RankEntry {

@@ -45,6 +45,11 @@ export const WEB_URL = "https://sapphire-guild.pages.dev";
  * 다시 깔 때까지 열 때마다 지우고 다시 설치하라고 안내한다 (pages/InstallGuide.tsx IconChangedPage)
  */
 export const ICON_VERSION = "2026-10-31-galaxy";
+/**
+ * 홈 화면 아이콘 그림을 바꿔 배포한 때. 이보다 늦게 만든 계정은 새 아이콘으로 깔았으니 다시 설치 안내를 띄우지 않는다 (App.tsx).
+ * 아이콘을 다시 바꾸면 ICON_VERSION 과 같이 바꾼다 (이번 판: 10/31 16:07 그림 교체, 17:02 에 시작 주소에 ?icon= 이 붙었다)
+ */
+export const ICON_CHANGED_AT = Date.parse("2026-10-31T16:07:00+09:00");
 
 /**
  * 안드로이드 앱을 받고 쓸 수 있는지. 제작자 요청(2026-10-31)으로 지금은 웹만 쓴다: 앱 받기는 '검토 후 오픈',
