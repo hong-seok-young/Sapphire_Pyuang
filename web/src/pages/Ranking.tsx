@@ -1,5 +1,7 @@
 import { useCallback, useState } from "react";
-import { GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, avatarUrl, expText, fetchGrowth, fetchRanking, growthText } from "../auth";
+import {
+  GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, avatarUrl, errorText, expText, fetchGrowth, fetchRanking, growthText, saveMyProfile,
+} from "../auth";
 import type { GrowthEntry, GrowthPeriod, Guild, Job, Me, RankEntry } from "../auth";
 import { useAsync } from "../data";
 import { JobEmblem, JobGlyph, MINE_TAG_PIC, RankMedal, RoleBadge } from "../emblems";
@@ -80,15 +82,83 @@ function Row({ r, me, now }: { r: Ranked; me: Me; now: number }) {
       <span className="rank-name">
         <small>
           {guildText(r.guild)} · {JOB_NAME[r.job]}
-          {r.exp != null && ` · ${expText(r.exp)}`}
         </small>
         {/* 닉네임은 10글자까지: 넘치면 글자를 줄여서 한 줄에 다 보인다 (자르지 않는다) */}
         <FitLine className="rank-nick" text={r.id} wrap={false} />
+        <ExpBar r={r} mine={r.id === me.id} />
       </span>
       {/* 레벨업 표시 자리는 늘 비워 두어서 표시가 떠도 닉네임이 밀리지 않는다 */}
       <span className="rank-up-slot">{up > 0 && <span className="rank-up">▲{up}</span>}</span>
       <RoleBadge role={r.role} />
     </li>
+  );
+}
+
+/**
+ * 닉네임 아래 경험치 막대 (0~100%, 제작자 요청). 안 적었으면 막대 없이 '경험치 입력 안 했어요'.
+ * 내 줄이면 눌러서 랭킹 화면에서 바로 적는다 (직업, 레벨, 길드는 그대로 두고 경험치만 저장)
+ */
+function ExpBar({ r, mine }: { r: Ranked; mine: boolean }) {
+  const [exp, setExp] = useState<number | null>(r.exp ?? null);
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(r.exp != null ? (r.exp / 1000).toFixed(3) : "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const valid = /^\d{1,2}(\.\d{1,3})?$/.test(text.trim());
+
+  async function save() {
+    if (!valid || !r.guild) return;
+    const value = Math.round(Number(text) * 1000);
+    setBusy(true);
+    setError("");
+    try {
+      await saveMyProfile(r.job, r.level, value, r.guild);
+      setExp(value);
+      setEditing(false);
+    } catch (x) {
+      setError(errorText(x));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <span className="rank-exp-edit">
+        <input
+          inputMode="decimal"
+          value={text}
+          onChange={(e) => setText(e.target.value.replace(/[^\d.]/g, "").slice(0, 6))}
+          placeholder="12.345"
+          aria-label="경험치 퍼센트"
+          autoFocus
+        />
+        <b>%</b>
+        <button disabled={busy || !valid} onClick={save}>
+          저장
+        </button>
+        <button onClick={() => setEditing(false)}>취소</button>
+        {error && <small className="rank-exp-error">{error}</small>}
+      </span>
+    );
+  }
+  const bar =
+    exp !== null ? (
+      <span className="rank-exp">
+        <span className="rank-exp-track">
+          <i style={{ width: `${Math.min(100, exp / 1000)}%` }} />
+        </span>
+        <small>{expText(exp)}</small>
+      </span>
+    ) : (
+      <small className="rank-exp-none">경험치 입력 안 했어요</small>
+    );
+  return mine ? (
+    <button className="rank-exp-btn" onClick={() => setEditing(true)} aria-label="경험치 입력">
+      {bar}
+    </button>
+  ) : (
+    bar
   );
 }
 
