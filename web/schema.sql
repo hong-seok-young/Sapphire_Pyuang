@@ -156,3 +156,23 @@ CREATE TABLE IF NOT EXISTS activity (
 );
 CREATE INDEX IF NOT EXISTS activity_at ON activity (at);
 CREATE INDEX IF NOT EXISTS activity_user_at ON activity (user_id, at);
+
+-- 알림 (server/alerts.ts, 30일 보관): 나와 관련된 일 (살래요, 입찰, 의뢰 수락 ...). read_at 이 없으면 안 읽음
+CREATE TABLE IF NOT EXISTS alerts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  text TEXT NOT NULL,
+  link TEXT,
+  created_at INTEGER NOT NULL,
+  read_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS alerts_user ON alerts (user_id, id);
+
+-- 알림 종류별 켜고 끄기 (줄이 없으면 그 종류의 기본값)
+CREATE TABLE IF NOT EXISTS alert_prefs (
+  user_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  enabled INTEGER NOT NULL,
+  PRIMARY KEY (user_id, kind)
+);

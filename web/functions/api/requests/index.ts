@@ -1,6 +1,7 @@
 // GET  /api/requests -> 길드원 의뢰소: 모집 중, 진행 중, 끝난(30일 안) 의뢰 전부. 수락하고 이틀 지난 것은 먼저 다시 모집 중으로
 // POST /api/requests { title, detail?, rewardGold? | rewardText? } -> 의뢰 올리기 (보상은 골드나 글 중 하나)
 import { NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
+import { notify } from "../../../server/alerts";
 import type { Env } from "../../../server/auth";
 import { MAX_OPEN_REQUESTS, readRequest, requestOut, tidyRequests } from "../../../server/requests";
 import type { RequestRow } from "../../../server/requests";
@@ -31,5 +32,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .bind(me.id, input.title, input.detail, input.rewardGold, input.rewardText, now, now)
     .first<RequestRow>();
   if (!row) return json({ error: "올리지 못했어요" }, 500);
+  await notify(env, "all", "request_new", `${me.id}님의 새 의뢰 “${row.title}”`, "#/requests", me.id);
   return json(requestOut(row), 201);
 };

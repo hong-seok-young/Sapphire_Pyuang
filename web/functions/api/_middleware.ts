@@ -13,7 +13,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const path = new URL(request.url).pathname;
   const method = request.method;
   const opening = method === "GET" && path === "/api/me";
-  if ((method === "GET" && !opening) || method === "HEAD" || method === "OPTIONS" || path === "/api/activity") return context.next();
+  if ((method === "GET" && !opening) || method === "HEAD" || method === "OPTIONS" || path === "/api/activity" || path.startsWith("/api/alerts")) return context.next();
 
   let me: { id: string } | null = null;
   let body: unknown = null;

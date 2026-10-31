@@ -73,7 +73,7 @@ export function forgetView() {
 
 const PAGE_NAME: Record<string, string> = {
   "": "홈", places: "사냥터 목록", search: "검색", equip: "장비", chat: "챗봇", ranking: "길드 랭킹", market: "사파이어 중개인",
-  requests: "길드원 의뢰소", me: "내 정보", admin: "길드원 관리", app: "앱", password: "비밀번호 바꾸기", log: "사용 기록",
+  requests: "길드원 의뢰소", alerts: "알림", me: "내 정보", admin: "길드원 관리", app: "앱", password: "비밀번호 바꾸기", log: "사용 기록",
 };
 
 /** 화면 주소를 이름으로: 글은 제목, 사냥터와 몬스터는 이름 */

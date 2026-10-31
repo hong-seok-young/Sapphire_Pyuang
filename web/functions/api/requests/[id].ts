@@ -6,6 +6,7 @@
 //   reopen  의뢰한 사람이 끝난 의뢰를 다시 모집
 // DELETE /api/requests/:id -> 의뢰 내리기 (의뢰한 사람, 또는 오피서 이상)
 import { FORBIDDEN, NEED_LOGIN, RANK, currentUser, json, paramId, readJson } from "../../../server/auth";
+import { notify } from "../../../server/alerts";
 import type { Env } from "../../../server/auth";
 import { MAX_OPEN_REQUESTS, requestOut, tidyRequests } from "../../../server/requests";
 import type { RequestRow } from "../../../server/requests";
@@ -60,6 +61,11 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
     if (action === "accept") return json({ error: row.status === "done" ? "끝난 의뢰예요" : "이미 다른 길드원이 수락했어요" }, 409);
     return json({ error: "지금 상태에서는 할 수 없어요" }, 409);
   }
+  const title = `의뢰 “${row.title}”`;
+  if (action === "accept") await notify(env, [row.owner], "request", `${me.id}님이 ${title} 수락`, "#/requests", me.id);
+  if (action === "giveup") await notify(env, [row.owner], "request", `${me.id}님이 ${title} 포기`, "#/requests", me.id);
+  if (action === "done" && row.accepter) await notify(env, [row.accepter], "request", `${title} 완료`, "#/requests", me.id);
+  if (action === "release" && row.accepter) await notify(env, [row.accepter], "request", `${title} 수락 취소`, "#/requests", me.id);
   return json(requestOut(updated));
 };
 

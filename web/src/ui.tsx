@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { EDITION } from "./platform";
+import { useUnread } from "./alerts";
 import type { Pic } from "./types";
 
 /**
@@ -49,12 +50,16 @@ export function TopBar({ title, back = true, right }: { title: ReactNode; back?:
         <img className="topbar-logo" src="icon-192.png" alt="" />
       )}
       <h1 className="topbar-title">{typeof title === "string" ? <FitLine text={title} shrink={2} /> : title}</h1>
-      {right ??
-        (location.hash.startsWith("#/me") ? null : (
-          <a className="topbar-me" href="#/me" aria-label="내 정보" title="내 정보">
-            👤
-          </a>
-        ))}
+      {right ?? (
+        <span className="topbar-right">
+          {!location.hash.startsWith("#/alerts") && <Bell className="topbar-me" />}
+          {!location.hash.startsWith("#/me") && (
+            <a className="topbar-me" href="#/me" aria-label="내 정보" title="내 정보">
+              👤
+            </a>
+          )}
+        </span>
+      )}
     </header>
   );
 }
@@ -170,6 +175,17 @@ export function TapTip({ tip, children }: { tip: string; children: ReactNode }) 
         </span>
       )}
     </span>
+  );
+}
+
+/** 알림 단추: 🔔 와 안 읽은 수 (제작자 요청) */
+export function Bell({ className }: { className?: string }) {
+  const n = useUnread();
+  return (
+    <a className={"bell " + (className ?? "")} href="#/alerts" aria-label={n ? `알림 ${n}개` : "알림"}>
+      🔔
+      {n > 0 && <i className="bell-dot">{n > 99 ? "99+" : n}</i>}
+    </a>
   );
 }
 

@@ -4,13 +4,15 @@
 import { NEED_LOGIN, currentUser, json, paramId, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
 import { MAX_NOTE, readNote, validPrice } from "../../../../server/market";
+import { itemName, notify } from "../../../../server/alerts";
 
 export const onRequestPut: PagesFunction<Env> = async ({ request, env, params }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   const id = Number(paramId(params));
   const row = Number.isInteger(id)
-    ? await env.DB.prepare("SELECT seller, status, mode FROM listings WHERE id = ?").bind(id).first<{ seller: string; status: string; mode: string }>()
+    ? await env.DB.prepare("SELECT seller, status, mode, item, enhance FROM listings WHERE id = ?").bind(id)
+        .first<{ seller: string; status: string; mode: string; item: string; enhance: number }>()
     : null;
   if (!row) return json({ error: "없는 글이에요" }, 404);
   if (row.seller === me.id) return json({ error: "내 물건이에요" }, 400);
@@ -28,6 +30,8 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
     .bind(id, me.id, note, offer, Date.now())
     .run();
   const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM listing_wants WHERE listing_id = ?").bind(id).first<{ n: number }>();
+  const offerText = offer !== null ? ` · 흥정 ${(offer as number).toLocaleString("ko-KR")}골드` : "";
+  await notify(env, [row.seller], "market_want", `${me.id}님이 ${itemName(row)} 살래요${offerText}`, "#/market", me.id);
   return json({ wants: n?.n ?? 1, wanted: true, myOffer: offer });
 };
 

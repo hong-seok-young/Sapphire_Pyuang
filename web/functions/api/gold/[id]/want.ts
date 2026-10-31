@@ -3,13 +3,15 @@
 import { NEED_LOGIN, currentUser, json, paramId, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
 import { MAX_NOTE, readNote } from "../../../../server/market";
+import { notify } from "../../../../server/alerts";
 
 export const onRequestPut: PagesFunction<Env> = async ({ request, env, params }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   const id = Number(paramId(params));
   const row = Number.isInteger(id)
-    ? await env.DB.prepare("SELECT owner, status FROM gold_offers WHERE id = ?").bind(id).first<{ owner: string; status: string }>()
+    ? await env.DB.prepare("SELECT owner, status, side, gold FROM gold_offers WHERE id = ?").bind(id)
+        .first<{ owner: string; status: string; side: string; gold: number }>()
     : null;
   if (!row) return json({ error: "없는 글이에요" }, 404);
   if (row.owner === me.id) return json({ error: "내 글이에요" }, 400);
@@ -23,6 +25,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
     .bind(id, me.id, note, Date.now())
     .run();
   const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM gold_wants WHERE offer_id = ?").bind(id).first<{ n: number }>();
+  await notify(env, [row.owner], "gold_want", `${me.id}님이 골드 ${row.side === "sell" ? "팝니다" : "삽니다"} ${row.gold}만 글에 거래할래요`, "#/market", me.id);
   return json({ wants: n?.n ?? 1, wanted: true });
 };
 

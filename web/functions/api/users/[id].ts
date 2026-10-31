@@ -1,6 +1,7 @@
 // DELETE /api/users/:id         -> 계정 지우기 (자기보다 낮은 역할만)
 // PATCH  /api/users/:id { role } -> 역할 바꾸기 (길드마스터, 앱개발자: 오피서 임명/해제 등)
 import { FORBIDDEN, NEED_LOGIN, RANK, canManage, currentUser, isRole, json, paramId, readJson } from "../../../server/auth";
+import { notify } from "../../../server/alerts";
 import type { Env, Role } from "../../../server/auth";
 
 async function target(env: Env, params: Record<string, string | string[]>) {
@@ -20,6 +21,8 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
     env.DB.prepare("DELETE FROM level_log WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM avatars WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM activity WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM alerts WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM alert_prefs WHERE user_id = ?").bind(user.id),
     env.DB.prepare(
       "DELETE FROM listing_wants WHERE user_id = ? OR listing_id IN (SELECT id FROM listings WHERE seller = ?)",
     ).bind(user.id, user.id),
@@ -52,5 +55,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
     return FORBIDDEN();
   }
   await env.DB.prepare("UPDATE users SET role = ? WHERE id = ?").bind(role, user.id).run();
+  const name = { master: "길드마스터", officer: "오피서", member: "길드원", developer: "앱개발자" }[role];
+  await notify(env, [user.id], "account", `역할이 ${name}(으)로 바뀌었어요`, "#/me", me.id);
   return json({ id: user.id, role });
 };

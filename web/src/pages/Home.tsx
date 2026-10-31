@@ -1,7 +1,7 @@
 import { inApp, isAndroid } from "../platform";
 import { RANK } from "../auth";
 import type { Me } from "../auth";
-import { FitLine, HeroTitle } from "../ui";
+import { Bell, FitLine, HeroTitle } from "../ui";
 
 interface Tile {
   title: string;
@@ -51,6 +51,8 @@ export function Home({ me }: { me: Me }) {
             아이모 길드 위키
             {/* 로그인한 사람: 초록 점과 닉네임. 닉네임은 10글자까지라 자르지 않고, 자리가 모자라면 다음 줄로 */}
             <span className="hero-user">
+              {/* 알림: 닉네임 앞 작은 🔔 (위의 단추 줄은 좁은 폰에서 'web' 과 겹쳐서) */}
+              <Bell className="hero-bell" />
               <i className="online-dot" aria-label="로그인 중" />
               {me.id}
             </span>

@@ -8,6 +8,7 @@ import { NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { KEEP_SOLD_MS, MAX_SELLING, USUAL_GOLD_RATE, listingOut, readListing } from "../../../server/market";
 import type { ListingRow } from "../../../server/market";
+import { itemName, notify } from "../../../server/alerts";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
@@ -93,5 +94,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     )
     .first<ListingRow>();
   if (!row) return json({ error: "올리지 못했어요" }, 500);
+  await notify(env, "all", "market_new", `${me.id}님이 ${itemName(row)} 올림${row.mode === "auction" ? " (경매)" : ""}`, "#/market", me.id);
   return json({ ...listingOut(row), wants: 0, wanted: false, myOffer: null, bidCount: 0, highestBid: null, myBid: null, wanters: [], bids: [] }, 201);
 };
