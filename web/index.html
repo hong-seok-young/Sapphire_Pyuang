@@ -26,6 +26,14 @@
       @keyframes boot-bob { 50% { transform: translateY(-6px); } }
     </style>
     <script>
+      // 크롬 등이 '홈 화면에 설치' 창을 띄울 수 있게 되면 받아 둔다 (InstallGuide 의 '설치' 단추)
+      window.addEventListener("beforeinstallprompt", function (e) {
+        e.preventDefault();
+        window.__installPrompt = e;
+        window.dispatchEvent(new Event("sapphire-installable"));
+      });
+    </script>
+    <script>
       // 배포 뒤 폰이 예전 페이지를 들고 있으면 없어진 예전 코드 파일을 찾다 멈춘다. 그때 한 번만 새로 불러온다 (30초 안에 또 하지 않음)
       (function () {
         function retry() {

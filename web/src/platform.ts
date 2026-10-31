@@ -22,6 +22,29 @@ export const appMenu =
 /** 안드로이드 폰 브라우저인지 (앱 받기 링크는 여기서만 보인다) */
 export const isAndroid = /Android/i.test(ua);
 
+/** 아이폰, 아이패드 */
+export const isIOS = /iPhone|iPad|iPod/.test(ua);
+/** 갤럭시 기본 브라우저(삼성 인터넷) */
+export const inSamsung = /SamsungBrowser/.test(ua);
+/** 카카오톡, 네이버 앱 안의 브라우저 (여기서는 홈 화면에 설치가 안 된다) */
+export const inKakao = /KAKAOTALK/i.test(ua);
+export const inNaver = /NAVER\(inapp/i.test(ua);
+
+/** 홈 화면에 설치한 웹앱으로 열렸는지 (브라우저 주소창 없이) */
+export function standalone(): boolean {
+  const nav = navigator as Navigator & { standalone?: boolean };
+  return nav.standalone === true || (typeof matchMedia === "function" && matchMedia("(display-mode: standalone)").matches);
+}
+
+/** 웹앱 주소 */
+export const WEB_URL = "https://sapphire-guild.pages.dev";
+
+/**
+ * 안드로이드 앱을 받고 쓸 수 있는지. 제작자 요청(2026-10-31)으로 지금은 웹만 쓴다: 앱 받기는 '검토 후 오픈',
+ * 이미 깐 앱은 열면 웹 주소로 안내만 한다 (pages/InstallGuide.tsx AppClosedPage). 다시 열 때 true 로.
+ */
+export const APP_OPEN = false;
+
 /** 안드로이드 앱 APK. GitHub 최신 릴리스라 앱 안 업데이트와 같은 파일이다 */
 export const APK_URL =
   "https://github.com/hong-seok-young/Sapphire_Pyuang/releases/latest/download/FloatingClock.apk";

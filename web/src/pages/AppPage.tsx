@@ -1,5 +1,5 @@
 import { Panel, TopBar } from "../ui";
-import { APK_URL, appMenu, isAndroid } from "../platform";
+import { APK_URL, APP_OPEN, appMenu, isAndroid } from "../platform";
 
 /**
  * 앱 안에서 누르는 앱 기능. sapphire:// 주소는 안드로이드 앱(MainActivity)이 받아서 그 기능을 연다.
@@ -57,7 +57,14 @@ export function AppPage() {
           따로 그릴 뿐이에요. 그래도 걱정되면 이 웹앱만 쓰면 돼요.
         </p>
       </Panel>
-      {isAndroid ? (
+      {!APP_OPEN ? (
+        // 제작자 요청 (2026-10-31): 지금은 웹만 쓴다. 앱 받기는 검토가 끝나면 연다
+        <div className="links">
+          <button className="btn" disabled>
+            검토 후 오픈
+          </button>
+        </div>
+      ) : isAndroid ? (
         <>
           <div className="links">
             <a className="btn" href={APK_URL}>📲 앱 다운로드</a>

@@ -10,6 +10,8 @@ import { EquipSlot, EquipSlots } from "./pages/Equip";
 import { MenuPage, PostPage } from "./pages/Posts";
 import { ChatPage } from "./pages/Chat";
 import { AppPage } from "./pages/AppPage";
+import { AppClosedPage, InstallGuide } from "./pages/InstallGuide";
+import { APP_OPEN, inApp, isAndroid, isIOS, standalone } from "./platform";
 import { LoginPage, PasswordPage } from "./pages/Login";
 import { AdminPage } from "./pages/Admin";
 import { MePage, ProfileSetupPage } from "./pages/Profile";
@@ -44,9 +46,30 @@ const SHOWN_TABS = appMenu ? [...TABS, APP_TAB] : TABS;
  */
 export function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined); // undefined = 확인 중
+  // 폰 브라우저로 열면 처음에 홈 화면 설치 안내 ('나중에'를 누르면 이번에 연 동안은 다시 안 보인다)
+  const [guide, setGuide] = useState(() => {
+    try {
+      if (sessionStorage.getItem("sapphire-install-later")) return false;
+    } catch {
+      // 못 읽으면 안내를 보인다
+    }
+    return !inApp && (isAndroid || isIOS) && !standalone();
+  });
+  const later = useCallback(() => {
+    try {
+      sessionStorage.setItem("sapphire-install-later", "1");
+    } catch {
+      // 못 적어도 이번 화면에서는 닫힌다
+    }
+    setGuide(false);
+  }, []);
   useEffect(() => {
     fetchMe().then(setMe, () => setMe(null));
   }, []);
+
+  // 안드로이드 앱은 검토 후 오픈: 이미 깐 앱 안에서는 웹으로 안내만 한다 (제작자 요청)
+  if (inApp && !APP_OPEN) return <AppClosedPage />;
+  if (guide) return <InstallGuide onLater={later} />;
 
   if (me === undefined) {
     return (

@@ -947,3 +947,20 @@ button { font: inherit; color: inherit; }
   .tile-update { padding: 0 2px; font-size: 7px; }
 }
 .log-where { display: block; margin-top: 2px; font-size: 10px; color: var(--muted); word-break: break-all; }
+
+/* install guide for phone browsers, and the 'app is under review' notice inside the Android app (pages/InstallGuide.tsx) */
+.guide {
+  min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 24px 20px; text-align: center; background: var(--night);
+}
+.guide-mark { image-rendering: pixelated; border: var(--px) solid var(--edge); box-shadow: 0 0 0 var(--px) var(--hi); }
+.guide-name { font-size: 22px; color: var(--gold); letter-spacing: 1px; }
+.guide-title { margin: 8px 0 0; font-size: 19px; color: var(--text); }
+.guide-text { margin: 0; max-width: 320px; font-size: 14px; color: var(--muted); line-height: 1.6; }
+.guide-how { margin: 6px 0 0; max-width: 320px; padding: 10px 12px; font-size: 14px; line-height: 1.6; color: var(--text);
+  background: var(--panel); border: var(--px) solid var(--edge); }
+.guide-buttons { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 280px; margin-top: 6px; }
+.guide-buttons .btn { display: block; text-decoration: none; }
+.guide-later { flex: none; width: 100%; max-width: 280px; margin-top: 4px; }
+.guide-url { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 14px; color: var(--gold); }
+

@@ -1,4 +1,4 @@
-import { inApp, isAndroid } from "../platform";
+import { APP_OPEN, inApp, isAndroid } from "../platform";
 import { RANK } from "../auth";
 import type { Me } from "../auth";
 import { Bell, FitLine, HeroTitle } from "../ui";
@@ -15,6 +15,8 @@ interface Tile {
   /** 특정 사람만 들어가는 칸: 테두리에 빛이 돈다 (gold 1군 전용, blue 운영진, purple 개발자) */
   ring?: "gold" | "blue" | "purple";
   soon?: boolean;
+  /** soon 일 때 오른쪽 위 표 (없으면 '준비 중') */
+  badge?: string;
   /** 안드로이드 폰 브라우저에서만 보인다 (앱 안, 아이폰에서는 숨김) */
   androidOnly?: boolean;
   /** 오피서 이상에게만 보인다 */
@@ -40,7 +42,8 @@ const TILES: Tile[] = [
   { title: "사파이어 중개인", to: "#/market", icon: "💰" },
   { title: "길드원 의뢰소", to: "#/requests", icon: "📋" },
   // 시계와 보스 타이머는 안드로이드 앱에만 있다. 웹앱은 위키와 챗봇만 맡는다
-  { title: "안드로이드 앱 받기", to: "#/app", icon: "📲", androidOnly: true },
+  // 앱은 검토 후 오픈 (제작자 요청 2026-10-31: 지금은 웹만)
+  { title: "안드로이드 앱 받기", to: "#/app", icon: "📲", androidOnly: true, soon: !APP_OPEN, badge: "검토 후 오픈" },
   { title: "길드원 관리", to: "#/admin", icon: "👥", managers: true, ribbon: "운영진", ring: "blue" },
   { title: "사용 기록", to: "#/log", icon: "📊", developer: true, ribbon: "개발자", ring: "purple" },
 ];
@@ -93,7 +96,7 @@ export function Home({ me }: { me: Me }) {
               <span className="tile-icon">{t.iconPic ? <img className="tile-pic" src={t.iconPic} alt="" /> : t.icon}</span>
               {/* 이름은 한 줄에 맞추고, 안 되면 낱말 사이에서만 줄을 바꾼다 ('성장'이 '성/장'으로 갈리지 않게) */}
               <FitLine className="tile-title" text={t.title} />
-              {t.soon && <span className="tile-badge">준비 중</span>}
+              {t.soon && <span className="tile-badge">{t.badge ?? "준비 중"}</span>}
             </a>
           );
         })}
