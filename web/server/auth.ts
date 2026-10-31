@@ -13,6 +13,8 @@ export interface Env {
   DB: D1Database;
   /** 챗봇(functions/api/chat.ts)이 쓰는 Claude API 키. Cloudflare Pages 비밀값 (자동 배포가 넣는다) */
   ANTHROPIC_API_KEY?: string;
+  /** 워크스페이스에 묶이지 않은 키를 쓸 때 보낼 워크스페이스 ID (wrkspc_...) */
+  ANTHROPIC_WORKSPACE_ID?: string;
   /** 사이트에 올라간 정적 파일 (플래티넘 상점 물건 목록을 서버 안에서 읽는다) */
   ASSETS: Fetcher;
 }

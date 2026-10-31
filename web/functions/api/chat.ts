@@ -117,7 +117,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return json({ error: `오늘 질문 ${DAILY_LIMIT}번을 다 썼어요. 내일 다시 물어봐 주세요` }, 429);
   }
 
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  // 워크스페이스에 묶이지 않은 키는 어느 워크스페이스로 쓸지 헤더로 알려야 한다 (없으면 400 'not scoped to a workspace')
+  const workspace = env.ANTHROPIC_WORKSPACE_ID?.trim();
+  const client = new Anthropic({
+    apiKey: env.ANTHROPIC_API_KEY,
+    ...(workspace ? { defaultHeaders: { "anthropic-workspace-id": workspace } } : {}),
+  });
   const stream = client.beta.messages.stream({
     model: MODEL,
     max_tokens: 8000, // 비용 상한. 폰으로 읽는 답이라 이보다 길 일이 거의 없다
