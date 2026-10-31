@@ -145,6 +145,13 @@ export function Home({ me }: { me: Me }) {
 
       <Tiles me={me} tiles={tiles} editable dragKey={dragKey} />
 
+      {/* 배치 편집: 아래 탭 왼쪽 끝 바로 위에 작게 (제작자 요청 2026-11-01: 꾹 누르기와 함께, 버전 글씨의 반대편) */}
+      {!L.editing && (
+        <button className="home-edit" onClick={() => setEditing(true)}>
+          ✏️ 배치 편집
+        </button>
+      )}
+
       {/* 아래 탭 챗봇 아이콘 바로 위에 아주 작게: 누르면 처음부터 지금까지의 패치 내역 (제작자 요청). 2026-11-01 정식 오픈 v1.0 */}
       <a className="home-version" href="#/patch">
         v{VERSION}
