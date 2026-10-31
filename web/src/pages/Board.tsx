@@ -14,7 +14,7 @@ import { go } from "../router";
 import { Loading, TopBar } from "../ui";
 
 /** 공지사항과 이벤트는 오피서 이상만 쓴다 (서버 server/board.ts canWrite 와 같다) */
-const canWrite = (me: Me, cat: Cat) => cat === "free" || RANK[me.role] >= 1;
+const canWrite = (me: Me, cat: Cat) => cat === "free" || cat === "suggest" || RANK[me.role] >= 1;
 const staff = (me: Me) => RANK[me.role] >= 1;
 
 /**

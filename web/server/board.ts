@@ -4,13 +4,13 @@
 import { RANK } from "./auth";
 import type { Env, Role } from "./auth";
 
-export const CATS = ["notice", "event", "free"] as const;
+export const CATS = ["notice", "event", "free", "suggest"] as const;
 export type Cat = (typeof CATS)[number];
 export const isCat = (c: unknown): c is Cat => typeof c === "string" && (CATS as readonly string[]).includes(c);
-export const CAT_NAME: Record<Cat, string> = { notice: "공지사항", event: "길드 이벤트", free: "자유" };
+export const CAT_NAME: Record<Cat, string> = { notice: "공지사항", event: "길드 이벤트", free: "자유", suggest: "건의 사항" };
 
-/** 공지사항과 이벤트는 오피서 이상만 쓴다. 자유 게시판은 누구나 */
-export const canWrite = (role: Role, cat: Cat) => cat === "free" || RANK[role] >= 1;
+/** 공지사항과 이벤트는 오피서 이상만 쓴다. 자유 게시판과 건의 사항은 누구나 */
+export const canWrite = (role: Role, cat: Cat) => cat === "free" || cat === "suggest" || RANK[role] >= 1;
 /** 글 지우기, 고정: 쓴 사람(지우기만) 또는 오피서 이상 */
 export const isStaff = (role: Role) => RANK[role] >= 1;
 

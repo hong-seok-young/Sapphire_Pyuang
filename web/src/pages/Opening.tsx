@@ -1,7 +1,8 @@
 // 정식 오픈 축하 (제작자 요청 2026-11-01: 클로즈베타를 끝내고 v1.0 으로 오픈. 들어오면 폭죽을 성대하게 한 번 쏘고 길드마스터의 오픈 글을 팝업으로).
 // 오픈 날과 그다음 날(opening.json showDays: 11/1 ~ 11/2) 동안 들어올 때마다 뜬다. '확인'은 이번만 닫고, '더 이상 보지 않기'를 누른 기기는
 // 그 계정으로 다시 안 뜬다 (제작자 요청 2026-11-01). 같은 글은 배포 때 첫 공지사항으로도 올라간다 (scripts/ci-d1.mjs).
-// 처음 2.6초는 화면 가득 폭죽과 'GRAND OPEN' 글씨만, 그 뒤 글 칸이 올라오고 폭죽은 둘레에서 이어진다 (폰에서 글 칸에 가려 폭죽이 안 보여서).
+// 먼저 화면 가득 폭죽과 'GRAND OPEN' 글씨. 2.5초 뒤 '눌러서 계속'이 뜨고, 눌러야 길드마스터의 글 칸이 올라온다 (제작자 요청: 저절로 넘기지 말고,
+// 예쁘니까 2~3초는 보여 준 뒤). 폭죽은 창을 닫을 때까지 계속 쏜다.
 // 움직임 줄이기를 켠 기기는 폭죽 없이 글만.
 import { useEffect, useRef, useState } from "react";
 import opening from "../opening.json";
@@ -58,7 +59,7 @@ function fireworks(canvas: HTMLCanvasElement): () => void {
     }
   };
 
-  // 처음에 한꺼번에 여러 발, 그 뒤 7초 동안 이어서 쏜다
+  // 처음에 한꺼번에 여러 발, 그 뒤 창을 닫을 때까지 이어서 쏜다
   const started = performance.now();
   for (let i = 0; i < 4; i++) setTimeout(launch, i * 180);
   let nextLaunch = started + 700;
@@ -69,7 +70,7 @@ function fireworks(canvas: HTMLCanvasElement): () => void {
     ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
     ctx.fillRect(0, 0, w, h);
     ctx.globalCompositeOperation = "lighter";
-    if (t - started < 7000 && t >= nextLaunch) {
+    if (t >= nextLaunch) {
       launch();
       if (Math.random() < 0.4) launch();
       nextLaunch = t + 350 + Math.random() * 450;
@@ -102,8 +103,7 @@ function fireworks(canvas: HTMLCanvasElement): () => void {
       ctx.fillRect(s.x, s.y, s.size, s.size);
     }
     ctx.globalAlpha = 1;
-    if (t - started < 7000 || rockets.length || sparks.length) raf = requestAnimationFrame(frame);
-    else ctx.clearRect(0, 0, w, h);
+    raf = requestAnimationFrame(frame);
   };
   raf = requestAnimationFrame(frame);
   return () => {
@@ -117,10 +117,12 @@ export function Opening({ user, onClose }: { user: string; onClose: () => void }
   const sky = useRef<HTMLCanvasElement>(null);
   const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const [card, setCard] = useState(calm);
+  // 2.5초가 지나야 눌러서 넘어간다 (그 전에는 눌러도 그대로)
+  const [ready, setReady] = useState(calm);
   useEffect(() => {
     if (!sky.current || calm) return;
     const stop = fireworks(sky.current);
-    const t = window.setTimeout(() => setCard(true), 2600);
+    const t = window.setTimeout(() => setReady(true), 2500);
     return () => {
       stop();
       window.clearTimeout(t);
@@ -135,13 +137,14 @@ export function Opening({ user, onClose }: { user: string; onClose: () => void }
     onClose();
   };
   return (
-    <div className="opening" role="dialog" aria-modal="true" aria-label={opening.title} onClick={() => setCard(true)}>
+    <div className="opening" role="dialog" aria-modal="true" aria-label={opening.title} onClick={() => ready && setCard(true)}>
       <canvas ref={sky} className="opening-sky" aria-hidden />
       {!card && (
         <div className="opening-hero" aria-hidden>
           <img src="guild-mark.png" alt="" width={88} height={88} />
           <b>GRAND OPEN</b>
           <span>사파이어 길드 포탈</span>
+          {ready && <em className="opening-next">눌러서 계속 ▶</em>}
         </div>
       )}
       {card && (

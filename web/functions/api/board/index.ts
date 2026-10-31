@@ -63,10 +63,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .bind(b.cat, me.id, title, body, Date.now())
     .first<{ id: number }>();
   if (!row) return json({ error: "글을 올리지 못했어요" }, 500);
-  // 공지사항과 이벤트는 모두에게 알린다 (끈 사람 빼고)
-  if (b.cat !== "free") {
-    const lead = body.replace(/\s+/g, " ").trim().slice(0, 90);
+  // 공지사항과 이벤트는 모두에게 알린다 (끈 사람 빼고). 건의 사항은 길드마스터·오피서(와 앱개발자)에게
+  const lead = body.replace(/\s+/g, " ").trim().slice(0, 90);
+  if (b.cat === "notice" || b.cat === "event") {
     await notify(env, "all", "board_notice", `[${CAT_NAME[b.cat]}] ${title} · ${me.id}${lead ? "\n" + lead : ""}`, `#/board/${row.id}`, me.id);
+  } else if (b.cat === "suggest") {
+    const { results } = await env.DB.prepare("SELECT id FROM users WHERE role IN ('developer', 'master', 'officer')").all<{ id: string }>();
+    await notify(env, results.map((r) => r.id), "board", `[건의 사항] ${title} · ${me.id}${lead ? "\n" + lead : ""}`, `#/board/${row.id}`, me.id);
   }
   return json({ id: row.id }, 201);
 };

@@ -2,10 +2,11 @@
 import { api, ApiError } from "./auth";
 import type { Role } from "./auth";
 
-export type Cat = "notice" | "event" | "free";
-export const CATS: Cat[] = ["notice", "event", "free"];
-export const CAT_NAME: Record<Cat, string> = { notice: "공지사항", event: "길드 이벤트", free: "자유" };
-export const CAT_ICON: Record<Cat, string> = { notice: "📌", event: "🎉", free: "💬" };
+// 건의 사항: 바라는 기능, 고칠 것 (제작자 요청 2026-11-01, 누구나 쓰고 운영진에게 알림)
+export type Cat = "notice" | "event" | "free" | "suggest";
+export const CATS: Cat[] = ["notice", "event", "free", "suggest"];
+export const CAT_NAME: Record<Cat, string> = { notice: "공지사항", event: "길드 이벤트", free: "자유", suggest: "건의 사항" };
+export const CAT_ICON: Record<Cat, string> = { notice: "📌", event: "🎉", free: "💬", suggest: "💡" };
 
 export interface PostSummary {
   id: number;
