@@ -79,8 +79,7 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
     <>
       <TopBar title="사용 기록" />
       <p className="log-note">
-        앱개발자에게만 보여요. 60일 동안 남아요. 비밀번호, 챗봇 질문, 한마디, 흥정 가격, 입찰 금액, 경험치는 남기지 않아요.
-        접속은 30분 넘게 쉬었다가 다시 쓰면 한 번으로 세요.
+        앱개발자에게만 보여요. 60일 동안 남아요. 비밀번호만 빼고 모두 남겨요. 접속은 30분 넘게 쉬었다가 다시 쓰면 한 번으로 세요.
       </p>
 
       <section className="panel">
@@ -139,6 +138,9 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
                     {r.via && <small> · {VIA_NAME[r.via]}</small>}
                     <br />
                     {r.kind === "visit" ? "🟢 접속" : r.kind === "view" ? `📖 ${pageName(r.what, wiki)}` : `✏️ ${actionText(r.what, r.detail)}`}
+                    {(r.ip || r.place || r.device) && (
+                      <small className="log-where">{[r.device, r.place, r.ip].filter(Boolean).join(" · ")}</small>
+                    )}
                   </span>
                 </div>
               </li>

@@ -14,6 +14,9 @@ export interface ActivityRow {
   what: string;
   detail: string | null;
   via: Via | null;
+  ip?: string | null;
+  place?: string | null;
+  device?: string | null;
   at: number;
 }
 
@@ -138,6 +141,11 @@ const ACTIONS: [RegExp, string][] = [
   [/^PATCH \/api\/shop\/orders\/\d+$/, "플래티넘 신청 처리"],
   [/^PUT \/api\/shop$/, "플래티넘 상점 설정"],
   [/^PUT \/api\/shop\/items\/(.+)$/, "플래티넘 물건 설정: $1"],
+  [/^POST \/api\/market\/\d+\/talk$/, "토론방 글"],
+  [/^DELETE \/api\/market\/\d+\/talk\/\d+$/, "토론방 글 지움"],
+  [/^PUT \/api\/users\/([^/]+)\/highspec$/, "고스펙 표시: $1"],
+  [/^PUT \/api\/alerts\/prefs$/, "알림 설정"],
+  [/^POST \/api\/dev\/switch$/, "테스트 계정 전환"],
   [/^PATCH \/api\/requests\/\d+$/, "의뢰"],
   [/^DELETE \/api\/requests\/\d+$/, "의뢰 내림"],
 ];
@@ -147,7 +155,29 @@ const JOB: Record<string, string> = { warrior: "전사", ranger: "레인저", ma
 const ROLE: Record<string, string> = { master: "길드마스터", officer: "오피서", member: "길드원" };
 const REQUEST_ACTION: Record<string, string> = { accept: "수락", giveup: "포기", release: "수락 취소", done: "완료", reopen: "다시 모집" };
 
-/** 한 일을 읽는 글로: '중개인 경매 입찰 · +8헌터보우 (판매왕)' */
+/** 위에서 따로 읽지 않는 칸의 이름 (비밀번호는 서버가 남기지 않는다) */
+const FIELD: Record<string, string> = {
+  note: "한마디", text: "글", offer: "흥정", amount: "입찰", exp: "경험치", question: "질문", photos: "사진", size: "크기",
+  parent: "답글", on: "켬", enabled: "판매", ratio: "1군 비율", highRatio: "고스펙 비율", market: "시중 비율",
+  limitCount: "한도 개수", limitWeeks: "한도 주", open: "오픈", itemId: "물건", kind: "종류", to: "대상", qty: "수량",
+  category: "종류", enchant: "속성", enchantValue: "속성 값", options: "옵션", rewardGold: "보상 골드", rewardText: "보상",
+  failed: "실패",
+};
+/** actionText 가 이미 읽는 칸 */
+const READ = new Set(["item", "enhance", "subject", "title", "price", "mode", "hours", "gold", "side", "rate", "status", "action", "id", "role", "job", "level", "guild", "newId", "fresh"]);
+
+function fieldText(k: string, v: unknown): string {
+  const name = FIELD[k] ?? k;
+  if (k === "exp" && typeof v === "number") return `경험치 ${(v / 1000).toFixed(3)}%`;
+  if ((k === "offer" || k === "amount") && typeof v === "number") return `${name} ${v.toLocaleString("ko-KR")} 골드`;
+  if (k === "photos" && typeof v === "number") return `사진 ${v}장`;
+  if (k === "failed") return `실패 (${String(v)})`;
+  if (typeof v === "boolean") return v ? name : `${name} 아님`;
+  if (typeof v === "string") return `${name} “${v}”`;
+  return `${name} ${typeof v === "object" ? JSON.stringify(v) : String(v)}`;
+}
+
+/** 한 일을 읽는 글로: '중개인 경매 입찰 · +8헌터보우 (판매왕) · 입찰 1,600 골드' */
 export function actionText(what: string, detail: string | null): string {
   let name = what;
   for (const [re, label] of ACTIONS) {
@@ -176,7 +206,8 @@ export function actionText(what: string, detail: string | null): string {
   if (typeof d.job === "string") bits.push(JOB[d.job] ?? d.job);
   if (typeof d.level === "number") bits.push(`Lv.${d.level}`);
   if (d.guild === "main" || d.guild === "second") bits.push(d.guild === "main" ? "1군" : "2군");
-  if (d.offered) bits.push("흥정 가격 붙임");
   if (typeof d.newId === "string") bits.push(`→ ${d.newId}${d.fresh ? " (다른 캐릭터, 성장 새로)" : ""}`);
+  // 나머지 칸도 모두 (제작자 요청: 비밀번호 빼고 다 본다)
+  for (const [k, v] of Object.entries(d)) if (!READ.has(k) && v !== null && v !== "") bits.push(fieldText(k, v));
   return bits.length ? `${name} · ${bits.join(" · ")}` : name;
 }

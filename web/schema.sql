@@ -145,14 +145,17 @@ CREATE TABLE IF NOT EXISTS avatars (
 );
 
 -- 사용 기록 (앱개발자만 본다, 60일 보관, server/activity.ts): 접속, 화면, 한 일.
--- 비밀번호, 챗봇 질문, 한마디, 흥정 가격, 입찰 금액, 경험치, IP 와 위치는 넣지 않는다
+-- 제작자 요청으로 비밀번호만 빼고 보낸 내용, IP, 대략의 위치, 기기를 모두 남긴다
 CREATE TABLE IF NOT EXISTS activity (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id TEXT NOT NULL,
   kind TEXT NOT NULL,   -- visit 접속 | view 화면 | act 한 일
   what TEXT NOT NULL,   -- 화면 주소(#/market) 또는 한 일(POST /api/market)
-  detail TEXT,          -- 한 일의 짧은 내용 JSON (남겨도 되는 칸과 무엇에 했는지)
+  detail TEXT,          -- 한 일의 내용 JSON (보낸 본문에서 비밀번호만 뺀 것, 무엇에 했는지)
   via TEXT,             -- app 앱 | float 게임 위 창 | ios, android, pc 웹
+  ip TEXT,
+  place TEXT,           -- Cloudflare 가 아는 도시, 지역, 나라
+  device TEXT,          -- User-Agent 에서 읽은 기기와 브라우저
   at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS activity_at ON activity (at);

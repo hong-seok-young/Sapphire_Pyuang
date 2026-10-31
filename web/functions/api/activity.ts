@@ -3,7 +3,7 @@
 //      (7일, 30일 접속 수, 7일 화면 수와 한 일 수, 마지막으로 쓴 때와 곳). before 를 주면 그보다 앞의 기록만
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../server/auth";
 import type { Env } from "../../server/auth";
-import { KEEP_DAYS, record, viaOf } from "../../server/activity";
+import { KEEP_DAYS, record, whereOf } from "../../server/activity";
 
 const PAGE = 150;
 const DAY = 86_400_000;
@@ -13,7 +13,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!me) return NEED_LOGIN();
   const { path } = await readJson<{ path: unknown }>(request);
   if (typeof path !== "string" || !path.startsWith("#/") || path.length > 200) return json({ error: "화면 주소가 맞지 않아요" }, 400);
-  await record(env, me.id, "view", path, null, viaOf(request));
+  await record(env, me.id, "view", path, null, whereOf(request));
   return json({ ok: true });
 };
 
@@ -40,7 +40,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     binds.push(before);
   }
   const rows = await env.DB.prepare(
-    "SELECT id, user_id AS user, kind, what, detail, via, at FROM activity" +
+    "SELECT id, user_id AS user, kind, what, detail, via, ip, place, device, at FROM activity" +
       (where.length ? " WHERE " + where.join(" AND ") : "") + ` ORDER BY id DESC LIMIT ${PAGE}`,
   )
     .bind(...binds)

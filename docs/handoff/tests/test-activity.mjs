@@ -39,6 +39,7 @@ try {
   const admin = (await req("POST", "/api/login", { id: "localtest", password: devPassword })).cookie;
   await req("DELETE", `/api/users/${enc("기록멤버")}`, null, admin);
   await req("POST", "/api/users", { id: "기록멤버", role: "member", password: "local-log-1" }, admin);
+  await req("POST", "/api/login", { id: "기록멤버", password: "local-log-wrong" }, null, APP_UA);
   const first = await req("POST", "/api/login", { id: "기록멤버", password: "local-log-1" }, null, APP_UA);
   const m = first.cookie;
   await req("POST", "/api/password", { current: "local-log-1", next: "local-log-new1" }, m, APP_UA);
@@ -63,7 +64,10 @@ try {
   const post = rows.find((r) => r.what === "POST /api/market");
   check("listing detail keeps item and price", post?.detail?.includes("고대의반지") && post.detail.includes("3000000"), post?.detail);
   const all = JSON.stringify(rows);
-  check("no note, no password in the log", !all.includes("비밀노트") && !all.includes("local-log"), "");
+  // 제작자 요청 (2026-10-31): 비밀번호만 빼고 모두 남긴다
+  check("note is in the log, no password is", all.includes("비밀노트") && !all.includes("local-log"), "");
+  check("wrong login is logged without the password", rows.some((r) => r.what === "POST /api/login" && r.detail?.includes("failed")));
+  check("device is recorded", rows.some((r) => typeof r.device === "string" && r.device.length > 0), rows[0]?.device);
   check("sold row names the listing", rows.find((r) => r.what.startsWith("PATCH"))?.detail?.includes("고대의반지 (기록멤버)"));
   check("via is app", rows.every((r) => r.via === "app"), rows.map((r) => r.via).join(","));
   const person = (log?.people ?? []).find((p) => p.id === "기록멤버");

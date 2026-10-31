@@ -946,4 +946,4 @@ button { font: inherit; color: inherit; }
   .tile-new .tile-ribbon { padding: 0 3px; font-size: 9px; }
   .tile-update { padding: 0 2px; font-size: 7px; }
 }
-
+.log-where { display: block; margin-top: 2px; font-size: 10px; color: var(--muted); word-break: break-all; }

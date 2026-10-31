@@ -80,6 +80,9 @@ const ADDED_COLUMNS = [
   ["listing_talk", "parent_id", "INTEGER"],
   ["users", "high_spec", "INTEGER NOT NULL DEFAULT 0"], ["plat_settings", "high_ratio", "REAL NOT NULL DEFAULT 4"],
   ["plat_items", "high_ratio", "REAL"],
+  ["activity", "ip", "TEXT"],
+  ["activity", "place", "TEXT"],
+  ["activity", "device", "TEXT"],
 ];
 for (const [table, column, type] of ADDED_COLUMNS) {
   const columns = parseJson(wrangler("d1", "execute", DB, "--remote", "--json", "--command", `PRAGMA table_info(${table})`))[0]?.results ?? [];

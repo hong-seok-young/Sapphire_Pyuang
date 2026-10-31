@@ -3,10 +3,10 @@
 // 기록이 안 돼도 하던 일은 그대로 끝난다.
 import { currentUser } from "../../server/auth";
 import type { Env } from "../../server/auth";
-import { detailOf, record, subjectOf, viaOf } from "../../server/activity";
+import { detailOf, record, subjectOf, whereOf } from "../../server/activity";
 
-/** 본문을 읽지 않는 곳: 비밀번호, 챗봇 질문, 사진 */
-const NO_BODY = /^\/api\/(password|chat|avatar|users\/[^/]+\/reset)$/;
+/** 본문이 JSON 이 아닌 곳: 캐릭터 사진(그림 파일)은 크기만 적는다 */
+const BINARY = /^\/api\/avatar$/;
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   const { request, env } = context;
@@ -21,24 +21,26 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   try {
     // 로그아웃, 글 지우기는 끝난 뒤에는 누구인지, 무슨 글인지 모르므로 먼저 본다
     me = await currentUser(env, request);
-    if (!opening && !NO_BODY.test(path)) body = await request.clone().json().catch(() => null);
+    if (!opening && BINARY.test(path)) body = { size: `${Math.round(Number(request.headers.get("content-length") ?? 0) / 1024)}KB` };
+    else if (!opening) body = await request.clone().json().catch(() => null);
     if (!opening) subject = await subjectOf(env, path);
   } catch {
     // 기록 준비가 안 돼도 하던 일은 한다
   }
   const res = await context.next();
-  if (!res.ok) return res;
+  // 로그인은 틀린 것도 남긴다 (누가 몇 번 틀렸는지). 다른 실패는 남기지 않는다
+  if (!res.ok && path !== "/api/login") return res;
   try {
-    const via = viaOf(request);
+    const where = whereOf(request);
     if (opening) {
-      if (me) await record(env, me.id, "visit", "open", null, via);
+      if (me) await record(env, me.id, "visit", "open", null, where);
     } else if (path === "/api/login") {
       // 로그인 본문에서는 아이디만 본다 (비밀번호는 남기지 않는다)
       const id = (body as { id?: unknown } | null)?.id;
-      if (typeof id === "string") await record(env, id, "act", "POST /api/login", null, via);
+      const detail = res.ok ? null : JSON.stringify({ failed: res.status });
+      if (typeof id === "string" && id) await record(env, id.slice(0, 40), "act", "POST /api/login", detail, where);
     } else if (me) {
-      const offered = method === "PUT" && path.endsWith("/want") && !!(body as { offer?: unknown } | null)?.offer;
-      await record(env, me.id, "act", `${method} ${decodeURIComponent(path)}`, detailOf(body, subject, offered ? { offered } : undefined), via);
+      await record(env, me.id, "act", `${method} ${decodeURIComponent(path)}`, detailOf(body, subject), where);
     }
   } catch {
     // 기록 실패는 무시한다

@@ -1,7 +1,7 @@
 // 사용 기록 (앱개발자만 보는 '사용 기록' 화면 #/log, 제작자 요청): 누가, 어디서(앱, 게임 위 창, 웹), 무엇을 했는지.
 // 접속(30분 넘게 쉬었다가 다시 쓰면 하나), 화면(본 화면 주소), 한 일(API 로 바꾼 것)을 남기고 60일 뒤 지운다.
-// 비밀번호, 챗봇 질문, 한마디, 흥정 가격, 입찰 금액, 경험치, 사진처럼 본인이나 상대에게만 보인다고 한 것은 남기지 않는다
-// (KEEP 에 있는 칸만 남긴다). 접속한 곳의 IP 나 위치도 남기지 않는다.
+// 제작자 요청으로 비밀번호만 빼고 모두 남긴다: 보낸 내용(한마디, 흥정 가격, 입찰 금액, 경험치, 챗봇 질문, 토론방 글 ...),
+// IP, 대략의 위치(Cloudflare 가 아는 도시), 기기. 사진은 그림 대신 장 수와 크기만 적는다.
 import type { Env } from "./auth";
 
 export const KEEP_DAYS = 60;
@@ -9,11 +9,11 @@ const DAY = 86_400_000;
 /** 이만큼 아무것도 안 하다가 다시 쓰면 접속 하나로 센다 */
 const VISIT_GAP = 30 * 60_000;
 
-/** 한 일에서 남기는 칸 (요청 본문). 나머지는 버린다 */
-const KEEP = [
-  "id", "item", "category", "enhance", "enchant", "enchantValue", "qty", "price", "mode", "hours", "status",
-  "side", "gold", "rate", "title", "rewardGold", "rewardText", "action", "job", "level", "guild", "role", "newId", "fresh",
-] as const;
+/** 남기지 않는 칸: 비밀번호 (로그인, 계정 만들기, 초기화의 password, 비밀번호 바꾸기의 current, next) */
+const SECRET = /pass|^current$|^next$/i;
+/** 챗봇에 같이 보내는 위키 자료는 길고 질문이 아니라서 뺀다 */
+const SKIP = new Set(["context"]);
+const MAX_TEXT = 1000;
 
 export type Kind = "visit" | "view" | "act";
 /** 어디서: 안드로이드 앱, 게임 위 위키 창, 웹(아이폰, 안드로이드, PC) */
@@ -28,34 +28,99 @@ export function viaOf(request: Request): Via {
   return "pc";
 }
 
-/** 한 일의 짧은 내용: 남겨도 되는 칸만, 그리고 무엇에 했는지(subject) */
-export function detailOf(body: unknown, subject: string | null, extra?: Record<string, unknown>): string | null {
-  const out: Record<string, unknown> = { ...extra };
-  if (body && typeof body === "object") {
-    for (const k of KEEP) {
-      const v = (body as Record<string, unknown>)[k];
-      if (typeof v === "number" || typeof v === "boolean" || (typeof v === "string" && v !== "")) {
-        out[k] = typeof v === "string" ? v.slice(0, 60) : v;
-      }
+/** 긴 그림 데이터(base64)는 크기만, 글은 1000자까지 */
+function plain(v: unknown): unknown {
+  if (typeof v === "string") {
+    const picture = v.length > 2000 && /^[A-Za-z0-9+/=]+$/.test(v.slice(0, 200));
+    return picture ? `[그림 ${Math.round((v.length * 3) / 4 / 1024)}KB]` : v.slice(0, MAX_TEXT);
+  }
+  if (typeof v === "number" || typeof v === "boolean" || v === null) return v;
+  const s = JSON.stringify(v);
+  return s && s.length > MAX_TEXT ? s.slice(0, MAX_TEXT) + "…" : v;
+}
+
+/** 챗봇 질문: 마지막 질문 글과 사진 장 수 */
+function chatQuestion(messages: unknown): Record<string, unknown> {
+  if (!Array.isArray(messages) || !messages.length) return {};
+  const last = messages[messages.length - 1] as { text?: unknown; images?: unknown };
+  return {
+    question: typeof last?.text === "string" ? last.text.slice(0, MAX_TEXT) : "",
+    ...(Array.isArray(last?.images) && last.images.length ? { photos: last.images.length } : {}),
+  };
+}
+
+/** 한 일의 내용: 보낸 본문 전부(비밀번호 빼고), 그리고 무엇에 했는지(subject) */
+export function detailOf(body: unknown, subject: string | null): string | null {
+  const out: Record<string, unknown> = {};
+  if (body && typeof body === "object" && !Array.isArray(body)) {
+    for (const [k, v] of Object.entries(body as Record<string, unknown>)) {
+      if (SECRET.test(k) || SKIP.has(k) || v === undefined || v === "") continue;
+      if (k === "messages") Object.assign(out, chatQuestion(v));
+      else out[k] = plain(v);
     }
   }
   if (subject) out.subject = subject;
   return Object.keys(out).length ? JSON.stringify(out) : null;
 }
 
+/** 접속한 곳: 앱/웹, IP, Cloudflare 가 아는 도시와 나라, 기기 (User-Agent 에서) */
+export interface Where {
+  via: Via;
+  ip: string | null;
+  place: string | null;
+  device: string | null;
+}
+
+function deviceOf(ua: string): string | null {
+  const app = ua.match(/SapphireApp\/([\w.]+)/)?.[1];
+  const android = ua.match(/Android ([\d.]+)(?:; ([^;)]+))?/);
+  const ios = ua.match(/(iPhone|iPad)[^)]*OS ([\d_]+)/);
+  const browser = /SamsungBrowser/.test(ua)
+    ? "삼성 인터넷"
+    : /CriOS|Chrome/.test(ua)
+      ? "크롬"
+      : /Firefox|FxiOS/.test(ua)
+        ? "파이어폭스"
+        : /Safari/.test(ua)
+          ? "사파리"
+          : null;
+  const parts: string[] = [];
+  // 크롬은 기기 이름을 'K' 로 가린다. 앱(WebView)의 'wv' 도 이름이 아니다
+  const model = android?.[2]?.trim();
+  if (android) parts.push(`안드로이드 ${android[1]}${model && model !== "K" && model !== "wv" ? ` ${model}` : ""}`);
+  else if (ios) parts.push(`${ios[1]} iOS ${ios[2].replace(/_/g, ".")}`);
+  else if (/Windows/.test(ua)) parts.push("윈도우");
+  else if (/Mac OS X/.test(ua)) parts.push("맥");
+  if (app) parts.push(`앱 ${app}`);
+  else if (browser) parts.push(browser);
+  return parts.length ? parts.join(" · ").slice(0, 80) : ua.slice(0, 80) || null;
+}
+
+export function whereOf(request: Request): Where {
+  const cf = (request as Request & { cf?: { city?: unknown; region?: unknown; country?: unknown } }).cf;
+  const place = [cf?.city, cf?.region, cf?.country].filter((x): x is string => typeof x === "string" && x !== "").join(", ");
+  return {
+    via: viaOf(request),
+    ip: request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for"),
+    place: place || null,
+    device: deviceOf(request.headers.get("user-agent") ?? ""),
+  };
+}
+
 /** 기록 하나. 30분 넘게 쉬었다가 다시 쓰면 접속도 하나 남기고, 가끔 60일 지난 기록을 지운다 */
-export async function record(env: Env, userId: string, kind: Kind, what: string, detail: string | null, via: Via): Promise<void> {
+export async function record(env: Env, userId: string, kind: Kind, what: string, detail: string | null, where: Where): Promise<void> {
   const now = Date.now();
+  const { via, ip, place, device } = where;
   const stmts = [
     env.DB.prepare(
-      "INSERT INTO activity (user_id, kind, what, via, at) SELECT ?1, 'visit', 'open', ?2, ?3 " +
-        "WHERE NOT EXISTS (SELECT 1 FROM activity WHERE user_id = ?1 AND at > ?4)",
-    ).bind(userId, via, now, now - VISIT_GAP),
+      "INSERT INTO activity (user_id, kind, what, via, ip, place, device, at) SELECT ?1, 'visit', 'open', ?2, ?3, ?4, ?5, ?6 " +
+        "WHERE NOT EXISTS (SELECT 1 FROM activity WHERE user_id = ?1 AND at > ?7)",
+    ).bind(userId, via, ip, place, device, now, now - VISIT_GAP),
   ];
   if (kind !== "visit") {
     stmts.push(
-      env.DB.prepare("INSERT INTO activity (user_id, kind, what, detail, via, at) VALUES (?, ?, ?, ?, ?, ?)")
-        .bind(userId, kind, what.slice(0, 200), detail, via, now),
+      env.DB.prepare("INSERT INTO activity (user_id, kind, what, detail, via, ip, place, device, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(userId, kind, what.slice(0, 200), detail, via, ip, place, device, now),
     );
   }
   if (Math.random() < 0.02) stmts.push(env.DB.prepare("DELETE FROM activity WHERE at < ?").bind(now - KEEP_DAYS * DAY));
