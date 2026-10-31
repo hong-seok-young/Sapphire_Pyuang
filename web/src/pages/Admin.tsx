@@ -222,7 +222,7 @@ function AccountRow({
       <button className="account-row" onClick={onOpen} aria-expanded={open}>
         {account.job && account.level ? <JobEmblem job={account.job} level={account.level} size={30} /> : <span className="account-noemblem" />}
         <span className="account-main">
-          <b className={account.highSpec ? "hs-shine" : undefined}>{account.id}</b>
+          <b className={account.highSpec ? "hs-text" : undefined}>{account.id}</b>
           <small>
             {account.guild ? `${GUILD_TIER[account.guild]} ${GUILD_NAME[account.guild]}` : "길드 안 정함"}
             {account.job && account.level ? ` · Lv.${account.level} ${JOB_NAME[account.job]}` : " · 직업·레벨 안 정함"}

@@ -71,10 +71,9 @@ function recentUp(r: RankEntry, now: number): number {
   return r.prevLevel !== null && r.level > r.prevLevel && now - r.levelAt < RECENT_MS ? r.level - r.prevLevel : 0;
 }
 
-/** 닉네임. 고스펙은 글자 색은 그대로 두고 빛이 왼쪽에서 오른쪽으로 번쩍 지나간다 (제작자 요청) */
+/** 닉네임. 고스펙은 글자 색은 그대로 두고 글자에만 반짝임이 늘 흐른다 (제작자 요청) */
 function Nick({ id, high, className }: { id: string; high?: boolean; className: string }) {
-  const line = <FitLine className={className} text={id} wrap={false} />;
-  return high ? <span className="hs-shine">{line}</span> : line;
+  return <FitLine className={className + (high ? " hs-text" : "")} text={id} wrap={false} />;
 }
 
 function Row({ r, me, now }: { r: Ranked; me: Me; now: number }) {
