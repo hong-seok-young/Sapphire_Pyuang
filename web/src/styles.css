@@ -1356,10 +1356,11 @@ p.ps-charge { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px;
 .ps-buy-packs h3 img { width: 12px; height: 12px; margin-right: 2px; vertical-align: -1px; image-rendering: pixelated; }
 
 /* closed beta version at the bottom right of home, very small, and the patch notes page (pages/PatchNotes.tsx, 제작자 요청) */
-/* '클로즈베타 v…' (제작자 요청 2026-11-01: 아래 탭 챗봇 아이콘 바로 위에 붙여서). 탭은 5칸, 한 칸 최대 128px, 가운데 정렬이라
-   챗봇 칸 가운데 = 화면 가운데 + 2칸 */
+/* '클로즈베타 v…' (제작자 요청 2026-11-01: 아래 탭 챗봇 아이콘 바로 위에 붙여서). 탭은 --tabs 칸, 한 칸 최대 128px, 가운데 정렬이라
+   챗봇 칸(--chat-at 번째) 가운데 = 화면 가운데 + (자리 - (칸 수 - 1) / 2) 칸 (App.tsx 가 두 값을 준다) */
 .home-version {
-  position: fixed; z-index: 10; left: calc(50% + 2 * min(20vw, 128px)); bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 3px);
+  position: fixed; z-index: 10; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 3px);
+  left: calc(50% + (var(--chat-at, 3) - (var(--tabs, 4) - 1) / 2) * min(100vw / var(--tabs, 4), 128px));
   transform: translateX(-50%); white-space: nowrap; font-size: 10px; color: var(--muted); opacity: 0.75;
 }
 .patch-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }

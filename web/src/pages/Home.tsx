@@ -31,13 +31,12 @@ interface Tile {
 }
 
 const TILES: Tile[] = [
-  // 사냥터는 아래 탭에 있어서, 이 자리는 1군 전용 플래티넘 할인 상점 (제작자 요청). 아이콘은 게임 첫 화면의 상점 그림
+  // 1군 전용 플래티넘 할인 상점 (제작자 요청). 아이콘은 게임 첫 화면의 상점 그림
   // 제목이 길지 않게 '1군 전용'은 왼쪽 위 띠로 (제작자 요청)
   { title: "플래티넘 할인 상점", to: "#/shop", icon: "🏪", iconPic: "/data/shop/shop_icon.png", ribbon: "1군 전용", ring: "gold" },
-  // 장비는 아래 탭에 있어서 이 자리는 게시판 (제작자 요청): 공지사항, 길드 이벤트, 자유 게시판
+  // 게시판 (제작자 요청): 공지사항, 길드 이벤트, 자유 게시판
   { title: "게시판", to: "#/board", icon: "📢" },
-  // 위키 자료 메뉴는 '정보' 한 칸으로 묶는다 (제작자 요청). 안은 InfoPage
-  { title: "정보", to: "#/info", icon: "📚" },
+  // 위키 자료('정보')는 아래 탭에 있어서 홈 칸으로 두지 않는다 (제작자 요청 2026-11-01). 안은 InfoPage
   { title: "길드 랭킹", to: "#/ranking", icon: "🏆" },
   { title: "사파이어 중개인", to: "#/market", icon: "💰" },
   { title: "길드원 의뢰소", to: "#/requests", icon: "📋" },
@@ -53,8 +52,10 @@ const TILES: Tile[] = [
   { title: "챗봇 개선", to: "#/gaps", icon: "🧙", developer: true, ribbon: "개발자", ring: "purple" },
 ];
 
-/** '정보' 안의 위키 자료 메뉴 */
+/** '정보' 안의 위키 자료 메뉴. 사냥터와 장비도 여기 (제작자 요청 2026-11-01: 아래 탭에서 정보 안으로) */
 const INFO_TILES: Tile[] = [
+  { title: "사냥터", to: "#/places", icon: "🗺️" },
+  { title: "장비", to: "#/equip", icon: "🛡️" },
   { title: "육성 공략", to: "#/menu/육성 공략", icon: "📈" },
   { title: "직업별 스킬", to: "#/menu/직업별 스킬", icon: "✨" },
   { title: "조합책", to: "#/menu/조합책", icon: "⚒️" },
@@ -80,7 +81,7 @@ function Tiles({ me, tiles }: { me: Me; tiles: Tile[] }) {
     <nav className="tiles">
       {tiles.map((t) => {
         // 고친 메뉴: 다른 색 테두리와 'UPDATE' (처음 들어간 뒤 하루 동안, updates.ts). '정보'는 안의 메뉴가 고쳐졌을 때도
-        const updated = !t.locked && (showUpdate(me.id, t.to) || (t.to === "#/info" && INFO_TILES.some((x) => showUpdate(me.id, x.to))));
+        const updated = !t.locked && showUpdate(me.id, t.to);
         const className =
           "tile" + (t.soon ? " tile-soon" : "") + (t.locked ? " tile-locked" : "") + (t.ring ? ` tile-ring tile-ring-${t.ring}` : "") + (updated ? " tile-new" : "");
         const inside = (

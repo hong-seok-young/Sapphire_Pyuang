@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import type { CSSProperties } from "react";
 import { NEED_LOGIN, loadWiki, useAsync } from "./data";
 import { useRoute } from "./router";
 import { PixelIcon, Loading, NotFound } from "./ui";
@@ -34,16 +35,19 @@ import { appMenu } from "./platform";
 import type { Me } from "./auth";
 
 /** 아래 탭. 아이콘은 아이모 그림과 어울리는 픽셀 그림 (public/icons, 제작자 요청) */
-const TABS: { to: string; label: string; icon: string; pic?: "home" | "map" | "search" | "gear" | "chat"; match: string }[] = [
-  { to: "#/", label: "홈", icon: "🏠", pic: "home", match: "" },
-  { to: "#/places", label: "사냥터", icon: "🗺️", pic: "map", match: "places" },
-  { to: "#/search", label: "검색", icon: "🔍", pic: "search", match: "search" },
-  { to: "#/equip", label: "장비", icon: "🛡️", pic: "gear", match: "equip" },
-  { to: "#/chat", label: "챗봇", icon: "💬", pic: "chat", match: "chat" },
+/**
+ * 아래 탭: 홈, 검색, 정보, 챗봇 (제작자 요청 2026-11-01: 사냥터와 장비는 '정보' 안으로, 정보는 장비 자리로).
+ * match: 이 탭이 켜지는 화면들 (정보 탭은 정보 안의 메뉴, 글, 사냥터, 장비, 공식 확률에서도)
+ */
+const TABS: { to: string; label: string; icon: string; pic?: "home" | "search" | "info" | "chat"; match: string[] }[] = [
+  { to: "#/", label: "홈", icon: "🏠", pic: "home", match: [""] },
+  { to: "#/search", label: "검색", icon: "🔍", pic: "search", match: ["search"] },
+  { to: "#/info", label: "정보", icon: "📚", pic: "info", match: ["info", "menu", "post", "places", "place", "equip", "odds"] },
+  { to: "#/chat", label: "챗봇", icon: "💬", pic: "chat", match: ["chat"] },
 ];
 
 /** 안드로이드 앱 안에서만 보이는 탭: 시계 설정, 게임 위에 띄우기 같은 앱 기능 (게임 위 위키 창 안에서는 숨김) */
-const APP_TAB: (typeof TABS)[number] = { to: "#/app", label: "앱", icon: "⏰", match: "app" };
+const APP_TAB: (typeof TABS)[number] = { to: "#/app", label: "앱", icon: "⏰", match: ["app"] };
 const SHOWN_TABS = appMenu ? [...TABS, APP_TAB] : TABS;
 
 /**
@@ -156,7 +160,11 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else body = <Home me={me} />;
 
   return (
-    <div className="app">
+    <div
+      className="app"
+      // 홈의 '클로즈베타' 글씨를 챗봇 탭 바로 위에 두려고 탭 수와 챗봇 탭 자리를 알린다 (styles.css .home-version)
+      style={{ "--tabs": SHOWN_TABS.length, "--chat-at": SHOWN_TABS.findIndex((t) => t.to === "#/chat") } as CSSProperties}
+    >
       {/* 테스트 계정으로 보는 중이면 맨 위에 '내 계정' (앱개발자로 돌아가기) */}
       {TEST_IDS.includes(me.id) && (
         <div className="test-banner">
@@ -179,7 +187,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
       </main>
       <nav className="tabbar">
         {SHOWN_TABS.map((t) => (
-          <a key={t.to} href={t.to} className={"tab" + (page === t.match ? " tab-on" : "")}>
+          <a key={t.to} href={t.to} className={"tab" + (t.match.includes(page) ? " tab-on" : "")}>
             <span className="tab-icon">{t.pic ? <PixelIcon name={t.pic} size={32} /> : t.icon}</span>
             <span className="tab-label">{t.label}</span>
           </a>
