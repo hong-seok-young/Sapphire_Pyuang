@@ -872,13 +872,14 @@ button { font: inherit; color: inherit; }
   width: 48px; height: 28px; text-align: center; color: var(--text); background: var(--panel); border: var(--px) solid var(--edge);
 }
 .ps-item-rules { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
-.ps-rule { display: flex; align-items: center; gap: 8px; padding: 6px; margin: 0; }
+.ps-rule { display: flex; align-items: flex-start; gap: 8px; padding: 6px; margin: 0; }
 .ps-rule img { width: 44px; height: auto; flex: none; }
 .ps-rule-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
 .ps-rule-main b { font-weight: 400; }
 .ps-rule-inputs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; color: var(--muted); }
 .ps-rule-inputs input { width: 40px; height: 24px; font-size: 12px; }
-.ps-rule-side { flex: none; display: flex; flex-direction: column; gap: 4px; }
+.ps-rule-side { flex: none; display: flex; gap: 4px; margin-left: auto; }
+.ps-rule-gap { width: 8px; }
 .ps-rule-side .pill { font-size: 11px; padding: 4px 8px; }
 
 /* home tiles only some people can open: a ribbon at the top left and light running around the border.
@@ -914,32 +915,20 @@ button { font: inherit; color: inherit; }
 .rank-name .rank-exp-none { white-space: nowrap; }
 .ps-tabs { flex-wrap: nowrap; gap: 5px; }
 .ps-tabs .pill { flex: 1 1 auto; padding: 6px 4px; font-size: 12px; }
-/* high-spec nickname (제작자 요청): the letters keep their colour; a bright light sweeps left to right twice (번쩍번쩍),
-   then rests. The light lives on a wrapper so FitLine's own width check never sees it; row height stays the same. */
-/* 10px of room on each side (taken back with negative margins) so the light has space to cross even a two-letter name */
-.hs-shine {
-  position: relative; display: block; max-width: calc(100% + 20px); margin: 0 -10px; padding: 0 10px; overflow: hidden;
-  animation: hs-glow 2.6s ease-in-out infinite;
+/* high-spec nickname (제작자 요청): only the letters shimmer, all the time. The letters keep their usual colour;
+   a light runs through them without pause and they glow softly. Nothing is drawn outside the letters. */
+.hs-text {
+  --hs-base: var(--text); --hs-hi: #8fd8ff; --hs-glow: rgba(140, 210, 255, 0.9);
+  color: transparent; text-shadow: none;
+  background: linear-gradient(100deg, var(--hs-base) 0 32%, var(--hs-hi) 42%, #fff 50%, var(--hs-hi) 58%, var(--hs-base) 68% 100%);
+  background-size: 150% 100%; -webkit-background-clip: text; background-clip: text;
+  animation: hs-run 1.8s linear infinite, hs-glow 1.2s ease-in-out infinite alternate;
 }
-.hs-shine::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(105deg, transparent 28%, rgba(255, 255, 255, 0.45) 41%, #fff 48% 52%, rgba(255, 255, 255, 0.45) 59%, transparent 72%);
-  transform: translateX(-120%); animation: hs-flash 2.6s ease-in-out infinite;
-}
-.growth-row-name .hs-shine, .account-main b.hs-shine { align-self: flex-start; }
-@keyframes hs-flash {
-  0% { transform: translateX(-120%); }
-  24% { transform: translateX(120%); }
-  24.01%, 32% { transform: translateX(-120%); }
-  54%, 100% { transform: translateX(120%); }
-}
-@keyframes hs-glow {
-  0%, 6%, 20%, 36%, 50%, 100% { filter: none; }
-  12%, 43% { filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 7px rgba(120, 190, 255, 0.9)); }
-}
+.rank-row .hs-text, .rank-mine-bar .hs-text { --hs-base: #2d4f6a; --hs-hi: #3aa8ff; --hs-glow: rgba(70, 170, 255, 0.85); }
+@keyframes hs-run { from { background-position: 300% 0; } to { background-position: 0 0; } }
+@keyframes hs-glow { from { filter: drop-shadow(0 0 1px var(--hs-glow)); } to { filter: drop-shadow(0 0 4px var(--hs-glow)); } }
 @media (prefers-reduced-motion: reduce) {
-  .hs-shine { animation: none; }
-  .hs-shine::after { animation: none; display: none; }
+  .hs-text { animation: none; }
 }
 
 /* updated menu on home (updates.ts, 제작자 요청): a mint border and an 'UPDATE' tag at the top right for a day after the first visit */

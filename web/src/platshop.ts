@@ -86,6 +86,7 @@ export function budget(items: ShopItem[], n: number, h: number, weeks: number) {
   let cost = 0;
   let plat = 0;
   let gold = 0;
+  let market = 0;
   const rows = items
     .filter((it) => it.enabled && it.limitCount > 0)
     .map((it) => {
@@ -93,9 +94,10 @@ export function budget(items: ShopItem[], n: number, h: number, weeks: number) {
       const c = buys * (n * (it.marketGold - it.gold) + h * (it.marketGold - it.highGold));
       cost += c;
       plat += buys * (n + h) * it.plat;
+      market += buys * (n + h) * it.marketGold;
       gold += buys * (n * it.gold + h * it.highGold);
       return { it, buys, cost: c };
     })
     .sort((a, b) => b.cost - a.cost);
-  return { cost, plat, gold, perWeek: weeks > 0 ? cost / weeks : 0, rows };
+  return { cost, plat, gold, market, perWeek: weeks > 0 ? cost / weeks : 0, rows };
 }

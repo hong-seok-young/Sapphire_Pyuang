@@ -353,30 +353,34 @@ function ItemRule({ it, settings, busy, run }: {
           {it.name}
           {it.count > 1 && ` ×${it.count}`}
         </b>
+        {/* 첫 줄은 비율 ('1군 5 : 100'처럼 무엇인지 보이게), 둘째 줄은 한도와 단추 (제작자 요청) */}
         <span className="ps-rule-inputs">
           1군
-          <input inputMode="decimal" value={ratio} onChange={(e) => setRatio(e.target.value)} placeholder={String(settings.ratio)} aria-label="1군 비율" />
+          <input inputMode="decimal" value={ratio} onChange={(e) => setRatio(e.target.value)} placeholder={String(settings.ratio)} aria-label="1군 비율" />: 100
+          <i className="ps-rule-gap" />
           고스펙
-          <input inputMode="decimal" value={highRatio} onChange={(e) => setHighRatio(e.target.value)} placeholder={String(settings.highRatio)} aria-label="고스펙 비율" />
-          <input inputMode="numeric" value={weeks} onChange={(e) => setWeeks(e.target.value)} placeholder={String(settings.limitWeeks)} aria-label="주" />주
-          <input inputMode="numeric" value={count} onChange={(e) => setCount(e.target.value)} placeholder={String(settings.limitCount)} aria-label="개" />개
+          <input inputMode="decimal" value={highRatio} onChange={(e) => setHighRatio(e.target.value)} placeholder={String(settings.highRatio)} aria-label="고스펙 비율" />: 100
         </span>
-      </span>
-      <span className="ps-rule-side">
-        <button
-          className="pill"
-          disabled={busy}
-          onClick={() => run(() => saveShopItem(it.id, { enabled: true, ratio: opt(ratio), highRatio: opt(highRatio), limitCount: opt(count), limitWeeks: opt(weeks) }), `${it.name} 저장했어요.`)}
-        >
-          저장
-        </button>
-        <button
-          className="pill"
-          disabled={busy}
-          onClick={() => run(() => saveShopItem(it.id, { enabled: false, ratio: opt(ratio), highRatio: opt(highRatio), limitCount: opt(count), limitWeeks: opt(weeks) }), `${it.name} 판매를 멈췄어요.`)}
-        >
-          판매 중지
-        </button>
+        <span className="ps-rule-inputs">
+          <input inputMode="numeric" value={weeks} onChange={(e) => setWeeks(e.target.value)} placeholder={String(settings.limitWeeks)} aria-label="주" />주에
+          <input inputMode="numeric" value={count} onChange={(e) => setCount(e.target.value)} placeholder={String(settings.limitCount)} aria-label="개" />개
+          <span className="ps-rule-side">
+            <button
+              className="pill"
+              disabled={busy}
+              onClick={() => run(() => saveShopItem(it.id, { enabled: true, ratio: opt(ratio), highRatio: opt(highRatio), limitCount: opt(count), limitWeeks: opt(weeks) }), `${it.name} 저장했어요.`)}
+            >
+              저장
+            </button>
+            <button
+              className="pill"
+              disabled={busy}
+              onClick={() => run(() => saveShopItem(it.id, { enabled: false, ratio: opt(ratio), highRatio: opt(highRatio), limitCount: opt(count), limitWeeks: opt(weeks) }), `${it.name} 판매를 멈췄어요.`)}
+            >
+              판매 중지
+            </button>
+          </span>
+        </span>
       </span>
     </li>
   );
@@ -399,6 +403,9 @@ function BudgetPanel({ items }: { items: ShopItem[] }) {
     <>
       <section className="panel ps-settings">
         <h2 className="panel-title">예산 계산</h2>
+        <p className="form-note">
+          시중가 100만 골드 물건을 80만 골드에 넘기면 80만 골드는 길드에 다시 들어와요. 그래서 길드 자금에서 줄어드는 건 차액 20만 골드뿐이고, 아래 부담은 이 차액만 더한 값이에요.
+        </p>
         <label>
           길드 자금 <input className="ps-wide" inputMode="numeric" value={fund} onChange={(e) => setFund(e.target.value.replace(/\D/g, ""))} placeholder="5000" /> 만 골드
         </label>
@@ -412,8 +419,9 @@ function BudgetPanel({ items }: { items: ShopItem[] }) {
       </section>
       <div className="ps-ledger">
         <div className="panel">
-          <b>{int(weeks) || 1}주 동안 길드 부담</b>
+          <b>{int(weeks) || 1}주 동안 길드 부담 (차액)</b>
           <span className="ps-gold">{gold(b.cost)}</span>
+          <small>시중가로 {gold(b.market)} - 받는 골드 {gold(b.gold)}</small>
           <small>주당 {gold(Math.round(b.perWeek))}</small>
         </div>
         <div className="panel">
@@ -422,7 +430,6 @@ function BudgetPanel({ items }: { items: ShopItem[] }) {
           <small>
             쓰는 플래티넘 <img src={SHOP_PIC + "plat.png"} alt="" /> {b.plat.toLocaleString("ko-KR")}
           </small>
-          <small>받는 골드 {gold(b.gold)}</small>
         </div>
       </div>
       <ul className="ps-orders">
@@ -436,8 +443,11 @@ function BudgetPanel({ items }: { items: ShopItem[] }) {
               <small>
                 한 사람 {r.buys}개 · {r.it.limitWeeks}주에 {r.it.limitCount}개
               </small>
+              <small>
+                한 개 시중 {goldWords(r.it.marketGold)} → 1군 {goldWords(r.it.gold)} · 고스펙 {goldWords(r.it.highGold)}
+              </small>
             </span>
-            <span className="ps-gold">{gold(Math.round(r.cost))}</span>
+            <span className="ps-gold">-{gold(Math.round(r.cost))}</span>
           </li>
         ))}
       </ul>
