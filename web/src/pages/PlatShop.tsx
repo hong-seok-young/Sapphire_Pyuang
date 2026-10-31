@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { ReactNode } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import { errorText } from "../auth";
 import { ago, goldText, goldWords } from "../market";
 import { SHOP_PIC, actOrder, budget, discount, fetchShop, goldOf, orderItem, saveShopItem, saveShopSettings } from "../platshop";
@@ -321,32 +321,59 @@ function ShopSettingsPanel({ settings, items, busy, run }: {
   busy: boolean;
   run: (fn: () => Promise<unknown>, done?: string) => void;
 }) {
-  const [s, setS] = useState(settings);
-  const num = (v: string) => (v === "" ? NaN : Number(v));
+  // 칸에는 적은 글자를 그대로 둔다 (숫자로 바로 바꾸면 칸을 비울 때 'NaN' 이 되어 다시 적을 수 없었다). 저장할 때 숫자로 바꾼다
+  const [f, setF] = useState({
+    ratio: String(settings.ratio),
+    highRatio: String(settings.highRatio),
+    market: String(settings.market),
+    weekPlat: String(settings.weekPlat),
+    highWeekPlat: String(settings.highWeekPlat),
+  });
+  const [open, setOpen] = useState(settings.open);
+  const field = (k: keyof typeof f, decimal = true) => ({
+    inputMode: decimal ? ("decimal" as const) : ("numeric" as const),
+    value: f[k],
+    onChange: (e: ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value.replace(decimal ? /[^\d.]/g : /\D/g, "") }),
+  });
+  function save() {
+    run(async () => {
+      if (Object.values(f).some((v) => v.trim() === "")) throw new Error("빈 칸을 채워 주세요");
+      const n = (v: string) => Number(v);
+      return saveShopSettings({
+        ...settings,
+        ratio: n(f.ratio),
+        highRatio: n(f.highRatio),
+        market: n(f.market),
+        weekPlat: n(f.weekPlat),
+        highWeekPlat: n(f.highWeekPlat),
+        open,
+      });
+    }, "저장했어요.");
+  }
   return (
     <>
       <section className="panel ps-settings">
         <h2 className="panel-title">통 설정</h2>
         <p className="form-note">비율은 플래티넘 100을 몇 만 골드에 넘기는지예요. 길마가 원스토어 할인으로 결제할 돈은 '예산'에서 계산해요.</p>
         <label>
-          1군 <input inputMode="decimal" value={s.ratio} onChange={(e) => setS({ ...s, ratio: num(e.target.value) })} /> : 100
+          1군 <input {...field("ratio")} /> : 100
         </label>
         <label>
-          고스펙 <input inputMode="decimal" value={s.highRatio} onChange={(e) => setS({ ...s, highRatio: num(e.target.value) })} /> : 100
+          고스펙 <input {...field("highRatio")} /> : 100
         </label>
         <label>
-          시중 <input inputMode="decimal" value={s.market} onChange={(e) => setS({ ...s, market: num(e.target.value) })} /> : 100
+          시중 <input {...field("market")} /> : 100
         </label>
         {/* 매주 지급하는 가상 플래티넘 (제작자 요청: 1군 300, 고스펙은 따로). 길마가 결제할 돈은 '예산'에서 본다 */}
         <label>
-          주당 지급 1군 <input inputMode="numeric" value={s.weekPlat} onChange={(e) => setS({ ...s, weekPlat: num(e.target.value) })} /> · 고스펙
-          <input inputMode="numeric" value={s.highWeekPlat} onChange={(e) => setS({ ...s, highWeekPlat: num(e.target.value) })} /> 플래티넘
+          주당 지급 1군 <input {...field("weekPlat", false)} /> · 고스펙
+          <input {...field("highWeekPlat", false)} /> 플래티넘
         </label>
         <div className="mk-chips">
-          <button className={"pill" + (s.open ? " pill-on" : "")} onClick={() => setS({ ...s, open: !s.open })}>
-            {s.open ? "오픈" : "오픈 전"}
+          <button className={"pill" + (open ? " pill-on" : "")} onClick={() => setOpen(!open)}>
+            {open ? "오픈" : "오픈 전"}
           </button>
-          <button className="pill pill-on" disabled={busy} onClick={() => run(() => saveShopSettings(s), "저장했어요.")}>
+          <button className="pill pill-on" disabled={busy} onClick={save}>
             저장
           </button>
         </div>

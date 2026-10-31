@@ -19,6 +19,8 @@ interface Tile {
   soon?: boolean;
   /** soon 일 때 오른쪽 위 표 (없으면 '준비 중') */
   badge?: string;
+  /** 아직 못 들어가는 칸 (개발 중): 눌러도 열리지 않는다 */
+  locked?: boolean;
   /** 안드로이드 폰 브라우저에서만 보인다 (앱 안, 아이폰에서는 숨김) */
   androidOnly?: boolean;
   /** 오피서 이상에게만 보인다 */
@@ -38,6 +40,9 @@ const TILES: Tile[] = [
   { title: "길드 랭킹", to: "#/ranking", icon: "🏆" },
   { title: "사파이어 중개인", to: "#/market", icon: "💰" },
   { title: "길드원 의뢰소", to: "#/requests", icon: "📋" },
+  // 길드원끼리 장비 빌려주기, 인던 같이 갈 사람 찾기 (제작자 요청 2026-10-31: 칸만 먼저 두고 개발 중으로 막는다)
+  { title: "장비대여", to: "", icon: "🤝", soon: true, badge: "개발 중", locked: true },
+  { title: "인던매칭", to: "", icon: "⚔️", soon: true, badge: "개발 중", locked: true },
   // 시계와 보스 타이머는 안드로이드 앱에만 있다. 웹앱은 위키와 챗봇만 맡는다
   // 앱은 검토 후 오픈 (제작자 요청 2026-10-31: 지금은 웹만)
   { title: "안드로이드 앱 받기", to: "#/app", icon: "📲", androidOnly: true, soon: !APP_OPEN, badge: "검토 후 오픈" },
@@ -72,21 +77,28 @@ function Tiles({ me, tiles }: { me: Me; tiles: Tile[] }) {
     <nav className="tiles">
       {tiles.map((t) => {
         // 고친 메뉴: 다른 색 테두리와 'UPDATE' (처음 들어간 뒤 하루 동안, updates.ts). '정보'는 안의 메뉴가 고쳐졌을 때도
-        const updated = showUpdate(me.id, t.to) || (t.to === "#/info" && INFO_TILES.some((x) => showUpdate(me.id, x.to)));
-        return (
-          <a
-            key={t.title}
-            className={"tile" + (t.soon ? " tile-soon" : "") + (t.ring ? ` tile-ring tile-ring-${t.ring}` : "") + (updated ? " tile-new" : "")}
-            href={t.to}
-          >
+        const updated = !t.locked && (showUpdate(me.id, t.to) || (t.to === "#/info" && INFO_TILES.some((x) => showUpdate(me.id, x.to))));
+        const className =
+          "tile" + (t.soon ? " tile-soon" : "") + (t.locked ? " tile-locked" : "") + (t.ring ? ` tile-ring tile-ring-${t.ring}` : "") + (updated ? " tile-new" : "");
+        const inside = (
+          <>
             {t.ribbon && <span className="tile-ribbon">{t.ribbon}</span>}
             {updated && <span className="tile-update">UPDATE</span>}
             <span className="tile-icon">
               <TileIcon t={t} />
             </span>
-            {/* 이름은 한 줄에 맞추고, 안 되면 낱말 사이에서만 줄을 바꾼다 ('성장'이 '성/장'으로 갈리지 않게) */}
-            <FitLine className="tile-title" text={t.title} />
+            {/* 칸 크기는 모두 같게 (제작자 요청: 작은 칸 기준): 이름은 줄을 바꾸지 않고 들어갈 만큼 글자를 줄인다 */}
+            <FitLine className="tile-title" text={t.title} wrap={false} />
             {t.soon && <span className="tile-badge">{t.badge ?? "준비 중"}</span>}
+          </>
+        );
+        return t.locked ? (
+          <span key={t.title} className={className} aria-disabled="true">
+            {inside}
+          </span>
+        ) : (
+          <a key={t.title} className={className} href={t.to}>
+            {inside}
           </a>
         );
       })}

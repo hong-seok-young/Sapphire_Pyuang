@@ -102,15 +102,20 @@ button { font: inherit; color: inherit; }
 /* minmax(0, 1fr): a long name never widens its column (tiles stay the same width) */
 .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .tiles-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* every home tile is the same size (제작자 요청: the small one, 89px). The top strip holds the ribbon, UPDATE and
+   badge for every tile, so icons sit at the same height in all of them */
 .tile {
   position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 6px; min-height: 86px; padding: 10px 6px; text-align: center;
+  gap: 4px; height: 89px; padding: 20px 6px 8px; text-align: center;
 }
 .tile:active, .row:active, .chip:active, .place-card:active, .card:active { transform: translate(1px, 1px); }
-.tile-icon { font-size: 26px; line-height: 1; min-height: 42px; display: flex; align-items: center; }
-.tile-title { font-size: 13px; line-height: 1.3; }
+.tile-icon { font-size: 26px; line-height: 1; height: 36px; display: flex; align-items: center; }
+/* fixed line height: a name shrunk to fit one line keeps the icon at the same height as in the other tiles */
+.tile-title { font-size: 13px; line-height: 17px; }
 .tile-count { font-size: 11px; color: var(--muted); }
 .tile-soon { opacity: 0.6; }
+.tile-locked { cursor: default; }
+.tile-locked:active { transform: none; }
 .tile-badge {
   position: absolute; top: 4px; right: 4px; font-size: 10px; padding: 0 4px;
   background: var(--sunset); color: var(--edge); border: 1px solid var(--edge);
@@ -901,7 +906,7 @@ button { font: inherit; color: inherit; }
   position: absolute; z-index: 3; top: 4px; left: 4px; padding: 0 5px; font-size: 10px; line-height: 16px;
   color: var(--edge); background: var(--ring-a, #ffd34d); border: 1px solid var(--edge);
 }
-.tile-ring { --ring-a: #ffd34d; --ring-b: #fff3b0; overflow: hidden; isolation: isolate; padding-top: 22px; }
+.tile-ring { --ring-a: #ffd34d; --ring-b: #fff3b0; overflow: hidden; isolation: isolate; }
 .tile-ring-blue { --ring-a: #6fb6ff; --ring-b: #d8ecff; }
 .tile-ring-purple { --ring-a: #b98cff; --ring-b: #efe2ff; }
 .tile-ring > * { position: relative; z-index: 2; }
