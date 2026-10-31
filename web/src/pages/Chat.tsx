@@ -2,7 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import type { FormEvent, KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import type { Wiki } from "../types";
-import { errorText } from "../auth";
+import { JOB_NAME, errorText } from "../auth";
+import type { Me } from "../auth";
 import {
   askChat,
   deleteFrom,
@@ -125,7 +126,7 @@ function toHistory(shown: Shown[]): ChatTurn[] {
 
 const secs = (ms: number | null | undefined) => Math.max(1, Math.round((ms ?? 0) / 1000));
 
-export function ChatPage({ wiki, arg, query }: { wiki: Wiki; arg: string; query: URLSearchParams }) {
+export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; query: URLSearchParams; me?: Me }) {
   const { data: posts, error: postsError } = useAsync(useCallback(() => loadPosts(), []));
   const listing = arg === "list";
   const wanted = /^\d+$/.test(arg) ? Number(arg) : null;
@@ -290,7 +291,9 @@ export function ChatPage({ wiki, arg, query }: { wiki: Wiki; arg: string; query:
   async function run(base: Shown[], question: string, reuse: boolean) {
     const run = ++runRef.current;
     const live = () => runRef.current === run;
-    const ctx = wikiContext(wiki, posts, question);
+    // 물은 사람의 직업, 레벨 (질문에 없으면 이것으로 공략과 사냥터를 고른다. 사진만 보낸 질문 등)
+    const asker = me ? { job: me.job ? JOB_NAME[me.job] : null, level: me.level } : undefined;
+    const ctx = wikiContext(wiki, posts, question, asker, !!(base[base.length - 1]?.images?.length || base[base.length - 1]?.photos));
     const lastUser = base[base.length - 1];
     const startedAt = Date.now();
     let firstText: number | null = null;

@@ -144,7 +144,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "menu") body = <MenuPage wiki={wiki} title={arg} />;
   else if (page === "info") body = <InfoPage me={me} />;
   else if (page === "post") body = <PostPage wiki={wiki} id={arg} />;
-  else if (page === "chat") body = <ChatPage wiki={wiki} arg={arg} query={route.query} />;
+  else if (page === "chat") body = <ChatPage wiki={wiki} arg={arg} query={route.query} me={me} />;
   else if (page === "gaps") body = me.role === "developer" ? <ChatGapsPage /> : <NotFound what="페이지" />;
   else if (page === "market") body = <MarketPage wiki={wiki} me={me} />;
   else if (page === "log") body = me.role === "developer" ? <ActivityLogPage wiki={wiki} /> : <NotFound what="페이지" />;

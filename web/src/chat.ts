@@ -111,11 +111,26 @@ function words(q: string): string[] {
   return q.split(/[\s,.?!~·()[\]"'“”‘’]+/).map((w) => w.replace(/(은|는|이|가|을|를|에|에서|으로|로|랑|하고|의|도|만)$/, "")).filter((w) => w.length >= 2);
 }
 
+/** 묻는 말 (본문 찾기에 쓰지 않는다): '어디서', '사냥해', '추천해줘', '뭐가' ... */
+const ASK_WORD = /^(어디|어디서|어디가|어떻게|어떤|무엇|뭐|뭐가|뭘|언제|누가|왜|좋은|좋아|추천|가면|사냥|사냥해|사냥하|사냥터|해야|해줘|알려|알려줘|있어|있나|있나요|되나|되나요|할까|하나요|가요|해요|돼|좀|지금|이제|그럼|이거|저거|이건|나|내|제)$|(해|해요|해줘|할까|하나|하나요|나요|까요|줘|요)$/;
+
 /** 질문의 레벨 ('30레벨', '30렙', 'Lv.30') */
 function levelOf(question: string): number | null {
   const m = question.match(/(\d{1,3})\s*(?:레벨|렙|lv)/i) ?? question.match(/(?:lv|레벨)\.?\s*(\d{1,3})/i);
   const n = m ? Number(m[1]) : NaN;
   return n >= 1 && n <= 200 ? n : null;
+}
+
+/** 공략 제목의 레벨 범위 ('초급 전사 육성 공략 Lv. 1～33' -> [1, 33]) */
+function titleRange(title: string): [number, number] | null {
+  const m = title.match(/Lv\.?\s*(\d{1,3})\s*[～~-]\s*(\d{1,3})/i);
+  return m ? [Number(m[1]), Number(m[2])] : null;
+}
+
+/** 물은 사람이 스스로 적은 직업(한글)과 레벨. 질문에 없을 때 자료를 고르는 데 쓴다 */
+export interface Asker {
+  job: string | null;
+  level: number | null;
 }
 
 export interface WikiContext {
@@ -128,16 +143,21 @@ export interface WikiContext {
  * 질문에 맞는 위키 자료를 짧은 글로 만든다.
  * 질문에 이름이 나온 아이템, 몬스터, 사냥터 → 레벨을 물으면 그 레벨 근처 사냥터와 직업 장비 → 없으면 낱말로 검색 →
  * 제목이 맞는 글(육성 공략 등) → 사냥터 목록 순서로 채운다.
+ * 질문에 레벨이나 직업이 없으면 물은 사람의 것을 쓴다 (챗봇 개선 2026-10-31: 사진만 보낸 질문에서 레벨, 직업을 몰라
+ * 맞는 공략을 못 붙였다). 레벨만 물으면 직업은 물은 사람 것, 사진만 보내면 둘 다 물은 사람 것.
  */
-export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined, question: string): WikiContext {
+export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined, question: string, asker?: Asker, photo = false): WikiContext {
   const q = norm(question);
   const parts: string[] = [];
   const found: string[] = [];
   const add = (s: string) => {
     if (s && parts.join("\n").length + s.length < MAX_CONTEXT) parts.push(s);
   };
-  const level = levelOf(question);
-  const job = JOBS.find((j) => question.includes(j)) ?? null;
+  const askedLevel = levelOf(question);
+  const askedJob = JOBS.find((j) => question.includes(j)) ?? null;
+  const level = askedLevel ?? (photo ? (asker?.level ?? null) : null);
+  const job = askedJob ?? (photo || askedLevel !== null ? (asker?.job ?? null) : null);
+  if (asker?.job || asker?.level) add(`[물은 사람] ${[asker.job, asker.level && `Lv.${asker.level}`].filter(Boolean).join(" ")} (길드원이 스스로 적은 값)`);
 
   // 1. 질문에 이름이 그대로 나온 것 (긴 이름부터, 짧은 이름이 긴 이름 안에 든 경우는 뺀다)
   const names: { kind: "item" | "monster" | "place"; name: string; id?: string }[] = [];
@@ -150,7 +170,7 @@ export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined,
   const picked = names.filter((n, i) => !names.slice(0, i).some((m) => norm(m.name).includes(norm(n.name)))).slice(0, 8);
 
   // 2. 없으면 질문 낱말로 검색해서 맞는 것 몇 개 (레벨을 물으면 아래 레벨 자료로 충분하다)
-  if (!picked.length && level === null) {
+  if (!picked.length && askedLevel === null) {
     for (const w of words(question)) {
       for (const h of search(wiki, w, 3)) {
         if (picked.length >= 6 || picked.some((p) => p.kind === h.kind && p.name === h.name)) continue;
@@ -202,6 +222,7 @@ export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined,
       .map((p) => ({ p, gap: p.level![0] <= level && level <= p.level![1] ? 0 : Math.min(Math.abs(p.level![0] - level), Math.abs(p.level![1] - level)) }))
       .sort((a, b) => a.gap - b.gap || a.p.level![0] - b.p.level![0])
       .slice(0, 8);
+    const exact = near.filter((x) => x.gap === 0).slice(0, 2);
     if (near.length) {
       found.push(`Lv.${level} 근처 사냥터 ${near.length}곳`);
       add(
@@ -218,6 +239,16 @@ export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined,
             })
             .join("\n"),
       );
+      // 레벨이 딱 맞는 사냥터는 몬스터마다 드랍과 원글 안내까지 (챗봇 개선 2026-10-31: '정원·금서고 몬스터와 드랍 자료 없음')
+      for (const { p } of exact) {
+        const mons = p.monsters.map((k) => wiki.monsters[k]).filter(Boolean);
+        const post = posts?.[p.id];
+        add(
+          `[${p.name} 자세히]\n` +
+            mons.map((m) => `${m.name}${m.level ? ` Lv.${m.level}` : ""}${m.drops.length ? ` 드랍: ${m.drops.slice(0, 10).join(", ")}` : ""}`).join("\n") +
+            (post ? "\n" + postText(post, [...p.above, ...p.below]).slice(0, 900) : ""),
+        );
+      }
     }
     if (job) {
       const gear = Object.values(wiki.items)
@@ -247,13 +278,21 @@ export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined,
     }
   }
 
-  // 3. 제목이 질문 낱말과 맞는 글 (육성 공략, 직업별 스킬, 조합책 등). 사냥터 글은 위에서 다뤘다
+  // 3. 제목이 질문 낱말과 맞는 글 (육성 공략, 직업별 스킬, 조합책 등). 사냥터 글은 위에서 다뤘다.
+  // 제목에 레벨 범위가 있는 공략(초급 Lv.1~33, 중급 34~43, 고급 44~55)은 레벨이 맞는 것만 (챗봇 개선 2026-10-31:
+  // '48렙 레인저'에 초급, 중급 공략이 붙고 고급이 빠졌다)
   if (posts) {
     const ws = words(question);
     const scored = wiki.menu
       .flatMap((s) => s.posts)
       .filter((p) => !wiki.places[p.id] && posts[p.id])
-      .map((p) => ({ p, score: ws.filter((w) => norm(p.title).includes(norm(w))).length }))
+      .map((p) => {
+        let score = ws.filter((w) => norm(p.title).includes(norm(w))).length;
+        if (job && !askedJob && p.title.includes(job)) score++;
+        const r = titleRange(p.title);
+        if (r && level !== null) score = r[0] <= level && level <= r[1] ? (score > 0 ? score + 3 : 0) : -1;
+        return { p, score };
+      })
       .filter((x) => x.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, 2);
@@ -264,7 +303,11 @@ export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined,
 
     // 3-2. 제목에는 없고 본문에만 나오는 글 (제작자: '금서고 자료가 왜 없지'. 장비 획득처, 퀘스트 재료처럼 여러 글에 흩어져 있다).
     // 이름이 나온 것(아이템, 몬스터, 사냥터)과 질문 낱말 중 드문 것으로 찾아서 그 둘레만 가져온다
-    const keys = [...new Set([...picked.map((n) => n.name), ...ws])].map(norm).filter((k) => k.length >= 2);
+    // 질문 말('어디서', '사냥해')과 숫자가 든 말('48렙')로는 찾지 않는다 (챗봇 개선 2026-10-31: 상관없는 글이 끼어 사냥터 목록이 잘렸다)
+    // 직업 이름도 뺀다 (직업은 위의 직업 장비와 레벨에 맞는 공략이 맡는다)
+    const keys = [...new Set([...picked.map((n) => n.name), ...ws.filter((w) => !/\d/.test(w) && !ASK_WORD.test(w) && !JOBS.includes(w))])]
+      .map(norm)
+      .filter((k) => k.length >= 2);
     const taken = new Set([...scored.map((x) => x.p.id), ...picked.map((n) => n.id).filter(Boolean)]);
     const texts = allPostTexts(wiki, posts);
     const hits = keys
