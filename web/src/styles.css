@@ -740,6 +740,11 @@ button { font: inherit; color: inherit; }
 /* item discussion room (Market.tsx Talk): a small bubble button, chat-like lines */
 .mk-talk-bar { display: flex; justify-content: flex-end; }
 .mk-actions .mk-talk-btn { margin-left: auto; }
+/* my own item has three buttons (완료, 가격 변경, 삭제): slimmer buttons so the 토론방 bubble stays on the same line (제작자 요청) */
+.mk-actions { column-gap: 5px; }
+.mk-actions > .pill { padding: 6px 7px; font-size: 12px; }
+.mk-actions .mk-talk-btn { padding: 4px 7px; }
+@media (max-width: 350px) { .mk-actions .mk-talk-label { display: none; } }
 .mk-talk-btn {
   position: relative; padding: 4px 10px; font-size: 12px; color: var(--text); cursor: pointer;
   background: var(--panel-2); border: var(--px) solid var(--edge); border-radius: 12px 12px 12px 3px;

@@ -65,7 +65,8 @@ function Detail({ wiki, me, l, rate, onChanged }: {
   // 종목 토론방 단추: 할 일 단추와 같은 줄 오른쪽 끝에 작은 말풍선으로 (제작자 요청: 줄을 따로 만들지 않게)
   const talkButton = (
     <button className={"mk-talk-btn" + (talkOpen ? " mk-talk-on" : "")} onClick={() => setTalkOpen((v) => !v)} aria-expanded={talkOpen}>
-      💬 토론방{talkCount > 0 && <b>{talkCount}</b>}
+      💬<span className="mk-talk-label"> 토론방</span>
+      {talkCount > 0 && <b>{talkCount}</b>}
     </button>
   );
 
