@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import type { Block, Cell, Run } from "./types";
 import { cafeUrl, isBigPicture } from "./cafe";
 
@@ -176,39 +177,58 @@ function href(to: string, link: PostLink): { href: string; external: boolean } |
   return { href: to, external: true };
 }
 
+/** 아이템 아이콘으로 보는 작은 그림 (build_data.py 의 ICON_SIDE 와 같다. 흰 바탕을 빼고 여백을 잘라 둔다) */
+const ICON_SIDE = 64;
+/** 아이콘은 모두 이 높이로 (제작자 요청: 크기 통일) */
+const ICON_H = 26;
+const isIcon = (r: Run) => "src" in r && Math.max(r.w, r.h) <= ICON_SIDE;
+
 export function Runs({ runs, link, hideBig }: { runs: Run[]; link: PostLink; hideBig?: boolean }) {
-  return (
-    <>
-      {runs.map((r, i) => {
-        let node;
-        if ("src" in r && hideBig && isBigPicture(r.w, r.h)) return null; // 원글 카드가 대신한다
-        if ("t" in r && hideBig && /지도\s*클릭/.test(r.t)) return null;
-        if ("src" in r) {
-          const small = r.h <= 24;
-          node = (
-            <img
-              className={small ? "inline-icon" : "inline-pic"}
-              src={r.src}
-              width={small ? r.w * 2 : r.w}
-              height={small ? r.h * 2 : r.h}
-              alt=""
-              loading="lazy"
-              decoding="async"
-            />
+  const textNode = (r: { t: string; b?: 1; c?: string }, t: string) => {
+    const color = appColor(r.c);
+    const style = color ? { color } : undefined;
+    return r.b ? <b style={style}>{t}</b> : style ? <span style={style}>{t}</span> : t;
+  };
+  const out: ReactNode[] = [];
+  for (let i = 0; i < runs.length; i++) {
+    const r = runs[i];
+    let node: ReactNode;
+    if ("src" in r && hideBig && isBigPicture(r.w, r.h)) continue; // 원글 카드가 대신한다
+    if ("t" in r && hideBig && /지도\s*클릭/.test(r.t)) continue;
+    if ("src" in r) {
+      const icon = isIcon(r);
+      const h = icon ? ICON_H : r.h;
+      const w = icon ? Math.round((r.w * ICON_H) / r.h) : r.w;
+      node = <img className={icon ? "inline-icon" : "inline-pic"} src={r.src} width={w} height={h} alt="" loading="lazy" decoding="async" />;
+      // 아이콘과 바로 뒤의 이름(첫 낱말, 예: '코스튬코인x30')은 한 덩어리로 (제작자 요청: 줄이 그 사이에서 끊기지 않게)
+      const next = runs[i + 1];
+      if (icon && !r.to && next && "t" in next && !next.to) {
+        const m = next.t.match(/^(\s*)(\S+)([\s\S]*)$/);
+        if (m && m[2].length <= 24) {
+          out.push(
+            <span key={i} className="post-ing">
+              {node}
+              {textNode(next, m[2])}
+            </span>,
           );
-        } else {
-          const color = appColor(r.c);
-          const style = color ? { color } : undefined;
-          node = r.b ? <b style={style}>{r.t}</b> : style ? <span style={style}>{r.t}</span> : r.t;
+          if (m[3]) out.push(<span key={i + "r"}>{textNode(next, m[3])}</span>);
+          i++;
+          continue;
         }
-        const to = r.to ? href(r.to, link) : null;
-        if (!to) return <span key={i}>{node}</span>;
-        return (
-          <a key={i} href={to.href} target={to.external ? "_blank" : undefined} rel={to.external ? "noreferrer" : undefined}>
-            {node}
-          </a>
-        );
-      })}
-    </>
-  );
+      }
+    } else {
+      node = textNode(r, r.t);
+    }
+    const to = r.to ? href(r.to, link) : null;
+    if (!to) {
+      out.push(<span key={i}>{node}</span>);
+      continue;
+    }
+    out.push(
+      <a key={i} href={to.href} target={to.external ? "_blank" : undefined} rel={to.external ? "noreferrer" : undefined}>
+        {node}
+      </a>,
+    );
+  }
+  return <>{out}</>;
 }

@@ -60,6 +60,39 @@ MAX_SIDE = 1600      # px; huge guide pictures are scaled down to this for phone
 
 _exported: dict[str, dict] = {}
 
+ICON_SIDE = 64  # px; item icons in the cafe posts are small pictures on a white square
+
+
+def cut_white_background(im: Image.Image) -> Image.Image | None:
+    """Item icons sit on a white square in the cafe posts; on the app's dark pages that looks like a sticker
+    (제작자 요청: 누끼). Make the white that touches the edges transparent. White inside the item stays.
+    Returns None when the picture has no white background (corners are not white)."""
+    rgba = im.convert("RGBA")
+    w, h = rgba.size
+    px = rgba.load()
+
+    def white(x: int, y: int) -> bool:
+        r, g, b, a = px[x, y]
+        return a > 0 and min(r, g, b) >= 232 and max(r, g, b) - min(r, g, b) <= 14
+
+    corners = [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)]
+    if sum(white(x, y) for x, y in corners) < 3:
+        return None
+    seen = set()
+    stack = [(x, y) for x in range(w) for y in (0, h - 1)] + [(x, y) for y in range(h) for x in (0, w - 1)]
+    while stack:
+        x, y = stack.pop()
+        if (x, y) in seen or not (0 <= x < w and 0 <= y < h) or not white(x, y):
+            continue
+        seen.add((x, y))
+        stack.extend(((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)))
+    for x, y in seen:
+        r, g, b, _ = px[x, y]
+        px[x, y] = (r, g, b, 0)
+    # trim the now-empty margin so every icon fills its box the same way
+    box = rgba.getbbox()
+    return rgba.crop(box) if box else None
+
 
 def export_picture(path: Path) -> dict | None:
     """Copy a picture into public/img under a short content-hash name. Returns {src, w, h}."""
@@ -76,6 +109,12 @@ def export_picture(path: Path) -> dict | None:
     except Exception:
         return None
     ext = {"PNG": ".png", "GIF": ".gif", "JPEG": ".jpg", "WEBP": ".webp"}.get(im.format, ".png")
+    if max(w, h) <= ICON_SIDE and not animated:
+        cut = cut_white_background(im)
+        if cut is not None:
+            buf = io.BytesIO()
+            cut.save(buf, "PNG", optimize=True)
+            data, ext = buf.getvalue(), ".png"
     if len(data) > BIG_IMAGE and not animated:
         im = im.convert("RGBA" if im.mode in ("RGBA", "LA", "P") else "RGB")
         if max(w, h) > MAX_SIDE:
@@ -88,6 +127,8 @@ def export_picture(path: Path) -> dict | None:
     target = OUT / "img" / name
     if not target.exists():
         target.write_bytes(data)
+    if ext == ".png" and max(w, h) <= ICON_SIDE:
+        w, h = Image.open(io.BytesIO(data)).size  # cut icons are trimmed
     info = {"src": "img/" + name, "w": w, "h": h}
     _exported[key] = info
     return info

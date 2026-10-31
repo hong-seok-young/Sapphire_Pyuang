@@ -221,7 +221,9 @@ button { font: inherit; color: inherit; }
 .post-nav-right { align-items: flex-end; }
 .post-nav .pill { padding: 6px 10px; font-size: 13px; color: var(--text); text-decoration: none; border-bottom: var(--px) solid var(--edge); }
 .paper-line { white-space: pre-wrap; }
-.inline-icon { vertical-align: middle; image-rendering: pixelated; }
+.inline-icon { vertical-align: middle; image-rendering: pixelated; object-fit: contain; max-width: 40px; }
+/* an item icon and its name stay together on one line (Blocks.tsx Runs, 제작자 요청: 줄이 중간에 끊기지 않게) */
+.post-ing { display: inline-flex; align-items: center; gap: 3px; margin-right: 6px; white-space: nowrap; vertical-align: middle; }
 .inline-pic { max-width: 100%; height: auto; vertical-align: middle; }
 
 
