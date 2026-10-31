@@ -1430,12 +1430,28 @@ a.mn-stage:active { transform: translate(1px, 1px); }
    one table per section, folded sections when there are many, the searched rows highlighted */
 .odds-source { margin: 0 0 6px; font-size: 11px; color: var(--muted); text-align: right; }
 .odds-search { width: 100%; margin: 0 0 10px; }
-.odds-cats { margin-bottom: 10px; }
-.odds-cats .pill small { margin-left: 2px; opacity: 0.7; font-size: 11px; }
-.odds-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
-.odds-chip { display: inline-flex; align-items: baseline; gap: 4px; max-width: 100%; white-space: normal; line-height: 1.35; color: var(--text); text-decoration: none; }
-.odds-chip small { font-size: 11px; color: var(--muted); }
-.odds-chip .odds-chip-cat { color: var(--gold); }
+/* categories: a grid of icon cells, clearly apart from the content list below (제작자 요청 2026-11-01) */
+.odds-cats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-bottom: 12px; }
+.odds-cat {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 7px 3px 5px; cursor: pointer;
+  color: var(--muted); background: var(--night-2); border: var(--px) solid var(--edge);
+  box-shadow: inset var(--px) var(--px) 0 var(--hi), inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--lo);
+}
+.odds-cat-icon { font-size: 20px; line-height: 24px; }
+.odds-cat .odds-cat-name { max-width: 100%; font-size: 11px; line-height: 15px; }
+.odds-cat small { font-size: 10px; opacity: 0.75; }
+.odds-cat-on { color: var(--edge); background: var(--sunset); box-shadow: inset 2px 2px 0 #ffc35c; }
+/* content: the chosen category's tables as a list, boxes grouped under their box name */
+.odds-panel { margin-bottom: 12px; padding: 0; }
+.odds-panel-head { display: flex; align-items: baseline; gap: 6px; margin: 0; padding: 10px 12px; font-size: 15px; color: var(--gold); }
+.odds-panel-head small { font-size: 11px; font-weight: 400; color: var(--muted); }
+.odds-group-name { padding: 9px 12px 3px; font-size: 12px; color: var(--gold); border-top: 1px solid rgba(169, 162, 207, 0.18); }
+.odds-row { display: flex; align-items: center; gap: 8px; padding: 11px 12px; color: var(--text); text-decoration: none; border-top: 1px solid rgba(169, 162, 207, 0.18); }
+.odds-group .odds-row { padding-left: 24px; border-top-style: dashed; }
+.odds-row span { flex: 1; min-width: 0; font-size: 14px; }
+.odds-row small { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.odds-row i { font-style: normal; color: var(--muted); }
+.odds-row:active { background: rgba(255, 255, 255, 0.05); }
 .odds-sec { margin: 0 0 10px; }
 details.odds-sec { padding: 6px 8px; background: var(--panel); border: var(--px) solid var(--edge); }
 details.odds-sec > summary { cursor: pointer; font-size: 13px; }

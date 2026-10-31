@@ -1,12 +1,12 @@
 // '정보' > '공식 확률' (#/odds, #/odds/<표 번호>). 제작자 요청 2026-10-31: 컴투스 공식 확률 정보를 위키에.
-// 목록은 위에 분류(가챠샵, 랜덤상자, 보석 ...) 단추, 아래에 고른 분류의 표 단추. 찾기 칸은 아이템·상자 이름이 든 표를 고른다.
+// 목록은 위에 분류(가챠샵, 랜덤상자, 보석 ...) 아이콘 칸, 아래에 고른 분류의 표 목록(같은 상자는 묶어서). 찾기 칸은 아이템·상자 이름이 든 표를 고른다.
 // 표 화면은 섹션마다 표, 섹션이 많으면 접어 두고, 맨 위에 공식 페이지 링크.
 import { useCallback, useState } from "react";
 import { useAsync } from "../data";
 import { loadOdds, matchedSections, oddsMatches, oddsName, oddsPage } from "../odds";
 import type { OddsSection, OddsTable } from "../odds";
 import { go } from "../router";
-import { Loading, NotFound, TopBar } from "../ui";
+import { FitLine, Loading, NotFound, TopBar } from "../ui";
 
 const CATEGORY_ICON: Record<string, string> = {
   가챠샵: "🎰",
@@ -34,6 +34,29 @@ function dateText(iso: string): string {
   return `${d.getFullYear()}.${two(d.getMonth() + 1)}.${two(d.getDate())}`;
 }
 
+/** 메뉴 끝의 '개별 획득 확률' 같은 말 (하나뿐이면 이름에 붙이지 않는다) */
+const GENERIC_LEAF = /^(개별 )?획득 확률$/;
+
+interface OddsGroup {
+  /** 묶음 이름 (공식 메뉴의 두 번째 칸: '별똥별의 실타래') */
+  name: string;
+  /** 묶음 안의 표와 그 표의 이름 ('개별 획득 확률', '코스튬 옵션 개별 확률') */
+  rows: { t: OddsTable; label: string }[];
+}
+
+/** 한 분류의 표를 공식 메뉴 두 번째 칸으로 묶는다. 표가 하나뿐이고 이름이 '개별 획득 확률'이면 묶음 이름만 */
+function groupsOf(tables: OddsTable[]): OddsGroup[] {
+  const groups: OddsGroup[] = [];
+  for (const t of tables) {
+    const name = t.path[1] ?? t.path[0];
+    const leaf = t.path.slice(2).join(" · ");
+    let g = groups.find((x) => x.name === name);
+    if (!g) groups.push((g = { name, rows: [] }));
+    g.rows.push({ t, label: leaf });
+  }
+  return groups;
+}
+
 export function OddsPage({ q: initial, cat: initialCat }: { q: string; cat: string }) {
   const { data: odds, error } = useAsync(useCallback(() => loadOdds(), []));
   const [q, setQ] = useState(initial);
@@ -47,23 +70,22 @@ export function OddsPage({ q: initial, cat: initialCat }: { q: string; cat: stri
     );
   }
   const found = q.trim() ? odds.tables.filter((t) => oddsMatches(t, q)) : null;
-  const groups = [...new Set(odds.tables.map((t) => t.path[0]))];
-  const current = groups.includes(cat) ? cat : groups[0];
+  const cats = [...new Set(odds.tables.map((t) => t.path[0]))];
+  const current = cats.includes(cat) ? cat : cats[0];
   // 고른 분류는 주소에 남겨 표를 보고 돌아와도 그대로 (기록은 늘리지 않는다)
-  const pick = (g: string) => {
-    setCat(g);
-    go(`#/odds?c=${encodeURIComponent(g)}`, true);
+  const pick = (c: string) => {
+    setCat(c);
+    go(`#/odds?c=${encodeURIComponent(c)}`, true);
   };
-  const chip = (t: OddsTable) => {
-    const hits = found ? matchedSections(t, q).length : 0;
-    return (
-      <a key={t.key} className="pill odds-chip" href={`#/odds/${t.key}${q.trim() ? "?q=" + encodeURIComponent(q.trim()) : ""}`}>
-        {found && <small className="odds-chip-cat">{t.path[0]}</small>}
-        {oddsName(t)}
-        {found ? <small>{hits}곳</small> : t.sections.length > 1 && <small>{t.sections.length}</small>}
-      </a>
-    );
-  };
+  const href = (t: OddsTable) => `#/odds/${t.key}${q.trim() ? "?q=" + encodeURIComponent(q.trim()) : ""}`;
+  const row = (t: OddsTable, label: string, meta: string, key: string = t.key) => (
+    <a key={key} className="odds-row" href={href(t)}>
+      <span>{label}</span>
+      {meta && <small>{meta}</small>}
+      <i aria-hidden>›</i>
+    </a>
+  );
+  const sectionMeta = (t: OddsTable) => (t.sections.length > 1 ? `표 ${t.sections.length}개` : "");
   return (
     <>
       <TopBar title="공식 확률" />
@@ -71,21 +93,48 @@ export function OddsPage({ q: initial, cat: initialCat }: { q: string; cat: stri
       <input className="mk-input odds-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 아이템, 상자 이름" aria-label="공식 확률 찾기" />
       {found ? (
         found.length ? (
-          <div className="odds-chips">{found.map(chip)}</div>
+          // 찾은 표는 분류마다 묶어서
+          cats
+            .filter((c) => found.some((t) => t.path[0] === c))
+            .map((c) => (
+              <section key={c} className="panel odds-panel">
+                <h2 className="odds-panel-head">
+                  {CATEGORY_ICON[c] ?? "🎲"} {c}
+                </h2>
+                {found.filter((t) => t.path[0] === c).map((t) => row(t, oddsName(t), `${matchedSections(t, q).length}곳`))}
+              </section>
+            ))
         ) : (
           <div className="empty">'{q}'이 든 표가 없어요.</div>
         )
       ) : (
         <>
-          {/* 분류 단추는 위에 한 번에, 고른 분류의 표만 아래에 짧은 단추로 (제작자 요청 2026-11-01: 길게 늘어뜨리지 말고, 단추도 좌우로 길지 않게) */}
-          <div className="filter odds-cats" role="tablist" aria-label="분류">
-            {groups.map((g) => (
-              <button key={g} role="tab" aria-selected={g === current} className={"pill" + (g === current ? " pill-on" : "")} onClick={() => pick(g)}>
-                {CATEGORY_ICON[g] ?? "🎲"} {g} <small>{odds.tables.filter((t) => t.path[0] === g).length}</small>
+          {/* 분류: 아이콘 칸 (제작자 요청 2026-11-01: 분류와 내용이 구분되게, 단추만 늘어놓지 말고) */}
+          <div className="odds-cats" role="tablist" aria-label="분류">
+            {cats.map((c) => (
+              <button key={c} role="tab" aria-selected={c === current} className={"odds-cat" + (c === current ? " odds-cat-on" : "")} onClick={() => pick(c)}>
+                <span className="odds-cat-icon">{CATEGORY_ICON[c] ?? "🎲"}</span>
+                <FitLine className="odds-cat-name" text={c} wrap={false} />
+                <small>{odds.tables.filter((t) => t.path[0] === c).length}</small>
               </button>
             ))}
           </div>
-          <div className="odds-chips">{odds.tables.filter((t) => t.path[0] === current).map(chip)}</div>
+          {/* 내용: 고른 분류의 표 목록. 같은 상자의 표는 상자 이름 아래로 묶는다 */}
+          <section className="panel odds-panel">
+            <h2 className="odds-panel-head">
+              {CATEGORY_ICON[current] ?? "🎲"} {current} <small>표 {odds.tables.filter((t) => t.path[0] === current).length}개</small>
+            </h2>
+            {groupsOf(odds.tables.filter((t) => t.path[0] === current)).map((g) =>
+              g.rows.length === 1 && (!g.rows[0].label || GENERIC_LEAF.test(g.rows[0].label)) ? (
+                row(g.rows[0].t, g.name, sectionMeta(g.rows[0].t))
+              ) : (
+                <div key={g.name} className="odds-group">
+                  <div className="odds-group-name">{g.name}</div>
+                  {g.rows.map((r) => row(r.t, r.label || g.name, sectionMeta(r.t)))}
+                </div>
+              ),
+            )}
+          </section>
         </>
       )}
     </>
