@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { NEED_LOGIN, loadWiki, useAsync } from "./data";
 import { useRoute } from "./router";
-import { PixelIcon, Loading, NotFound } from "./ui";
-import { Home, InfoPage } from "./pages/Home";
+import { FitLine, PixelIcon, Loading, NotFound } from "./ui";
+import { Home, InfoPage, TileIcon } from "./pages/Home";
+import { canSee, clickItem, isUpdated, itemOf, loadLayout, pressItem, setEditing, useLauncher } from "./launcher";
+import type { LaunchItem } from "./launcher";
 import { Search } from "./pages/Search";
 import { Places, PlacePage } from "./pages/Places";
 import { ItemPage, MonsterPage } from "./pages/Detail";
@@ -34,21 +36,12 @@ import { RANK, TEST_IDS, fetchMe, switchAccount } from "./auth";
 import { appMenu } from "./platform";
 import type { Me } from "./auth";
 
-/** 아래 탭. 아이콘은 아이모 그림과 어울리는 픽셀 그림 (public/icons, 제작자 요청) */
 /**
- * 아래 탭: 홈, 검색, 정보, 챗봇 (제작자 요청 2026-11-01: 사냥터와 장비는 '정보' 안으로, 정보는 장비 자리로).
- * match: 이 탭이 켜지는 화면들 (정보 탭은 정보 안의 메뉴, 글, 사냥터, 장비, 공식 확률에서도)
+ * 아래 탭은 사람마다 배치가 다르다 (src/launcher.ts, 제작자 요청 2026-11-01: 폰 홈 화면처럼 홈 칸과 아래 탭을 오가며 옮기기).
+ * 처음에는 홈 · 게시판 · 검색 · 정보 · 챗봇. 아이콘은 아이모 그림과 어울리는 픽셀 그림 (public/icons), 없으면 칸 그림.
+ * 안드로이드 앱 안에서만 보이는 '앱' 탭(시계 설정, 게임 위에 띄우기)은 배치와 상관없이 맨 끝 (게임 위 위키 창 안에서는 숨김).
  */
-const TABS: { to: string; label: string; icon: string; pic?: "home" | "search" | "info" | "chat"; match: string[] }[] = [
-  { to: "#/", label: "홈", icon: "🏠", pic: "home", match: [""] },
-  { to: "#/search", label: "검색", icon: "🔍", pic: "search", match: ["search"] },
-  { to: "#/info", label: "정보", icon: "📚", pic: "info", match: ["info", "menu", "post", "places", "place", "equip", "odds"] },
-  { to: "#/chat", label: "챗봇", icon: "💬", pic: "chat", match: ["chat"] },
-];
-
-/** 안드로이드 앱 안에서만 보이는 탭: 시계 설정, 게임 위에 띄우기 같은 앱 기능 (게임 위 위키 창 안에서는 숨김) */
-const APP_TAB: (typeof TABS)[number] = { to: "#/app", label: "앱", icon: "⏰", match: ["app"] };
-const SHOWN_TABS = appMenu ? [...TABS, APP_TAB] : TABS;
+const APP_TAB: LaunchItem = { key: "apptab", title: "앱", to: "#/app", icon: "⏰", match: ["app"] };
 
 /**
  * 위키는 길드원만 본다. 로그인 전에는 로그인 화면, 임시 비밀번호로 들어오면 비밀번호 바꾸기 화면만 보인다.
@@ -122,6 +115,19 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   useEffect(() => void ensurePush().then(() => reportPush(me.id)), [me.id]);
   // 업데이트된 메뉴에 처음 들어간 때 (홈 칸의 'UPDATE' 가 그때부터 하루 동안 보인다)
   useEffect(() => markMenuVisit(me.id, location.hash), [route, me.id]);
+  // 홈 칸과 아래 탭 배치 (계정마다). 홈을 떠나면 배치 편집은 끝낸다
+  useEffect(() => loadLayout(me.id), [me.id]);
+  const launcher = useLauncher();
+  useEffect(() => {
+    if (page !== "" && launcher.editing) setEditing(false);
+  }, [page, launcher.editing]);
+  const layout = launcher.preview ?? launcher.layout;
+  const dock = layout.dock.map(itemOf).filter((t): t is LaunchItem => !!t && canSee(t, me));
+  const tabs = appMenu ? [...dock, APP_TAB] : dock;
+  const chatAt = tabs.findIndex((t) => t.key === "chat");
+  const editable = page === "";
+  const dragKey = launcher.drag?.moved ? launcher.drag.key : undefined;
+  const dragItem = dragKey ? itemOf(dragKey) : undefined;
 
   // 다른 기기에서 비밀번호가 초기화되는 등으로 로그인이 풀리면 로그인 화면으로
   const loggedOut = error?.includes(NEED_LOGIN) ?? false;
@@ -162,8 +168,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   return (
     <div
       className="app"
-      // 홈의 '클로즈베타' 글씨를 챗봇 탭 바로 위에 두려고 탭 수와 챗봇 탭 자리를 알린다 (styles.css .home-version)
-      style={{ "--tabs": SHOWN_TABS.length, "--chat-at": SHOWN_TABS.findIndex((t) => t.to === "#/chat") } as CSSProperties}
+      // 홈의 '클로즈베타' 글씨를 챗봇 탭(없으면 마지막 탭) 바로 위에 두려고 탭 수와 그 자리를 알린다 (styles.css .home-version)
+      style={{ "--tabs": tabs.length, "--chat-at": chatAt >= 0 ? chatAt : tabs.length - 1 } as CSSProperties}
     >
       {/* 테스트 계정으로 보는 중이면 맨 위에 '내 계정' (앱개발자로 돌아가기) */}
       {TEST_IDS.includes(me.id) && (
@@ -185,14 +191,49 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
       <main className="page" key={page === "chat" ? "chat" : route.parts.join("/")}>
         {body}
       </main>
-      <nav className="tabbar">
-        {SHOWN_TABS.map((t) => (
-          <a key={t.to} href={t.to} className={"tab" + (t.match.includes(page) ? " tab-on" : "")}>
-            <span className="tab-icon">{t.pic ? <PixelIcon name={t.pic} size={32} /> : t.icon}</span>
-            <span className="tab-label">{t.label}</span>
-          </a>
-        ))}
+      <nav className={"tabbar" + (launcher.editing && editable ? " launch-editing" : "")} data-zone="dock">
+        {tabs.map((t) => {
+          // 아래 탭도 고친 메뉴면 'UPDATE' (제작자 요청 2026-11-01, 홈 칸과 같은 updates.ts)
+          const updated = t !== APP_TAB && isUpdated(me.id, t);
+          const className =
+            "tab" + (t.match.includes(page) ? " tab-on" : "") + (t.locked ? " tab-locked" : "") + (dragKey === t.key ? " launch-drag-src" : "");
+          const inside = (
+            <>
+              {updated && <span className="tab-up">UPDATE</span>}
+              <span className="tab-icon">{t.pic ? <PixelIcon name={t.pic} size={32} /> : <TileIcon t={t} />}</span>
+              <FitLine className="tab-label" text={t.short ?? t.title} wrap={false} />
+            </>
+          );
+          const handlers =
+            t === APP_TAB
+              ? {}
+              : {
+                  "data-slot": t.key,
+                  "data-zone": "dock",
+                  onPointerDown: (e: ReactPointerEvent<HTMLElement>) => pressItem(e, t.key, editable),
+                  onClick: clickItem,
+                  onContextMenu: (e: ReactMouseEvent) => editable && e.preventDefault(),
+                };
+          return t.locked ? (
+            <span key={t.key} className={className} aria-disabled="true" {...handlers}>
+              {inside}
+            </span>
+          ) : (
+            <a key={t.key} href={t.to} className={className} draggable={false} {...handlers}>
+              {inside}
+            </a>
+          );
+        })}
       </nav>
+      {/* 끌고 있는 칸 (손가락을 따라온다) */}
+      {dragItem && launcher.drag && (
+        <div className="launch-ghost" style={{ left: launcher.drag.x, top: launcher.drag.y }} aria-hidden>
+          <span className="tile-icon">
+            <TileIcon t={dragItem} />
+          </span>
+          <span>{dragItem.short ?? dragItem.title}</span>
+        </div>
+      )}
     </div>
   );
 }

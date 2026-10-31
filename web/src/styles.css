@@ -1451,3 +1451,33 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 .odds-table tr.odds-hit td { background: #3d3214; color: var(--gold); }
 .odds-more { margin-top: 6px; }
 .odds-note { margin: 10px 2px 90px; font-size: 10px; color: var(--muted); }
+
+/* home tiles and bottom tabs arranged per person (src/launcher.ts, 제작자 요청 2026-11-01: like a phone home screen).
+   Long-press a home tile to edit: tiles and tabs wiggle and can be dragged between the home grid and the bottom bar */
+.tile, .tab, .search-entry { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.tab { position: relative; min-width: 0; }
+.tab .tab-label { max-width: 100%; padding: 0 2px; }
+.tab-icon .tile-pic { width: 30px; height: 30px; object-fit: contain; }
+.tab-locked { opacity: 0.6; cursor: default; }
+/* 'UPDATE' on a bottom tab (same mint as the home tiles) */
+.tab-up {
+  position: absolute; top: 3px; left: 50%; transform: translateX(4px); z-index: 2; padding: 0 3px; font-size: 7px; font-weight: 700;
+  line-height: 12px; color: var(--edge); background: #3fe0a0; border: 1px solid var(--edge); pointer-events: none;
+}
+.launch-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 8px 10px; }
+.launch-bar b { flex: 1; color: #3fe0a0; }
+.home-edit { display: block; margin: 14px auto 0; font-size: 12px; opacity: 0.8; }
+.launch-editing .tiles { min-height: 89px; }
+.launch-editing .tile, .tabbar.launch-editing .tab, .launch-editing .search-entry { touch-action: none; cursor: grab; animation: launch-wiggle 0.22s ease-in-out infinite alternate; }
+.launch-editing .tile:nth-child(2n), .tabbar.launch-editing .tab:nth-child(2n) { animation-delay: -0.11s; }
+.tabbar.launch-editing { box-shadow: 0 calc(-1 * var(--px)) 0 #3fe0a0; }
+@keyframes launch-wiggle { from { transform: rotate(-1.2deg); } to { transform: rotate(1.2deg); } }
+@media (prefers-reduced-motion: reduce) { .launch-editing .tile, .tabbar.launch-editing .tab, .launch-editing .search-entry { animation: none; } }
+.launch-drag-src { opacity: 0.3; }
+.launch-ghost {
+  position: fixed; z-index: 60; transform: translate(-50%, -70%) scale(1.06); pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 76px; padding: 8px 10px; font-size: 12px;
+  color: var(--text); background: var(--panel); border: var(--px) solid #3fe0a0; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+}
+.launch-ghost .tile-icon { font-size: 24px; height: 30px; }
+.launch-ghost .tile-pic { width: 30px; height: 30px; object-fit: contain; }

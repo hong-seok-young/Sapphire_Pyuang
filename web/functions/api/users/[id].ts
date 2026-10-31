@@ -29,6 +29,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
     env.DB.prepare("DELETE FROM chat_threads WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM chat_gaps WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM plat_wallets WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM layouts WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM chat_usage WHERE user_id = ?").bind(user.id),
     // 게시판: 그 사람의 글(과 거기 딸린 사진, 댓글, 좋아요), 다른 글에 단 댓글과 좋아요
     env.DB.prepare("DELETE FROM board_files WHERE post_id IN (SELECT id FROM board_posts WHERE author = ?)").bind(user.id),

@@ -392,3 +392,10 @@ CREATE TABLE IF NOT EXISTS plat_wallets (
   started_at INTEGER NOT NULL            -- 지갑을 연 때 (이 뒤의 신청만 쓴 것으로 센다)
 );
 
+
+-- 홈 칸과 아래 탭 배치 (src/launcher.ts, functions/api/layout.ts, 제작자 요청 2026-11-01: 폰 홈 화면처럼 각자 옮기기)
+CREATE TABLE IF NOT EXISTS layouts (
+  user_id TEXT PRIMARY KEY,
+  data TEXT NOT NULL,                     -- {"dock": [...], "grid": [...]} 칸 이름 (launcher.ts ITEMS 의 key)
+  updated_at INTEGER NOT NULL
+);

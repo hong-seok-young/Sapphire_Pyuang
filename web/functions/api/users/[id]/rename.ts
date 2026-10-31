@@ -12,7 +12,7 @@ const ID_COLUMNS: [string, string][] = [
   ["listing_bids", "user_id"], ["gold_offers", "owner"], ["gold_wants", "user_id"], ["requests", "owner"], ["requests", "accepter"],
   ["activity", "user_id"], ["alerts", "user_id"], ["alert_prefs", "user_id"], ["listing_talk", "user_id"], ["plat_orders", "user_id"],
   ["favorites", "user_id"], ["board_posts", "author"], ["board_comments", "user_id"], ["board_likes", "user_id"], ["board_views", "user_id"],
-  ["chat_threads", "user_id"], ["chat_gaps", "user_id"], ["plat_wallets", "user_id"],
+  ["chat_threads", "user_id"], ["chat_gaps", "user_id"], ["plat_wallets", "user_id"], ["layouts", "user_id"],
 ];
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
