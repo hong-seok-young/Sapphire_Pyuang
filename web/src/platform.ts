@@ -40,8 +40,9 @@ export function standalone(): boolean {
 export const WEB_URL = "https://sapphire-guild.pages.dev";
 
 /**
- * 홈 화면 아이콘 그림의 판 (web/public/icon-*.png 를 바꾸면 같이 바꾼다). 폰은 처음 설치할 때 받은 아이콘을 계속 쓰므로,
- * 홈 화면 웹앱으로 열었는데 이 판을 아직 못 봤으면 지우고 다시 설치하라고 한 번 안내한다 (pages/InstallGuide.tsx IconChanged)
+ * 홈 화면 아이콘 그림의 판 (web/public/icon-*.png 를 바꾸면 같이 바꾸고, manifest.webmanifest 의 start_url ?icon= 도 같게).
+ * 폰은 설치할 때 받은 아이콘과 시작 주소를 계속 쓴다. 그래서 홈 화면 웹앱이 ?icon=이 판 없이 열리면 예전에 깐 것이라
+ * 다시 깔 때까지 열 때마다 지우고 다시 설치하라고 안내한다 (pages/InstallGuide.tsx IconChangedPage)
  */
 export const ICON_VERSION = "2026-10-31-galaxy";
 

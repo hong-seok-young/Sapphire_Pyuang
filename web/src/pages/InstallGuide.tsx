@@ -45,7 +45,7 @@ function CopyAddress() {
  * 이미 앱을 깐 사람에게는 앱(과 게임 위 위키 창) 안에서 이 안내만 보이고 웹 주소로 보낸다.
  * 앱은 같은 주소를 앱 안에서 열기 때문에, 크롬과 삼성 인터넷을 여는 주소(googlechrome://, samsunginternet://)로 바깥 브라우저를 연다.
  */
-export function AppClosedPage() {
+export function AppClosedPage({ onLogin }: { onLogin?: () => void }) {
   const target = encodeURIComponent(WEB_URL);
   return (
     <div className="guide">
@@ -62,6 +62,12 @@ export function AppClosedPage() {
         </a>
       </div>
       <CopyAddress />
+      {/* 앱개발자는 앱을 그대로 쓴다: 로그아웃돼 있으면 여기서 로그인 */}
+      {onLogin && (
+        <button className="btn btn-ghost guide-later" onClick={onLogin}>
+          개발자 로그인
+        </button>
+      )}
     </div>
   );
 }
@@ -139,29 +145,36 @@ export function InstallGuide({ onLater }: { onLater: () => void }) {
   );
 }
 
-const ICON_KEY = "sapphire.iconSeen";
+const ICON_LATER = "sapphire-icon-later";
 
 /**
- * 홈 화면 아이콘이 바뀌었으니 지우고 다시 설치하라는 안내를 보일지 (제작자 요청). 홈 화면 웹앱(폰)으로 열었고 이 판을 아직 못 봤을 때만.
- * 브라우저로 열면 앞으로 새 아이콘으로 설치할 테니 본 것으로 적어 둔다
+ * 홈 화면 아이콘이 바뀌었으니 지우고 다시 설치하라는 안내를 보일지 (제작자 요청: 다시 깐 사람에게는 안 뜨고, 안 깐 사람에게는 계속).
+ * 새로 깐 홈 화면 웹앱은 시작 주소에 ?icon=지금 판 이 붙어 열린다 (manifest start_url). 브라우저에서는 '홈 화면에 추가'가
+ * 지금 주소로 깔리기도 하므로 주소에 판을 붙여 둔다. '나중에'는 이번에 연 동안만 닫는다
  */
 export function iconNoticeNeeded(): boolean {
-  try {
-    if (localStorage.getItem(ICON_KEY) === ICON_VERSION) return false;
-    if (!standalone()) {
-      localStorage.setItem(ICON_KEY, ICON_VERSION);
-      return false;
+  const fresh = new URLSearchParams(location.search).get("icon") === ICON_VERSION;
+  if (!standalone()) {
+    if (!fresh) {
+      const u = new URL(location.href);
+      u.searchParams.set("icon", ICON_VERSION);
+      history.replaceState(history.state, "", u);
     }
-  } catch {
     return false;
+  }
+  if (fresh) return false;
+  try {
+    if (sessionStorage.getItem(ICON_LATER)) return false;
+  } catch {
+    // 못 읽으면 안내를 보인다
   }
   return isAndroid || isIOS;
 }
 
 export function IconChangedPage({ onDone }: { onDone: () => void }) {
-  const done = () => {
+  const later = () => {
     try {
-      localStorage.setItem(ICON_KEY, ICON_VERSION);
+      sessionStorage.setItem(ICON_LATER, "1");
     } catch {
       // 못 적어도 이번에는 닫힌다
     }
@@ -171,7 +184,7 @@ export function IconChangedPage({ onDone }: { onDone: () => void }) {
     <div className="guide">
       <img className="guide-icon" src="icon-192.png" alt="" width={84} height={84} />
       <h1 className="guide-title">앱 아이콘이 바뀌었어요</h1>
-      <p className="guide-text">홈 화면 아이콘이 아직 옛날 그림이면 지우고 다시 설치해 주세요. 폰은 처음 설치할 때 받은 아이콘을 계속 써요.</p>
+      <p className="guide-text">지금 홈 화면 아이콘은 예전 것이에요. 지우고 다시 설치해 주세요. 다시 설치하면 이 안내는 더 안 떠요.</p>
       <ol className="guide-steps">
         <li>홈 화면의 Sapphire 아이콘을 길게 눌러 {isIOS ? "'앱 제거' → '홈 화면에서 제거'" : "'삭제'(또는 '제거')"}</li>
         <li>{isIOS ? "사파리" : "크롬이나 삼성 인터넷"}에서 아래 주소 열기</li>
@@ -180,8 +193,8 @@ export function IconChangedPage({ onDone }: { onDone: () => void }) {
       <CopyAddress />
       {isIOS && <p className="guide-text">다시 설치하면 로그인을 한 번 더 해야 할 수 있어요.</p>}
       <div className="guide-buttons">
-        <button className="btn" onClick={done}>
-          확인
+        <button className="btn btn-ghost" onClick={later}>
+          나중에
         </button>
       </div>
     </div>

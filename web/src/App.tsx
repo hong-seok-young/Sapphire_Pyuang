@@ -66,12 +66,12 @@ export function App() {
   }, []);
   // 홈 화면 아이콘이 바뀌었으면 홈 화면 웹앱으로 연 사람에게 지우고 다시 설치하라고 한 번 안내 (제작자 요청)
   const [iconNotice, setIconNotice] = useState(iconNoticeNeeded);
+  // 앱 안 '검토 후 오픈' 화면에서 '개발자 로그인'을 눌렀는지
+  const [appLogin, setAppLogin] = useState(false);
   useEffect(() => {
     fetchMe().then(setMe, () => setMe(null));
   }, []);
 
-  // 안드로이드 앱은 검토 후 오픈: 이미 깐 앱 안에서는 웹으로 안내만 한다 (제작자 요청)
-  if (inApp && !APP_OPEN) return <AppClosedPage />;
   if (guide) return <InstallGuide onLater={later} />;
   if (iconNotice) return <IconChangedPage onDone={() => setIconNotice(false)} />;
 
@@ -83,6 +83,11 @@ export function App() {
         </main>
       </div>
     );
+  }
+  // 안드로이드 앱은 검토 후 오픈: 이미 깐 앱 안에서는 웹으로 안내만 한다. 앱개발자(퓨앙)는 그대로 쓴다 (제작자 요청)
+  if (inApp && !APP_OPEN && me?.role !== "developer") {
+    if (me === null && appLogin) return <LoginPage onLogin={setMe} />;
+    return <AppClosedPage onLogin={me === null ? () => setAppLogin(true) : undefined} />;
   }
   if (me === null) return <LoginPage onLogin={setMe} />;
   if (me.mustChange) {

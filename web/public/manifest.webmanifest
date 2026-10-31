@@ -2,7 +2,7 @@
   "name": "Sapphire 아이모 위키",
   "short_name": "Sapphire",
   "description": "아이모 길드 Sapphire 위키: 사냥터, 몬스터 드랍, 장비, 육성 공략",
-  "start_url": "./",
+  "start_url": "./?icon=2026-10-31-galaxy",
   "scope": "./",
   "display": "standalone",
   "background_color": "#141831",
