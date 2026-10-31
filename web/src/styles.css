@@ -847,10 +847,17 @@ button { font: inherit; color: inherit; }
 .ps-buy {
   position: fixed; z-index: 20; left: 50%; transform: translateX(-50%); width: min(616px, calc(100% - 16px));
   bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 6px);
-  display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--panel-2); border: var(--px) solid var(--edge);
+  display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; background: var(--panel-2); border: var(--px) solid var(--edge);
   box-shadow: 0 -2px 0 rgba(0, 0, 0, 0.25); animation: page-in 0.16s ease-out;
 }
-.ps-buy img { width: 48px; height: auto; flex: none; }
+.ps-buy-row { display: flex; align-items: center; gap: 8px; }
+.ps-buy-row > img { width: 48px; height: auto; flex: none; }
+/* what a package holds (the game's 'i' popup slots) */
+.ps-contents { display: flex; flex-direction: column; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--hi); }
+.ps-contents b { font-size: 12px; font-weight: 400; color: var(--gold); }
+.ps-contents small { color: var(--muted); }
+.ps-contents-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 4px; }
+.ps-contents-grid img { display: block; width: 100%; max-width: 52px; height: auto; }
 .ps-buy-name { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 11px; color: var(--muted); }
 .ps-buy-name b { font-size: 13px; font-weight: 400; color: var(--text); }
 .ps-buy-name small b { font-size: 11px; color: var(--gold); }
@@ -1085,4 +1092,6 @@ button { font: inherit; color: inherit; }
 .lv-log li { display: flex; align-items: center; gap: 6px; padding: 3px 6px; background: var(--night-2); border: 1px solid var(--edge); }
 .lv-log li span { flex: 1; }
 .lv-log button { padding: 0 6px; font-size: 11px; color: var(--muted); background: none; border: 0; cursor: pointer; }
+.phone-push { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--hi); }
+.phone-push small { font-size: 12px; color: var(--muted); }
 

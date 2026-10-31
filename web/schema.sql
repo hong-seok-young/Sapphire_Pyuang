@@ -306,3 +306,17 @@ CREATE TABLE IF NOT EXISTS link_previews (
   site TEXT,
   fetched_at INTEGER NOT NULL
 );
+
+-- 폰 자체 알림 (웹 푸시, server/push.ts): 알림을 받을 폰. 한 사람 5대까지
+CREATE TABLE IF NOT EXISTS push_subs (
+  endpoint TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS push_subs_user ON push_subs (user_id);
+-- 폰 알림 서명 키 (서버가 처음 쓸 때 만든다. 한 줄)
+CREATE TABLE IF NOT EXISTS push_keys (
+  id INTEGER PRIMARY KEY,
+  public_key TEXT NOT NULL,
+  private_jwk TEXT NOT NULL
+);

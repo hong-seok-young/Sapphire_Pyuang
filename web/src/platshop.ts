@@ -29,6 +29,8 @@ export interface ShopItem {
   custom: boolean;
   /** 한도 기간 안에 내가 신청하거나 산 수 */
   used: number;
+  /** 패키지에 들어 있는 것: 게임 'i' 정보창의 칸 그림 (자료/scripts/make_shop_info.py), 제목 아래 작은 글 */
+  contents?: { tiles: string[]; note?: string };
 }
 
 export interface ShopOrder {

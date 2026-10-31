@@ -336,7 +336,51 @@ async function aiAlpha(src: ImageData): Promise<Uint8Array> {
   const a = new Uint8Array(src.width * src.height);
   for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3] >= 128 ? 255 : 0;
   if (!a.some((v) => v)) throw new Error("AI 가 캐릭터를 찾지 못했어요. 캐릭터가 꽉 차게 잘라 주세요");
-  return a;
+  return keepBiggest(a, src.width, src.height);
+}
+
+/**
+ * AI 는 이름표, 펫처럼 떨어져 있는 것도 남긴다 (제작자가 본 결과). 가장 큰 덩어리(캐릭터)와 거기 붙은 것만 남기고
+ * 떨어진 조각은 지운다. 남은 조각은 지우개로 누르면 된다
+ */
+function keepBiggest(a: Uint8Array, w: number, h: number): Uint8Array {
+  const label = new Int32Array(a.length);
+  let best = 0;
+  let bestSize = 0;
+  let next = 0;
+  const stack: number[] = [];
+  for (let start = 0; start < a.length; start++) {
+    if (!a[start] || label[start]) continue;
+    next++;
+    let size = 0;
+    label[start] = next;
+    stack.push(start);
+    while (stack.length) {
+      const i = stack.pop()!;
+      size++;
+      const x = i % w;
+      const y = (i - x) / w;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const j = ny * w + nx;
+          if (a[j] && !label[j]) {
+            label[j] = next;
+            stack.push(j);
+          }
+        }
+      }
+    }
+    if (size > bestSize) {
+      bestSize = size;
+      best = next;
+    }
+  }
+  const out = new Uint8Array(a.length);
+  for (let i = 0; i < a.length; i++) if (label[i] === best) out[i] = 255;
+  return out;
 }
 
 /** 2단계: 배경 지우기. 처음에 AI 가 지우고 (안 되면 가장자리 배경), 남은 곳은 눌러서 지우거나 되살린다 */

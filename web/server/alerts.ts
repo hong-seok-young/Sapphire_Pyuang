@@ -1,7 +1,8 @@
 // 알림 (제작자 요청): 내 물건에 살래요, 입찰, 의뢰 수락처럼 나와 관련된 일을 앱 안 알림함(#/alerts)에 남긴다.
 // 종류마다 끄고 켤 수 있다 (D1 alert_prefs). 새 물건, 새 의뢰처럼 많은 것은 처음엔 꺼져 있다. 30일 뒤 지운다.
-// 폰 푸시나 게임 위 알림이 아니다 (게임 위에 아무것도 띄우지 않는다)
+// 폰 자체 알림(웹 푸시)도 같이 보낸다 (server/push.ts, 폰에서 켠 사람만). 게임 위에는 아무것도 띄우지 않는다
 import type { Env } from "./auth";
+import { pushNew } from "./push";
 
 /** 알림 종류와 처음 켜짐 여부 (화면 web/src/alerts.ts 의 이름과 같다) */
 export const ALERT_KINDS = {
@@ -35,6 +36,7 @@ export async function notify(env: Env, to: string[] | "all", kind: AlertKind, te
     )
       .bind(kind, text.slice(0, 120), link, now, from, kind, ALERT_KINDS[kind] ? 1 : 0, ...(to === "all" ? [] : to))
       .run();
+    await pushNew(env, kind, now);
     if (Math.random() < 0.02) await env.DB.prepare("DELETE FROM alerts WHERE created_at < ?").bind(now - KEEP_MS).run();
   } catch (e) {
     console.error("notify failed", e);

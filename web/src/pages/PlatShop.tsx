@@ -136,6 +136,21 @@ export function PlatShopPage() {
           </ul>
           {item && (
             <div className="ps-buy">
+              {/* 게임의 'i' 정보창처럼 들어 있는 아이템 (제작자가 준 스샷에서 칸을 그대로 잘랐다) */}
+              {item.contents && (
+                <div className="ps-contents">
+                  <b>
+                    획득 가능한 아이템
+                    {item.contents.note && <small> · {item.contents.note}</small>}
+                  </b>
+                  <span className="ps-contents-grid">
+                    {item.contents.tiles.map((t) => (
+                      <img key={t} src={SHOP_PIC + t} alt="" loading="lazy" />
+                    ))}
+                  </span>
+                </div>
+              )}
+              <div className="ps-buy-row">
               <img src={SHOP_PIC + item.tile} alt="" />
               <span className="ps-buy-name">
                 <b>
@@ -158,6 +173,7 @@ export function PlatShopPage() {
               >
                 {!data.main ? "1군 전용" : item.used >= item.limitCount ? "한도 다 씀" : "구매 신청"}
               </button>
+              </div>
             </div>
           )}
         </>

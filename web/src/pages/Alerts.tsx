@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { errorText } from "../auth";
 import { ALERT_GROUPS, clearUnread, fetchAlerts, readAllAlerts, setAlertPref } from "../alerts";
+import { disablePush, enablePush, pushState } from "../push";
+import type { PushState } from "../push";
 import type { Alert, AlertKind } from "../alerts";
 import { ago } from "../market";
 import { Loading, TopBar } from "../ui";
@@ -56,6 +58,7 @@ export function AlertsPage() {
       {prefs && (
         <section className="panel alert-prefs">
           <h2 className="panel-title">알림 설정</h2>
+          <PhonePush />
           {ALERT_GROUPS.map((g) => (
             <div key={g.menu} className="alert-pref-row">
               <span>{g.menu}</span>
@@ -74,3 +77,45 @@ export function AlertsPage() {
     </>
   );
 }
+
+/** 폰 자체 알림 켜고 끄기 (제작자 요청: 갤럭시·아이폰 알림으로 간략 내용과 함께). 이 폰에만 해당한다 */
+function PhonePush() {
+  const [state, setState] = useState<PushState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    pushState().then(setState, () => setState("unsupported"));
+  }, []);
+  async function toggle() {
+    setBusy(true);
+    setError("");
+    try {
+      setState(state === "on" ? await disablePush() : await enablePush());
+    } catch (x) {
+      setError(errorText(x));
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!state) return null;
+  return (
+    <div className="alert-pref-group phone-push">
+      <b>📱 폰 알림</b>
+      {state === "on" || state === "off" ? (
+        <button className={"pill" + (state === "on" ? " pill-on" : "")} disabled={busy} onClick={toggle}>
+          {state === "on" ? "켜짐" : "꺼짐"}
+        </button>
+      ) : (
+        <small>
+          {state === "ios-install"
+            ? "아이폰은 홈 화면에 설치한 앱에서만 돼요"
+            : state === "denied"
+              ? "폰 설정에서 이 앱의 알림을 허용해 주세요"
+              : "이 브라우저는 폰 알림을 못 받아요"}
+        </small>
+      )}
+      {error && <small className="form-error">{error}</small>}
+    </div>
+  );
+}
+
