@@ -142,3 +142,17 @@ CREATE TABLE IF NOT EXISTS avatars (
   updated_by TEXT,
   png BLOB NOT NULL                       -- 맨 끝 칸 (랭킹은 updated_at 만 읽는다)
 );
+
+-- 사용 기록 (앱개발자만 본다, 60일 보관, server/activity.ts): 접속, 화면, 한 일.
+-- 비밀번호, 챗봇 질문, 한마디, 흥정 가격, 입찰 금액, 경험치, IP 와 위치는 넣지 않는다
+CREATE TABLE IF NOT EXISTS activity (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  kind TEXT NOT NULL,   -- visit 접속 | view 화면 | act 한 일
+  what TEXT NOT NULL,   -- 화면 주소(#/market) 또는 한 일(POST /api/market)
+  detail TEXT,          -- 한 일의 짧은 내용 JSON (남겨도 되는 칸과 무엇에 했는지)
+  via TEXT,             -- app 앱 | float 게임 위 창 | ios, android, pc 웹
+  at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS activity_at ON activity (at);
+CREATE INDEX IF NOT EXISTS activity_user_at ON activity (user_id, at);

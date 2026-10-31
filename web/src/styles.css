@@ -661,3 +661,22 @@ button { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* activity log (pages/ActivityLog.tsx, developer only) */
+.log-note { margin: 0 0 10px; font-size: 12px; color: var(--muted); }
+.log-search { width: 100%; margin-bottom: 8px; }
+.log-people { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; }
+.log-person {
+  width: 100%; display: grid; grid-template-columns: auto 1fr; gap: 0 8px; padding: 6px 8px; text-align: left; cursor: pointer;
+  background: var(--panel-2); border: var(--px) solid var(--edge);
+}
+.log-person b { font-weight: 400; color: var(--text); }
+.log-person span { font-size: 12px; color: var(--muted); text-align: right; }
+.log-person > small { grid-column: 1 / -1; font-size: 11px; color: var(--muted); }
+.log-person-on { box-shadow: inset 0 0 0 2px var(--sunset); }
+.log-list { list-style: none; margin: 0; padding: 0; }
+.log-day { margin: 12px 0 4px; font-size: 13px; color: var(--gold); }
+.log-row { display: flex; gap: 10px; padding: 6px 2px; font-size: 13px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.log-row time { flex: none; width: 40px; color: var(--muted); font-size: 12px; }
+.log-row small { color: var(--muted); font-size: 11px; }
+.log-visit { color: #8ff0b0; }

@@ -12,6 +12,8 @@ interface Tile {
   androidOnly?: boolean;
   /** 오피서 이상에게만 보인다 */
   managers?: boolean;
+  /** 앱개발자에게만 보인다 */
+  developer?: boolean;
 }
 
 const TILES: Tile[] = [
@@ -31,11 +33,12 @@ const TILES: Tile[] = [
   // 시계와 보스 타이머는 안드로이드 앱에만 있다. 웹앱은 위키와 챗봇만 맡는다
   { title: "안드로이드 앱 받기", to: "#/app", icon: "📲", androidOnly: true },
   { title: "길드원 관리", to: "#/admin", icon: "👥", managers: true },
+  { title: "사용 기록", to: "#/log", icon: "📊", developer: true },
 ];
 
 export function Home({ me }: { me: Me }) {
   const shown = TILES.filter(
-    (t) => (!t.androidOnly || (isAndroid && !inApp)) && (!t.managers || RANK[me.role] >= 1),
+    (t) => (!t.androidOnly || (isAndroid && !inApp)) && (!t.managers || RANK[me.role] >= 1) && (!t.developer || me.role === "developer"),
   );
 
   return (

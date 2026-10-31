@@ -16,6 +16,8 @@ import { MePage, ProfileSetupPage } from "./pages/Profile";
 import { RankingPage } from "./pages/Ranking";
 import { MarketPage } from "./pages/Market";
 import { RequestsPage } from "./pages/Requests";
+import { ActivityLogPage } from "./pages/ActivityLog";
+import { forgetView, reportView } from "./activity";
 import { RANK, fetchMe } from "./auth";
 import { appMenu } from "./platform";
 import type { Me } from "./auth";
@@ -67,6 +69,21 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   const { data: wiki, error } = useAsync(useCallback(() => loadWiki(), []));
   const [page = "", arg = ""] = route.parts;
 
+  // 사용 기록: 지금 보는 화면을 보낸다. 5분 넘게 다른 앱에 있다가 돌아오면 같은 화면도 다시 (접속 세기)
+  useEffect(() => reportView(location.hash), [route]);
+  useEffect(() => {
+    let hiddenAt = 0;
+    const onVisible = () => {
+      if (document.hidden) hiddenAt = Date.now();
+      else if (hiddenAt && Date.now() - hiddenAt > 5 * 60_000) {
+        forgetView();
+        reportView(location.hash);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
   // 다른 기기에서 비밀번호가 초기화되는 등으로 로그인이 풀리면 로그인 화면으로
   const loggedOut = error?.includes(NEED_LOGIN) ?? false;
   useEffect(() => {
@@ -91,6 +108,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "post") body = <PostPage wiki={wiki} id={arg} />;
   else if (page === "chat") body = <ChatPage wiki={wiki} />;
   else if (page === "market") body = <MarketPage wiki={wiki} me={me} />;
+  else if (page === "log") body = me.role === "developer" ? <ActivityLogPage wiki={wiki} /> : <NotFound what="페이지" />;
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
   else if (page === "app" || page === "timer") body = <AppPage />;
   else body = <Home me={me} />;

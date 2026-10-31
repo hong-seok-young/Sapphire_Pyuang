@@ -9,69 +9,11 @@
 
 ---
 
-## 1. 사용 기록 (앱개발자만 보는 화면) — 설계와 서버 초안 있음
+## 1. 사용 기록 — 했음 (2026-10-31)
 
-제작자 요청 그대로: "나만 볼 수 있게 백로그도 다 기록해서 볼 수 있게 해 줘. 누가 어디서 뭐 하고, 몇 번 접속하고 등등"
-
-### 정한 것
-- 보는 사람: 역할이 `developer`(퓨앙)인 계정만. 화면 `#/log` '사용 기록', 홈 타일 📊 (앱개발자에게만 보임).
-- 남기는 것 (D1 `activity`, 60일 뒤 지움):
-  - **접속(visit)**: 30분 넘게 아무것도 안 하다가 다시 쓰면 하나. `/api/me`(앱 열기), 화면 보기, 한 일이 모두 접속을 깨운다.
-  - **화면(view)**: 본 화면의 해시 주소(`#/market`, `#/post/343732` ...). 한 화면에 1.5초 넘게 있을 때만, 같은 화면은 잇달아 안 보냄.
-    5분 넘게 다른 앱에 있다 돌아오면 지금 화면을 다시 보낸다 (접속 세기).
-  - **한 일(act)**: GET 이 아닌 API 요청이 성공하면 `메서드 경로` 와 짧은 내용(detail JSON).
-  - **어디서(via)**: User-Agent 로 `float`(게임 위 위키 창, `SapphireFloat`), `app`(`SapphireApp`), `ios`/`android`/`pc`(웹).
-- **남기지 않는 것** (화면에 '판 사람만 봐요', '본인만 봐요'라고 안내한 것들이라): 비밀번호, 챗봇 질문 내용, 한마디(note),
-  흥정 가격(offer, 대신 `offered: true` 만), 입찰 금액(amount), 경험치(exp), 사진, IP와 위치.
-  → `server/activity.ts` 의 `KEEP` 목록에 있는 칸만 남긴다.
-- 계정을 지우면 그 사람의 기록도 지운다 (`functions/api/users/[id].ts` DELETE 에 `DELETE FROM activity WHERE user_id = ?` 추가).
-- 길드원에게 기록한다는 걸 알릴지는 제작자에게 물어볼 것 (예: 로그인 화면 아래 한 줄 "접속과 사용 기록은 앱 관리를 위해 남아요").
-
-### 초안 파일 (이 폴더의 `activity/`) — 아직 시험 안 함
-| 초안 | 넣을 곳 |
-| --- | --- |
-| `activity/server-activity.ts` | `web/server/activity.ts` (viaOf, detailOf, record, subjectOf, KEEP_DAYS) |
-| `activity/api-middleware.ts` | `web/functions/api/_middleware.ts` (모든 /api 쓰기 요청 기록, /api/me 는 접속) |
-| `activity/api-activity.ts` | `web/functions/api/activity.ts` (POST 화면 보기, GET 앱개발자 전용 보기 + 사람별 요약) |
-
-`web/schema.sql` 에 넣을 표:
-```sql
--- 사용 기록 (앱개발자만 본다, 60일 보관): 접속, 화면, 한 일. 비밀번호, 챗봇 질문, 한마디, 흥정 가격, 입찰 금액, 경험치는 넣지 않는다
-CREATE TABLE IF NOT EXISTS activity (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id TEXT NOT NULL,
-  kind TEXT NOT NULL,   -- visit 접속 | view 화면 | act 한 일
-  what TEXT NOT NULL,   -- 화면 주소(#/market) 또는 한 일(POST /api/market)
-  detail TEXT,          -- 한 일의 짧은 내용 JSON (KEEP 칸과 subject)
-  via TEXT,             -- app | float | ios | android | pc
-  at INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS activity_at ON activity (at);
-CREATE INDEX IF NOT EXISTS activity_user_at ON activity (user_id, at);
-```
-(새 표라 `ci-d1.mjs` 의 ADDED_COLUMNS 는 필요 없다. 배포가 schema.sql 을 그대로 돌린다.)
-
-### 남은 화면 쪽 일
-- `web/src/activity.ts`: 타입, `fetchActivity({user, kind, before})`, `reportView(hash)`(1.5초 디바운스, `fetch(..., {keepalive: true})`),
-  `VIA_NAME`(앱 / 게임 위 창 / 웹(아이폰) / 웹(안드로이드) / 웹(PC)).
-- `App.tsx` 의 `Wiki`: 라우트가 바뀔 때 `reportView(location.hash)`, `visibilitychange` 로 5분 넘게 숨었다 돌아오면 다시 보냄.
-  `page === "log"` 이면 `me.role === "developer"` 일 때만 `ActivityLogPage`(위키 자료가 필요하니 `!wiki` 검사 뒤에).
-- `pages/ActivityLog.tsx`:
-  - 위: "앱개발자에게만 보여요. 60일 동안 남아요. 비밀번호, 챗봇 질문, 한마디, 흥정 가격, 입찰 금액, 경험치는 남기지 않아요."
-  - 사람별 요약 (GET 의 `people`): 닉네임, 7일/30일 접속 수, 마지막으로 쓴 때(n분 전)와 곳, 7일 화면 수·한 일 수.
-    누르면 아래 기록을 그 사람만 거른다. 사람이 많으니 닉네임 검색 칸.
-  - 종류 칩: 전체 / 접속 / 화면 / 한 일 (줄이 모자라면 다음 줄로, 옆으로 넘기는 띠 금지).
-  - 기록: 날짜 머리줄(오늘, 어제, 10월 29일) 아래 `시:분 닉네임 · 곳 — 내용`. 맨 아래 '더 보기'(before = 마지막 id).
-  - 화면 이름은 위키 자료로 푼다: `#/post/ID` -> 글 제목, `#/place/ID` -> 사냥터 이름, `#/item/이름`, `#/monster/키`,
-    `#/menu/이름`, 그 밖은 고정 이름(사파이어 중개인, 길드 랭킹, 길드원 의뢰소, 챗봇, 내 정보, 길드원 관리 ...).
-  - 한 일 이름은 `메서드 경로` 정규식 표로: 로그인, 로그아웃, 비밀번호 바꿈, 직업·레벨 저장(PUT /api/profile), 캐릭터 사진,
-    계정 만듦/지움, 역할 바꿈, 비밀번호 초기화, 비밀번호 바꾸게 함, 중개인 물건 올림/고침/내림, 살래요(흥정 있음)/취소, 입찰,
-    골드 글 올림/고침/내림, 거래할래요, 의뢰 올림/수락/완료/내림(PATCH 본문 action), 챗봇 질문.
-- `Home.tsx` 타일 `{ title: "사용 기록", to: "#/log", icon: "📊", developer: true }`.
-- 시험: 로컬 D1 에 표를 만들고(`npx wrangler d1 execute sapphire-accounts --local --file schema.sql`),
-  `tests/` 의 시험처럼 node 로: 접속 30분 묶음, 화면 기록, 한 일 detail 에 비밀번호/note/offer/amount/exp 가 없는지,
-  GET 은 developer 만(다른 역할 403), 계정 삭제 시 기록 삭제. 360px 화면에서 잘리는 글 없는지.
-- 문서: CLAUDE.md 에 '사용 기록' 절, README 웹앱 절, CLAUDE.md 기록.
+`web/server/activity.ts`, `web/functions/api/_middleware.ts`, `web/functions/api/activity.ts`, `web/src/activity.ts`,
+`web/src/pages/ActivityLog.tsx`, D1 `activity`. 시험 `tests/test-activity.mjs` 16가지 통과 (중개인 시험 58가지도 다시 통과).
+남은 것: 길드원에게 기록한다고 알릴지 제작자에게 묻기. 닉네임 바꾸기를 만들면 `activity.user_id` 도 같이 바꾼다.
 
 ---
 
@@ -134,6 +76,45 @@ CREATE INDEX IF NOT EXISTS activity_user_at ON activity (user_id, at);
 - `TapTip` 말풍선은 이미 0.15초 안에 나타나고 2초 뒤 사라짐 (그대로).
 - 움직임 줄이기 설정을 켠 사람(`@media (prefers-reduced-motion: reduce)`)에게는 모두 끈다.
 - 확인: 360px 폰 크기에서 전환이 늦어 보이지 않는지, 누를 때 바로 반응하는지.
+
+---
+
+## 5. 알림 — 아직 시작 안 함
+
+제작자 요청: "알림창도 만들어야겠지. 살래요라든지, 어떤 물건이 올라왔다든지 등등. 길드원끼리 쓰다 보니 알림창이 있으면 좋겠다.
+각 메뉴별로 알림을 끄고 켤 수 있게."
+
+### 정한 방향
+- 앱 안 알림함 (폰 푸시는 아님): 위 줄(`TopBar`)과 홈의 사람 단추 옆에 🔔 단추와 안 읽은 수 빨간 점. 누르면 `#/alerts` 목록
+  (무엇, 누가, 언제, 누르면 그 글로). 열면 읽음.
+- D1 `alerts(id, user_id, kind, text, link, created_at, read_at)` + `alert_settings(user_id, kind, off)`. 30일 뒤 지움.
+- 알림 종류(메뉴별로 끄고 켬, '내 정보' 또는 알림함 위의 칩): 
+  중개인 — 내 물건에 살래요/흥정, 내 경매에 입찰, 내 입찰보다 높은 입찰(밀렸어요), 경매 끝(판 사람, 낙찰자), 새 물건 올라옴(기본 끔, 많아서);
+  골드 — 내 글에 거래할래요; 의뢰소 — 내 의뢰 수락/포기, 새 의뢰(기본 끔); 토론방 — 내 물건 토론방에 새 글, 내 글에 답;
+  계정 — 비밀번호 바꾸게 함, 역할 바뀜.
+- 서버에서 그 일이 생기는 곳(각 API)에서 `notify(env, userIds, kind, text, link)` 한 줄씩. 끈 사람은 넣지 않는다.
+- `/api/me` 에 안 읽은 수를 같이 주거나, 화면이 1분마다/화면을 다시 볼 때 `GET /api/alerts/count`.
+- 게임에 아무것도 보내지 않는 앱 안 알림이라 게임 안전 규칙에 맞는다 (게임 위 시계에 알림을 띄우지 않는다).
+
+---
+
+## 6. 종목 토론방 (중개인 물건마다) — 아직 시작 안 함
+
+제작자 요청: "길드원 거래소에 올린 아이템마다 종목 토론방. 이 가격이 어떻다, 뉴비면 이걸 살까요 물어보고, 판매자가 답한다.
+댓글을 하나씩 쓰는 채팅 느낌. 버튼은 아이템 판매 화면에 덕지덕지 붙지 않게, 말풍선처럼 조그맣고 귀엽게.
+채팅창은 게임 디자인을 안 따라가도 되고 우리 앱과 어울리는 게 중요. 길드마스터, 오피서 표시나 쓴 시간(시:분)을 붙여도 된다.
+일단 만들어 보면 제작자가 고친다." (게임 채팅 스샷: 오른쪽 위 'Chat' 말풍선 단추, 아래 입력 줄, 위에 '[닉네임] 글' 줄들)
+
+### 정한 방향
+- 물건 줄 오른쪽 아래(가격 밑)에 작은 말풍선 단추 `💬 3`(글 수, 없으면 `💬`만). 이 앱 픽셀 디자인으로 그린다
+  (게임 'Chat' 그림을 쓰려면 제작자 스샷에서 잘라 비공개 자료 저장소에 둔다 — 게임 그림 규칙).
+  누르면 정보창 아래에 토론방이 펼쳐진다 (화면을 가리는 창 금지).
+- 토론방: 채팅처럼 위에서 아래로 `[닉네임] 글  12:41`. 판 사람 글은 '판매자' 표시와 다른 색, 길드마스터/오피서는 작은 마크
+  (`RoleBadge` 와 같은 왕관/방패, 앱개발자는 표시 없음). 아래 한 줄 입력칸 + 보내기. 200자, 한 사람 1분에 5개까지.
+  자기 글은 지우기, 오피서 이상은 남의 글도 지우기. 물건을 내리면 토론방도 지운다. 거래 완료 뒤에도 30일 보인다.
+- D1 `listing_talk(id, listing_id, user_id, text, created_at)`, `GET/POST /api/market/:id/talk`, `DELETE /api/market/:id/talk/:talkId`.
+  목록 `GET /api/market` 에 `talkCount`. 알림(5번)을 만들면 판 사람과 그 방에 쓴 사람에게 새 글 알림.
+- 사용 기록 미들웨어는 글 내용을 남기지 않게 `KEEP` 에 `text` 를 넣지 않는다 (지금도 없음).
 
 ---
 
