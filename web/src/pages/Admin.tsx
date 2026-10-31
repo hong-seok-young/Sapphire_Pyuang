@@ -107,13 +107,13 @@ export function AdminPage({ me }: { me: Me }) {
             이 비밀번호를 본인에게 따로 알려 주세요. 처음 로그인하면 자기 비밀번호로 바꾸게 돼요.
           </p>
           <div className="links">
-            <button className="btn btn-ghost" onClick={() => setNotice(null)}>확인했어요</button>
+            <button className="btn btn-ghost" onClick={() => setNotice(null)}>확인</button>
           </div>
         </Panel>
       )}
 
       <form className="panel form" onSubmit={create}>
-        <h2 className="panel-title">계정 만들기</h2>
+        <h2 className="panel-title">계정 생성</h2>
         <label>
           아이디 (게임 닉네임)
           <input value={newId} onChange={(e) => setNewId(e.target.value)} autoCapitalize="off" />

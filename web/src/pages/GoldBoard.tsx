@@ -162,7 +162,7 @@ function GoldDetail({ me, o, onChanged }: { me: Me; o: GoldOffer; onChanged: (ne
                   })
                 }
               >
-                바꾸기
+                변경
               </button>
               <button className="pill" onClick={() => setRate(null)}>
                 취소
@@ -176,21 +176,21 @@ function GoldDetail({ me, o, onChanged }: { me: Me; o: GoldOffer; onChanged: (ne
                 </button>
               ) : (
                 <button className="pill" disabled={busy} onClick={() => run(async () => onChanged({ ...o, ...(await updateGold(o.id, { status: "open" })) }))}>
-                  다시 올리기
+                  다시 등록
                 </button>
               )}
               {o.status === "open" && (
                 <button className="pill" disabled={busy} onClick={() => setRate(String(o.rate))}>
-                  시세 바꾸기
+                  시세 변경
                 </button>
               )}
               {confirmDelete ? (
                 <button className="pill pill-danger" disabled={busy} onClick={remove}>
-                  정말 내리기
+                  삭제 확인
                 </button>
               ) : (
                 <button className="pill" disabled={busy} onClick={() => setConfirmDelete(true)}>
-                  내리기
+                  삭제
                 </button>
               )}
             </div>
@@ -220,7 +220,7 @@ function GoldDetail({ me, o, onChanged }: { me: Me; o: GoldOffer; onChanged: (ne
             {manager &&
               (confirmDelete ? (
                 <button className="pill pill-danger" disabled={busy} onClick={remove}>
-                  정말 내리기
+                  삭제 확인
                 </button>
               ) : (
                 <button className="pill" disabled={busy} onClick={() => setConfirmDelete(true)}>
@@ -285,7 +285,7 @@ export function GoldBoard({ me }: { me: Me }) {
           </button>
         ))}
         <button className={"pill mk-chip" + (writing ? " pill-on" : "")} onClick={() => setWriting((w) => !w)}>
-          ＋ 글 올리기
+          ＋ 글쓰기
         </button>
         <button className="pill mk-chip" onClick={() => setReload((n) => n + 1)} aria-label="새로 보기">
           ⟳

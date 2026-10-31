@@ -202,7 +202,7 @@ function AvatarPanel({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
           {error && <p className="form-error">{error}</p>}
           <div className="avatar-actions">
             <button type="button" className="btn" onClick={() => setMaking(true)}>
-              {me.avatar ? "다른 사진으로 바꾸기" : "📷 스샷에서 캐릭터 따기"}
+              {me.avatar ? "사진 변경" : "📷 캐릭터 등록"}
             </button>
             {me.avatar && (
               <button
@@ -222,7 +222,7 @@ function AvatarPanel({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
                   }
                 }}
               >
-                사진 지우기
+                사진 삭제
               </button>
             )}
           </div>

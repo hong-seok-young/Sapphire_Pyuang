@@ -111,7 +111,7 @@ export function AvatarMaker({ onSaved, onCancel }: { onSaved: (avatar: number) =
               ◀ 다시 편집
             </button>
             <button type="button" className="btn" onClick={upload} disabled={busy}>
-              {busy ? "올리는 중…" : "올리기"}
+              {busy ? "올리는 중…" : "등록"}
             </button>
           </div>
         </>
@@ -255,7 +255,7 @@ function CropStep({ img, onBack, onCrop }: { img: HTMLImageElement; onBack: () =
           ◀ 다른 스샷
         </button>
         <button type="button" className="btn" onClick={crop}>
-          이만큼 자르기
+          자르기
         </button>
       </div>
     </>
@@ -356,10 +356,10 @@ function EraseStep({ source, onBack, onDone }: { source: ImageData; onBack: () =
       <canvas ref={canvas} className="avatar-erase" onPointerDown={tap} />
       <div className="avatar-modes">
         <button type="button" className={"pill" + (mode === "erase" ? " pill-on" : "")} onClick={() => setMode("erase")}>
-          🧽 지우기
+          🧽 지우개
         </button>
         <button type="button" className={"pill" + (mode === "keep" ? " pill-on" : "")} onClick={() => setMode("keep")}>
-          ✏️ 되살리기
+          ✏️ 복원
         </button>
         <button
           type="button"
@@ -379,7 +379,7 @@ function EraseStep({ source, onBack, onDone }: { source: ImageData; onBack: () =
       </label>
       <div className="avatar-modes">
         <button type="button" className="pill" onClick={() => change(clearEdges(source, tol, alpha))}>
-          가장자리 배경 다시 지우기
+          가장자리 정리
         </button>
         <button type="button" className="pill" onClick={() => change(new Uint8Array(alpha.length).fill(255))}>
           처음 그림으로
@@ -388,10 +388,10 @@ function EraseStep({ source, onBack, onDone }: { source: ImageData; onBack: () =
       {error && <p className="form-error">{error}</p>}
       <div className="avatar-actions">
         <button type="button" className="btn btn-ghost" onClick={onBack}>
-          ◀ 다시 자르기
+          ◀ 이전
         </button>
         <button type="button" className="btn" onClick={done}>
-          다 됐어요
+          완료
         </button>
       </div>
     </>

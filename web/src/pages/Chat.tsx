@@ -185,7 +185,7 @@ export function ChatPage({ wiki }: { wiki: Wiki }) {
             maxLength={2000}
           />
           <button className="btn chat-send" disabled={busy || (!input.trim() && !pending.length)}>
-            {busy ? "…" : "보내기"}
+            {busy ? "…" : "전송"}
           </button>
         </div>
         <p className="chat-note">

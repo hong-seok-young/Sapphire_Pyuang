@@ -60,7 +60,7 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
         {appMenu && (
           // 시계는 위키 로그인과 상관없이 쓴다 (안드로이드 앱이 sapphire:// 주소를 받아 시계 설정을 연다)
           <div className="links">
-            <a className="btn btn-ghost" href="sapphire://clock">⏰ 시계 설정은 로그인 없이 쓸 수 있어요</a>
+            <a className="btn btn-ghost" href="sapphire://clock">⏰ 시계 설정</a>
           </div>
         )}
       </main>
@@ -135,7 +135,7 @@ export function PasswordPage({ forced = false, onDone, onBack }: { forced?: bool
       </label>
       {error && <p className="form-error">{error}</p>}
       <button className="btn" disabled={busy || !current || !next || !again}>
-        {busy ? "바꾸는 중…" : "비밀번호 바꾸기"}
+        {busy ? "바꾸는 중…" : "비밀번호 변경"}
       </button>
     </form>
   );
@@ -143,7 +143,7 @@ export function PasswordPage({ forced = false, onDone, onBack }: { forced?: bool
   if (!forced) {
     return (
       <>
-        <TopBar title="비밀번호 바꾸기" />
+        <TopBar title="비밀번호 변경" />
         {form}
       </>
     );
@@ -155,7 +155,7 @@ export function PasswordPage({ forced = false, onDone, onBack }: { forced?: bool
           <img className="hero-mark" src="icon-192.png" alt="" width={72} height={72} />
           <div>
             <HeroTitle />
-            <p className="hero-sub">비밀번호 바꾸기</p>
+            <p className="hero-sub">비밀번호 변경</p>
           </div>
         </header>
         {form}

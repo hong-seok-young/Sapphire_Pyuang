@@ -60,7 +60,7 @@ export function AppPage() {
       {isAndroid ? (
         <>
           <div className="links">
-            <a className="btn" href={APK_URL}>📲 앱 받기</a>
+            <a className="btn" href={APK_URL}>📲 앱 다운로드</a>
           </div>
           <Panel title="설치할 때">
             <p className="app-note">

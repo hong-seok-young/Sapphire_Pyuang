@@ -99,7 +99,7 @@ function RequestForm({ onDone }: { onDone: () => void }) {
       </div>
       {error && <p className="form-error">{error}</p>}
       <button className="btn" disabled={busy || !ok}>
-        {busy ? "올리는 중…" : "의뢰 올리기"}
+        {busy ? "올리는 중…" : "의뢰 등록"}
       </button>
     </form>
   );
@@ -150,14 +150,14 @@ function RequestDetail({ me, r, onChanged }: { me: Me; r: GuildRequest; onChange
         {!mine && r.status === "open" && (
           <>
             <button className="pill mk-want" disabled={busy} onClick={() => act("accept")}>
-              ✋ 수락하기
+              ✋ 수락
             </button>
             <small className="mk-meta">다 모아 두고 눌러 주세요. 수락하면 이틀 안에 게임에서 전해 주세요.</small>
           </>
         )}
         {accepter && r.status === "accepted" && (
           <button className="pill" disabled={busy} onClick={() => act("giveup")}>
-            포기하기
+            포기
           </button>
         )}
         {mine && r.status === "accepted" && (
@@ -172,7 +172,7 @@ function RequestDetail({ me, r, onChanged }: { me: Me; r: GuildRequest; onChange
         )}
         {mine && r.status === "open" && (
           <button className="pill" disabled={busy} onClick={() => act("done")}>
-            ✔ 완료로 닫기
+            ✔ 완료
           </button>
         )}
         {mine && r.status === "done" && (
@@ -183,11 +183,11 @@ function RequestDetail({ me, r, onChanged }: { me: Me; r: GuildRequest; onChange
         {(mine || manager) &&
           (confirmDelete ? (
             <button className="pill pill-danger" disabled={busy} onClick={remove}>
-              정말 내리기
+              삭제 확인
             </button>
           ) : (
             <button className="pill" disabled={busy} onClick={() => setConfirmDelete(true)}>
-              {mine ? "내리기" : "내리기 (관리)"}
+              {mine ? "삭제" : "내리기 (관리)"}
             </button>
           ))}
       </div>
@@ -233,7 +233,7 @@ export function RequestsPage({ me }: { me: Me }) {
           </button>
         ))}
         <button className={"pill mk-chip" + (writing ? " pill-on" : "")} onClick={() => setWriting((w) => !w)}>
-          ＋ 의뢰 올리기
+          ＋ 의뢰 등록
         </button>
         <button className="pill mk-chip" onClick={() => setReload((n) => n + 1)} aria-label="새로 보기">
           ⟳
