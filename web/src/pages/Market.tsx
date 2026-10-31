@@ -203,7 +203,7 @@ function Detail({ wiki, me, l, rate, onChanged }: {
                   })
                 }
               >
-                바꾸기
+                변경
               </button>
               <button className="pill" onClick={() => setPrice(null)}>
                 취소
@@ -222,16 +222,16 @@ function Detail({ wiki, me, l, rate, onChanged }: {
               )}
               {l.status === "selling" && !auction && (
                 <button className="pill" disabled={busy} onClick={() => setPrice(String(l.price))}>
-                  가격 바꾸기
+                  가격 변경
                 </button>
               )}
               {confirmDelete ? (
                 <button className="pill pill-danger" disabled={busy} onClick={remove}>
-                  정말 내리기
+                  삭제 확인
                 </button>
               ) : (
                 <button className="pill" disabled={busy} onClick={() => setConfirmDelete(true)}>
-                  내리기
+                  삭제
                 </button>
               )}
             </div>
@@ -321,11 +321,11 @@ function Detail({ wiki, me, l, rate, onChanged }: {
             {manager &&
               (confirmDelete ? (
                 <button className="pill pill-danger" disabled={busy} onClick={remove}>
-                  정말 내리기
+                  삭제 확인
                 </button>
               ) : (
                 <button className="pill" disabled={busy} onClick={() => setConfirmDelete(true)}>
-                  내리기 (관리)
+                  삭제(관리)
                 </button>
               ))}
           </div>
@@ -459,7 +459,7 @@ function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: ()
     <form className="panel mk-form" onSubmit={submit}>
       <div className="mk-chips">
         <button type="button" className={"pill" + (mode === "sale" ? " pill-on" : "")} onClick={() => setMode("sale")}>
-          바로 판매 (흥정 받기)
+          바로 판매
         </button>
         <button type="button" className={"pill" + (mode === "auction" ? " pill-on" : "")} onClick={() => setMode("auction")}>
           🔨 경매
@@ -657,7 +657,7 @@ function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: ()
       </label>
       {error && <p className="form-error">{error}</p>}
       <button className="btn" disabled={busy || !ok}>
-        {busy ? "올리는 중…" : mode === "auction" ? "경매 올리기" : "올리기"}
+        {busy ? "올리는 중…" : mode === "auction" ? "경매 등록" : "등록"}
       </button>
     </form>
   );
@@ -752,7 +752,7 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
             )}
             {(wanted > 0 || onlyWanted) && (
               <button className={"pill mk-chip" + (onlyWanted ? " pill-on" : "")} onClick={() => setOnlyWanted((v) => !v)}>
-                ♥ 사고 싶은 것 <small>{wanted}</small>
+                ♥ 관심 물건 <small>{wanted}</small>
               </button>
             )}
           </div>

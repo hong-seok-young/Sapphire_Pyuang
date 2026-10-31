@@ -73,6 +73,12 @@ function toMessages(turns: ChatTurn[], context: string): Anthropic.Beta.BetaMess
   });
 }
 
+/** 앱개발자에게만 붙이는 실제 오류 (상태 코드와 API 메시지, 키 같은 비밀값은 들어 있지 않다) */
+function errorCause(e: unknown): string {
+  if (e instanceof Anthropic.APIError) return ` [원인 ${e.status ?? "-"}: ${String(e.message).slice(0, 200)}]`;
+  return ` [원인: ${String(e instanceof Error ? e.message : e).slice(0, 200)}]`;
+}
+
 /** 길드원에게 보여 줄 오류 글 */
 function errorText(e: unknown): string {
   if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) {
@@ -126,7 +132,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   } catch (e) {
     console.error("chat request failed", e instanceof Anthropic.APIError ? e.status : e);
     await refund();
-    return json({ error: errorText(e) }, e instanceof Anthropic.RateLimitError ? 429 : 502);
+    return json({ error: errorText(e) + (me.role === "developer" ? errorCause(e) : "") }, e instanceof Anthropic.RateLimitError ? 429 : 502);
   }
 
   const enc = new TextEncoder();
@@ -147,7 +153,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       } catch (e) {
         console.error("chat stream failed", e instanceof Anthropic.APIError ? e.status : e);
         if (!wrote) await refund();
-        end = { kind: "error", message: errorText(e) };
+        end = { kind: "error", message: errorText(e) + (me.role === "developer" ? errorCause(e) : "") };
       }
       if (end) controller.enqueue(enc.encode(CONTROL + JSON.stringify(end)));
       controller.close();

@@ -259,7 +259,7 @@ function AccountRow({
           )}
           <div className="account-actions">
             <button className="pill" disabled={busy} onClick={() => setEditing((e) => !e)}>
-              {editing ? "정보 수정 닫기" : "정보 수정"}
+              {editing ? "닫기" : "정보 수정"}
             </button>
             {account.avatar && (
               <button
@@ -275,13 +275,13 @@ function AccountRow({
                   }
                 }}
               >
-                사진 내리기
+                사진 삭제
               </button>
             )}
             {manageable && (
               <>
                 <button className="pill" disabled={busy} onClick={() => setRenaming((v) => !v)}>
-                  닉네임 바꾸기
+                  닉네임 변경
                 </button>
                 <button className="pill" disabled={busy} onClick={onReset}>
                   비밀번호 초기화
@@ -289,7 +289,7 @@ function AccountRow({
                 {confirmDelete ? (
                   <>
                     <button className="pill pill-danger" disabled={busy} onClick={onDelete}>
-                      정말 삭제
+                      삭제 확인
                     </button>
                     <button className="pill" onClick={() => setConfirmDelete(false)}>
                       취소
@@ -327,7 +327,7 @@ function AccountRow({
                   }
                 }}
               >
-                바꾸기
+                변경
               </button>
             </div>
           )}

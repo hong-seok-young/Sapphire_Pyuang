@@ -280,7 +280,7 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
       <RenamePanel me={me} onMe={onMe} />
       <div className="links">
         <a className="btn btn-ghost" href="#/ranking">🏆 길드 랭킹</a>
-        <a className="btn btn-ghost" href="#/password">비밀번호 바꾸기</a>
+        <a className="btn btn-ghost" href="#/password">비밀번호 변경</a>
       </div>
       <div className="links">
         <button
@@ -328,17 +328,17 @@ function RenamePanel({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
 
   return (
     <section className="panel profile-panel">
-      <h2 className="panel-title">닉네임 바꾸기</h2>
+      <h2 className="panel-title">닉네임 변경</h2>
       <label className="rename-field">
         새 닉네임
         <input value={newId} onChange={(e) => setNewId(e.target.value.slice(0, 20))} autoCapitalize="off" placeholder={me.id} />
       </label>
       <div className="mk-chips">
         <button type="button" className={"pill" + (!switched ? " pill-on" : "")} onClick={() => setSwitched(false)}>
-          닉네임만 바꿔요
+          닉네임만
         </button>
         <button type="button" className={"pill" + (switched ? " pill-on" : "")} onClick={() => setSwitched(true)}>
-          다른 캐릭터로 바꿨어요
+          캐릭터 변경
         </button>
       </div>
       {switched ? (
@@ -349,7 +349,7 @@ function RenamePanel({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
             job={me.job}
             level={null}
             withExp
-            submitLabel={busy ? "바꾸는 중…" : "닉네임과 캐릭터 바꾸기"}
+            submitLabel={busy ? "바꾸는 중…" : "변경"}
             onSave={async (job, level, exp, guild) => {
               if (!name) throw new Error("새 닉네임을 적어 주세요");
               await rename({ job, level, exp, guild });
@@ -358,7 +358,7 @@ function RenamePanel({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
         </>
       ) : (
         <button className="btn" disabled={busy || !name} onClick={() => rename()}>
-          {busy ? "바꾸는 중…" : "닉네임 바꾸기"}
+          {busy ? "바꾸는 중…" : "닉네임 변경"}
         </button>
       )}
       {error && <p className="form-error">{error}</p>}

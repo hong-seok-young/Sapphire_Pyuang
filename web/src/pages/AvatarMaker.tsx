@@ -109,7 +109,7 @@ export function AvatarMaker({ onSaved, onCancel }: { onSaved: (avatar: number) =
           </div>
           <div className="avatar-actions">
             <button type="button" className="btn btn-ghost" onClick={() => setStep("erase")} disabled={busy}>
-              ◀ 다시 고치기
+              ◀ 다시 편집
             </button>
             <button type="button" className="btn" onClick={upload} disabled={busy}>
               {busy ? "올리는 중…" : "올리기"}
@@ -119,7 +119,7 @@ export function AvatarMaker({ onSaved, onCancel }: { onSaved: (avatar: number) =
       )}
       {error && <p className="form-error">{error}</p>}
       <button type="button" className="btn btn-ghost avatar-cancel" onClick={onCancel} disabled={busy}>
-        그만두기
+        취소
       </button>
     </div>
   );
