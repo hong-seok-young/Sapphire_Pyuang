@@ -19,6 +19,18 @@ const PROMPT = `이 사진은 모바일 게임 아이모(IMO) 화면이야. 보�
 {"job": 캐릭터 직업 "전사" | "레인저" | "마법사" | "무도가" | null, "level": 캐릭터 레벨 숫자 | null, "names": [화면에 글자로 보이는 아이템, 재료, 장비, 스킬, 몬스터, 사냥터, NPC 이름. 최대 ${MAX_NAMES}개]}
 직업은 화면에 글자로 나오거나 스킬·장비로 분명할 때만, 레벨은 'Lv.34' 처럼 숫자가 보일 때만 적어. 사진이 여러 장이면 같이 보고 하나로 적어.`;
 
+/** 답 모양을 API 가 지키게 한다 (그냥 'JSON 으로'라고만 하면 두 번에 한 번꼴로 모양이 어긋나 빈 값이 됐다) */
+const SEEN_SCHEMA = {
+  type: "object",
+  properties: {
+    job: { anyOf: [{ type: "string", enum: JOBS }, { type: "null" }] },
+    level: { anyOf: [{ type: "integer" }, { type: "null" }] },
+    names: { type: "array", items: { type: "string" } },
+  },
+  required: ["job", "level", "names"],
+  additionalProperties: false,
+};
+
 interface Seen {
   job: string | null;
   level: number | null;
@@ -28,10 +40,24 @@ interface Seen {
 /** 모델 답에서 JSON 을 꺼내 검사한다. 맞지 않는 칸은 버린다 */
 function parseSeen(text: string): Seen {
   const empty: Seen = { job: null, level: null, names: [] };
-  const m = text.match(/\{[\s\S]*\}/);
-  if (!m) return empty;
+  // 글 속 { 마다 짝이 맞는 } 까지 잘라 처음으로 풀리는 것 (설명이 붙거나 중괄호가 두 번 나와도)
+  let raw: { job?: unknown; level?: unknown; names?: unknown } | null = null;
+  for (let start = text.indexOf("{"); start >= 0 && !raw; start = text.indexOf("{", start + 1)) {
+    let depth = 0;
+    for (let i = start; i < text.length; i++) {
+      if (text[i] === "{") depth++;
+      else if (text[i] === "}" && --depth === 0) {
+        try {
+          raw = JSON.parse(text.slice(start, i + 1));
+        } catch {
+          // 다음 { 부터 다시
+        }
+        break;
+      }
+    }
+  }
+  if (!raw || typeof raw !== "object") return empty;
   try {
-    const raw = JSON.parse(m[0]) as { job?: unknown; level?: unknown; names?: unknown };
     const level = Number(raw.level);
     return {
       job: typeof raw.job === "string" && JOBS.includes(raw.job) ? raw.job : null,
@@ -61,10 +87,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     apiKey: env.ANTHROPIC_API_KEY,
     ...(workspace ? { defaultHeaders: { "anthropic-workspace-id": workspace } } : {}),
   });
-  try {
-    const res = await client.messages.create({
+  const read = (schema: boolean) =>
+    client.messages.create({
       model: PEEK_MODEL,
       max_tokens: 400,
+      ...(schema ? { output_config: { format: { type: "json_schema" as const, schema: SEEN_SCHEMA } } } : {}),
       messages: [
         {
           role: "user",
@@ -78,8 +105,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         },
       ],
     });
+  try {
+    let res: Anthropic.Message;
+    try {
+      res = await read(true);
+    } catch (e) {
+      // 이 모델이 답 모양 지정을 못 받으면 그냥 묻고 글에서 꺼낸다
+      if (!(e instanceof Anthropic.BadRequestError)) throw e;
+      console.error("chat peek without schema", String(e.message).slice(0, 200));
+      res = await read(false);
+    }
     const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-    return json(parseSeen(text));
+    const seen = parseSeen(text);
+    if (!seen.job && !seen.level && !seen.names.length) console.error("chat peek empty", text.slice(0, 300));
+    return json(seen);
   } catch (e) {
     console.error("chat peek failed", e instanceof Anthropic.APIError ? e.status : e);
     return json(empty);
