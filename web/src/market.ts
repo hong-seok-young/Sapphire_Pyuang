@@ -1,7 +1,7 @@
 // 사파이어 중개인 (서버: functions/api/market, server/market.ts). 길드원끼리 파는 물건 게시판.
 // 실제 거래는 게임 안에서 한다. 이 화면은 무엇을 얼마에 파는지, 누가 사고 싶은지만 모은다.
 import { JOBS, JOB_NAME, api } from "./auth";
-import type { Job } from "./auth";
+import type { Job, Role } from "./auth";
 import type { Item, Wiki } from "./types";
 
 /** 게임 거래소의 종류 (코스튬은 하나로 묶었다). 서버 server/market.ts 와 같다 */
@@ -97,6 +97,8 @@ export interface Listing {
   /** 내가 '살래요'에 적은 흥정 가격 */
   myOffer: number | null;
   bidCount: number;
+  /** 종목 토론방 글 수 */
+  talkCount: number;
   highestBid: number | null;
   /** 내 가장 높은 입찰 */
   myBid: number | null;
@@ -132,6 +134,17 @@ export const wantListing = (id: number, note: string | null, offer: number | nul
 /** 경매 입찰 */
 export const bidListing = (id: number, amount: number) =>
   api<{ bidCount: number; highestBid: number; myBid: number }>(`/api/market/${id}/bids`, "POST", { amount });
+/** 종목 토론방 글 한 줄 */
+export interface TalkLine {
+  id: number;
+  user: string;
+  role: Role | null;
+  text: string;
+  at: number;
+}
+export const fetchTalk = (id: number) => api<{ talk: TalkLine[] }>(`/api/market/${id}/talk`).then((r) => r.talk);
+export const postTalk = (id: number, text: string) => api<TalkLine>(`/api/market/${id}/talk`, "POST", { text });
+export const deleteTalk = (id: number, talkId: number) => api<{ ok: boolean }>(`/api/market/${id}/talk/${talkId}`, "DELETE");
 export const unwantListing = (id: number) => api<{ wants: number; wanted: boolean }>(`/api/market/${id}/want`, "DELETE");
 
 /** 3800000 -> "3,800,000" */

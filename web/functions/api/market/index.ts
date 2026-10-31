@@ -20,7 +20,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         "(SELECT offer FROM listing_wants w WHERE w.listing_id = l.id AND w.user_id = ?1) AS my_offer, " +
         "(SELECT COUNT(*) FROM listing_bids b WHERE b.listing_id = l.id) AS bid_count, " +
         "(SELECT MAX(amount) FROM listing_bids b WHERE b.listing_id = l.id) AS highest_bid, " +
-        "(SELECT MAX(amount) FROM listing_bids b WHERE b.listing_id = l.id AND b.user_id = ?1) AS my_bid " +
+        "(SELECT MAX(amount) FROM listing_bids b WHERE b.listing_id = l.id AND b.user_id = ?1) AS my_bid, " +
+        "(SELECT COUNT(*) FROM listing_talk t WHERE t.listing_id = l.id) AS talk_count " +
         "FROM listings l WHERE l.status = 'selling' OR l.seller = ?1 ORDER BY l.created_at DESC",
     ).bind(me.id),
     env.DB.prepare(
@@ -51,9 +52,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     goldRate: avg ? Math.round(avg * 10) / 10 : USUAL_GOLD_RATE,
     listings: (rows.results as (ListingRow & {
       wants: number; wanted: number; my_offer: number | null; bid_count: number; highest_bid: number | null; my_bid: number | null;
+      talk_count: number;
     })[]).map((r) => ({
       ...listingOut(r),
       wants: r.wants,
+      talkCount: r.talk_count,
       wanted: r.wanted === 1,
       myOffer: r.my_offer,
       bidCount: r.bid_count,
@@ -78,6 +81,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     env.DB.prepare(
       "DELETE FROM listing_bids WHERE listing_id IN (SELECT id FROM listings WHERE status = 'sold' AND updated_at < ?)",
     ).bind(now - KEEP_SOLD_MS),
+    env.DB.prepare(
+      "DELETE FROM listing_talk WHERE listing_id IN (SELECT id FROM listings WHERE status = 'sold' AND updated_at < ?)",
+    ).bind(now - KEEP_SOLD_MS),
     env.DB.prepare("DELETE FROM listings WHERE status = 'sold' AND updated_at < ?").bind(now - KEEP_SOLD_MS),
   ]);
   const selling = await env.DB.prepare("SELECT COUNT(*) AS n FROM listings WHERE seller = ? AND status = 'selling'")
@@ -95,5 +101,5 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .first<ListingRow>();
   if (!row) return json({ error: "올리지 못했어요" }, 500);
   await notify(env, "all", "market_new", `${me.id}님이 ${itemName(row)} 올림${row.mode === "auction" ? " (경매)" : ""}`, "#/market", me.id);
-  return json({ ...listingOut(row), wants: 0, wanted: false, myOffer: null, bidCount: 0, highestBid: null, myBid: null, wanters: [], bids: [] }, 201);
+  return json({ ...listingOut(row), wants: 0, wanted: false, myOffer: null, bidCount: 0, highestBid: null, myBid: null, talkCount: 0, wanters: [], bids: [] }, 201);
 };

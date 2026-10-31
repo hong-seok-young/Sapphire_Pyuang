@@ -9,7 +9,7 @@ const ID_COLUMNS: [string, string][] = [
   ["users", "created_by"], ["sessions", "user_id"], ["chat_usage", "user_id"], ["profiles", "user_id"], ["profiles", "updated_by"],
   ["level_log", "user_id"], ["avatars", "user_id"], ["avatars", "updated_by"], ["listings", "seller"], ["listing_wants", "user_id"],
   ["listing_bids", "user_id"], ["gold_offers", "owner"], ["gold_wants", "user_id"], ["requests", "owner"], ["requests", "accepter"],
-  ["activity", "user_id"], ["alerts", "user_id"], ["alert_prefs", "user_id"],
+  ["activity", "user_id"], ["alerts", "user_id"], ["alert_prefs", "user_id"], ["listing_talk", "user_id"],
 ];
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {

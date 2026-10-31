@@ -48,6 +48,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
   await env.DB.batch([
     env.DB.prepare("DELETE FROM listing_wants WHERE listing_id = ?").bind(row.id),
     env.DB.prepare("DELETE FROM listing_bids WHERE listing_id = ?").bind(row.id),
+    env.DB.prepare("DELETE FROM listing_talk WHERE listing_id = ?").bind(row.id),
     env.DB.prepare("DELETE FROM listings WHERE id = ?").bind(row.id),
   ]);
   return json({ ok: true });

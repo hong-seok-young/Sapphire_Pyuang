@@ -176,3 +176,13 @@ CREATE TABLE IF NOT EXISTS alert_prefs (
   enabled INTEGER NOT NULL,
   PRIMARY KEY (user_id, kind)
 );
+
+-- 종목 토론방 (중개인 물건마다 댓글, functions/api/market/[id]/talk.ts). 물건을 내리면 같이 지운다
+CREATE TABLE IF NOT EXISTS listing_talk (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  listing_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS listing_talk_listing ON listing_talk (listing_id, id);

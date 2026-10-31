@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { JOB_NAME, RANK, errorText } from "../auth";
+import { JOB_NAME, RANK, ROLE_NAME, errorText, positionOf } from "../auth";
 import type { Me } from "../auth";
 import { useAsync } from "../data";
 import {
   AUCTION_HOURS, CATEGORIES, ENCHANTS, ENCHANT_CATEGORIES, ENHANCE_CATEGORIES, MARKET_PIC, OTHER_CATEGORIES, auctionOver, bidListing,
-  cashText, currentPrice, nextBid, MAX_ENHANCE, MAX_NOTE, MAX_PRICE, MAX_QTY, ago, categoryOf, categoryPic, createListing,
+  cashText, currentPrice, deleteTalk, fetchTalk, nextBid, postTalk, MAX_ENHANCE, MAX_NOTE, MAX_PRICE, MAX_QTY, ago, categoryOf, categoryPic, createListing,
   deleteListing, enchantText, fetchMarket, goldText, goldWords, inRoll, itemFacts, jobsFor, listingName, rollHint, unwantListing,
   updateListing, wantListing, wikiItem,
 } from "../market";
-import type { Category, Enchant, Listing, ListingOption } from "../market";
+import type { Category, Enchant, Listing, ListingOption, TalkLine } from "../market";
 import type { Wiki } from "../types";
 import { Loading, PicImg, TopBar } from "../ui";
 import { timeLeft } from "../requests";
@@ -60,6 +60,8 @@ function Detail({ wiki, me, l, rate, onChanged }: {
   const [bid, setBid] = useState(String(nextBid(l)));
   const [price, setPrice] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [talkOpen, setTalkOpen] = useState(false);
+  const [talkCount, setTalkCount] = useState(l.talkCount);
 
   async function run(fn: () => Promise<void>) {
     setBusy(true);
@@ -332,6 +334,111 @@ function Detail({ wiki, me, l, rate, onChanged }: {
         )
       )}
       {error && <p className="form-error">{error}</p>}
+      {/* 종목 토론방: 정보창 오른쪽 아래 작은 말풍선 하나 (제작자 요청: 단추가 덕지덕지 붙지 않게) */}
+      <div className="mk-talk-bar">
+        <button className={"mk-talk-btn" + (talkOpen ? " mk-talk-on" : "")} onClick={() => setTalkOpen((v) => !v)} aria-expanded={talkOpen}>
+          💬 토론방{talkCount > 0 && <b>{talkCount}</b>}
+        </button>
+      </div>
+      {talkOpen && <Talk l={l} me={me} onCount={setTalkCount} />}
+    </div>
+  );
+}
+
+/** '12:41', 오늘이 아니면 '10/29 12:41' */
+function talkTime(t: number): string {
+  const d = new Date(t);
+  const hm = d.toTimeString().slice(0, 5);
+  return d.toDateString() === new Date().toDateString() ? hm : `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
+}
+
+/**
+ * 종목 토론방 (제작자 요청): 이 물건에 대해 한 줄씩 쓰는 방. 판 사람 글에는 '판매자', 길드마스터와 오피서는 표시를 붙이고
+ * 쓴 시각을 보인다. 열려 있는 동안 20초마다 새 글을 본다. 자기 글은 지우고, 오피서 이상은 남의 글도 지운다
+ */
+function Talk({ l, me, onCount }: { l: Listing; me: Me; onCount: (n: number) => void }) {
+  const [talk, setTalk] = useState<TalkLine[] | null>(null);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const load = useCallback(
+    () =>
+      fetchTalk(l.id).then(
+        (t) => {
+          setTalk(t);
+          onCount(t.length);
+        },
+        (x) => setError(errorText(x)),
+      ),
+    [l.id, onCount],
+  );
+  useEffect(() => {
+    load();
+    const timer = window.setInterval(load, 20_000);
+    return () => window.clearInterval(timer);
+  }, [load]);
+
+  async function send(e: FormEvent) {
+    e.preventDefault();
+    if (!text.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      await postTalk(l.id, text.trim());
+      setText("");
+      await load();
+    } catch (x) {
+      setError(errorText(x));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mk-talk">
+      {talk === null ? (
+        <p className="mk-meta">불러오는 중…</p>
+      ) : talk.length === 0 ? (
+        <p className="mk-meta">아직 글이 없어요.</p>
+      ) : (
+        <ul className="mk-talk-list">
+          {talk.map((t) => {
+            const position = t.role ? positionOf(t.role) : "member";
+            return (
+              <li key={t.id} className={t.user === l.seller ? "mk-talk-seller" : undefined}>
+                <b>{t.user}</b>
+                {t.user === l.seller && <span className="mk-talk-tag">판매자</span>}
+                {position !== "member" && <span className="mk-talk-tag mk-talk-staff">{ROLE_NAME[position]}</span>}
+                <span className="mk-talk-text">{t.text}</span>
+                <time>{talkTime(t.at)}</time>
+                {(t.user === me.id || RANK[me.role] >= 1) && (
+                  <button
+                    className="mk-talk-del"
+                    aria-label="삭제"
+                    onClick={async () => {
+                      try {
+                        await deleteTalk(l.id, t.id);
+                        await load();
+                      } catch (x) {
+                        setError(errorText(x));
+                      }
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <form className="mk-talk-form" onSubmit={send}>
+        <input className="mk-input" value={text} onChange={(e) => setText(e.target.value.slice(0, 200))} placeholder="글 쓰기" aria-label="토론방 글" />
+        <button className="pill" disabled={busy || !text.trim()}>
+          등록
+        </button>
+      </form>
+      {error && <p className="form-error">{error}</p>}
     </div>
   );
 }
@@ -361,6 +468,7 @@ function Rows({ wiki, me, list, rate, onChanged, empty }: {
                   {auction && <span className="mk-auction-tag">🔨 경매{auctionOver(l) ? " 끝" : l.endsAt ? ` ${timeLeft(l.endsAt)}` : ""}</span>}
                   {l.enchant && <span className="mk-ench">{enchantText(l)}</span>}
                   {auction ? l.bidCount > 0 && <span>입찰 {l.bidCount}</span> : l.wants > 0 && <span className={"mk-wants" + (l.wanted ? " mk-wants-me" : "")}>♥ {l.wants}</span>}
+                  {l.talkCount > 0 && <span className="mk-talk-count">💬 {l.talkCount}</span>}
                   {l.status === "sold" && <span>거래 완료</span>}
                   {!auction && !l.enchant && !l.wants && l.status !== "sold" && <span>{ago(l.createdAt)}</span>}
                 </small>
