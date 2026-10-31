@@ -78,6 +78,34 @@ function postText(post: Post, blocks?: number[]): string {
   return list.map(blockText).filter(Boolean).join("\n").slice(0, MAX_POST);
 }
 
+/** 모든 글의 글자 (본문 찾기용, 한 번만 만든다). flat 은 띄어쓰기를 뺀 소문자 */
+const textCache = new WeakMap<object, { id: string; title: string; text: string; flat: string }[]>();
+function allPostTexts(wiki: Wiki, posts: Record<string, Post>) {
+  let list = textCache.get(posts);
+  if (!list) {
+    const titles = new Map(wiki.menu.flatMap((s) => s.posts).map((p) => [p.id, p.title]));
+    list = Object.entries(posts).map(([id, post]) => {
+      const text = post.blocks.map(blockText).filter(Boolean).join("\n");
+      // 찾은 자리를 원문과 맞추려고 띄어쓰기는 그대로 두고, 낱말 찾기만 띄어쓰기 없이 한다
+      return { id, title: titles.get(id) ?? wiki.places[id]?.name ?? "글", text, flat: norm(text) };
+    });
+    textCache.set(posts, list);
+  }
+  return list;
+}
+
+/** 띄어쓰기를 뺀 글의 자리(flatAt)를 원문 자리로 */
+function textPos(text: string, flatAt: number): number {
+  if (flatAt <= 0) return 0;
+  let n = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (/\s/.test(text[i])) continue;
+    if (n === flatAt) return i;
+    n++;
+  }
+  return 0;
+}
+
 /** 질문 낱말 (두 글자 이상) */
 function words(q: string): string[] {
   return q.split(/[\s,.?!~·()[\]"'“”‘’]+/).map((w) => w.replace(/(은|는|이|가|을|를|에|에서|으로|로|랑|하고|의|도|만)$/, "")).filter((w) => w.length >= 2);
@@ -232,6 +260,28 @@ export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined,
     for (const { p } of scored) {
       found.push(p.title);
       add(`[${p.title}]\n` + postText(posts[p.id]));
+    }
+
+    // 3-2. 제목에는 없고 본문에만 나오는 글 (제작자: '금서고 자료가 왜 없지'. 장비 획득처, 퀘스트 재료처럼 여러 글에 흩어져 있다).
+    // 이름이 나온 것(아이템, 몬스터, 사냥터)과 질문 낱말 중 드문 것으로 찾아서 그 둘레만 가져온다
+    const keys = [...new Set([...picked.map((n) => n.name), ...ws])].map(norm).filter((k) => k.length >= 2);
+    const taken = new Set([...scored.map((x) => x.p.id), ...picked.map((n) => n.id).filter(Boolean)]);
+    const texts = allPostTexts(wiki, posts);
+    const hits = keys
+      .map((k) => ({ k, posts: texts.filter((t) => !taken.has(t.id) && t.flat.includes(k)) }))
+      .filter((h) => h.posts.length > 0 && h.posts.length <= 25) // 너무 흔한 낱말은 자리를 못 짚는다
+      .sort((a, b) => a.posts.length - b.posts.length);
+    let more = 0;
+    for (const h of hits) {
+      for (const t of h.posts) {
+        if (more >= 5 || taken.has(t.id)) continue;
+        const at = textPos(t.text, t.flat.indexOf(h.k));
+        const around = t.text.slice(Math.max(0, at - 300), at + 900);
+        taken.add(t.id);
+        more++;
+        found.push(t.title);
+        add(`[${t.title} 중에서]\n` + around);
+      }
     }
   }
 
