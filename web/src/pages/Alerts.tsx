@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { errorText } from "../auth";
 import { ALERT_GROUPS, clearUnread, fetchAlerts, readAllAlerts, setAlertPref } from "../alerts";
-import { disablePush, enablePush, pushState } from "../push";
+import { disablePush, enablePush, markPushOff, pushState } from "../push";
 import type { PushState } from "../push";
 import type { Alert, AlertKind } from "../alerts";
 import { ago } from "../market";
@@ -90,7 +90,9 @@ function PhonePush() {
     setBusy(true);
     setError("");
     try {
-      setState(state === "on" ? await disablePush() : await enablePush());
+      const next = state === "on" ? await disablePush() : await enablePush();
+      markPushOff(next !== "on"); // 직접 끈 폰은 앱을 열 때 저절로 다시 켜지 않는다
+      setState(next);
     } catch (x) {
       setError(errorText(x));
     } finally {

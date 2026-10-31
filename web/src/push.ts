@@ -51,3 +51,40 @@ export async function disablePush(): Promise<PushState> {
   }
   return "off";
 }
+
+const OFF_KEY = "sapphire.pushOff";
+const ASKED_KEY = "sapphire.pushAsked";
+const getFlag = (k: string) => {
+  try {
+    return localStorage.getItem(k) === "1";
+  } catch {
+    return false;
+  }
+};
+const setFlag = (k: string, on: boolean) => {
+  try {
+    if (on) localStorage.setItem(k, "1");
+    else localStorage.removeItem(k);
+  } catch {
+    // 못 적어도 이번에는 된다
+  }
+};
+export const markPushOff = (off: boolean) => setFlag(OFF_KEY, off);
+export const markPushAsked = () => setFlag(ASKED_KEY, true);
+
+/**
+ * 폰 알림은 처음부터 켠다 (제작자 요청: 기본은 허용). 폰이 이미 알림을 허락했으면 묻지 않고 구독해서 서버에 알린다.
+ * 사용자가 알림함에서 직접 끈 폰은 다시 켜지 않는다
+ */
+export async function ensurePush(): Promise<void> {
+  try {
+    if (!supported() || Notification.permission !== "granted" || getFlag(OFF_KEY)) return;
+    await enablePush();
+  } catch {
+    // 다음에 앱을 열 때 다시
+  }
+}
+
+/** 홈에 '폰 알림 켜기' 카드를 띄울지: 아직 허락을 묻지 않았고(브라우저가 '물어보기' 상태), 카드를 닫은 적이 없을 때 */
+export const shouldAskPush = () => supported() && Notification.permission === "default" && !getFlag(ASKED_KEY) && !getFlag(OFF_KEY);
+

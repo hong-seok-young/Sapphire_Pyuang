@@ -1160,4 +1160,6 @@ button { font: inherit; color: inherit; }
 .cafe-link-buttons { display: flex; gap: 6px; }
 .cafe-link-buttons .pill { text-decoration: none; color: var(--text); }
 .cafe-link-buttons .pill-on { color: var(--edge); }
+.push-ask { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 8px 10px; }
+.push-ask span { flex: 1; font-size: 14px; }
 

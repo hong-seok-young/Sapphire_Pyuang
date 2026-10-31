@@ -3,6 +3,8 @@ import { RANK } from "../auth";
 import type { Me } from "../auth";
 import { Bell, FitLine, HeroTitle } from "../ui";
 import { showUpdate } from "../updates";
+import { useState } from "react";
+import { enablePush, markPushAsked, shouldAskPush } from "../push";
 
 interface Tile {
   title: string;
@@ -78,6 +80,8 @@ export function Home({ me }: { me: Me }) {
         </a>
       </header>
 
+      <PushAsk />
+
       <a className="search-entry" href="#/search">
         <span>🔍</span> 아이템, 몬스터, 사냥터 검색
       </a>
@@ -106,3 +110,34 @@ export function Home({ me }: { me: Me }) {
     </div>
   );
 }
+
+/** 폰 알림 켜기 카드 (한 번만): 브라우저는 사용자가 눌러야 알림을 허락받을 수 있어서 처음 한 번 묻는다 (제작자 요청: 기본은 허용) */
+function PushAsk() {
+  const [show, setShow] = useState(shouldAskPush);
+  const [busy, setBusy] = useState(false);
+  if (!show) return null;
+  const close = () => {
+    markPushAsked();
+    setShow(false);
+  };
+  return (
+    <div className="panel push-ask">
+      <span>📱 폰 알림</span>
+      <button
+        className="pill pill-on"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          await enablePush().catch(() => null);
+          close();
+        }}
+      >
+        켜기
+      </button>
+      <button className="pill" onClick={close}>
+        나중에
+      </button>
+    </div>
+  );
+}
+
