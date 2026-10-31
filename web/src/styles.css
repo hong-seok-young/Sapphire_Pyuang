@@ -60,7 +60,8 @@ button { font: inherit; color: inherit; }
 .pic, .inline-icon, .inline-pic, .topbar-logo, .hero-mark { image-rendering: pixelated; }
 .pic-empty { display: inline-block; width: 24px; height: 24px; }
 
-.app { max-width: 640px; margin: 0 auto; min-height: 100vh; }
+/* 100dvh: the visible height on phones (100vh is taller there and made the home screen scroll for nothing) */
+.app { max-width: 640px; margin: 0 auto; min-height: 100vh; min-height: 100dvh; }
 .page { padding: 0 12px calc(var(--tab-h) + 24px + env(safe-area-inset-bottom)); }
 
 /* pixel frame */
@@ -680,3 +681,22 @@ button { font: inherit; color: inherit; }
 .log-row time { flex: none; width: 40px; color: var(--muted); font-size: 12px; }
 .log-row small { color: var(--muted); font-size: 11px; }
 .log-visit { color: #8ff0b0; }
+
+/* admin: one row per account, the actions open under the row */
+.admin-count { margin-top: 14px; }
+.admin-search { width: 100%; margin-bottom: 8px; }
+.account-list { gap: 4px; }
+.account { padding: 0; background: var(--panel); border: var(--px) solid var(--edge); }
+.account-row { width: 100%; display: flex; align-items: center; gap: 8px; padding: 6px 8px; text-align: left; cursor: pointer; }
+.account-noemblem { flex: none; width: 30px; height: 30px; }
+.account-main { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.account-main b { font-size: 14px; font-weight: 700; }
+.account-main small { font-size: 11px; color: var(--muted); }
+.account-tags { flex: none; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; max-width: 46%; }
+.account-tags .role-badge { font-size: 10px; white-space: nowrap; }
+.account-more { flex: none; width: 14px; color: var(--muted); }
+.account-open { box-shadow: inset 0 0 0 2px var(--sunset); }
+.account-panel { display: flex; flex-direction: column; gap: 8px; padding: 4px 8px 10px; }
+.account-field { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.account-roles { display: flex; flex-wrap: wrap; gap: 6px; }
+.account-roles .pill, .account-panel .account-actions .pill { font-size: 12px; padding: 5px 9px; }

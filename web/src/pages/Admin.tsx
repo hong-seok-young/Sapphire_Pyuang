@@ -4,20 +4,28 @@ import {
   ROLE_NAME, RANK, canManage, createAccount, deleteAccount, errorText, listAccounts, positionOf, requirePasswordChange, resetPassword, setRole,
 } from "../auth";
 import type { Account, Me, Role } from "../auth";
-import { GUILD_NAME, GUILD_TIER, JOB_NAME, avatarUrl, deleteAvatarOf, saveProfileOf } from "../auth";
+import { GUILD_NAME, GUILD_TIER, JOB_NAME, deleteAvatarOf, saveProfileOf } from "../auth";
 import { JobEmblem } from "../emblems";
 import { ProfileForm } from "./Profile";
 import { Loading, Panel, TopBar } from "../ui";
 
+/** 길드원이 몇백 명이어도 처음엔 이만큼만 그리고 '더 보기' */
+const PAGE_SIZE = 50;
+
+type FilterKey = "all" | "main" | "second" | "staff" | "pw" | "noprofile";
+/** 목록 거르기 칩 (제작자 요청: 길드원이 많아지면 찾기) */
+const FILTERS: { key: FilterKey; label: string; test: (a: Account) => boolean }[] = [
+  { key: "all", label: "전체", test: () => true },
+  { key: "main", label: "1군", test: (a) => a.guild === "main" },
+  { key: "second", label: "2군", test: (a) => a.guild === "second" },
+  { key: "staff", label: "오피서 이상", test: (a) => a.role === "master" || a.role === "officer" },
+  { key: "pw", label: "비밀번호 바꾸기 전", test: (a) => a.mustChange },
+  { key: "noprofile", label: "직업·레벨 안 정함", test: (a) => !a.job || !a.level || !a.guild },
+];
+
 /** 이 역할로 만들거나 바꿀 수 있는 역할 (높은 것부터) */
 const ASSIGNABLE: Role[] = ["master", "officer", "member"];
 
-/** '오피서로', '길드원으로' 처럼 받침에 맞는 조사를 붙인다 (받침이 없거나 ㄹ 받침이면 '로') */
-function toRoleText(name: string): string {
-  const code = name.charCodeAt(name.length - 1) - 0xac00;
-  const jong = code >= 0 && code <= 11171 ? code % 28 : 0;
-  return name + (jong === 0 || jong === 8 ? "로" : "으로");
-}
 
 /**
  * 길드원 관리 (오피서 이상).
@@ -39,6 +47,13 @@ export function AdminPage({ me }: { me: Me }) {
   const [busy, setBusy] = useState(false);
 
   const creatable = ASSIGNABLE.filter((r) => canManage(me.role, r));
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<FilterKey>("all");
+  const [open, setOpen] = useState<string | null>(null);
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const q = query.replace(/\s+/g, "").toLowerCase();
+  const test = FILTERS.find((f) => f.key === filter)!.test;
+  const shown = (accounts ?? []).filter((a) => test(a) && (!q || a.id.replace(/\s+/g, "").toLowerCase().includes(q)));
 
   const reload = useCallback(() => {
     listAccounts().then(setAccounts, (e) => setError(errorText(e)));
@@ -125,37 +140,66 @@ export function AdminPage({ me }: { me: Me }) {
       {!accounts ? (
         <Loading />
       ) : (
-        <ul className="list">
-          {accounts.map((a) => (
-            <AccountRow
-              key={a.id}
-              account={a}
-              me={me}
-              busy={busy}
-              onReset={() =>
-                run(async () => {
-                  const r = await resetPassword(a.id, chosenPassword());
-                  setNotice({ title: "비밀번호를 초기화했어요", id: r.id, password: r.tempPassword });
-                })
-              }
-              onMustChange={() => run(async () => void (await requirePasswordChange(a.id)))}
-              onRole={(role) => run(async () => void (await setRole(a.id, role)))}
-              onDelete={() => run(async () => void (await deleteAccount(a.id)))}
-              onChanged={reload}
-            />
-          ))}
-        </ul>
+        <>
+          <h2 className="panel-title admin-count">
+            길드원 {accounts.length}명{shown.length !== accounts.length && ` 중 ${shown.length}명`}
+          </h2>
+          <input className="mk-input admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="🔍 닉네임 찾기" aria-label="닉네임 찾기" />
+          <div className="filter">
+            {FILTERS.map((f) => (
+              <button key={f.key} className={"pill" + (filter === f.key ? " pill-on" : "")} onClick={() => setFilter(f.key)}>
+                {f.label} <small>{accounts.filter(f.test).length}</small>
+              </button>
+            ))}
+          </div>
+          <ul className="list account-list">
+            {shown.slice(0, limit).map((a) => (
+              <AccountRow
+                key={a.id}
+                account={a}
+                me={me}
+                busy={busy}
+                open={open === a.id}
+                onOpen={() => setOpen(open === a.id ? null : a.id)}
+                onReset={() =>
+                  run(async () => {
+                    const r = await resetPassword(a.id, chosenPassword());
+                    setNotice({ title: "비밀번호를 초기화했어요", id: r.id, password: r.tempPassword });
+                  })
+                }
+                onMustChange={() => run(async () => void (await requirePasswordChange(a.id)))}
+                onRole={(role) => run(async () => void (await setRole(a.id, role)))}
+                onDelete={() => run(async () => void (await deleteAccount(a.id)))}
+                onChanged={reload}
+              />
+            ))}
+          </ul>
+          {shown.length > limit && (
+            <div className="links">
+              <button className="btn btn-ghost" onClick={() => setLimit((n) => n + PAGE_SIZE)}>
+                더 보기 ({shown.length - limit}명 더)
+              </button>
+            </div>
+          )}
+          {shown.length === 0 && <div className="empty">찾는 길드원이 없어요.</div>}
+        </>
       )}
     </>
   );
 }
 
+/**
+ * 계정 한 줄: 엠블럼, 닉네임, 길드와 레벨, 표시. 누르면 그 줄 아래로만 관리 칸이 펼쳐진다 (제작자 요청: 한 행으로).
+ * 역할은 드롭다운 대신 세 칸 단추 (게임 위 위키 창 WebView 에서는 <select> 가 안 열려서)
+ */
 function AccountRow({
-  account, me, busy, onReset, onMustChange, onRole, onDelete, onChanged,
+  account, me, busy, open, onOpen, onReset, onMustChange, onRole, onDelete, onChanged,
 }: {
   account: Account;
   me: Me;
   busy: boolean;
+  open: boolean;
+  onOpen: () => void;
   onReset: () => void;
   onMustChange: () => void;
   onRole: (role: Role) => void;
@@ -167,81 +211,109 @@ function AccountRow({
   const [photoError, setPhotoError] = useState("");
   const manageable = account.id !== me.id && canManage(me.role, account.role);
   // 역할 바꾸기는 길드마스터 이상만 (오피서 임명/해제)
-  const roleTargets = RANK[me.role] >= 2 ? ASSIGNABLE.filter((r) => r !== account.role && canManage(me.role, r)) : [];
+  const canRole = manageable && RANK[me.role] >= 2;
 
   return (
-    <li className="panel account">
-      <div className="account-head">
-        {account.job && account.level ? <JobEmblem job={account.job} level={account.level} size={30} /> : null}
-        {account.avatar && <img className="account-avatar" src={avatarUrl(account.id, account.avatar)} alt="" />}
-        <span className="account-id">{account.id}</span>
-        {account.mustChange && <span className="role-badge muted">비밀번호 바꾸기 전</span>}
-        {/* 앱개발자는 길드 직책이 아니라서 길드원으로 보이고, 앱 관리 권한은 따로 적는다 */}
-        <span className="role-badge">{ROLE_NAME[positionOf(account.role)]}</span>
-        {account.role === "developer" && <span className="role-badge muted">앱 관리</span>}
-      </div>
-      <div className="account-sub">
-        <span className="muted">
-          {account.guild ? `${GUILD_TIER[account.guild]} ${GUILD_NAME[account.guild]} · ` : "길드 안 정함 · "}
-          {account.job && account.level ? `Lv.${account.level} ${JOB_NAME[account.job]}` : "직업, 레벨 아직 안 정함"}
+    <li className={"account" + (open ? " account-open" : "")}>
+      <button className="account-row" onClick={onOpen} aria-expanded={open}>
+        {account.job && account.level ? <JobEmblem job={account.job} level={account.level} size={30} /> : <span className="account-noemblem" />}
+        <span className="account-main">
+          <b>{account.id}</b>
+          <small>
+            {account.guild ? `${GUILD_TIER[account.guild]} ${GUILD_NAME[account.guild]}` : "길드 안 정함"}
+            {account.job && account.level ? ` · Lv.${account.level} ${JOB_NAME[account.job]}` : " · 직업·레벨 안 정함"}
+          </small>
         </span>
-        <span className="account-sub-actions">
-          {account.avatar && (
-            <button
-              className="pill"
-              disabled={busy}
-              onClick={async () => {
-                setPhotoError("");
-                try {
-                  await deleteAvatarOf(account.id);
-                  onChanged();
-                } catch (x) {
-                  setPhotoError(errorText(x));
-                }
+        <span className="account-tags">
+          {account.mustChange && <span className="role-badge muted">비밀번호 바꾸기 전</span>}
+          {/* 앱개발자는 길드 직책이 아니라서 길드원으로 보이고, 앱 관리 권한은 따로 적는다 */}
+          <span className="role-badge">{ROLE_NAME[positionOf(account.role)]}</span>
+          {account.role === "developer" && <span className="role-badge muted">앱 관리</span>}
+        </span>
+        <span className="account-more" aria-hidden="true">
+          {open ? "▴" : "▾"}
+        </span>
+      </button>
+      {open && (
+        <div className="account-panel">
+          {canRole && (
+            <div className="account-field">
+              <span>역할</span>
+              <div className="account-roles">
+                {ASSIGNABLE.map((r) => (
+                  <button
+                    key={r}
+                    className={"pill" + (account.role === r ? " pill-on" : "")}
+                    disabled={busy || account.role === r || !canManage(me.role, r)}
+                    onClick={() => onRole(r)}
+                  >
+                    {ROLE_NAME[r]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="account-actions">
+            <button className="pill" disabled={busy} onClick={() => setEditing((e) => !e)}>
+              {editing ? "고치기 닫기" : "길드·직업·레벨 고치기"}
+            </button>
+            {account.avatar && (
+              <button
+                className="pill"
+                disabled={busy}
+                onClick={async () => {
+                  setPhotoError("");
+                  try {
+                    await deleteAvatarOf(account.id);
+                    onChanged();
+                  } catch (x) {
+                    setPhotoError(errorText(x));
+                  }
+                }}
+              >
+                사진 내리기
+              </button>
+            )}
+            {manageable && (
+              <>
+                <button className="pill" disabled={busy} onClick={onReset}>
+                  비밀번호 초기화
+                </button>
+                {!account.mustChange && (
+                  <button className="pill" disabled={busy} onClick={onMustChange}>
+                    비밀번호 바꾸게 하기
+                  </button>
+                )}
+                {confirmDelete ? (
+                  <>
+                    <button className="pill pill-danger" disabled={busy} onClick={onDelete}>
+                      정말 삭제
+                    </button>
+                    <button className="pill" onClick={() => setConfirmDelete(false)}>
+                      취소
+                    </button>
+                  </>
+                ) : (
+                  <button className="pill" disabled={busy} onClick={() => setConfirmDelete(true)}>
+                    계정 삭제
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+          {photoError && <p className="form-error">{photoError}</p>}
+          {editing && (
+            <ProfileForm
+              guild={account.guild}
+              job={account.job}
+              level={account.level}
+              submitLabel={`${account.id} 저장`}
+              onSave={async (job, level, _exp, guild) => {
+                await saveProfileOf(account.id, job, level, guild);
+                setEditing(false);
+                onChanged();
               }}
-            >
-              사진 내리기
-            </button>
-          )}
-          <button className="pill" disabled={busy} onClick={() => setEditing((e) => !e)}>
-            {editing ? "닫기" : "레벨·직업 고치기"}
-          </button>
-        </span>
-      </div>
-      {photoError && <p className="form-error">{photoError}</p>}
-      {editing && (
-        <ProfileForm
-          guild={account.guild}
-          job={account.job}
-          level={account.level}
-          submitLabel={`${account.id} 저장`}
-          onSave={async (job, level, _exp, guild) => {
-            await saveProfileOf(account.id, job, level, guild);
-            setEditing(false);
-            onChanged();
-          }}
-        />
-      )}
-      {manageable && (
-        <div className="account-actions">
-          {roleTargets.map((r) => (
-            <button key={r} className="pill" disabled={busy} onClick={() => onRole(r)}>
-              {toRoleText(ROLE_NAME[r])}
-            </button>
-          ))}
-          <button className="pill" disabled={busy} onClick={onReset}>비밀번호 초기화</button>
-          {!account.mustChange && (
-            <button className="pill" disabled={busy} onClick={onMustChange}>
-              비밀번호 바꾸게 하기
-            </button>
-          )}
-          {confirmDelete ? (
-            <>
-              <button className="pill pill-danger" disabled={busy} onClick={onDelete}>정말 삭제</button>
-              <button className="pill" onClick={() => setConfirmDelete(false)}>취소</button>
-            </>
-          ) : (
-            <button className="pill" disabled={busy} onClick={() => setConfirmDelete(true)}>계정 삭제</button>
+            />
           )}
         </div>
       )}
