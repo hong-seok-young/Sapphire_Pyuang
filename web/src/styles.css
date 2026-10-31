@@ -1270,7 +1270,7 @@ button { font: inherit; color: inherit; }
 .ps-week-bar i { display: block; height: 100%; background: linear-gradient(90deg, #7fd8ff, #b58cff); }
 .ps-order-main small img { width: 14px; height: 14px; vertical-align: -2px; image-rendering: pixelated; }
 /* IMO-style icons (제작자 요청): pixel sprites and game item pictures stay crisp */
-.px-icon, .tile-item { image-rendering: pixelated; vertical-align: middle; }
+.px-icon { image-rendering: pixelated; vertical-align: middle; }
 .tab-icon .px-icon { display: block; }
 .tile-pic { height: 36px; }
 .search-entry .px-icon { margin-right: 4px; }

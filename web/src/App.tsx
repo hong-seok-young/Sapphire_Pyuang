@@ -132,7 +132,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "shop") body = <PlatShopPage />;
   else if (page === "board") body = <BoardPage me={me} arg={arg} sub={route.parts[2] ?? ""} query={route.query} />;
   else if (!wiki) body = <Loading error={loggedOut ? undefined : error} />;
-  else if (page === "") body = <Home me={me} wiki={wiki} />;
+  else if (page === "") body = <Home me={me} />;
   else if (page === "search") body = <Search wiki={wiki} q={route.query.get("q") ?? ""} />;
   else if (page === "places") body = <Places wiki={wiki} region={route.query.get("r") ?? ""} />;
   else if (page === "place") body = <PlacePage wiki={wiki} id={arg} />;
@@ -140,7 +140,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "item") body = <ItemPage wiki={wiki} name={arg} />;
   else if (page === "equip") body = arg ? <EquipSlot wiki={wiki} slot={arg} /> : <EquipSlots wiki={wiki} />;
   else if (page === "menu") body = <MenuPage wiki={wiki} title={arg} />;
-  else if (page === "info") body = <InfoPage me={me} wiki={wiki} />;
+  else if (page === "info") body = <InfoPage me={me} />;
   else if (page === "post") body = <PostPage wiki={wiki} id={arg} />;
   else if (page === "chat") body = <ChatPage wiki={wiki} arg={arg} query={route.query} />;
   else if (page === "gaps") body = me.role === "developer" ? <ChatGapsPage /> : <NotFound what="페이지" />;
@@ -148,7 +148,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "log") body = me.role === "developer" ? <ActivityLogPage wiki={wiki} /> : <NotFound what="페이지" />;
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
   else if (page === "app" || page === "timer") body = <AppPage />;
-  else body = <Home me={me} wiki={wiki} />;
+  else body = <Home me={me} />;
 
   return (
     <div className="app">
