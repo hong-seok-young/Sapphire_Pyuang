@@ -15,6 +15,7 @@ import { AdminPage } from "./pages/Admin";
 import { MePage, ProfileSetupPage } from "./pages/Profile";
 import { RankingPage } from "./pages/Ranking";
 import { MarketPage } from "./pages/Market";
+import { RequestsPage } from "./pages/Requests";
 import { RANK, fetchMe } from "./auth";
 import { appMenu } from "./platform";
 import type { Me } from "./auth";
@@ -77,8 +78,9 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "admin") body = RANK[me.role] >= 1 ? <AdminPage me={me} /> : <NotFound what="페이지" />;
   else if (page === "me") body = <MePage me={me} onMe={onMe} onLogout={onLogout} />;
   else if (page === "ranking") body = <RankingPage me={me} />;
+  else if (page === "requests") body = <RequestsPage me={me} />;
   else if (!wiki) body = <Loading error={loggedOut ? undefined : error} />;
-  else if (page === "") body = <Home me={me} onLogout={onLogout} />;
+  else if (page === "") body = <Home me={me} />;
   else if (page === "search") body = <Search wiki={wiki} q={route.query.get("q") ?? ""} />;
   else if (page === "places") body = <Places wiki={wiki} region={route.query.get("r") ?? ""} />;
   else if (page === "place") body = <PlacePage wiki={wiki} id={arg} />;
@@ -91,7 +93,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "market") body = <MarketPage wiki={wiki} me={me} />;
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
   else if (page === "app" || page === "timer") body = <AppPage />;
-  else body = <Home me={me} onLogout={onLogout} />;
+  else body = <Home me={me} />;
 
   return (
     <div className="app">

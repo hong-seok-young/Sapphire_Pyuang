@@ -36,6 +36,7 @@ export function PicImg({ pic, scale = 1, max, fit, alt = "", className }: {
   return <img className={"pic " + (className ?? "")} src={pic.src} width={w} height={h} alt={alt} loading="lazy" decoding="async" />;
 }
 
+/** 화면 위 줄: 뒤로, 제목, 오른쪽에는 따로 준 것이 없으면 '내 정보' 단추 (내 정보 화면에서는 빼고) */
 export function TopBar({ title, back = true, right }: { title: ReactNode; back?: boolean; right?: ReactNode }) {
   return (
     <header className="topbar">
@@ -47,7 +48,12 @@ export function TopBar({ title, back = true, right }: { title: ReactNode; back?:
         <img className="topbar-logo" src="icon-192.png" alt="" />
       )}
       <h1 className="topbar-title">{title}</h1>
-      {right}
+      {right ??
+        (location.hash.startsWith("#/me") ? null : (
+          <a className="topbar-me" href="#/me" aria-label="내 정보">
+            👤 내 정보
+          </a>
+        ))}
     </header>
   );
 }

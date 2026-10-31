@@ -43,7 +43,8 @@ function Row({ r, me, now }: { r: Ranked; me: Me; now: number }) {
         </small>
         <b>{r.id}</b>
       </span>
-      {up > 0 && <span className="rank-up">▲{up}</span>}
+      {/* 레벨업 표시 자리는 늘 비워 두어서 표시가 떠도 닉네임이 밀리지 않는다 */}
+      <span className="rank-up-slot">{up > 0 && <span className="rank-up">▲{up}</span>}</span>
       <RoleBadge role={r.role} />
     </li>
   );

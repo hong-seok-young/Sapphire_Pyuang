@@ -106,6 +106,21 @@ CREATE TABLE IF NOT EXISTS gold_wants (
   PRIMARY KEY (offer_id, user_id)
 );
 
+-- 길드원 의뢰소: 의뢰를 올리고 모아 둔 길드원이 선착순으로 수락한 뒤 게임 안에서 거래한다 (server/requests.ts)
+CREATE TABLE IF NOT EXISTS requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  owner TEXT NOT NULL,                    -- 의뢰한 길드원
+  title TEXT NOT NULL,                    -- 의뢰 (예: 검은진액 100개)
+  detail TEXT,                            -- 자세한 설명 (없어도 됨)
+  reward_gold INTEGER,                    -- 보상 골드 (골드로 줄 때)
+  reward_text TEXT,                       -- 보상 (골드가 아닐 때 자유롭게)
+  status TEXT NOT NULL DEFAULT 'open',    -- open 모집 중 | accepted 진행 중 (이틀 지나면 다시 open) | done 완료 (30일 뒤 지운다)
+  accepter TEXT,                          -- 수락한 길드원 (선착순 한 명)
+  accepted_at INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
 -- 길드원이 직접 올린 자기 캐릭터 그림 (랭킹 시상대에 선다). '내 정보'에서 사용자가 고른 스샷을 잘라 만든 PNG
 CREATE TABLE IF NOT EXISTS avatars (
   user_id TEXT PRIMARY KEY,

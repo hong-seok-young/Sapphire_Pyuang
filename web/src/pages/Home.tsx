@@ -1,5 +1,5 @@
 import { inApp, isAndroid } from "../platform";
-import { ROLE_NAME, RANK, logout } from "../auth";
+import { RANK } from "../auth";
 import type { Me } from "../auth";
 import { HeroTitle } from "../ui";
 
@@ -27,23 +27,25 @@ const TILES: Tile[] = [
   { title: "AI 챗봇", to: "#/chat", icon: "💬" },
   { title: "길드 랭킹", to: "#/ranking", icon: "🏆" },
   { title: "사파이어 중개인", to: "#/market", icon: "💰" },
+  { title: "길드원 의뢰소", to: "#/requests", icon: "📋" },
   // 시계와 보스 타이머는 안드로이드 앱에만 있다. 웹앱은 위키와 챗봇만 맡는다
   { title: "안드로이드 앱 받기", to: "#/app", icon: "📲", androidOnly: true },
   { title: "길드원 관리", to: "#/admin", icon: "👥", managers: true },
 ];
 
-export function Home({ me, onLogout }: { me: Me; onLogout: () => void }) {
+export function Home({ me }: { me: Me }) {
   const shown = TILES.filter(
     (t) => (!t.androidOnly || (isAndroid && !inApp)) && (!t.managers || RANK[me.role] >= 1),
   );
 
-  async function signOut() {
-    await logout().catch(() => undefined);
-    onLogout();
-  }
-
   return (
     <div className="home">
+      {/* 내 정보 (직업, 레벨, 캐릭터 사진, 비밀번호, 로그아웃)는 오른쪽 위 단추로 (제작자 요청) */}
+      <div className="home-top">
+        <a className="pill hero-me" href="#/me">
+          👤 내 정보
+        </a>
+      </div>
       <header className="hero">
         <img className="hero-mark" src="icon-192.png" alt="" width={72} height={72} />
         <div>
@@ -66,13 +68,6 @@ export function Home({ me, onLogout }: { me: Me; onLogout: () => void }) {
         ))}
       </nav>
 
-      <div className="me-line">
-        <span>
-          {me.id} · {ROLE_NAME[me.role]}
-        </span>
-        <a href="#/me">내 정보</a>
-        <button type="button" onClick={signOut}>로그아웃</button>
-      </div>
     </div>
   );
 }

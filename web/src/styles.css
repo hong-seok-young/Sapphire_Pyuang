@@ -253,8 +253,6 @@ button { font: inherit; color: inherit; }
 .pill-danger { background: var(--red); color: var(--edge); }
 .temp-pw { font-size: 18px; letter-spacing: 1px; color: var(--gold); user-select: all; }
 .notice { border-color: var(--gold); }
-.me-line { margin: 18px 4px 0; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 12px; color: var(--muted); }
-.me-line a, .me-line button { color: var(--gold); text-decoration: underline; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
 .hero-edition { font-size: 15px; letter-spacing: 0; color: var(--sapphire); text-shadow: 1px 1px 0 var(--edge); }
 
 /* chatbot */
@@ -573,3 +571,20 @@ button { font: inherit; color: inherit; }
 .gold-rate-unit { font-size: 16px; color: var(--muted); }
 .gold-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; font-size: 14px; }
 .gold-sum b { color: #8ff0b0; font-weight: 400; font-size: 16px; }
+/* '내 정보' button at the top right */
+.home-top { display: flex; justify-content: flex-end; padding-top: calc(8px + env(safe-area-inset-top)); }
+.home-top + .hero { padding-top: 2px; }
+.hero-me { font-size: 12px; color: var(--text); }
+.topbar-me {
+  flex: none; padding: 6px 8px; font-size: 12px; white-space: nowrap; color: var(--text); background: var(--panel-2);
+  border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 var(--hi);
+}
+.rank-up-slot { flex: none; width: 38px; display: flex; justify-content: center; }
+/* guild request board (Requests.tsx) */
+.rq-status { flex: none; width: 54px; padding: 4px 0; text-align: center; font-size: 12px; border: var(--px) solid var(--edge); }
+.rq-status-open { color: var(--edge); background: #7fe0a0; }
+.rq-status-accepted { color: #fff; background: var(--sapphire); }
+.rq-status-done { color: var(--muted); background: var(--night-2); }
+.rq-reward { display: inline-flex; align-items: center; gap: 4px; color: var(--gold); }
+.rq-detail { height: 72px; padding: 8px 10px; resize: vertical; line-height: 1.4; }
+.rq-detail-text { white-space: pre-line; }
