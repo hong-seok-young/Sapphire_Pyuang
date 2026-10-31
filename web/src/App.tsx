@@ -78,7 +78,6 @@ export function App() {
   }, []);
 
   if (guide) return <InstallGuide onLater={later} />;
-  if (iconNotice) return <IconChangedPage onDone={() => setIconNotice(false)} />;
 
   if (me === undefined) {
     return (
@@ -89,6 +88,9 @@ export function App() {
       </div>
     );
   }
+  // 아이콘 다시 설치 안내: 예전 아이콘을 들고 있을 수 있는 사람에게. 앱개발자(퓨앙)는 이미 새 아이콘이라 띄우지 않는다
+  // (제작자 요청 2026-11-01: 나는 최종 아이콘인데 왜 뜨냐, 새로 깔거나 구 아이콘인 사람에게만)
+  if (iconNotice && me?.role !== "developer") return <IconChangedPage onDone={() => setIconNotice(false)} />;
   // 안드로이드 앱은 검토 후 오픈: 이미 깐 앱 안에서는 웹으로 안내만 한다. 앱개발자(퓨앙)는 그대로 쓴다 (제작자 요청)
   if (inApp && !APP_OPEN && me?.role !== "developer") {
     if (me === null && appLogin) return <LoginPage onLogin={setMe} />;

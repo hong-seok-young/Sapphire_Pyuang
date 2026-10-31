@@ -149,8 +149,8 @@ export function InstallGuide({ onLater }: { onLater: () => void }) {
 }
 
 const ICON_LATER = "sapphire-icon-later";
-/** '앱 아이콘이 바뀌었어요' 안내를 쓸지. 2026-11-01 제작자 요청으로 끔 (새 아이콘으로 깐 폰에도 떠서) */
-const ICON_NOTICE_ON = false;
+/** '앱 아이콘이 바뀌었어요' 안내를 쓸지 (2026-11-01 잠깐 껐다가 다시 켬: 앱개발자 계정에는 안 띄우고(App.tsx) 구 아이콘인 사람에게는 띄운다) */
+const ICON_NOTICE_ON = true;
 /** '재설치 완료'를 누른 판 (이 폰에서는 다시 안 뜬다) */
 const ICON_DONE = "sapphire.iconReinstalled";
 
@@ -169,7 +169,6 @@ export function iconNoticeNeeded(): boolean {
     }
     return false;
   }
-  // 2026-11-01 제작자 요청으로 끔: 새 은하수 아이콘으로 깐 폰에도 떴다 (시작 주소만으로는 예전에 깐 것인지 가릴 수 없어서). 아래는 다시 켤 때를 위해 둔다
   if (!ICON_NOTICE_ON) return false;
   // 새 판으로 깐 웹앱이 한 번 열리면 이 폰에 적어 둔다. 그 뒤 링크(카톡 등)로 주소에 ?icon= 없이 열려도 다시 묻지 않는다
   // (제작자: 아이콘 안 바꿨는데 '바뀌었다'가 떴다)
