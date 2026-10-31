@@ -201,17 +201,25 @@ button { font: inherit; color: inherit; }
 .btn { flex: 1; padding: 10px; text-align: center; font-size: 13px; background: var(--sapphire); color: #fff; text-shadow: 1px 1px 0 var(--edge); }
 .btn-ghost { background: var(--panel); }
 
-/* original post (paper) */
-.paper {
-  background: var(--paper); color: var(--paper-ink); padding: 10px 8px; margin-bottom: 8px;
-  border: var(--px) solid var(--edge); box-shadow: inset 0 0 0 var(--px) #fff8e7;
-  font-family: "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; font-size: 13px; -webkit-font-smoothing: auto;
+/* wiki posts in the app's own style (제작자 요청 2026-10-31: 원글을 옮겨 온 종이 모양 대신). Blocks.tsx */
+.paper { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; color: var(--text); font-size: 14px; line-height: 1.7; }
+.paper a { color: #8fd0ff; text-decoration: none; border-bottom: 1px dotted rgba(143, 208, 255, 0.6); }
+.paper-p {
+  margin: 0; padding: 10px 12px; white-space: pre-wrap; word-break: keep-all; background: var(--panel);
+  border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 var(--hi), inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--lo);
 }
-.paper a { color: #1f4fd8; text-decoration: underline; }
-.paper-p { margin: 4px 0; white-space: pre-wrap; word-break: keep-all; }
-.paper-table-wrap { overflow-x: auto; margin: 8px 0; }
-.paper-table { border-collapse: collapse; margin: 0 auto; min-width: 100%; }
-.paper-table td { border: 1px solid var(--paper-line); padding: 4px 5px; vertical-align: middle; text-align: center; word-break: keep-all; }
+.paper-table-wrap { overflow-x: auto; margin: 0; }
+.paper-table {
+  border-collapse: collapse; min-width: 100%; background: var(--panel);
+  border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 var(--hi), inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--lo);
+}
+.paper-table td { border: 1px solid var(--hi); padding: 8px 10px; vertical-align: middle; text-align: left; word-break: keep-all; }
+/* a one-cell table is just a box in the original: no inner lines */
+.paper-table tr:only-child td:only-child { border: 0; }
+.post-nav { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }
+.post-nav span { display: flex; flex-direction: column; gap: 4px; }
+.post-nav-right { align-items: flex-end; }
+.post-nav .pill { padding: 6px 10px; font-size: 13px; color: var(--text); text-decoration: none; border-bottom: var(--px) solid var(--edge); }
 .paper-line { white-space: pre-wrap; }
 .inline-icon { vertical-align: middle; image-rendering: pixelated; }
 .inline-pic { max-width: 100%; height: auto; vertical-align: middle; }

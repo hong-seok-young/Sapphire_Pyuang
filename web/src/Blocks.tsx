@@ -5,6 +5,45 @@ import { cafeUrl, isBigPicture } from "./cafe";
 type PostLink = (postId: string) => string | null;
 
 const runsOf = (b: Block): Run[] => (b.k === "p" ? b.r : b.rows.flatMap((row) => row.flatMap((c) => c.l.flat())));
+
+/**
+ * 원글의 글자색: 밝은 종이 위에 쓴 색이라 어두운 바탕(앱)에서 안 보이는 어두운 색은 버리고(앱 글자색), 빨강·주황 같은 강조색만 남긴다
+ * (제작자 요청: 원글에서 따온 듯한 모양 말고 우리 앱 모양으로)
+ */
+function appColor(c: string | undefined): string | undefined {
+  if (!c) return undefined;
+  let r = 0, g = 0, b = 0;
+  const hex = c.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  const rgb = c.match(/rgba?\((\d+)\D+(\d+)\D+(\d+)/i);
+  if (hex) {
+    const h = hex[1].length === 3 ? hex[1].replace(/./g, (x) => x + x) : hex[1];
+    [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  } else if (rgb) {
+    [r, g, b] = [rgb[1], rgb[2], rgb[3]].map(Number);
+  } else return undefined;
+  const light = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  const saturated = Math.max(r, g, b) - Math.min(r, g, b) > 90;
+  return light >= 0.5 || (saturated && light >= 0.3) ? c : undefined;
+}
+
+/** 옆 사냥터로 가는 줄 (◀ 왼쪽 칸 | 오른쪽 칸 ▶): 링크만 모아 단추로 */
+function navLinks(b: Block, link: PostLink): { left: { label: string; to: string }[]; right: { label: string; to: string }[] } | null {
+  if (b.k !== "table" || b.rows.length !== 1 || b.rows[0].length !== 2) return null;
+  const all = runsOf(b).map((r) => ("t" in r ? r.t : "")).join("");
+  if (!/[◀▶]/.test(all)) return null;
+  const side = (i: number) =>
+    b.rows[0][i].l
+      .map((line) => {
+        const r = line.find((x) => "to" in x && x.to && "t" in x && x.t.trim());
+        const to = r && r.to?.startsWith("post:") ? link(r.to.slice(5)) : null;
+        const label = line.map((x) => ("t" in x ? x.t : "")).join("").replace(/[◀▶️\s]+/g, " ").trim();
+        return to && label ? { label, to } : null;
+      })
+      .filter((x): x is { label: string; to: string } => x !== null);
+  const left = side(0);
+  const right = side(1);
+  return left.length || right.length ? { left, right } : null;
+}
 const hasBigPicture = (b: Block) => runsOf(b).some((r) => "src" in r && isBigPicture(r.w, r.h));
 /** 그림을 뺀 뒤 남은 글이 그림 안내뿐인지 ('지도 클릭 시 고화질 확대' 같은) */
 const onlyPictureNote = (b: Block) =>
@@ -60,6 +99,27 @@ export function Blocks({ blocks, link, postId, what = "그림" }: { blocks: Bloc
   return (
     <div className="paper">
       {blocks.map((b, i) => {
+        const nav = navLinks(b, link);
+        if (nav) {
+          return (
+            <nav className="post-nav" key={i}>
+              <span>
+                {nav.left.map((n) => (
+                  <a key={n.to} className="pill" href={n.to}>
+                    ◀ {n.label}
+                  </a>
+                ))}
+              </span>
+              <span className="post-nav-right">
+                {nav.right.map((n) => (
+                  <a key={n.to} className="pill" href={n.to}>
+                    {n.label} ▶
+                  </a>
+                ))}
+              </span>
+            </nav>
+          );
+        }
         const big = !!postId && hasBigPicture(b);
         if (big && onlyPictureNote(b)) return <CafeLink key={i} postId={postId!} what={what} />;
         const body =
@@ -97,7 +157,7 @@ export function Blocks({ blocks, link, postId, what = "그림" }: { blocks: Bloc
 
 function CellView({ cell, link, hideBig }: { cell: Cell; link: PostLink; hideBig?: boolean }) {
   return (
-    <td colSpan={cell.cs} rowSpan={cell.rs} style={cell.bg ? { background: cell.bg } : undefined}>
+    <td colSpan={cell.cs} rowSpan={cell.rs}>
       {cell.l.map((line, i) => (
         <div className="paper-line" key={i}>
           {line.length ? <Runs runs={line} link={link} hideBig={hideBig} /> : " "}
@@ -137,7 +197,8 @@ export function Runs({ runs, link, hideBig }: { runs: Run[]; link: PostLink; hid
             />
           );
         } else {
-          const style = r.c ? { color: r.c } : undefined;
+          const color = appColor(r.c);
+          const style = color ? { color } : undefined;
           node = r.b ? <b style={style}>{r.t}</b> : style ? <span style={style}>{r.t}</span> : r.t;
         }
         const to = r.to ? href(r.to, link) : null;
