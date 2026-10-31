@@ -41,9 +41,10 @@ CREATE TABLE IF NOT EXISTS profiles (
   prev_level INTEGER,                     -- 레벨이 바뀌기 바로 전 레벨 (랭킹의 레벨업 표시)
   level_at INTEGER NOT NULL,              -- 레벨이 마지막으로 바뀐 때 (같은 레벨, 같은 경험치면 먼저 오른 사람이 위)
   updated_by TEXT,
-  exp INTEGER                             -- 경험치 % x 1000 (12.345% -> 12345). 본인만 적고 본인만 본다. 같은 레벨이면 높은 쪽이 위
+  exp INTEGER,                            -- 경험치 % x 1000 (12.345% -> 12345). 본인만 적고 본인만 본다. 같은 레벨이면 높은 쪽이 위
+  guild TEXT                              -- main 1군 Sapphire | second 2군 FairyTale. 처음 들어올 때 고르고 오피서 이상이 고친다
 );
--- 나중에 더한 칸(exp)은 이미 있던 DB 에 scripts/ci-d1.mjs 가 ALTER TABLE 로 넣는다
+-- 나중에 더한 칸(exp, guild)은 이미 있던 DB 에 scripts/ci-d1.mjs 가 ALTER TABLE 로 넣는다
 
 -- 레벨, 경험치를 적을 때마다 남기는 기록 (성장 랭킹: 오늘, 이번 주, 이번 달에 오른 만큼). server/auth.ts saveProfile
 CREATE TABLE IF NOT EXISTS level_log (

@@ -50,8 +50,8 @@ export function TopBar({ title, back = true, right }: { title: ReactNode; back?:
       <h1 className="topbar-title">{title}</h1>
       {right ??
         (location.hash.startsWith("#/me") ? null : (
-          <a className="topbar-me" href="#/me" aria-label="내 정보">
-            👤 내 정보
+          <a className="topbar-me" href="#/me" aria-label="내 정보" title="내 정보">
+            👤
           </a>
         ))}
     </header>

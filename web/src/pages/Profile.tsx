@@ -1,9 +1,10 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import {
-  EXP_MAX, JOBS, JOB_NAME, MAX_LEVEL, ROLE_NAME, avatarUrl, deleteMyAvatar, errorText, expText, logout, saveMyProfile,
+  EXP_MAX, GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, MAX_LEVEL, ROLE_NAME, avatarUrl, deleteMyAvatar, errorText, expText,
+  logout, saveMyProfile,
 } from "../auth";
-import type { Job, Me } from "../auth";
+import type { Guild, Job, Me } from "../auth";
 import { JobEmblem, JobGlyph } from "../emblems";
 import { HeroTitle, TopBar } from "../ui";
 import { AvatarMaker } from "./AvatarMaker";
@@ -18,11 +19,13 @@ function parseExp(text: string): number | null | undefined {
 }
 
 /**
- * 직업과 레벨 고르기 (처음 정하는 창, 내 정보, 길드원 관리가 같이 쓴다). 직업 단추에는 게임의 직업 문양을 넣는다.
+ * 길드(1군 Sapphire / 2군 FairyTale), 직업, 레벨 고르기 (처음 정하는 창, 내 정보, 길드원 관리가 같이 쓴다).
+ * 직업 단추에는 게임의 직업 문양을 넣는다.
  * withExp 이면 경험치 %도 적는다 (본인만: 처음 정하는 창과 내 정보. 오피서가 남의 것을 고칠 때는 없다).
  * 브라우저 고르기 창(<select>)은 게임 위 위키 창에서 안 열려서 단추로 고른다 (CLAUDE.md).
  */
 export function ProfileForm({
+  guild: startGuild,
   job: startJob,
   level: startLevel,
   exp: startExp = null,
@@ -30,13 +33,15 @@ export function ProfileForm({
   submitLabel,
   onSave,
 }: {
+  guild: Guild | null;
   job: Job | null;
   level: number | null;
   exp?: number | null;
   withExp?: boolean;
   submitLabel: string;
-  onSave: (job: Job, level: number, exp: number | null) => Promise<void>;
+  onSave: (job: Job, level: number, exp: number | null, guild: Guild) => Promise<void>;
 }) {
+  const [guild, setGuild] = useState<Guild | null>(startGuild);
   const [job, setJob] = useState<Job | null>(startJob);
   const [level, setLevel] = useState(startLevel ? String(startLevel) : "");
   const [exp, setExp] = useState(startExp !== null ? (startExp / 1000).toFixed(3) : "");
@@ -44,15 +49,15 @@ export function ProfileForm({
   const [error, setError] = useState("");
   const n = Number(level);
   const expValue = withExp ? parseExp(exp) : null;
-  const ok = job !== null && Number.isInteger(n) && n >= 1 && n <= MAX_LEVEL && expValue !== undefined;
+  const ok = guild !== null && job !== null && Number.isInteger(n) && n >= 1 && n <= MAX_LEVEL && expValue !== undefined;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!ok || expValue === undefined) return;
+    if (!ok || expValue === undefined || guild === null) return;
     setBusy(true);
     setError("");
     try {
-      await onSave(job, n, expValue);
+      await onSave(job, n, expValue, guild);
     } catch (x) {
       setError(errorText(x));
     } finally {
@@ -63,6 +68,14 @@ export function ProfileForm({
   const step = (d: number) => setLevel(String(Math.min(MAX_LEVEL, Math.max(1, (Number(level) || 0) + d))));
   return (
     <form className="profile-form" onSubmit={submit}>
+      <div className="guild-pick">
+        {GUILDS.map((g) => (
+          <button key={g} type="button" className={"job-btn guild-btn" + (guild === g ? " job-on" : "")} onClick={() => setGuild(g)}>
+            <b>{GUILD_TIER[g]}</b>
+            <span>{GUILD_NAME[g]}</span>
+          </button>
+        ))}
+      </div>
       <div className="job-pick">
         {JOBS.map((j) => (
           <button key={j} type="button" className={"job-btn" + (job === j ? " job-on" : "")} onClick={() => setJob(j)}>
@@ -117,11 +130,16 @@ export function ProfileForm({
   );
 }
 
-/** 직업, 레벨을 아직 안 정한 길드원이 들어오면 이 창만 보인다 (길드 랭킹에 쓰려고 한 번 정한다) */
+/**
+ * 길드(1군/2군), 직업, 레벨을 아직 안 정한 길드원이 들어오면 이 창만 보인다 (길드 랭킹에 쓰려고 한 번 정한다).
+ * 이미 정한 직업, 레벨은 채워 두어서 1군/2군만 고르면 된다.
+ */
 export function ProfileSetupPage({
+  me,
   onDone,
   onBack,
 }: {
+  me: Me;
   onDone: (p: Partial<Me>) => void;
   onBack: () => void;
 }) {
@@ -133,19 +151,21 @@ export function ProfileSetupPage({
           <img className="hero-mark" src="icon-192.png" alt="" width={72} height={72} />
           <div>
             <HeroTitle />
-            <p className="hero-sub">직업과 레벨 정하기</p>
+            <p className="hero-sub">길드와 직업, 레벨 정하기</p>
           </div>
         </header>
         <section className="panel profile-panel">
-          <p className="form-note">길드 레벨 랭킹에 쓰여요. 레벨이 오르면 '내 정보'에서 바꾸면 돼요.</p>
+          <p className="form-note">1군(Sapphire)인지 2군(FairyTale)인지와 직업, 레벨을 골라요. 길드 랭킹에 쓰여요.</p>
           <ProfileForm
-            job={null}
-            level={null}
+            guild={me.guild}
+            job={me.job}
+            level={me.level}
+            exp={me.exp}
             withExp
             submitLabel="정하고 들어가기"
-            onSave={async (job, level, exp) => {
-              await saveMyProfile(job, level, exp);
-              onDone({ job, level, exp });
+            onSave={async (job, level, exp, guild) => {
+              await saveMyProfile(job, level, exp, guild);
+              onDone({ job, level, exp, guild });
             }}
           />
         </section>
@@ -227,6 +247,7 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
         <div>
           <div className="me-name">{me.id}</div>
           <div className="muted">
+            {me.guild && `${GUILD_TIER[me.guild]} ${GUILD_NAME[me.guild]} · `}
             {ROLE_NAME[me.role]}
             {me.job && ` · ${JOB_NAME[me.job]}`}
             {me.level && ` · Lv.${me.level}`}
@@ -237,15 +258,16 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
       <section className="panel profile-panel">
         <h2 className="panel-title">레벨업 했으면 바꿔 주세요</h2>
         <ProfileForm
-          key={`${me.job}-${me.level}-${me.exp}`}
+          key={`${me.guild}-${me.job}-${me.level}-${me.exp}`}
+          guild={me.guild}
           job={me.job}
           level={me.level}
           exp={me.exp}
           withExp
           submitLabel="저장"
-          onSave={async (job, level, exp) => {
-            await saveMyProfile(job, level, exp);
-            onMe({ job, level, exp });
+          onSave={async (job, level, exp, guild) => {
+            await saveMyProfile(job, level, exp, guild);
+            onMe({ job, level, exp, guild });
             setSaved(true);
           }}
         />

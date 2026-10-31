@@ -21,6 +21,12 @@ export type Job = "warrior" | "ranger" | "mage" | "monk";
 export const JOBS: Job[] = ["warrior", "ranger", "mage", "monk"];
 export const JOB_NAME: Record<Job, string> = { warrior: "전사", ranger: "레인저", mage: "마법사", monk: "무도가" };
 export const MAX_LEVEL = 99;
+
+/** 길드: 1군 Sapphire, 2군 FairyTale (둘 다 사파이어 길드원). 서버 server/auth.ts 와 같다 */
+export type Guild = "main" | "second";
+export const GUILDS: Guild[] = ["main", "second"];
+export const GUILD_NAME: Record<Guild, string> = { main: "Sapphire", second: "FairyTale" };
+export const GUILD_TIER: Record<Guild, string> = { main: "1군", second: "2군" };
 /** 경험치 %는 1000을 곱한 정수 (12.345% -> 12345). 서버 server/auth.ts 와 같다 */
 export const EXP_MAX = 99_999;
 
@@ -38,6 +44,8 @@ export interface Me {
   level: number | null;
   /** 경험치 % x 1000. 안 적었으면 null. 본인만 본다 */
   exp: number | null;
+  /** 1군/2군. 안 골랐으면 null: 처음 정하는 창이 뜬다 */
+  guild: Guild | null;
   /** 캐릭터 그림을 올린 때. 없으면 null */
   avatar: number | null;
 }
@@ -51,6 +59,7 @@ export interface RankEntry {
   prevLevel: number | null;
   /** 레벨이 마지막으로 바뀐 때 (ms) */
   levelAt: number;
+  guild: Guild | null;
   /** 캐릭터 그림을 올린 때. 없으면 null */
   avatar: number | null;
   /** 경험치 % x 1000. 내 줄에만 온다 */
@@ -65,6 +74,7 @@ export interface Account {
   createdBy: string | null;
   job: Job | null;
   level: number | null;
+  guild: Guild | null;
   avatar: number | null;
 }
 
@@ -115,11 +125,11 @@ export function errorText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-export const saveMyProfile = (job: Job, level: number, exp: number | null) =>
-  api<{ job: Job; level: number; exp: number | null }>("/api/profile", "PUT", { job, level, exp });
+export const saveMyProfile = (job: Job, level: number, exp: number | null, guild: Guild) =>
+  api<{ job: Job; level: number; exp: number | null; guild: Guild }>("/api/profile", "PUT", { job, level, exp, guild });
 /** 오피서 이상: 다른 사람이 잘못 고른 직업, 레벨 고치기 */
-export const saveProfileOf = (id: string, job: Job, level: number) =>
-  api<{ id: string; job: Job; level: number }>(`/api/users/${encodeURIComponent(id)}/profile`, "PUT", { job, level });
+export const saveProfileOf = (id: string, job: Job, level: number, guild: Guild) =>
+  api<{ id: string; job: Job; level: number; guild: Guild }>(`/api/users/${encodeURIComponent(id)}/profile`, "PUT", { job, level, guild });
 export const fetchRanking = () => api<RankEntry[]>("/api/ranking");
 
 /** 성장 랭킹 기간: 오늘, 이번 주(월요일부터), 이번 달 (한국 시간 0시 기준) */
@@ -134,6 +144,7 @@ export interface GrowthEntry {
   fromLevel: number;
   /** 오른 양: 경험치 % x 1000 (레벨 1 = 100000) */
   growth: number;
+  guild: Guild | null;
   avatar: number | null;
   updatedAt: number;
 }

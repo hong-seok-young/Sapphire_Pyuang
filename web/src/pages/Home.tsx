@@ -40,18 +40,23 @@ export function Home({ me }: { me: Me }) {
 
   return (
     <div className="home">
-      {/* 내 정보 (직업, 레벨, 캐릭터 사진, 비밀번호, 로그아웃)는 오른쪽 위 단추로 (제작자 요청) */}
-      <div className="home-top">
-        <a className="pill hero-me" href="#/me">
-          👤 내 정보
-        </a>
-      </div>
       <header className="hero">
         <img className="hero-mark" src="icon-192.png" alt="" width={72} height={72} />
         <div>
           <HeroTitle />
-          <p className="hero-sub">아이모 길드 위키</p>
+          <p className="hero-sub">
+            아이모 길드 위키
+            {/* 로그인한 사람: 초록 점과 닉네임. 닉네임은 10글자까지라 자르지 않고, 자리가 모자라면 다음 줄로 */}
+            <span className="hero-user">
+              <i className="online-dot" aria-label="로그인 중" />
+              {me.id}
+            </span>
+          </p>
         </div>
+        {/* 내 정보 (직업, 레벨, 캐릭터 사진, 비밀번호, 로그아웃): 'web' 오른쪽의 사람 단추 (제작자 요청) */}
+        <a className="pill hero-me" href="#/me" aria-label="내 정보" title="내 정보">
+          👤
+        </a>
       </header>
 
       <a className="search-entry" href="#/search">

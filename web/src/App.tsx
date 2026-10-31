@@ -56,8 +56,8 @@ export function App() {
   if (me.mustChange) {
     return <PasswordPage forced onDone={() => setMe({ ...me, mustChange: false })} onBack={() => setMe(null)} />;
   }
-  if (!me.job || !me.level) {
-    return <ProfileSetupPage onDone={(p) => setMe({ ...me, ...p })} onBack={() => setMe(null)} />;
+  if (!me.job || !me.level || !me.guild) {
+    return <ProfileSetupPage me={me} onDone={(p) => setMe({ ...me, ...p })} onBack={() => setMe(null)} />;
   }
   return <Wiki me={me} onMe={(p) => setMe({ ...me, ...p })} onLogout={() => setMe(null)} />;
 }

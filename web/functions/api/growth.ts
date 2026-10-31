@@ -3,7 +3,7 @@
 // 길드원이 레벨, 경험치를 적을 때마다 남긴 기록(level_log)으로 센다: 기간 시작 전 마지막 기록(없으면 기간 안 첫 기록)과 지금을 비교.
 // 오른 사람만 많이 오른 순 (같으면 먼저 적은 사람이 위). 경험치 값 자체는 주지 않고 오른 양(growth, % x 1000)만 준다.
 import { NEED_LOGIN, currentUser, json } from "../../server/auth";
-import type { Env, Job, Role } from "../../server/auth";
+import type { Env, Guild, Job, Role } from "../../server/auth";
 
 const KST = 9 * 3_600_000;
 const DAY = 86_400_000;
@@ -38,7 +38,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     env.DB.prepare("SELECT user_id, level, exp, MAX(at) AS at FROM level_log WHERE at <= ? GROUP BY user_id").bind(start),
     env.DB.prepare("SELECT user_id, level, exp, MIN(at) AS at FROM level_log WHERE at > ? GROUP BY user_id").bind(start),
     env.DB.prepare(
-      "SELECT u.id AS id, u.role AS role, p.job AS job, p.level AS level, p.exp AS exp, a.updated_at AS avatar, " +
+      "SELECT u.id AS id, u.role AS role, p.job AS job, p.level AS level, p.exp AS exp, p.guild AS guild, a.updated_at AS avatar, " +
         "(SELECT MAX(at) FROM level_log l WHERE l.user_id = p.user_id) AS last_at " +
         "FROM profiles p JOIN users u ON u.id = p.user_id LEFT JOIN avatars a ON a.user_id = p.user_id",
     ),
@@ -47,12 +47,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   for (const p of during.results as Point[]) base.set(p.user_id, p);
   for (const p of before.results as Point[]) base.set(p.user_id, p); // 기간 전 기록이 있으면 그것부터
   const entries = (current.results as {
-    id: string; role: Role; job: Job; level: number; exp: number | null; avatar: number | null; last_at: number | null;
+    id: string; role: Role; job: Job; level: number; exp: number | null; guild: Guild | null; avatar: number | null; last_at: number | null;
   }[])
     .map((r) => {
       const from = base.get(r.id);
       return {
-        id: r.id, role: r.role, job: r.job, level: r.level, avatar: r.avatar,
+        id: r.id, role: r.role, job: r.job, level: r.level, guild: r.guild, avatar: r.avatar,
         fromLevel: from?.level ?? r.level, growth: from ? total(r) - total(from) : 0, updatedAt: r.last_at ?? 0,
       };
     })

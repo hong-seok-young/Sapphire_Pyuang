@@ -4,7 +4,7 @@ import {
   ROLE_NAME, RANK, canManage, createAccount, deleteAccount, errorText, listAccounts, resetPassword, setRole,
 } from "../auth";
 import type { Account, Me, Role } from "../auth";
-import { JOB_NAME, avatarUrl, deleteAvatarOf, saveProfileOf } from "../auth";
+import { GUILD_NAME, GUILD_TIER, JOB_NAME, avatarUrl, deleteAvatarOf, saveProfileOf } from "../auth";
 import { JobEmblem } from "../emblems";
 import { ProfileForm } from "./Profile";
 import { Loading, Panel, TopBar } from "../ui";
@@ -177,6 +177,7 @@ function AccountRow({
       </div>
       <div className="account-sub">
         <span className="muted">
+          {account.guild ? `${GUILD_TIER[account.guild]} ${GUILD_NAME[account.guild]} · ` : "길드 안 정함 · "}
           {account.job && account.level ? `Lv.${account.level} ${JOB_NAME[account.job]}` : "직업, 레벨 아직 안 정함"}
         </span>
         <span className="account-sub-actions">
@@ -205,11 +206,12 @@ function AccountRow({
       {photoError && <p className="form-error">{photoError}</p>}
       {editing && (
         <ProfileForm
+          guild={account.guild}
           job={account.job}
           level={account.level}
           submitLabel={`${account.id} 저장`}
-          onSave={async (job, level) => {
-            await saveProfileOf(account.id, job, level);
+          onSave={async (job, level, _exp, guild) => {
+            await saveProfileOf(account.id, job, level, guild);
             setEditing(false);
             onChanged();
           }}

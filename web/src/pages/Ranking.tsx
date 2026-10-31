@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
-import { JOBS, JOB_NAME, ROLE_NAME, avatarUrl, expText, fetchGrowth, fetchRanking, growthText } from "../auth";
-import type { GrowthEntry, GrowthPeriod, Job, Me, RankEntry } from "../auth";
+import { GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, avatarUrl, expText, fetchGrowth, fetchRanking, growthText } from "../auth";
+import type { GrowthEntry, GrowthPeriod, Guild, Job, Me, RankEntry } from "../auth";
 import { useAsync } from "../data";
 import { JobEmblem, JobGlyph, MINE_TAG_PIC, RankMedal, RoleBadge } from "../emblems";
 import { Loading, TopBar } from "../ui";
@@ -16,6 +16,46 @@ const VIEWS: { key: View; label: string }[] = [
   { key: "month", label: "월간 성장" },
 ];
 const PERIOD_NAME: Record<GrowthPeriod, string> = { day: "오늘", week: "이번 주", month: "이번 달" };
+
+/** 길드 고르기: 통합(all), 1군 Sapphire, 2군 FairyTale */
+type GuildFilter = Guild | "all";
+
+/** 길드 이름 (예전에 안 고른 사람은 '길드 미정') */
+const guildText = (g: Guild | null) => (g ? GUILD_NAME[g] : "길드 미정");
+
+/** 평균 레벨 (한 자리 소수) */
+function averageLevel(list: { level: number }[]): number | null {
+  return list.length ? Math.round((list.reduce((s, r) => s + r.level, 0) / list.length) * 10) / 10 : null;
+}
+
+/**
+ * 통합, 1군, 2군 칸: 사람 수와 평균 레벨을 따로 보여 주고, 누르면 그 길드만 본다.
+ * withAverage 가 아니면 (성장 랭킹) 사람 수만.
+ */
+function GuildCards({ items, selected, onSelect, withAverage = true }: {
+  items: { guild: Guild | null; level: number }[];
+  selected: GuildFilter;
+  onSelect: (g: GuildFilter) => void;
+  withAverage?: boolean;
+}) {
+  const card = (key: GuildFilter, title: string, sub: string, list: { level: number }[]) => {
+    const avg = averageLevel(list);
+    return (
+      <button key={key} type="button" className={"guild-stat" + (selected === key ? " guild-stat-on" : "")} aria-pressed={selected === key} onClick={() => onSelect(key)}>
+        <b>{title}</b>
+        <small>{sub}</small>
+        <span>{list.length}명</span>
+        {withAverage && <strong>{avg !== null ? `평균 Lv.${avg}` : "-"}</strong>}
+      </button>
+    );
+  };
+  return (
+    <div className="guild-stats">
+      {card("all", "통합", "사파이어 전체", items)}
+      {GUILDS.map((g) => card(g, GUILD_TIER[g], GUILD_NAME[g], items.filter((r) => r.guild === g)))}
+    </div>
+  );
+}
 
 interface Ranked extends RankEntry {
   /** 지금 보는 목록(직업 필터)에서의 순위 */
@@ -39,9 +79,10 @@ function Row({ r, me, now }: { r: Ranked; me: Me; now: number }) {
       <JobEmblem job={r.job} level={r.level} rank={r.overall} size={50} />
       <span className="rank-name">
         <small>
-          {ROLE_NAME[r.role]} · {JOB_NAME[r.job]}
+          {guildText(r.guild)} · {JOB_NAME[r.job]}
         </small>
-        <b>{r.id}</b>
+        {/* 닉네임은 10글자까지: 긴 이름은 글자를 줄여서 자르지 않는다 */}
+        <b className={r.id.length > 7 ? "rank-name-long" : undefined}>{r.id}</b>
       </span>
       {/* 레벨업 표시 자리는 늘 비워 두어서 표시가 떠도 닉네임이 밀리지 않는다 */}
       <span className="rank-up-slot">{up > 0 && <span className="rank-up">▲{up}</span>}</span>
@@ -50,41 +91,38 @@ function Row({ r, me, now }: { r: Ranked; me: Me; now: number }) {
   );
 }
 
-/** 레벨 랭킹: 게임의 경험치 랭킹 목록처럼 (메달, 엠블럼, 맨 아래 '내순위') */
-function LevelRanking({ me, data }: { me: Me; data: RankEntry[] }) {
+/** 레벨 랭킹: 게임의 경험치 랭킹 목록처럼 (메달, 엠블럼, 맨 아래 '내순위'). 길드(통합/1군/2군)와 직업으로 거른다 */
+function LevelRanking({ me, data, guild, onGuild }: { me: Me; data: RankEntry[]; guild: GuildFilter; onGuild: (g: GuildFilter) => void }) {
   const [filter, setFilter] = useState<Job | "all">("all");
   const now = Date.now();
   const overall = new Map(data.map((r, i) => [r.id, i + 1]));
-  const list: Ranked[] = (filter === "all" ? data : data.filter((r) => r.job === filter)).map((r, i) => ({
+  const inGuild = guild === "all" ? data : data.filter((r) => r.guild === guild);
+  const list: Ranked[] = (filter === "all" ? inGuild : inGuild.filter((r) => r.job === filter)).map((r, i) => ({
     ...r,
     rank: i + 1,
     overall: overall.get(r.id) ?? i + 1,
   }));
   const mine = list.find((r) => r.id === me.id);
   const above = mine && mine.rank > 1 ? list[mine.rank - 2] : undefined;
-  const avg = data.length ? Math.round((data.reduce((s, r) => s + r.level, 0) / data.length) * 10) / 10 : 0;
-  const ups = data.filter((r) => recentUp(r, now) > 0).length;
+  const ups = inGuild.filter((r) => recentUp(r, now) > 0).length;
   const hint = mine
     ? above
       ? above.level > mine.level
         ? `한 칸 위까지 Lv.+${above.level - mine.level}`
         : "같은 레벨! 경험치를 올려요"
       : "👑 1등!"
-    : filter === "all"
-      ? "레벨을 정하면 올라가요"
-      : "이 직업이 아니에요";
+    : guild !== "all" && me.guild !== guild
+      ? `${GUILD_TIER[guild]}이 아니에요`
+      : filter === "all"
+        ? "레벨을 정하면 올라가요"
+        : "이 직업이 아니에요";
 
   return (
     <>
+      <GuildCards items={data} selected={guild} onSelect={onGuild} />
       <div className="rank-stats">
         <span>
-          👥 <b>{data.length}</b>명
-        </span>
-        <span>
-          평균 <b>Lv.{avg}</b>
-        </span>
-        <span>
-          최고 <b>Lv.{data[0]?.level ?? "-"}</b>
+          최고 <b>Lv.{inGuild[0]?.level ?? "-"}</b>
         </span>
         {ups > 0 && (
           <span>
@@ -96,7 +134,7 @@ function LevelRanking({ me, data }: { me: Me; data: RankEntry[] }) {
       <div className="job-filter" role="tablist" aria-label="직업">
         <button role="tab" aria-selected={filter === "all"} className={"job-chip" + (filter === "all" ? " job-chip-on" : "")} onClick={() => setFilter("all")}>
           <span className="job-chip-all">ALL</span>
-          <small>{data.length}</small>
+          <small>{inGuild.length}</small>
         </button>
         {JOBS.map((j) => (
           <button
@@ -108,14 +146,17 @@ function LevelRanking({ me, data }: { me: Me; data: RankEntry[] }) {
           >
             <JobGlyph job={j} size={22} />
             <small>
-              {JOB_NAME[j]} {data.filter((r) => r.job === j).length}
+              {JOB_NAME[j]} {inGuild.filter((r) => r.job === j).length}
             </small>
           </button>
         ))}
       </div>
 
       {list.length === 0 ? (
-        <div className="empty">아직 {filter === "all" ? "" : JOB_NAME[filter] + " "}길드원이 없어요.</div>
+        <div className="empty">
+          아직 {guild === "all" ? "" : GUILD_NAME[guild] + " "}
+          {filter === "all" ? "" : JOB_NAME[filter] + " "}길드원이 없어요.
+        </div>
       ) : (
         <ul className="rank-list">
           {list.map((r) => (
@@ -130,7 +171,7 @@ function LevelRanking({ me, data }: { me: Me; data: RankEntry[] }) {
         {me.job && me.level ? <JobEmblem job={me.job} level={me.level} rank={overall.get(me.id)} size={50} /> : null}
         <span className="rank-name">
           <small>{me.exp !== null ? `경험치 ${expText(me.exp)}` : hint}</small>
-          <b>{me.id}</b>
+          <b className={me.id.length > 7 ? "rank-name-long" : undefined}>{me.id}</b>
           {me.exp !== null && <small className="rank-hint">{hint}</small>}
         </span>
         <a className="pill rank-edit" href="#/me">
@@ -163,13 +204,15 @@ function dayText(t: number): string {
  * 성장 랭킹: 오늘, 이번 주, 이번 달에 오른 만큼 (레벨 1 = 100%). 길드원이 레벨, 경험치를 적을 때마다 남긴 기록으로 센다.
  * 1등은 크게, 캐릭터 사진이 있으면 사진으로 보여 준다. 이 화면은 게임 그림 대신 이 앱 디자인으로 그린다.
  */
-function GrowthRanking({ me, period }: { me: Me; period: GrowthPeriod }) {
+function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthPeriod; guild: GuildFilter; onGuild: (g: GuildFilter) => void }) {
   const { data, error } = useAsync(useCallback(() => fetchGrowth(period), [period]));
   if (!data) return <Loading error={error} />;
-  const [first, ...rest] = data.entries;
-  const mine = data.entries.findIndex((e) => e.id === me.id);
+  const entries = guild === "all" ? data.entries : data.entries.filter((e) => e.guild === guild);
+  const [first, ...rest] = entries;
+  const mine = entries.findIndex((e) => e.id === me.id);
   return (
     <>
+      <GuildCards items={data.entries} selected={guild} onSelect={onGuild} withAverage={false} />
       <p className="growth-note">
         {period === "day" ? "오늘 0시" : `${dayText(data.start)} 0시`}부터 지금까지 오른 만큼이에요. 레벨, 경험치를 적을 때마다 기록돼요.
       </p>
@@ -184,7 +227,7 @@ function GrowthRanking({ me, period }: { me: Me; period: GrowthPeriod }) {
             </span>
             <b className="growth-hero-name">{first.id}</b>
             <span className="growth-hero-sub">
-              {JOB_NAME[first.job]} · Lv.{first.fromLevel}
+              {guildText(first.guild)} · {JOB_NAME[first.job]} · Lv.{first.fromLevel}
               {first.level !== first.fromLevel && ` → ${first.level}`}
             </span>
             <span className="growth-hero-value">{growthText(first.growth)}</span>
@@ -200,7 +243,7 @@ function GrowthRanking({ me, period }: { me: Me; period: GrowthPeriod }) {
                   <span className="growth-row-name">
                     <b>{e.id}</b>
                     <small>
-                      {JOB_NAME[e.job]} · Lv.{e.fromLevel}
+                      {guildText(e.guild)} · {JOB_NAME[e.job]} · Lv.{e.fromLevel}
                       {e.level !== e.fromLevel && ` → ${e.level}`}
                     </small>
                   </span>
@@ -213,7 +256,7 @@ function GrowthRanking({ me, period }: { me: Me; period: GrowthPeriod }) {
       )}
       <p className="growth-me">
         {mine >= 0
-          ? `내 ${PERIOD_NAME[period]} 성장: ${mine + 1}등 ${growthText(data.entries[mine].growth)}`
+          ? `내 ${PERIOD_NAME[period]} 성장: ${mine + 1}등 ${growthText(entries[mine].growth)}`
           : `${PERIOD_NAME[period]} 내 성장은 아직 없어요.`}{" "}
         <a href="#/me">레벨, 경험치 적기 ▸</a>
       </p>
@@ -229,6 +272,7 @@ function GrowthRanking({ me, period }: { me: Me; period: GrowthPeriod }) {
 export function RankingPage({ me }: { me: Me }) {
   const { data, error } = useAsync(useCallback(() => fetchRanking(), []));
   const [view, setView] = useState<View>("level");
+  const [guild, setGuild] = useState<GuildFilter>("all");
   return (
     <>
       <TopBar title="길드 랭킹" />
@@ -250,9 +294,9 @@ export function RankingPage({ me }: { me: Me }) {
         ))}
       </div>
       {view !== "level" ? (
-        <GrowthRanking me={me} period={view} />
+        <GrowthRanking me={me} period={view} guild={guild} onGuild={setGuild} />
       ) : data ? (
-        <LevelRanking me={me} data={data} />
+        <LevelRanking me={me} data={data} guild={guild} onGuild={setGuild} />
       ) : (
         <Loading error={error} />
       )}

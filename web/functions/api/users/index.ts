@@ -3,7 +3,7 @@
 import {
   FORBIDDEN, NEED_LOGIN, RANK, canManage, currentUser, firstPassword, isRole, json, passwordFields, readJson, validId,
 } from "../../../server/auth";
-import type { Env, Job, Role } from "../../../server/auth";
+import type { Env, Guild, Job, Role } from "../../../server/auth";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
@@ -11,16 +11,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (RANK[me.role] < 1) return FORBIDDEN();
   const { results } = await env.DB.prepare(
     "SELECT u.id AS id, u.role AS role, u.must_change AS must_change, u.created_at AS created_at, u.created_by AS created_by, " +
-      "p.job AS job, p.level AS level, a.updated_at AS avatar FROM users u LEFT JOIN profiles p ON p.user_id = u.id " +
+      "p.job AS job, p.level AS level, p.guild AS guild, a.updated_at AS avatar FROM users u LEFT JOIN profiles p ON p.user_id = u.id " +
       "LEFT JOIN avatars a ON a.user_id = u.id",
   ).all<{
     id: string; role: Role; must_change: number; created_at: number; created_by: string | null; job: Job | null; level: number | null;
-    avatar: number | null;
+    guild: Guild | null; avatar: number | null;
   }>();
   const users = results
     .map((u) => ({
       id: u.id, role: u.role, mustChange: u.must_change === 1, createdAt: u.created_at, createdBy: u.created_by,
-      job: u.job, level: u.level, avatar: u.avatar,
+      job: u.job, level: u.level, guild: u.guild, avatar: u.avatar,
     }))
     .sort((a, b) => RANK[b.role] - RANK[a.role] || a.id.localeCompare(b.id, "ko"));
   return json(users);

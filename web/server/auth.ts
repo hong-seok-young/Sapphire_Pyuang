@@ -141,15 +141,30 @@ export function validExp(n: unknown): n is number {
   return Number.isInteger(n) && (n as number) >= 0 && (n as number) <= EXP_MAX;
 }
 
+/** 길드: 1군 Sapphire(main), 2군 FairyTale(second). 둘 다 사파이어 길드원이다. 화면 web/src/auth.ts 와 같다 */
+export type Guild = "main" | "second";
+export const GUILDS: Guild[] = ["main", "second"];
+
+export function isGuild(g: unknown): g is Guild {
+  return g === "main" || g === "second";
+}
+
+/** 저장할 직업, 레벨과 (보냈으면) 경험치, 길드 */
+export interface ProfileInput {
+  job: Job;
+  level: number;
+  exp?: number | null;
+  guild?: Guild;
+}
+
 /**
- * 직업과 레벨(과 경험치) 저장. 레벨이 바뀌면 바로 전 레벨과 바뀐 때를 남긴다.
- * exp 를 안 주면(오피서가 남의 것을 고칠 때) 경험치는 그대로 둔다.
+ * 직업과 레벨(과 경험치, 길드) 저장. 레벨이 바뀌면 바로 전 레벨과 바뀐 때를 남긴다.
+ * exp, guild 를 안 주면(예전 화면, 오피서가 남의 경험치는 못 고침) 그대로 둔다.
  * 저장할 때마다 level_log 에 레벨과 경험치를 남긴다 (성장 랭킹). 기록이 처음이면 저장 전 상태도 먼저 남긴다.
  */
-export async function saveProfile(
-  env: Env, userId: string, job: Job, level: number, by: string, exp?: number | null,
-): Promise<void> {
-  const keepExp = exp === undefined;
+export async function saveProfile(env: Env, userId: string, by: string, p: ProfileInput): Promise<void> {
+  const keepExp = p.exp === undefined;
+  const keepGuild = p.guild === undefined;
   const now = Date.now();
   await env.DB.batch([
     env.DB.prepare(
@@ -157,13 +172,14 @@ export async function saveProfile(
         "WHERE user_id = ? AND NOT EXISTS (SELECT 1 FROM level_log WHERE user_id = ?)",
     ).bind(userId, userId),
     env.DB.prepare(
-      "INSERT INTO profiles (user_id, job, level, prev_level, level_at, updated_by, exp) VALUES (?, ?, ?, NULL, ?, ?, ?) " +
+      "INSERT INTO profiles (user_id, job, level, prev_level, level_at, updated_by, exp, guild) VALUES (?, ?, ?, NULL, ?, ?, ?, ?) " +
         "ON CONFLICT (user_id) DO UPDATE SET " +
         "prev_level = CASE WHEN excluded.level != profiles.level THEN profiles.level ELSE profiles.prev_level END, " +
         "level_at = CASE WHEN excluded.level != profiles.level THEN excluded.level_at ELSE profiles.level_at END, " +
         "job = excluded.job, level = excluded.level, updated_by = excluded.updated_by" +
-        (keepExp ? "" : ", exp = excluded.exp"),
-    ).bind(userId, job, level, now, by, keepExp ? null : exp),
+        (keepExp ? "" : ", exp = excluded.exp") +
+        (keepGuild ? "" : ", guild = excluded.guild"),
+    ).bind(userId, p.job, p.level, now, by, keepExp ? null : p.exp, keepGuild ? null : p.guild),
     env.DB.prepare(
       "INSERT OR REPLACE INTO level_log (user_id, at, level, exp) SELECT user_id, ?, level, exp FROM profiles WHERE user_id = ?",
     ).bind(now, userId),
@@ -171,29 +187,34 @@ export async function saveProfile(
 }
 
 /**
- * 화면이 보낸 { job, level, exp? } 를 검사한다. 맞지 않으면 null.
- * exp 를 안 보냈으면 결과에도 없고(그대로 둔다), 비웠으면 null.
+ * 화면이 보낸 { job, level, exp?, guild? } 를 검사한다. 맞지 않으면 null.
+ * exp, guild 를 안 보냈으면 결과에도 없다(그대로 둔다). exp 를 비웠으면 null.
  */
-export function readProfile(body: {
-  job?: unknown; level?: unknown; exp?: unknown;
-}): { job: Job; level: number; exp?: number | null } | null {
+export function readProfile(body: { job?: unknown; level?: unknown; exp?: unknown; guild?: unknown }): ProfileInput | null {
   if (!isJob(body.job) || !validLevel(body.level)) return null;
-  if (body.exp === undefined) return { job: body.job, level: body.level };
-  if (body.exp === null || validExp(body.exp)) return { job: body.job, level: body.level, exp: body.exp };
-  return null;
+  const out: ProfileInput = { job: body.job, level: body.level };
+  if (body.exp !== undefined) {
+    if (body.exp !== null && !validExp(body.exp)) return null;
+    out.exp = body.exp as number | null;
+  }
+  if (body.guild !== undefined) {
+    if (!isGuild(body.guild)) return null;
+    out.guild = body.guild;
+  }
+  return out;
 }
 
 /** 로그인한 사람의 정보 (/api/me, /api/login 이 같은 모양으로 준다). exp, avatar 는 본인 것이라 여기서만 준다 */
 export async function meInfo(env: Env, user: User) {
   const p = await env.DB.prepare(
-    "SELECT p.job AS job, p.level AS level, p.exp AS exp, a.updated_at AS avatar FROM users u " +
+    "SELECT p.job AS job, p.level AS level, p.exp AS exp, p.guild AS guild, a.updated_at AS avatar FROM users u " +
       "LEFT JOIN profiles p ON p.user_id = u.id LEFT JOIN avatars a ON a.user_id = u.id WHERE u.id = ?",
   )
     .bind(user.id)
-    .first<{ job: Job | null; level: number | null; exp: number | null; avatar: number | null }>();
+    .first<{ job: Job | null; level: number | null; exp: number | null; guild: Guild | null; avatar: number | null }>();
   return {
     id: user.id, role: user.role, mustChange: user.must_change === 1,
-    job: p?.job ?? null, level: p?.level ?? null, exp: p?.exp ?? null, avatar: p?.avatar ?? null,
+    job: p?.job ?? null, level: p?.level ?? null, exp: p?.exp ?? null, guild: p?.guild ?? null, avatar: p?.avatar ?? null,
   };
 }
 
