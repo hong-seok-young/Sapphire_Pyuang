@@ -1009,7 +1009,19 @@ button { font: inherit; color: inherit; }
 .bd-meta b { color: var(--text); font-weight: 400; }
 .bd-body { white-space: pre-wrap; word-break: break-word; font-size: 15px; line-height: 1.7; color: var(--text); }
 .bd-body a { color: #8fd0ff; word-break: break-all; }
+.bd-photo { display: block; width: 100%; padding: 0; background: none; border: 0; cursor: zoom-in; }
 .bd-photo img { display: block; width: 100%; height: auto; border: var(--px) solid var(--edge); }
+/* photo viewer (Board.tsx PhotoViewer): the whole picture fits the screen, nothing is cut */
+.pv { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; background: rgba(5, 5, 12, 0.96); animation: page-in 0.12s ease-out; }
+.pv-top { display: flex; align-items: center; gap: 8px; padding: calc(env(safe-area-inset-top) + 8px) 10px 8px; color: var(--text); font-size: 13px; }
+.pv-top span { flex: 1; }
+.pv-btn { padding: 6px 12px; font-size: 14px; color: var(--text); text-decoration: none; background: var(--panel); border: var(--px) solid var(--edge); cursor: pointer; }
+.pv-btn:disabled { opacity: 0.35; }
+.pv-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: pan-y pinch-zoom; }
+.pv-stage img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; user-select: none; }
+.pv-zoom { overflow: auto; display: block; touch-action: auto; }
+.pv-zoom img { max-width: none; max-height: none; width: 200%; }
+.pv-nav { display: flex; justify-content: space-between; padding: 8px 10px calc(env(safe-area-inset-bottom) + 10px); }
 .bd-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .bd-files a { display: block; padding: 7px 9px; color: var(--text); text-decoration: none; background: var(--night-2); border: var(--px) solid var(--edge); word-break: break-all; }
 .bd-files small { color: var(--muted); }

@@ -1,4 +1,5 @@
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import { RANK, errorText } from "../auth";
 import type { Me } from "../auth";
@@ -212,6 +213,7 @@ function PostView({ me, id }: { me: Me; id: number }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [viewing, setViewing] = useState<number | null>(null);
 
   const reload = useCallback(() => {
     fetchPost(id).then(setD, (x) => setError(errorText(x)));
@@ -258,11 +260,12 @@ function PostView({ me, id }: { me: Me; id: number }) {
           </span>
         </div>
         <Body text={post.body} />
-        {photos.map((f) => (
-          <a key={f.id} className="bd-photo" href={fileUrl(f.id)} target="_blank" rel="noopener noreferrer">
+        {photos.map((f, i) => (
+          <button key={f.id} className="bd-photo" onClick={() => setViewing(i)} aria-label="사진 크게 보기">
             <img src={fileUrl(f.id)} alt={f.name} loading="lazy" />
-          </a>
+          </button>
         ))}
+        {viewing !== null && <PhotoViewer photos={photos} start={viewing} onClose={() => setViewing(null)} />}
         {attachments.length > 0 && (
           <ul className="bd-files">
             {attachments.map((f) => (
@@ -558,3 +561,90 @@ function Write({ me, cat: startCat, editId }: { me: Me; cat?: Cat; editId?: numb
     </>
   );
 }
+
+/**
+ * 사진 크게 보기 (제작자 요청: 새 창으로 열면 위아래가 잘리고 뒤로 가기에 웹이 꺼졌다).
+ * 앱 안에서 화면에 맞춰 보이고(잘리지 않게), ✕ 나 폰의 뒤로 가기로 닫는다 (열 때 방문 기록을 하나 넣어 둔다).
+ * 옆으로 밀면 다음·이전 사진, 두 번 누르면 두 배로 키워서 끌어 본다
+ */
+function PhotoViewer({ photos, start, onClose }: { photos: BoardFile[]; start: number; onClose: () => void }) {
+  const [i, setI] = useState(start);
+  const [zoom, setZoom] = useState(false);
+  const touch = useRef<{ x: number; y: number } | null>(null);
+  const lastTap = useRef(0);
+  // 열 때 한 번만 방문 기록을 넣는다 (onClose 가 새로 만들어져도 다시 넣지 않게)
+  const close = useRef(onClose);
+  close.current = onClose;
+  const count = photos.length;
+
+  useEffect(() => {
+    history.pushState({ photo: true }, "");
+    const onPop = () => close.current();
+    window.addEventListener("popstate", onPop);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") history.back();
+      if (e.key === "ArrowRight") setI((n) => Math.min(count - 1, n + 1));
+      if (e.key === "ArrowLeft") setI((n) => Math.max(0, n - 1));
+    };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [count]);
+  useEffect(() => setZoom(false), [i]);
+
+  const f = photos[i];
+  // 화면 전환 애니메이션(transform)이 걸린 칸 안에서는 fixed 가 화면 기준이 아니라서 body 에 바로 그린다
+  return createPortal(
+    <div className="pv" role="dialog" aria-label="사진">
+      <div className="pv-top">
+        <span>
+          {i + 1} / {photos.length}
+        </span>
+        <a className="pv-btn" href={fileUrl(f.id)} download={f.name}>
+          저장
+        </a>
+        <button className="pv-btn" onClick={() => history.back()} aria-label="닫기">
+          ✕
+        </button>
+      </div>
+      <div
+        className={"pv-stage" + (zoom ? " pv-zoom" : "")}
+        onTouchStart={(e) => {
+          if (e.touches.length === 1) touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }}
+        onTouchEnd={(e) => {
+          const t = touch.current;
+          touch.current = null;
+          if (!t || zoom) return;
+          const dx = e.changedTouches[0].clientX - t.x;
+          const dy = e.changedTouches[0].clientY - t.y;
+          if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) setI((n) => Math.min(photos.length - 1, Math.max(0, n + (dx < 0 ? 1 : -1))));
+          else if (dy > 90 && Math.abs(dy) > Math.abs(dx)) history.back(); // 아래로 쓸어내리면 닫기
+        }}
+        onClick={() => {
+          const now = Date.now();
+          if (now - lastTap.current < 300) setZoom((z) => !z);
+          lastTap.current = now;
+        }}
+      >
+        <img src={fileUrl(f.id)} alt={f.name} draggable={false} />
+      </div>
+      {photos.length > 1 && (
+        <div className="pv-nav">
+          <button className="pv-btn" disabled={i === 0} onClick={() => setI(i - 1)} aria-label="이전 사진">
+            ◀
+          </button>
+          <button className="pv-btn" disabled={i === photos.length - 1} onClick={() => setI(i + 1)} aria-label="다음 사진">
+            ▶
+          </button>
+        </div>
+      )}
+    </div>,
+    document.body,
+  );
+}
+
