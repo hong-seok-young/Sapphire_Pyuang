@@ -909,39 +909,30 @@ button { font: inherit; color: inherit; }
 .rank-name .rank-exp-none { white-space: nowrap; }
 .ps-tabs { flex-wrap: nowrap; gap: 5px; }
 .ps-tabs .pill { flex: 1 1 auto; padding: 6px 4px; font-size: 12px; }
-/* high-spec nickname (제작자 요청): gold letters, a light sweeping across, a soft glow, two little twinkles on the corners.
-   Only paint and filter animate, so the row height and the name's place never change. */
-.hs-nick {
-  position: relative; color: transparent; text-shadow: none;
-  background: linear-gradient(100deg, #f0a81e 0 38%, #ffe27a 45%, #fffbea 50%, #ffe27a 55%, #f0a81e 62% 100%);
-  background-size: 300% 100%; background-position: 100% 0; -webkit-background-clip: text; background-clip: text;
-  filter: drop-shadow(1px 1px 0 var(--edge));
-  animation: hs-sweep 2.8s ease-in-out infinite, hs-glow 2.8s ease-in-out infinite;
+/* high-spec nickname (제작자 요청): the letters keep their colour; a bright light sweeps left to right twice (번쩍번쩍),
+   then rests. The light lives on a wrapper so FitLine's own width check never sees it; row height stays the same. */
+/* 10px of room on each side (taken back with negative margins) so the light has space to cross even a two-letter name */
+.hs-shine {
+  position: relative; display: block; max-width: calc(100% + 20px); margin: 0 -10px; padding: 0 10px; overflow: hidden;
+  animation: hs-glow 2.6s ease-in-out infinite;
 }
-/* light ranking rows: deeper gold so the letters stay easy to read */
-.rank-row .hs-nick, .rank-mine-bar .hs-nick {
-  background-image: linear-gradient(100deg, #b26f00 0 38%, #f2b31f 45%, #fff3b0 50%, #f2b31f 55%, #b26f00 62% 100%);
-  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.8));
-  animation: hs-sweep 2.8s ease-in-out infinite, hs-glow-light 2.8s ease-in-out infinite;
+.hs-shine::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 28%, rgba(255, 255, 255, 0.45) 41%, #fff 48% 52%, rgba(255, 255, 255, 0.45) 59%, transparent 72%);
+  transform: translateX(-120%); animation: hs-flash 2.6s ease-in-out infinite;
 }
-.hs-nick::before, .hs-nick::after {
-  content: "✦"; position: absolute; font-size: 8px; line-height: 1; color: #fff; text-shadow: 0 0 3px #ffc35c, 0 0 1px #ffc35c;
-  opacity: 0; pointer-events: none; animation: hs-twinkle 2.8s ease-in-out infinite;
+.growth-row-name .hs-shine, .account-main b.hs-shine { align-self: flex-start; }
+@keyframes hs-flash {
+  0% { transform: translateX(-120%); }
+  24% { transform: translateX(120%); }
+  24.01%, 32% { transform: translateX(-120%); }
+  54%, 100% { transform: translateX(120%); }
 }
-.hs-nick::before { left: 0; top: 0; }
-.hs-nick::after { right: 0; bottom: 1px; animation-delay: 1.1s; }
-.account-main b.hs-nick, .growth-row-name .hs-nick { align-self: flex-start; max-width: 100%; }
-@keyframes hs-sweep { 0%, 15% { background-position: 100% 0; } 70%, 100% { background-position: 0 0; } }
 @keyframes hs-glow {
-  0%, 100% { filter: drop-shadow(1px 1px 0 var(--edge)); }
-  45% { filter: drop-shadow(1px 1px 0 var(--edge)) drop-shadow(0 0 4px rgba(255, 200, 70, 0.75)); }
+  0%, 6%, 20%, 36%, 50%, 100% { filter: none; }
+  12%, 43% { filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 7px rgba(120, 190, 255, 0.9)); }
 }
-@keyframes hs-glow-light {
-  0%, 100% { filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.8)); }
-  45% { filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.8)) drop-shadow(0 0 3px rgba(255, 190, 40, 0.9)); }
-}
-@keyframes hs-twinkle { 0%, 30%, 62%, 100% { opacity: 0; transform: scale(0.3) rotate(0deg); } 44% { opacity: 1; transform: scale(1.15) rotate(45deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .hs-nick, .rank-row .hs-nick, .rank-mine-bar .hs-nick { animation: none; background-position: 50% 0; }
-  .hs-nick::before, .hs-nick::after { animation: none; }
+  .hs-shine { animation: none; }
+  .hs-shine::after { animation: none; display: none; }
 }
