@@ -1,4 +1,5 @@
 import { StrictMode } from "react";
+import { UpdateBar } from "./ui";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { App } from "./App";
@@ -19,6 +20,17 @@ function noticeUpdate() {
   } catch {
     return;
   }
+  // 다음 업데이트 때 첫 화면 막대가 코드 크기를 어림하게 적어 둔다
+  window.setTimeout(() => {
+    const entry = performance.getEntriesByType("resource").find((e) => e.name === src) as PerformanceResourceTiming | undefined;
+    if (entry?.decodedBodySize) {
+      try {
+        localStorage.setItem("sapphire-build-size", String(entry.decodedBodySize));
+      } catch {
+        // 못 적어도 어림값을 쓴다
+      }
+    }
+  }, 3000);
   if (!before || before === src) return;
   const toast = document.createElement("div");
   toast.className = "update-toast";
@@ -31,5 +43,6 @@ noticeUpdate();
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />
+    <UpdateBar />
   </StrictMode>,
 );

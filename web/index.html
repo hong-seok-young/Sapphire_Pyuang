@@ -23,6 +23,9 @@
       .boot .boot-slow { display: none; }
       .boot.slow .boot-slow { display: block; }
       .boot.updating #boot-msg { color: #ffc35c; }
+      .boot-bar { display: none; width: min(70vw, 260px); height: 10px; background: #0e1026; border: 2px solid #07060f; overflow: hidden; }
+      .boot-bar i { display: block; width: 0; height: 100%; background: linear-gradient(90deg, #6f8fff, #8fd8ff); transition: width 0.2s ease-out; }
+      .boot.updating .boot-bar { display: block; }
       @keyframes boot-bob { 50% { transform: translateY(-6px); } }
     </style>
     <script>
@@ -65,6 +68,7 @@
         <img src="guild-mark.png" alt="" />
         <b>Sapphire</b>
         <p id="boot-msg">불러오는 중…</p>
+        <div class="boot-bar"><i id="boot-fill"></i></div>
         <p class="boot-slow">잠시만 기다려 주세요.</p>
       </div>
     </div>
@@ -80,8 +84,33 @@
         var before = null;
         try { before = localStorage.getItem("sapphire-build"); } catch (e) {}
         if (before && before !== code.src) {
-          msg.textContent = "업데이트가 있어요. 새 버전을 반영하는 중…";
+          msg.textContent = "업데이트가 있어요. 새 버전을 받는 중… 0%";
           boot.className += " updating";
+          // 새 코드를 받는 만큼 막대를 채운다 (제작자 요청: 무엇을 하는지와 %). 크기를 모르면 지난번 크기로 어림한다
+          var fill = document.getElementById("boot-fill");
+          var guess = 900000;
+          try { guess = Number(localStorage.getItem("sapphire-build-size")) || guess; } catch (e) {}
+          var show = function (p) {
+            var pct = Math.min(100, Math.round(p * 100));
+            if (fill) fill.style.width = pct + "%";
+            msg.textContent = pct < 100 ? "업데이트가 있어요. 새 버전을 받는 중… " + pct + "%" : "새 버전으로 여는 중… 100%";
+          };
+          if (window.fetch && window.ReadableStream) {
+            fetch(code.src).then(function (res) {
+              var total = Number(res.headers.get("content-length")) || guess;
+              var reader = res.body.getReader();
+              var got = 0;
+              var pump = function () {
+                return reader.read().then(function (r) {
+                  if (r.done) return show(1);
+                  got += r.value.length;
+                  show(Math.min(0.99, got / total));
+                  return pump();
+                });
+              };
+              return pump();
+            }).catch(function () {});
+          }
         } else if (before) {
           msg.textContent = "새로고침 중…";
         }

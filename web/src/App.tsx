@@ -10,7 +10,7 @@ import { EquipSlot, EquipSlots } from "./pages/Equip";
 import { MenuPage, PostPage } from "./pages/Posts";
 import { ChatPage } from "./pages/Chat";
 import { AppPage } from "./pages/AppPage";
-import { AppClosedPage, InstallGuide } from "./pages/InstallGuide";
+import { AppClosedPage, IconChangedPage, InstallGuide, iconNoticeNeeded } from "./pages/InstallGuide";
 import { APP_OPEN, inApp, isAndroid, isIOS, standalone } from "./platform";
 import { LoginPage, PasswordPage } from "./pages/Login";
 import { AdminPage } from "./pages/Admin";
@@ -64,6 +64,8 @@ export function App() {
     }
     setGuide(false);
   }, []);
+  // 홈 화면 아이콘이 바뀌었으면 홈 화면 웹앱으로 연 사람에게 지우고 다시 설치하라고 한 번 안내 (제작자 요청)
+  const [iconNotice, setIconNotice] = useState(iconNoticeNeeded);
   useEffect(() => {
     fetchMe().then(setMe, () => setMe(null));
   }, []);
@@ -71,6 +73,7 @@ export function App() {
   // 안드로이드 앱은 검토 후 오픈: 이미 깐 앱 안에서는 웹으로 안내만 한다 (제작자 요청)
   if (inApp && !APP_OPEN) return <AppClosedPage />;
   if (guide) return <InstallGuide onLater={later} />;
+  if (iconNotice) return <IconChangedPage onDone={() => setIconNotice(false)} />;
 
   if (me === undefined) {
     return (

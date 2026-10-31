@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useUpdate } from "./update";
 import { isFavorite, toggleFavorite, useFavorites } from "./favorites";
 import type { FavKind } from "./favorites";
 import type { ReactNode } from "react";
@@ -255,5 +256,28 @@ export function FavStar({ kind, fkey, name, className }: { kind: FavKind; fkey: 
 /** 즐겨찾기를 못 바꿨을 때 (화면은 이미 되돌렸다). 브라우저 대화상자를 쓰지 않으므로 콘솔에만 */
 function alertText(x: unknown) {
   console.warn("즐겨찾기를 바꾸지 못했어요", x);
+}
+
+/** 새 버전을 받는 동안 아래쪽 막대: 무엇을 하는지와 %, 100%가 되면 새로고침 (update.ts, 제작자 요청) */
+export function UpdateBar() {
+  const { pct, label, waiting } = useUpdate();
+  if (pct === null) return null;
+  return (
+    <div className="update-bar" role="status">
+      <div className="update-bar-text">
+        <span>⬇ {label}</span>
+        {waiting ? (
+          <button className="pill pill-on" onClick={() => location.reload()}>
+            새로고침
+          </button>
+        ) : (
+          <b>{pct}%</b>
+        )}
+      </div>
+      <div className="update-bar-track">
+        <i style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
 }
 

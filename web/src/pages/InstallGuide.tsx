@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { WEB_URL, inKakao, inNaver, inSamsung, isIOS } from "../platform";
+import { ICON_VERSION, WEB_URL, inKakao, inNaver, inSamsung, isAndroid, isIOS, standalone } from "../platform";
 
 /** 브라우저가 미리 잡아 둔 설치 창 (index.html 머리 스크립트가 beforeinstallprompt 를 받아 둔다) */
 interface InstallPrompt extends Event {
@@ -138,3 +138,53 @@ export function InstallGuide({ onLater }: { onLater: () => void }) {
     </div>
   );
 }
+
+const ICON_KEY = "sapphire.iconSeen";
+
+/**
+ * 홈 화면 아이콘이 바뀌었으니 지우고 다시 설치하라는 안내를 보일지 (제작자 요청). 홈 화면 웹앱(폰)으로 열었고 이 판을 아직 못 봤을 때만.
+ * 브라우저로 열면 앞으로 새 아이콘으로 설치할 테니 본 것으로 적어 둔다
+ */
+export function iconNoticeNeeded(): boolean {
+  try {
+    if (localStorage.getItem(ICON_KEY) === ICON_VERSION) return false;
+    if (!standalone()) {
+      localStorage.setItem(ICON_KEY, ICON_VERSION);
+      return false;
+    }
+  } catch {
+    return false;
+  }
+  return isAndroid || isIOS;
+}
+
+export function IconChangedPage({ onDone }: { onDone: () => void }) {
+  const done = () => {
+    try {
+      localStorage.setItem(ICON_KEY, ICON_VERSION);
+    } catch {
+      // 못 적어도 이번에는 닫힌다
+    }
+    onDone();
+  };
+  return (
+    <div className="guide">
+      <img className="guide-icon" src="icon-192.png" alt="" width={84} height={84} />
+      <h1 className="guide-title">앱 아이콘이 바뀌었어요</h1>
+      <p className="guide-text">홈 화면 아이콘이 아직 옛날 그림이면 지우고 다시 설치해 주세요. 폰은 처음 설치할 때 받은 아이콘을 계속 써요.</p>
+      <ol className="guide-steps">
+        <li>홈 화면의 Sapphire 아이콘을 길게 눌러 {isIOS ? "'앱 제거' → '홈 화면에서 제거'" : "'삭제'(또는 '제거')"}</li>
+        <li>{isIOS ? "사파리" : "크롬이나 삼성 인터넷"}에서 아래 주소 열기</li>
+        <li>{isIOS ? "공유 버튼(□↑) → '홈 화면에 추가'" : "메뉴 → '홈 화면에 추가'(또는 '앱 설치')"}</li>
+      </ol>
+      <CopyAddress />
+      {isIOS && <p className="guide-text">다시 설치하면 로그인을 한 번 더 해야 할 수 있어요.</p>}
+      <div className="guide-buttons">
+        <button className="btn" onClick={done}>
+          확인
+        </button>
+      </div>
+    </div>
+  );
+}
+
