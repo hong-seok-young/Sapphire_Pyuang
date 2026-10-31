@@ -83,6 +83,7 @@ const ADDED_COLUMNS = [
   ["activity", "ip", "TEXT"],
   ["activity", "place", "TEXT"],
   ["activity", "device", "TEXT"],
+  ["alert_prefs", "push", "INTEGER"],
 ];
 for (const [table, column, type] of ADDED_COLUMNS) {
   const columns = parseJson(wrangler("d1", "execute", DB, "--remote", "--json", "--command", `PRAGMA table_info(${table})`))[0]?.results ?? [];

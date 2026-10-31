@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { errorText } from "../auth";
-import { ALERT_GROUPS, clearUnread, fetchAlerts, readAllAlerts, setAlertPref } from "../alerts";
+import { ALERT_GROUPS, clearUnread, fetchAlerts, readAllAlerts, setAlertPref, setPushPref } from "../alerts";
 import { disablePush, enablePush, markPushOff, pushState } from "../push";
 import type { PushState } from "../push";
 import type { Alert, AlertKind } from "../alerts";
@@ -11,6 +11,7 @@ import { Loading, TopBar } from "../ui";
 export function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[] | null>(null);
   const [prefs, setPrefs] = useState<Record<AlertKind, boolean> | null>(null);
+  const [pushPrefs, setPushPrefs] = useState<Partial<Record<AlertKind, boolean>>>({});
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -18,6 +19,7 @@ export function AlertsPage() {
       (r) => {
         setAlerts(r.alerts);
         setPrefs(r.prefs);
+        setPushPrefs(r.pushPrefs ?? {});
         if (r.unread > 0) readAllAlerts().then(clearUnread, () => undefined);
       },
       (x) => setError(errorText(x)),
@@ -36,6 +38,18 @@ export function AlertsPage() {
     }
   }
 
+  /** 폰 알림(팝업)만 켜고 끄기. 없으면 켜짐 */
+  async function togglePush(kind: AlertKind) {
+    const on = pushPrefs[kind] === false;
+    setPushPrefs({ ...pushPrefs, [kind]: on });
+    try {
+      await setPushPref(kind, on);
+    } catch (x) {
+      setPushPrefs({ ...pushPrefs, [kind]: !on });
+      setError(errorText(x));
+    }
+  }
+
   return (
     <>
       <TopBar title="알림" />
@@ -48,7 +62,7 @@ export function AlertsPage() {
           {alerts.map((a) => (
             <li key={a.id} className={a.readAt ? "" : "alert-new"}>
               <a href={a.link ?? "#/alerts"}>
-                <span>{a.text}</span>
+                <span className="alert-text">{a.text}</span>
                 <small>{ago(a.at)}</small>
               </a>
             </li>
@@ -63,10 +77,21 @@ export function AlertsPage() {
             <div key={g.menu} className="alert-pref-row">
               <span>{g.menu}</span>
               <div className="mk-chips">
+                {/* 앞은 앱 알림함, 옆 📱 는 폰 알림(팝업) (제작자 요청: 폰 팝업은 따로) */}
                 {g.kinds.map((k) => (
-                  <button key={k.kind} className={"pill" + (prefs[k.kind] ? " pill-on" : "")} onClick={() => toggle(k.kind)}>
-                    {k.name}
-                  </button>
+                  <span key={k.kind} className="pref-pair">
+                    <button className={"pill" + (prefs[k.kind] ? " pill-on" : "")} onClick={() => toggle(k.kind)}>
+                      {k.name}
+                    </button>
+                    <button
+                      className={"pill pref-push" + (prefs[k.kind] && pushPrefs[k.kind] !== false ? " pill-on" : "")}
+                      disabled={!prefs[k.kind]}
+                      onClick={() => togglePush(k.kind)}
+                      aria-label={`${k.name} 폰 알림`}
+                    >
+                      📱
+                    </button>
+                  </span>
                 ))}
               </div>
             </div>

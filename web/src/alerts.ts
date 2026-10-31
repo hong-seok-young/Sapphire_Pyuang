@@ -32,9 +32,12 @@ export const ALERT_GROUPS: { menu: string; kinds: { kind: AlertKind; name: strin
   { menu: "계정", kinds: [{ kind: "account", name: "역할" }] },
 ];
 
-export const fetchAlerts = () => api<{ alerts: Alert[]; unread: number; prefs: Record<AlertKind, boolean> }>("/api/alerts");
+export const fetchAlerts = () =>
+  api<{ alerts: Alert[]; unread: number; prefs: Record<AlertKind, boolean>; pushPrefs?: Record<AlertKind, boolean> }>("/api/alerts");
 export const readAllAlerts = () => api<{ ok: boolean }>("/api/alerts", "POST");
 export const setAlertPref = (kind: AlertKind, on: boolean) => api<{ kind: AlertKind; on: boolean }>("/api/alerts/prefs", "PUT", { kind, on });
+/** 그 종류의 폰 알림(푸시)만 켜고 끄기 (앱 알림함은 그대로) */
+export const setPushPref = (kind: AlertKind, push: boolean) => api<{ kind: AlertKind; push: boolean }>("/api/alerts/prefs", "PUT", { kind, push });
 
 let unread = 0;
 const listeners = new Set<(n: number) => void>();

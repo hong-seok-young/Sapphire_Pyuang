@@ -178,7 +178,8 @@ CREATE TABLE IF NOT EXISTS alert_prefs (
   user_id TEXT NOT NULL,
   kind TEXT NOT NULL,
   enabled INTEGER NOT NULL,
-  PRIMARY KEY (user_id, kind)
+  PRIMARY KEY (user_id, kind),
+  push INTEGER                -- 폰 알림(푸시)을 이 종류에 보낼지. 없으면 켜짐
 );
 
 -- 종목 토론방 (중개인 물건마다 댓글, functions/api/market/[id]/talk.ts). 물건을 내리면 같이 지운다

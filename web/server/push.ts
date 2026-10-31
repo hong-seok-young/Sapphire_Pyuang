@@ -54,7 +54,9 @@ async function vapid(keys: Keys, endpoint: string): Promise<string> {
 export async function pushNew(env: Env, kind: string, createdAt: number): Promise<void> {
   try {
     const { results } = await env.DB.prepare(
-      "SELECT DISTINCT s.endpoint FROM push_subs s JOIN alerts a ON a.user_id = s.user_id WHERE a.created_at = ? AND a.kind = ? LIMIT ?",
+      "SELECT DISTINCT s.endpoint FROM push_subs s JOIN alerts a ON a.user_id = s.user_id WHERE a.created_at = ?1 AND a.kind = ?2 " +
+        // 이 종류의 폰 알림을 끈 사람은 뺀다 (앱 알림함에는 그대로 남는다. 제작자 요청: 폰 알림은 따로 설정)
+        "AND COALESCE((SELECT p.push FROM alert_prefs p WHERE p.user_id = s.user_id AND p.kind = ?2), 1) = 1 LIMIT ?3",
     )
       .bind(createdAt, kind, MAX_SENDS)
       .all<{ endpoint: string }>();

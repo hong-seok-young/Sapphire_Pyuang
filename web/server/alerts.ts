@@ -34,7 +34,7 @@ export async function notify(env: Env, to: string[] | "all", kind: AlertKind, te
       "INSERT INTO alerts (user_id, kind, text, link, created_at) SELECT u.id, ?, ?, ?, ? FROM users u WHERE u.id != ? " +
         "AND COALESCE((SELECT p.enabled FROM alert_prefs p WHERE p.user_id = u.id AND p.kind = ?), ?) = 1" + who,
     )
-      .bind(kind, text.slice(0, 120), link, now, from, kind, ALERT_KINDS[kind] ? 1 : 0, ...(to === "all" ? [] : to))
+      .bind(kind, text.slice(0, 200), link, now, from, kind, ALERT_KINDS[kind] ? 1 : 0, ...(to === "all" ? [] : to))
       .run();
     await pushNew(env, kind, now);
     if (Math.random() < 0.02) await env.DB.prepare("DELETE FROM alerts WHERE created_at < ?").bind(now - KEEP_MS).run();

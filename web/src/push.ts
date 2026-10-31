@@ -11,6 +11,12 @@ const supported = () => "serviceWorker" in navigator && "PushManager" in window 
 export function registerWorker() {
   if (!("serviceWorker" in navigator)) return;
   navigator.serviceWorker.register("/sw.js").catch(() => {});
+  // 폰 알림을 누르면 서비스 워커가 그 글 주소를 보낸다 -> 그 화면으로 (public/sw.js notificationclick)
+  navigator.serviceWorker.addEventListener("message", (e) => {
+    const m = e.data as { type?: string; link?: string } | null;
+    if (m?.type === "open" && typeof m.link === "string" && m.link.startsWith("#/")) location.hash = m.link;
+  });
+  navigator.serviceWorker.startMessages();
 }
 
 export async function pushState(): Promise<PushState> {

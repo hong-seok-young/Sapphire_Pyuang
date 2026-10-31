@@ -64,6 +64,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .first<{ id: number }>();
   if (!row) return json({ error: "글을 올리지 못했어요" }, 500);
   // 공지사항과 이벤트는 모두에게 알린다 (끈 사람 빼고)
-  if (b.cat !== "free") await notify(env, "all", "board_notice", `[${CAT_NAME[b.cat]}] ${title}`, `#/board/${row.id}`, me.id);
+  if (b.cat !== "free") {
+    const lead = body.replace(/\s+/g, " ").trim().slice(0, 90);
+    await notify(env, "all", "board_notice", `[${CAT_NAME[b.cat]}] ${title} · ${me.id}${lead ? "\n" + lead : ""}`, `#/board/${row.id}`, me.id);
+  }
   return json({ id: row.id }, 201);
 };

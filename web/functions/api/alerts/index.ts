@@ -11,11 +11,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     env.DB.prepare("SELECT id, kind, text, link, created_at AS at, read_at AS readAt FROM alerts WHERE user_id = ? ORDER BY id DESC LIMIT 60")
       .bind(me.id),
     env.DB.prepare("SELECT COUNT(*) AS n FROM alerts WHERE user_id = ? AND read_at IS NULL").bind(me.id),
-    env.DB.prepare("SELECT kind, enabled FROM alert_prefs WHERE user_id = ?").bind(me.id),
+    env.DB.prepare("SELECT kind, enabled, push FROM alert_prefs WHERE user_id = ?").bind(me.id),
   ]);
   const on: Record<string, boolean> = { ...ALERT_KINDS };
-  for (const p of prefs.results as { kind: string; enabled: number }[]) if (p.kind in on) on[p.kind] = p.enabled === 1;
-  return json({ alerts: rows.results, unread: (unread.results[0] as { n: number }).n, prefs: on });
+  const push: Record<string, boolean> = Object.fromEntries(Object.keys(ALERT_KINDS).map((k) => [k, true]));
+  for (const p of prefs.results as { kind: string; enabled: number; push: number | null }[]) {
+    if (!(p.kind in on)) continue;
+    on[p.kind] = p.enabled === 1;
+    if (p.push !== null) push[p.kind] = p.push === 1;
+  }
+  return json({ alerts: rows.results, unread: (unread.results[0] as { n: number }).n, prefs: on, pushPrefs: push });
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
