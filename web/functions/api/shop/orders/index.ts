@@ -8,6 +8,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   const guild = await env.DB.prepare("SELECT guild FROM profiles WHERE user_id = ?").bind(me.id).first<{ guild: string | null }>();
+  const high = (await env.DB.prepare("SELECT high_spec FROM users WHERE id = ?").bind(me.id).first<{ high_spec: number }>())?.high_spec === 1;
   if (guild?.guild !== "main") return json({ error: "1군 길드원만 살 수 있어요" }, 403);
   const { itemId } = await readJson<{ itemId: unknown }>(request);
   const [catalog, settings, rules] = await Promise.all([loadCatalog(env, request), loadSettings(env), loadRules(env)]);
@@ -26,16 +27,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const row = await env.DB.prepare(
     "INSERT INTO plat_orders (user_id, item_id, item_name, plat, gold, ratio, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'requested', ?) RETURNING id",
   )
-    .bind(me.id, item.id, item.name, item.plat, e.gold, e.ratio, now)
+    .bind(me.id, item.id, item.name, item.plat, high ? e.highGold : e.gold, high ? e.highRatio : e.ratio, now)
     .first<{ id: number }>();
   const staff = await env.DB.prepare("SELECT id FROM users WHERE role IN ('developer', 'master', 'officer')").all<{ id: string }>();
   await notify(
     env,
     staff.results.map((u) => u.id),
     "shop",
-    `${me.id}님이 ${item.name} 구매 신청 (${e.gold.toLocaleString("ko-KR")}골드)`,
+    `${me.id}님이 ${item.name} 구매 신청 (${(high ? e.highGold : e.gold).toLocaleString("ko-KR")}골드${high ? ", 고스펙" : ""})`,
     "#/shop",
     me.id,
   );
-  return json({ id: row?.id, itemId: item.id, gold: e.gold, status: "requested" }, 201);
+  return json({ id: row?.id, itemId: item.id, gold: high ? e.highGold : e.gold, status: "requested" }, 201);
 };

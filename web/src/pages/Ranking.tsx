@@ -80,15 +80,18 @@ function Row({ r, me, now }: { r: Ranked; me: Me; now: number }) {
       </span>
       <JobEmblem job={r.job} level={r.level} rank={r.overall} size={50} />
       <span className="rank-name">
-        <small>
-          {guildText(r.guild)} · {JOB_NAME[r.job]}
-        </small>
+        {/* 작은 글씨도 한 줄에 (넘치면 글자를 줄인다): 줄 높이가 사람마다 달라지지 않게 */}
+        <FitLine className="rank-sub" text={`${guildText(r.guild)} · ${JOB_NAME[r.job]}`} wrap={false} />
         {/* 닉네임은 10글자까지: 넘치면 글자를 줄여서 한 줄에 다 보인다 (자르지 않는다) */}
         <FitLine className="rank-nick" text={r.id} wrap={false} />
         <ExpBar r={r} mine={r.id === me.id} />
       </span>
       {/* 레벨업 표시 자리는 늘 비워 두어서 표시가 떠도 닉네임이 밀리지 않는다 */}
-      <span className="rank-up-slot">{up > 0 && <span className="rank-up">▲{up}</span>}</span>
+      {/* 고스펙 표도 이 칸 위쪽에 둔다 (줄 높이와 닉네임 자리가 그대로이게, 제작자 요청) */}
+      <span className="rank-up-slot">
+        {r.highSpec && <span className="hs-badge">고스펙</span>}
+        {up > 0 && <span className="rank-up">▲{up}</span>}
+      </span>
       <RoleBadge role={r.role} />
     </li>
   );
@@ -151,7 +154,7 @@ function ExpBar({ r, mine }: { r: Ranked; mine: boolean }) {
         <small>{expText(exp)}</small>
       </span>
     ) : (
-      <small className="rank-exp-none">경험치 입력 안 했어요</small>
+      <small className="rank-exp-none">경험치 미입력</small>
     );
   return mine ? (
     <button className="rank-exp-btn" onClick={() => setEditing(true)} aria-label="경험치 입력">

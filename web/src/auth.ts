@@ -70,8 +70,10 @@ export interface RankEntry {
   guild: Guild | null;
   /** 캐릭터 그림을 올린 때. 없으면 null */
   avatar: number | null;
-  /** 경험치 % x 1000. 내 줄에만 온다 */
+  /** 경험치 % x 1000 */
   exp?: number | null;
+  /** 고스펙 길드원 (길드마스터, 오피서가 표시) */
+  highSpec?: boolean;
 }
 
 export interface Account {
@@ -84,6 +86,8 @@ export interface Account {
   level: number | null;
   guild: Guild | null;
   avatar: number | null;
+  /** 고스펙 길드원 */
+  highSpec: boolean;
 }
 
 export class ApiError extends Error {
@@ -126,6 +130,9 @@ export const deleteAccount = (id: string) => api<{ ok: boolean }>(`/api/users/${
 export const setRole = (id: string, role: Role) =>
   api<{ id: string; role: Role }>(`/api/users/${encodeURIComponent(id)}`, "PATCH", { role });
 /** password: 관리자가 정한 처음 비밀번호. 비우면 서버가 임시 비밀번호를 만든다 */
+/** 고스펙 표시 (오피서 이상) */
+export const setHighSpec = (id: string, on: boolean) =>
+  api<{ id: string; highSpec: boolean }>(`/api/users/${encodeURIComponent(id)}/highspec`, "PUT", { on });
 export const resetPassword = (id: string, password?: string) =>
   api<{ id: string; tempPassword: string }>(`/api/users/${encodeURIComponent(id)}/reset`, "POST", { password });
 /**

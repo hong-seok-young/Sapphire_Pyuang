@@ -5,7 +5,7 @@ import {
   setRole,
 } from "../auth";
 import type { Account, Me, Role } from "../auth";
-import { GUILD_NAME, GUILD_TIER, JOB_NAME, deleteAvatarOf, saveProfileOf } from "../auth";
+import { GUILD_NAME, GUILD_TIER, JOB_NAME, deleteAvatarOf, saveProfileOf, setHighSpec } from "../auth";
 import { JobEmblem } from "../emblems";
 import { ProfileForm } from "./Profile";
 import { Loading, Panel, TopBar } from "../ui";
@@ -231,6 +231,7 @@ function AccountRow({
         <span className="account-tags">
           {account.mustChange && <span className="role-badge muted">비밀번호 바꾸기 전</span>}
           {/* 앱개발자는 길드 직책이 아니라서 길드원으로 보이고, 앱 관리 권한은 따로 적는다 */}
+          {account.highSpec && <span className="role-badge hs-badge">고스펙</span>}
           <span className="role-badge">{ROLE_NAME[positionOf(account.role)]}</span>
           {account.role === "developer" && <span className="role-badge muted">앱 관리</span>}
         </span>
@@ -260,6 +261,22 @@ function AccountRow({
           <div className="account-actions">
             <button className="pill" disabled={busy} onClick={() => setEditing((e) => !e)}>
               {editing ? "닫기" : "정보 수정"}
+            </button>
+            {/* 고스펙 표시: 랭킹에 '고스펙', 플래티넘 상점에서 고스펙 할인가 (제작자 요청) */}
+            <button
+              className={"pill" + (account.highSpec ? " pill-on" : "")}
+              disabled={busy}
+              onClick={async () => {
+                setPhotoError("");
+                try {
+                  await setHighSpec(account.id, !account.highSpec);
+                  onChanged();
+                } catch (x) {
+                  setPhotoError(errorText(x));
+                }
+              }}
+            >
+              고스펙
             </button>
             {account.avatar && (
               <button

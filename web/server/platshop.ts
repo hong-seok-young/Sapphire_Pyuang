@@ -14,6 +14,8 @@ export interface ShopItem {
 
 export interface ShopSettings {
   ratio: number;
+  /** 고스펙 길드원의 할인 비율 (제작자 요청: 고스펙에게 더 할인) */
+  highRatio: number;
   market: number;
   limitCount: number;
   limitWeeks: number;
@@ -21,7 +23,7 @@ export interface ShopSettings {
   open: boolean;
 }
 
-export const DEFAULT_SETTINGS: ShopSettings = { ratio: 5, market: 7, limitCount: 1, limitWeeks: 2, open: false };
+export const DEFAULT_SETTINGS: ShopSettings = { ratio: 5, highRatio: 4, market: 7, limitCount: 1, limitWeeks: 2, open: false };
 
 /** 물건 목록 (사이트에 올라간 정적 파일, 로그인 검사 없이 서버 안에서 읽는다) */
 export async function loadCatalog(env: Env, request: Request): Promise<ShopItem[]> {
@@ -31,25 +33,32 @@ export async function loadCatalog(env: Env, request: Request): Promise<ShopItem[
 }
 
 export async function loadSettings(env: Env): Promise<ShopSettings> {
-  const row = await env.DB.prepare("SELECT ratio, market, limit_count, limit_weeks, open FROM plat_settings WHERE id = 1")
-    .first<{ ratio: number; market: number; limit_count: number; limit_weeks: number; open: number }>();
+  const row = await env.DB.prepare("SELECT ratio, high_ratio, market, limit_count, limit_weeks, open FROM plat_settings WHERE id = 1")
+    .first<{ ratio: number; high_ratio: number; market: number; limit_count: number; limit_weeks: number; open: number }>();
   return row
-    ? { ratio: row.ratio, market: row.market, limitCount: row.limit_count, limitWeeks: row.limit_weeks, open: row.open === 1 }
+    ? {
+        ratio: row.ratio, highRatio: row.high_ratio, market: row.market, limitCount: row.limit_count, limitWeeks: row.limit_weeks,
+        open: row.open === 1,
+      }
     : DEFAULT_SETTINGS;
 }
 
 export interface ItemRule {
   enabled: boolean;
   ratio: number | null;
+  highRatio: number | null;
   limitCount: number | null;
   limitWeeks: number | null;
 }
 
 export async function loadRules(env: Env): Promise<Map<string, ItemRule>> {
-  const rows = await env.DB.prepare("SELECT item_id, enabled, ratio, limit_count, limit_weeks FROM plat_items")
-    .all<{ item_id: string; enabled: number; ratio: number | null; limit_count: number | null; limit_weeks: number | null }>();
+  const rows = await env.DB.prepare("SELECT item_id, enabled, ratio, high_ratio, limit_count, limit_weeks FROM plat_items")
+    .all<{ item_id: string; enabled: number; ratio: number | null; high_ratio: number | null; limit_count: number | null; limit_weeks: number | null }>();
   return new Map(
-    rows.results.map((r) => [r.item_id, { enabled: r.enabled === 1, ratio: r.ratio, limitCount: r.limit_count, limitWeeks: r.limit_weeks }]),
+    rows.results.map((r) => [
+      r.item_id,
+      { enabled: r.enabled === 1, ratio: r.ratio, highRatio: r.high_ratio, limitCount: r.limit_count, limitWeeks: r.limit_weeks },
+    ]),
   );
 }
 
@@ -59,14 +68,17 @@ export const goldOf = (plat: number, ratio: number) => Math.round((plat / 100) *
 /** 한 물건의 실제 값 (물건마다 정한 게 없으면 통 설정) */
 export function effective(item: ShopItem, s: ShopSettings, rule: ItemRule | undefined) {
   const ratio = rule?.ratio ?? s.ratio;
+  const highRatio = rule?.highRatio ?? s.highRatio;
   return {
     enabled: rule?.enabled ?? true,
     ratio,
+    highRatio,
+    highGold: goldOf(item.plat, highRatio),
     limitCount: rule?.limitCount ?? s.limitCount,
     limitWeeks: rule?.limitWeeks ?? s.limitWeeks,
     gold: goldOf(item.plat, ratio),
     marketGold: goldOf(item.plat, s.market),
-    custom: !!rule && (rule.ratio !== null || rule.limitCount !== null || rule.limitWeeks !== null),
+    custom: !!rule && (rule.ratio !== null || rule.highRatio !== null || rule.limitCount !== null || rule.limitWeeks !== null),
   };
 }
 

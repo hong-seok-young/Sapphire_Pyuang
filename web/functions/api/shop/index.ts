@@ -20,6 +20,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     .bind(me.id)
     .all<{ id: number; itemId: string; itemName: string; plat: number; gold: number; ratio: number; status: string; at: number; doneAt: number | null }>();
   const guild = await env.DB.prepare("SELECT guild FROM profiles WHERE user_id = ?").bind(me.id).first<{ guild: string | null }>();
+  const flags = await env.DB.prepare("SELECT high_spec FROM users WHERE id = ?").bind(me.id).first<{ high_spec: number }>();
 
   const items = catalog
     .map((it) => {
@@ -50,22 +51,28 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     ]);
     manage = { pending: pending.results, recent: recent.results, total: total.results[0], month: thisMonth.results[0] };
   }
-  return json({ open: settings.open, settings, items, orders: mine.results, main: guild?.guild === "main", manager, manage });
+  return json({
+    open: settings.open, settings, items, orders: mine.results, main: guild?.guild === "main", highSpec: flags?.high_spec === 1, manager, manage,
+  });
 };
 
 export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (RANK[me.role] < 1) return FORBIDDEN();
-  const b = await readJson<{ ratio: unknown; market: unknown; limitCount: unknown; limitWeeks: unknown; open: unknown }>(request);
-  if (!validRatio(b.ratio) || !validRatio(b.market) || !validCount(b.limitCount) || !validWeeks(b.limitWeeks) || typeof b.open !== "boolean") {
+  const b = await readJson<{ ratio: unknown; highRatio: unknown; market: unknown; limitCount: unknown; limitWeeks: unknown; open: unknown }>(request);
+  if (
+    !validRatio(b.ratio) || !validRatio(b.highRatio) || !validRatio(b.market) || !validCount(b.limitCount) || !validWeeks(b.limitWeeks) ||
+    typeof b.open !== "boolean"
+  ) {
     return json({ error: "비율은 0보다 크게, 한도는 0~99개, 1~52주로 적어 주세요" }, 400);
   }
   await env.DB.prepare(
-    "INSERT INTO plat_settings (id, ratio, market, limit_count, limit_weeks, open, updated_by, updated_at) VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7) " +
-      "ON CONFLICT (id) DO UPDATE SET ratio = ?1, market = ?2, limit_count = ?3, limit_weeks = ?4, open = ?5, updated_by = ?6, updated_at = ?7",
+    "INSERT INTO plat_settings (id, ratio, high_ratio, market, limit_count, limit_weeks, open, updated_by, updated_at) " +
+      "VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) ON CONFLICT (id) DO UPDATE SET ratio = ?1, high_ratio = ?2, market = ?3, limit_count = ?4, " +
+      "limit_weeks = ?5, open = ?6, updated_by = ?7, updated_at = ?8",
   )
-    .bind(b.ratio, b.market, b.limitCount, b.limitWeeks, b.open ? 1 : 0, me.id, Date.now())
+    .bind(b.ratio, b.highRatio, b.market, b.limitCount, b.limitWeeks, b.open ? 1 : 0, me.id, Date.now())
     .run();
-  return json({ ratio: b.ratio, market: b.market, limitCount: b.limitCount, limitWeeks: b.limitWeeks, open: b.open });
+  return json({ ratio: b.ratio, highRatio: b.highRatio, market: b.market, limitCount: b.limitCount, limitWeeks: b.limitWeeks, open: b.open });
 };

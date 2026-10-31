@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS users (
   pw_iter INTEGER NOT NULL,
   must_change INTEGER NOT NULL DEFAULT 1, -- 임시 비밀번호면 1. 로그인하면 먼저 바꾸게 한다
   created_at INTEGER NOT NULL,
-  created_by TEXT
+  created_by TEXT,
+  high_spec INTEGER NOT NULL DEFAULT 0    -- 고스펙 길드원 (길드마스터, 오피서가 표시. 플래티넘 상점에서 더 할인)
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -192,6 +193,7 @@ CREATE INDEX IF NOT EXISTS listing_talk_listing ON listing_talk (listing_id, id)
 CREATE TABLE IF NOT EXISTS plat_settings (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   ratio REAL NOT NULL DEFAULT 5,          -- 길드 할인가 (처음 5:100)
+  high_ratio REAL NOT NULL DEFAULT 4,     -- 고스펙 할인가 (처음 4:100)
   market REAL NOT NULL DEFAULT 7,         -- 시중가 (줄 그어 보이는 값, 7:100)
   limit_count INTEGER NOT NULL DEFAULT 1, -- 한 사람이 물건마다 limit_weeks 주에 몇 개
   limit_weeks INTEGER NOT NULL DEFAULT 2,
@@ -205,6 +207,7 @@ CREATE TABLE IF NOT EXISTS plat_items (
   item_id TEXT PRIMARY KEY,
   enabled INTEGER NOT NULL DEFAULT 1,
   ratio REAL,
+  high_ratio REAL,
   limit_count INTEGER,
   limit_weeks INTEGER
 );

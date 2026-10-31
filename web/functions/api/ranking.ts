@@ -9,15 +9,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (!me) return NEED_LOGIN();
   const { results } = await env.DB.prepare(
     "SELECT u.id AS id, u.role AS role, p.job AS job, p.level AS level, p.prev_level AS prev_level, p.level_at AS level_at, " +
-      "p.exp AS exp, p.guild AS guild, a.updated_at AS avatar FROM profiles p JOIN users u ON u.id = p.user_id AND u.id NOT IN ('테스트1', '테스트2') " +
+      "p.exp AS exp, p.guild AS guild, u.high_spec AS high_spec, a.updated_at AS avatar FROM profiles p JOIN users u ON u.id = p.user_id AND u.id NOT IN ('테스트1', '테스트2') " +
       "LEFT JOIN avatars a ON a.user_id = p.user_id ORDER BY p.level DESC, p.exp DESC, p.level_at ASC, u.id ASC",
   ).all<{
     id: string; role: Role; job: Job; level: number; prev_level: number | null; level_at: number; exp: number | null;
-    guild: Guild | null; avatar: number | null;
+    guild: Guild | null; avatar: number | null; high_spec: number;
   }>();
   return json(
     results.map((r) => ({
       id: r.id, role: r.role, job: r.job, level: r.level, prevLevel: r.prev_level, levelAt: r.level_at, guild: r.guild, avatar: r.avatar,
+      highSpec: r.high_spec === 1,
       exp: r.exp, // 모두에게 보인다 (제작자 요청: 성장 순위 보상 이벤트를 확인하려고)
     })),
   );

@@ -78,6 +78,8 @@ const ADDED_COLUMNS = [
   ["profiles", "exp", "INTEGER"], ["listings", "options", "TEXT"], ["profiles", "guild", "TEXT"],
   ["listings", "mode", "TEXT NOT NULL DEFAULT 'sale'"], ["listings", "ends_at", "INTEGER"], ["listing_wants", "offer", "INTEGER"],
   ["listing_talk", "parent_id", "INTEGER"],
+  ["users", "high_spec", "INTEGER NOT NULL DEFAULT 0"], ["plat_settings", "high_ratio", "REAL NOT NULL DEFAULT 4"],
+  ["plat_items", "high_ratio", "REAL"],
 ];
 for (const [table, column, type] of ADDED_COLUMNS) {
   const columns = parseJson(wrangler("d1", "execute", DB, "--remote", "--json", "--command", `PRAGMA table_info(${table})`))[0]?.results ?? [];

@@ -896,3 +896,18 @@ button { font: inherit; color: inherit; }
 @keyframes ring-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
 .ps-rules-title { margin: 12px 0 6px; }
 .ps-rule-off { opacity: 0.75; }
+
+/* high-spec (고스펙): a tag at the end of the small line, and the price that applies to me in the shop */
+.rank-up-slot { flex-direction: column; align-items: center; gap: 2px; }
+.hs-badge { padding: 0 3px; font-size: 9px; font-weight: 700; line-height: 13px; color: #fff; background: #e0a000; border-radius: 3px; white-space: nowrap; }
+.account-tags .hs-badge { font-size: 10px; color: var(--edge); background: #ffd34d; }
+.ps-strong { color: var(--gold); font-weight: 700; }
+.ps-dim { color: #7c779b; }
+.ps-price-row { display: block; text-align: center; font-size: 11px; line-height: 1.35; }
+.ps-wide { width: 80px !important; }
+.ps-ledger small { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); }
+.ps-ledger small img { width: 12px; height: auto; }
+.rank-name .rank-sub { font-size: 12px; font-weight: 700; color: #6b84a0; }
+.rank-name .rank-exp-none { white-space: nowrap; }
+.ps-tabs { flex-wrap: nowrap; gap: 5px; }
+.ps-tabs .pill { flex: 1 1 auto; padding: 6px 4px; font-size: 12px; }

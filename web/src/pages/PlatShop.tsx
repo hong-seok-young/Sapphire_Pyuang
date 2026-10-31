@@ -2,15 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { errorText } from "../auth";
 import { ago, goldText, goldWords } from "../market";
-import { SHOP_PIC, actOrder, discount, fetchShop, orderItem, platWorth, saveShopItem, saveShopSettings } from "../platshop";
+import { SHOP_PIC, actOrder, budget, discount, fetchShop, orderItem, platWorth, saveShopItem, saveShopSettings } from "../platshop";
 import type { ShopData, ShopItem, ShopOrder, ShopSettings } from "../platshop";
 import { Loading, TopBar } from "../ui";
 
-type Tab = "shop" | "mine" | "pending" | "ledger" | "settings";
+type Tab = "shop" | "mine" | "pending" | "ledger" | "settings" | "budget";
 const STATUS: Record<ShopOrder["status"], string> = { requested: "신청함", done: "거래 완료", cancelled: "취소" };
 
-/** 25만 골드처럼 */
-const gold = (n: number) => `${goldWords(n)} 골드`;
+/** 25만 골드처럼 (만 골드 아래는 반올림) */
+const gold = (n: number) => `${goldWords(Math.round(n / 10_000) * 10_000)} 골드`;
 
 /**
  * 1군 전용 플래티넘 할인 상점 (제작자 요청). 게임 상점의 물건 칸(스샷에서 자른 그림)을 세로 화면에 3칸씩 놓고,
@@ -66,6 +66,10 @@ export function PlatShopPage() {
   const items = data.items ?? [];
   const s = data.settings!;
   const item = items.find((it) => it.id === picked) ?? null;
+  const high = !!data.highSpec;
+  /** 내가 사는 값: 고스펙이면 고스펙 할인가 */
+  const myGold = (it: ShopItem) => (high ? it.highGold : it.gold);
+  const myRatio = (it: ShopItem) => (high ? it.highRatio : it.ratio);
   const pending = data.manage?.pending.length ?? 0;
   const tabs: { key: Tab; label: string }[] = [
     { key: "shop", label: "상점" },
@@ -75,6 +79,7 @@ export function PlatShopPage() {
           { key: "pending" as Tab, label: `신청${pending ? ` ${pending}` : ""}` },
           { key: "ledger" as Tab, label: "정산" },
           { key: "settings" as Tab, label: "설정" },
+          { key: "budget" as Tab, label: "예산" },
         ]
       : []),
   ];
@@ -88,9 +93,10 @@ export function PlatShopPage() {
       </div>
       {!data.open && <p className="ps-closed">오픈 전 · 오피서 이상만 보여요</p>}
       <p className="ps-rate">
-        <img src={SHOP_PIC + "plat.png"} alt="플래티넘" /> 100 = <b>{s.ratio}만</b> 골드 <s>{s.market}만</s>
+        <img src={SHOP_PIC + "plat.png"} alt="플래티넘" /> 100 = <s>{s.market}만</s> <span className={high ? "ps-dim" : "ps-strong"}>1군 {s.ratio}만</span>{" "}
+        <span className={high ? "ps-strong" : "ps-dim"}>고스펙 {s.highRatio}만</span>
       </p>
-      <div className="filter">
+      <div className="filter ps-tabs">
         {tabs.map((t) => (
           <button key={t.key} className={"pill" + (tab === t.key ? " pill-on" : "")} onClick={() => setTab(t.key)}>
             {t.label}
@@ -113,13 +119,16 @@ export function PlatShopPage() {
                     <i className="ps-strike" />
                     <b className="ps-worth">
                       <img src={SHOP_PIC + "plat.png"} alt="" />
-                      {platWorth(it, s.market).toLocaleString("ko-KR")}
+                      {platWorth({ plat: it.plat, ratio: myRatio(it) }, s.market).toLocaleString("ko-KR")}
                     </b>
                   </span>
+                  {/* 시중가에 줄, 1군 할인가와 고스펙 할인가. 내게 맞는 값만 진하게 (제작자 요청) */}
                   <span className="ps-price">
-                    <s>{goldWords(it.marketGold)}</s> <b>{goldWords(it.gold)}</b>
-                    <em>-{discount(it)}%</em>
+                    <s>{goldWords(it.marketGold)}</s>
+                    <em>-{discount(myGold(it), it.marketGold)}%</em>
                   </span>
+                  <span className={"ps-price-row" + (high ? " ps-dim" : " ps-strong")}>1군 {goldWords(it.gold)}</span>
+                  <span className={"ps-price-row" + (high ? " ps-strong" : " ps-dim")}>고스펙 {goldWords(it.highGold)}</span>
                   <small className="ps-limit">{it.used >= it.limitCount ? "한도 다 씀" : `${it.limitWeeks}주 ${it.limitCount}개`}</small>
                 </button>
               </li>
@@ -134,8 +143,9 @@ export function PlatShopPage() {
                   {item.count > 1 && ` ×${item.count}`}
                 </b>
                 <small>
-                  플래티넘 <s>{item.plat.toLocaleString("ko-KR")}</s> → {platWorth(item, s.market).toLocaleString("ko-KR")} 어치 · <s>{gold(item.marketGold)}</s> →{" "}
-                  <b>{goldText(item.gold)} 골드</b>
+                  플래티넘 <s>{item.plat.toLocaleString("ko-KR")}</s> → {platWorth({ plat: item.plat, ratio: myRatio(item) }, s.market).toLocaleString("ko-KR")} 어치 ·{" "}
+                  <s>{gold(item.marketGold)}</s> → <b>{goldText(myGold(item))} 골드</b>
+                  {high && " (고스펙)"}
                 </small>
                 <small>
                   {item.limitWeeks}주에 {item.limitCount}개 · 남은 {Math.max(0, item.limitCount - item.used)}개
@@ -208,6 +218,8 @@ export function PlatShopPage() {
       {tab === "settings" && data.manage && (
         <ShopSettingsPanel settings={s} items={items} busy={busy} run={run} />
       )}
+
+      {tab === "budget" && data.manage && <BudgetPanel items={items} />}
     </>
   );
 }
@@ -253,6 +265,9 @@ function ShopSettingsPanel({ settings, items, busy, run }: {
           할인 <input inputMode="decimal" value={s.ratio} onChange={(e) => setS({ ...s, ratio: num(e.target.value) })} /> : 100
         </label>
         <label>
+          고스펙 <input inputMode="decimal" value={s.highRatio} onChange={(e) => setS({ ...s, highRatio: num(e.target.value) })} /> : 100
+        </label>
+        <label>
           시중 <input inputMode="decimal" value={s.market} onChange={(e) => setS({ ...s, market: num(e.target.value) })} /> : 100
         </label>
         <label>
@@ -296,7 +311,14 @@ function ShopSettingsPanel({ settings, items, busy, run }: {
                     disabled={busy}
                     onClick={() =>
                       run(
-                        () => saveShopItem(it.id, { enabled: true, ratio: it.custom ? it.ratio : null, limitCount: it.custom ? it.limitCount : null, limitWeeks: it.custom ? it.limitWeeks : null }),
+                        () =>
+                          saveShopItem(it.id, {
+                            enabled: true,
+                            ratio: it.custom ? it.ratio : null,
+                            highRatio: it.custom ? it.highRatio : null,
+                            limitCount: it.custom ? it.limitCount : null,
+                            limitWeeks: it.custom ? it.limitWeeks : null,
+                          }),
                         `${it.name} 다시 판매해요.`,
                       )
                     }
@@ -319,6 +341,7 @@ function ItemRule({ it, settings, busy, run }: {
   run: (fn: () => Promise<unknown>, done?: string) => void;
 }) {
   const [ratio, setRatio] = useState(it.ratio !== settings.ratio ? String(it.ratio) : "");
+  const [highRatio, setHighRatio] = useState(it.highRatio !== settings.highRatio ? String(it.highRatio) : "");
   const [count, setCount] = useState(it.limitCount !== settings.limitCount ? String(it.limitCount) : "");
   const [weeks, setWeeks] = useState(it.limitWeeks !== settings.limitWeeks ? String(it.limitWeeks) : "");
   const opt = (v: string) => (v.trim() === "" ? null : Number(v));
@@ -331,8 +354,10 @@ function ItemRule({ it, settings, busy, run }: {
           {it.count > 1 && ` ×${it.count}`}
         </b>
         <span className="ps-rule-inputs">
-          <input inputMode="decimal" value={ratio} onChange={(e) => setRatio(e.target.value)} placeholder={String(settings.ratio)} aria-label="비율" />
-          :100
+          1군
+          <input inputMode="decimal" value={ratio} onChange={(e) => setRatio(e.target.value)} placeholder={String(settings.ratio)} aria-label="1군 비율" />
+          고스펙
+          <input inputMode="decimal" value={highRatio} onChange={(e) => setHighRatio(e.target.value)} placeholder={String(settings.highRatio)} aria-label="고스펙 비율" />
           <input inputMode="numeric" value={weeks} onChange={(e) => setWeeks(e.target.value)} placeholder={String(settings.limitWeeks)} aria-label="주" />주
           <input inputMode="numeric" value={count} onChange={(e) => setCount(e.target.value)} placeholder={String(settings.limitCount)} aria-label="개" />개
         </span>
@@ -341,18 +366,81 @@ function ItemRule({ it, settings, busy, run }: {
         <button
           className="pill"
           disabled={busy}
-          onClick={() => run(() => saveShopItem(it.id, { enabled: true, ratio: opt(ratio), limitCount: opt(count), limitWeeks: opt(weeks) }), `${it.name} 저장했어요.`)}
+          onClick={() => run(() => saveShopItem(it.id, { enabled: true, ratio: opt(ratio), highRatio: opt(highRatio), limitCount: opt(count), limitWeeks: opt(weeks) }), `${it.name} 저장했어요.`)}
         >
           저장
         </button>
         <button
           className="pill"
           disabled={busy}
-          onClick={() => run(() => saveShopItem(it.id, { enabled: false, ratio: opt(ratio), limitCount: opt(count), limitWeeks: opt(weeks) }), `${it.name} 판매를 멈췄어요.`)}
+          onClick={() => run(() => saveShopItem(it.id, { enabled: false, ratio: opt(ratio), highRatio: opt(highRatio), limitCount: opt(count), limitWeeks: opt(weeks) }), `${it.name} 판매를 멈췄어요.`)}
         >
           판매 중지
         </button>
       </span>
     </li>
+  );
+}
+
+/**
+ * 예산 (오피서 이상, 제작자 요청): 오픈 전에 길드 자금이 얼마나 들지 미리 본다. 1군, 고스펙 인원과 기간을 적으면
+ * 모두 판매 중인 물건을 한도까지 산다고 치고, 길드가 내는 몫(시중가 - 할인가)과 자금이 몇 주 버티는지 보인다
+ */
+function BudgetPanel({ items }: { items: ShopItem[] }) {
+  const [fund, setFund] = useState("");
+  const [n, setN] = useState("20");
+  const [h, setH] = useState("3");
+  const [weeks, setWeeks] = useState("4");
+  const int = (v: string) => Math.max(0, Math.floor(Number(v) || 0));
+  const b = budget(items, int(n), int(h), Math.max(1, int(weeks)));
+  const fundGold = int(fund) * 10_000;
+  const lasts = b.perWeek > 0 && fundGold > 0 ? fundGold / b.perWeek : null;
+  return (
+    <>
+      <section className="panel ps-settings">
+        <h2 className="panel-title">예산 계산</h2>
+        <label>
+          길드 자금 <input className="ps-wide" inputMode="numeric" value={fund} onChange={(e) => setFund(e.target.value.replace(/\D/g, ""))} placeholder="5000" /> 만 골드
+        </label>
+        <label>
+          1군 <input inputMode="numeric" value={n} onChange={(e) => setN(e.target.value.replace(/\D/g, ""))} /> 명 · 고스펙
+          <input inputMode="numeric" value={h} onChange={(e) => setH(e.target.value.replace(/\D/g, ""))} /> 명
+        </label>
+        <label>
+          기간 <input inputMode="numeric" value={weeks} onChange={(e) => setWeeks(e.target.value.replace(/\D/g, ""))} /> 주
+        </label>
+      </section>
+      <div className="ps-ledger">
+        <div className="panel">
+          <b>{int(weeks) || 1}주 동안 길드 부담</b>
+          <span className="ps-gold">{gold(b.cost)}</span>
+          <small>주당 {gold(Math.round(b.perWeek))}</small>
+        </div>
+        <div className="panel">
+          <b>자금이 버티는 기간</b>
+          <span className="ps-gold">{lasts === null ? "-" : `${lasts >= 100 ? "100주 넘게" : `${lasts.toFixed(1)}주`}`}</span>
+          <small>
+            쓰는 플래티넘 <img src={SHOP_PIC + "plat.png"} alt="" /> {b.plat.toLocaleString("ko-KR")}
+          </small>
+          <small>받는 골드 {gold(b.gold)}</small>
+        </div>
+      </div>
+      <ul className="ps-orders">
+        {b.rows.slice(0, 15).map((r) => (
+          <li key={r.it.id} className="panel ps-order">
+            <span className="ps-order-main">
+              <b>
+                {r.it.name}
+                {r.it.count > 1 && ` ×${r.it.count}`}
+              </b>
+              <small>
+                한 사람 {r.buys}개 · {r.it.limitWeeks}주에 {r.it.limitCount}개
+              </small>
+            </span>
+            <span className="ps-gold">{gold(Math.round(r.cost))}</span>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }

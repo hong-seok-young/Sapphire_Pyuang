@@ -1,4 +1,4 @@
-// PUT /api/shop/items/:id { enabled, ratio, limitCount, limitWeeks } -> (오피서 이상) 물건 하나의 판매 여부와 따로 정한 비율, 한도.
+// PUT /api/shop/items/:id { enabled, ratio, highRatio, limitCount, limitWeeks } -> (오피서 이상) 물건 하나의 판매 여부와 따로 정한 비율, 한도.
 //     ratio, limitCount, limitWeeks 가 null 이면 통 설정을 따른다
 import { FORBIDDEN, NEED_LOGIN, RANK, currentUser, json, paramId, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
@@ -10,18 +10,20 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
   if (RANK[me.role] < 1) return FORBIDDEN();
   const id = paramId(params);
   if (!(await loadCatalog(env, request)).some((it) => it.id === id)) return json({ error: "없는 물건이에요" }, 404);
-  const b = await readJson<{ enabled: unknown; ratio: unknown; limitCount: unknown; limitWeeks: unknown }>(request);
+  const b = await readJson<{ enabled: unknown; ratio: unknown; highRatio: unknown; limitCount: unknown; limitWeeks: unknown }>(request);
+  const highRatio = b.highRatio === undefined ? null : b.highRatio;
   const ok =
     typeof b.enabled === "boolean" &&
     (b.ratio === null || validRatio(b.ratio)) &&
+    (highRatio === null || validRatio(highRatio)) &&
     (b.limitCount === null || validCount(b.limitCount)) &&
     (b.limitWeeks === null || validWeeks(b.limitWeeks));
   if (!ok) return json({ error: "비율은 0보다 크게, 한도는 0~99개, 1~52주로 적어 주세요" }, 400);
   await env.DB.prepare(
-    "INSERT INTO plat_items (item_id, enabled, ratio, limit_count, limit_weeks) VALUES (?1, ?2, ?3, ?4, ?5) " +
-      "ON CONFLICT (item_id) DO UPDATE SET enabled = ?2, ratio = ?3, limit_count = ?4, limit_weeks = ?5",
+    "INSERT INTO plat_items (item_id, enabled, ratio, high_ratio, limit_count, limit_weeks) VALUES (?1, ?2, ?3, ?4, ?5, ?6) " +
+      "ON CONFLICT (item_id) DO UPDATE SET enabled = ?2, ratio = ?3, high_ratio = ?4, limit_count = ?5, limit_weeks = ?6",
   )
-    .bind(id, b.enabled ? 1 : 0, b.ratio, b.limitCount, b.limitWeeks)
+    .bind(id, b.enabled ? 1 : 0, b.ratio, highRatio, b.limitCount, b.limitWeeks)
     .run();
   return json({ ok: true });
 };
