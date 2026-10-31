@@ -1,6 +1,6 @@
 // 챗봇: 질문에 맞는 위키 자료 고르기, 고른 스샷 줄이기, /api/chat 부르기 (서버는 functions/api/chat/index.ts), 대화 기록.
 // 위키 자료는 이미 화면에 받아 둔 것에서 고른다. 서버는 길이만 자르고 질문 앞에 붙인다.
-import type { Block, Post, Run, Wiki } from "./types";
+import type { Block, Place, Post, Run, Wiki } from "./types";
 import { api } from "./auth";
 import { search } from "./search";
 import { levelText } from "./ui";
@@ -62,6 +62,16 @@ const MAX_CONTEXT = 15000;
 /** 글 하나(육성 공략, 사냥터 원글 등)에서 가져올 글자 수 */
 const MAX_POST = 2500;
 const JOBS = ["전사", "레인저", "마법사", "무도가"];
+/** 직업을 줄여 부르는 말 (챗봇 개선 2026-11-01: '35 8고봉 법사'의 '법사'를 마법사로 못 알아들었다) */
+const JOB_ALIAS: [RegExp, string][] = [
+  [/마법사|법사/, "마법사"],
+  [/레인저|궁수/, "레인저"],
+  [/무도가/, "무도가"],
+  [/전사|워리어/, "전사"],
+];
+/** 직업 이름과 줄임말 (본문 찾기 낱말에서 뺀다) */
+const JOB_WORDS = [...JOBS, "법사", "궁수", "워리어"];
+const jobOf = (question: string) => JOB_ALIAS.find(([re]) => re.test(question))?.[1] ?? null;
 
 const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 
@@ -116,9 +126,18 @@ function words(q: string): string[] {
 /** 묻는 말 (본문 찾기에 쓰지 않는다): '어디서', '사냥해', '추천해줘', '뭐가' ... */
 const ASK_WORD = /^(어디|어디서|어디가|어떻게|어떤|무엇|뭐|뭐가|뭘|언제|누가|왜|좋은|좋아|추천|가면|사냥|사냥해|사냥하|사냥터|해야|해줘|알려|알려줘|있어|있나|있나요|되나|되나요|할까|하나요|가요|해요|돼|좀|지금|이제|그럼|이거|저거|이건|나|내|제)$|(해|해요|해줘|할까|하나|하나요|나요|까요|줘|요)$/;
 
-/** 질문의 레벨 ('30레벨', '30렙', 'Lv.30') */
+/** 사냥터, 장비, 육성을 묻는 말. 이런 질문에서는 홀로 선 숫자를 레벨로 본다 */
+const HUNT_WORD = /사냥|어디|렙업|레벨업|육성|장비|세팅|추천|스킬|퀘스트|전사|레인저|마법사|무도가|법사|궁수/;
+
+/**
+ * 질문의 레벨 ('30레벨', '30렙', 'Lv.30'). 사냥·장비를 묻는 질문이면 홀로 선 숫자도 레벨로 본다
+ * (챗봇 개선 2026-11-01: '35 8고봉 법사 어디서 사냥해'의 35를 몰라 레벨에 맞는 사냥터 자료가 빠졌다. '8고봉', '1군', '100개'처럼 붙은 숫자는 아니다)
+ */
 function levelOf(question: string): number | null {
-  const m = question.match(/(\d{1,3})\s*(?:레벨|렙|lv)/i) ?? question.match(/(?:lv|레벨)\.?\s*(\d{1,3})/i);
+  const m =
+    question.match(/(\d{1,3})\s*(?:레벨|렙|lv)/i) ??
+    question.match(/(?:lv|레벨)\.?\s*(\d{1,3})/i) ??
+    (HUNT_WORD.test(question) ? question.match(/(?:^|\s)(\d{1,2})(?=\s|$|에서|에|이면|인데|쯤|짜리)/) : null);
   const n = m ? Number(m[1]) : NaN;
   return n >= 1 && n <= 200 ? n : null;
 }
@@ -183,7 +202,7 @@ export function wikiContext(
     if (s && parts.join("\n").length + s.length < MAX_CONTEXT) parts.push(s);
   };
   const askedLevel = levelOf(question);
-  const askedJob = JOBS.find((j) => question.includes(j)) ?? null;
+  const askedJob = jobOf(question);
   const level = askedLevel ?? (photo ? (seen?.level ?? asker?.level ?? null) : null);
   const job = askedJob ?? (photo ? (seen?.job ?? asker?.job ?? null) : askedLevel !== null ? (asker?.job ?? null) : null);
   if (asker?.job || asker?.level) add(`[물은 사람] ${[asker.job, asker.level && `Lv.${asker.level}`].filter(Boolean).join(" ")} (길드원이 스스로 적은 값)`);
@@ -251,12 +270,19 @@ export function wikiContext(
 
   // 레벨을 물으면: 그 레벨 근처 사냥터(몬스터, 장비 드랍)와 직업 장비 (제작자 요청: 답을 더 알차게)
   if (level !== null) {
-    const near = Object.values(wiki.places)
+    const around = Object.values(wiki.places)
       .filter((p) => p.level && p.level[0] - 3 <= level && level <= p.level[1] + 3)
-      .map((p) => ({ p, gap: p.level![0] <= level && level <= p.level![1] ? 0 : Math.min(Math.abs(p.level![0] - level), Math.abs(p.level![1] - level)) }))
-      .sort((a, b) => a.gap - b.gap || a.p.level![0] - b.p.level![0])
-      .slice(0, 8);
-    const exact = near.filter((x) => x.gap === 0).slice(0, 2);
+      .map((p) => ({ p, gap: p.level![0] <= level && level <= p.level![1] ? 0 : Math.min(Math.abs(p.level![0] - level), Math.abs(p.level![1] - level)) }));
+    // 막 들어갈 만한 곳(시작 레벨이 지금 레벨에 가까운 곳)부터
+    const fromStart = (x: { p: Place }) => Math.abs(level - x.p.level![0]);
+    const near = [...around].sort((a, b) => a.gap - b.gap || fromStart(a) - fromStart(b)).slice(0, 8);
+    // 레벨이 딱 맞는 곳 4곳은 몬스터 드랍과 가는 길까지: 시작 레벨이 가깝고 레벨 폭이 좁은(그 레벨에 맞춘) 곳부터
+    // (챗봇 개선 2026-11-01: 시작 레벨이 낮은 2곳만 골라 Lv.35 에 30~36 사막이 들고 34~40 죽늪이 빠졌다)
+    const width = (x: { p: Place }) => x.p.level![1] - x.p.level![0];
+    const exact = around
+      .filter((x) => x.gap === 0)
+      .sort((a, b) => fromStart(a) - fromStart(b) || width(a) - width(b))
+      .slice(0, 4);
     if (near.length) {
       found.push(`Lv.${level} 근처 사냥터 ${near.length}곳`);
       add(
@@ -279,8 +305,8 @@ export function wikiContext(
         const post = posts?.[p.id];
         add(
           `[${p.name} 자세히]\n` +
-            mons.map((m) => `${m.name}${m.level ? ` Lv.${m.level}` : ""}${m.drops.length ? ` 드랍: ${m.drops.slice(0, 10).join(", ")}` : ""}`).join("\n") +
-            (post ? "\n" + postText(post, [...p.above, ...p.below]).slice(0, 900) : ""),
+            mons.map((m) => `${m.name}${m.level ? ` Lv.${m.level}` : ""}${m.drops.length ? ` 드랍: ${m.drops.slice(0, 8).join(", ")}` : ""}`).join("\n") +
+            (post ? "\n" + postText(post, [...p.above, ...p.below]).slice(0, 600) : ""),
         );
       }
     }
@@ -339,7 +365,7 @@ export function wikiContext(
     // 이름이 든 섹션을 먼저, 표마다 1500자까지
     if (odds) {
       const askOdds = /확률|가챠|뽑기|상자|합성|세공|재설정|염색|퍼센트|%/.test(question);
-      const terms = [...new Set([...picked.map((n) => n.name), ...ws.filter((w) => !/\d/.test(w) && !ASK_WORD.test(w) && !JOBS.includes(w) && w !== "확률")])].filter((w) => w.length >= 2);
+      const terms = [...new Set([...picked.map((n) => n.name), ...ws.filter((w) => !/\d/.test(w) && !ASK_WORD.test(w) && !JOB_WORDS.includes(w) && w !== "확률")])].filter((w) => w.length >= 2);
       const scoredOdds = odds.tables
         .map((t) => {
           const name = norm(t.path.join(""));
@@ -371,7 +397,7 @@ export function wikiContext(
     // 이름이 나온 것(아이템, 몬스터, 사냥터)과 질문 낱말 중 드문 것으로 찾아서 그 둘레만 가져온다
     // 질문 말('어디서', '사냥해')과 숫자가 든 말('48렙')로는 찾지 않는다 (챗봇 개선 2026-10-31: 상관없는 글이 끼어 사냥터 목록이 잘렸다)
     // 직업 이름도 뺀다 (직업은 위의 직업 장비와 레벨에 맞는 공략이 맡는다)
-    const keys = [...new Set([...picked.map((n) => n.name), ...ws.filter((w) => !/\d/.test(w) && !ASK_WORD.test(w) && !JOBS.includes(w))])]
+    const keys = [...new Set([...picked.map((n) => n.name), ...ws.filter((w) => !/\d/.test(w) && !ASK_WORD.test(w) && !JOB_WORDS.includes(w))])]
       .map(norm)
       .filter((k) => k.length >= 2);
     const taken = new Set([...scored.map((x) => x.p.id), ...picked.map((n) => n.id).filter(Boolean)]);

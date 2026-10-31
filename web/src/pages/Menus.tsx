@@ -1,13 +1,13 @@
 // 위키 메뉴 화면 (#/menu/이름). 제작자 요청 2026-10-31: 글 제목만 늘어놓지 말고 직업별로 묶고 단추를 잘 배치해서 꾸미기.
 // 육성 공략은 직업 카드에 초급·중급·고급 단추 (내 직업 카드와 내 레벨 단계는 금색), 직업별 스킬은 직업 카드,
 // 나머지 메뉴는 묶음(인스턴스 던전, 길드던전, 지도 ...)마다 아이콘 카드. 묶음에 안 맞는 글은 맨 아래 '그 밖의 글'에 모인다.
-// 원글에서 보는 공략 글(cafe.ts GUIDE_SECTIONS)은 누르면 중간 화면 없이 바로 카페 원글이 열린다 (제작자 요청: 동선을 한 번에). 작은 ↗ 표시
+// 원글에서만 보는 글(cafe.ts isOriginalOnly: 공략 글, 지도·스샷뿐인 글)은 누르면 중간 화면 없이 바로 카페 원글이 열린다 (제작자 요청: 동선을 한 번에). 단추에 '원글 ↗'
 import type { Job, Me } from "../auth";
 import { JOB_NAME } from "../auth";
 import { JobGlyph } from "../emblems";
 import type { Wiki } from "../types";
 import { NotFound, TopBar } from "../ui";
-import { cafeUrl, isGuidePost } from "../cafe";
+import { cafeUrl, isOriginalOnly } from "../cafe";
 
 interface Item {
   id: string;
@@ -79,16 +79,16 @@ function rangeOf(title: string): [number, number] | null {
   return m ? [Number(m[1]), Number(m[2])] : null;
 }
 
-/** 글로 가는 링크: 원글에서 보는 공략 글은 카페 원글로 바로 (새 창), 나머지는 위키 글 화면 */
+/** 글로 가는 링크: 원글에서만 보는 글(공략 글, 지도·스샷뿐인 글)은 카페 원글로 바로 (새 창), 나머지는 위키 글 화면 */
 type LinkTo = (id: string) => { href: string; target?: string; rel?: string };
-/** 원글로 바로 가는 글이면 ↗ */
-const Out = ({ to, id }: { to: LinkTo; id: string }) => (to(id).target ? <i className="mn-out">↗</i> : null);
+/** 원글로 바로 가는 글은 단추에 '원글 ↗' (제작자 요청 2026-11-01: 바로 원글 가는 건 단추에 써 놓고) */
+const Out = ({ to, id }: { to: LinkTo; id: string }) => (to(id).target ? <i className="mn-out">원글 ↗</i> : null);
 
 export function MenuPage({ wiki, title, me }: { wiki: Wiki; title: string; me?: Me }) {
   const sec = wiki.menu.find((m) => m.title === title);
   if (!sec) return <NotFound what="메뉴" />;
   const myJob = me?.job ? JOB_NAME[me.job] : null;
-  const to: LinkTo = (id) => (isGuidePost(wiki, id) ? { href: cafeUrl(id), target: "_blank", rel: "noopener noreferrer" } : { href: "#/post/" + id });
+  const to: LinkTo = (id) => (isOriginalOnly(wiki, id) ? { href: cafeUrl(id), target: "_blank", rel: "noopener noreferrer" } : { href: "#/post/" + id });
   const body =
     title === "육성 공략" ? (
       <GuideJobs items={sec.posts} myJob={myJob} myLevel={me?.level ?? null} to={to} />

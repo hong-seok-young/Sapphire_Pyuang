@@ -44,9 +44,7 @@ function navLinks(b: Block, link: PostLink): { left: { label: string; to: string
   const right = side(1);
   return left.length || right.length ? { left, right } : null;
 }
-/** 원글에서 보는 그림: 큰 그림(이어 붙인 지도, 스샷)과 뺀 움짤 자리 */
-const leftToOriginal = (r: Run) => "src" in r && (r.gif === 1 || isBigPicture(r.w, r.h));
-const hasBigPicture = (b: Block) => runsOf(b).some(leftToOriginal);
+const hasBigPicture = (b: Block) => runsOf(b).some((r) => "src" in r && isBigPicture(r.w, r.h));
 /** 그림을 뺀 뒤 남은 글이 그림 안내뿐인지 ('지도 클릭 시 고화질 확대' 같은) */
 const onlyPictureNote = (b: Block) =>
   runsOf(b)
@@ -57,8 +55,8 @@ const onlyPictureNote = (b: Block) =>
     .trim() === "";
 
 /**
- * '원글 보기' 줄 (제작자 요청 2026-11-01: '그림은 원글 봐라, 지도는 원글 봐라' 말고 그냥 다 원글 보기로).
- * 글 맨 위와, 앱에 띄우지 않는 큰 그림(이어 붙인 지도, 스샷)·움짤 자리에 똑같이 단다. 누르면 바로 카페 원글이 새 창으로.
+ * 화면 맨 위 '원글 보기' 줄, 글마다 하나 (제작자 요청 2026-11-01: '그림은 원글 봐라, 지도는 원글 봐라' 말고 원글 보기 하나만).
+ * 누르면 바로 카페 원글이 새 창으로. title: 공략 글처럼 글 전체를 원글에서 볼 때 제목
  */
 export function OriginalLink({ postId, title }: { postId: string; title?: string }) {
   return (
@@ -72,7 +70,8 @@ export function OriginalLink({ postId, title }: { postId: string; title?: string
 /**
  * 원글의 문단과 표를 그대로 보여 준다. 글쓴이가 쓴 색이 살도록 종이색 바탕 위에 그린다.
  * link 는 원글 속 다른 글 링크가 갈 위키 주소를 준다 (data.ts postLink).
- * 큰 그림(이어 붙인 지도, 스샷)은 앱에 띄우지 않고 그 자리에 '원글 보기' 줄을 둔다 (postId 가 있을 때, 제작자 요청)
+ * 큰 그림(이어 붙인 지도, 스샷)은 앱에 띄우지 않는다 (postId 가 있을 때). 원글 링크는 화면 맨 위 '원글 보기' 하나뿐이다
+ * (제작자 요청 2026-11-01: '원글 보기는 하나만 해도 되지 않냐', 그림·지도 자리마다 달았던 줄은 뺐다)
  */
 export function Blocks({ blocks, link, postId }: { blocks: Block[]; link: PostLink; postId?: string }) {
   return (
@@ -100,34 +99,25 @@ export function Blocks({ blocks, link, postId }: { blocks: Block[]; link: PostLi
           );
         }
         const big = !!postId && hasBigPicture(b);
-        if (big && onlyPictureNote(b)) return <OriginalLink key={i} postId={postId!} />;
-        const body =
-          b.k === "p" ? (
-            <p className="paper-p" key={i}>
-              <Runs runs={b.r} link={link} hideBig={big} />
-            </p>
-          ) : (
-            <div className="paper-table-wrap" key={i}>
-              <table className="paper-table">
-                <tbody>
-                  {b.rows.map((row, r) => (
-                    <tr key={r}>
-                      {row.map((cell, c) => (
-                        <CellView key={c} cell={cell} link={link} hideBig={big} />
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          );
-        return big ? (
-          <div key={i}>
-            {body}
-            <OriginalLink postId={postId!} />
-          </div>
+        if (big && onlyPictureNote(b)) return null; // 그림뿐인 칸은 통째로 뺀다
+        return b.k === "p" ? (
+          <p className="paper-p" key={i}>
+            <Runs runs={b.r} link={link} hideBig={big} />
+          </p>
         ) : (
-          body
+          <div className="paper-table-wrap" key={i}>
+            <table className="paper-table">
+              <tbody>
+                {b.rows.map((row, r) => (
+                  <tr key={r}>
+                    {row.map((cell, c) => (
+                      <CellView key={c} cell={cell} link={link} hideBig={big} />
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         );
       })}
     </div>
@@ -171,7 +161,7 @@ export function Runs({ runs, link, hideBig }: { runs: Run[]; link: PostLink; hid
   for (let i = 0; i < runs.length; i++) {
     const r = runs[i];
     let node: ReactNode;
-    if ("src" in r && (r.gif === 1 || (hideBig && isBigPicture(r.w, r.h)))) continue; // '원글 보기' 줄이 대신한다
+    if ("src" in r && hideBig && isBigPicture(r.w, r.h)) continue; // 원글에서 본다 (화면 맨 위 '원글 보기')
     if ("t" in r && hideBig && /지도\s*클릭/.test(r.t)) continue;
     if ("src" in r) {
       const icon = isIcon(r);

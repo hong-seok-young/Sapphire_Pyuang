@@ -4,8 +4,6 @@ export interface Pic {
   src: string;
   w: number;
   h: number;
-  /** 본문에서 뺀 움짤 자리 (그림 파일 없이 화면이 '원글 보기' 줄만 단다) */
-  gif?: 1;
 }
 
 /** 글 본문 조각: 글자 / 그림. to 가 있으면 링크 ("post:123" 은 위키 안의 글, 그 밖에는 바깥 주소) */
@@ -32,7 +30,8 @@ export interface MenuSection {
   title: string;
   index?: string | null;
   equip?: boolean;
-  posts: { id: string; title: string }[];
+  /** orig: 앱에 보일 것이 없는 글 (지도, 스샷뿐). 메뉴에서 누르면 바로 카페 원글 (build_data.py shows_something) */
+  posts: { id: string; title: string; orig?: 1 }[];
 }
 
 export interface Region {

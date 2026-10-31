@@ -188,12 +188,11 @@ GIFS_DROPPED = [0]
 
 
 def body_picture(img: Tag) -> dict | None:
-    """글 본문의 그림. 움짤(아이콘보다 큰 움직이는 그림)은 파일을 만들지 않고 센다 (제작자 요청 2026-10-31).
-    그 자리에는 그림 없는 표시({"gif": 1})를 두고 화면이 '원글 보기' 줄을 단다 (2026-11-01: 원글로 가는 자리는 모두 같은 '원글 보기')"""
+    """글 본문의 그림. 움짤(아이콘보다 큰 움직이는 그림)은 빼고 센다 (제작자 요청 2026-10-31, 원글은 화면 맨 위 '원글 보기' 하나로)"""
     pic = picture_of(img, drop_animation=True)
     if pic and pic.get("dropped"):
         GIFS_DROPPED[0] += 1
-        return {"src": "", "w": 0, "h": 0, "gif": 1}
+        return None
     return pic
 
 
@@ -370,6 +369,41 @@ def block_text(b: dict) -> str:
     return " ".join(plain(c["l"]) for row in b["rows"] for c in row).strip()
 
 
+HASHTAGS = re.compile(r"(\s*#[^\s#]+)+\s*")
+PS_LINE = re.compile(r"p\.?\s?s\b", re.I)
+
+
+def drop_chatter(blocks: list[dict]) -> list[dict]:
+    """모든 글에서 게임 정보가 아닌 칸을 뺀다 (제작자 요청 2026-11-01: '이딴 거 뭔 쓸모가 있냐'):
+    카페 해시태그만 있는 칸('#오숲 #죽늪 #미궁 …'), 작성자의 'P.S.' 와 그 뒤에 이어지는 글자뿐인 문단(그림, 표가 나오면 멈춘다)."""
+    out: list[dict] = []
+    in_ps = False
+    for b in blocks:
+        t = block_text(b)
+        pictured = any("src" in r for r in (b["r"] if b["k"] == "p" else []))
+        if in_ps and (b["k"] != "p" or pictured):
+            in_ps = False
+        if b["k"] == "p" and not pictured and PS_LINE.match(t):
+            in_ps = True
+        if in_ps or (t and HASHTAGS.fullmatch(t)):
+            continue
+        out.append(b)
+    return out
+
+
+def shows_something(post: dict) -> bool:
+    """앱 화면에 보일 것이 있는 글인지. 큰 그림(지도, 스샷)은 앱에 띄우지 않으므로 그것뿐인 글(지도 글 등)은 메뉴에서 누르면
+    바로 카페 원글이 열린다 (menu 의 "orig", 제작자 요청 2026-11-01: '아무 내용 없이 카페로 갈 거면 한 번 눌러 바로 원글로')."""
+    for b in post["blocks"]:
+        runs = run_list(b)
+        if any("src" in r and r["w"] < 300 and r["h"] < 300 for r in runs):
+            return True
+        t = re.sub(r"\(?\s*지도\s*클릭[^)]*\)?", "", block_text(b))
+        if re.sub(r"[◀▶️\s]|메뉴이동|이전으로 돌아가기", "", t):
+            return True
+    return False
+
+
 def game_info_only(blocks: list[dict]) -> list[dict]:
     """강화·보석·성장 글은 게임 정보만 (제작자 요청 2026-10-31): 작성자의 수정 기록('❗[26.09.04→26.09.05] …'),
     앱에서 못 쓰는 '엑셀 파일 다운로드' 칸부터 끝까지, 뒤에 홀로 남은 '[참조]' 줄을 뺀다. 원글은 화면의 '원글 보기'로."""
@@ -405,7 +439,7 @@ def load_posts() -> tuple[dict, dict]:
                 continue
             title = titles.get(aid) or (soup.title.get_text().split(" : ")[0] if soup.title else aid)
             GIFS_DROPPED[0] = 0
-            blocks = body_blocks(box)
+            blocks = drop_chatter(body_blocks(box))
             if aid in GAME_INFO_ONLY:
                 blocks = game_info_only(blocks)
             posts[aid] = {"id": aid, "title": title.strip(), "blocks": blocks}
@@ -815,7 +849,8 @@ def main():
     menu = []
     for title, index_post, ids in MENU:
         menu.append({"title": title, "index": index_post,
-                     "posts": [{"id": i, "title": posts[i]["title"]} for i in ids if i in posts]})
+                     "posts": [{"id": i, "title": posts[i]["title"], **({} if shows_something(posts[i]) else {"orig": 1})}
+                               for i in ids if i in posts]})
     menu.insert(2, {"title": "장비", "equip": True,
                     "posts": [{"id": e["post"], "title": e["slot"]} for e in equipment]})
 

@@ -12,5 +12,9 @@ export const GUIDE_SECTIONS = ["육성 공략", "인던 · 길드던전", "전�
 export const isGuidePost = (wiki: Wiki, postId: string) =>
   wiki.menu.some((m) => GUIDE_SECTIONS.includes(m.title) && m.posts.some((p) => p.id === postId));
 
+/** 원글에서만 보는 글: 직접 쓴 공략 글, 앱에 보일 것이 없는 글(지도, 스샷뿐. 제작자 요청 2026-11-01: 한 번 눌러 바로 원글로) */
+export const isOriginalOnly = (wiki: Wiki, postId: string) =>
+  isGuidePost(wiki, postId) || wiki.menu.some((m) => m.posts.some((p) => p.id === postId && p.orig === 1));
+
 /** 이만큼 큰 그림은 직접 찍거나 이어 붙인 것(지도, 스샷)이라 원글에서 본다. 작은 아이템·스킬 그림은 그대로 */
 export const isBigPicture = (w: number, h: number) => w >= 300 || h >= 300;

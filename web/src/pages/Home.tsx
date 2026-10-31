@@ -156,7 +156,7 @@ export function Home({ me }: { me: Me }) {
 
       <Tiles me={me} tiles={shown} />
 
-      {/* 오른쪽 아래 아주 작게: 누르면 처음부터 지금까지의 패치 내역 (제작자 요청) */}
+      {/* 아래 탭 챗봇 아이콘 바로 위에 아주 작게: 누르면 처음부터 지금까지의 패치 내역 (제작자 요청) */}
       <a className="home-version" href="#/patch">
         클로즈베타 v{VERSION}
       </a>
