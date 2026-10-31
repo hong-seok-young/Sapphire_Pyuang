@@ -10,6 +10,7 @@ import {
   deleteThread,
   listThreads,
   loadThread,
+  peekPhotos,
   readAttachment,
   reportAnswer,
   saveAnswer,
@@ -17,7 +18,7 @@ import {
   updateThread,
   wikiContext,
 } from "../chat";
-import type { ChatFile, ChatImage, ChatSource, ChatStep, ChatTurn, SavedMsg, ThreadSummary } from "../chat";
+import type { ChatFile, ChatImage, ChatSource, ChatStep, ChatTurn, SavedMsg, Seen, ThreadSummary } from "../chat";
 import { loadPosts, useAsync } from "../data";
 import { loadOdds } from "../odds";
 import { inFloat } from "../platform";
@@ -294,10 +295,18 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
     const live = () => runRef.current === run;
     // 물은 사람의 직업, 레벨 (질문에 없으면 이것으로 공략과 사냥터를 고른다. 사진만 보낸 질문 등)
     const asker = me ? { job: me.job ? JOB_NAME[me.job] : null, level: me.level } : undefined;
+    const lastUser = base[base.length - 1];
+    // 사진 질문은 사진 속 직업, 레벨, 보이는 이름을 먼저 읽고 그 값으로 자료를 고른다 (챗봇 개선 2026-11-01, chat.ts Seen)
+    let seen: Seen | null = null;
+    if (lastUser?.images?.length) {
+      setTurns([...base, { role: "assistant", text: "", thinking: "", found: ["📷 사진 읽는 중"], streaming: true }]);
+      setBusy(true);
+      seen = await peekPhotos(lastUser.images);
+      if (!live()) return;
+    }
     // 공식 확률 표 (못 받으면 없이 묻는다)
     const odds = await loadOdds().catch(() => undefined);
-    const ctx = wikiContext(wiki, posts, question, asker, !!(base[base.length - 1]?.images?.length || base[base.length - 1]?.photos), odds);
-    const lastUser = base[base.length - 1];
+    const ctx = wikiContext(wiki, posts, question, asker, !!(lastUser?.images?.length || lastUser?.photos), odds, seen ?? undefined);
     const startedAt = Date.now();
     let firstText: number | null = null;
     let text = "";
@@ -434,10 +443,10 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
       ctrlRef.current.abort();
       return;
     }
-    // 서버가 받던 답을 기다리는 중이면 그만 기다린다
+    // 서버가 받던 답을 기다리는 중이거나 사진을 먼저 읽는 중이면 그만 기다린다
     runRef.current++;
     setBusy(false);
-    setTurns((t) => t.filter((x) => !x.resuming));
+    setTurns((t) => t.filter((x) => !x.resuming && !(x.role === "assistant" && x.streaming && !x.text)));
   }
 
   function onKey(e: KeyboardEvent<HTMLTextAreaElement>) {

@@ -135,6 +135,22 @@ export interface Asker {
   level: number | null;
 }
 
+/**
+ * 사진 질문의 사진에서 먼저 읽은 직업, 레벨, 글자로 보이는 이름 (/api/chat/peek). 사진 속 캐릭터는 물은 사람이 적어 둔 값과
+ * 다를 수 있다 (챗봇 개선 2026-11-01: 적어 둔 값은 Lv.50 인데 사진은 Lv.34 마법사라 엉뚱한 공략과 장비가 붙었다)
+ */
+export interface Seen {
+  job: string | null;
+  level: number | null;
+  names: string[];
+}
+
+/** 사진에서 직업, 레벨, 이름을 먼저 읽는다. 못 읽으면 null (그러면 물은 사람의 값으로 고른다) */
+export async function peekPhotos(images: ChatImage[]): Promise<Seen | null> {
+  const seen = await api<Seen>("/api/chat/peek", "POST", { images }).catch(() => null);
+  return seen && (seen.job || seen.level || seen.names?.length) ? seen : null;
+}
+
 export interface WikiContext {
   text: string;
   /** 화면의 '위키에서 찾음' 줄 (찾은 것 이름) */
@@ -147,9 +163,20 @@ export interface WikiContext {
  * 제목이 맞는 글(육성 공략 등) → 사냥터 목록 순서로 채운다.
  * 질문에 레벨이나 직업이 없으면 물은 사람의 것을 쓴다 (챗봇 개선 2026-10-31: 사진만 보낸 질문에서 레벨, 직업을 몰라
  * 맞는 공략을 못 붙였다). 레벨만 물으면 직업은 물은 사람 것, 사진만 보내면 둘 다 물은 사람 것.
+ * 사진에서 먼저 읽은 값(seen)이 있으면 사진 속 캐릭터의 직업, 레벨을 먼저 쓰고, 사진에 보이는 이름도 질문 낱말처럼 찾는다.
  */
-export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined, question: string, asker?: Asker, photo = false, odds?: Odds): WikiContext {
-  const q = norm(question);
+export function wikiContext(
+  wiki: Wiki,
+  posts: Record<string, Post> | undefined,
+  question: string,
+  asker?: Asker,
+  photo = false,
+  odds?: Odds,
+  seen?: Seen,
+): WikiContext {
+  // 사진에서 읽은 이름도 질문 낱말처럼 쓴다 (사진만 보낸 질문은 글이 없다)
+  const asked = [question, ...(seen?.names ?? [])].join(" ");
+  const q = norm(asked);
   const parts: string[] = [];
   const found: string[] = [];
   const add = (s: string) => {
@@ -157,9 +184,14 @@ export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined,
   };
   const askedLevel = levelOf(question);
   const askedJob = JOBS.find((j) => question.includes(j)) ?? null;
-  const level = askedLevel ?? (photo ? (asker?.level ?? null) : null);
-  const job = askedJob ?? (photo || askedLevel !== null ? (asker?.job ?? null) : null);
+  const level = askedLevel ?? (photo ? (seen?.level ?? asker?.level ?? null) : null);
+  const job = askedJob ?? (photo ? (seen?.job ?? asker?.job ?? null) : askedLevel !== null ? (asker?.job ?? null) : null);
   if (asker?.job || asker?.level) add(`[물은 사람] ${[asker.job, asker.level && `Lv.${asker.level}`].filter(Boolean).join(" ")} (길드원이 스스로 적은 값)`);
+  if (seen) {
+    const who = [seen.job, seen.level && `Lv.${seen.level}`].filter(Boolean).join(" ");
+    if (who) found.push(`사진: ${who}`);
+    add(`[사진에서 읽음] ${who ? `사진 속 캐릭터 ${who}` : "캐릭터 직업·레벨은 안 보임"}${seen.names.length ? ` · 보이는 이름: ${seen.names.join(", ")}` : ""} (자료는 이 값으로 골랐다)`);
+  }
 
   // 1. 질문에 이름이 그대로 나온 것 (긴 이름부터, 짧은 이름이 긴 이름 안에 든 경우는 뺀다)
   const names: { kind: "item" | "monster" | "place"; name: string; id?: string }[] = [];
@@ -173,7 +205,7 @@ export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined,
 
   // 2. 없으면 질문 낱말로 검색해서 맞는 것 몇 개 (레벨을 물으면 아래 레벨 자료로 충분하다)
   if (!picked.length && askedLevel === null) {
-    for (const w of words(question)) {
+    for (const w of words(asked)) {
       for (const h of search(wiki, w, 3)) {
         if (picked.length >= 6 || picked.some((p) => p.kind === h.kind && p.name === h.name)) continue;
         picked.push({ kind: h.kind, name: h.name, id: h.kind === "place" ? h.to.split("/").pop() : undefined });
@@ -284,7 +316,7 @@ export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined,
   // 제목에 레벨 범위가 있는 공략(초급 Lv.1~33, 중급 34~43, 고급 44~55)은 레벨이 맞는 것만 (챗봇 개선 2026-10-31:
   // '48렙 레인저'에 초급, 중급 공략이 붙고 고급이 빠졌다)
   if (posts) {
-    const ws = words(question);
+    const ws = words(asked);
     const scored = wiki.menu
       .flatMap((s) => s.posts)
       .filter((p) => !wiki.places[p.id] && posts[p.id])
@@ -297,7 +329,7 @@ export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined,
       })
       .filter((x) => x.score > 0)
       .sort((a, b) => b.score - a.score)
-      .slice(0, 2);
+      .slice(0, photo ? 3 : 2); // 사진 질문은 공략과 직업 스킬 글을 같이 (장비, 스킬 우선순위를 묻는 일이 많다)
     for (const { p } of scored) {
       found.push(p.title);
       add(`[${p.title}]\n` + postText(posts[p.id]));

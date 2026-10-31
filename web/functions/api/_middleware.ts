@@ -12,7 +12,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const { request, env } = context;
   const path = new URL(request.url).pathname;
   const method = request.method;
-  if (method === "GET" || method === "HEAD" || method === "OPTIONS" || path === "/api/activity" || path.startsWith("/api/alerts")) return context.next();
+  // 사진 질문의 사진 먼저 읽기(/api/chat/peek)는 바로 뒤의 챗봇 질문이 남으므로 따로 남기지 않는다 (사진 본문을 두 번 풀지 않게)
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS" || path === "/api/activity" || path === "/api/chat/peek" || path.startsWith("/api/alerts")) return context.next();
 
   let me: { id: string } | null = null;
   let body: unknown = null;
