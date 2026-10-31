@@ -6,7 +6,7 @@ const BASE = "data/";
 /** 위키 자료는 로그인한 길드원에게만 온다 (functions/data/_middleware.ts). 로그인이 풀리면 이 오류가 난다 */
 export const NEED_LOGIN = "NeedLogin";
 
-async function getJson<T>(name: string): Promise<T> {
+export async function getJson<T>(name: string): Promise<T> {
   const res = await fetch(BASE + name + ".json");
   if (res.status === 401) throw new Error(NEED_LOGIN);
   if (!res.ok) throw new Error(`${name}.json: ${res.status}`);

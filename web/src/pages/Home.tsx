@@ -62,6 +62,8 @@ const INFO_TILES: Tile[] = [
   { title: "인던 · 길드던전", to: "#/menu/인던 · 길드던전", icon: "🏰" },
   { title: "전장 · 헌팅그라운드", to: "#/menu/전장 · 헌팅그라운드", icon: "🚩" },
   { title: "퀘스트 · 지도", to: "#/menu/퀘스트 · 지도", icon: "📜" },
+  // 컴투스 공식 확률 정보 (제작자 요청 2026-10-31, pages/Odds.tsx)
+  { title: "공식 확률", to: "#/odds", icon: "🎲" },
 ];
 
 /**

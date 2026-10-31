@@ -4,6 +4,8 @@ import type { Block, Post, Run, Wiki } from "./types";
 import { api } from "./auth";
 import { search } from "./search";
 import { levelText } from "./ui";
+import { matchedSections, oddsName } from "./odds";
+import type { Odds } from "./odds";
 
 export interface ChatImage {
   type: string;
@@ -146,7 +148,7 @@ export interface WikiContext {
  * 질문에 레벨이나 직업이 없으면 물은 사람의 것을 쓴다 (챗봇 개선 2026-10-31: 사진만 보낸 질문에서 레벨, 직업을 몰라
  * 맞는 공략을 못 붙였다). 레벨만 물으면 직업은 물은 사람 것, 사진만 보내면 둘 다 물은 사람 것.
  */
-export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined, question: string, asker?: Asker, photo = false): WikiContext {
+export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined, question: string, asker?: Asker, photo = false, odds?: Odds): WikiContext {
   const q = norm(question);
   const parts: string[] = [];
   const found: string[] = [];
@@ -299,6 +301,38 @@ export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined,
     for (const { p } of scored) {
       found.push(p.title);
       add(`[${p.title}]\n` + postText(posts[p.id]));
+    }
+
+    // 3-1. 컴투스 공식 확률 (제작자 요청 2026-10-31): 확률을 묻거나, 질문의 이름(아이템, 상자, 옵션)이 공식 표에 나오면 그 표.
+    // 이름이 든 섹션을 먼저, 표마다 1500자까지
+    if (odds) {
+      const askOdds = /확률|가챠|뽑기|상자|합성|세공|재설정|염색|퍼센트|%/.test(question);
+      const terms = [...new Set([...picked.map((n) => n.name), ...ws.filter((w) => !/\d/.test(w) && !ASK_WORD.test(w) && !JOBS.includes(w) && w !== "확률")])].filter((w) => w.length >= 2);
+      const scoredOdds = odds.tables
+        .map((t) => {
+          const name = norm(t.path.join(""));
+          const nameHits = terms.filter((w) => name.includes(norm(w))).length;
+          const secs = [...new Set(terms.flatMap((w) => matchedSections(t, w)))];
+          return { t, secs, score: nameHits * 3 + Math.min(secs.length, 3) };
+        })
+        .filter((x) => x.score >= (askOdds ? 1 : 3))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 2);
+      for (const { t, secs } of scoredOdds) {
+        const order = [...secs, ...t.sections.map((_, i) => i).filter((i) => !secs.includes(i))];
+        let body = "";
+        for (const i of order) {
+          const s = t.sections[i];
+          const part = [s.t && `## ${s.t}`, s.d, s.c.join(" | "), ...s.r.map((r) => r.join(" | "))].filter(Boolean).join("\n");
+          if (body.length + part.length > 1500) {
+            if (!body) body = part.slice(0, 1500);
+            break;
+          }
+          body += (body ? "\n" : "") + part;
+        }
+        found.push(`공식 확률: ${oddsName(t)}`);
+        add(`[컴투스 공식 확률: ${t.path.join(" > ")}]\n${body}`);
+      }
     }
 
     // 3-2. 제목에는 없고 본문에만 나오는 글 (제작자: '금서고 자료가 왜 없지'. 장비 획득처, 퀘스트 재료처럼 여러 글에 흩어져 있다).

@@ -14,6 +14,7 @@
   market/*.png    사파이어 중개인 화면 그림 (자료/이미지/중개인)
   equipment.json  부위별 장비 표
   meta.json       출처, 만든 날짜
+  odds.json       컴투스 공식 확률 정보 (자료/공식/확률, scripts/fetch_official_odds.mjs 가 받은 것)
 """
 from __future__ import annotations
 
@@ -833,6 +834,50 @@ def main():
     size = sum(f.stat().st_size for f in (OUT / "img").iterdir())
     print("완료", meta["counts"], f"그림 {size / 1e6:.1f}MB")
     copy_rank_pictures()
+    build_odds()
+
+
+ODDS_GAME = "5960bb5afe064cdfbc9063dedc97f646ccf5346cdb4a9636c19810330d95ce1a"
+
+
+def ko(value) -> str:
+    """공식 확률 자료의 글자: '{"en":"HP","ko":"체력",...}' 처럼 여러 나라 말이 든 글은 한국어(없으면 영어)만"""
+    if isinstance(value, dict):
+        return (value.get("ko") or value.get("en") or "").strip()
+    text = str(value if value is not None else "")
+    if text.startswith("{") and '"ko"' in text:
+        try:
+            return ko(json.loads(text))
+        except ValueError:
+            pass
+    return text.strip()
+
+
+def build_odds():
+    """컴투스 공식 확률 정보 -> data/odds.json (제작자 요청 2026-10-31: 공식 정보도 위키와 챗봇에).
+    표마다 메뉴 길(가챠샵 > 별똥별의 조각들 > 개별 획득 확률), 섹션마다 제목, 설명, 열, 행 (한국어만)."""
+    src = SRC / "공식" / "확률"
+    if not src.exists():
+        print("공식 확률 없음 (자료/scripts/fetch_official_odds.mjs)")
+        return
+    tables, note = [], ""
+    for f in sorted(src.glob("*.json"), key=lambda f: int(f.stem) if f.stem.isdigit() else 0):
+        if not f.stem.isdigit():
+            continue
+        d = json.loads(f.read_text(encoding="utf-8"))
+        note = note or ko(d.get("description"))
+        sections = []
+        for it in d.get("items", []):
+            # 행의 칸은 열의 key 로 찾는다 (표마다 'ItemName', 'GemCombineRate', 'col_0' 처럼 다르다)
+            columns = it["item"]["columns"]
+            cols = [ko(c.get("value")) for c in columns]
+            rows = [[ko(r.get(c["key"])) for c in columns] for r in it["item"]["rows"]]
+            sections.append({"t": ko(it.get("title")), "d": ko(it.get("description")), "c": cols, "r": rows})
+        tables.append({"key": d["key"], "path": d["path"], "sections": sections})
+    fetched = (src / "받은때.txt").read_text(encoding="utf-8").strip() if (src / "받은때.txt").exists() else ""
+    odds = {"fetched": fetched, "page": f"https://lim.com2us.com/{ODDS_GAME}/{{key}}?lang=ko", "note": note, "tables": tables}
+    (OUT / "data" / "odds.json").write_text(json.dumps(odds, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print("공식 확률 표", len(tables), "행", sum(len(s["r"]) for t in tables for s in t["sections"]))
 
 
 def copy_rank_pictures():

@@ -9,6 +9,7 @@ export const MENU_UPDATES: Record<string, string> = {
   "#/market": "2026-10-31T12:00+09:00",
   "#/admin": "2026-10-31T15:00+09:00",
   "#/menu/육성 공략": "2026-10-31T22:10+09:00",
+  "#/odds": "2026-11-01T01:00+09:00",
 };
 
 const DAY = 86_400_000;

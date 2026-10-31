@@ -1430,3 +1430,24 @@ a.mn-stage:active { transform: translate(1px, 1px); }
 }
 .orig-link b { flex: none; font-weight: 700; color: var(--gold); }
 .orig-link:active { transform: translate(1px, 1px); }
+
+/* official probability tables (pages/Odds.tsx, 제작자 요청): source line, search, category cards (shared .mn-* cards),
+   one table per section, folded sections when there are many, the searched rows highlighted */
+.odds-source { margin: 0 0 6px; font-size: 11px; color: var(--muted); text-align: right; }
+.odds-search { width: 100%; margin: 0 0 10px; }
+.odds-found { margin-bottom: 14px; }
+.odds-sec { margin: 0 0 10px; }
+details.odds-sec { padding: 6px 8px; background: var(--panel); border: var(--px) solid var(--edge); }
+details.odds-sec > summary { cursor: pointer; font-size: 13px; }
+details.odds-sec > summary small { margin-left: 4px; color: var(--muted); }
+details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
+.odds-sec-title { margin: 0 0 4px; font-size: 14px; color: var(--gold); }
+.odds-desc { margin: 0 0 6px; font-size: 11px; line-height: 1.5; color: var(--muted); }
+.odds-scroll { overflow-x: auto; }
+.odds-table { width: 100%; border-collapse: collapse; font-size: 12px; background: var(--night-2); }
+.odds-table th, .odds-table td { padding: 5px 6px; text-align: left; border: 1px solid rgba(169, 162, 207, 0.22); }
+.odds-table th { position: sticky; top: 0; color: var(--gold); font-weight: 700; background: var(--panel-2); white-space: nowrap; }
+.odds-table td:last-child { white-space: nowrap; text-align: right; }
+.odds-table tr.odds-hit td { background: #3d3214; color: var(--gold); }
+.odds-more { margin-top: 6px; }
+.odds-note { margin: 10px 2px 90px; font-size: 10px; color: var(--muted); }

@@ -19,6 +19,7 @@ import {
 } from "../chat";
 import type { ChatFile, ChatImage, ChatSource, ChatStep, ChatTurn, SavedMsg, ThreadSummary } from "../chat";
 import { loadPosts, useAsync } from "../data";
+import { loadOdds } from "../odds";
 import { inFloat } from "../platform";
 import { go } from "../router";
 import { Loading, TopBar } from "../ui";
@@ -293,7 +294,9 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
     const live = () => runRef.current === run;
     // 물은 사람의 직업, 레벨 (질문에 없으면 이것으로 공략과 사냥터를 고른다. 사진만 보낸 질문 등)
     const asker = me ? { job: me.job ? JOB_NAME[me.job] : null, level: me.level } : undefined;
-    const ctx = wikiContext(wiki, posts, question, asker, !!(base[base.length - 1]?.images?.length || base[base.length - 1]?.photos));
+    // 공식 확률 표 (못 받으면 없이 묻는다)
+    const odds = await loadOdds().catch(() => undefined);
+    const ctx = wikiContext(wiki, posts, question, asker, !!(base[base.length - 1]?.images?.length || base[base.length - 1]?.photos), odds);
     const lastUser = base[base.length - 1];
     const startedAt = Date.now();
     let firstText: number | null = null;
