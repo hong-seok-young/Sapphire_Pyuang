@@ -918,13 +918,15 @@ button { font: inherit; color: inherit; }
 /* high-spec nickname (제작자 요청): only the letters shimmer, all the time. The letters keep their usual colour;
    a light runs through them without pause and they glow softly. Nothing is drawn outside the letters. */
 .hs-text {
-  --hs-base: var(--text); --hs-hi: #8fd8ff; --hs-glow: rgba(140, 210, 255, 0.9);
+  --hs-base: var(--text); --hs-deep: #c8901e; --hs-hi: #ffd34d; --hs-core: #fffbe6; --hs-glow: rgba(255, 196, 50, 0.9);
   color: transparent; text-shadow: none;
-  background: linear-gradient(100deg, var(--hs-base) 0 32%, var(--hs-hi) 42%, #fff 50%, var(--hs-hi) 58%, var(--hs-base) 68% 100%);
+  /* metallic gold: deep gold, bright gold, a near-white glint in the middle (제작자 요청: 노란색 말고 진짜 금처럼) */
+  background: linear-gradient(100deg, var(--hs-base) 0 30%, var(--hs-deep) 38%, var(--hs-hi) 45%, var(--hs-core) 50%, var(--hs-hi) 55%,
+    var(--hs-deep) 62%, var(--hs-base) 70% 100%);
   background-size: 150% 100%; -webkit-background-clip: text; background-clip: text;
   animation: hs-run 1.8s linear infinite, hs-glow 1.2s ease-in-out infinite alternate;
 }
-.rank-row .hs-text, .rank-mine-bar .hs-text { --hs-base: #2d4f6a; --hs-hi: #3aa8ff; --hs-glow: rgba(70, 170, 255, 0.85); }
+.rank-row .hs-text, .rank-mine-bar .hs-text { --hs-base: #2d4f6a; --hs-deep: #a86b00; --hs-hi: #e8a800; --hs-core: #fff1b8; --hs-glow: rgba(235, 165, 0, 0.85); }
 @keyframes hs-run { from { background-position: 300% 0; } to { background-position: 0 0; } }
 @keyframes hs-glow { from { filter: drop-shadow(0 0 1px var(--hs-glow)); } to { filter: drop-shadow(0 0 4px var(--hs-glow)); } }
 @media (prefers-reduced-motion: reduce) {
