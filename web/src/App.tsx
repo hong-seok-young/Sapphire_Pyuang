@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { NEED_LOGIN, loadWiki, useAsync } from "./data";
 import { useRoute } from "./router";
-import { Loading, NotFound } from "./ui";
+import { PixelIcon, Loading, NotFound } from "./ui";
 import { Home, InfoPage } from "./pages/Home";
 import { Search } from "./pages/Search";
 import { Places, PlacePage } from "./pages/Places";
@@ -30,16 +30,17 @@ import { RANK, TEST_IDS, fetchMe, switchAccount } from "./auth";
 import { appMenu } from "./platform";
 import type { Me } from "./auth";
 
-const TABS = [
-  { to: "#/", label: "홈", icon: "🏠", match: "" },
-  { to: "#/places", label: "사냥터", icon: "🗺️", match: "places" },
-  { to: "#/search", label: "검색", icon: "🔍", match: "search" },
-  { to: "#/equip", label: "장비", icon: "🛡️", match: "equip" },
-  { to: "#/chat", label: "챗봇", icon: "💬", match: "chat" },
+/** 아래 탭. 아이콘은 아이모 그림과 어울리는 픽셀 그림 (public/icons, 제작자 요청) */
+const TABS: { to: string; label: string; icon: string; pic?: "home" | "map" | "search" | "gear" | "chat"; match: string }[] = [
+  { to: "#/", label: "홈", icon: "🏠", pic: "home", match: "" },
+  { to: "#/places", label: "사냥터", icon: "🗺️", pic: "map", match: "places" },
+  { to: "#/search", label: "검색", icon: "🔍", pic: "search", match: "search" },
+  { to: "#/equip", label: "장비", icon: "🛡️", pic: "gear", match: "equip" },
+  { to: "#/chat", label: "챗봇", icon: "💬", pic: "chat", match: "chat" },
 ];
 
 /** 안드로이드 앱 안에서만 보이는 탭: 시계 설정, 게임 위에 띄우기 같은 앱 기능 (게임 위 위키 창 안에서는 숨김) */
-const APP_TAB = { to: "#/app", label: "앱", icon: "⏰", match: "app" };
+const APP_TAB: (typeof TABS)[number] = { to: "#/app", label: "앱", icon: "⏰", match: "app" };
 const SHOWN_TABS = appMenu ? [...TABS, APP_TAB] : TABS;
 
 /**
@@ -142,7 +143,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "shop") body = <PlatShopPage />;
   else if (page === "board") body = <BoardPage me={me} arg={arg} sub={route.parts[2] ?? ""} query={route.query} />;
   else if (!wiki) body = <Loading error={loggedOut ? undefined : error} />;
-  else if (page === "") body = <Home me={me} />;
+  else if (page === "") body = <Home me={me} wiki={wiki} />;
   else if (page === "search") body = <Search wiki={wiki} q={route.query.get("q") ?? ""} />;
   else if (page === "places") body = <Places wiki={wiki} region={route.query.get("r") ?? ""} />;
   else if (page === "place") body = <PlacePage wiki={wiki} id={arg} />;
@@ -150,7 +151,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "item") body = <ItemPage wiki={wiki} name={arg} />;
   else if (page === "equip") body = arg ? <EquipSlot wiki={wiki} slot={arg} /> : <EquipSlots wiki={wiki} />;
   else if (page === "menu") body = <MenuPage wiki={wiki} title={arg} />;
-  else if (page === "info") body = <InfoPage me={me} />;
+  else if (page === "info") body = <InfoPage me={me} wiki={wiki} />;
   else if (page === "post") body = <PostPage wiki={wiki} id={arg} />;
   else if (page === "chat") body = <ChatPage wiki={wiki} arg={arg} query={route.query} />;
   else if (page === "gaps") body = me.role === "developer" ? <ChatGapsPage /> : <NotFound what="페이지" />;
@@ -158,7 +159,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "log") body = me.role === "developer" ? <ActivityLogPage wiki={wiki} /> : <NotFound what="페이지" />;
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
   else if (page === "app" || page === "timer") body = <AppPage />;
-  else body = <Home me={me} />;
+  else body = <Home me={me} wiki={wiki} />;
 
   return (
     <div className="app">
@@ -185,7 +186,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
       <nav className="tabbar">
         {SHOWN_TABS.map((t) => (
           <a key={t.to} href={t.to} className={"tab" + (page === t.match ? " tab-on" : "")}>
-            <span className="tab-icon">{t.icon}</span>
+            <span className="tab-icon">{t.pic ? <PixelIcon name={t.pic} size={32} /> : t.icon}</span>
             <span className="tab-label">{t.label}</span>
           </a>
         ))}

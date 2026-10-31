@@ -59,7 +59,7 @@ export function TopBar({ title, back = true, right, star }: { title: ReactNode; 
           {!location.hash.startsWith("#/alerts") && <Bell className="topbar-me" />}
           {!location.hash.startsWith("#/me") && (
             <a className="topbar-me" href="#/me" aria-label="내 정보" title="내 정보">
-              👤
+              <PixelIcon name="me" size={24} />
             </a>
           )}
         </span>
@@ -183,11 +183,19 @@ export function TapTip({ tip, children }: { tip: string; children: ReactNode }) 
 }
 
 /** 알림 단추: 🔔 와 안 읽은 수 (제작자 요청) */
-export function Bell({ className }: { className?: string }) {
+/**
+ * 앱 단추의 픽셀 아이콘 (public/icons, scripts/make_pixel_icons.py). 아이모 아이템 그림과 어울리게 16칸 그림을 정수배로 키운다
+ * (제작자 요청: 아이콘을 아이모 그래픽 느낌으로). 게임에 그림이 있는 것(책, 메달, 동전 ...)은 게임 그림을 쓴다 (Home.tsx)
+ */
+export function PixelIcon({ name, size = 16, className }: { name: "bell" | "home" | "map" | "search" | "gear" | "chat" | "me" | "phone"; size?: number; className?: string }) {
+  return <img className={"px-icon " + (className ?? "")} src={`/icons/${name}.png`} width={size} height={size} alt="" aria-hidden />;
+}
+
+export function Bell({ className, size = 24 }: { className?: string; size?: number }) {
   const n = useUnread();
   return (
     <a className={"bell " + (className ?? "")} href="#/alerts" aria-label={n ? `알림 ${n}개` : "알림"}>
-      🔔
+      <PixelIcon name="bell" size={size} />
       {n > 0 && <i className="bell-dot">{n > 99 ? "99+" : n}</i>}
     </a>
   );

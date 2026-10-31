@@ -1,7 +1,8 @@
 import { APP_OPEN, inApp, isAndroid } from "../platform";
 import { RANK } from "../auth";
 import type { Me } from "../auth";
-import { Bell, FitLine, HeroTitle, TopBar } from "../ui";
+import { Bell, FitLine, HeroTitle, PicImg, PixelIcon, TopBar } from "../ui";
+import type { Wiki } from "../types";
 import { showUpdate } from "../updates";
 import { useState } from "react";
 import { enablePush, markPushAsked, shouldAskPush } from "../push";
@@ -12,6 +13,10 @@ interface Tile {
   icon: string;
   /** 이모지 대신 그림 (게임 스샷에서 자른 아이콘) */
   iconPic?: string;
+  /** 이모지 대신 위키의 아이모 아이템 그림 (제작자 요청: 아이콘을 아이모 그래픽 느낌으로). 없으면 icon */
+  item?: string;
+  /** 이모지 대신 앱의 픽셀 아이콘 (public/icons) */
+  pixel?: "phone";
   /** 칸 왼쪽 위 작은 띠 (예: 1군 전용) */
   ribbon?: string;
   /** 특정 사람만 들어가는 칸: 테두리에 빛이 돈다 (gold 1군 전용, blue 운영진, purple 개발자) */
@@ -32,34 +37,43 @@ const TILES: Tile[] = [
   // 제목이 길지 않게 '1군 전용'은 왼쪽 위 띠로 (제작자 요청)
   { title: "플래티넘 할인 상점", to: "#/shop", icon: "🏪", iconPic: "/data/shop/shop_icon.png", ribbon: "1군 전용", ring: "gold" },
   // 장비는 아래 탭에 있어서 이 자리는 게시판 (제작자 요청): 공지사항, 길드 이벤트, 자유 게시판
-  { title: "게시판", to: "#/board", icon: "📢" },
+  { title: "게시판", to: "#/board", icon: "📢", item: "관측기록A" },
   // 위키 자료 메뉴는 '정보' 한 칸으로 묶는다 (제작자 요청). 안은 InfoPage
-  { title: "정보", to: "#/info", icon: "📚" },
-  { title: "길드 랭킹", to: "#/ranking", icon: "🏆" },
-  { title: "사파이어 중개인", to: "#/market", icon: "💰" },
-  { title: "길드원 의뢰소", to: "#/requests", icon: "📋" },
+  { title: "정보", to: "#/info", icon: "📚", item: "마법서(A등급)" },
+  { title: "길드 랭킹", to: "#/ranking", icon: "🏆", iconPic: "/data/rank/medal1.png" },
+  { title: "사파이어 중개인", to: "#/market", icon: "💰", iconPic: "/data/market/tab_buy_on.png" },
+  { title: "길드원 의뢰소", to: "#/requests", icon: "📋", item: "데조르바의도안" },
   // 시계와 보스 타이머는 안드로이드 앱에만 있다. 웹앱은 위키와 챗봇만 맡는다
   // 앱은 검토 후 오픈 (제작자 요청 2026-10-31: 지금은 웹만)
-  { title: "안드로이드 앱 받기", to: "#/app", icon: "📲", androidOnly: true, soon: !APP_OPEN, badge: "검토 후 오픈" },
-  { title: "길드원 관리", to: "#/admin", icon: "👥", managers: true, ribbon: "운영진", ring: "blue" },
-  { title: "사용 기록", to: "#/log", icon: "📊", developer: true, ribbon: "개발자", ring: "purple" },
+  { title: "안드로이드 앱 받기", to: "#/app", icon: "📲", pixel: "phone", androidOnly: true, soon: !APP_OPEN, badge: "검토 후 오픈" },
+  { title: "길드원 관리", to: "#/admin", icon: "👥", iconPic: "/data/rank/emblem_purple_warrior.png", managers: true, ribbon: "운영진", ring: "blue" },
+  { title: "사용 기록", to: "#/log", icon: "📊", item: "오래된주문서", developer: true, ribbon: "개발자", ring: "purple" },
   // 챗봇이 모르는 질문 (제작자 요청: 보고 고친 뒤 물은 사람에게 알린다)
-  { title: "챗봇 개선", to: "#/gaps", icon: "🧙", developer: true, ribbon: "개발자", ring: "purple" },
+  { title: "챗봇 개선", to: "#/gaps", icon: "🧙", item: "오래된깃털", developer: true, ribbon: "개발자", ring: "purple" },
 ];
 
 /** '정보' 안의 위키 자료 메뉴 */
 const INFO_TILES: Tile[] = [
-  { title: "육성 공략", to: "#/menu/육성 공략", icon: "📈" },
-  { title: "직업별 스킬", to: "#/menu/직업별 스킬", icon: "✨" },
-  { title: "조합책", to: "#/menu/조합책", icon: "⚒️" },
-  { title: "강화 · 보석 · 성장", to: "#/menu/강화 · 보석 · 성장", icon: "💎" },
-  { title: "인던 · 길드던전", to: "#/menu/인던 · 길드던전", icon: "🏰" },
-  { title: "전장 · 헌팅그라운드", to: "#/menu/전장 · 헌팅그라운드", icon: "🚩" },
-  { title: "퀘스트 · 지도", to: "#/menu/퀘스트 · 지도", icon: "📜" },
+  { title: "육성 공략", to: "#/menu/육성 공략", icon: "📈", item: "마력활성스크롤" },
+  { title: "직업별 스킬", to: "#/menu/직업별 스킬", icon: "✨", item: "마법서(B등급)" },
+  { title: "조합책", to: "#/menu/조합책", icon: "⚒️", item: "조드의도안" },
+  { title: "강화 · 보석 · 성장", to: "#/menu/강화 · 보석 · 성장", icon: "💎", item: "고대의수정" },
+  { title: "인던 · 길드던전", to: "#/menu/인던 · 길드던전", icon: "🏰", item: "던전상자20" },
+  { title: "전장 · 헌팅그라운드", to: "#/menu/전장 · 헌팅그라운드", icon: "🚩", item: "어비스가드증표" },
+  { title: "퀘스트 · 지도", to: "#/menu/퀘스트 · 지도", icon: "📜", item: "원한서린양피지" },
 ];
 
+/** 칸 그림: 아이모 아이템 그림(정수배로 키움) > 게임 스샷에서 자른 그림 > 픽셀 아이콘 > 이모지 */
+function TileIcon({ t, wiki }: { t: Tile; wiki: Wiki }) {
+  const pic = t.item ? wiki.items[t.item]?.icon : null;
+  if (pic) return <PicImg pic={pic} scale={Math.max(1, Math.floor(42 / Math.max(pic.w, pic.h)))} className="tile-item" />;
+  if (t.iconPic) return <img className="tile-pic" src={t.iconPic} alt="" />;
+  if (t.pixel) return <PixelIcon name={t.pixel} size={32} />;
+  return <>{t.icon}</>;
+}
+
 /** 칸 그리기 (홈과 정보가 같이 쓴다) */
-function Tiles({ me, tiles }: { me: Me; tiles: Tile[] }) {
+function Tiles({ me, wiki, tiles }: { me: Me; wiki: Wiki; tiles: Tile[] }) {
   return (
     <nav className="tiles">
       {tiles.map((t) => {
@@ -73,7 +87,9 @@ function Tiles({ me, tiles }: { me: Me; tiles: Tile[] }) {
           >
             {t.ribbon && <span className="tile-ribbon">{t.ribbon}</span>}
             {updated && <span className="tile-update">UPDATE</span>}
-            <span className="tile-icon">{t.iconPic ? <img className="tile-pic" src={t.iconPic} alt="" /> : t.icon}</span>
+            <span className="tile-icon">
+              <TileIcon t={t} wiki={wiki} />
+            </span>
             {/* 이름은 한 줄에 맞추고, 안 되면 낱말 사이에서만 줄을 바꾼다 ('성장'이 '성/장'으로 갈리지 않게) */}
             <FitLine className="tile-title" text={t.title} />
             {t.soon && <span className="tile-badge">{t.badge ?? "준비 중"}</span>}
@@ -85,16 +101,16 @@ function Tiles({ me, tiles }: { me: Me; tiles: Tile[] }) {
 }
 
 /** 정보 (#/info): 위키 자료 메뉴 모음 */
-export function InfoPage({ me }: { me: Me }) {
+export function InfoPage({ me, wiki }: { me: Me; wiki: Wiki }) {
   return (
     <>
       <TopBar title="정보" />
-      <Tiles me={me} tiles={INFO_TILES} />
+      <Tiles me={me} wiki={wiki} tiles={INFO_TILES} />
     </>
   );
 }
 
-export function Home({ me }: { me: Me }) {
+export function Home({ me, wiki }: { me: Me; wiki: Wiki }) {
   const shown = TILES.filter(
     (t) => (!t.androidOnly || (isAndroid && !inApp)) && (!t.managers || RANK[me.role] >= 1) && (!t.developer || me.role === "developer"),
   );
@@ -111,7 +127,7 @@ export function Home({ me }: { me: Me }) {
             {/* 로그인한 사람: 초록 점과 닉네임. 닉네임은 10글자까지라 자르지 않고, 자리가 모자라면 다음 줄로 */}
             <span className="hero-user">
               {/* 알림: 닉네임 앞 작은 🔔 (위의 단추 줄은 좁은 폰에서 'web' 과 겹쳐서) */}
-              <Bell className="hero-bell" />
+              <Bell className="hero-bell" size={16} />
               <i className="online-dot" aria-label="로그인 중" />
               {me.id}
             </span>
@@ -119,17 +135,17 @@ export function Home({ me }: { me: Me }) {
         </div>
         {/* 내 정보 (직업, 레벨, 캐릭터 사진, 비밀번호, 로그아웃): 'web' 오른쪽의 사람 단추 (제작자 요청) */}
         <a className="pill hero-me" href="#/me" aria-label="내 정보" title="내 정보">
-          👤
+          <PixelIcon name="me" size={32} />
         </a>
       </header>
 
       <PushAsk />
 
       <a className="search-entry" href="#/search">
-        <span>🔍</span> 아이템, 몬스터, 사냥터 검색
+        <PixelIcon name="search" size={16} /> 아이템, 몬스터, 사냥터 검색
       </a>
 
-      <Tiles me={me} tiles={shown} />
+      <Tiles me={me} wiki={wiki} tiles={shown} />
 
     </div>
   );
