@@ -9,7 +9,19 @@ export interface ShopSettings {
   market: number;
   limitCount: number;
   limitWeeks: number;
+  /** 1군 한 사람의 주당 플래티넘 (제작자 요청: 처음 300) */
+  weekPlat: number;
+  /** 고스펙 한 사람의 주당 플래티넘 */
+  highWeekPlat: number;
   open: boolean;
+}
+
+/** 이번 주(월요일 0시부터) 내 플래티넘 한도 */
+export interface WeekUse {
+  allowance: number;
+  used: number;
+  left: number;
+  resetAt: number;
 }
 
 export interface ShopItem {
@@ -22,13 +34,9 @@ export interface ShopItem {
   ratio: number;
   highRatio: number;
   highGold: number;
-  limitCount: number;
-  limitWeeks: number;
   gold: number;
   marketGold: number;
   custom: boolean;
-  /** 한도 기간 안에 내가 신청하거나 산 수 */
-  used: number;
   /** 패키지에 들어 있는 것: 게임 'i' 정보창의 칸 그림 (자료/scripts/make_shop_info.py), 제목 아래 작은 글 */
   contents?: { tiles: string[]; note?: string };
 }
@@ -62,17 +70,15 @@ export interface ShopData {
   highSpec?: boolean;
   manager?: boolean;
   manage?: { pending: ShopOrder[]; recent: ShopOrder[]; total: Ledger; month: Ledger } | null;
+  week?: WeekUse;
 }
 
 export const fetchShop = () => api<ShopData>("/api/shop");
 export const orderItem = (itemId: string) => api<{ id: number }>("/api/shop/orders", "POST", { itemId });
 export const actOrder = (id: number, action: "done" | "cancel") => api<{ status: string }>(`/api/shop/orders/${id}`, "PATCH", { action });
 export const saveShopSettings = (s: ShopSettings) => api<ShopSettings>("/api/shop", "PUT", s);
-export const saveShopItem = (
-  id: string,
-  r: { enabled: boolean; ratio: number | null; highRatio: number | null; limitCount: number | null; limitWeeks: number | null },
-) =>
-  api<{ ok: boolean }>(`/api/shop/items/${id}`, "PUT", r);
+export const saveShopItem = (id: string, r: { enabled: boolean; ratio: number | null; highRatio: number | null }) =>
+  api<{ ok: boolean }>(`/api/shop/items/${id}`, "PUT", { ...r, limitCount: null, limitWeeks: null });
 
 /** 할인가를 시중 비율로 치면 몇 플래티넘어치인지: 500 플래티넘을 5:100 (시중 7:100)으로 사면 357 */
 export const platWorth = (it: Pick<ShopItem, "plat" | "ratio">, market: number) => Math.round((it.plat * it.ratio) / market);
@@ -80,26 +86,26 @@ export const platWorth = (it: Pick<ShopItem, "plat" | "ratio">, market: number) 
 /** 할인율 (시중가 대비) */
 export const discount = (gold: number, marketGold: number) => (marketGold > 0 ? Math.round((1 - gold / marketGold) * 100) : 0);
 
+/** 플래티넘을 골드로: 비율이 5 면 플래티넘 100 = 5만 골드 (서버 goldOf 와 같다) */
+export const goldOf = (plat: number, ratio: number) => Math.round((plat / 100) * ratio * 10_000);
+
 /**
- * 예산 (제작자 요청): 1군 n명, 고스펙 h명이 판매 중인 물건을 weeks 주 동안 한도까지 다 산다고 칠 때.
- * 길드가 내는 몫은 시중가와 할인가의 차이 (7:100 을 5:100 으로 팔면 플래티넘 100마다 2만 골드)
+ * 예산 (제작자 요청): 1군 n명, 고스펙 h명이 weeks 주 동안 주당 플래티넘을 다 쓴다고 칠 때.
+ * 길드가 내는 몫은 시중가와 할인가의 차이 (7:100 을 5:100 으로 팔면 플래티넘 100마다 2만 골드).
+ * 물건마다 비율을 따로 정했으면 실제와 조금 다르다
  */
-export function budget(items: ShopItem[], n: number, h: number, weeks: number) {
-  let cost = 0;
-  let plat = 0;
-  let gold = 0;
-  let market = 0;
-  const rows = items
-    .filter((it) => it.enabled && it.limitCount > 0)
-    .map((it) => {
-      const buys = it.limitCount * Math.ceil(weeks / it.limitWeeks);
-      const c = buys * (n * (it.marketGold - it.gold) + h * (it.marketGold - it.highGold));
-      cost += c;
-      plat += buys * (n + h) * it.plat;
-      market += buys * (n + h) * it.marketGold;
-      gold += buys * (n * it.gold + h * it.highGold);
-      return { it, buys, cost: c };
-    })
-    .sort((a, b) => b.cost - a.cost);
-  return { cost, plat, gold, market, perWeek: weeks > 0 ? cost / weeks : 0, rows };
+export function budget(s: ShopSettings, n: number, h: number, weeks: number) {
+  const group = (people: number, weekPlat: number, ratio: number) => {
+    const plat = people * weekPlat * weeks;
+    const market = goldOf(plat, s.market);
+    const gold = goldOf(plat, ratio);
+    return { people, weekPlat, ratio, plat, market, gold, cost: market - gold };
+  };
+  const rows = [
+    { name: "1군", ...group(n, s.weekPlat, s.ratio) },
+    { name: "고스펙", ...group(h, s.highWeekPlat, s.highRatio) },
+  ];
+  const sum = (k: "plat" | "market" | "gold" | "cost") => rows.reduce((a, r) => a + r[k], 0);
+  const cost = sum("cost");
+  return { cost, plat: sum("plat"), gold: sum("gold"), market: sum("market"), perWeek: weeks > 0 ? cost / weeks : 0, rows };
 }

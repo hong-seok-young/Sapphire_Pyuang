@@ -1258,4 +1258,13 @@ button { font: inherit; color: inherit; }
 .mk-convert { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; padding: 8px 10px; background: rgba(255, 195, 92, 0.1); border-left: 3px solid var(--gold); }
 .mk-convert b { font-weight: 400; color: var(--gold); }
 .pill-gold { background: var(--gold); color: var(--edge); }
+/* platinum shop: this week's platinum (PlatShop.tsx) */
+.ps-week { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; padding: 8px 10px; background: var(--panel); border: var(--px) solid var(--edge); }
+.ps-week span { display: flex; align-items: center; gap: 4px; font-size: 14px; }
+.ps-week span img { width: 18px; height: 18px; image-rendering: pixelated; }
+.ps-week b { color: var(--gold); font-weight: 400; font-size: 16px; }
+.ps-week small { font-size: 11px; color: var(--muted); }
+.ps-week-bar { display: block; height: 8px; background: var(--night-2); border: 1px solid var(--edge); }
+.ps-week-bar i { display: block; height: 100%; background: linear-gradient(90deg, #7fd8ff, #b58cff); }
+.ps-order-main small img { width: 14px; height: 14px; vertical-align: -2px; image-rendering: pixelated; }
 

@@ -205,6 +205,8 @@ CREATE TABLE IF NOT EXISTS plat_settings (
   limit_count INTEGER NOT NULL DEFAULT 1, -- 한 사람이 물건마다 limit_weeks 주에 몇 개
   limit_weeks INTEGER NOT NULL DEFAULT 2,
   open INTEGER NOT NULL DEFAULT 0,        -- 1 이면 길드원에게 연다 (그 전에는 오피서 이상만 들어간다)
+  week_plat INTEGER NOT NULL DEFAULT 300,      -- 1군 한 사람이 한 주(월요일 0시부터)에 살 수 있는 플래티넘 (제작자 요청)
+  high_week_plat INTEGER NOT NULL DEFAULT 300, -- 고스펙 한 사람의 주당 플래티넘 (길드 자금을 보고 오피서가 조정)
   updated_by TEXT,
   updated_at INTEGER
 );

@@ -1,8 +1,8 @@
-// POST /api/shop/orders { itemId } -> 구매 신청 (1군만, 판매 중인 물건, 한도 안). 오피서 이상에게 알림이 간다
+// POST /api/shop/orders { itemId } -> 구매 신청 (1군만, 판매 중인 물건, 이번 주 플래티넘 한도 안). 오피서 이상에게 알림이 간다
 import { NEED_LOGIN, RANK, currentUser, json, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
 import { notify } from "../../../../server/alerts";
-import { WEEK, effective, loadCatalog, loadRules, loadSettings } from "../../../../server/platshop";
+import { effective, loadCatalog, loadRules, loadSettings, weekUse } from "../../../../server/platshop";
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
@@ -18,12 +18,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const e = effective(item, settings, rules.get(item.id));
   if (!e.enabled) return json({ error: "지금은 팔지 않는 물건이에요" }, 409);
   const now = Date.now();
-  const used = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM plat_orders WHERE user_id = ? AND item_id = ? AND status != 'cancelled' AND created_at > ?",
-  )
-    .bind(me.id, item.id, now - e.limitWeeks * WEEK)
-    .first<{ n: number }>();
-  if ((used?.n ?? 0) >= e.limitCount) return json({ error: `${e.limitWeeks}주에 ${e.limitCount}개까지 살 수 있어요` }, 409);
+  // 이번 주 플래티넘 한도 (제작자 요청: 1군 주당 300, 고스펙은 따로)
+  const week = await weekUse(env, me.id, high, settings, now);
+  if (item.plat > week.left) {
+    return json({ error: `이번 주 플래티넘이 모자라요 (남은 ${week.left.toLocaleString("ko-KR")} / 이 물건 ${item.plat.toLocaleString("ko-KR")})` }, 409);
+  }
   const row = await env.DB.prepare(
     "INSERT INTO plat_orders (user_id, item_id, item_name, plat, gold, ratio, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'requested', ?) RETURNING id",
   )
