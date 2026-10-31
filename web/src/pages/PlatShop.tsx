@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import { errorText } from "../auth";
 import { ago, goldText, goldWords } from "../market";
-import { SHOP_PIC, actOrder, budget, discount, fetchShop, orderItem, saveShopItem, saveShopSettings } from "../platshop";
+import { SHOP_PIC, actOrder, budget, discount, fetchShop, goldOf, orderItem, packsFor, packsWithin, saveShopItem, saveShopSettings } from "../platshop";
 import type { ShopData, ShopItem, ShopOrder, ShopSettings, Wallet } from "../platshop";
 import { Loading, TopBar } from "../ui";
 import { WEEK } from "../week";
@@ -512,9 +512,9 @@ function Gain({ v, className = "" }: { v: number; className?: string }) {
 }
 
 /**
- * 예산 검토 (오피서 이상, 제작자 요청 2026-10-31). 원스토어 할인(그때그때 다르다)으로 플래티넘을 사고, 1군과 고스펙이 지금 설정대로
- * 주당 플래티넘을 다 사 가면: 구매(플래티넘, 쓴 돈) | 판매(들어오는 골드) | 손익(쓴 돈을 1원 = 75골드처럼 골드로 바꿔 들어오는 골드와 견준다).
- * 할인율과 골드 비율은 이 폰에 마지막 값을 기억한다
+ * 예산 검토 (오피서 이상, 제작자 요청 2026-10-31). 원스토어 할인(그때그때 다르다)으로 플래티넘을 몇 개 또는 현금 얼마어치 사고(비우면
+ * 길드원이 사 갈 만큼), 1군과 고스펙이 지금 설정대로 주당 플래티넘을 다 사 가면: 구매(플래티넘, 쓴 돈) | 판매(들어오는 골드, 남는 플래티넘은
+ * 1군 비율로 골드로 친다) | 손익(쓴 돈을 1원 = 75골드처럼 골드로 바꿔 들어오는 골드와 견준다). 할인율과 골드 비율은 이 폰에 기억한다
  */
 function BudgetPanel({ settings }: { settings: ShopSettings }) {
   const [n, setN] = useState("20");
@@ -522,17 +522,27 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
   const [weeks, setWeeks] = useState("4");
   const [off, setOff] = useState(() => saved(OFF_KEY, "20"));
   const [goldRate, setGoldRate] = useState(() => saved(RATE_KEY, "75"));
+  /** 얼마나 살지: 플래티넘 개수 또는 현금 (비우면 길드원이 사 갈 만큼) */
+  const [mode, setMode] = useState<"plat" | "won">("plat");
+  const [amount, setAmount] = useState("");
   const int = (v: string) => Math.max(0, Math.floor(Number(v) || 0));
   const b = budget(settings, int(n), int(h), Math.max(1, int(weeks)));
   const rate = Math.min(90, Math.max(0, Number(off) || 0));
   const perWon = Math.max(0, Number(goldRate) || 0);
-  const paid = Math.round(b.buy.won * (1 - rate / 100));
+  const want = int(amount);
+  const buy = mode === "won" && want > 0 ? packsWithin(want / (1 - rate / 100)) : packsFor(mode === "plat" && want > 0 ? want : b.plat);
+  const paid = Math.round(buy.won * (1 - rate / 100));
   /** 쓴 돈을 골드로 */
   const spentGold = paid * perWon;
-  /** 1군, 고스펙 따로: 산 플래티넘 값을 판매한 플래티넘만큼 나눠 친다 */
-  const share = (plat: number) => (b.buy.plat > 0 ? (paid * plat) / b.buy.plat : 0);
+  /** 길드원이 사 가는 만큼 (산 것보다 많이는 못 산다)과 남는 플래티넘. 남는 것은 1군 비율로 골드로 친다 (제작자 요청) */
+  const sold = Math.min(buy.plat, b.plat);
+  const soldPart = b.plat > 0 ? sold / b.plat : 0;
+  const left = buy.plat - sold;
+  const leftGold = goldOf(left, settings.ratio);
+  const inGold = b.gold * soldPart + leftGold;
+  /** 1군, 고스펙 따로: 쓴 돈을 산 플래티넘 중 그쪽이 사 간 만큼으로 나눠 친다 */
+  const share = (plat: number) => (buy.plat > 0 ? (paid * plat) / buy.plat : 0);
   const gem = <img src={SHOP_PIC + "plat.png"} alt="" />;
-  const left = b.buy.plat - b.plat;
   return (
     <>
       <section className="panel ps-settings">
@@ -571,6 +581,31 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
             </button>
           ))}
         </div>
+        <div className="mk-chips">
+          {(["plat", "won"] as const).map((m) => (
+            <button
+              key={m}
+              className={"pill" + (mode === m ? " pill-on" : "")}
+              onClick={() => {
+                setMode(m);
+                setAmount("");
+              }}
+            >
+              {m === "plat" ? "플래티넘 개수로" : "현금으로"}
+            </button>
+          ))}
+        </div>
+        <label>
+          구매
+          <input
+            className="ps-wide"
+            inputMode="numeric"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value.replace(/\D/g, "").slice(0, 9))}
+            placeholder={mode === "plat" ? String(b.plat) : ""}
+          />{" "}
+          {mode === "plat" ? "개" : "원"}
+        </label>
         <label>
           현금 : 골드 = 1 :
           <input
@@ -589,23 +624,29 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
           <b>구매</b>
           <span>
             {gem}
-            {b.buy.plat.toLocaleString("ko-KR")}
+            {buy.plat.toLocaleString("ko-KR")}
           </span>
           <span className="ps-review-big">{won(paid)}</span>
           <small>
-            원스토어 {rate}% · 정가 {won(b.buy.won)}
+            원스토어 {rate}% · 정가 {won(buy.won)}
           </small>
         </div>
         <div className="panel">
           <b>판매</b>
           <span>길드원이 다 사 가면</span>
-          <span className="ps-review-big">{man(b.gold)}</span>
-          {left > 0 && <small>남는 플래티넘 {left.toLocaleString("ko-KR")}</small>}
+          <span className="ps-review-big">{man(inGold)}</span>
+          {left > 0 && (
+            <small>
+              남는 {gem}
+              {left.toLocaleString("ko-KR")} = {man(leftGold)} 포함
+            </small>
+          )}
+          {buy.plat < b.plat && <small className="ps-down">{gem}{(b.plat - buy.plat).toLocaleString("ko-KR")} 모자라요</small>}
         </div>
         <div className="panel">
           <b>손익</b>
           <span>쓴 돈 = {man(spentGold)}</span>
-          <Gain v={b.gold - spentGold} className="ps-review-big" />
+          <Gain v={inGold - spentGold} className="ps-review-big" />
           <small>1원 = {perWon}골드</small>
         </div>
       </div>
@@ -617,14 +658,14 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
             </b>
             <small>
               {gem}
-              {r.plat.toLocaleString("ko-KR")} · {r.ratio}:100 · 들어오는 골드 {man(r.gold)}
+              {Math.round(r.plat * soldPart).toLocaleString("ko-KR")} · {r.ratio}:100 · 들어오는 골드 {man(r.gold * soldPart)}
             </small>
-            <Gain v={r.gold - share(r.plat) * perWon} />
+            <Gain v={r.gold * soldPart - share(r.plat * soldPart) * perWon} />
           </li>
         ))}
       </ul>
       <p className="ps-review-note">
-        사는 상품: {b.buy.packs.map((k) => `${k.plat.toLocaleString("ko-KR")}${k.count > 1 ? `×${k.count}` : ""}`).join(" · ") || "-"}
+        사는 상품: {buy.packs.map((k) => `${k.plat.toLocaleString("ko-KR")}${k.count > 1 ? `×${k.count}` : ""}`).join(" · ") || "-"}
       </p>
     </>
   );

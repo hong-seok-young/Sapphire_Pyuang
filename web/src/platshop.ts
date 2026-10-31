@@ -121,14 +121,50 @@ export function packsFor(plat: number) {
   const counts = PLAT_PACKS.map(() => 0);
   counts[0] = bulk;
   for (let p = rest; p > 0; p = Math.max(0, p - PLAT_PACKS[last[p]].plat)) counts[last[p]]++;
+  return packsOf(counts);
+}
+
+/** 상품마다 산 개수를 묶음으로 */
+function packsOf(counts: number[]) {
   const packs = PLAT_PACKS.map((k, i) => ({ ...k, count: counts[i] })).filter((k) => k.count > 0);
   return { packs, plat: packs.reduce((a, k) => a + k.plat * k.count, 0), won: packs.reduce((a, k) => a + k.won * k.count, 0) };
 }
 
+/** 정가로 won 원 안에서 플래티넘을 가장 많이 사는 묶음 (상품 값은 모두 100원 단위). 큰 상품으로 대부분 채우고 나머지만 따져 본다 */
+export function packsWithin(won: number) {
+  const big = PLAT_PACKS[0];
+  const bulk = Math.max(0, Math.floor(won / big.won) - 1);
+  const units = Math.max(0, Math.floor((won - bulk * big.won) / 100));
+  // most[u]: 100원 x u 안에서 가장 많은 플래티넘, last[u]: 그때 마지막에 산 상품
+  const most = new Array<number>(units + 1).fill(0);
+  const last = new Array<number>(units + 1).fill(-1);
+  for (let u = 1; u <= units; u++) {
+    most[u] = most[u - 1];
+    last[u] = -2; // 100원 남김
+    PLAT_PACKS.forEach((k, i) => {
+      const c = k.won / 100;
+      if (c <= u && most[u - c] + k.plat > most[u]) {
+        most[u] = most[u - c] + k.plat;
+        last[u] = i;
+      }
+    });
+  }
+  const counts = PLAT_PACKS.map(() => 0);
+  counts[0] = bulk;
+  for (let u = units; u > 0; ) {
+    if (last[u] === -2) u--;
+    else {
+      counts[last[u]]++;
+      u -= PLAT_PACKS[last[u]].won / 100;
+    }
+  }
+  return packsOf(counts);
+}
+
 /**
  * 예산 (제작자 요청 2026-10-31): 길마가 원스토어 할인으로 아이모 플래티넘을 결제하고, 그 플래티넘으로 산 물건을 1군과 고스펙에게
- * 할인된 골드로 넘긴다. 1군 n명, 고스펙 h명이 weeks 주 동안 주당 플래티넘을 다 쓴다고 칠 때 필요한 플래티넘, 사는 상품 묶음(정가),
- * 받는 골드와 시중가. 결제할 돈은 그때그때 다른 할인율을 화면에서 곱한다. 물건마다 비율을 따로 정했으면 실제와 조금 다르다
+ * 할인된 골드로 넘긴다. 1군 n명, 고스펙 h명이 weeks 주 동안 주당 플래티넘을 다 쓴다고 칠 때 필요한 플래티넘, 받는 골드와 시중가.
+ * 사는 묶음과 결제할 돈은 화면에서 정한다 (packsFor, packsWithin). 물건마다 비율을 따로 정했으면 실제와 조금 다르다
  */
 export function budget(s: ShopSettings, n: number, h: number, weeks: number) {
   const group = (people: number, weekPlat: number, ratio: number) => {
@@ -140,6 +176,5 @@ export function budget(s: ShopSettings, n: number, h: number, weeks: number) {
     { name: "고스펙", ...group(h, s.highWeekPlat, s.highRatio) },
   ];
   const sum = (k: "plat" | "gold" | "market") => rows.reduce((a, r) => a + r[k], 0);
-  const plat = sum("plat");
-  return { plat, gold: sum("gold"), market: sum("market"), buy: packsFor(plat), rows };
+  return { plat: sum("plat"), gold: sum("gold"), market: sum("market"), rows };
 }
