@@ -2,7 +2,7 @@ import { Fragment, useMemo } from "react";
 import type { ReactNode } from "react";
 import type { Wiki } from "../types";
 import { monstersByName } from "../data";
-import { PicImg } from "../ui";
+import { PicImg, levelText } from "../ui";
 
 /**
  * 챗봇 답 그리기 (제작자 요청: 줄글만 말고 그림을 쓰고, 눌러서 그 화면으로 가게, 아이모 게임답게).
@@ -32,7 +32,7 @@ interface Target {
   big?: ReactNode;
 }
 
-const TOKEN = /\[\[(아이템|몬스터|사냥터|메뉴|화면|질문):([^\]\n]{1,60})\]\]/g;
+const TOKEN = /\[\[(아이템|몬스터|사냥터|메뉴|화면|질문|모름):([^\]\n]{1,200})\]\]/g;
 const squash = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 
 function useResolver(wiki: Wiki) {
@@ -67,9 +67,23 @@ function useResolver(wiki: Wiki) {
         };
       }
       if (kind === "사냥터") {
+        // 지도 그림을 되풀이하지 않고 (제작자 요청) 그 사냥터에서 잡는 몬스터 그림을 붙인다: 단추는 가장 센 몬스터, 카드는 셋
         const p = placeByName.get(key);
         if (!p) return null;
-        return { kind, name: p.name, to: "#/place/" + p.id, icon: "🗺️", big: <span className="ans-card-emoji">🗺️</span>, sub: p.region };
+        const mons = p.monsters
+          .map((k) => wiki.monsters[k])
+          .filter((m) => m?.img)
+          .sort((a, b) => (b.level ?? 0) - (a.level ?? 0));
+        return {
+          kind, name: p.name, to: "#/place/" + p.id,
+          icon: mons[0] ? <PicImg pic={mons[0].img} max={20} /> : null,
+          big: mons.length ? (
+            <span className="ans-card-mons">
+              {mons.slice(0, 3).map((m) => <PicImg key={m.key} pic={m.img} max={30} />)}
+            </span>
+          ) : undefined,
+          sub: [levelText(p.level), p.region].filter(Boolean).join(" · "),
+        };
       }
       if (kind === "메뉴") {
         const s = wiki.menu.find((m) => squash(m.title) === key);
@@ -98,7 +112,7 @@ function inline(text: string, resolve: ReturnType<typeof useResolver>, seen: Tar
     pushText(text.slice(last, m.index));
     last = (m.index ?? 0) + m[0].length;
     n++;
-    if (m[1] === "질문") continue; // 아래 추천 질문으로
+    if (m[1] === "질문" || m[1] === "모름") continue; // 추천 질문은 아래로, 모르는 부분은 개발자에게 (아래 한 줄로만 알린다)
     const t = resolve(m[1] as Kind, m[2]);
     if (!t) {
       out.push(<b key={`${keyBase}x${n}`}>{m[2]}</b>);
@@ -107,7 +121,7 @@ function inline(text: string, resolve: ReturnType<typeof useResolver>, seen: Tar
     if (!seen.some((s) => s.to === t.to)) seen.push(t);
     out.push(
       <a key={`${keyBase}c${n}`} className={"ans-chip ans-chip-" + t.kind} href={t.to}>
-        <span className="ans-chip-icon">{t.icon}</span>
+        {t.icon && <span className="ans-chip-icon">{t.icon}</span>}
         {t.name}
       </a>,
     );
@@ -131,7 +145,7 @@ export function ChatAnswer({ wiki, text, done, onAsk }: { wiki: Wiki; text: stri
   };
   lines.forEach((raw, i) => {
     const line = raw.trimEnd();
-    const onlyAsks = line.replace(TOKEN, (all, kind) => (kind === "질문" ? "" : all)).trim() === "" && /\[\[질문:/.test(line);
+    const onlyAsks = line.replace(TOKEN, (all, kind) => (kind === "질문" || kind === "모름" ? "" : all)).trim() === "" && /\[\[(질문|모름):/.test(line);
     if (onlyAsks) return;
     const head = line.match(/^#{2,3}\s+(.*)$/);
     const bullet = line.match(/^\s*[-•]\s+(.*)$/);
@@ -169,6 +183,7 @@ export function ChatAnswer({ wiki, text, done, onAsk }: { wiki: Wiki; text: stri
           ))}
         </div>
       )}
+      {done && /\[\[모름:/.test(text) && <div className="ans-gap">📝 잘 모르는 부분은 개발자에게 알렸어요. 고치면 알려 드릴게요</div>}
       {done && asks.length > 0 && (
         <div className="ans-asks">
           {asks.slice(0, 3).map((q) => (

@@ -1,6 +1,7 @@
-// 챗봇: 질문에 맞는 위키 자료 고르기, 고른 스샷 줄이기, /api/chat 부르기 (서버는 functions/api/chat.ts).
+// 챗봇: 질문에 맞는 위키 자료 고르기, 고른 스샷 줄이기, /api/chat 부르기 (서버는 functions/api/chat/index.ts), 대화 기록.
 // 위키 자료는 이미 화면에 받아 둔 것에서 고른다. 서버는 길이만 자르고 질문 앞에 붙인다.
 import type { Block, Post, Run, Wiki } from "./types";
+import { api } from "./auth";
 import { search } from "./search";
 import { levelText } from "./ui";
 
@@ -8,18 +9,57 @@ export interface ChatImage {
   type: string;
   data: string; // base64 ("data:" 머리 없이)
 }
+/** 첨부 파일 (PDF 는 base64, 글 파일은 글 그대로). 서버는 내용을 저장하지 않는다 */
+export interface ChatFile {
+  kind: "pdf" | "text";
+  name: string;
+  data: string;
+  size: number;
+}
 export interface ChatTurn {
   role: "user" | "assistant";
   text: string;
   images?: ChatImage[];
+  files?: ChatFile[];
 }
 
-/** 위키 자료 전체 글자 수 (서버도 12000 자에서 자른다) */
-const MAX_CONTEXT = 11000;
+/** 답하며 한 일 (웹 찾기, 글 읽기, 결과 거르기) */
+export interface ChatStep {
+  kind: "search" | "fetch" | "code";
+  text: string;
+}
+/** 웹 출처 */
+export interface ChatSource {
+  url: string;
+  title: string;
+}
+
+const TEXT_EXT = /\.(txt|md|csv|tsv|json|log|xml|html?|ya?ml|ini|srt)$/i;
+const MAX_PDF = 3_300_000;
+const MAX_TEXT_FILE = 200_000;
+
+/** 고른 파일을 첨부로 (PDF, 글 파일). 맞지 않으면 길드원에게 보일 글로 Error */
+export async function readAttachment(file: File): Promise<ChatFile> {
+  if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+    if (file.size > MAX_PDF) throw new Error(`${file.name}: PDF 는 3MB 까지예요`);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return { kind: "pdf", name: file.name, data: btoa(bin), size: file.size };
+  }
+  if (file.type.startsWith("text/") || file.type === "application/json" || TEXT_EXT.test(file.name)) {
+    const text = await file.text();
+    if (text.length > MAX_TEXT_FILE) throw new Error(`${file.name}: 글 파일은 20만 자까지예요`);
+    return { kind: "text", name: file.name, data: text, size: file.size };
+  }
+  throw new Error(`${file.name}: 사진, PDF, 글 파일(txt, csv, json 등)만 올릴 수 있어요`);
+}
+
+/** 위키 자료 전체 글자 수 (서버도 16000 자에서 자른다) */
+const MAX_CONTEXT = 15000;
 /** 글 하나(육성 공략, 사냥터 원글 등)에서 가져올 글자 수 */
 const MAX_POST = 2500;
-/** 답 글 뒤에 붙는 알림의 시작 글자 (functions/api/chat.ts 와 같아야 한다) */
-const CONTROL = "\u001e";
+const JOBS = ["전사", "레인저", "마법사", "무도가"];
 
 const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 
@@ -43,16 +83,33 @@ function words(q: string): string[] {
   return q.split(/[\s,.?!~·()[\]"'“”‘’]+/).map((w) => w.replace(/(은|는|이|가|을|를|에|에서|으로|로|랑|하고|의|도|만)$/, "")).filter((w) => w.length >= 2);
 }
 
+/** 질문의 레벨 ('30레벨', '30렙', 'Lv.30') */
+function levelOf(question: string): number | null {
+  const m = question.match(/(\d{1,3})\s*(?:레벨|렙|lv)/i) ?? question.match(/(?:lv|레벨)\.?\s*(\d{1,3})/i);
+  const n = m ? Number(m[1]) : NaN;
+  return n >= 1 && n <= 200 ? n : null;
+}
+
+export interface WikiContext {
+  text: string;
+  /** 화면의 '위키에서 찾음' 줄 (찾은 것 이름) */
+  found: string[];
+}
+
 /**
  * 질문에 맞는 위키 자료를 짧은 글로 만든다.
- * 질문에 이름이 나온 아이템, 몬스터, 사냥터 → 없으면 낱말로 검색 → 제목이 맞는 글(육성 공략 등) → 사냥터 목록 순서로 채운다.
+ * 질문에 이름이 나온 아이템, 몬스터, 사냥터 → 레벨을 물으면 그 레벨 근처 사냥터와 직업 장비 → 없으면 낱말로 검색 →
+ * 제목이 맞는 글(육성 공략 등) → 사냥터 목록 순서로 채운다.
  */
-export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined, question: string): string {
+export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined, question: string): WikiContext {
   const q = norm(question);
   const parts: string[] = [];
+  const found: string[] = [];
   const add = (s: string) => {
     if (s && parts.join("\n").length + s.length < MAX_CONTEXT) parts.push(s);
   };
+  const level = levelOf(question);
+  const job = JOBS.find((j) => question.includes(j)) ?? null;
 
   // 1. 질문에 이름이 그대로 나온 것 (긴 이름부터, 짧은 이름이 긴 이름 안에 든 경우는 뺀다)
   const names: { kind: "item" | "monster" | "place"; name: string; id?: string }[] = [];
@@ -64,8 +121,8 @@ export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined,
   names.sort((a, b) => b.name.length - a.name.length);
   const picked = names.filter((n, i) => !names.slice(0, i).some((m) => norm(m.name).includes(norm(n.name)))).slice(0, 8);
 
-  // 2. 없으면 질문 낱말로 검색해서 맞는 것 몇 개
-  if (!picked.length) {
+  // 2. 없으면 질문 낱말로 검색해서 맞는 것 몇 개 (레벨을 물으면 아래 레벨 자료로 충분하다)
+  if (!picked.length && level === null) {
     for (const w of words(question)) {
       for (const h of search(wiki, w, 3)) {
         if (picked.length >= 6 || picked.some((p) => p.kind === h.kind && p.name === h.name)) continue;
@@ -75,6 +132,7 @@ export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined,
   }
 
   for (const n of picked) {
+    found.push(n.name);
     if (n.kind === "monster") {
       for (const m of Object.values(wiki.monsters).filter((x) => x.name === n.name)) {
         const place = wiki.places[m.place];
@@ -109,6 +167,58 @@ export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined,
     }
   }
 
+  // 레벨을 물으면: 그 레벨 근처 사냥터(몬스터, 장비 드랍)와 직업 장비 (제작자 요청: 답을 더 알차게)
+  if (level !== null) {
+    const near = Object.values(wiki.places)
+      .filter((p) => p.level && p.level[0] - 3 <= level && level <= p.level[1] + 3)
+      .map((p) => ({ p, gap: p.level![0] <= level && level <= p.level![1] ? 0 : Math.min(Math.abs(p.level![0] - level), Math.abs(p.level![1] - level)) }))
+      .sort((a, b) => a.gap - b.gap || a.p.level![0] - b.p.level![0])
+      .slice(0, 8);
+    if (near.length) {
+      found.push(`Lv.${level} 근처 사냥터 ${near.length}곳`);
+      add(
+        `[레벨 ${level} 근처 사냥터]\n` +
+          near
+            .map(({ p }) => {
+              const mons = p.monsters.map((k) => wiki.monsters[k]).filter(Boolean);
+              const gear = [...new Set(mons.flatMap((m) => m.drops))].filter((d) => wiki.items[d]?.equip.length).slice(0, 8);
+              return (
+                `${p.name} (${p.region}, ${levelText(p.level)}) 몬스터: ` +
+                mons.map((m) => m.name + (m.level ? ` Lv.${m.level}` : "")).join(", ") +
+                (gear.length ? ` · 장비 드랍: ${gear.join(", ")}` : "")
+              );
+            })
+            .join("\n"),
+      );
+    }
+    if (job) {
+      const gear = Object.values(wiki.items)
+        .flatMap((it) => it.equip.map((e) => ({ it, e })))
+        .filter(({ e }) => (e.info["직업"] === job || e.info["직업"] === "공용") && Math.abs(Number(e.info["레벨제한"]) - level) <= 5)
+        .sort((a, b) => Number(b.e.info["레벨제한"]) - Number(a.e.info["레벨제한"]))
+        .slice(0, 16);
+      if (gear.length) {
+        found.push(`${job} 장비 ${gear.length}개`);
+        add(
+          `[직업 장비: ${job}, Lv.${level - 5}~${level + 5}]\n` +
+            gear
+              .map(({ it, e }) =>
+                [
+                  `${it.name} (${e.slot}, Lv.${e.info["레벨제한"]})`,
+                  e.info["공격"] && `공격 ${e.info["공격"]}`,
+                  e.info["방어력"] && `방어 ${e.info["방어력"]}`,
+                  e.info["옵션"] && `옵션 ${e.info["옵션"]}`,
+                  e.info["획득처"] && `획득 ${e.info["획득처"]}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · "),
+              )
+              .join("\n"),
+        );
+      }
+    }
+  }
+
   // 3. 제목이 질문 낱말과 맞는 글 (육성 공략, 직업별 스킬, 조합책 등). 사냥터 글은 위에서 다뤘다
   if (posts) {
     const ws = words(question);
@@ -119,7 +229,10 @@ export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined,
       .filter((x) => x.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, 2);
-    for (const { p } of scored) add(`[${p.title}]\n` + postText(posts[p.id]));
+    for (const { p } of scored) {
+      found.push(p.title);
+      add(`[${p.title}]\n` + postText(posts[p.id]));
+    }
   }
 
   // 4. 위키 메뉴 이름 (답에서 [[메뉴:이름]] 으로 보낼 수 있게)
@@ -132,7 +245,7 @@ export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined,
         .map((r) => `${r.name}: ` + r.places.map((id) => wiki.places[id]).filter(Boolean).map((p) => p.name + (levelText(p.level) ? `(${levelText(p.level)})` : "")).join(", "))
         .join("\n"),
   );
-  return parts.join("\n\n");
+  return { text: parts.join("\n\n"), found };
 }
 
 /** 갤러리에서 고른 그림을 긴 변 1568px JPEG 로 줄인다 (Claude 가 더 크면 어차피 줄이고, 보내는 양과 비용이 준다) */
@@ -149,49 +262,237 @@ export async function shrinkImage(file: File): Promise<{ image: ChatImage; previ
 }
 
 export interface ChatResult {
-  /** 안전 필터가 거절했으면 true (그동안 받은 글은 버린다) */
+  /** 안전 필터가 거절했으면 true */
   refused: boolean;
   /** 답이 길어서 잘렸으면 true */
   cut: boolean;
+  /** 끝 신호(message_stop) 없이 연결이 끝났으면 true (답이 중간에서 끊김) */
+  broken: boolean;
+  /** 웹 찾기가 길어서 API 가 멈췄으면 true */
+  paused: boolean;
+  /** 멈추기를 눌렀으면 true */
+  aborted: boolean;
   /** 오늘 남은 질문 수 (서버가 알려 준 것) */
   left: number | null;
 }
 
-/** 질문을 보내고, 답 글을 받는 대로 onText 로 넘긴다. 실패하면 길드원에게 보여 줄 글로 Error 를 던진다 */
-export async function askChat(turns: ChatTurn[], context: string, onText: (text: string) => void): Promise<ChatResult> {
+export interface AskEvents {
+  /** 서버가 답을 보내기 시작할 때: 대화 번호(새 대화면 새 번호)와 넣은 질문 번호 */
+  onStart(info: { thread: number | null; msg: number | null }): void;
+  /** 생각(요약) 글 조각 */
+  onThinking(piece: string): void;
+  /** 답 글 조각 */
+  onText(piece: string): void;
+  /** 웹 찾기, 글 읽기를 했을 때 */
+  onStep(step: ChatStep): void;
+  /** 답이 기댄 웹 출처 */
+  onSource(src: ChatSource): void;
+}
+
+/** API 오류 이벤트를 길드원 글로 */
+function streamError(type: string | undefined): string {
+  if (type === "overloaded_error" || type === "api_error") return "AI 서버가 바빠요. 잠시 뒤에 다시 물어봐 주세요";
+  if (type === "rate_limit_error") return "지금 질문이 몰렸어요. 잠시 뒤에 다시 물어봐 주세요";
+  return "답을 받다가 문제가 생겼어요";
+}
+
+/** 오류 이벤트로 멈춘 것 (연결 끊김과 구별) */
+class StreamError extends Error {}
+
+interface SseEvent {
+  type: string;
+  index?: number;
+  content_block?: {
+    type: string;
+    name?: string;
+    content?: unknown;
+  };
+  delta?: {
+    type?: string;
+    text?: string;
+    thinking?: string;
+    partial_json?: string;
+    stop_reason?: string | null;
+    citation?: { url?: string; title?: string };
+  };
+  error?: { type?: string; message?: string };
+}
+
+const host = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+};
+
+/**
+ * 질문을 보내고, 서버가 그대로 넘겨 주는 Claude API 의 SSE 를 읽어 생각과 답을 받는 대로 넘긴다.
+ * 실패하면 길드원에게 보여 줄 글로 Error 를 던진다. 멈추기(signal)는 받은 데까지로 끝낸다
+ */
+export async function askChat(
+  req: { turns: ChatTurn[]; context: string; thread: number | null; again?: boolean },
+  on: AskEvents,
+  signal: AbortSignal,
+): Promise<ChatResult> {
+  const result: ChatResult = { refused: false, cut: false, broken: false, paused: false, aborted: false, left: null };
   let res: Response;
   try {
     res = await fetch("/api/chat", {
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ messages: turns, context }),
+      body: JSON.stringify({ messages: req.turns, context: req.context, thread: req.thread, again: req.again === true }),
+      signal,
     });
   } catch {
+    if (signal.aborted) return { ...result, aborted: true };
     throw new Error("인터넷 연결을 확인해 주세요");
   }
   if (!res.ok || !res.body) {
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(data.error ?? `문제가 생겼어요 (${res.status})`);
   }
-  const left = res.headers.get("x-chat-left");
+  const header = (h: string) => (res.headers.get(h) === null ? null : Number(res.headers.get(h)));
+  result.left = header("x-chat-left");
+  on.onStart({ thread: header("x-chat-thread"), msg: header("x-chat-msg") });
+  // 이 계정에서 웹 찾기를 쓸 수 없으면 (콘솔에서 꺼 둔 경우) 숨기지 않고 알린다
+  if (res.headers.get("x-chat-web") === "off") on.onStep({ kind: "search", text: "꺼짐 (위키 자료로만 답해요)" });
+
   const reader = res.body.getReader();
   const dec = new TextDecoder();
-  let all = "";
-  let shown = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (value) all += dec.decode(value, { stream: true });
-    const cut = all.indexOf(CONTROL);
-    const text = cut >= 0 ? all.slice(0, cut) : all;
-    if (text.length > shown) {
-      onText(text.slice(shown));
-      shown = text.length;
+  let buf = "";
+  let finished = false;
+  // 블록마다 종류와 도구 입력 (웹 찾기 검색어, 읽은 주소)
+  const blocks = new Map<number, { type: string; name?: string; json: string }>();
+  let lastType = "";
+  let wrote = false;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (value) buf += dec.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+      let at: number;
+      while ((at = buf.indexOf("\n\n")) >= 0) {
+        const chunk = buf.slice(0, at);
+        buf = buf.slice(at + 2);
+        const data = chunk
+          .split("\n")
+          .filter((l) => l.startsWith("data:"))
+          .map((l) => l.slice(5).replace(/^ /, ""))
+          .join("\n");
+        if (!data) continue;
+        let ev: SseEvent;
+        try {
+          ev = JSON.parse(data) as SseEvent;
+        } catch {
+          continue;
+        }
+        if (ev.type === "content_block_start" && ev.content_block) {
+          const b = ev.content_block;
+          blocks.set(ev.index ?? -1, { type: b.type, name: b.name, json: "" });
+          // 웹 찾기 뒤에 이어지는 답은 줄을 띄운다 (출처가 붙은 글은 블록이 잘게 나뉘므로 글 블록 사이는 붙인다. 서버 answerFromSse 와 같은 규칙)
+          if (b.type === "text" && wrote && lastType !== "text" && lastType !== "thinking") on.onText("\n\n");
+          lastType = b.type;
+          if (b.type === "web_fetch_tool_result" && b.content && typeof b.content === "object") {
+            const r = b.content as { url?: string; content?: { title?: string } };
+            if (r.url) on.onSource({ url: r.url, title: r.content?.title || host(r.url) });
+          }
+          if (b.type === "web_search_tool_result" && Array.isArray(b.content)) on.onStep({ kind: "search", text: `결과 ${b.content.length}개` });
+        } else if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta" && ev.delta.text) {
+          wrote = true;
+          on.onText(ev.delta.text);
+        } else if (ev.type === "content_block_delta" && ev.delta?.type === "thinking_delta" && ev.delta.thinking) on.onThinking(ev.delta.thinking);
+        else if (ev.type === "content_block_delta" && ev.delta?.type === "input_json_delta" && ev.delta.partial_json) {
+          const b = blocks.get(ev.index ?? -1);
+          if (b) b.json += ev.delta.partial_json;
+        } else if (ev.type === "content_block_delta" && ev.delta?.type === "citations_delta" && ev.delta.citation?.url) {
+          on.onSource({ url: ev.delta.citation.url, title: ev.delta.citation.title || host(ev.delta.citation.url) });
+        } else if (ev.type === "content_block_stop") {
+          const b = blocks.get(ev.index ?? -1);
+          if (b?.type === "server_tool_use") {
+            let input: { query?: string; url?: string } = {};
+            try {
+              input = JSON.parse(b.json || "{}") as typeof input;
+            } catch {
+              // 입력을 못 읽어도 한 일은 보인다
+            }
+            if (b.name === "web_search") on.onStep({ kind: "search", text: input.query ? `“${input.query}”` : "웹 찾기" });
+            else if (b.name === "web_fetch") on.onStep({ kind: "fetch", text: input.url ? host(input.url) : "글 읽기" });
+            else on.onStep({ kind: "code", text: "찾은 것 거르기" });
+          }
+        } else if (ev.type === "message_delta" && ev.delta?.stop_reason) {
+          result.refused = ev.delta.stop_reason === "refusal";
+          result.cut = ev.delta.stop_reason === "max_tokens";
+          result.paused = ev.delta.stop_reason === "pause_turn";
+        } else if (ev.type === "message_stop") finished = true;
+        else if (ev.type === "error") throw new StreamError(streamError(ev.error?.type));
+      }
+      if (done) break;
     }
-    if (done) break;
+  } catch (e) {
+    if (signal.aborted) return { ...result, aborted: true };
+    if (e instanceof StreamError) throw e;
+    return { ...result, broken: true };
   }
-  const at = all.indexOf(CONTROL);
-  const end = at >= 0 ? (JSON.parse(all.slice(at + 1)) as { kind: string; message?: string }) : null;
-  if (end?.kind === "error") throw new Error(end.message ?? "답을 받다가 문제가 생겼어요");
-  return { refused: end?.kind === "refusal", cut: end?.kind === "max_tokens", left: left === null ? null : Number(left) };
+  return { ...result, broken: !finished };
 }
+
+// ---- 대화 기록 (서버 functions/api/chat/threads, 그 길드원만 본다)
+
+export interface ThreadSummary {
+  id: number;
+  title: string;
+  pinned: boolean;
+  updated_at: number;
+  /** 찾기에서 맞은 말 한 줄 */
+  hit?: string | null;
+}
+export interface SavedMsg {
+  id: number;
+  role: "user" | "assistant";
+  text: string;
+  photos: number;
+  thinking: string | null;
+  think_ms: number | null;
+  found: string | null;
+  /** JSON: 첨부 이름 */
+  attach: string | null;
+  /** JSON: ChatStep[] */
+  steps: string | null;
+  /** JSON: ChatSource[] */
+  sources: string | null;
+  created_at: number;
+}
+
+export const listThreads = (q = "") => api<{ threads: ThreadSummary[] }>("/api/chat/threads" + (q ? "?q=" + encodeURIComponent(q) : ""));
+export interface FixedGap {
+  id: number;
+  question: string;
+  note: string | null;
+}
+export const loadThread = (id: number) => api<{ thread: ThreadSummary; msgs: SavedMsg[]; fixed?: FixedGap[] }>(`/api/chat/threads/${id}`);
+export const updateThread = (id: number, patch: { title?: string; pinned?: boolean }) => api<{ ok: true }>(`/api/chat/threads/${id}`, "PATCH", patch);
+export const deleteThread = (id: number) => api<{ ok: true }>(`/api/chat/threads/${id}`, "DELETE");
+export const saveAnswer = (thread: number, a: { text: string; thinking: string; thinkMs: number | null; found: string; steps: string; sources: string }) =>
+  api<{ id: number }>(`/api/chat/threads/${thread}/msgs`, "POST", a);
+/** 길드원의 '👎 별로' (앱개발자에게 간다) */
+export const reportAnswer = (msg: number) => api<{ ok: true }>("/api/chat/gaps", "POST", { msg });
+
+export interface ChatGap {
+  id: number;
+  user_id: string;
+  thread_id: number;
+  question: string;
+  answer: string | null;
+  reason: string;
+  kind: "bot" | "user";
+  status: "open" | "fixed";
+  note: string | null;
+  created_at: number;
+  fixed_at: number | null;
+}
+export const listGaps = (status: "open" | "fixed") => api<{ gaps: ChatGap[] }>(`/api/chat/gaps?status=${status}`);
+export const fixGap = (id: number, note: string) => api<{ ok: true }>(`/api/chat/gaps/${id}`, "PATCH", { note });
+
+/** 그 말부터 뒤를 지운다 (다시 답하기, 질문 수정) */
+export const deleteFrom = (thread: number, from: number) => api<{ ok: true }>(`/api/chat/threads/${thread}/msgs?from=${from}`, "DELETE");

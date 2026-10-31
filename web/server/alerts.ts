@@ -18,6 +18,9 @@ export const ALERT_KINDS = {
   shop: true,
   board: true,
   board_notice: true,
+  chat_fixed: true,
+  chat_gap: true,
+  chat_done: true,
 } as const;
 export type AlertKind = keyof typeof ALERT_KINDS;
 export const isAlertKind = (k: unknown): k is AlertKind => typeof k === "string" && k in ALERT_KINDS;

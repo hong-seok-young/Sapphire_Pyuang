@@ -4,7 +4,7 @@ import { api } from "./auth";
 
 export type AlertKind =
   | "market_want" | "market_bid" | "market_outbid" | "market_new" | "gold_want" | "request" | "request_new" | "talk" | "account" | "shop"
-  | "board" | "board_notice";
+  | "board" | "board_notice" | "chat_fixed" | "chat_gap" | "chat_done";
 
 export interface Alert {
   id: number;
@@ -16,7 +16,7 @@ export interface Alert {
 }
 
 /** 메뉴별 알림 종류 (켜고 끄기 칸). 이름은 짧은 명사로 */
-export const ALERT_GROUPS: { menu: string; kinds: { kind: AlertKind; name: string }[] }[] = [
+export const ALERT_GROUPS: { menu: string; kinds: { kind: AlertKind; name: string; developer?: boolean }[] }[] = [
   {
     menu: "중개인",
     kinds: [
@@ -29,6 +29,10 @@ export const ALERT_GROUPS: { menu: string; kinds: { kind: AlertKind; name: strin
   { menu: "토론방", kinds: [{ kind: "talk", name: "새 글" }] },
   { menu: "게시판", kinds: [{ kind: "board", name: "내 글 댓글" }, { kind: "board_notice", name: "새 공지·이벤트" }] },
   { menu: "상점", kinds: [{ kind: "shop", name: "플래티넘 구매" }] },
+  {
+    menu: "챗봇",
+    kinds: [{ kind: "chat_done", name: "답변 완료" }, { kind: "chat_fixed", name: "개선됨" }, { kind: "chat_gap", name: "모르는 질문", developer: true }],
+  },
   { menu: "계정", kinds: [{ kind: "account", name: "역할" }] },
 ];
 

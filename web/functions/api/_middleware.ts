@@ -21,7 +21,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   try {
     // 로그아웃, 글 지우기는 끝난 뒤에는 누구인지, 무슨 글인지 모르므로 먼저 본다
     me = await currentUser(env, request);
-    if (!opening && BINARY.test(path)) body = { size: `${Math.round(Number(request.headers.get("content-length") ?? 0) / 1024)}KB` };
+    const size = Number(request.headers.get("content-length") ?? 0);
+    // 그림 파일, 첨부가 큰 챗봇 질문은 크기만 적는다 (큰 본문을 두 번 풀면 서버 CPU 한도에 걸린다)
+    if (!opening && (BINARY.test(path) || (path === "/api/chat" && size > 150_000))) body = { size: `${Math.round(size / 1024)}KB` };
     else if (!opening) body = await request.clone().json().catch(() => null);
     if (!opening) subject = await subjectOf(env, path);
   } catch {

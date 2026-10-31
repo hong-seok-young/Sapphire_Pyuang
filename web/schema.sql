@@ -321,3 +321,49 @@ CREATE TABLE IF NOT EXISTS push_keys (
   public_key TEXT NOT NULL,
   private_jwk TEXT NOT NULL
 );
+
+-- 챗봇 대화 기록 (functions/api/chat, server/chatlog.ts, 제작자 요청: 클로드·GPT 처럼 대화 목록과 이어 하기).
+-- 그 길드원만 본다. 사진은 저장하지 않고 장 수만. 한 사람 300개까지 (넘으면 고정 안 한 오래된 것부터 지운다)
+CREATE TABLE IF NOT EXISTS chat_threads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  pinned INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS chat_threads_user ON chat_threads (user_id, updated_at);
+CREATE TABLE IF NOT EXISTS chat_msgs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  thread_id INTEGER NOT NULL,
+  role TEXT NOT NULL,           -- user / assistant
+  text TEXT NOT NULL,
+  photos INTEGER NOT NULL DEFAULT 0,
+  thinking TEXT,                -- 답하기 전 생각 (요약, 화면의 '생각' 칸)
+  think_ms INTEGER,
+  found TEXT,                   -- 화면이 찾은 위키 자료 이름 (' · ')
+  attach TEXT,                  -- 첨부 이름 JSON (사진, 파일 이름. 내용은 저장하지 않는다)
+  steps TEXT,                   -- 답하며 한 일 JSON (웹 찾기, 글 읽기)
+  sources TEXT,                 -- 웹 출처 JSON [{url, title}]
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS chat_msgs_thread ON chat_msgs (thread_id, id);
+
+-- 챗봇이 모르는 질문 (제작자 요청): 길잡이가 짐작하거나 자료가 없다고 표시한 답([[모름:...]])과 길드원의 '👎 별로'.
+-- 앱개발자에게 알리고(#/gaps), 개선 완료를 누르면 물은 사람에게 알린다. status: open / fixed
+CREATE TABLE IF NOT EXISTS chat_gaps (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  thread_id INTEGER NOT NULL,
+  msg_id INTEGER,
+  question TEXT NOT NULL,
+  answer TEXT,
+  reason TEXT NOT NULL,
+  kind TEXT NOT NULL,            -- bot (길잡이가 모름) / user (길드원이 별로라고 함)
+  status TEXT NOT NULL DEFAULT 'open',
+  note TEXT,                     -- 무엇을 고쳤는지
+  created_at INTEGER NOT NULL,
+  fixed_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS chat_gaps_status ON chat_gaps (status, created_at);
+

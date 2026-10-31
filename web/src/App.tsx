@@ -20,6 +20,7 @@ import { MarketPage } from "./pages/Market";
 import { RequestsPage } from "./pages/Requests";
 import { ActivityLogPage } from "./pages/ActivityLog";
 import { AlertsPage } from "./pages/Alerts";
+import { ChatGapsPage } from "./pages/ChatGaps";
 import { PlatShopPage } from "./pages/PlatShop";
 import { BoardPage } from "./pages/Board";
 import { forgetView, reportView } from "./activity";
@@ -136,7 +137,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "me") body = <MePage me={me} onMe={onMe} onLogout={onLogout} />;
   else if (page === "ranking") body = <RankingPage me={me} />;
   else if (page === "requests") body = <RequestsPage me={me} />;
-  else if (page === "alerts") body = <AlertsPage />;
+  else if (page === "alerts") body = <AlertsPage developer={me.role === "developer"} />;
   else if (page === "shop") body = <PlatShopPage />;
   else if (page === "board") body = <BoardPage me={me} arg={arg} sub={route.parts[2] ?? ""} query={route.query} />;
   else if (!wiki) body = <Loading error={loggedOut ? undefined : error} />;
@@ -149,7 +150,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "equip") body = arg ? <EquipSlot wiki={wiki} slot={arg} /> : <EquipSlots wiki={wiki} />;
   else if (page === "menu") body = <MenuPage wiki={wiki} title={arg} />;
   else if (page === "post") body = <PostPage wiki={wiki} id={arg} />;
-  else if (page === "chat") body = <ChatPage wiki={wiki} />;
+  else if (page === "chat") body = <ChatPage wiki={wiki} arg={arg} query={route.query} />;
+  else if (page === "gaps") body = me.role === "developer" ? <ChatGapsPage /> : <NotFound what="페이지" />;
   else if (page === "market") body = <MarketPage wiki={wiki} me={me} />;
   else if (page === "log") body = me.role === "developer" ? <ActivityLogPage wiki={wiki} /> : <NotFound what="페이지" />;
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
@@ -174,7 +176,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
         </div>
       )}
       {/* 화면이 바뀔 때 0.16초 안에 살짝 떠오른다 (주소의 ? 뒤만 바뀌면 그대로) */}
-      <main className="page" key={route.parts.join("/")}>
+      {/* 챗봇은 새 대화가 #/chat -> #/chat/번호 로 바뀌어도, 목록을 다녀와도 받던 답이 이어지게 한 화면으로 둔다 */}
+      <main className="page" key={page === "chat" ? "chat" : route.parts.join("/")}>
         {body}
       </main>
       <nav className="tabbar">

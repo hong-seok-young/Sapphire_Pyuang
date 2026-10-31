@@ -40,7 +40,6 @@ const TILES: Tile[] = [
   { title: "인던 · 길드던전", to: "#/menu/인던 · 길드던전", icon: "🏰" },
   { title: "전장 · 헌팅그라운드", to: "#/menu/전장 · 헌팅그라운드", icon: "🚩" },
   { title: "퀘스트 · 지도", to: "#/menu/퀘스트 · 지도", icon: "📜" },
-  { title: "AI 챗봇", to: "#/chat", icon: "💬" },
   { title: "길드 랭킹", to: "#/ranking", icon: "🏆" },
   { title: "사파이어 중개인", to: "#/market", icon: "💰" },
   { title: "길드원 의뢰소", to: "#/requests", icon: "📋" },
@@ -49,6 +48,8 @@ const TILES: Tile[] = [
   { title: "안드로이드 앱 받기", to: "#/app", icon: "📲", androidOnly: true, soon: !APP_OPEN, badge: "검토 후 오픈" },
   { title: "길드원 관리", to: "#/admin", icon: "👥", managers: true, ribbon: "운영진", ring: "blue" },
   { title: "사용 기록", to: "#/log", icon: "📊", developer: true, ribbon: "개발자", ring: "purple" },
+  // 챗봇이 모르는 질문 (제작자 요청: 보고 고친 뒤 물은 사람에게 알린다)
+  { title: "챗봇 개선", to: "#/gaps", icon: "🧙", developer: true, ribbon: "개발자", ring: "purple" },
 ];
 
 export function Home({ me }: { me: Me }) {

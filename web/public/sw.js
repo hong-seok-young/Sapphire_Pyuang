@@ -18,6 +18,9 @@ const KIND_TITLE = {
   board_notice: "📢 게시판",
   shop: "💎 플래티넘 상점",
   account: "👤 내 계정",
+  chat_fixed: "🧙 챗봇 · 개선됨",
+  chat_done: "🧙 챗봇 · 답변 완료",
+  chat_gap: "🧙 챗봇 · 모르는 질문",
 };
 
 self.addEventListener("install", () => self.skipWaiting());
