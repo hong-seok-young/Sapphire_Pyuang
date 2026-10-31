@@ -830,7 +830,7 @@ button { font: inherit; color: inherit; }
 /* platinum discount shop (pages/PlatShop.tsx): game shop tiles three per row, strikethrough market price */
 .tile-pic { height: 30px; width: auto; image-rendering: auto; }
 .ps-closed { margin: 0 0 6px; text-align: center; font-size: 12px; color: var(--edge); background: #ffd34d; }
-.ps-rate { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 0 0 8px; font-size: 13px; }
+.ps-rate { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 0 0 8px; font-size: 13px; font-weight: 700; }
 .ps-rate img, .ps-ledger img { width: 16px; height: 16px; }
 .ps-rate b { color: var(--gold); }
 .ps-rate s, .ps-price s, .ps-buy s { color: var(--muted); }
@@ -851,10 +851,13 @@ button { font: inherit; color: inherit; }
 .ps-worth img { width: 9px; height: auto; }
 .ps-picked { box-shadow: 0 0 0 2px var(--sunset); }
 .ps-off { opacity: 0.45; }
-.ps-price { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 0 4px; font-size: 12px; }
-.ps-price b { color: var(--gold); font-weight: 400; }
-.ps-price em { font-style: normal; font-size: 10px; color: #ff7a6b; }
-.ps-limit { text-align: center; font-size: 10px; color: var(--muted); }
+/* every line under a shop card in one font (제작자 요청): the same size and bold weight, only the colour differs.
+   Thin Galmuri at 10px or 12px next to bold 11px looked broken on phones */
+.ps-price, .ps-price-row, .ps-limit { font-size: 11px; font-weight: 700; line-height: 1.35; }
+.ps-price { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 0 4px; }
+.ps-price b { color: var(--gold); }
+.ps-price em { font-style: normal; color: #ff7a6b; }
+.ps-limit { text-align: center; color: var(--muted); }
 .ps-buy {
   position: fixed; z-index: 20; left: 50%; transform: translateX(-50%); width: min(616px, calc(100% - 16px));
   bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 6px);
@@ -924,8 +927,8 @@ button { font: inherit; color: inherit; }
 /* high-spec (고스펙): a tag at the end of the small line, and the price that applies to me in the shop */
 .rank-up-slot { flex-direction: column; align-items: center; gap: 2px; }
 .ps-strong { color: var(--gold); font-weight: 700; }
-.ps-dim { color: #7c779b; }
-.ps-price-row { display: block; text-align: center; font-size: 11px; line-height: 1.35; }
+.ps-dim { color: var(--muted); }
+.ps-price-row { display: block; text-align: center; }
 .ps-wide { width: 80px !important; }
 .ps-ledger small { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); }
 .ps-ledger small img { width: 12px; height: auto; }
