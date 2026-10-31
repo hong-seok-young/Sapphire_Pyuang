@@ -1327,23 +1327,17 @@ button { font: inherit; color: inherit; }
   .gc, .gc-area, .gc-line, .gc-rest, .gc-dot, .gc-up { animation: none; opacity: 1; transform: none; stroke-dashoffset: 0; }
 }
 
-/* platinum shop budget review (PlatShop.tsx BudgetPanel, 제작자 요청): buy / sell / profit in three columns,
-   rows for platinum, cash and gold. Profit is green, loss is red */
-.ps-review { width: 100%; margin: 0 0 8px; border-collapse: collapse; table-layout: fixed; font-size: 12px; font-weight: 700; }
-.ps-review th, .ps-review td { padding: 7px 2px; text-align: center; border-bottom: 1px solid rgba(169, 162, 207, 0.2); }
-.ps-review tbody tr:last-child th, .ps-review tbody tr:last-child td { border-bottom: 0; }
-.ps-review thead th { font-size: 13px; color: var(--gold); }
-.ps-review thead th:first-child, .ps-review tbody th { width: 58px; }
-.ps-review tbody th { font-size: 12px; color: var(--muted); text-align: left; padding-left: 6px; }
-.ps-review small { display: block; font-size: 10px; color: var(--muted); }
-.ps-review img, .ps-review-groups img, .ps-review-note img { width: 12px; height: 12px; margin-right: 2px; vertical-align: -1px; image-rendering: pixelated; }
-.ps-review-gain small { display: block; font-size: 10px; }
+/* platinum shop budget review (PlatShop.tsx BudgetPanel, 제작자 요청): three cards, buy (platinum, money) | sell (gold coming
+   in) | profit (money spent turned into gold at 1 : 75 against the gold coming in). Profit is green, loss is red */
+.ps-review { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0 0 8px; }
+.ps-review .panel { display: flex; flex-direction: column; align-items: center; gap: 3px; margin: 0; padding: 8px 4px; text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); }
+.ps-review .panel > b:first-child { font-size: 13px; color: var(--gold); }
+.ps-review small { font-size: 10px; }
+.ps-review-big { font-size: 14px; color: var(--text); }
+.ps-review img, .ps-review-groups img { width: 12px; height: 12px; margin-right: 2px; vertical-align: -1px; image-rendering: pixelated; }
 .ps-up { color: #8ff0b0; }
 .ps-down { color: #ff8a7a; }
 .ps-review-groups { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.ps-review-groups li { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 0; font-size: 12px; font-weight: 700; }
+.ps-review-groups li { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 0; font-size: 12px; font-weight: 700; text-align: center; }
 .ps-review-groups small { font-size: 11px; color: var(--muted); }
-.ps-review-groups span { display: flex; align-items: baseline; gap: 4px; color: var(--muted); }
-.ps-review-groups .ps-review-gain { display: inline; }
-.ps-review-groups .ps-review-gain small { display: inline; margin-left: 2px; }
 .ps-review-note { margin: 0 0 90px; text-align: center; font-size: 11px; color: var(--muted); }
