@@ -179,6 +179,9 @@ export const clearLevelBadge = (id: string) => api<{ ok: boolean }>(`/api/users/
 export const saveProfileOf = (id: string, job: Job, level: number, guild: Guild, change: ChangeKind = "fix") =>
   api<{ id: string; job: Job; level: number; guild: Guild }>(`/api/users/${encodeURIComponent(id)}/profile`, "PUT", { job, level, guild, change });
 export const fetchRanking = () => api<RankEntry[]>("/api/ranking");
+/** 랭킹 그래프: 그 사람의 레벨·경험치 기록 (오래된 것부터)과 지금 값 */
+export const fetchHistory = (id: string) =>
+  api<{ points: LevelLogEntry[]; profile: { level: number; exp: number | null } }>(`/api/users/${encodeURIComponent(id)}/history`);
 
 /** 성장 랭킹 기간: 오늘(0시부터), 이번 주(목요일 오전 10시부터), 이번 달(1일 0시부터), 한국 시간 */
 export type GrowthPeriod = "day" | "week" | "month";

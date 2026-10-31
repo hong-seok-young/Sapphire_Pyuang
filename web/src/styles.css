@@ -1275,3 +1275,46 @@ button { font: inherit; color: inherit; }
 .tile-pic { height: 36px; }
 .search-entry .px-icon { margin-right: 4px; }
 
+
+/* growth chart (pages/GrowthChart.tsx, 제작자 요청): tap a nickname in the ranking. The panel opens, the line draws
+   from the left, the dots pop in one after another and level-ups are gold. Nothing moves with reduced motion */
+.nick-btn {
+  display: block; width: 100%; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit;
+  text-align: inherit; cursor: pointer;
+}
+.nick-btn-open .rank-nick, .nick-btn-open .growth-nick { text-decoration: underline 2px; text-underline-offset: 3px; }
+.rank-chart { list-style: none; }
+.growth-hero + .gc { margin: -4px 0 10px; }
+.gc {
+  padding: 8px 8px 6px; background: var(--night-2); border: var(--px) solid var(--edge);
+  box-shadow: inset var(--px) var(--px) 0 var(--hi), inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--lo);
+  transform-origin: top center; animation: gc-open 0.22s ease-out both;
+}
+.gc-svg { display: block; width: 100%; max-width: 480px; height: auto; margin: 0 auto; overflow: visible; }
+.gc-grid { stroke: rgba(169, 162, 207, 0.22); stroke-width: 1; shape-rendering: crispEdges; }
+.gc-axis { font-size: 10px; font-weight: 700; fill: var(--muted); }
+.gc-stop-a { stop-color: var(--gold); stop-opacity: 0.35; }
+.gc-stop-b { stop-color: var(--gold); stop-opacity: 0; }
+.gc-area { opacity: 0; animation: gc-fade 0.5s 0.55s ease-out forwards; }
+.gc-line {
+  fill: none; stroke: var(--gold); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round;
+  stroke-dasharray: 1; stroke-dashoffset: 1; animation: gc-draw 0.9s 0.1s ease-out forwards;
+}
+.gc-rest { stroke: var(--gold); stroke-width: 1.5; stroke-dasharray: 3 3; opacity: 0; animation: gc-fade 0.3s 1s ease-out forwards; }
+.gc-dot {
+  fill: var(--text); stroke: var(--edge); stroke-width: 1; transform-box: fill-box; transform-origin: center; transform: scale(0);
+  animation: gc-pop 0.28s var(--d, 0s) cubic-bezier(0.3, 1.6, 0.6, 1) forwards;
+}
+.gc-dot-up { fill: var(--gold); }
+.gc-up { font-size: 10px; font-weight: 700; fill: var(--gold); opacity: 0; animation: gc-fade 0.3s var(--d, 0s) ease-out forwards; }
+.gc-sum { margin: 4px 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 0 6px; font-size: 11px; font-weight: 700; color: var(--muted); }
+.gc-sum b { color: var(--text); }
+.gc-sum em { font-style: normal; color: #8ff0b0; }
+.gc-empty { margin: 0; text-align: center; font-size: 12px; color: var(--muted); }
+@keyframes gc-open { from { opacity: 0; transform: translateY(-4px) scaleY(0.92); } }
+@keyframes gc-draw { to { stroke-dashoffset: 0; } }
+@keyframes gc-fade { to { opacity: 1; } }
+@keyframes gc-pop { to { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .gc, .gc-area, .gc-line, .gc-rest, .gc-dot, .gc-up { animation: none; opacity: 1; transform: none; stroke-dashoffset: 0; }
+}

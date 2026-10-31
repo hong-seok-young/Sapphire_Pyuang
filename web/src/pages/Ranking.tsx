@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { Fragment, useCallback, useState } from "react";
 import {
   GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, avatarUrl, errorText, expText, fetchGrowth, fetchRanking, growthText, saveMyProfile,
 } from "../auth";
@@ -7,6 +7,7 @@ import { useAsync } from "../data";
 import { JobEmblem, JobGlyph, MINE_TAG_PIC, RankMedal, RoleBadge } from "../emblems";
 import { ChangeAsk, FitLine, Loading, TopBar } from "../ui";
 import { weekStart } from "../week";
+import { GrowthChart } from "./GrowthChart";
 
 
 type View = "level" | GrowthPeriod;
@@ -83,7 +84,16 @@ function Nick({ id, high, className }: { id: string; high?: boolean; className: 
   return <FitLine className={className + (high ? " hs-text" : "")} text={id} wrap={false} />;
 }
 
-function Row({ r, me, now }: { r: Ranked; me: Me; now: number }) {
+/** 누르면 아래에 레벨·경험치 그래프가 펼쳐지는 닉네임 (제작자 요청 2026-10-31) */
+function NickButton({ open, onToggle, ...nick }: { id: string; high?: boolean; className: string; open: boolean; onToggle: () => void }) {
+  return (
+    <button type="button" className={"nick-btn" + (open ? " nick-btn-open" : "")} aria-expanded={open} onClick={onToggle}>
+      <Nick {...nick} />
+    </button>
+  );
+}
+
+function Row({ r, me, now, open, onToggle }: { r: Ranked; me: Me; now: number; open: boolean; onToggle: () => void }) {
   const up = recentUp(r, now);
   return (
     <li className={"rank-row" + (r.rank <= 3 ? " rank-top-" + r.rank : "") + (r.id === me.id ? " rank-mine" : "")}>
@@ -95,7 +105,7 @@ function Row({ r, me, now }: { r: Ranked; me: Me; now: number }) {
         {/* 작은 글씨도 한 줄에 (넘치면 글자를 줄인다): 줄 높이가 사람마다 달라지지 않게 */}
         <FitLine className="rank-sub" text={`${guildText(r.guild)} · ${JOB_NAME[r.job]}`} wrap={false} />
         {/* 닉네임은 10글자까지: 넘치면 글자를 줄여서 한 줄에 다 보인다 (자르지 않는다) */}
-        <Nick className="rank-nick" id={r.id} high={r.highSpec} />
+        <NickButton className="rank-nick" id={r.id} high={r.highSpec} open={open} onToggle={onToggle} />
         <ExpBar r={r} mine={r.id === me.id} />
       </span>
       {/* 레벨업 표시 자리는 늘 비워 두어서 표시가 떠도 닉네임이 밀리지 않는다 */}
@@ -196,6 +206,7 @@ function ExpBar({ r, mine }: { r: Ranked; mine: boolean }) {
 /** 레벨 랭킹: 게임의 경험치 랭킹 목록처럼 (메달, 엠블럼, 맨 아래 '내순위'). 길드(통합/1군/2군)와 직업으로 거른다 */
 function LevelRanking({ me, data, guild, onGuild }: { me: Me; data: RankEntry[]; guild: GuildFilter; onGuild: (g: GuildFilter) => void }) {
   const [filter, setFilter] = useState<Job | "all">("all");
+  const [openId, setOpenId] = useState<string | null>(null);
   const now = Date.now();
   const overall = new Map(data.map((r, i) => [r.id, i + 1]));
   const inGuild = guild === "all" ? data : data.filter((r) => r.guild === guild);
@@ -262,7 +273,14 @@ function LevelRanking({ me, data, guild, onGuild }: { me: Me; data: RankEntry[];
       ) : (
         <ul className="rank-list">
           {list.map((r) => (
-            <Row key={r.id} r={r} me={me} now={now} />
+            <Fragment key={r.id}>
+              <Row r={r} me={me} now={now} open={openId === r.id} onToggle={() => setOpenId(openId === r.id ? null : r.id)} />
+              {openId === r.id && (
+                <li className="rank-chart">
+                  <GrowthChart id={r.id} />
+                </li>
+              )}
+            </Fragment>
           ))}
         </ul>
       )}
@@ -281,7 +299,7 @@ function LevelRanking({ me, data, guild, onGuild }: { me: Me; data: RankEntry[];
         </a>
       </div>
       <p className="rank-note">
-        레벨, 경험치, 캐릭터 사진은 각자 '내 정보'에서 바꿔요. 잘못 적힌 레벨은 오피서에게 말해 주세요.
+        닉네임을 누르면 레벨·경험치 그래프가 보여요. 레벨, 경험치, 캐릭터 사진은 각자 '내 정보'에서 바꿔요. 잘못 적힌 레벨은 오피서에게 말해 주세요.
       </p>
     </>
   );
@@ -308,6 +326,8 @@ function dayText(t: number): string {
  */
 function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthPeriod; guild: GuildFilter; onGuild: (g: GuildFilter) => void }) {
   const { data, error } = useAsync(useCallback(() => fetchGrowth(period), [period]));
+  const [openId, setOpenId] = useState<string | null>(null);
+  const toggle = (id: string) => setOpenId(openId === id ? null : id);
   if (!data) return <Loading error={error} />;
   const entries = guild === "all" ? data.entries : data.entries.filter((e) => e.guild === guild);
   const [first, ...rest] = entries;
@@ -316,7 +336,9 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
     <>
       <GuildCards items={data.entries} selected={guild} onSelect={onGuild} withAverage={false} />
       <p className="growth-note">
-        {period === "day" ? "오늘 0시" : `${dayText(data.start)} 0시`}부터 지금까지 오른 만큼이에요. 레벨, 경험치를 적을 때마다 기록돼요.
+        {/* 주간은 목요일 오전 10시부터 (제작자 요청, week.ts) */}
+        {period === "day" ? "오늘 0시" : `${dayText(data.start)} ${period === "week" ? "오전 10시" : "0시"}`}부터 지금까지 오른 만큼이에요.
+        레벨, 경험치를 적을 때마다 기록돼요. 닉네임을 누르면 그래프가 보여요.
       </p>
       {!first ? (
         <div className="empty">{PERIOD_NAME[period]} 아직 오른 사람이 없어요. 레벨업 하면 '내 정보'에서 적어 주세요!</div>
@@ -327,30 +349,38 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
             <span className="growth-hero-face">
               <Face e={first} size={96} />
             </span>
-            <Nick className="growth-hero-name" id={first.id} high={first.highSpec} />
+            <NickButton className="growth-hero-name" id={first.id} high={first.highSpec} open={openId === first.id} onToggle={() => toggle(first.id)} />
             <span className="growth-hero-sub">
               {guildText(first.guild)} · {JOB_NAME[first.job]} · Lv.{first.fromLevel}
               {first.level !== first.fromLevel && ` → ${first.level}`}
             </span>
             <span className="growth-hero-value">{growthText(first.growth)}</span>
           </div>
+          {openId === first.id && <GrowthChart id={first.id} />}
           {rest.length > 0 && (
             <ol className="growth-list">
               {rest.map((e, i) => (
-                <li key={e.id} className={"growth-row" + (e.id === me.id ? " growth-mine" : "")}>
-                  <span className={"growth-rank growth-rank-" + (i + 2)}>{i + 2}</span>
-                  <span className="growth-row-face">
-                    <Face e={e} size={40} />
-                  </span>
-                  <span className="growth-row-name">
-                    <Nick className="growth-nick" id={e.id} high={e.highSpec} />
-                    <small>
-                      {guildText(e.guild)} · {JOB_NAME[e.job]} · Lv.{e.fromLevel}
-                      {e.level !== e.fromLevel && ` → ${e.level}`}
-                    </small>
-                  </span>
-                  <span className="growth-row-value">{growthText(e.growth)}</span>
-                </li>
+                <Fragment key={e.id}>
+                  <li className={"growth-row" + (e.id === me.id ? " growth-mine" : "")}>
+                    <span className={"growth-rank growth-rank-" + (i + 2)}>{i + 2}</span>
+                    <span className="growth-row-face">
+                      <Face e={e} size={40} />
+                    </span>
+                    <span className="growth-row-name">
+                      <NickButton className="growth-nick" id={e.id} high={e.highSpec} open={openId === e.id} onToggle={() => toggle(e.id)} />
+                      <small>
+                        {guildText(e.guild)} · {JOB_NAME[e.job]} · Lv.{e.fromLevel}
+                        {e.level !== e.fromLevel && ` → ${e.level}`}
+                      </small>
+                    </span>
+                    <span className="growth-row-value">{growthText(e.growth)}</span>
+                  </li>
+                  {openId === e.id && (
+                    <li className="rank-chart">
+                      <GrowthChart id={e.id} />
+                    </li>
+                  )}
+                </Fragment>
               ))}
             </ol>
           )}
@@ -369,7 +399,8 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
 /**
  * 길드 랭킹. '레벨'은 게임의 경험치 랭킹 화면처럼 (직업 필터, 1~3위 메달, 맨 아래 '내순위'),
  * '오늘, 주간, 월간 성장'은 그 기간에 많이 오른 순서. 레벨, 직업, 경험치, 캐릭터 사진은 길드원이 직접 적고 올린 것이다
- * (게임을 읽지 않는다. CLAUDE.md 게임 안전 규칙). 경험치 숫자는 본인 것만 보이고, 성장 랭킹에는 오른 양만 보인다.
+ * (게임을 읽지 않는다. CLAUDE.md 게임 안전 규칙). 경험치는 모두에게 보인다 (제작자 요청). 닉네임을 누르면
+ * 그 사람의 레벨·경험치 그래프가 그 줄 아래에 펼쳐진다 (GrowthChart).
  */
 export function RankingPage({ me }: { me: Me }) {
   const { data, error } = useAsync(useCallback(() => fetchRanking(), []));

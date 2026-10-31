@@ -2,7 +2,8 @@
 // 가만히 있으니 답답하다). 받은 코드는 브라우저가 들고 있어서 새로고침은 금방이다. 글을 쓰는 중이면 저절로 하지 않고 단추를 보인다.
 import { useEffect, useState } from "react";
 
-const CHECK_MS = 5 * 60_000;
+/** 새 버전 확인 간격. 웹과 앱(같은 사이트를 띄운다)에 배포가 거의 바로 같이 들어가게 1분마다 (제작자 요청) */
+const CHECK_MS = 60_000;
 
 /** 지금 화면의 코드 파일 (빌드마다 이름이 바뀐다). 개발 서버면 null */
 export function currentBuild(): string | null {
