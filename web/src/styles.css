@@ -703,3 +703,17 @@ button { font: inherit; color: inherit; }
 .account-roles { display: flex; flex-wrap: wrap; gap: 6px; }
 .account-roles .pill, .account-panel .account-actions .pill { font-size: 12px; padding: 5px 9px; }
 .rename-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; font-size: 13px; }
+
+/* '새 버전으로 업데이트됐어요' (main.tsx noticeUpdate): 위에서 톡 내려왔다 사라진다 */
+.update-toast {
+  position: fixed; z-index: 50; left: 50%; top: calc(10px + env(safe-area-inset-top)); transform: translateX(-50%);
+  padding: 8px 14px; font-size: 13px; white-space: nowrap; color: var(--edge); background: var(--gold);
+  border: var(--px) solid var(--edge); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); pointer-events: none;
+  animation: toast 3.2s ease forwards;
+}
+@keyframes toast {
+  0% { opacity: 0; transform: translate(-50%, -12px); }
+  8%, 85% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -6px); }
+}
+

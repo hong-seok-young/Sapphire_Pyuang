@@ -11,9 +11,54 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <link rel="manifest" href="manifest.webmanifest" />
     <title>Sapphire 아이모 위키</title>
+    <style>
+      /* 앱 코드가 뜨기 전 첫 화면 (배포 직후 새 코드를 받는 동안 까만 화면만 보이지 않게, 제작자 요청) */
+      html, body { margin: 0; background: #141831; }
+      .boot { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 14px; padding: 24px; box-sizing: border-box; color: #f3f0ff; text-align: center; word-break: keep-all;
+        font-family: "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+      .boot img { width: 72px; height: 72px; image-rendering: pixelated; animation: boot-bob 1.2s ease-in-out infinite; }
+      .boot b { font-size: 22px; color: #ffc35c; letter-spacing: 1px; }
+      .boot p { margin: 0; font-size: 14px; color: #a9a2cf; line-height: 1.6; }
+      .boot .boot-slow { display: none; }
+      .boot.slow .boot-slow { display: block; }
+      @keyframes boot-bob { 50% { transform: translateY(-6px); } }
+    </style>
+    <script>
+      // 배포 뒤 폰이 예전 페이지를 들고 있으면 없어진 예전 코드 파일을 찾다 멈춘다. 그때 한 번만 새로 불러온다 (30초 안에 또 하지 않음)
+      (function () {
+        function retry() {
+          try {
+            var last = Number(sessionStorage.getItem("sapphire-reload") || 0);
+            if (Date.now() - last < 30000) return;
+            sessionStorage.setItem("sapphire-reload", String(Date.now()));
+          } catch (e) {}
+          var msg = document.getElementById("boot-msg");
+          if (msg) msg.textContent = "새로 업데이트됐어요. 새 버전으로 다시 불러올게요…";
+          setTimeout(function () { location.reload(); }, 600);
+        }
+        window.addEventListener("error", function (e) {
+          var t = e.target;
+          if (t && (t.tagName === "SCRIPT" || t.tagName === "LINK") && (t.src || t.href || "").indexOf("/assets/") >= 0) retry();
+        }, true);
+        window.addEventListener("vite:preloadError", function (e) { e.preventDefault(); retry(); });
+        // 앱이 4초 안에 안 뜨면 새 버전을 받는 중이라고 알린다
+        setTimeout(function () {
+          var boot = document.getElementById("boot");
+          if (boot) boot.className = "boot slow";
+        }, 4000);
+      })();
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="boot" class="boot">
+        <img src="icon-192.png" alt="" />
+        <b>Sapphire</b>
+        <p id="boot-msg">불러오는 중…</p>
+        <p class="boot-slow">새 버전을 받는 중이에요. 업데이트 뒤 처음 열 때는 조금 더 걸려요.</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
