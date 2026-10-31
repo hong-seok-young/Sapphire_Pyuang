@@ -253,3 +253,56 @@ CREATE TABLE IF NOT EXISTS cutout_log (
   at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS cutout_log_user ON cutout_log (user_id, at);
+
+-- 게시판 (제작자 요청, server/board.ts): 공지사항(notice), 길드 이벤트(event), 자유(free). 사진과 첨부 파일, 댓글, 좋아요, 본 사람
+CREATE TABLE IF NOT EXISTS board_posts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cat TEXT NOT NULL,
+  author TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  pinned INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  edited_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS board_posts_cat ON board_posts (cat, id);
+CREATE TABLE IF NOT EXISTS board_files (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  post_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  image INTEGER NOT NULL DEFAULT 0,
+  data BLOB NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS board_files_post ON board_files (post_id);
+CREATE TABLE IF NOT EXISTS board_comments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  post_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  parent_id INTEGER,
+  text TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS board_comments_post ON board_comments (post_id, id);
+CREATE TABLE IF NOT EXISTS board_likes (
+  post_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  PRIMARY KEY (post_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS board_views (
+  post_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  PRIMARY KEY (post_id, user_id)
+);
+-- 글 속 링크 미리보기 (functions/api/board/preview.ts), 7일 동안 다시 쓴다
+CREATE TABLE IF NOT EXISTS link_previews (
+  url TEXT PRIMARY KEY,
+  title TEXT,
+  description TEXT,
+  image TEXT,
+  site TEXT,
+  fetched_at INTEGER NOT NULL
+);

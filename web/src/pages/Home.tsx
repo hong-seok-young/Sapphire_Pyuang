@@ -29,7 +29,8 @@ const TILES: Tile[] = [
   // 사냥터는 아래 탭에 있어서, 이 자리는 1군 전용 플래티넘 할인 상점 (제작자 요청). 아이콘은 게임 첫 화면의 상점 그림
   // 제목이 길지 않게 '1군 전용'은 왼쪽 위 띠로 (제작자 요청)
   { title: "플래티넘 할인 상점", to: "#/shop", icon: "🏪", iconPic: "/data/shop/shop_icon.png", ribbon: "1군 전용", ring: "gold" },
-  { title: "장비", to: "#/equip", icon: "🛡️" },
+  // 장비는 아래 탭에 있어서 이 자리는 게시판 (제작자 요청): 공지사항, 길드 이벤트, 자유 게시판
+  { title: "게시판", to: "#/board", icon: "📢" },
   { title: "육성 공략", to: "#/menu/육성 공략", icon: "📈" },
   { title: "직업별 스킬", to: "#/menu/직업별 스킬", icon: "✨" },
   { title: "조합책", to: "#/menu/조합책", icon: "⚒️" },

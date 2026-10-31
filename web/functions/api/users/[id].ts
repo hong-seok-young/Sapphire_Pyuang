@@ -24,6 +24,12 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
     env.DB.prepare("DELETE FROM alerts WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM alert_prefs WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM favorites WHERE user_id = ?").bind(user.id),
+    // 게시판: 그 사람의 글(과 거기 딸린 사진, 댓글, 좋아요), 다른 글에 단 댓글과 좋아요
+    env.DB.prepare("DELETE FROM board_files WHERE post_id IN (SELECT id FROM board_posts WHERE author = ?)").bind(user.id),
+    env.DB.prepare("DELETE FROM board_comments WHERE user_id = ? OR post_id IN (SELECT id FROM board_posts WHERE author = ?)").bind(user.id, user.id),
+    env.DB.prepare("DELETE FROM board_likes WHERE user_id = ? OR post_id IN (SELECT id FROM board_posts WHERE author = ?)").bind(user.id, user.id),
+    env.DB.prepare("DELETE FROM board_views WHERE user_id = ? OR post_id IN (SELECT id FROM board_posts WHERE author = ?)").bind(user.id, user.id),
+    env.DB.prepare("DELETE FROM board_posts WHERE author = ?").bind(user.id),
     env.DB.prepare(
       "DELETE FROM listing_wants WHERE user_id = ? OR listing_id IN (SELECT id FROM listings WHERE seller = ?)",
     ).bind(user.id, user.id),

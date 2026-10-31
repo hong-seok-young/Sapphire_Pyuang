@@ -219,6 +219,15 @@
   '즐겨찾기'를 보인다. 즐겨찾기는 아이템, 몬스터, 사냥터의 ☆ (검색 결과 줄 오른쪽, 그 화면 위 줄)로 달고 빼며 계정마다 서버에 둔다
   (D1 `favorites`, `/api/favorites`, `web/src/favorites.ts`, 한 사람 200개). 닉네임 바꾸기와 계정 삭제에도 따라간다.
 
+## 게시판 (제작자 요청, 홈의 '장비' 칸 자리. 장비는 아래 탭에 있다)
+- `#/board` (`web/src/pages/Board.tsx`, `web/src/board.ts`, 서버 `web/functions/api/board`, `web/server/board.ts`, D1 `board_*`).
+  공지사항, 길드 이벤트(오피서 이상만 씀), 자유 게시판(누구나). 글에 사진(화면이 긴 변 1600px JPEG 로 줄여 보냄)과 첨부 파일
+  (하나 1.9MB, 글 하나에 10개, D1 `board_files`. 사진이 아닌 파일은 내려받기로만 준다), 링크는 주소를 눌러 열고 유튜브는 글 안에서
+  재생(youtube-nocookie), 다른 링크는 서버가 그 페이지의 og 제목·설명·그림을 읽어 미리보기 (`/api/board/preview`, D1 `link_previews` 7일).
+  댓글과 답글(한 단계), 좋아요, 본 사람 수, 공지 고정(오피서 이상), 제목·내용·글쓴이 찾기, 30개씩 더 보기.
+  글 고치기는 쓴 사람, 지우기는 쓴 사람이나 오피서 이상. 알림: 내 글 댓글과 내 댓글 답글('게시판 내 글 댓글'),
+  새 공지·이벤트는 모두에게('새 공지·이벤트'). 닉네임 바꾸기와 계정 삭제에도 따라간다.
+
 ## 길드원 의뢰소
 - `#/requests` (`web/src/pages/Requests.tsx`, `web/src/requests.ts`, 서버 `web/functions/api/requests`, `web/server/requests.ts`, D1 `requests`).
   길드원 제안(김다혜 님)을 제작자가 요청: "검은진액 100개, 보상 5만 골드"처럼 의뢰를 자유롭게 올리고(보상은 골드나 글),

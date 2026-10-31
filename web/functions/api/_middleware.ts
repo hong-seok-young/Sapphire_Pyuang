@@ -6,7 +6,7 @@ import type { Env } from "../../server/auth";
 import { detailOf, record, subjectOf, whereOf } from "../../server/activity";
 
 /** 본문이 JSON 이 아닌 곳: 캐릭터 사진, AI 지우기(그림 파일)는 크기만 적는다 */
-const BINARY = /^\/api\/avatar(\/cutout)?$/;
+const BINARY = /^\/api\/(avatar(\/cutout)?|board\/\d+\/files)$/;
 
 export const onRequest: PagesFunction<Env> = async (context) => {
   const { request, env } = context;

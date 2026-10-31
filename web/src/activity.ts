@@ -76,7 +76,7 @@ export function forgetView() {
 
 const PAGE_NAME: Record<string, string> = {
   "": "홈", places: "사냥터 목록", search: "검색", equip: "장비", chat: "챗봇", ranking: "길드 랭킹", market: "사파이어 중개인",
-  requests: "길드원 의뢰소", alerts: "알림", shop: "플래티넘 할인 상점", me: "내 정보", admin: "길드원 관리", app: "앱", password: "비밀번호 바꾸기", log: "사용 기록",
+  requests: "길드원 의뢰소", alerts: "알림", shop: "플래티넘 할인 상점", board: "게시판", me: "내 정보", admin: "길드원 관리", app: "앱", password: "비밀번호 바꾸기", log: "사용 기록",
 };
 
 /** 화면 주소를 이름으로: 글은 제목, 사냥터와 몬스터는 이름 */
@@ -142,6 +142,16 @@ const ACTIONS: [RegExp, string][] = [
   [/^PUT \/api\/shop$/, "플래티넘 상점 설정"],
   [/^PUT \/api\/shop\/items\/(.+)$/, "플래티넘 물건 설정: $1"],
   [/^POST \/api\/market\/\d+\/talk$/, "토론방 글"],
+  [/^POST \/api\/board$/, "게시판 글 씀"],
+  [/^PATCH \/api\/board\/(\d+)$/, "게시판 글 고침 #$1"],
+  [/^DELETE \/api\/board\/(\d+)$/, "게시판 글 지움 #$1"],
+  [/^POST \/api\/board\/(\d+)\/files$/, "게시판 파일 올림 #$1"],
+  [/^POST \/api\/board\/(\d+)\/comments$/, "게시판 댓글 #$1"],
+  [/^PUT \/api\/board\/(\d+)\/like$/, "게시판 좋아요 #$1"],
+  [/^DELETE \/api\/board\/comments\/\d+$/, "게시판 댓글 지움"],
+  [/^DELETE \/api\/board\/files\/\d+$/, "게시판 파일 지움"],
+  [/^POST \/api\/avatar\/cutout$/, "캐릭터 사진 AI 지우기"],
+  [/^PUT \/api\/favorites$/, "즐겨찾기"],
   [/^DELETE \/api\/market\/\d+\/talk\/\d+$/, "토론방 글 지움"],
   [/^PUT \/api\/users\/([^/]+)\/highspec$/, "고스펙 표시: $1"],
   [/^PUT \/api\/alerts\/prefs$/, "알림 설정"],
