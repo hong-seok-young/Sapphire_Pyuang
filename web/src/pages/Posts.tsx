@@ -5,28 +5,6 @@ import { Blocks, CafeLink } from "../Blocks";
 import { loadPosts, postLink, useAsync } from "../data";
 import { isGuidePost } from "../cafe";
 
-export function MenuPage({ wiki, title }: { wiki: Wiki; title: string }) {
-  const sec = wiki.menu.find((m) => m.title === title);
-  if (!sec) return <NotFound what="메뉴" />;
-  return (
-    <>
-      <TopBar title={title} />
-      <ul className="list">
-        {sec.posts.map((p) => (
-          <li key={p.id}>
-            <a className="row" href={"#/post/" + p.id}>
-              <span className="row-main">
-                <span className="row-title">{p.title.replace(/\s*_ReMAKE$/, "")}</span>
-              </span>
-              <span className="row-arrow">▶</span>
-            </a>
-          </li>
-        ))}
-      </ul>
-    </>
-  );
-}
-
 export function PostPage({ wiki, id }: { wiki: Wiki; id: string }) {
   const { data: posts, error } = useAsync(useCallback(() => loadPosts(), []));
   if (!posts) return <Loading error={error} />;

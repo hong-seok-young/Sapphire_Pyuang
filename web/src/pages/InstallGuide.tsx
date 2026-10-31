@@ -83,7 +83,8 @@ function steps(): { how: string; fix?: { label: string; href: string } } {
     };
   }
   if (inNaver) return { how: "네이버 앱 안에서는 설치가 안 돼요. 아래 ⋮ → '기본 브라우저로 열기'를 눌러 주세요." };
-  if (isIOS) return { how: "아래 공유 버튼(□↑) → '홈 화면에 추가' → '추가'를 눌러 주세요." };
+  // 요즘 사파리는 '공유'가 아래쪽 ⋯ 메뉴 안에 있다 (길드원이 알려 준 순서, 2026-10-31)
+  if (isIOS) return { how: "아래쪽 ⋯ → '공유' → '홈 화면에 추가' → '추가'를 눌러 주세요. 공유 버튼(□↑)이 바로 보이면 그걸 눌러도 돼요." };
   if (inSamsung) return { how: "아래 메뉴(≡) → '현재 페이지 추가' → '홈 화면'을 눌러 주세요." };
   return { how: "오른쪽 위 ⋮ → '홈 화면에 추가' 또는 '앱 설치'를 눌러 주세요." };
 }
@@ -202,7 +203,7 @@ export function IconChangedPage({ onDone }: { onDone: () => void }) {
       <ol className="guide-steps">
         <li>홈 화면의 Sapphire 아이콘을 길게 눌러 {isIOS ? "'앱 제거' → '홈 화면에서 제거'" : "'삭제'(또는 '제거')"}</li>
         <li>{isIOS ? "사파리" : "크롬이나 삼성 인터넷"}에서 아래 주소 열기</li>
-        <li>{isIOS ? "공유 버튼(□↑) → '홈 화면에 추가'" : "메뉴 → '홈 화면에 추가'(또는 '앱 설치')"}</li>
+        <li>{isIOS ? "아래쪽 ⋯ → '공유' → '홈 화면에 추가' → '추가'" : "메뉴 → '홈 화면에 추가'(또는 '앱 설치')"}</li>
       </ol>
       <CopyAddress url={`${WEB_URL}/?icon=${ICON_VERSION}`} />
       {isIOS && <p className="guide-text">다시 설치하면 로그인을 한 번 더 해야 할 수 있어요.</p>}
