@@ -179,6 +179,11 @@ export async function saveProfile(env: Env, userId: string, by: string, p: Profi
   const keepExp = p.exp === undefined;
   const keepGuild = p.guild === undefined;
   const now = Date.now();
+  // 경험치를 처음 적는 것(레벨은 그대로)은 성장이 아니다: 고침처럼 마지막 기록을 채운다 (제작자 요청)
+  if (change === "grow" && !keepExp && p.exp !== null) {
+    const cur = await env.DB.prepare("SELECT level, exp FROM profiles WHERE user_id = ?").bind(userId).first<{ level: number; exp: number | null }>();
+    if (cur && cur.exp === null && cur.level === p.level) change = "fix";
+  }
   if (change === "fix") {
     await env.DB.batch([
       env.DB.prepare(

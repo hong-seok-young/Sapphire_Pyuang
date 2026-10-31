@@ -73,7 +73,8 @@ export function ProfileForm({
     e.preventDefault();
     if (!ok) return;
     // 이미 있던 레벨·경험치를 바꾸면 먼저 묻는다 (제작자 요청: 잘못 쓴 것을 고친 게 레벨업으로 잡히지 않게)
-    const changed = startLevel !== null && (n !== startLevel || (withExp && expValue !== startExp));
+    // 경험치를 처음 적는 것만이면 묻지 않는다 (성장이 아니라서 서버가 고침처럼 저장한다)
+    const changed = startLevel !== null && (n !== startLevel || (withExp && startExp !== null && expValue !== startExp));
     if (askChange && changed) setAsking(true);
     else save();
   }

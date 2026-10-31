@@ -24,8 +24,11 @@ async function expUps(env: Env): Promise<Map<string, number>> {
     while (i < results.length && results[i].user_id === user) rows.push(results[i++]);
     const last = rows[0];
     if (now - last.at > RECENT_MS) continue;
-    const before = rows.find((r) => r.level !== last.level || (r.exp ?? 0) !== (last.exp ?? 0));
-    if (before && before.level === last.level && (last.exp ?? 0) > (before.exp ?? 0)) ups.set(user, (last.exp ?? 0) - (before.exp ?? 0));
+    const before = rows.find((r) => r.level !== last.level || r.exp !== last.exp);
+    // 앞 기록에 경험치가 없었으면(처음 적은 것) 오른 게 아니다
+    if (before && before.level === last.level && before.exp !== null && last.exp !== null && last.exp > before.exp) {
+      ups.set(user, last.exp - before.exp);
+    }
   }
   return ups;
 }

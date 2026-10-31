@@ -26,6 +26,12 @@ interface Point {
 }
 
 const total = (p: { level: number; exp: number | null }) => p.level * 100_000 + (p.exp ?? 0);
+/**
+ * 오른 만큼. 어느 한쪽 경험치가 비어 있으면(아직 안 적었던 때) 경험치는 모르는 값이라 오른 레벨만 센다
+ * (제작자 요청: 레벨만 적었다가 나중에 경험치를 처음 적은 것이 성장으로 잡혔다)
+ */
+const grown = (now: { level: number; exp: number | null }, from: { level: number; exp: number | null }) =>
+  now.exp === null || from.exp === null ? (now.level - from.level) * 100_000 : total(now) - total(from);
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
@@ -53,7 +59,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       const from = base.get(r.id);
       return {
         id: r.id, role: r.role, job: r.job, level: r.level, guild: r.guild, avatar: r.avatar,
-        fromLevel: from?.level ?? r.level, growth: from ? total(r) - total(from) : 0, updatedAt: r.last_at ?? 0,
+        fromLevel: from?.level ?? r.level, growth: from ? grown(r, from) : 0, updatedAt: r.last_at ?? 0,
         highSpec: r.high_spec === 1,
       };
     })
