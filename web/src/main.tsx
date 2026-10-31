@@ -43,9 +43,13 @@ noticeUpdate();
 // 폰 알림을 받는 서비스 워커 (화면 파일을 저장하지 않는다)
 registerWorker();
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <App />
-    <UpdateBar />
-  </StrictMode>,
+// 업데이트 때는 첫 화면 막대가 100%까지 찬 뒤에 그린다 (index.html __bootReady)
+const bootReady = (window as unknown as { __bootReady?: Promise<void> }).__bootReady ?? Promise.resolve();
+void bootReady.then(() =>
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <App />
+      <UpdateBar />
+    </StrictMode>,
+  ),
 );

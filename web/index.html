@@ -86,15 +86,31 @@
         if (before && before !== code.src) {
           msg.textContent = "업데이트가 있어요. 새 버전을 받는 중… 0%";
           boot.className += " updating";
-          // 새 코드를 받는 만큼 막대를 채운다 (제작자 요청: 무엇을 하는지와 %). 크기를 모르면 지난번 크기로 어림한다
+          // 막대를 0%부터 채운 뒤에 화면을 띄운다 (제작자 요청: 0%에서 갑자기 화면이 떠서 진행이 안 보였다).
+          // 새 코드를 받은 만큼과 0.9초 시계 중 느린 쪽을 따라 채우고, 100%가 되면 main.tsx 가 화면을 그린다
           var fill = document.getElementById("boot-fill");
           var guess = 900000;
           try { guess = Number(localStorage.getItem("sapphire-build-size")) || guess; } catch (e) {}
+          var real = 0;
+          var started = Date.now();
           var show = function (p) {
             var pct = Math.min(100, Math.round(p * 100));
             if (fill) fill.style.width = pct + "%";
             msg.textContent = pct < 100 ? "업데이트가 있어요. 새 버전을 받는 중… " + pct + "%" : "새 버전으로 여는 중… 100%";
           };
+          window.__bootReady = new Promise(function (resolve) {
+            var done = false;
+            var finish = function () { if (!done) { done = true; show(1); setTimeout(resolve, 250); } };
+            var tick = function () {
+              if (done) return;
+              var time = Math.min(1, (Date.now() - started) / 900);
+              var p = Math.min(real, time);
+              show(p);
+              if (p >= 1) finish(); else setTimeout(tick, 40);
+            };
+            setTimeout(tick, 40);
+            setTimeout(finish, 8000); // 무슨 일이 있어도 8초 뒤에는 화면을 띄운다
+          });
           if (window.fetch && window.ReadableStream) {
             fetch(code.src).then(function (res) {
               var total = Number(res.headers.get("content-length")) || guess;
@@ -102,14 +118,16 @@
               var got = 0;
               var pump = function () {
                 return reader.read().then(function (r) {
-                  if (r.done) return show(1);
+                  if (r.done) { real = 1; return; }
                   got += r.value.length;
-                  show(Math.min(0.99, got / total));
+                  real = Math.min(0.99, got / total);
                   return pump();
                 });
               };
               return pump();
-            }).catch(function () {});
+            }).catch(function () { real = 1; });
+          } else {
+            real = 1;
           }
         } else if (before) {
           msg.textContent = "새로고침 중…";
