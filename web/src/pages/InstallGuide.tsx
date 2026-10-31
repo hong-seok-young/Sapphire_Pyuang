@@ -62,6 +62,8 @@ export function AppClosedPage({ onLogin }: { onLogin?: () => void }) {
         </a>
       </div>
       <CopyAddress />
+      {/* 앱은 스스로 지워지지 않는다 (안드로이드 규칙). 웹으로 옮긴 뒤 지우라고 알린다 (제작자 요청) */}
+      <p className="guide-text">웹을 홈 화면에 설치했으면 이 앱은 지워 주세요. 앱 아이콘을 길게 눌러 '삭제'(또는 '제거')를 누르면 돼요.</p>
       {/* 앱개발자는 앱을 그대로 쓴다: 로그아웃돼 있으면 여기서 로그인 */}
       {onLogin && (
         <button className="btn btn-ghost guide-later" onClick={onLogin}>

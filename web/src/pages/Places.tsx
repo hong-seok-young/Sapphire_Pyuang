@@ -61,7 +61,7 @@ export function PlacePage({ wiki, id }: { wiki: Wiki; id: string }) {
   const post = posts?.[id];
   const link = posts ? postLink(wiki, posts) : () => null;
   const part = (idx: number[]) =>
-    post && idx.length > 0 && <Blocks blocks={idx.map((i) => post.blocks[i])} link={link} />;
+    post && idx.length > 0 && <Blocks blocks={idx.map((i) => post.blocks[i])} link={link} postId={id} what="지도" />;
   return (
     <>
       <TopBar title={p.name} star={<FavStar kind="place" fkey={id} name={p.name} className="topbar-me" />} />

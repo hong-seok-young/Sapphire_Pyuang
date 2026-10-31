@@ -80,6 +80,7 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
       <TopBar title="사용 기록" />
       <p className="log-note">
         앱개발자에게만 보여요. 60일 동안 남아요. 비밀번호만 빼고 모두 남겨요. 접속은 30분 넘게 쉬었다가 다시 쓰면 한 번으로 세요.
+        위치는 인터넷 주소(IP)로 어림한 값이라 실제 동네가 아니라 통신사망 지역(예: 수원)으로 나올 수 있어요.
       </p>
 
       <section className="panel">

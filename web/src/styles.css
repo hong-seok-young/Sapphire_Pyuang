@@ -1138,3 +1138,18 @@ button { font: inherit; color: inherit; }
 .ans-asks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .ans-asks .pill { padding: 5px 9px; font-size: 12px; color: var(--text); text-align: left; }
 
+/* cafe original card (Blocks.tsx CafeLink): maps, screenshots and written guides open the cafe post */
+.cafe-link { margin: 6px 0; padding: 8px 10px; color: var(--text); background: var(--panel); border: var(--px) solid var(--edge);
+  box-shadow: inset 0 0 0 1px #03c75a; }
+.cafe-link-head { display: flex; align-items: center; gap: 8px; }
+.cafe-link-icon { flex: none; font-size: 24px; }
+.cafe-link-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.cafe-link-text b { font-size: 14px; font-weight: 400; }
+.cafe-link-text small { font-size: 11px; color: var(--muted); }
+.cafe-link-head .pill { flex: none; }
+.cafe-link-ask { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--hi); }
+.cafe-link-ask p { margin: 0 0 6px; font-size: 13px; color: #8ff0b8; }
+.cafe-link-buttons { display: flex; gap: 6px; }
+.cafe-link-buttons .pill { text-decoration: none; color: var(--text); }
+.cafe-link-buttons .pill-on { color: var(--edge); }
+
