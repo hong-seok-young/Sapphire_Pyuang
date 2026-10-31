@@ -1,7 +1,7 @@
 import { APP_OPEN, inApp, isAndroid } from "../platform";
 import { RANK } from "../auth";
 import type { Me } from "../auth";
-import { Bell, FitLine, HeroTitle } from "../ui";
+import { Bell, FitLine, HeroTitle, TopBar } from "../ui";
 import { showUpdate } from "../updates";
 import { useState } from "react";
 import { enablePush, markPushAsked, shouldAskPush } from "../push";
@@ -33,13 +33,8 @@ const TILES: Tile[] = [
   { title: "플래티넘 할인 상점", to: "#/shop", icon: "🏪", iconPic: "/data/shop/shop_icon.png", ribbon: "1군 전용", ring: "gold" },
   // 장비는 아래 탭에 있어서 이 자리는 게시판 (제작자 요청): 공지사항, 길드 이벤트, 자유 게시판
   { title: "게시판", to: "#/board", icon: "📢" },
-  { title: "육성 공략", to: "#/menu/육성 공략", icon: "📈" },
-  { title: "직업별 스킬", to: "#/menu/직업별 스킬", icon: "✨" },
-  { title: "조합책", to: "#/menu/조합책", icon: "⚒️" },
-  { title: "강화 · 보석 · 성장", to: "#/menu/강화 · 보석 · 성장", icon: "💎" },
-  { title: "인던 · 길드던전", to: "#/menu/인던 · 길드던전", icon: "🏰" },
-  { title: "전장 · 헌팅그라운드", to: "#/menu/전장 · 헌팅그라운드", icon: "🚩" },
-  { title: "퀘스트 · 지도", to: "#/menu/퀘스트 · 지도", icon: "📜" },
+  // 위키 자료 메뉴는 '정보' 한 칸으로 묶는다 (제작자 요청). 안은 InfoPage
+  { title: "정보", to: "#/info", icon: "📚" },
   { title: "길드 랭킹", to: "#/ranking", icon: "🏆" },
   { title: "사파이어 중개인", to: "#/market", icon: "💰" },
   { title: "길드원 의뢰소", to: "#/requests", icon: "📋" },
@@ -51,6 +46,53 @@ const TILES: Tile[] = [
   // 챗봇이 모르는 질문 (제작자 요청: 보고 고친 뒤 물은 사람에게 알린다)
   { title: "챗봇 개선", to: "#/gaps", icon: "🧙", developer: true, ribbon: "개발자", ring: "purple" },
 ];
+
+/** '정보' 안의 위키 자료 메뉴 */
+const INFO_TILES: Tile[] = [
+  { title: "육성 공략", to: "#/menu/육성 공략", icon: "📈" },
+  { title: "직업별 스킬", to: "#/menu/직업별 스킬", icon: "✨" },
+  { title: "조합책", to: "#/menu/조합책", icon: "⚒️" },
+  { title: "강화 · 보석 · 성장", to: "#/menu/강화 · 보석 · 성장", icon: "💎" },
+  { title: "인던 · 길드던전", to: "#/menu/인던 · 길드던전", icon: "🏰" },
+  { title: "전장 · 헌팅그라운드", to: "#/menu/전장 · 헌팅그라운드", icon: "🚩" },
+  { title: "퀘스트 · 지도", to: "#/menu/퀘스트 · 지도", icon: "📜" },
+];
+
+/** 칸 그리기 (홈과 정보가 같이 쓴다) */
+function Tiles({ me, tiles }: { me: Me; tiles: Tile[] }) {
+  return (
+    <nav className="tiles">
+      {tiles.map((t) => {
+        // 고친 메뉴: 다른 색 테두리와 'UPDATE' (처음 들어간 뒤 하루 동안, updates.ts). '정보'는 안의 메뉴가 고쳐졌을 때도
+        const updated = showUpdate(me.id, t.to) || (t.to === "#/info" && INFO_TILES.some((x) => showUpdate(me.id, x.to)));
+        return (
+          <a
+            key={t.title}
+            className={"tile" + (t.soon ? " tile-soon" : "") + (t.ring ? ` tile-ring tile-ring-${t.ring}` : "") + (updated ? " tile-new" : "")}
+            href={t.to}
+          >
+            {t.ribbon && <span className="tile-ribbon">{t.ribbon}</span>}
+            {updated && <span className="tile-update">UPDATE</span>}
+            <span className="tile-icon">{t.iconPic ? <img className="tile-pic" src={t.iconPic} alt="" /> : t.icon}</span>
+            {/* 이름은 한 줄에 맞추고, 안 되면 낱말 사이에서만 줄을 바꾼다 ('성장'이 '성/장'으로 갈리지 않게) */}
+            <FitLine className="tile-title" text={t.title} />
+            {t.soon && <span className="tile-badge">{t.badge ?? "준비 중"}</span>}
+          </a>
+        );
+      })}
+    </nav>
+  );
+}
+
+/** 정보 (#/info): 위키 자료 메뉴 모음 */
+export function InfoPage({ me }: { me: Me }) {
+  return (
+    <>
+      <TopBar title="정보" />
+      <Tiles me={me} tiles={INFO_TILES} />
+    </>
+  );
+}
 
 export function Home({ me }: { me: Me }) {
   const shown = TILES.filter(
@@ -87,26 +129,7 @@ export function Home({ me }: { me: Me }) {
         <span>🔍</span> 아이템, 몬스터, 사냥터 검색
       </a>
 
-      <nav className="tiles">
-        {shown.map((t) => {
-          // 고친 메뉴: 다른 색 테두리와 'UPDATE' (처음 들어간 뒤 하루 동안, updates.ts)
-          const updated = showUpdate(me.id, t.to);
-          return (
-            <a
-              key={t.title}
-              className={"tile" + (t.soon ? " tile-soon" : "") + (t.ring ? ` tile-ring tile-ring-${t.ring}` : "") + (updated ? " tile-new" : "")}
-              href={t.to}
-            >
-              {t.ribbon && <span className="tile-ribbon">{t.ribbon}</span>}
-              {updated && <span className="tile-update">UPDATE</span>}
-              <span className="tile-icon">{t.iconPic ? <img className="tile-pic" src={t.iconPic} alt="" /> : t.icon}</span>
-              {/* 이름은 한 줄에 맞추고, 안 되면 낱말 사이에서만 줄을 바꾼다 ('성장'이 '성/장'으로 갈리지 않게) */}
-              <FitLine className="tile-title" text={t.title} />
-              {t.soon && <span className="tile-badge">{t.badge ?? "준비 중"}</span>}
-            </a>
-          );
-        })}
-      </nav>
+      <Tiles me={me} tiles={shown} />
 
     </div>
   );

@@ -231,9 +231,8 @@ function AccountRow({
         </span>
         <span className="account-tags">
           {account.mustChange && <span className="role-badge muted">비밀번호 바꾸기 전</span>}
-          {/* 앱개발자는 길드 직책이 아니라서 길드원으로 보이고, 앱 관리 권한은 따로 적는다 */}
+          {/* 앱개발자는 길드 직책이 아니라서 그냥 길드원으로 보인다 (제작자 요청: 앱 관리 표시도 빼고 순서도 길드원 자리) */}
           <span className="role-badge">{ROLE_NAME[positionOf(account.role)]}</span>
-          {account.role === "developer" && <span className="role-badge muted">앱 관리</span>}
           {account.push && (
             <span className="push-mark" title={PUSH_MARK[account.push].text} aria-label={PUSH_MARK[account.push].text}>
               {PUSH_MARK[account.push].icon}

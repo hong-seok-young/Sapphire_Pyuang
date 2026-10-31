@@ -5,6 +5,8 @@ import {
 } from "../../../server/auth";
 import type { Env, Guild, Job, Role } from "../../../server/auth";
 
+const POSITION: Record<Role, number> = { master: 2, officer: 1, member: 0, developer: 0 };
+
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
@@ -23,7 +25,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       id: u.id, role: u.role, mustChange: u.must_change === 1, createdAt: u.created_at, createdBy: u.created_by,
       job: u.job, level: u.level, guild: u.guild, avatar: u.avatar, highSpec: u.high_spec === 1, push: u.push_perm, pushAt: u.push_at,
     }))
-    .sort((a, b) => RANK[b.role] - RANK[a.role] || a.id.localeCompare(b.id, "ko"));
+    // 길드 직책 순서: 길드마스터, 오피서, 길드원 (앱개발자는 길드 직책이 아니라 길드원 자리. 제작자 요청)
+    .sort((a, b) => POSITION[b.role] - POSITION[a.role] || a.id.localeCompare(b.id, "ko"));
   return json(users);
 };
 
