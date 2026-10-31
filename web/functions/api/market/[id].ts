@@ -23,6 +23,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
   if (status !== "selling" && status !== "sold") return json({ error: "상태가 맞지 않아요" }, 400);
   const price = body.price ?? row.price;
   if (!validPrice(price)) return json({ error: "가격을 골드로 적어 주세요" }, 400);
+  if (row.mode === "auction" && price !== row.price) return json({ error: "경매는 시작가를 바꿀 수 없어요. 내리고 다시 올려 주세요" }, 400);
   const note = body.note === undefined ? row.note : readNote(body.note);
   if (note === undefined) return json({ error: `한마디는 ${MAX_NOTE}자까지예요` }, 400);
   if (status === "selling" && row.status === "sold") {
@@ -46,6 +47,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
   if (row.seller !== me.id && RANK[me.role] < 1) return FORBIDDEN();
   await env.DB.batch([
     env.DB.prepare("DELETE FROM listing_wants WHERE listing_id = ?").bind(row.id),
+    env.DB.prepare("DELETE FROM listing_bids WHERE listing_id = ?").bind(row.id),
     env.DB.prepare("DELETE FROM listings WHERE id = ?").bind(row.id),
   ]);
   return json({ ok: true });

@@ -3,7 +3,7 @@ import { GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, avatarUrl, expText, fet
 import type { GrowthEntry, GrowthPeriod, Guild, Job, Me, RankEntry } from "../auth";
 import { useAsync } from "../data";
 import { JobEmblem, JobGlyph, MINE_TAG_PIC, RankMedal, RoleBadge } from "../emblems";
-import { Loading, TopBar } from "../ui";
+import { FitLine, Loading, TopBar } from "../ui";
 
 /** 최근 레벨업 표시 기간 */
 const RECENT_MS = 7 * 86_400_000;
@@ -81,8 +81,8 @@ function Row({ r, me, now }: { r: Ranked; me: Me; now: number }) {
         <small>
           {guildText(r.guild)} · {JOB_NAME[r.job]}
         </small>
-        {/* 닉네임은 10글자까지: 긴 이름은 글자를 줄여서 자르지 않는다 */}
-        <b className={r.id.length > 7 ? "rank-name-long" : undefined}>{r.id}</b>
+        {/* 닉네임은 10글자까지: 넘치면 글자를 줄여서 한 줄에 다 보인다 (자르지 않는다) */}
+        <FitLine className="rank-nick" text={r.id} wrap={false} />
       </span>
       {/* 레벨업 표시 자리는 늘 비워 두어서 표시가 떠도 닉네임이 밀리지 않는다 */}
       <span className="rank-up-slot">{up > 0 && <span className="rank-up">▲{up}</span>}</span>
@@ -171,7 +171,7 @@ function LevelRanking({ me, data, guild, onGuild }: { me: Me; data: RankEntry[];
         {me.job && me.level ? <JobEmblem job={me.job} level={me.level} rank={overall.get(me.id)} size={50} /> : null}
         <span className="rank-name">
           <small>{me.exp !== null ? `경험치 ${expText(me.exp)}` : hint}</small>
-          <b className={me.id.length > 7 ? "rank-name-long" : undefined}>{me.id}</b>
+          <FitLine className="rank-nick" text={me.id} wrap={false} />
           {me.exp !== null && <small className="rank-hint">{hint}</small>}
         </span>
         <a className="pill rank-edit" href="#/me">
@@ -225,7 +225,7 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
             <span className="growth-hero-face">
               <Face e={first} size={96} />
             </span>
-            <b className="growth-hero-name">{first.id}</b>
+            <FitLine className="growth-hero-name" text={first.id} wrap={false} />
             <span className="growth-hero-sub">
               {guildText(first.guild)} · {JOB_NAME[first.job]} · Lv.{first.fromLevel}
               {first.level !== first.fromLevel && ` → ${first.level}`}
@@ -241,7 +241,7 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
                     <Face e={e} size={40} />
                   </span>
                   <span className="growth-row-name">
-                    <b>{e.id}</b>
+                    <FitLine className="growth-nick" text={e.id} wrap={false} />
                     <small>
                       {guildText(e.guild)} · {JOB_NAME[e.job]} · Lv.{e.fromLevel}
                       {e.level !== e.fromLevel && ` → ${e.level}`}

@@ -53,7 +53,24 @@ export interface Wanter {
   id: string;
   note: string | null;
   at: number;
+  /** 흥정 가격 (중개인 '살래요'에서, 판 사람만 본다) */
+  offer?: number | null;
 }
+
+/** 경매 입찰 (판 사람만 본다) */
+export interface Bid {
+  id: string;
+  amount: number;
+  at: number;
+}
+
+/** 경매 시간: 12시간, 1일, 2일, 3일 (서버 server/market.ts 와 같다) */
+export const AUCTION_HOURS: { hours: number; label: string }[] = [
+  { hours: 12, label: "12시간" },
+  { hours: 24, label: "1일" },
+  { hours: 48, label: "2일" },
+  { hours: 72, label: "3일" },
+];
 
 export interface Listing {
   id: number;
@@ -69,12 +86,24 @@ export interface Listing {
   /** 옵션이 범위에서 뜨는 아이템이면 판 사람이 적은 값 */
   options: ListingOption[] | null;
   status: "selling" | "sold";
+  /** sale 바로 판매 | auction 경매 (price 가 시작가) */
+  mode: "sale" | "auction";
+  /** 경매가 끝나는 때 */
+  endsAt: number | null;
   createdAt: number;
   updatedAt: number;
   wants: number;
   wanted: boolean;
-  /** 내 글에만 온다: '살래요'를 누른 사람 */
+  /** 내가 '살래요'에 적은 흥정 가격 */
+  myOffer: number | null;
+  bidCount: number;
+  highestBid: number | null;
+  /** 내 가장 높은 입찰 */
+  myBid: number | null;
+  /** 내 글에만 온다: '살래요'를 누른 사람 (흥정 가격 포함) */
   wanters?: Wanter[];
+  /** 내 경매에만 온다: 입찰 (높은 순) */
+  bids?: Bid[];
 }
 
 export interface ListingInput {
@@ -87,15 +116,22 @@ export interface ListingInput {
   price: number;
   note: string | null;
   options: ListingOption[] | null;
+  mode: "sale" | "auction";
+  hours: number | null;
 }
 
-export const fetchMarket = () => api<{ listings: Listing[] }>("/api/market").then((r) => r.listings);
+/** 글 전부와 골드 시세(1만 원에 몇 만 골드, 현금 환산용) */
+export const fetchMarket = () => api<{ listings: Listing[]; goldRate: number }>("/api/market");
 export const createListing = (input: ListingInput) => api<Listing>("/api/market", "POST", input);
 export const updateListing = (id: number, change: { status?: "selling" | "sold"; price?: number; note?: string | null }) =>
   api<Omit<Listing, "wants" | "wanted" | "wanters">>(`/api/market/${id}`, "PATCH", change);
 export const deleteListing = (id: number) => api<{ ok: boolean }>(`/api/market/${id}`, "DELETE");
-export const wantListing = (id: number, note: string | null) =>
-  api<{ wants: number; wanted: boolean }>(`/api/market/${id}/want`, "PUT", { note });
+/** '살래요' (offer: 흥정 가격, 판 사람만 본다) */
+export const wantListing = (id: number, note: string | null, offer: number | null) =>
+  api<{ wants: number; wanted: boolean; myOffer: number | null }>(`/api/market/${id}/want`, "PUT", { note, offer });
+/** 경매 입찰 */
+export const bidListing = (id: number, amount: number) =>
+  api<{ bidCount: number; highestBid: number; myBid: number }>(`/api/market/${id}/bids`, "POST", { amount });
 export const unwantListing = (id: number) => api<{ wants: number; wanted: boolean }>(`/api/market/${id}/want`, "DELETE");
 
 /** 3800000 -> "3,800,000" */
@@ -108,6 +144,31 @@ export function goldWords(n: number): string {
   const man = Math.floor((n % 100_000_000) / 10_000);
   const rest = n % 10_000;
   return [eok ? `${eok}억` : "", man ? `${man}만` : "", rest ? `${rest}` : ""].filter(Boolean).join(" ");
+}
+
+/** 100000 -> "10만 원", 13699 -> "1만 3699원" */
+export function wonText(won: number): string {
+  const words = goldWords(won);
+  return words ? (won % 10_000 === 0 ? `${words} 원` : `${words}원`) : "0원";
+}
+
+/** 골드를 현금으로 어림한다: 시세가 75 (1만 원에 75만 골드)면 300만 골드 = 4만 원. 1만 원부터는 100원, 그 아래는 10원 단위 */
+export function cashText(gold: number, rate: number): string {
+  const won = gold / rate;
+  const step = won >= 10_000 ? 100 : 10;
+  return `≈ ${wonText(Math.round(won / step) * step)}`;
+}
+
+/** 경매 지금 값: 최고 입찰, 없으면 시작가 */
+export const currentPrice = (l: Pick<Listing, "price" | "highestBid">) => l.highestBid ?? l.price;
+
+/** 경매가 끝났는지 */
+export const auctionOver = (l: Pick<Listing, "mode" | "endsAt">, now = Date.now()) => l.mode === "auction" && l.endsAt !== null && l.endsAt <= now;
+
+/** 다음 입찰 권하는 값: 지금 최고가보다 5% (천 골드 단위로 올림), 첫 입찰이면 시작가 */
+export function nextBid(l: Pick<Listing, "price" | "highestBid">): number {
+  if (l.highestBid === null) return l.price;
+  return l.highestBid + Math.max(1000, Math.ceil((l.highestBid * 0.05) / 1000) * 1000);
 }
 
 /** "+6 숙련마법사옷" 처럼 강화를 붙인 이름 */

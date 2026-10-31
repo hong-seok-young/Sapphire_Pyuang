@@ -325,6 +325,26 @@ def load_posts() -> tuple[dict, dict]:
 
 # ---------------------------------------------------------------- hunting grounds, monsters, drops
 
+def clean_title(title: str) -> str:
+    """화면에 보이는 제목: 카페 글의 '_ReMAKE' 꼬리표를 빼고, 밑줄로 이은 말은 ' · ' 로 잇는다 (제작자 요청, 보기 좋게 통일).
+    예: '테멘 거점(Temen Base)_헌팅그라운드' -> '테멘 거점(Temen Base) · 헌팅그라운드'"""
+    t = re.sub(r"\s*_?ReMAKE\s*$", "", title, flags=re.I)
+    t = re.sub(r"\s*_+\s*", " · ", t)
+    return re.sub(r"\s{2,}", " ", t).strip(" ·")
+
+
+def tidy_links(x) -> None:
+    """링크 글자의 '_____클릭_____' 같은 밑줄 장식을 뺀다."""
+    if isinstance(x, dict):
+        if "to" in x and isinstance(x.get("t"), str):
+            x["t"] = re.sub(r"_{2,}", " ", x["t"])
+        for v in x.values():
+            tidy_links(v)
+    elif isinstance(x, list):
+        for v in x:
+            tidy_links(v)
+
+
 def split_top(s: str) -> list[str]:
     out, depth, cur = [], 0, ""
     for ch in s:
@@ -688,6 +708,13 @@ def main():
             rel = named.get(name) or named.get(name.replace(" ", "")) or named.get(name.split(":")[0])
             if rel:
                 it["icon"] = export_picture(SRC / "이미지" / rel)
+
+    # 보이는 제목과 링크 글자를 다듬는다 (장비 표 찾기는 원래 제목으로 끝난 뒤)
+    for post in posts.values():
+        post["title"] = clean_title(post["title"])
+        tidy_links(post["blocks"])
+    for place in places.values():
+        place["title"] = clean_title(place["title"])
 
     menu = []
     for title, index_post, ids in MENU:

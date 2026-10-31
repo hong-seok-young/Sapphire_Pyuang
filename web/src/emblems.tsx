@@ -3,7 +3,8 @@
 // 그림은 비공개 자료 저장소에 두고 build_data.py 가 public/data/rank 로 복사한다 (로그인한 길드원에게만 보인다).
 // 단추는 이 앱 디자인으로 그리고 게임 그림은 직업 문양만 쓴다 (제작자 요청).
 import type { Job, Role } from "./auth";
-import { JOB_NAME, ROLE_NAME } from "./auth";
+import { JOB_NAME, ROLE_NAME, positionOf } from "./auth";
+import { TapTip } from "./ui";
 
 const PIC = "/data/rank/";
 export const MINE_TAG_PIC = PIC + "mine_tag.png";
@@ -44,22 +45,22 @@ export function JobGlyph({ job, size = 20 }: { job: Job; size?: number }) {
   );
 }
 
-/** 오른쪽 마름모 배지: 앱개발자, 길드마스터, 오피서 (길드원은 비워 둔다). 게임의 길드 마크 자리 */
+/**
+ * 오른쪽 마름모 배지: 길드마스터, 오피서 (길드원은 비워 둔다). 게임의 길드 마크 자리.
+ * 앱개발자는 길드 직책이 아니라서 길드원처럼 비운다. 누르면 무슨 마크인지 옆에 잠깐 뜬다 (제작자 요청)
+ */
 export function RoleBadge({ role }: { role: Role }) {
-  if (role === "member") return <span className="role-diamond role-diamond-none" />;
+  const position = positionOf(role);
+  if (position === "member") return <span className="role-diamond role-diamond-none" />;
   return (
-    <span className={"role-diamond role-diamond-" + role} title={ROLE_NAME[role]}>
-      <svg width="34" height="34" viewBox="0 0 34 34" aria-label={ROLE_NAME[role]} role="img">
-        <rect className="diamond-bg" x="7" y="7" width="20" height="20" rx="3" transform="rotate(45 17 17)" />
-        {role === "master" && <path className="diamond-glyph" d="M10 21 L11.5 12.5 L14.8 16 L17 11 L19.2 16 L22.5 12.5 L24 21 Z" />}
-        {role === "officer" && <path className="diamond-glyph" d="M17 10.5 L23 12.8 C 23 18 20.5 21.6 17 23.5 C 13.5 21.6 11 18 11 12.8 Z" />}
-        {role === "developer" && (
-          <g className="diamond-glyph diamond-gear">
-            <circle cx="17" cy="17" r="3.2" />
-            <path d="M17 10 V12.2 M17 21.8 V24 M10 17 H12.2 M21.8 17 H24 M12 12 L13.6 13.6 M20.4 20.4 L22 22 M22 12 L20.4 13.6 M13.6 20.4 L12 22" />
-          </g>
-        )}
-      </svg>
-    </span>
+    <TapTip tip={ROLE_NAME[position]}>
+      <span className={"role-diamond role-diamond-" + position}>
+        <svg width="34" height="34" viewBox="0 0 34 34" aria-label={ROLE_NAME[position]} role="img">
+          <rect className="diamond-bg" x="7" y="7" width="20" height="20" rx="3" transform="rotate(45 17 17)" />
+          {position === "master" && <path className="diamond-glyph" d="M10 21 L11.5 12.5 L14.8 16 L17 11 L19.2 16 L22.5 12.5 L24 21 Z" />}
+          {position === "officer" && <path className="diamond-glyph" d="M17 10.5 L23 12.8 C 23 18 20.5 21.6 17 23.5 C 13.5 21.6 11 18 11 12.8 Z" />}
+        </svg>
+      </span>
+    </TapTip>
   );
 }

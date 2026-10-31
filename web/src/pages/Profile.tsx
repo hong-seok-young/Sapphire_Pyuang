@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import {
   EXP_MAX, GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, MAX_LEVEL, ROLE_NAME, avatarUrl, deleteMyAvatar, errorText, expText,
-  logout, saveMyProfile,
+  logout, positionOf, saveMyProfile,
 } from "../auth";
 import type { Guild, Job, Me } from "../auth";
 import { JobEmblem, JobGlyph } from "../emblems";
@@ -248,7 +248,7 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
           <div className="me-name">{me.id}</div>
           <div className="muted">
             {me.guild && `${GUILD_TIER[me.guild]} ${GUILD_NAME[me.guild]} · `}
-            {ROLE_NAME[me.role]}
+            {ROLE_NAME[positionOf(me.role)]}
             {me.job && ` · ${JOB_NAME[me.job]}`}
             {me.level && ` · Lv.${me.level}`}
             {me.exp !== null && ` · ${expText(me.exp)}`}

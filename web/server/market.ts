@@ -22,6 +22,10 @@ export const MAX_NOTE = 60;
 export const MAX_SELLING = 20;
 /** 거래 완료한 글은 이만큼 지나면 지운다 */
 export const KEEP_SOLD_MS = 30 * 86_400_000;
+/** 경매 시간 (시간 단위): 12시간, 1일, 2일, 3일 */
+export const AUCTION_HOURS = [12, 24, 48, 72];
+/** 골드 시세(1만 원에 몇 만 골드)를 모를 때 쓰는 값 (제작자가 알려 준 요즘 시세) */
+export const USUAL_GOLD_RATE = 75;
 /** 옵션이 범위에서 뜨는 아이템(헌터보우: 명중 0~11 / 민첩 0~8)은 판 사람이 뜬 값을 적는다. 한 글에 이만큼까지 */
 export const MAX_OPTIONS = 8;
 
@@ -42,6 +46,10 @@ export interface ListingInput {
   price: number;
   note: string | null;
   options: ListingOption[] | null;
+  /** sale 바로 판매 (흥정은 '살래요'에 적는다) | auction 경매 (price 가 시작가) */
+  mode: "sale" | "auction";
+  /** 경매면 몇 시간 동안 */
+  hours: number | null;
 }
 
 const ITEM_NAME = /^[\p{L}\p{N} ()[\]:+\-.,'·~!&]{1,30}$/u;
@@ -102,7 +110,14 @@ export function readListing(b: Record<string, unknown>): ListingInput | string {
   if (note === undefined) return `한마디는 ${MAX_NOTE}자까지예요`;
   const options = readOptions(b.options);
   if (typeof options === "string") return options;
-  return { item, category, enhance: enhance as number, enchant, enchantValue, qty: qty as number, price: b.price, note, options };
+  const mode = b.mode ?? "sale";
+  if (mode !== "sale" && mode !== "auction") return "판매 방식이 맞지 않아요";
+  let hours: number | null = null;
+  if (mode === "auction") {
+    if (!AUCTION_HOURS.includes(b.hours as number)) return "경매 시간을 골라 주세요";
+    hours = b.hours as number;
+  }
+  return { item, category, enhance: enhance as number, enchant, enchantValue, qty: qty as number, price: b.price, note, options, mode, hours };
 }
 
 export interface ListingRow {
@@ -118,6 +133,9 @@ export interface ListingRow {
   note: string | null;
   /** ListingOption[] 의 JSON */
   options: string | null;
+  mode: "sale" | "auction";
+  /** 경매가 끝나는 때 */
+  ends_at: number | null;
   status: "selling" | "sold";
   created_at: number;
   updated_at: number;
@@ -137,6 +155,6 @@ export function listingOut(r: ListingRow) {
   return {
     id: r.id, seller: r.seller, item: r.item, category: r.category, enhance: r.enhance, enchant: r.enchant,
     enchantValue: r.enchant_value, qty: r.qty, price: r.price, note: r.note, options: parseOptions(r.options), status: r.status,
-    createdAt: r.created_at, updatedAt: r.updated_at,
+    mode: r.mode ?? "sale", endsAt: r.ends_at, createdAt: r.created_at, updatedAt: r.updated_at,
   };
 }

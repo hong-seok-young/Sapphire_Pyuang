@@ -69,19 +69,32 @@ CREATE TABLE IF NOT EXISTS listings (
   note TEXT,                              -- 한마디
   status TEXT NOT NULL DEFAULT 'selling', -- selling 판매 중 | sold 거래 완료 (30일 뒤 지운다)
   options TEXT,                           -- 판 사람이 적은 옵션 값 JSON [{name, value, unit}] (옵션이 범위에서 뜨는 아이템)
+  mode TEXT NOT NULL DEFAULT 'sale',      -- sale 바로 판매 (흥정은 listing_wants.offer) | auction 경매 (price = 시작가)
+  ends_at INTEGER,                        -- 경매가 끝나는 때
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS listings_seller ON listings (seller, status);
 
--- '살래요'를 누른 길드원 (이름과 한마디는 판 사람에게만 보인다)
+-- '살래요'를 누른 길드원 (이름, 한마디, 흥정 가격은 판 사람에게만 보인다)
 CREATE TABLE IF NOT EXISTS listing_wants (
   listing_id INTEGER NOT NULL,
   user_id TEXT NOT NULL,
   note TEXT,
   created_at INTEGER NOT NULL,
+  offer INTEGER,                          -- 흥정 가격 (골드, 안 적으면 null)
   PRIMARY KEY (listing_id, user_id)
 );
+
+-- 경매 입찰 (최고가와 입찰 수는 모두에게, 누가 얼마를 불렀는지는 판 사람에게만)
+CREATE TABLE IF NOT EXISTS listing_bids (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  listing_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS listing_bids_listing ON listing_bids (listing_id, amount);
 
 -- 골드 거래: 게임 골드를 원화로 사고팔려는 글 (server/gold.ts). 현금거래 위험을 알린 뒤 제작자가 만들라고 했다.
 -- 앱은 돈을 받거나 보내지 않는다

@@ -2,8 +2,10 @@
 // 게임 골드를 원화로 사고팔려는 글과 '거래할래요'. 앱은 돈을 받거나 보내지 않는다.
 // 현금거래는 게임 운영정책 위반으로 계정이 정지될 수 있다고 알렸고, 제작자가 그래도 만들라고 했다 (2026-10-31).
 import { api } from "./auth";
-import { goldWords } from "./market";
+import { goldWords, wonText } from "./market";
 import type { Wanter } from "./market";
+
+export { wonText };
 
 /** 금액은 만 골드 단위 (750 = 750만 골드). 서버 server/gold.ts 와 같다 */
 export const MAX_GOLD = 1_000_000;
@@ -48,8 +50,3 @@ export const goldAmountText = (gold: number) => `${goldWords(gold * 10_000)} 골
 /** 원화: 만 골드 / 시세 x 1만 원 */
 export const wonOf = (gold: number, rate: number) => Math.round((gold * 10_000) / rate);
 
-/** 100000 -> "10만 원", 13699 -> "1만 3699원" */
-export function wonText(won: number): string {
-  const words = goldWords(won);
-  return words ? (won % 10_000 === 0 ? `${words} 원` : `${words}원`) : "0원";
-}

@@ -11,6 +11,9 @@ export const ROLE_NAME: Record<Role, string> = {
 
 export const RANK: Record<Role, number> = { developer: 3, master: 2, officer: 1, member: 0 };
 
+/** 길드 안의 직책 (랭킹 마크, 내 정보, 길드원 관리). 앱개발자는 앱을 관리하는 권한일 뿐 길드 직책이 아니라서 길드원으로 보인다 (제작자 요청) */
+export const positionOf = (role: Role): Role => (role === "developer" ? "member" : role);
+
 /** actor 가 target 역할의 계정을 다룰 수 있는지 (서버와 같은 규칙. 화면에서 버튼을 보일지 정하는 데만 쓴다) */
 export function canManage(actor: Role, target: Role): boolean {
   return RANK[actor] >= 1 && RANK[actor] > RANK[target];
@@ -120,6 +123,9 @@ export const setRole = (id: string, role: Role) =>
 /** password: 관리자가 정한 처음 비밀번호. 비우면 서버가 임시 비밀번호를 만든다 */
 export const resetPassword = (id: string, password?: string) =>
   api<{ id: string; tempPassword: string }>(`/api/users/${encodeURIComponent(id)}/reset`, "POST", { password });
+/** 다음에 들어올 때 비밀번호를 바꾸게 하기 (지금 비밀번호와 로그인은 그대로) */
+export const requirePasswordChange = (id: string) =>
+  api<{ id: string; mustChange: boolean }>(`/api/users/${encodeURIComponent(id)}/must-change`, "POST");
 
 export function errorText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);

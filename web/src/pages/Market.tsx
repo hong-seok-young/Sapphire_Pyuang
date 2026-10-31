@@ -4,13 +4,15 @@ import { JOB_NAME, RANK, errorText } from "../auth";
 import type { Me } from "../auth";
 import { useAsync } from "../data";
 import {
-  CATEGORIES, ENCHANTS, ENCHANT_CATEGORIES, ENHANCE_CATEGORIES, MARKET_PIC, OTHER_CATEGORIES, MAX_ENHANCE, MAX_NOTE, MAX_PRICE, MAX_QTY, ago, categoryOf, categoryPic, createListing,
+  AUCTION_HOURS, CATEGORIES, ENCHANTS, ENCHANT_CATEGORIES, ENHANCE_CATEGORIES, MARKET_PIC, OTHER_CATEGORIES, auctionOver, bidListing,
+  cashText, currentPrice, nextBid, MAX_ENHANCE, MAX_NOTE, MAX_PRICE, MAX_QTY, ago, categoryOf, categoryPic, createListing,
   deleteListing, enchantText, fetchMarket, goldText, goldWords, inRoll, itemFacts, jobsFor, listingName, rollHint, unwantListing,
   updateListing, wantListing, wikiItem,
 } from "../market";
 import type { Category, Enchant, Listing, ListingOption } from "../market";
 import type { Wiki } from "../types";
 import { Loading, PicImg, TopBar } from "../ui";
+import { timeLeft } from "../requests";
 import { GoldBoard } from "./GoldBoard";
 
 type Tab = "buy" | "mine" | "sell" | "gold";
@@ -41,15 +43,21 @@ function Slot({ wiki, l, size = 36 }: { wiki: Wiki; l: { item: string; enhance: 
   );
 }
 
-/** 누른 글의 정보창과 할 일 (살래요, 거래 완료, 가격 바꾸기, 내리기) */
-function Detail({ wiki, me, l, onChanged }: { wiki: Wiki; me: Me; l: Listing; onChanged: (next: Listing | null) => void }) {
+/** 누른 글의 정보창과 할 일: 살래요(흥정 가격), 경매 입찰, (내 글) 살래요 명단, 입찰 명단, 거래 완료, 가격 바꾸기, 내리기 */
+function Detail({ wiki, me, l, rate, onChanged }: {
+  wiki: Wiki; me: Me; l: Listing; rate: number; onChanged: (next: Listing | null) => void;
+}) {
   const facts = itemFacts(wikiItem(wiki, l.item));
   const rolled = new Map((l.options ?? []).map((o) => [o.name, o]));
   const mine = l.seller === me.id;
   const manager = RANK[me.role] >= 1;
+  const auction = l.mode === "auction";
+  const over = auctionOver(l);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
+  const [offer, setOffer] = useState("");
+  const [bid, setBid] = useState(String(nextBid(l)));
   const [price, setPrice] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -65,6 +73,13 @@ function Detail({ wiki, me, l, onChanged }: { wiki: Wiki; me: Me; l: Listing; on
     }
   }
   const newPrice = price === null ? 0 : Number(price.replace(/\D/g, ""));
+  const offerN = Number(offer) || 0;
+  const bidN = Number(bid) || 0;
+  const remove = () =>
+    run(async () => {
+      await deleteListing(l.id);
+      onChanged(null);
+    });
 
   return (
     <div className="mk-detail">
@@ -117,17 +132,50 @@ function Detail({ wiki, me, l, onChanged }: { wiki: Wiki; me: Me; l: Listing; on
       </div>
       {l.note && <p className="mk-note">“{l.note}”</p>}
       <p className="mk-meta">
-        {l.seller} · {ago(l.createdAt)} 올림{l.qty > 1 && ` · ${l.qty}개 한꺼번에`} · <Coin /> {goldText(l.price)}
+        {l.seller} · {ago(l.createdAt)} 올림{l.qty > 1 && ` · ${l.qty}개 한꺼번에`}
         {l.status === "sold" && " · 거래 완료"}
       </p>
+      {auction ? (
+        <p className="mk-deal">
+          🔨 {l.highestBid !== null ? "지금 최고가" : "시작가"} <Coin /> {goldText(currentPrice(l))} <small>{cashText(currentPrice(l), rate)}</small>
+          <br />
+          <small>
+            입찰 {l.bidCount}번 · {over ? "경매가 끝났어요" : l.endsAt ? `${timeLeft(l.endsAt)} 남음` : ""}
+            {l.highestBid !== null && ` · 시작가 ${goldText(l.price)}`}
+          </small>
+        </p>
+      ) : (
+        <p className="mk-deal">
+          <Coin /> {goldText(l.price)} <small>{cashText(l.price, rate)} (골드 시세 {rate}:1)</small>
+        </p>
+      )}
 
       {mine ? (
         <>
-          {(l.wanters?.length ?? 0) > 0 ? (
+          {auction ? (
+            (l.bids?.length ?? 0) > 0 ? (
+              <ul className="mk-wanters">
+                {l.bids!.map((b, i) => (
+                  <li key={b.id + b.at}>
+                    {i === 0 ? (over ? "🏆 낙찰 " : "🔨 최고 ") : "· "}
+                    <b>{b.id}</b> <Coin /> {goldText(b.amount)} <small>{ago(b.at)}</small>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mk-meta">아직 입찰한 사람이 없어요.</p>
+            )
+          ) : (l.wanters?.length ?? 0) > 0 ? (
             <ul className="mk-wanters">
               {l.wanters!.map((w) => (
                 <li key={w.id}>
                   ♥ <b>{w.id}</b> <small>{ago(w.at)}</small>
+                  {w.offer ? (
+                    <span className="mk-offer">
+                      {" "}
+                      흥정 <Coin /> {goldText(w.offer)} <small>{cashText(w.offer, rate)}</small>
+                    </span>
+                  ) : null}
                   {w.note && <span> “{w.note}”</span>}
                 </li>
               ))}
@@ -172,13 +220,13 @@ function Detail({ wiki, me, l, onChanged }: { wiki: Wiki; me: Me; l: Listing; on
                   다시 판매
                 </button>
               )}
-              {l.status === "selling" && (
+              {l.status === "selling" && !auction && (
                 <button className="pill" disabled={busy} onClick={() => setPrice(String(l.price))}>
                   가격 바꾸기
                 </button>
               )}
               {confirmDelete ? (
-                <button className="pill pill-danger" disabled={busy} onClick={() => run(async () => { await deleteListing(l.id); onChanged(null); })}>
+                <button className="pill pill-danger" disabled={busy} onClick={remove}>
                   정말 내리기
                 </button>
               ) : (
@@ -192,14 +240,67 @@ function Detail({ wiki, me, l, onChanged }: { wiki: Wiki; me: Me; l: Listing; on
       ) : (
         l.status === "selling" && (
           <div className="mk-actions">
-            {l.wanted ? (
-              <button className="pill pill-on" disabled={busy} onClick={() => run(async () => onChanged({ ...l, ...(await unwantListing(l.id)) }))}>
-                ♥ 살래요 취소
-              </button>
+            {auction ? (
+              over ? (
+                <p className="mk-meta">
+                  경매가 끝났어요.{l.myBid !== null && l.myBid === l.highestBid && " 🏆 내가 낙찰받았어요! 판 사람과 게임에서 거래해요."}
+                </p>
+              ) : (
+                <>
+                  {l.myBid !== null && (
+                    <p className="mk-meta mk-full">
+                      내 입찰 <Coin /> {goldText(l.myBid)} {l.myBid === l.highestBid ? "· 지금 내가 최고가예요" : "· 다른 사람이 더 높게 불렀어요"}
+                    </p>
+                  )}
+                  <input
+                    className="mk-input"
+                    inputMode="numeric"
+                    value={bidN ? goldText(bidN) : ""}
+                    onChange={(e) => setBid(e.target.value.replace(/\D/g, "").slice(0, 11))}
+                    aria-label="입찰가"
+                  />
+                  <button
+                    className="pill mk-want"
+                    disabled={busy || bidN <= (l.highestBid ?? l.price - 1)}
+                    onClick={() =>
+                      run(async () => {
+                        const r = await bidListing(l.id, bidN);
+                        const next = { ...l, ...r };
+                        onChanged(next);
+                        setBid(String(nextBid(next)));
+                      })
+                    }
+                  >
+                    🔨 입찰
+                  </button>
+                  <small className="mk-meta mk-full">
+                    {bidN > 0 && `${cashText(bidN, rate)} · `}지금 최고가보다 높게 불러야 해요. 누가 불렀는지는 판 사람만 봐요.
+                  </small>
+                </>
+              )
+            ) : l.wanted ? (
+              <>
+                {l.myOffer !== null && (
+                  <p className="mk-meta mk-full">
+                    내가 부른 흥정 가격 <Coin /> {goldText(l.myOffer)} <small>{cashText(l.myOffer, rate)}</small>
+                  </p>
+                )}
+                <button className="pill pill-on" disabled={busy} onClick={() => run(async () => onChanged({ ...l, ...(await unwantListing(l.id)), myOffer: null }))}>
+                  ♥ 살래요 취소
+                </button>
+              </>
             ) : (
               <>
                 <input
-                  className="mk-input"
+                  className="mk-input mk-full"
+                  inputMode="numeric"
+                  value={offerN ? goldText(offerN) : ""}
+                  onChange={(e) => setOffer(e.target.value.replace(/\D/g, "").slice(0, 11))}
+                  placeholder="흥정 가격 (안 적어도 돼요)"
+                  aria-label="흥정 가격"
+                />
+                <input
+                  className="mk-input mk-full"
                   value={note}
                   onChange={(e) => setNote(e.target.value.slice(0, MAX_NOTE))}
                   placeholder="판 사람에게 한마디 (안 적어도 돼요)"
@@ -207,16 +308,19 @@ function Detail({ wiki, me, l, onChanged }: { wiki: Wiki; me: Me; l: Listing; on
                 />
                 <button
                   className="pill mk-want"
-                  disabled={busy}
-                  onClick={() => run(async () => onChanged({ ...l, ...(await wantListing(l.id, note.trim() || null)) }))}
+                  disabled={busy || offerN > MAX_PRICE}
+                  onClick={() => run(async () => onChanged({ ...l, ...(await wantListing(l.id, note.trim() || null, offerN || null)) }))}
                 >
                   ♥ 살래요
                 </button>
+                <small className="mk-meta mk-full">
+                  {offerN > 0 && `${cashText(offerN, rate)} · `}흥정 가격과 한마디는 판 사람만 봐요.
+                </small>
               </>
             )}
             {manager &&
               (confirmDelete ? (
-                <button className="pill pill-danger" disabled={busy} onClick={() => run(async () => { await deleteListing(l.id); onChanged(null); })}>
+                <button className="pill pill-danger" disabled={busy} onClick={remove}>
                   정말 내리기
                 </button>
               ) : (
@@ -232,10 +336,11 @@ function Detail({ wiki, me, l, onChanged }: { wiki: Wiki; me: Me; l: Listing; on
   );
 }
 
-function Rows({ wiki, me, list, onChanged, empty }: {
+function Rows({ wiki, me, list, rate, onChanged, empty }: {
   wiki: Wiki;
   me: Me;
   list: Listing[];
+  rate: number;
   onChanged: (id: number, next: Listing | null) => void;
   empty: ReactNode;
 }) {
@@ -243,29 +348,35 @@ function Rows({ wiki, me, list, onChanged, empty }: {
   if (!list.length) return <div className="empty">{empty}</div>;
   return (
     <ul className="mk-list">
-      {list.map((l) => (
-        <li key={l.id} className={"mk-item" + (open === l.id ? " mk-open" : "") + (l.status === "sold" ? " mk-done" : "")}>
-          <button className="mk-row" onClick={() => setOpen(open === l.id ? null : l.id)}>
-            <Slot wiki={wiki} l={l} />
-            <span className="mk-name">
-              <b>{listingName(l)}</b>
-              <small>
-                {l.enchant && <span className="mk-ench">{enchantText(l)}</span>}
-                {l.wants > 0 && <span className={"mk-wants" + (l.wanted ? " mk-wants-me" : "")}>♥ {l.wants}</span>}
-                {l.status === "sold" && <span>거래 완료</span>}
-                {!l.enchant && !l.wants && l.status !== "sold" && <span>{ago(l.createdAt)}</span>}
-              </small>
-            </span>
-            <span className="mk-price">
-              <small>{l.seller}</small>
-              <b>
-                <Coin /> {goldText(l.price)}
-              </b>
-            </span>
-          </button>
-          {open === l.id && <Detail wiki={wiki} me={me} l={l} onChanged={(next) => onChanged(l.id, next)} />}
-        </li>
-      ))}
+      {list.map((l) => {
+        const auction = l.mode === "auction";
+        const shownPrice = auction ? currentPrice(l) : l.price;
+        return (
+          <li key={l.id} className={"mk-item" + (open === l.id ? " mk-open" : "") + (l.status === "sold" ? " mk-done" : "")}>
+            <button className="mk-row" onClick={() => setOpen(open === l.id ? null : l.id)}>
+              <Slot wiki={wiki} l={l} />
+              <span className="mk-name">
+                <b>{listingName(l)}</b>
+                <small>
+                  {auction && <span className="mk-auction-tag">🔨 경매{auctionOver(l) ? " 끝" : l.endsAt ? ` ${timeLeft(l.endsAt)}` : ""}</span>}
+                  {l.enchant && <span className="mk-ench">{enchantText(l)}</span>}
+                  {auction ? l.bidCount > 0 && <span>입찰 {l.bidCount}</span> : l.wants > 0 && <span className={"mk-wants" + (l.wanted ? " mk-wants-me" : "")}>♥ {l.wants}</span>}
+                  {l.status === "sold" && <span>거래 완료</span>}
+                  {!auction && !l.enchant && !l.wants && l.status !== "sold" && <span>{ago(l.createdAt)}</span>}
+                </small>
+              </span>
+              <span className="mk-price">
+                <small>{l.seller}</small>
+                <b>
+                  <Coin /> {goldText(shownPrice)}
+                </b>
+                <small className="mk-cash">{cashText(shownPrice, rate)}</small>
+              </span>
+            </button>
+            {open === l.id && <Detail wiki={wiki} me={me} l={l} rate={rate} onChanged={(next) => onChanged(l.id, next)} />}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -278,7 +389,9 @@ const squash = (s: string) => s.replace(/\s+/g, "").toLowerCase();
  * 위키에 없는 아이템은 이름을 그대로 적고 종류를 직접 고른다 (나중에 위키 자료에 넣으면 그림이 붙는다).
  * 강화는 갑옷~신발, 속성부여는 벨트~반지만 적는다.
  */
-function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
+function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: () => void }) {
+  const [mode, setMode] = useState<"sale" | "auction">("sale");
+  const [hours, setHours] = useState(24);
   const [item, setItem] = useState("");
   const [typing, setTyping] = useState(false);
   const [category, setCategory] = useState<Category | null>(null);
@@ -332,6 +445,7 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
       await createListing({
         item: name, category: cat, enhance: enhanceOk ? enhance : 0, enchant: enchantOk ? enchant : null,
         enchantValue: enchantOk && enchant ? enchantValue : null, qty: qtyN, price: priceN, note: note.trim() || null, options,
+        mode, hours: mode === "auction" ? hours : null,
       });
       onDone();
     } catch (x) {
@@ -343,6 +457,14 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
 
   return (
     <form className="panel mk-form" onSubmit={submit}>
+      <div className="mk-chips">
+        <button type="button" className={"pill" + (mode === "sale" ? " pill-on" : "")} onClick={() => setMode("sale")}>
+          바로 판매 (흥정 받기)
+        </button>
+        <button type="button" className={"pill" + (mode === "auction" ? " pill-on" : "")} onClick={() => setMode("auction")}>
+          🔨 경매
+        </button>
+      </div>
       <label className="mk-field">
         <span>아이템 이름</span>
         <input
@@ -506,7 +628,7 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
         </label>
         <label className="mk-field">
           <span>
-            가격 (골드){priceN > 0 && <b className="mk-words"> {goldWords(priceN)}</b>}
+            {mode === "auction" ? "시작가" : "가격"} (골드){priceN > 0 && <b className="mk-words"> {goldWords(priceN)} {cashText(priceN, rate)}</b>}
           </span>
           <input
             className="mk-input"
@@ -517,13 +639,25 @@ function SellForm({ wiki, onDone }: { wiki: Wiki; onDone: () => void }) {
           />
         </label>
       </div>
+      {mode === "auction" && (
+        <div className="mk-field">
+          <span>경매 시간 (시작가부터 남들이 점점 높게 불러요. 끝나면 가장 높게 부른 사람에게 팔아요)</span>
+          <div className="mk-chips">
+            {AUCTION_HOURS.map((h) => (
+              <button key={h.hours} type="button" className={"pill" + (hours === h.hours ? " pill-on" : "")} onClick={() => setHours(h.hours)}>
+                {h.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <label className="mk-field">
         <span>한마디 (안 적어도 돼요)</span>
         <input className="mk-input" value={note} onChange={(e) => setNote(e.target.value.slice(0, MAX_NOTE))} placeholder="예: 저녁 9시 이후 접속해요" />
       </label>
       {error && <p className="form-error">{error}</p>}
       <button className="btn" disabled={busy || !ok}>
-        {busy ? "올리는 중…" : "올리기"}
+        {busy ? "올리는 중…" : mode === "auction" ? "경매 올리기" : "올리기"}
       </button>
     </form>
   );
@@ -538,12 +672,17 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const [reload, setReload] = useState(0);
   const { data, error } = useAsync(useCallback(() => fetchMarket(), [reload]));
   const [listings, setListings] = useState<Listing[] | null>(null);
+  const [rate, setRate] = useState(75);
+  const [onlyAuction, setOnlyAuction] = useState(false);
   const [tab, setTab] = useState<Tab>("buy");
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState<Category | "전체">("전체");
   const [onlyWanted, setOnlyWanted] = useState(false);
   useEffect(() => {
-    if (data) setListings(data);
+    if (data) {
+      setListings(data.listings);
+      setRate(data.goldRate);
+    }
   }, [data]);
 
   const all = listings ?? [];
@@ -554,9 +693,13 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const wantsOnMine = mine.filter((l) => l.status === "selling").reduce((s, l) => s + l.wants, 0);
   const q = squash(query);
   const shown = selling.filter(
-    (l) => (cat === "전체" || l.category === cat) && (!onlyWanted || l.wanted) && (!q || squash(listingName(l)).includes(q)),
+    (l) =>
+      (cat === "전체" || l.category === cat) && (!onlyWanted || l.wanted) && (!onlyAuction || l.mode === "auction") &&
+      (!q || squash(listingName(l)).includes(q)),
   );
   const cats = CATEGORIES.filter((c) => selling.some((l) => l.category === c));
+  const auctions = selling.filter((l) => l.mode === "auction").length;
+  const wanted = selling.filter((l) => l.wanted).length;
   const changed = (id: number, next: Listing | null) =>
     setListings((ls) => (ls ?? []).flatMap((l) => (l.id !== id ? [l] : next ? [next] : [])));
 
@@ -601,23 +744,33 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
                 <small>{c === "전체" ? selling.length : selling.filter((l) => l.category === c).length}</small>
               </button>
             ))}
-            <button className={"pill mk-chip" + (onlyWanted ? " pill-on" : "")} onClick={() => setOnlyWanted((v) => !v)}>
-              ♥ 살래요 한 것
-            </button>
+            {/* 경매, 내가 '살래요'를 누른 물건: 있을 때만 (켜 둔 채 없어지면 끌 수 있게 그대로 둔다) */}
+            {(auctions > 0 || onlyAuction) && (
+              <button className={"pill mk-chip" + (onlyAuction ? " pill-on" : "")} onClick={() => setOnlyAuction((v) => !v)}>
+                🔨 경매 <small>{auctions}</small>
+              </button>
+            )}
+            {(wanted > 0 || onlyWanted) && (
+              <button className={"pill mk-chip" + (onlyWanted ? " pill-on" : "")} onClick={() => setOnlyWanted((v) => !v)}>
+                ♥ 사고 싶은 것 <small>{wanted}</small>
+              </button>
+            )}
           </div>
           <Rows
             wiki={wiki}
             me={me}
             list={shown}
+            rate={rate}
             onChanged={changed}
             empty={selling.length ? "찾는 물건이 없어요." : "아직 올라온 물건이 없어요. '팔기'에서 첫 물건을 올려 보세요!"}
           />
         </>
       ) : tab === "mine" ? (
-        <Rows wiki={wiki} me={me} list={mine} onChanged={changed} empty="아직 판 물건이 없어요. '팔기'에서 올려요." />
+        <Rows wiki={wiki} me={me} list={mine} rate={rate} onChanged={changed} empty="아직 판 물건이 없어요. '팔기'에서 올려요." />
       ) : (
         <SellForm
           wiki={wiki}
+          rate={rate}
           onDone={() => {
             setReload((n) => n + 1);
             setTab("mine");

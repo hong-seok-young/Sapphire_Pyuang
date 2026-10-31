@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
-  ROLE_NAME, RANK, canManage, createAccount, deleteAccount, errorText, listAccounts, resetPassword, setRole,
+  ROLE_NAME, RANK, canManage, createAccount, deleteAccount, errorText, listAccounts, positionOf, requirePasswordChange, resetPassword, setRole,
 } from "../auth";
 import type { Account, Me, Role } from "../auth";
 import { GUILD_NAME, GUILD_TIER, JOB_NAME, avatarUrl, deleteAvatarOf, saveProfileOf } from "../auth";
@@ -25,6 +25,7 @@ function toRoleText(name: string): string {
  * 앱개발자: 길드마스터까지 모두. 처음 비밀번호는 만들 때 한 번만 보여 준다.
  * '처음 비밀번호'를 정하면(예: 123123) 새 계정과 비밀번호 초기화에 그걸 쓰고, 비우면 임시 비밀번호를 만든다.
  * 어느 쪽이든 그 사람은 처음 로그인할 때 비밀번호를 바꾼다.
+ * '비밀번호 바꾸게 하기'는 지금 비밀번호와 로그인은 그대로 두고, 그 사람이 다음에 들어올 때 비밀번호 바꾸기 화면을 한 번 보게 한다.
  * 오피서 이상은 누구든 잘못 고른 직업과 레벨을 고치고, 캐릭터가 아닌 사진이 올라왔으면 내릴 수 있다 (길드 랭킹).
  * 경험치 %는 본인만 아는 값이라 여기에 보이지 않는다.
  */
@@ -137,6 +138,7 @@ export function AdminPage({ me }: { me: Me }) {
                   setNotice({ title: "비밀번호를 초기화했어요", id: r.id, password: r.tempPassword });
                 })
               }
+              onMustChange={() => run(async () => void (await requirePasswordChange(a.id)))}
               onRole={(role) => run(async () => void (await setRole(a.id, role)))}
               onDelete={() => run(async () => void (await deleteAccount(a.id)))}
               onChanged={reload}
@@ -149,12 +151,13 @@ export function AdminPage({ me }: { me: Me }) {
 }
 
 function AccountRow({
-  account, me, busy, onReset, onRole, onDelete, onChanged,
+  account, me, busy, onReset, onMustChange, onRole, onDelete, onChanged,
 }: {
   account: Account;
   me: Me;
   busy: boolean;
   onReset: () => void;
+  onMustChange: () => void;
   onRole: (role: Role) => void;
   onDelete: () => void;
   onChanged: () => void;
@@ -172,8 +175,10 @@ function AccountRow({
         {account.job && account.level ? <JobEmblem job={account.job} level={account.level} size={30} /> : null}
         {account.avatar && <img className="account-avatar" src={avatarUrl(account.id, account.avatar)} alt="" />}
         <span className="account-id">{account.id}</span>
-        {account.mustChange && <span className="role-badge muted">임시 비밀번호</span>}
-        <span className="role-badge">{ROLE_NAME[account.role]}</span>
+        {account.mustChange && <span className="role-badge muted">비밀번호 바꾸기 전</span>}
+        {/* 앱개발자는 길드 직책이 아니라서 길드원으로 보이고, 앱 관리 권한은 따로 적는다 */}
+        <span className="role-badge">{ROLE_NAME[positionOf(account.role)]}</span>
+        {account.role === "developer" && <span className="role-badge muted">앱 관리</span>}
       </div>
       <div className="account-sub">
         <span className="muted">
@@ -225,6 +230,11 @@ function AccountRow({
             </button>
           ))}
           <button className="pill" disabled={busy} onClick={onReset}>비밀번호 초기화</button>
+          {!account.mustChange && (
+            <button className="pill" disabled={busy} onClick={onMustChange}>
+              비밀번호 바꾸게 하기
+            </button>
+          )}
           {confirmDelete ? (
             <>
               <button className="pill pill-danger" disabled={busy} onClick={onDelete}>정말 삭제</button>

@@ -1,7 +1,7 @@
 import { inApp, isAndroid } from "../platform";
 import { RANK } from "../auth";
 import type { Me } from "../auth";
-import { HeroTitle } from "../ui";
+import { FitLine, HeroTitle } from "../ui";
 
 interface Tile {
   title: string;
@@ -67,7 +67,8 @@ export function Home({ me }: { me: Me }) {
         {shown.map((t) => (
           <a key={t.title} className={"tile" + (t.soon ? " tile-soon" : "")} href={t.to}>
             <span className="tile-icon">{t.icon}</span>
-            <span className="tile-title">{t.title}</span>
+            {/* 이름은 한 줄에 맞추고, 안 되면 낱말 사이에서만 줄을 바꾼다 ('성장'이 '성/장'으로 갈리지 않게) */}
+            <FitLine className="tile-title" text={t.title} />
             {t.soon && <span className="tile-badge">준비 중</span>}
           </a>
         ))}

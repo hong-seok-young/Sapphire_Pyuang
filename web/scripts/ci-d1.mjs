@@ -74,7 +74,10 @@ writeFileSync("wrangler.toml", toml.replace(/^database_id = ".*"$/m, `database_i
 wrangler("d1", "execute", DB, "--remote", "--yes", "--file=schema.sql");
 
 /** schema.sql 은 이미 있는 표를 바꾸지 않는다. 나중에 더한 칸: [표, 칸, 종류] */
-const ADDED_COLUMNS = [["profiles", "exp", "INTEGER"], ["listings", "options", "TEXT"], ["profiles", "guild", "TEXT"]];
+const ADDED_COLUMNS = [
+  ["profiles", "exp", "INTEGER"], ["listings", "options", "TEXT"], ["profiles", "guild", "TEXT"],
+  ["listings", "mode", "TEXT NOT NULL DEFAULT 'sale'"], ["listings", "ends_at", "INTEGER"], ["listing_wants", "offer", "INTEGER"],
+];
 for (const [table, column, type] of ADDED_COLUMNS) {
   const columns = parseJson(wrangler("d1", "execute", DB, "--remote", "--json", "--command", `PRAGMA table_info(${table})`))[0]?.results ?? [];
   if (!columns.some((c) => c.name === column)) {

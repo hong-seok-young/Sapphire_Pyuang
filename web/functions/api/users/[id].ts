@@ -22,6 +22,9 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
     env.DB.prepare(
       "DELETE FROM listing_wants WHERE user_id = ? OR listing_id IN (SELECT id FROM listings WHERE seller = ?)",
     ).bind(user.id, user.id),
+    env.DB.prepare(
+      "DELETE FROM listing_bids WHERE user_id = ? OR listing_id IN (SELECT id FROM listings WHERE seller = ?)",
+    ).bind(user.id, user.id),
     env.DB.prepare("DELETE FROM listings WHERE seller = ?").bind(user.id),
     env.DB.prepare(
       "DELETE FROM gold_wants WHERE user_id = ? OR offer_id IN (SELECT id FROM gold_offers WHERE owner = ?)",
