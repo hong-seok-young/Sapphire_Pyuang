@@ -1097,3 +1097,44 @@ button { font: inherit; color: inherit; }
 /* EXP-only growth mark next to the nickname (same slot as the level-up mark) */
 .rank-exp-up { padding: 1px 4px; font-size: 10px; background: #2fb67c; white-space: nowrap; }
 
+/* chatbot answers (pages/ChatAnswer.tsx): an NPC dialogue box with picture chips that open the wiki, cards and quick replies */
+.bubble-assistant:not(.bubble-error) {
+  background: linear-gradient(180deg, #2b2463 0%, #211c4f 100%);
+  box-shadow: inset 0 0 0 1px #5b4fb0, 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+.npc-name {
+  display: inline-block; margin: -2px 0 6px; padding: 1px 8px; font-size: 11px; color: var(--edge); background: var(--gold);
+  border: 1px solid var(--edge);
+}
+.ans { display: flex; flex-direction: column; gap: 6px; line-height: 1.7; font-size: 14px; }
+.ans-p { margin: 0; }
+.ans-route { padding: 6px 8px; background: rgba(0, 0, 0, 0.22); border-left: 3px solid var(--gold); }
+.ans-h {
+  margin: 6px 0 0; padding: 3px 8px; font-size: 13px; font-weight: 400; color: var(--gold);
+  background: rgba(255, 195, 92, 0.1); border-left: 3px solid var(--gold);
+}
+.ans-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 3px; }
+.ans-list li::marker { color: var(--gold); }
+.ans-chip {
+  display: inline-flex; align-items: center; gap: 3px; margin: 0 2px; padding: 0 6px 0 3px; vertical-align: middle;
+  font-size: 13px; line-height: 22px; color: var(--text); text-decoration: none; background: var(--night-2); border: 1px solid var(--edge);
+  box-shadow: inset 0 0 0 1px var(--hi);
+}
+.ans-chip:active { transform: translateY(1px); }
+.ans-chip-아이템 { box-shadow: inset 0 0 0 1px #ffc35c; }
+.ans-chip-몬스터 { box-shadow: inset 0 0 0 1px #ff8a6b; }
+.ans-chip-사냥터 { box-shadow: inset 0 0 0 1px #6fd39a; }
+.ans-chip-icon { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 20px; }
+.ans-chip-icon img { max-height: 20px; width: auto; }
+.ans-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 4px; }
+.ans-card {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; text-align: center; text-decoration: none;
+  color: var(--text); background: var(--panel); border: var(--px) solid var(--edge); box-shadow: inset 0 0 0 1px var(--hi);
+}
+.ans-card-pic { height: 46px; display: flex; align-items: center; justify-content: center; }
+.ans-card-emoji { font-size: 28px; }
+.ans-card b { font-size: 12px; font-weight: 400; word-break: keep-all; }
+.ans-card small { font-size: 10px; color: var(--muted); }
+.ans-asks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.ans-asks .pill { padding: 5px 9px; font-size: 12px; color: var(--text); text-align: left; }
+

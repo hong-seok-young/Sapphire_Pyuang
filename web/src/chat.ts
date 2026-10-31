@@ -122,7 +122,10 @@ export function wikiContext(wiki: Wiki, posts: Record<string, Post> | undefined,
     for (const { p } of scored) add(`[${p.title}]\n` + postText(posts[p.id]));
   }
 
-  // 4. 사냥터 목록 (레벨에 맞는 사냥터를 물을 때 쓴다)
+  // 4. 위키 메뉴 이름 (답에서 [[메뉴:이름]] 으로 보낼 수 있게)
+  add("[위키 메뉴]\n" + wiki.menu.map((m) => m.title).join(", "));
+
+  // 5. 사냥터 목록 (레벨에 맞는 사냥터를 물을 때 쓴다)
   add(
     "[사냥터 목록]\n" +
       wiki.regions

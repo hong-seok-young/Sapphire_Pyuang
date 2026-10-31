@@ -6,6 +6,7 @@ import type { ChatImage, ChatTurn } from "../chat";
 import { loadPosts, useAsync } from "../data";
 import { inFloat } from "../platform";
 import { TopBar } from "../ui";
+import { ChatAnswer } from "./ChatAnswer";
 
 /** 화면에 보이는 말 하나. previews 는 이번에 고른 사진 미리보기 (저장하지 않는다) */
 interface Shown extends ChatTurn {
@@ -77,9 +78,9 @@ export function ChatPage({ wiki }: { wiki: Wiki }) {
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  async function send(e?: FormEvent) {
+  async function send(e?: FormEvent, asked?: string) {
     e?.preventDefault();
-    const question = input.trim();
+    const question = (asked ?? input).trim();
     if (busy || (!question && !pending.length)) return;
     const user: Shown = {
       role: "user",
@@ -147,9 +148,19 @@ export function ChatPage({ wiki }: { wiki: Wiki }) {
       <div className="chat-list">
         {turns.map((t, i) => (
           <div key={i} className={"bubble bubble-" + t.role + (t.error ? " bubble-error" : "")}>
+            {/* 답은 게임의 NPC 대화창처럼 (제작자 요청) */}
+            {t.role === "assistant" && !t.error && <div className="npc-name">🧙 사파이어 길잡이</div>}
             {t.previews?.map((src, j) => <img key={j} className="bubble-pic" src={src} alt="고른 스샷" />)}
             {!t.previews?.length && t.photos ? <div className="bubble-photos">📷 사진 {t.photos}장</div> : null}
-            {t.text ? <Rich text={t.text} /> : t.role === "assistant" && busy && i === turns.length - 1 ? <span className="chat-wait">생각하는 중…</span> : null}
+            {t.text ? (
+              t.role === "assistant" && !t.error ? (
+                <ChatAnswer wiki={wiki} text={t.text} done={!(busy && i === turns.length - 1)} onAsk={(q) => void send(undefined, q)} />
+              ) : (
+                <Rich text={t.text} />
+              )
+            ) : t.role === "assistant" && busy && i === turns.length - 1 ? (
+              <span className="chat-wait">길잡이가 위키를 뒤지는 중…</span>
+            ) : null}
           </div>
         ))}
         <div ref={endRef} />
