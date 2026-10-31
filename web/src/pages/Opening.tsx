@@ -1,19 +1,21 @@
 // 정식 오픈 축하 (제작자 요청 2026-11-01: 클로즈베타를 끝내고 v1.0 으로 오픈. 들어오면 폭죽을 성대하게 한 번 쏘고 길드마스터의 오픈 글을 팝업으로).
-// 오픈 뒤 2주(opening.json showDays) 동안, 계정마다 이 기기에서 한 번. 같은 글은 배포 때 첫 공지사항으로도 올라간다 (scripts/ci-d1.mjs).
+// 오픈 날과 그다음 날(opening.json showDays: 11/1 ~ 11/2) 동안 들어올 때마다 뜬다. '확인'은 이번만 닫고, '더 이상 보지 않기'를 누른 기기는
+// 그 계정으로 다시 안 뜬다 (제작자 요청 2026-11-01). 같은 글은 배포 때 첫 공지사항으로도 올라간다 (scripts/ci-d1.mjs).
 // 처음 2.6초는 화면 가득 폭죽과 'GRAND OPEN' 글씨만, 그 뒤 글 칸이 올라오고 폭죽은 둘레에서 이어진다 (폰에서 글 칸에 가려 폭죽이 안 보여서).
 // 움직임 줄이기를 켠 기기는 폭죽 없이 글만.
 import { useEffect, useRef, useState } from "react";
 import opening from "../opening.json";
 
 const DAY = 86_400_000;
-const seenKey = (user: string) => "sapphire.opening." + user;
+/** '더 이상 보지 않기'를 누른 계정 (처음 판의 '확인' 기록과 다른 이름이라 그때 닫은 사람에게도 다시 뜬다) */
+const neverKey = (user: string) => "sapphire.openingNever." + user;
 
-/** 이 사람에게 오픈 축하를 띄울지 (오픈 날부터 2주, 이 기기에서 아직 안 봤으면) */
+/** 이 사람에게 오픈 축하를 띄울지 (오픈 날과 그다음 날, 이 기기에서 '더 이상 보지 않기'를 안 눌렀으면) */
 export function shouldCelebrate(user: string, now = Date.now()): boolean {
   const start = Date.parse(opening.openAt);
   if (!Number.isFinite(start) || now < start || now > start + opening.showDays * DAY) return false;
   try {
-    return !localStorage.getItem(seenKey(user));
+    return !localStorage.getItem(neverKey(user));
   } catch {
     return false; // 못 적는 기기는 매번 뜨지 않게 띄우지 않는다
   }
@@ -110,7 +112,7 @@ function fireworks(canvas: HTMLCanvasElement): () => void {
   };
 }
 
-/** 오픈 축하: 폭죽과 길드마스터의 오픈 글. '확인'을 누르면 이 기기에서는 다시 안 뜬다 */
+/** 오픈 축하: 폭죽과 길드마스터의 오픈 글. '확인'은 이번만 닫고, '더 이상 보지 않기'는 이 기기에서 다시 안 뜨게 */
 export function Opening({ user, onClose }: { user: string; onClose: () => void }) {
   const sky = useRef<HTMLCanvasElement>(null);
   const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -124,9 +126,9 @@ export function Opening({ user, onClose }: { user: string; onClose: () => void }
       window.clearTimeout(t);
     };
   }, [calm]);
-  const close = () => {
+  const never = () => {
     try {
-      localStorage.setItem(seenKey(user), String(Date.now()));
+      localStorage.setItem(neverKey(user), String(Date.now()));
     } catch {
       // 못 적어도 닫는다
     }
@@ -149,9 +151,14 @@ export function Opening({ user, onClose }: { user: string; onClose: () => void }
         <h2>{opening.title}</h2>
         <div className="opening-body">{opening.body}</div>
         <p className="opening-meta">길드마스터 {opening.author} · 공지사항에도 있어요</p>
-        <button className="btn" onClick={close}>
-          확인
-        </button>
+        <div className="opening-buttons">
+          <button className="btn btn-ghost" onClick={never}>
+            더 이상 보지 않기
+          </button>
+          <button className="btn" onClick={onClose}>
+            확인
+          </button>
+        </div>
       </div>
       )}
     </div>

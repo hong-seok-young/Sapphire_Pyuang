@@ -141,3 +141,19 @@ if (queryFirst("SELECT 1 AS done FROM setup WHERE key = 'opening_notice'")) {
   ]);
   console.log("오픈 공지를 올렸어요");
 }
+
+// 오픈 글을 고쳤으면(opening.json rev) 올라간 공지의 내용을 그 판으로 한 번 바꾼다 (제작자 요청 2026-11-01: '이런 걸 할 수 있어요'를 짧게).
+// 판마다 한 번만 해서, 그 뒤 길드마스터가 직접 고친 내용은 덮어쓰지 않는다
+{
+  const opening = JSON.parse(readFileSync("src/opening.json", "utf8"));
+  const rev = Number(opening.rev ?? 1);
+  const key = `opening_notice_rev${rev}`;
+  if (rev > 1 && !queryFirst(`SELECT 1 AS done FROM setup WHERE key = '${key}'`)) {
+    const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+    runSql([
+      `UPDATE board_posts SET body = ${q(opening.body)} WHERE id = (SELECT MIN(id) FROM board_posts WHERE cat = 'notice' AND title = ${q(opening.title)});`,
+      `INSERT OR REPLACE INTO setup (key, done_at) VALUES ('${key}', ${Date.now()});`,
+    ]);
+    console.log(`오픈 공지 내용을 ${rev}판으로 고쳤어요`);
+  }
+}
