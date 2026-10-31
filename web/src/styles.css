@@ -1357,11 +1357,12 @@ p.ps-charge { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px;
 
 /* closed beta version at the bottom right of home, very small, and the patch notes page (pages/PatchNotes.tsx, 제작자 요청) */
 /* '클로즈베타 v…' (제작자 요청 2026-11-01: 아래 탭 챗봇 아이콘 바로 위에 붙여서). 탭은 --tabs 칸, 한 칸 최대 128px, 가운데 정렬이라
-   챗봇 칸(--chat-at 번째) 가운데 = 화면 가운데 + (자리 - (칸 수 - 1) / 2) 칸 (App.tsx 가 두 값을 준다) */
+   챗봇 칸(--chat-at 번째) 오른쪽 끝 = 화면 가운데 + (자리 - (칸 수 - 1) / 2 + 0.5) 칸 (App.tsx 가 두 값을 준다).
+   글씨가 칸보다 넓어 가운데 맞춤이면 화면 밖으로 잘려서(제작자: '글씨 잘린다') 그 칸 오른쪽 끝에 맞추고, 화면 끝에서 4px 은 띄운다 */
 .home-version {
   position: fixed; z-index: 10; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 3px);
-  left: calc(50% + (var(--chat-at, 3) - (var(--tabs, 4) - 1) / 2) * min(100vw / var(--tabs, 4), 128px));
-  transform: translateX(-50%); white-space: nowrap; font-size: 10px; color: var(--muted); opacity: 0.75;
+  right: max(4px, calc(50% - (var(--chat-at, 4) - (var(--tabs, 5) - 1) / 2 + 0.5) * min(100% / var(--tabs, 5), 128px)));
+  white-space: nowrap; font-size: 10px; color: var(--muted); opacity: 0.75;
 }
 .patch-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .patch { margin: 0; padding: 8px 12px; }
@@ -1482,7 +1483,6 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 }
 .launch-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 8px 10px; }
 .launch-bar b { flex: 1; color: #3fe0a0; }
-.home-edit { display: block; margin: 14px auto 0; font-size: 12px; opacity: 0.8; }
 .launch-editing .tiles { min-height: 89px; }
 .launch-editing .tile, .tabbar.launch-editing .tab, .launch-editing .search-entry { touch-action: none; cursor: grab; animation: launch-wiggle 0.22s ease-in-out infinite alternate; }
 .launch-editing .tile:nth-child(2n), .tabbar.launch-editing .tab:nth-child(2n) { animation-delay: -0.11s; }
@@ -1497,3 +1497,21 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 }
 .launch-ghost .tile-icon { font-size: 24px; height: 30px; }
 .launch-ghost .tile-pic { width: 30px; height: 30px; object-fit: contain; }
+
+/* sign-up requests waiting in 길드원 관리 (functions/api/signup, 제작자 요청 2026-11-01) */
+.signup-requests { margin-bottom: 12px; border-color: #3fe0a0; }
+.signup-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid rgba(169, 162, 207, 0.18); }
+.signup-row b { flex: 1; min-width: 0; font-size: 15px; }
+.signup-row small { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* new posts and listings from other members (src/news.ts, 제작자 요청 2026-11-01): a red count bubble, apart from the mint
+   developer 'UPDATE' tag. On a tile it sits on the top right corner, on a bottom tab at the top right of the icon */
+.news-badge {
+  position: absolute; z-index: 4; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; font-size: 11px; font-weight: 700;
+  line-height: 16px; text-align: center; color: #fff; background: #ff4d4f; border: 1px solid var(--edge); pointer-events: none;
+}
+.tile-news { top: -7px; right: -7px; }
+.tile-ring > .tile-news { position: absolute; z-index: 4; }
+.tab-news { top: 2px; left: 50%; margin-left: 8px; }
+/* with a count on the right, the tab's 'UPDATE' tag moves to the left of the icon */
+.tab:has(.tab-news) .tab-up { transform: translateX(calc(-100% - 6px)); }

@@ -6,6 +6,7 @@ import { FitLine, PixelIcon, Loading, NotFound } from "./ui";
 import { Home, InfoPage, TileIcon } from "./pages/Home";
 import { canSee, clickItem, isUpdated, itemOf, loadLayout, pressItem, setEditing, useLauncher } from "./launcher";
 import type { LaunchItem } from "./launcher";
+import { markNewsSeen, newsFor, refreshNews, startNews, useNews } from "./news";
 import { Search } from "./pages/Search";
 import { Places, PlacePage } from "./pages/Places";
 import { ItemPage, MonsterPage } from "./pages/Detail";
@@ -118,6 +119,13 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   // 홈 칸과 아래 탭 배치 (계정마다). 홈을 떠나면 배치 편집은 끝낸다
   useEffect(() => loadLayout(me.id), [me.id]);
   const launcher = useLauncher();
+  // 새 글·새 물건 숫자 배지 (news.ts): 그 메뉴를 열면 지우고, 홈으로 올 때 다시 묻는다
+  useEffect(() => startNews(me.id), [me.id]);
+  useEffect(() => {
+    markNewsSeen(page);
+    if (page === "") void refreshNews();
+  }, [page]);
+  const news = useNews();
   useEffect(() => {
     if (page !== "" && launcher.editing) setEditing(false);
   }, [page, launcher.editing]);
@@ -197,9 +205,11 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
           const updated = t !== APP_TAB && isUpdated(me.id, t);
           const className =
             "tab" + (t.match.includes(page) ? " tab-on" : "") + (t.locked ? " tab-locked" : "") + (dragKey === t.key ? " launch-drag-src" : "");
+          const fresh = newsFor(news, t.key);
           const inside = (
             <>
               {updated && <span className="tab-up">UPDATE</span>}
+              {fresh > 0 && <span className="news-badge tab-news">{fresh > 99 ? "99+" : fresh}</span>}
               <span className="tab-icon">{t.pic ? <PixelIcon name={t.pic} size={32} /> : <TileIcon t={t} />}</span>
               <FitLine className="tab-label" text={t.short ?? t.title} wrap={false} />
             </>

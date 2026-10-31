@@ -399,3 +399,13 @@ CREATE TABLE IF NOT EXISTS layouts (
   data TEXT NOT NULL,                     -- {"dock": [...], "grid": [...]} 칸 이름 (launcher.ts ITEMS 의 key)
   updated_at INTEGER NOT NULL
 );
+
+-- 아이디 생성 요청 (functions/api/signup, 제작자 요청 2026-11-01): 로그인 화면에서 본인이 닉네임과 비밀번호를 넣어 요청하고
+-- 길드마스터·오피서가 '길드원 관리'에서 승낙하면 이 해시 그대로 users 에 계정을 만든다. 비밀번호 원문은 두지 않는다
+CREATE TABLE IF NOT EXISTS signup_requests (
+  id TEXT PRIMARY KEY,                    -- 바라는 아이디 (게임 닉네임)
+  pw_hash TEXT NOT NULL,
+  pw_salt TEXT NOT NULL,
+  pw_iter INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);

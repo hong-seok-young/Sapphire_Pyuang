@@ -6,6 +6,7 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent }
 import { enablePush, markPushAsked, shouldAskPush } from "../push";
 import { INFO_TILES, canSee, clickItem, isUpdated, itemOf, pressItem, resetLayout, setEditing, useLauncher } from "../launcher";
 import type { LaunchItem } from "../launcher";
+import { newsFor, useNews } from "../news";
 
 /**
  * 칸 그림: 이모지 (상점 칸만 게임 상점 그림). 제작자 요청 2026-10-31: 게임 아이템 그림을 키운 아이콘은 뭉개져서
@@ -19,6 +20,7 @@ export function TileIcon({ t }: { t: LaunchItem }) {
  * 칸 그리기 (홈과 정보가 같이 쓴다). editable: 홈 칸 (꾹 눌러 편집, 끌어서 옮기기, launcher.ts)
  */
 function Tiles({ me, tiles, editable = false, dragKey }: { me: Me; tiles: LaunchItem[]; editable?: boolean; dragKey?: string }) {
+  const news = useNews();
   return (
     <nav className="tiles" {...(editable ? { "data-zone": "grid" } : {})}>
       {tiles.map((t) => {
@@ -35,6 +37,8 @@ function Tiles({ me, tiles, editable = false, dragKey }: { me: Me; tiles: Launch
           <>
             {t.ribbon && <span className="tile-ribbon">{t.ribbon}</span>}
             {updated && <span className="tile-update">UPDATE</span>}
+            {/* 사람들이 새로 올린 글·물건 수 (news.ts, 'UPDATE' 와 따로) */}
+            {newsFor(news, t.key) > 0 && <span className="news-badge tile-news">{newsFor(news, t.key) > 99 ? "99+" : newsFor(news, t.key)}</span>}
             <span className="tile-icon">
               <TileIcon t={t} />
             </span>
@@ -140,12 +144,6 @@ export function Home({ me }: { me: Me }) {
       )}
 
       <Tiles me={me} tiles={tiles} editable dragKey={dragKey} />
-
-      {!L.editing && (
-        <button className="pill home-edit" onClick={() => setEditing(true)}>
-          ✏️ 배치 편집
-        </button>
-      )}
 
       {/* 아래 탭 챗봇 아이콘 바로 위에 아주 작게: 누르면 처음부터 지금까지의 패치 내역 (제작자 요청) */}
       <a className="home-version" href="#/patch">

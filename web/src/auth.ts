@@ -233,3 +233,17 @@ export async function uploadAvatar(png: Blob): Promise<number> {
 export const deleteMyAvatar = () => api<{ ok: boolean }>("/api/avatar", "DELETE");
 /** 오피서 이상: 캐릭터가 아닌 그림이 올라왔을 때 내리기 */
 export const deleteAvatarOf = (id: string) => api<{ ok: boolean }>(`/api/users/${encodeURIComponent(id)}/avatar`, "DELETE");
+
+// ---------- 아이디 생성 요청 (제작자 요청 2026-11-01: 로그인 화면에서 본인이 요청, 운영진이 승낙) ----------
+
+export interface SignupRequest {
+  id: string;
+  createdAt: number;
+}
+
+/** 로그인 전에 아이디 생성 요청 (닉네임, 비밀번호). 운영진이 승낙하면 그 비밀번호로 들어온다 */
+export const requestSignup = (id: string, password: string) => api<{ ok: true }>("/api/signup", "POST", { id, password });
+/** 승낙을 기다리는 요청 (오피서 이상) */
+export const listSignups = () => api<SignupRequest[]>("/api/signup");
+export const decideSignup = (id: string, action: "approve" | "reject") =>
+  api<{ ok: true }>(`/api/signup/${encodeURIComponent(id)}`, "POST", { action });

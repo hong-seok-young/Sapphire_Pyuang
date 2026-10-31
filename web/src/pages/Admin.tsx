@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
-  ROLE_NAME, RANK, canManage, createAccount, deleteAccount, errorText, listAccounts, positionOf, renameAccount, resetPassword,
-  setRole,
+  ROLE_NAME, RANK, canManage, createAccount, decideSignup, deleteAccount, errorText, listAccounts, listSignups, positionOf, renameAccount,
+  resetPassword, setRole,
 } from "../auth";
+import type { SignupRequest } from "../auth";
 import type { Account, Me, Role } from "../auth";
 import { GUILD_NAME, GUILD_TIER, JOB_NAME, clearLevelBadge, deleteAvatarOf, deleteLevelLog, expText, fetchLevelLog, saveProfileOf, setHighSpec } from "../auth";
 import type { LevelLogEntry } from "../auth";
@@ -72,8 +73,10 @@ export function AdminPage({ me }: { me: Me }) {
   const test = FILTERS.find((f) => f.key === filter)!.test;
   const shown = (accounts ?? []).filter((a) => test(a) && (!q || a.id.replace(/\s+/g, "").toLowerCase().includes(q)));
 
+  const [signups, setSignups] = useState<SignupRequest[]>([]);
   const reload = useCallback(() => {
     listAccounts().then(setAccounts, (e) => setError(errorText(e)));
+    listSignups().then(setSignups, () => setSignups([]));
   }, []);
   useEffect(reload, [reload]);
 
@@ -117,6 +120,25 @@ export function AdminPage({ me }: { me: Me }) {
             <button className="btn btn-ghost" onClick={() => setNotice(null)}>확인</button>
           </div>
         </Panel>
+      )}
+
+      {/* 로그인 화면에서 본인이 보낸 아이디 생성 요청 (제작자 요청 2026-11-01). 승낙하면 그 비밀번호로 길드원 계정이 생긴다 */}
+      {signups.length > 0 && (
+        <section className="panel signup-requests">
+          <h2 className="panel-title">아이디 생성 요청 {signups.length}</h2>
+          {signups.map((s) => (
+            <div key={s.id} className="signup-row">
+              <b>{s.id}</b>
+              <small>{new Date(s.createdAt).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</small>
+              <button className="pill pill-on" disabled={busy} onClick={() => run(() => decideSignup(s.id, "approve").then(() => undefined))}>
+                승낙
+              </button>
+              <button className="pill" disabled={busy} onClick={() => run(() => decideSignup(s.id, "reject").then(() => undefined))}>
+                거절
+              </button>
+            </div>
+          ))}
+        </section>
       )}
 
       <form className="panel form" onSubmit={create}>

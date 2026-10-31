@@ -12,7 +12,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   const row = await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(id).first<UserRow>();
   if (!row) {
-    await hashPassword(password, DUMMY_SALT) // 없는 아이디도 같은 시간이 걸리게
+    // 아이디 생성 요청만 하고 아직 승낙 전이면 (비밀번호가 맞을 때만) 그렇게 알려 준다 (functions/api/signup)
+    const pending = await env.DB.prepare("SELECT pw_hash, pw_salt, pw_iter FROM signup_requests WHERE id = ?")
+      .bind(id)
+      .first<Pick<UserRow, "pw_hash" | "pw_salt" | "pw_iter">>();
+    if (pending && (await verifyPassword(password, pending))) {
+      return json({ error: "아직 승낙 전이에요. 길드마스터나 오피서가 승낙하면 들어올 수 있어요" }, 403);
+    }
+    if (!pending) await hashPassword(password, DUMMY_SALT); // 없는 아이디도 같은 시간이 걸리게
     return json({ error: "아이디나 비밀번호가 맞지 않아요" }, 401);
   }
   if (!(await verifyPassword(password, row))) return json({ error: "아이디나 비밀번호가 맞지 않아요" }, 401);
