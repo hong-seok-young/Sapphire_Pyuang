@@ -6,7 +6,7 @@
 //      mode: sale 바로 판매 | auction 경매 (price = 시작가, hours 시간 동안)
 import { NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { KEEP_SOLD_MS, MAX_SELLING, USUAL_GOLD_RATE, listingOut, readListing } from "../../../server/market";
+import { MAX_SELLING, SHOW_SOLD_MS, USUAL_GOLD_RATE, listingOut, readListing } from "../../../server/market";
 import type { ListingRow } from "../../../server/market";
 import { itemName, notify } from "../../../server/alerts";
 
@@ -22,8 +22,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         "(SELECT MAX(amount) FROM listing_bids b WHERE b.listing_id = l.id) AS highest_bid, " +
         "(SELECT MAX(amount) FROM listing_bids b WHERE b.listing_id = l.id AND b.user_id = ?1) AS my_bid, " +
         "(SELECT COUNT(*) FROM listing_talk t WHERE t.listing_id = l.id) AS talk_count " +
-        "FROM listings l WHERE l.status = 'selling' OR l.seller = ?1 ORDER BY l.created_at DESC",
-    ).bind(me.id),
+        "FROM listings l WHERE l.status = 'selling' OR (l.seller = ?1 AND l.updated_at >= ?2) ORDER BY l.created_at DESC",
+    ).bind(me.id, Date.now() - SHOW_SOLD_MS),
     env.DB.prepare(
       "SELECT w.listing_id AS listing_id, w.user_id AS user_id, w.note AS note, w.offer AS offer, w.created_at AS created_at " +
         "FROM listing_wants w JOIN listings l ON l.id = w.listing_id WHERE l.seller = ? ORDER BY w.created_at",
@@ -73,19 +73,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const input = readListing(await readJson<Record<string, unknown>>(request));
   if (typeof input === "string") return json({ error: input }, 400);
   const now = Date.now();
-  // 오래된 거래 완료 글 정리 (올릴 때 가끔 하면 충분하다)
-  await env.DB.batch([
-    env.DB.prepare(
-      "DELETE FROM listing_wants WHERE listing_id IN (SELECT id FROM listings WHERE status = 'sold' AND updated_at < ?)",
-    ).bind(now - KEEP_SOLD_MS),
-    env.DB.prepare(
-      "DELETE FROM listing_bids WHERE listing_id IN (SELECT id FROM listings WHERE status = 'sold' AND updated_at < ?)",
-    ).bind(now - KEEP_SOLD_MS),
-    env.DB.prepare(
-      "DELETE FROM listing_talk WHERE listing_id IN (SELECT id FROM listings WHERE status = 'sold' AND updated_at < ?)",
-    ).bind(now - KEEP_SOLD_MS),
-    env.DB.prepare("DELETE FROM listings WHERE status = 'sold' AND updated_at < ?").bind(now - KEEP_SOLD_MS),
-  ]);
   const selling = await env.DB.prepare("SELECT COUNT(*) AS n FROM listings WHERE seller = ? AND status = 'selling'")
     .bind(me.id)
     .first<{ n: number }>();

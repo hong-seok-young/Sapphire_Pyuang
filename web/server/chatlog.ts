@@ -46,10 +46,6 @@ export async function newThread(env: Env, userId: string, title: string): Promis
   const row = await env.DB.prepare("INSERT INTO chat_threads (user_id, title, pinned, created_at, updated_at) VALUES (?, ?, 0, ?, ?) RETURNING id")
     .bind(userId, title, now, now)
     .first<{ id: number }>();
-  const old = await env.DB.prepare("SELECT id FROM chat_threads WHERE user_id = ? AND pinned = 0 ORDER BY updated_at DESC LIMIT -1 OFFSET ?")
-    .bind(userId, MAX_THREADS)
-    .all<{ id: number }>();
-  await deleteThreads(env, old.results.map((r) => r.id));
   return row!.id;
 }
 

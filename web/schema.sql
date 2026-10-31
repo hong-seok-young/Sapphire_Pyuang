@@ -57,6 +57,17 @@ CREATE TABLE IF NOT EXISTS level_log (
   exp INTEGER,                            -- 경험치 % x 1000. 안 적었으면 null (0 으로 센다)
   PRIMARY KEY (user_id, at)
 );
+-- level_log 에서 빠진 기록을 지우지 않고 옮겨 둔다 (제작자 요청 2026-11-01: 레벨과 경험치 추이는 평생 기록).
+-- reason: character 닉네임 바꾸기에서 '다른 캐릭터로 바꿨어요' / removed 오피서가 '성장 기록'에서 뺀 줄
+CREATE TABLE IF NOT EXISTS level_log_archive (
+  user_id TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  level INTEGER NOT NULL,
+  exp INTEGER,
+  archived_at INTEGER NOT NULL,
+  reason TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS level_log_archive_user ON level_log_archive (user_id, at);
 
 -- 사파이어 중개인: 길드원끼리 파는 물건 (게임 밖의 약속, 실제 거래는 게임 안에서). server/market.ts
 CREATE TABLE IF NOT EXISTS listings (

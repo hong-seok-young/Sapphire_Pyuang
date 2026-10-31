@@ -30,7 +30,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     env.DB.prepare("DELETE FROM cutout_tmp WHERE created_at < ?").bind(now - 5 * 60_000),
     env.DB.prepare("INSERT INTO cutout_tmp (id, img, type, created_at) VALUES (?, ?, ?, ?)").bind(id, bytes, isPng(bytes) ? "image/png" : "image/jpeg", now),
     env.DB.prepare("INSERT INTO cutout_log (user_id, at) VALUES (?, ?)").bind(me.id, now),
-    env.DB.prepare("DELETE FROM cutout_log WHERE at < ?").bind(now - DAY_MS),
   ]);
   try {
     const src = new URL(`/api/avatar/cutout/${id}`, request.url).toString();

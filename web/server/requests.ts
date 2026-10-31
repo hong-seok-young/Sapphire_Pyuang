@@ -10,8 +10,8 @@ export const MAX_REWARD_TEXT = 40;
 export const MAX_OPEN_REQUESTS = 10;
 /** 수락하고 이만큼 지나도 끝나지 않으면 다시 모집 중 */
 export const ACCEPT_MS = 2 * 86_400_000;
-/** 끝난 의뢰는 이만큼 보여 주고 지운다 */
-export const KEEP_DONE_MS = 30 * 86_400_000;
+/** 끝난 의뢰는 이만큼만 목록에 보인다. 기록은 지우지 않는다 (제작자 요청 2026-11-01: 기록은 평생) */
+export const SHOW_DONE_MS = 30 * 86_400_000;
 
 export interface RequestInput {
   title: string;
@@ -71,13 +71,12 @@ export function requestOut(r: RequestRow) {
   };
 }
 
-/** 수락하고 이틀이 지난 의뢰는 다시 모집 중으로, 오래된 끝난 의뢰는 지운다 */
+/** 수락하고 이틀이 지난 의뢰는 다시 모집 중으로 */
 export function tidyRequests(db: D1Database, now: number): D1PreparedStatement[] {
   return [
     db.prepare(
       "UPDATE requests SET status = 'open', accepter = NULL, accepted_at = NULL, updated_at = ?1 " +
         "WHERE status = 'accepted' AND accepted_at < ?2",
     ).bind(now, now - ACCEPT_MS),
-    db.prepare("DELETE FROM requests WHERE status = 'done' AND updated_at < ?").bind(now - KEEP_DONE_MS),
   ];
 }

@@ -9,8 +9,8 @@ export const MAX_GOLD = 1_000_000;
 export const MAX_RATE = 9999;
 /** 한 사람이 한꺼번에 올려 둘 수 있는 골드 글 */
 export const MAX_OPEN_GOLD = 5;
-/** 거래 끝난 글은 이만큼 지나면 지운다 */
-export const KEEP_DONE_MS = 30 * 86_400_000;
+/** 거래 끝난 내 글은 이만큼만 목록에 보인다. 기록은 지우지 않는다 (제작자 요청 2026-11-01: 기록은 평생) */
+export const SHOW_DONE_MS = 30 * 86_400_000;
 
 export interface GoldInput {
   side: "sell" | "buy";

@@ -22,8 +22,8 @@ export const MAX_PRICE = 99_999_999_999;
 export const MAX_NOTE = 60;
 /** 한 사람이 한꺼번에 팔 수 있는 수 (게임 거래소처럼 20) */
 export const MAX_SELLING = 20;
-/** 거래 완료한 글은 이만큼 지나면 지운다 */
-export const KEEP_SOLD_MS = 30 * 86_400_000;
+/** 거래 완료한 내 글은 이만큼만 목록에 보인다. 기록은 지우지 않는다 (제작자 요청 2026-11-01: 기록은 평생) */
+export const SHOW_SOLD_MS = 30 * 86_400_000;
 /** 경매 시간 (시간 단위): 12시간, 1일, 2일, 3일 */
 export const AUCTION_HOURS = [12, 24, 48, 72];
 /** '살래요'가 이만큼이면 경매로 바꿀 수 있다 (제작자 요청) */

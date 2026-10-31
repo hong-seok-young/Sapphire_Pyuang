@@ -1,16 +1,19 @@
-// GET  /api/requests -> 길드원 의뢰소: 모집 중, 진행 중, 끝난(30일 안) 의뢰 전부. 수락하고 이틀 지난 것은 먼저 다시 모집 중으로
+// GET  /api/requests -> 길드원 의뢰소: 모집 중, 진행 중, 끝난(30일 안, 그 전 것도 지우지 않고 둔다) 의뢰 전부. 수락하고 이틀 지난 것은 먼저 다시 모집 중으로
 // POST /api/requests { title, detail?, rewardGold? | rewardText? } -> 의뢰 올리기 (보상은 골드나 글 중 하나)
 import { NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import { notify } from "../../../server/alerts";
 import type { Env } from "../../../server/auth";
-import { MAX_OPEN_REQUESTS, readRequest, requestOut, tidyRequests } from "../../../server/requests";
+import { MAX_OPEN_REQUESTS, SHOW_DONE_MS, readRequest, requestOut, tidyRequests } from "../../../server/requests";
 import type { RequestRow } from "../../../server/requests";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  await env.DB.batch(tidyRequests(env.DB, Date.now()));
-  const { results } = await env.DB.prepare("SELECT * FROM requests ORDER BY created_at DESC").all<RequestRow>();
+  const now = Date.now();
+  await env.DB.batch(tidyRequests(env.DB, now));
+  const { results } = await env.DB.prepare("SELECT * FROM requests WHERE status != 'done' OR updated_at >= ? ORDER BY created_at DESC")
+    .bind(now - SHOW_DONE_MS)
+    .all<RequestRow>();
   return json({ requests: results.map(requestOut) });
 };
 

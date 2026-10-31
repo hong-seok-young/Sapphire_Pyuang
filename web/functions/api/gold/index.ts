@@ -4,7 +4,7 @@
 // 앱은 돈을 받거나 보내지 않는다 (server/gold.ts)
 import { NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { KEEP_DONE_MS, MAX_OPEN_GOLD, goldOut, readGold } from "../../../server/gold";
+import { MAX_OPEN_GOLD, SHOW_DONE_MS, goldOut, readGold } from "../../../server/gold";
 import type { GoldRow } from "../../../server/gold";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
@@ -14,8 +14,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     env.DB.prepare(
       "SELECT g.*, (SELECT COUNT(*) FROM gold_wants w WHERE w.offer_id = g.id) AS wants, " +
         "EXISTS (SELECT 1 FROM gold_wants w WHERE w.offer_id = g.id AND w.user_id = ?1) AS wanted " +
-        "FROM gold_offers g WHERE g.status = 'open' OR g.owner = ?1 ORDER BY g.created_at DESC",
-    ).bind(me.id),
+        "FROM gold_offers g WHERE g.status = 'open' OR (g.owner = ?1 AND g.updated_at >= ?2) ORDER BY g.created_at DESC",
+    ).bind(me.id, Date.now() - SHOW_DONE_MS),
     env.DB.prepare(
       "SELECT w.offer_id AS offer_id, w.user_id AS user_id, w.note AS note, w.created_at AS created_at " +
         "FROM gold_wants w JOIN gold_offers g ON g.id = w.offer_id WHERE g.owner = ? ORDER BY w.created_at",
@@ -43,12 +43,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const input = readGold(await readJson<Record<string, unknown>>(request));
   if (typeof input === "string") return json({ error: input }, 400);
   const now = Date.now();
-  await env.DB.batch([
-    env.DB.prepare(
-      "DELETE FROM gold_wants WHERE offer_id IN (SELECT id FROM gold_offers WHERE status = 'done' AND updated_at < ?)",
-    ).bind(now - KEEP_DONE_MS),
-    env.DB.prepare("DELETE FROM gold_offers WHERE status = 'done' AND updated_at < ?").bind(now - KEEP_DONE_MS),
-  ]);
   const open = await env.DB.prepare("SELECT COUNT(*) AS n FROM gold_offers WHERE owner = ? AND status = 'open'")
     .bind(me.id)
     .first<{ n: number }>();

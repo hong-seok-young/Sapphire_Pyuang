@@ -21,7 +21,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   // 내 플래티넘 지갑 (제작자 요청: 매주 300씩 지급되고 쌓인다. 고스펙은 따로)
   const w = await wallet(env, me.id, true, high, settings, now);
   if (item.plat > w.balance) {
-    return json({ error: `플래티넘이 모자라요 (가진 것 ${w.balance.toLocaleString("ko-KR")} / 이 물건 ${item.plat.toLocaleString("ko-KR")})` }, 409);
+    return json({ error: `플래티넘 이용한도가 모자라요 (남은 한도 ${w.balance.toLocaleString("ko-KR")} / 이 물건 ${item.plat.toLocaleString("ko-KR")})` }, 409);
   }
   const row = await env.DB.prepare(
     "INSERT INTO plat_orders (user_id, item_id, item_name, plat, gold, ratio, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'requested', ?) RETURNING id",

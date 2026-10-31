@@ -43,7 +43,7 @@ const TILES: Tile[] = [
   { title: "길드원 의뢰소", to: "#/requests", icon: "📋" },
   // 길드원끼리 장비 빌려주기, 인던 같이 갈 사람 찾기 (제작자 요청 2026-10-31: 칸만 먼저 두고 개발 중으로 막는다)
   { title: "장비대여", to: "", icon: "🤝", soon: true, badge: "개발 중", locked: true },
-  { title: "인던매칭", to: "", icon: "⚔️", soon: true, badge: "개발 중", locked: true },
+  { title: "길던&인던 매칭", to: "", icon: "⚔️", soon: true, badge: "개발 중", locked: true }, // 길드던전과 인던 매칭 둘 다 (제작자 요청 2026-11-01)
   // 시계와 보스 타이머는 안드로이드 앱에만 있다. 웹앱은 위키와 챗봇만 맡는다
   // 앱은 검토 후 오픈 (제작자 요청 2026-10-31: 지금은 웹만)
   { title: "안드로이드 앱 받기", to: "#/app", icon: "📲", androidOnly: true, soon: !APP_OPEN, badge: "검토 후 오픈" },

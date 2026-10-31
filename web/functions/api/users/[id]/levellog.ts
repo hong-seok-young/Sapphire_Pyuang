@@ -29,7 +29,13 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
   if (t.error) return t.error;
   const at = Number(new URL(request.url).searchParams.get("at"));
   if (!Number.isFinite(at) || at <= 0) return json({ error: "지울 기록을 골라 주세요" }, 400);
-  await env.DB.prepare("DELETE FROM level_log WHERE user_id = ? AND at = ?").bind(t.user.id, at).run();
+  // 뺀 줄도 지우지 않고 옮겨 둔다 (제작자 요청 2026-11-01: 레벨과 경험치 추이는 평생 기록)
+  await env.DB.batch([
+    env.DB.prepare(
+      "INSERT INTO level_log_archive (user_id, at, level, exp, archived_at, reason) SELECT user_id, at, level, exp, ?, 'removed' FROM level_log WHERE user_id = ? AND at = ?",
+    ).bind(Date.now(), t.user.id, at),
+    env.DB.prepare("DELETE FROM level_log WHERE user_id = ? AND at = ?").bind(t.user.id, at),
+  ]);
   return json({ ok: true });
 };
 

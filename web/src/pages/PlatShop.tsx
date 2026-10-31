@@ -22,7 +22,7 @@ function leftText(ms: number): string {
 }
 
 /**
- * 내 플래티넘 지갑 (제작자 요청: 말 대신 눈으로). 남은 플래티넘, 그리고 다음 지급(목요일 오전 10시)까지 지난 만큼 차는 막대와
+ * 플래티넘 이용한도 칸 (제작자 요청: 말 대신 눈으로. 2026-11-01 '내 플래티넘' 대신 '플래티넘 이용한도'). 남은 플래티넘, 그리고 다음 지급(목요일 오전 10시)까지 지난 만큼 차는 막대와
  * '3일 13시간 20분 뒤 +300'. 30초마다 다시 세고, 지급 때가 지나면 상점을 다시 불러 늘어난 플래티넘을 보인다
  */
 function WalletBox({ wallet, high, onDue }: { wallet: Wallet; high: boolean; onDue: () => void }) {
@@ -41,7 +41,7 @@ function WalletBox({ wallet, high, onDue }: { wallet: Wallet; high: boolean; onD
   return (
     <div className="ps-week">
       <span className="ps-week-top">
-        내 플래티넘 {gem} <b className="ps-week-balance">{wallet.balance.toLocaleString("ko-KR")}</b>
+        플래티넘 이용한도 {gem} <b className="ps-week-balance">{wallet.balance.toLocaleString("ko-KR")}</b>
         {high && <em className="ps-week-tag">고스펙</em>}
       </span>
       {wallet.weekly > 0 ? (
@@ -212,7 +212,7 @@ export function PlatShopPage() {
                 </small>
                 {data.wallet && (
                   <small>
-                    내 플래티넘 {data.wallet.balance.toLocaleString("ko-KR")} → 사면 {Math.max(0, data.wallet.balance - item.plat).toLocaleString("ko-KR")}
+                    이용한도 {data.wallet.balance.toLocaleString("ko-KR")} → 사면 {Math.max(0, data.wallet.balance - item.plat).toLocaleString("ko-KR")}
                   </small>
                 )}
               </span>
