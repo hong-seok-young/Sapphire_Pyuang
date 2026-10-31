@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
-  ROLE_NAME, RANK, canManage, createAccount, deleteAccount, errorText, listAccounts, positionOf, requirePasswordChange, resetPassword, setRole,
+  ROLE_NAME, RANK, canManage, createAccount, deleteAccount, errorText, listAccounts, positionOf, renameAccount, resetPassword,
+  setRole,
 } from "../auth";
 import type { Account, Me, Role } from "../auth";
 import { GUILD_NAME, GUILD_TIER, JOB_NAME, deleteAvatarOf, saveProfileOf } from "../auth";
 import { JobEmblem } from "../emblems";
 import { ProfileForm } from "./Profile";
 import { Loading, Panel, TopBar } from "../ui";
+
+/** '처음 비밀번호'를 비워 두고 초기화하면 쓰는 비밀번호 (제작자 요청). 다음 로그인 때 바꾸게 한다 */
+const RESET_PASSWORD = "123123";
 
 /** 길드원이 몇백 명이어도 처음엔 이만큼만 그리고 '더 보기' */
 const PAGE_SIZE = 50;
@@ -33,7 +37,7 @@ const ASSIGNABLE: Role[] = ["master", "officer", "member"];
  * 앱개발자: 길드마스터까지 모두. 처음 비밀번호는 만들 때 한 번만 보여 준다.
  * '처음 비밀번호'를 정하면(예: 123123) 새 계정과 비밀번호 초기화에 그걸 쓰고, 비우면 임시 비밀번호를 만든다.
  * 어느 쪽이든 그 사람은 처음 로그인할 때 비밀번호를 바꾼다.
- * '비밀번호 바꾸게 하기'는 지금 비밀번호와 로그인은 그대로 두고, 그 사람이 다음에 들어올 때 비밀번호 바꾸기 화면을 한 번 보게 한다.
+ * 비밀번호 초기화는 '처음 비밀번호'를 비워 두면 123123 으로 한다 (제작자 요청). 그 사람은 다음 로그인 때 바꾼다.
  * 오피서 이상은 누구든 잘못 고른 직업과 레벨을 고치고, 캐릭터가 아닌 사진이 올라왔으면 내릴 수 있다 (길드 랭킹).
  * 경험치 %는 본인만 아는 값이라 여기에 보이지 않는다.
  */
@@ -119,7 +123,7 @@ export function AdminPage({ me }: { me: Me }) {
           <input value={firstPw} onChange={(e) => setFirstPw(e.target.value)} autoCapitalize="off" autoComplete="off" />
         </label>
         <p className="form-note">
-          정하면 새 계정과 비밀번호 초기화에 이 비밀번호를 써요 (6자 이상). 받은 사람은 처음 로그인할 때 자기 비밀번호로 바꿔요.
+          정하면 새 계정과 비밀번호 초기화에 이 비밀번호를 써요 (6자 이상). 비워 두면 새 계정은 임시 비밀번호, 초기화는 123123 이에요. 받은 사람은 처음 로그인할 때 자기 비밀번호로 바꿔요.
         </p>
         {creatable.length > 1 && (
           <div className="role-pick">
@@ -163,11 +167,10 @@ export function AdminPage({ me }: { me: Me }) {
                 onOpen={() => setOpen(open === a.id ? null : a.id)}
                 onReset={() =>
                   run(async () => {
-                    const r = await resetPassword(a.id, chosenPassword());
+                    const r = await resetPassword(a.id, chosenPassword() ?? RESET_PASSWORD);
                     setNotice({ title: "비밀번호를 초기화했어요", id: r.id, password: r.tempPassword });
                   })
                 }
-                onMustChange={() => run(async () => void (await requirePasswordChange(a.id)))}
                 onRole={(role) => run(async () => void (await setRole(a.id, role)))}
                 onDelete={() => run(async () => void (await deleteAccount(a.id)))}
                 onChanged={reload}
@@ -193,7 +196,7 @@ export function AdminPage({ me }: { me: Me }) {
  * 역할은 드롭다운 대신 세 칸 단추 (게임 위 위키 창 WebView 에서는 <select> 가 안 열려서)
  */
 function AccountRow({
-  account, me, busy, open, onOpen, onReset, onMustChange, onRole, onDelete, onChanged,
+  account, me, busy, open, onOpen, onReset, onRole, onDelete, onChanged,
 }: {
   account: Account;
   me: Me;
@@ -201,7 +204,6 @@ function AccountRow({
   open: boolean;
   onOpen: () => void;
   onReset: () => void;
-  onMustChange: () => void;
   onRole: (role: Role) => void;
   onDelete: () => void;
   onChanged: () => void;
@@ -209,6 +211,8 @@ function AccountRow({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
   const [photoError, setPhotoError] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [newId, setNewId] = useState("");
   const manageable = account.id !== me.id && canManage(me.role, account.role);
   // 역할 바꾸기는 길드마스터 이상만 (오피서 임명/해제)
   const canRole = manageable && RANK[me.role] >= 2;
@@ -255,7 +259,7 @@ function AccountRow({
           )}
           <div className="account-actions">
             <button className="pill" disabled={busy} onClick={() => setEditing((e) => !e)}>
-              {editing ? "고치기 닫기" : "길드·직업·레벨 고치기"}
+              {editing ? "정보 수정 닫기" : "정보 수정"}
             </button>
             {account.avatar && (
               <button
@@ -276,14 +280,12 @@ function AccountRow({
             )}
             {manageable && (
               <>
+                <button className="pill" disabled={busy} onClick={() => setRenaming((v) => !v)}>
+                  닉네임 바꾸기
+                </button>
                 <button className="pill" disabled={busy} onClick={onReset}>
                   비밀번호 초기화
                 </button>
-                {!account.mustChange && (
-                  <button className="pill" disabled={busy} onClick={onMustChange}>
-                    비밀번호 바꾸게 하기
-                  </button>
-                )}
                 {confirmDelete ? (
                   <>
                     <button className="pill pill-danger" disabled={busy} onClick={onDelete}>
@@ -301,6 +303,34 @@ function AccountRow({
               </>
             )}
           </div>
+          {renaming && (
+            <div className="mk-actions">
+              <input
+                className="mk-input"
+                value={newId}
+                onChange={(e) => setNewId(e.target.value.slice(0, 20))}
+                placeholder="새 닉네임"
+                aria-label="새 닉네임"
+                autoCapitalize="off"
+              />
+              <button
+                className="pill"
+                disabled={busy || !newId.trim()}
+                onClick={async () => {
+                  setPhotoError("");
+                  try {
+                    await renameAccount(account.id, newId.trim());
+                    setRenaming(false);
+                    onChanged();
+                  } catch (x) {
+                    setPhotoError(errorText(x));
+                  }
+                }}
+              >
+                바꾸기
+              </button>
+            </div>
+          )}
           {photoError && <p className="form-error">{photoError}</p>}
           {editing && (
             <ProfileForm

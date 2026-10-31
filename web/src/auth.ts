@@ -123,9 +123,18 @@ export const setRole = (id: string, role: Role) =>
 /** password: 관리자가 정한 처음 비밀번호. 비우면 서버가 임시 비밀번호를 만든다 */
 export const resetPassword = (id: string, password?: string) =>
   api<{ id: string; tempPassword: string }>(`/api/users/${encodeURIComponent(id)}/reset`, "POST", { password });
-/** 다음에 들어올 때 비밀번호를 바꾸게 하기 (지금 비밀번호와 로그인은 그대로) */
-export const requirePasswordChange = (id: string) =>
-  api<{ id: string; mustChange: boolean }>(`/api/users/${encodeURIComponent(id)}/must-change`, "POST");
+/**
+ * 닉네임 바꾸기 (본인, 또는 다룰 수 있는 관리자). character 를 주면(본인만) 다른 캐릭터로 바꾼 것:
+ * 직업, 레벨을 그 캐릭터로 바꾸고 성장 기록을 새로 시작한다
+ */
+export const renameAccount = (
+  id: string,
+  newId: string,
+  character?: { job: Job; level: number; exp: number | null; guild: Guild },
+) =>
+  api<{ id: string; fresh: boolean }>(`/api/users/${encodeURIComponent(id)}/rename`, "POST", {
+    newId, ...(character ? { fresh: true, ...character } : {}),
+  });
 
 export function errorText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);

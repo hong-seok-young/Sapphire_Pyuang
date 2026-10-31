@@ -12,7 +12,7 @@ const VISIT_GAP = 30 * 60_000;
 /** 한 일에서 남기는 칸 (요청 본문). 나머지는 버린다 */
 const KEEP = [
   "id", "item", "category", "enhance", "enchant", "enchantValue", "qty", "price", "mode", "hours", "status",
-  "side", "gold", "rate", "title", "rewardGold", "rewardText", "action", "job", "level", "guild", "role",
+  "side", "gold", "rate", "title", "rewardGold", "rewardText", "action", "job", "level", "guild", "role", "newId", "fresh",
 ] as const;
 
 export type Kind = "visit" | "view" | "act";

@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import {
   EXP_MAX, GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, MAX_LEVEL, ROLE_NAME, avatarUrl, deleteMyAvatar, errorText, expText,
-  logout, positionOf, saveMyProfile,
+  logout, positionOf, renameAccount, saveMyProfile,
 } from "../auth";
 import type { Guild, Job, Me } from "../auth";
 import { JobEmblem, JobGlyph } from "../emblems";
@@ -79,11 +79,13 @@ export function ProfileForm({
       <div className="job-pick">
         {JOBS.map((j) => (
           <button key={j} type="button" className={"job-btn" + (job === j ? " job-on" : "")} onClick={() => setJob(j)}>
-            <JobGlyph job={j} size={30} />
+            <JobGlyph job={j} size={22} />
             <span>{JOB_NAME[j]}</span>
           </button>
         ))}
       </div>
+      {/* 레벨과 경험치는 한 줄 (자리가 모자라면 다음 줄로) */}
+      <div className="level-line">
       <div className="level-row">
         <span className="level-label">레벨</span>
         <button type="button" className="pill level-step" onClick={() => step(-1)} aria-label="레벨 내리기">
@@ -102,7 +104,6 @@ export function ProfileForm({
         </button>
       </div>
       {withExp && (
-        <>
           <div className="level-row">
             <span className="level-label">경험치</span>
             <input
@@ -115,12 +116,14 @@ export function ProfileForm({
             />
             <span className="exp-unit">%</span>
           </div>
-          <p className={"form-note" + (expValue === undefined ? " form-error" : "")}>
-            {expValue === undefined
-              ? "경험치는 0 ~ 99.999 사이로, 소수점 3자리까지 적어 주세요."
-              : "게임 화면의 경험치 %를 소수점 3자리까지 (안 적어도 돼요). 숫자는 나만 보고, 같은 레벨이면 높은 사람이 위예요. 레벨이 오르면 같이 바꿔 주세요."}
-          </p>
-        </>
+      )}
+      </div>
+      {withExp && (
+        <p className={"form-note" + (expValue === undefined ? " form-error" : "")}>
+          {expValue === undefined
+            ? "경험치는 0 ~ 99.999 사이로, 소수점 3자리까지 적어 주세요."
+            : "경험치 %는 소수점 3자리까지, 안 적어도 돼요. 나만 보고, 같은 레벨이면 높은 쪽이 위예요."}
+        </p>
       )}
       {error && <p className="form-error">{error}</p>}
       <button className="btn" disabled={busy || !ok}>
@@ -274,6 +277,7 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
         {saved && <p className="form-note">저장했어요. 길드 랭킹에 바로 보여요.</p>}
       </section>
       <AvatarPanel me={me} onMe={onMe} />
+      <RenamePanel me={me} onMe={onMe} />
       <div className="links">
         <a className="btn btn-ghost" href="#/ranking">🏆 길드 랭킹</a>
         <a className="btn btn-ghost" href="#/password">비밀번호 바꾸기</a>
@@ -291,5 +295,74 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
         </button>
       </div>
     </>
+  );
+}
+
+/**
+ * 닉네임 바꾸기 (제작자 요청: 키우는 캐릭터를 바꾸거나 캐릭터를 사는 일이 있어서). 다음 로그인부터 새 닉네임으로 들어온다.
+ * '다른 캐릭터로 바꿨어요'를 고르면 새 캐릭터의 직업, 레벨도 같이 적고 성장 랭킹을 그 레벨부터 새로 센다
+ */
+function RenamePanel({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
+  const [newId, setNewId] = useState("");
+  const [switched, setSwitched] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState("");
+  const name = newId.trim();
+
+  async function rename(character?: { job: Job; level: number; exp: number | null; guild: Guild }) {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await renameAccount(me.id, name, character);
+      onMe({ id: r.id, ...(character ?? {}) });
+      setDone(`'${r.id}'(으)로 바꿨어요. 다음 로그인부터 새 닉네임으로 들어와요.`);
+      setNewId("");
+      setSwitched(false);
+    } catch (x) {
+      setError(errorText(x));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="panel profile-panel">
+      <h2 className="panel-title">닉네임 바꾸기</h2>
+      <label className="rename-field">
+        새 닉네임
+        <input value={newId} onChange={(e) => setNewId(e.target.value.slice(0, 20))} autoCapitalize="off" placeholder={me.id} />
+      </label>
+      <div className="mk-chips">
+        <button type="button" className={"pill" + (!switched ? " pill-on" : "")} onClick={() => setSwitched(false)}>
+          닉네임만 바꿔요
+        </button>
+        <button type="button" className={"pill" + (switched ? " pill-on" : "")} onClick={() => setSwitched(true)}>
+          다른 캐릭터로 바꿨어요
+        </button>
+      </div>
+      {switched ? (
+        <>
+          <p className="form-note">새 캐릭터의 직업과 레벨을 적어요. 성장 랭킹은 이 레벨부터 새로 세요 (산 캐릭터로 성장이 튀지 않게).</p>
+          <ProfileForm
+            guild={me.guild}
+            job={me.job}
+            level={null}
+            withExp
+            submitLabel={busy ? "바꾸는 중…" : "닉네임과 캐릭터 바꾸기"}
+            onSave={async (job, level, exp, guild) => {
+              if (!name) throw new Error("새 닉네임을 적어 주세요");
+              await rename({ job, level, exp, guild });
+            }}
+          />
+        </>
+      ) : (
+        <button className="btn" disabled={busy || !name} onClick={() => rename()}>
+          {busy ? "바꾸는 중…" : "닉네임 바꾸기"}
+        </button>
+      )}
+      {error && <p className="form-error">{error}</p>}
+      {done && <p className="form-note">{done}</p>}
+    </section>
   );
 }

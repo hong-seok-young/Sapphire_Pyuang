@@ -119,7 +119,7 @@ const ACTIONS: [RegExp, string][] = [
   [/^DELETE \/api\/users\/([^/]+)$/, "계정 지움: $1"],
   [/^PATCH \/api\/users\/([^/]+)$/, "역할 바꿈: $1"],
   [/^POST \/api\/users\/([^/]+)\/reset$/, "비밀번호 초기화: $1"],
-  [/^POST \/api\/users\/([^/]+)\/must-change$/, "비밀번호 바꾸게 함: $1"],
+  [/^POST \/api\/users\/([^/]+)\/rename$/, "닉네임 바꿈: $1"],
   [/^PUT \/api\/users\/([^/]+)\/profile$/, "직업·레벨 고침: $1"],
   [/^DELETE \/api\/users\/([^/]+)\/avatar$/, "사진 내림: $1"],
   [/^POST \/api\/market$/, "중개인 물건 올림"],
@@ -173,5 +173,6 @@ export function actionText(what: string, detail: string | null): string {
   if (typeof d.level === "number") bits.push(`Lv.${d.level}`);
   if (d.guild === "main" || d.guild === "second") bits.push(d.guild === "main" ? "1군" : "2군");
   if (d.offered) bits.push("흥정 가격 붙임");
+  if (typeof d.newId === "string") bits.push(`→ ${d.newId}${d.fresh ? " (다른 캐릭터, 성장 새로)" : ""}`);
   return bits.length ? `${name} · ${bits.join(" · ")}` : name;
 }

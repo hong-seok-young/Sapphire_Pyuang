@@ -145,23 +145,7 @@ try {
   check("seller takes the auction down", (await req("DELETE", `/api/market/${auc2}`, null, s)).status === 200);
   check("its bids are gone", d1(`SELECT COUNT(*) AS n FROM listing_bids WHERE listing_id = ${auc2}`)[0]?.n === 0);
 
-  // --- '비밀번호 바꾸게 하기' ---
-  const member = (await req("POST", "/api/login", { id: "입찰이", password: "local-auc-pw3" })).cookie;
-  check("member starts without the flag", (await req("GET", "/api/me", null, member)).json?.mustChange === false);
-  check("member cannot set it -> 403", (await req("POST", `/api/users/${enc("경매왕")}/must-change`, null, member)).status === 403);
-  check("officer cannot set it on self -> 403", (await req("POST", `/api/users/${enc("경매오피")}/must-change`, null, o)).status === 403);
-  check("unknown id -> 404", (await req("POST", `/api/users/${enc("없는사람")}/must-change`, null, admin)).status === 404);
-  check("needs login -> 401", (await req("POST", `/api/users/${enc("입찰이")}/must-change`)).status === 401);
-  const set = await req("POST", `/api/users/${enc("입찰이")}/must-change`, null, o);
-  check("officer sets it on a member", set.status === 200 && set.json?.mustChange === true);
-  check("member stays logged in and must change now", (await req("GET", "/api/me", null, member)).json?.mustChange === true);
-  check("the old password still works", (await req("POST", "/api/login", { id: "입찰이", password: "local-auc-pw3" })).status === 200);
-  check("admin list shows the flag", ((await req("GET", "/api/users", null, admin)).json ?? []).find((u) => u.id === "입찰이")?.mustChange === true);
-  check("same password again -> 400", (await req("POST", "/api/password", { current: "local-auc-pw3", next: "local-auc-pw3" }, member)).status === 400);
-  check("member changes it", (await req("POST", "/api/password", { current: "local-auc-pw3", next: "local-auc-new3" }, member)).status === 200);
-  check("flag is cleared", (await req("GET", "/api/me", null, member)).json?.mustChange === false);
-  check("officer cannot set it on the developer -> 403", (await req("POST", `/api/users/${enc("localtest")}/must-change`, null, o)).status === 403);
-  check("developer sets it on an officer", (await req("POST", `/api/users/${enc("경매오피")}/must-change`, null, admin)).status === 200);
+  // ('비밀번호 바꾸게 하기'는 제작자 요청으로 뺐다)
 } finally {
   for (const [id] of [["경매왕"], ["입찰일"], ["입찰이"], ["경매오피"]]) {
     try { await req("DELETE", `/api/users/${enc(id)}`, null, (await req("POST", "/api/login", { id: "localtest", password: devPassword })).cookie); } catch {}
