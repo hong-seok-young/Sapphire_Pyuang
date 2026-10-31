@@ -5,6 +5,7 @@
 //  3. 계정이 하나도 없을 때만 앱개발자 계정(퓨앙)을 저장소 비밀값 DEV_PASSWORD 로 만든다.
 //  4. 저장소 비밀값 FIRST_PASSWORD 가 있으면 시작 계정(길드마스터, 오피서)을 한 번만 만든다 (제작자 요청).
 //     이미 있는 아이디는 그대로 두고, 한 번 만든 뒤에는 다시 만들지 않는다 (지운 계정이 배포 때 되살아나지 않게).
+//  5. 정식 오픈 글(src/opening.json, 길드마스터)을 첫 공지사항으로 한 번 올리고 모두에게 알림을 넣는다 (setup 'opening_notice').
 // 3, 4 의 계정은 처음 로그인하면 비밀번호를 바꾸게 한다. 그 밖의 길드원은 '길드원 관리'에서 만든다.
 // 공개 저장소라 실행 기록을 누구나 볼 수 있으므로 비밀번호, 해시, SQL 은 화면에 찍지 않는다.
 import { execFileSync } from "node:child_process";
@@ -123,4 +124,20 @@ if (first) {
     ]);
     console.log(`시작 계정(${STARTING.map(([user]) => user).join(", ")})을 만들었어요. 처음 로그인하면 비밀번호를 바꿔요`);
   }
+}
+
+// 정식 오픈 글을 첫 공지사항으로 한 번 (제작자 요청 2026-11-01). 이미 올렸으면 그대로 둔다 (길드마스터가 고치거나 지워도 되살리지 않게)
+if (queryFirst("SELECT 1 AS done FROM setup WHERE key = 'opening_notice'")) {
+  console.log("오픈 공지는 이미 올렸어요");
+} else {
+  const opening = JSON.parse(readFileSync("src/opening.json", "utf8"));
+  const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+  const now = Date.now();
+  runSql([
+    `INSERT INTO board_posts (cat, author, title, body, pinned, created_at) VALUES ('notice', ${q(opening.author)}, ${q(opening.title)}, ${q(opening.body)}, 1, ${now});`,
+    `INSERT INTO alerts (user_id, kind, text, link, created_at) SELECT id, 'board_notice', ${q(`[공지사항] ${opening.title} · ${opening.author}`)}, ` +
+      `'#/board/' || (SELECT MAX(id) FROM board_posts WHERE cat = 'notice' AND title = ${q(opening.title)}), ${now} FROM users WHERE id != ${q(opening.author)};`,
+    `INSERT OR REPLACE INTO setup (key, done_at) VALUES ('opening_notice', ${now});`,
+  ]);
+  console.log("오픈 공지를 올렸어요");
 }

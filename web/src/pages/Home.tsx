@@ -145,9 +145,9 @@ export function Home({ me }: { me: Me }) {
 
       <Tiles me={me} tiles={tiles} editable dragKey={dragKey} />
 
-      {/* 아래 탭 챗봇 아이콘 바로 위에 아주 작게: 누르면 처음부터 지금까지의 패치 내역 (제작자 요청) */}
+      {/* 아래 탭 챗봇 아이콘 바로 위에 아주 작게: 누르면 처음부터 지금까지의 패치 내역 (제작자 요청). 2026-11-01 정식 오픈 v1.0 */}
       <a className="home-version" href="#/patch">
-        클로즈베타 v{VERSION}
+        v{VERSION}
       </a>
     </div>
   );

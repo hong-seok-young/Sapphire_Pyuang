@@ -30,6 +30,7 @@ import { PlatShopPage } from "./pages/PlatShop";
 import { BoardPage } from "./pages/Board";
 import { PatchNotesPage } from "./pages/PatchNotes";
 import { OddsPage, OddsTablePage } from "./pages/Odds";
+import { Opening, shouldCelebrate } from "./pages/Opening";
 import { reportOpen, reportView } from "./activity";
 import { markMenuVisit } from "./updates";
 import { ensurePush, reportPush } from "./push";
@@ -119,6 +120,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   // 홈 칸과 아래 탭 배치 (계정마다). 홈을 떠나면 배치 편집은 끝낸다
   useEffect(() => loadLayout(me.id), [me.id]);
   const launcher = useLauncher();
+  // 정식 오픈 축하 (폭죽과 길드마스터의 오픈 글, 오픈 뒤 2주 동안 이 기기에서 한 번. pages/Opening.tsx)
+  const [celebrate, setCelebrate] = useState(() => shouldCelebrate(me.id));
   // 새 글·새 물건 숫자 배지 (news.ts): 그 메뉴를 열면 지우고, 홈으로 올 때 다시 묻는다
   useEffect(() => startNews(me.id), [me.id]);
   useEffect(() => {
@@ -176,7 +179,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   return (
     <div
       className="app"
-      // 홈의 '클로즈베타' 글씨를 챗봇 탭(없으면 마지막 탭) 바로 위에 두려고 탭 수와 그 자리를 알린다 (styles.css .home-version)
+      // 홈의 버전 글씨를 챗봇 탭(없으면 마지막 탭) 바로 위에 두려고 탭 수와 그 자리를 알린다 (styles.css .home-version)
       style={{ "--tabs": tabs.length, "--chat-at": chatAt >= 0 ? chatAt : tabs.length - 1 } as CSSProperties}
     >
       {/* 테스트 계정으로 보는 중이면 맨 위에 '내 계정' (앱개발자로 돌아가기) */}
@@ -235,6 +238,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
           );
         })}
       </nav>
+      {celebrate && <Opening user={me.id} onClose={() => setCelebrate(false)} />}
       {/* 끌고 있는 칸 (손가락을 따라온다) */}
       {dragItem && launcher.drag && (
         <div className="launch-ghost" style={{ left: launcher.drag.x, top: launcher.drag.y }} aria-hidden>
