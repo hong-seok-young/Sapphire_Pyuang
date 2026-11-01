@@ -1631,3 +1631,59 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 .off-body table { border-collapse: collapse; font-size: 12px; min-width: 100%; }
 .off-body td, .off-body th { border: 1px solid var(--hi); padding: 4px 6px; }
 .off-text { white-space: pre-line; }
+
+/* IMO maintenance marquee under the home subtitle (Home.tsx MaintBanner): amber LED-board text scrolling left until the maintenance ends */
+.maint {
+  display: flex; align-items: center; gap: 8px; margin: -4px 0 12px; padding: 7px 10px;
+  background: #1c0f06; color: #ffb547; font-size: 13px; line-height: 18px; overflow: hidden;
+  border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 #5a3412, inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #0d0603;
+  text-shadow: 0 0 4px rgba(255, 170, 60, 0.75);
+}
+.maint-on { color: #ff8a5c; text-shadow: 0 0 4px rgba(255, 110, 70, 0.8); }
+.maint-icon { flex: none; text-shadow: none; }
+.maint-track {
+  flex: 1; min-width: 0; overflow: hidden; white-space: nowrap;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+}
+.maint-run { display: inline-flex; animation: maint-scroll linear infinite; will-change: transform; }
+.maint-run > span { padding-right: 56px; }
+@keyframes maint-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) {
+  .maint-run { animation: none; display: inline; }
+  .maint-track { white-space: normal; -webkit-mask-image: none; mask-image: none; }
+  .maint-run > span[aria-hidden] { display: none; }
+}
+
+/* To do (pages/Todo.tsx): today / this week / events with pixel check boxes */
+.todo-who { margin: -4px 4px 10px; font-size: 12px; color: var(--muted); }
+.todo { padding: 8px 10px 4px; }
+.todo-head { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; font-size: 15px; color: var(--gold); text-shadow: 1px 1px 0 var(--edge); }
+.todo-head b { font-size: 12px; color: var(--muted); text-shadow: none; }
+.todo-head b.todo-all { color: #7dffb0; }
+.todo-head small { margin-left: auto; font-size: 11px; font-weight: 400; color: var(--muted); text-shadow: none; }
+.todo-list { list-style: none; margin: 0; padding: 0; }
+.todo-row { display: flex; align-items: stretch; border-top: 1px solid rgba(74, 63, 134, 0.6); }
+.todo-row:first-child { border-top: none; }
+.todo-hit {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 9px 2px; min-height: 44px;
+  background: none; border: none; text-align: left; cursor: pointer;
+}
+.todo-hit:active { transform: translate(1px, 1px); }
+.todo-box {
+  flex: none; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1;
+  background: var(--lo); border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 #0b0a1a; color: var(--edge);
+}
+.todo-done .todo-box { background: var(--gold); box-shadow: inset var(--px) var(--px) 0 #fff1c9; font-weight: 700; }
+.todo-text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.todo-name { font-size: 15px; color: var(--text); }
+.todo-note { font-size: 12px; color: var(--muted); }
+.todo-right { flex: none; font-size: 12px; color: var(--sunset); }
+.todo-done .todo-name { color: var(--muted); text-decoration: line-through; }
+.todo-done .todo-note, .todo-done .todo-right { opacity: 0.6; }
+.todo-go { flex: none; display: flex; align-items: center; padding: 0 4px 0 10px; font-size: 22px; color: var(--muted); }
+.todo-empty { margin: 6px 2px 10px; font-size: 13px; color: var(--muted); }
+.todo-working { margin: 0 4px 12px; font-size: 12px; color: var(--muted); }
+/* official post: struck-out text (a maintenance end time that was extended) */
+.off-body s { opacity: 0.6; }
+

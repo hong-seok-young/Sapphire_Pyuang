@@ -1,12 +1,13 @@
 import type { Me } from "../auth";
 import { Bell, CharacterSwitch, FitLine, HeroTitle, MeButton, PixelIcon, TopBar } from "../ui";
 import { VERSION } from "../patchnotes";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { enablePush, markPushAsked, shouldAskPush } from "../push";
 import { INFO_TILES, canSee, clickItem, isUpdated, itemOf, pressItem, resetLayout, setEditing, useLauncher } from "../launcher";
 import type { LaunchItem } from "../launcher";
-import { newsFor, useNews } from "../news";
+import { newsFor, useMaint, useNews } from "../news";
+import type { Maint } from "../news";
 
 /**
  * 칸 그림: 이모지 (상점 칸만 게임 상점 그림). 제작자 요청 2026-10-31: 게임 아이템 그림을 키운 아이콘은 뭉개져서
@@ -111,6 +112,9 @@ export function Home({ me }: { me: Me }) {
         <MeButton className="pill hero-me" size={32} />
       </header>
 
+      {/* 아이모 점검 전광판: 공식 점검 글이 뜨면 점검이 끝날 때까지 (제작자 요청 2026-11-01) */}
+      <MaintBanner />
+
       {/* 배치 편집 중 (홈 칸을 꾹 누르면): 끌어서 홈 칸끼리, 홈 칸과 아래 탭 사이를 옮긴다 (launcher.ts) */}
       {L.editing && (
         <div className="panel launch-bar">
@@ -185,6 +189,57 @@ function PushAsk() {
         나중에
       </button>
     </div>
+  );
+}
+
+const DOW = "일월화수목금토";
+/** 한국 시간 '11월 5일(목)', '10:30' */
+function kstParts(ms: number) {
+  const d = new Date(ms + 9 * 3_600_000);
+  return {
+    day: `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일(${DOW[d.getUTCDay()]})`,
+    hm: `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`,
+  };
+}
+
+/** '지금 아이모 정기 점검 중 · 11월 5일(목) 10:30 ~ 15:00 (연장) · 시리온 서버' */
+function maintText(m: Maint, now: number): string {
+  const s = kstParts(m.start);
+  const e = m.end !== null ? kstParts(m.end) : null;
+  const range = `${s.day} ${s.hm} ~ ${e ? (e.day === s.day ? "" : e.day + " ") + e.hm : "종료 시까지"}${m.extended ? " (연장)" : ""}`;
+  const head = now >= m.start ? `지금 아이모 ${m.label} 중` : `아이모 ${m.label} 예정`;
+  const dungeon = m.dungeonFrom !== null && now < m.start ? ` · 인던은 ${kstParts(m.dungeonFrom).hm}부터 입장 제한` : "";
+  return `${head} · ${range}${m.servers ? " · " + m.servers : ""}${dungeon}`;
+}
+
+/**
+ * 아이모 점검 전광판 (제작자 요청 2026-11-01): '사파이어 길드 포탈' 아래에 언제부터 언제 점검인지 글씨가 왼쪽으로 계속 흐른다.
+ * 서버가 공식 점검 글을 2분마다 새로 받아 읽는다 (연장 공지도, server/maint.ts). 끝나는 시각이 지나면 바로 사라진다.
+ * 누르면 그 공식 글. 움직임 줄이기면 흐르지 않고 줄을 바꿔 다 보인다
+ */
+function MaintBanner() {
+  const list = useMaint();
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 20_000);
+    return () => window.clearInterval(t);
+  }, []);
+  const shown = list.filter((m) => (m.end !== null ? m.end > now : now < m.start + 12 * 3_600_000));
+  if (!shown.length) return null;
+  const text = shown.map((m) => maintText(m, now)).join("   ✦   ");
+  return (
+    <a className={"maint" + (shown.some((m) => now >= m.start) ? " maint-on" : "")} href={`#/official/${shown[0].id}`} aria-label={text}>
+      <span className="maint-icon" aria-hidden>
+        🔧
+      </span>
+      <span className="maint-track">
+        {/* 같은 글을 두 번 이어 붙여 끊김 없이 흐른다 (절반만큼 옮기고 처음으로) */}
+        <span className="maint-run" style={{ animationDuration: `${Math.max(10, text.length * 0.3)}s` }}>
+          <span>{text}</span>
+          <span aria-hidden>{text}</span>
+        </span>
+      </span>
+    </a>
   );
 }
 

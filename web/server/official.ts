@@ -2,6 +2,8 @@
 // (scripts/fetch-official.mjs, 30분마다). 화면 목록(functions/api/official.ts)과 챗봇 자료(functions/api/chat)가 쓴다.
 // 공식 홈페이지의 공개 글을 읽을 뿐 게임은 읽지 않는다 (CLAUDE.md 게임 안전 규칙).
 import type { Env } from "./auth";
+import { UPSERT_SQL, rowOf, srcOf, upsertValues } from "./officialText";
+import type { HiveItem } from "./officialText";
 
 export type OfficialType = "N" | "C" | "I" | "D" | "E";
 export const TYPE_NAME: Record<string, string> = { N: "공지사항", C: "점검", I: "안내", D: "오류", E: "이벤트" };
@@ -70,3 +72,42 @@ export async function officialContext(env: Env, question: string): Promise<strin
   }
   return parts.join("\n\n");
 }
+
+/** 점검 글을 새로 받는 간격 (2분) */
+export const MAINT_EVERY = 120_000;
+
+/**
+ * 점검 글(종류 C) 최근 3개를 새로 받는다 (점검 전광판: 새 점검, 연장, 종료가 몇 분 안에 보이게. 제작자 요청 2026-11-01).
+ * /api/news 가 2분에 한 번 뒤에서 부른다 (lastAt: 지난번 때, 그 값일 때만 맡아 여럿이 같이 와도 한 번). 받는 글은 30KB 쯤이고
+ * 원문이 그대로면 바꾸지 않아 무료 요금제 CPU 한도(10ms) 안에 든다. 이벤트·공지는 크고(글 하나 400KB 도 있다) GitHub Actions 가 받는다
+ */
+export async function refreshMaint(env: Env, lastAt: number | null, now = Date.now()): Promise<void> {
+  const claim =
+    lastAt === null
+      ? await env.DB.prepare("INSERT OR IGNORE INTO setup (key, done_at) VALUES ('official_maint_checked', ?)").bind(now).run()
+      : await env.DB.prepare("UPDATE setup SET done_at = ? WHERE key = 'official_maint_checked' AND done_at = ?").bind(now, lastAt).run();
+  if (!claim.meta.changes) return;
+  const res = await fetch("https://withhive.com/api/notice/list/32", {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "x-requested-with": "XMLHttpRequest",
+      accept: "application/json",
+      cookie: "language=ko",
+    },
+    body: "page=1&type=C&rows=3",
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) return;
+  const list = ((await res.json()) as { data?: { notice_list?: HiveItem[] } }).data?.notice_list ?? [];
+  const items = list.filter((i) => Number(i?.noticeId) > 0 && i.noticeTitle);
+  if (!items.length) return;
+  const ids = items.map((i) => Number(i.noticeId));
+  const { results } = await env.DB.prepare(`SELECT id, src FROM official_news WHERE id IN (${ids.map(() => "?").join(", ")})`)
+    .bind(...ids)
+    .all<{ id: number; src: string | null }>();
+  const known = new Map(results.map((r) => [r.id, r.src]));
+  const changed = items.filter((i) => known.get(Number(i.noticeId)) !== srcOf(i));
+  if (changed.length) await env.DB.batch(changed.map((i) => env.DB.prepare(UPSERT_SQL).bind(...upsertValues(rowOf(i, "notice"), now))));
+}
+

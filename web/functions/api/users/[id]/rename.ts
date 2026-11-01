@@ -15,6 +15,7 @@ const ID_COLUMNS: [string, string][] = [
   ["chat_threads", "user_id"], ["chat_gaps", "user_id"], ["plat_wallets", "user_id"], ["layouts", "user_id"],
   ["users", "main_id"], ["signup_requests", "owner"],
   ["push_subs", "user_id"], ["cutout_log", "user_id"], ["plat_orders", "done_by"], ["plat_orders", "voided_by"], ["plat_settings", "updated_by"],
+  ["todo_checks", "user_id"],
 ];
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {

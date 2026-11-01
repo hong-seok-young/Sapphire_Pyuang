@@ -12,6 +12,23 @@ const POLL_MS = 120_000;
 
 type Counts = Record<NewsKey, number>;
 let counts: Counts = { board: 0, market: 0, requests: 0 };
+
+/** 아이모 점검 하나 (홈 점검 전광판, 제작자 요청 2026-11-01. 서버 server/maint.ts 가 공식 점검 글에서 읽은 것) */
+export interface Maint {
+  /** 공식 글 번호 (#/official/번호) */
+  id: number;
+  /** '정기 점검', '임시 점검', '긴급 점검', '점검' */
+  label: string;
+  start: number;
+  /** 모르면 null ('종료 시까지') */
+  end: number | null;
+  /** 일부 서버만이면 그 서버 */
+  servers: string | null;
+  extended: boolean;
+  /** 인스턴스 던전 입장 제한이 시작되는 때 */
+  dungeonFrom: number | null;
+}
+let maint: Maint[] = [];
 let user = "";
 let timer: number | undefined;
 let listening = false;
@@ -22,6 +39,8 @@ const subscribe = (l: () => void) => {
   return () => listeners.delete(l);
 };
 export const useNews = () => useSyncExternalStore(subscribe, () => counts);
+/** 지금 띄울 아이모 점검 (새 글 수와 같이 2분마다 온다) */
+export const useMaint = () => useSyncExternalStore(subscribe, () => maint);
 
 const storeKey = () => "sapphire.newsSeen." + user;
 function seenAll(): Record<NewsKey, number> {
@@ -52,11 +71,13 @@ export function refreshNews(): Promise<void> {
   const seen = seenAll();
   const q = KEYS.map((k) => `${k}=${seen[k]}`).join("&");
   if (inflight?.q === q) return inflight.p;
-  const p = api<Counts>(`/api/news?${q}`)
+  const p = api<Counts & { maint?: Maint[] }>(`/api/news?${q}`)
     .catch(() => null)
     .then((r) => {
       if (r && user) {
         counts = { board: r.board ?? 0, market: r.market ?? 0, requests: r.requests ?? 0 };
+        // 점검은 바뀌었을 때만 새로 (전광판이 흐르다가 처음부터 다시 흐르지 않게)
+        if (Array.isArray(r.maint) && JSON.stringify(r.maint) !== JSON.stringify(maint)) maint = r.maint;
         emit();
       }
     })
@@ -72,6 +93,7 @@ export function startNews(id: string) {
   if (user === id) return;
   user = id;
   counts = { board: 0, market: 0, requests: 0 };
+  maint = [];
   emit();
   void refreshNews();
   window.clearInterval(timer);

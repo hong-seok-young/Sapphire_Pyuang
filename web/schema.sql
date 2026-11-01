@@ -415,8 +415,8 @@ CREATE TABLE IF NOT EXISTS signup_requests (
   owner TEXT                              -- '내 정보'의 캐릭터 추가 요청이면 요청한 사람의 본캐 (승낙하면 그 사람의 부캐가 된다)
 );
 
--- 컴투스 공식 소식 (제작자 요청 2026-11-01): withhive.com 아이모 공지사항·점검·이벤트. scripts/fetch-official.mjs 가 30분마다 받아 넣는다
--- (.github/workflows/official-news.yml). 화면 '정보 > 공식 소식'은 제목과 날짜만 보이고 누르면 공식 페이지, 챗봇은 본문 글자로 답한다. 지우지 않는다
+-- 컴투스 공식 소식 (제작자 요청 2026-11-01): withhive.com 아이모 공지사항·점검·이벤트. scripts/fetch-official.mjs 가 30분마다 받아 넣고
+-- (.github/workflows/official-news.yml), 점검 글은 서버가 2분마다 새로 받는다 (점검 전광판). 게시판 '아이모 소식'에서 읽고, 챗봇은 본문 글자로 답한다. 지우지 않는다
 CREATE TABLE IF NOT EXISTS official_news (
   id INTEGER PRIMARY KEY,                 -- withhive 글 번호 (공식 페이지 주소의 번호)
   kind TEXT NOT NULL,                     -- notice | event
@@ -427,9 +427,35 @@ CREATE TABLE IF NOT EXISTS official_news (
   image TEXT,                             -- 대표 그림 주소 (이벤트)
   body TEXT NOT NULL,                     -- 본문 글자만 (그림, 꾸밈은 뺐다. 3만 자까지)
   fetched_at INTEGER NOT NULL,            -- 받거나 바뀐 때
-  html TEXT                               -- 간단히 한 본문 HTML (문단, 굵게, 표, 목록, 그림, 링크만. 게시판 '아이모 소식'에서 읽는다, 58KB 넘으면 비움)
+  html TEXT,                              -- 간단히 한 본문 HTML (문단, 굵게, 표, 목록, 그림, 링크만. 게시판 '아이모 소식'에서 읽는다, 58KB 넘으면 비움)
+  src TEXT                                -- 원문(제목+본문)의 해시와 바꾼 방법의 판 (server/officialText.ts): 같으면 다시 쓰지 않는다
 );
 CREATE INDEX IF NOT EXISTS official_news_kind ON official_news (kind, id);
+CREATE INDEX IF NOT EXISTS official_news_type ON official_news (type, id);          -- 점검 전광판 (2분마다 최근 점검 글 3개)
+CREATE INDEX IF NOT EXISTS official_news_date ON official_news (kind, start_date);  -- To do 로 정리할 최근 글
+
+-- To do 의 이벤트 할 일 (제작자 요청 2026-11-01: 이벤트를 안 읽어도 본인 직업·레벨에 맞는 할 일). 공식 글 하나를 Claude 가 읽고 뽑은 것
+-- (server/todoDigest.ts, 주로 GitHub Actions 의 scripts/digest-official.mjs, 새 글은 서버 /api/todo/digest). 원문(src)이 바뀌면 다시 정리한다. 지우지 않는다
+CREATE TABLE IF NOT EXISTS official_todo (
+  id INTEGER PRIMARY KEY,                 -- official_news.id
+  src TEXT,                               -- 정리한 원문의 표시 (official_news.src)
+  tasks TEXT NOT NULL,                    -- JSON [{t 할 일, n 어디서, c d|w|o, days 요일, at 시각, s 시작, e 끝, lv [최소, 최대], jobs}]
+  until INTEGER NOT NULL,                 -- 할 일이 끝나는 가장 늦은 때 (없으면 0): To do 는 이것이 지금보다 뒤인 글만 읽는다
+  made_at INTEGER NOT NULL,               -- 정리한 때 (0 이면 아직)
+  claimed_at INTEGER,                     -- 정리를 맡은 때 (10분 안이면 다른 곳이 손대지 않는다)
+  model TEXT                              -- 정리한 모델
+);
+CREATE INDEX IF NOT EXISTS official_todo_until ON official_todo (until);
+
+-- To do 체크 (제작자 요청 2026-11-01). 그 주기 안에서만 보인다: period 'd2026-11-01' 오늘(한국 시간 0시), 'w2026-10-29' 이번 주(목요일 오전 10시), 'o' 계속.
+-- item: 'd:guild-attend', 'w:dungeon:342379', 'o:95976:abc' (주기:무엇). 사람이 푸는 것만 지운다. 닉네임 바꾸기와 계정 삭제에 따라간다
+CREATE TABLE IF NOT EXISTS todo_checks (
+  user_id TEXT NOT NULL,
+  item TEXT NOT NULL,
+  period TEXT NOT NULL,
+  done_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, item, period)
+);
 
 -- 자주 부르는 곳이 표 전체를 읽지 않게 하는 색인 (2026-11-01 오픈 전 검토: D1 무료 한도 하루 500만 줄 읽기)
 CREATE INDEX IF NOT EXISTS users_main ON users (main_id);                          -- 로그인 확인마다 같은 사람의 캐릭터 찾기

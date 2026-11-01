@@ -16,6 +16,7 @@ import { growthEntries } from "./growth";
 import type { Period } from "./growth";
 import { ACCEPT_MS } from "./requests";
 import { weekStart } from "./week";
+import { doneKeys, eventTasks } from "./todo";
 
 /** 길드 앱 자료 전체 글자 수 */
 export const MAX_APP = 24000;
@@ -38,6 +39,7 @@ const ASK = {
   shop: /플티|플래티넘|상점|지갑|할인|신청/,
   logs: /로그|기록|접속|활동|들어(왔|온|와|오)|방문|누가|언제|아이피|\bip\b|어디서|위치|기기|폰|몇 ?번|뭐 ?했|했(어|냐|니|나|는지)|최근|요즘/i,
   gaps: /챗봇|질문|개선|모름|별로/,
+  todo: /할 ?일|투두|to ?do|숙제|뭐 ?(해|하|할)|챙겨|인던|던전|길드 ?(출석|임무)|체크|이벤트/i,
 };
 
 interface Person {
@@ -313,6 +315,25 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
         : []),
     ];
     parts.push(section("플래티넘 할인 상점", lines, 2000));
+  }
+
+  // ---------- To do (홈 'To do' 화면과 같은 값: 이 사람의 레벨·직업에 맞는 할 일과 이번 주기에 체크한 것) ----------
+  if (ASK.todo.test(q)) {
+    const mine = people.find((p) => p.id === me.id);
+    const [tasks, done] = await Promise.all([eventTasks(env, { job: mine?.job ?? null, level: mine?.level ?? null }, now), doneKeys(env, me.id, now)]);
+    const checked = new Set(done);
+    const mark = (key: string) => (checked.has(key) ? " (체크함)" : "");
+    const lines = [
+      `늘 하는 일: 매일(한국 시간 0시 초기화) 길드 출석${mark("d:guild-attend")} · 매주(목요일 오전 10시 초기화) 길드 임무${mark("w:guild-mission")}, ` +
+        "들어갈 수 있는 인스턴스 던전(위키 '인스턴스 던전' 지역, 이름의 숫자가 입장 레벨: 인던20 ~ 인던44), 길드던전(Lv.35부터), 헌팅 그라운드 주간 이용 시간(Lv.30부터)",
+      ...tasks.map(
+        (t) =>
+          `이벤트 할 일: ${t.text}${t.note ? ` (${t.note})` : ""} · ${t.cycle === "d" ? "매일" : t.cycle === "w" ? "매주" : "기간 안에 한 번"}` +
+          `${t.at ? ` · ${t.at}` : ""}${t.until ? ` · ${when(t.until)}까지` : ""} · 공식 글 '${t.post.title}'${mark(t.key)}`,
+      ),
+    ];
+    if (!tasks.length) lines.push("이벤트 할 일: 지금 이 사람에게 맞는 것 없음");
+    parts.push(section(`To do: ${me.id}의 레벨·직업에 맞는 할 일 (홈 'To do' 화면, 공식 글에서 뽑은 이벤트 할 일 포함)`, lines, 2500));
   }
 
   // ---------- 앱개발자만: 사용 기록, 챗봇 개선 ----------

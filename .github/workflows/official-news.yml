@@ -1,7 +1,8 @@
 # 컴투스 공식 소식 받기 (제작자 요청 2026-11-01): 아이모 공식 홈페이지(withhive.com)의 공지사항·점검·이벤트를
-# 30분마다 받아 계정 DB(D1)의 official_news 에 넣는다 (web/scripts/fetch-official.mjs). 처음이거나 '모든 쪽'을 고르면 전부 받는다.
-# 위키의 '정보 > 공식 소식'과 챗봇이 이 자료를 쓴다. 비밀값은 배포(deploy-web.yml)와 같은 CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID.
-# 공개 저장소라 실행 기록에는 받은 개수만 찍는다.
+# 30분마다 받아 계정 DB(D1)의 official_news 에 넣고 (web/scripts/fetch-official.mjs, 처음이거나 '모든 쪽'을 고르면 전부),
+# To do 의 이벤트 할 일을 Claude 로 정리한다 (web/scripts/digest-official.mjs, 원문이 바뀐 글만). 게시판 '아이모 소식', 챗봇, To do 가 쓴다.
+# 점검 글은 서버도 2분마다 새로 받는다 (점검 전광판, web/server/official.ts). 비밀값은 배포(deploy-web.yml)와 같은
+# CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, ANTHROPIC_API_KEY (ANTHROPIC_WORKSPACE_ID). 공개 저장소라 실행 기록에는 개수만 찍는다.
 name: Official news
 
 on:
@@ -24,7 +25,7 @@ permissions:
 jobs:
   fetch:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -44,4 +45,11 @@ jobs:
 
       - name: Fetch official news
         working-directory: web
-        run: node scripts/fetch-official.mjs ${{ inputs.all && '--all' || '' }}
+        run: node --experimental-strip-types scripts/fetch-official.mjs ${{ inputs.all && '--all' || '' }}
+
+      - name: To do digest
+        working-directory: web
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+        run: node --experimental-strip-types scripts/digest-official.mjs --budget 1800

@@ -42,6 +42,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
     env.DB.prepare("DELETE FROM push_subs WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM cutout_log WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM favorites WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM todo_checks WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM chat_msgs WHERE thread_id IN (SELECT id FROM chat_threads WHERE user_id = ?)").bind(user.id),
     env.DB.prepare("DELETE FROM chat_threads WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM chat_gaps WHERE user_id = ?").bind(user.id),

@@ -102,7 +102,7 @@ jobs:
       - name: Official news (Korea snapshot)
         working-directory: web
         run: |
-          if [ -f "../자료/공식/소식.json" ]; then node scripts/fetch-official.mjs --load "../자료/공식/소식.json"; fi
+          if [ -f "../자료/공식/소식.json" ]; then node --experimental-strip-types scripts/fetch-official.mjs --load "../자료/공식/소식.json"; fi
 
       # 챗봇(functions/api/chat.ts)의 Claude API 키를 Cloudflare Pages 비밀값으로 넣는다. 없으면 챗봇은 '준비 중'이라고 답한다
       - name: Chatbot API key
@@ -125,3 +125,13 @@ jobs:
       - name: Deploy to Cloudflare Pages
         working-directory: web
         run: npm run deploy
+
+      # To do 의 이벤트 할 일: 아직 정리 안 된 공식 글을 Claude 로 정리한다 (scripts/digest-official.mjs, 4분까지. 남은 것은 30분마다 도는 공식 소식 작업이 한다).
+      # 사이트 배포가 끝난 뒤에 해서 배포를 늦추지 않고, 실패해도 배포는 성공으로 둔다
+      - name: To do digest
+        continue-on-error: true
+        working-directory: web
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+        run: node --experimental-strip-types scripts/digest-official.mjs --budget 240

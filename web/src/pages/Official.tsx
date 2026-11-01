@@ -106,9 +106,9 @@ export function OfficialList({ tab }: { tab: OfficialTab }) {
   );
 }
 
-/** 남겨서 그리는 태그 (공식 글의 HTML 은 서버가 이미 걸렀지만, 여기서도 이것만 만든다: 속성은 그림 주소와 링크만) */
+/** 남겨서 그리는 태그 (공식 글의 HTML 은 서버가 이미 걸렀지만, 여기서도 이것만 만든다: 속성은 그림 주소와 링크만). S 는 연장 전 점검 시간처럼 줄 그은 글자 */
 const TAGS: Record<string, string> = {
-  P: "p", BR: "br", B: "b", I: "i", U: "u", H4: "h4", UL: "ul", OL: "ol", LI: "li", TABLE: "table", THEAD: "thead", TBODY: "tbody",
+  P: "p", BR: "br", B: "b", I: "i", U: "u", S: "s", H4: "h4", UL: "ul", OL: "ol", LI: "li", TABLE: "table", THEAD: "thead", TBODY: "tbody",
   TR: "tr", TD: "td", TH: "th", HR: "hr", BLOCKQUOTE: "blockquote", IMG: "img", A: "a",
 };
 

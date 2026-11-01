@@ -52,6 +52,8 @@ export const ITEMS: LaunchItem[] = [
   { key: "chat", title: "챗봇", to: "#/chat", icon: "💬", pic: "chat", match: ["chat"] },
   // 1군 전용 플래티넘 할인 상점 (제작자 요청). 아이콘은 게임 첫 화면의 상점 그림. '1군 전용'은 왼쪽 위 띠로
   { key: "shop", title: "플래티넘 할인 상점", short: "상점", to: "#/shop", icon: "🏪", iconPic: "/data/shop/shop_icon.png", ribbon: "1군 전용", ring: "gold", match: ["shop"] },
+  // To do: 이벤트를 안 읽어도 내 직업·레벨에 맞는 오늘·이번 주 할 일 (제작자 요청 2026-11-01, pages/Todo.tsx)
+  { key: "todo", title: "To do", to: "#/todo", icon: "✅", match: ["todo"] },
   { key: "ranking", title: "길드 랭킹", short: "랭킹", to: "#/ranking", icon: "🏆", match: ["ranking"] },
   { key: "market", title: "사파이어 중개인", short: "중개인", to: "#/market", icon: "💰", match: ["market"] },
   { key: "requests", title: "길드원 의뢰소", short: "의뢰소", to: "#/requests", icon: "📋", match: ["requests"] },
@@ -98,7 +100,7 @@ export interface Layout {
 export const DOCK_MAX = 5;
 export const DEFAULT_LAYOUT: Layout = {
   dock: ["home", "board", "search", "info", "chat"],
-  grid: ["shop", "ranking", "market", "requests", "rent", "match", "app", "admin", "log", "gaps"],
+  grid: ["todo", "shop", "ranking", "market", "requests", "rent", "match", "app", "admin", "log", "gaps"],
 };
 
 /** 저장된 배치를 맞춘다: 모르는 칸과 겹친 칸은 빼고, 홈은 아래 탭 맨 앞, 아래 탭은 5칸까지, 새로 생긴 칸은 홈 칸 끝에 */

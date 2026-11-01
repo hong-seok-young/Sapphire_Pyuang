@@ -33,6 +33,7 @@ import { BoardPage } from "./pages/Board";
 import { OfficialPostPage } from "./pages/Official";
 import { PatchNotesPage } from "./pages/PatchNotes";
 import { OddsPage, OddsTablePage } from "./pages/Odds";
+import { TodoPage } from "./pages/Todo";
 import { Opening, shouldCelebrate } from "./pages/Opening";
 import { reportOpen, reportView } from "./activity";
 import { markMenuVisit } from "./updates";
@@ -253,6 +254,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "post") body = <PostPage wiki={wiki} id={arg} />;
   else if (page === "chat") body = <ChatPage wiki={wiki} arg={arg} query={route.query} me={me} />;
   else if (page === "market") body = <MarketPage wiki={wiki} me={me} />;
+  // To do: 오늘·이번 주·이벤트 할 일 (제작자 요청 2026-11-01). 인던 목록이 위키 자료라서 위키를 기다린다
+  else if (page === "todo") body = <TodoPage wiki={wiki} me={me} />;
   else if (page === "log") body = me.role === "developer" ? <ActivityLogPage wiki={wiki} /> : <NotFound what="페이지" />;
   else body = <Home me={me} />;
 
