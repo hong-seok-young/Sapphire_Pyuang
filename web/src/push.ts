@@ -32,8 +32,27 @@ function keyBytes(b64: string): Uint8Array {
   return Uint8Array.from(s, (c) => c.charCodeAt(0));
 }
 
+const SENT_KEY = "sapphire.pushSent";
+
+/** 서버에 이 폰을 알린다. force 가 아니면 같은 사람·같은 구독을 7일 안에 보낸 적이 있을 때 건너뛴다 (앱을 열 때마다 보내던 것) */
+async function sendSub(endpoint: string, user: string | undefined, force: boolean) {
+  const mark = `${user ?? ""}|${endpoint}`;
+  try {
+    const old = JSON.parse(localStorage.getItem(SENT_KEY) ?? "null") as { mark: string; at: number } | null;
+    if (!force && old?.mark === mark && Date.now() - old.at < 7 * 86_400_000) return;
+  } catch {
+    // 못 읽으면 보낸다
+  }
+  await api("/api/push", "PUT", { endpoint });
+  try {
+    localStorage.setItem(SENT_KEY, JSON.stringify({ mark, at: Date.now() }));
+  } catch {
+    // 못 적으면 다음에 또 보낸다
+  }
+}
+
 /** 켜기: 권한 묻기 -> 구독 -> 서버에 이 폰 알리기 */
-export async function enablePush(): Promise<PushState> {
+export async function enablePush(user?: string, force = true): Promise<PushState> {
   if (!supported()) return pushState();
   const permission = await Notification.requestPermission();
   if (permission !== "granted") return permission === "denied" ? "denied" : "off";
@@ -44,7 +63,7 @@ export async function enablePush(): Promise<PushState> {
     const { publicKey } = await api<{ publicKey: string }>("/api/push");
     sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(publicKey) });
   }
-  await api("/api/push", "PUT", { endpoint: sub.endpoint });
+  await sendSub(sub.endpoint, user, force);
   return "on";
 }
 
@@ -82,10 +101,10 @@ export const markPushAsked = () => setFlag(ASKED_KEY, true);
  * 폰 알림은 처음부터 켠다 (제작자 요청: 기본은 허용). 폰이 이미 알림을 허락했으면 묻지 않고 구독해서 서버에 알린다.
  * 사용자가 알림함에서 직접 끈 폰은 다시 켜지 않는다
  */
-export async function ensurePush(): Promise<void> {
+export async function ensurePush(user?: string): Promise<void> {
   try {
     if (!supported() || Notification.permission !== "granted" || getFlag(OFF_KEY)) return;
-    await enablePush();
+    await enablePush(user, false);
   } catch {
     // 다음에 앱을 열 때 다시
   }

@@ -53,8 +53,12 @@ function setUnread(n: number) {
   for (const l of listeners) l(n);
 }
 
+let lastAsk = 0;
+let polling = false;
+
 /** 안 읽은 수를 다시 묻는다 (화면 위 🔔). 실패하면 그대로 둔다 */
 export function refreshUnread() {
+  lastAsk = Date.now();
   api<{ unread: number }>("/api/alerts/count").then((r) => setUnread(r.unread), () => undefined);
 }
 export const clearUnread = () => setUnread(0);
@@ -64,14 +68,14 @@ export function useUnread(): number {
   const [n, setN] = useState(unread);
   useEffect(() => {
     listeners.add(setN);
-    refreshUnread();
-    const timer = window.setInterval(refreshUnread, 60_000);
-    const onVisible = () => !document.hidden && refreshUnread();
-    document.addEventListener("visibilitychange", onVisible);
+    if (Date.now() - lastAsk > 30_000) refreshUnread();
+    if (!polling) {
+      polling = true;
+      window.setInterval(() => !document.hidden && refreshUnread(), 60_000);
+      document.addEventListener("visibilitychange", () => !document.hidden && refreshUnread());
+    }
     return () => {
       listeners.delete(setN);
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
   return n;

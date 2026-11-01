@@ -288,8 +288,19 @@ export function Panel({ title, children, className }: { title?: ReactNode; child
   );
 }
 
-export function Loading({ error }: { error?: string }) {
-  return <div className="loading">{error ? "자료를 불러오지 못했어요: " + error : "불러오는 중…"}</div>;
+export function Loading({ error, onRetry }: { error?: string; onRetry?: () => void }) {
+  return (
+    <div className="loading">
+      {error ? "자료를 불러오지 못했어요: " + error : "불러오는 중…"}
+      {error && onRetry && (
+        <div className="links">
+          <button className="btn btn-ghost" onClick={onRetry}>
+            다시 시도
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function NotFound({ what }: { what: string }) {

@@ -31,7 +31,8 @@ export async function notify(env: Env, to: string[] | "all", kind: AlertKind, te
   if (to !== "all" && to.length === 0) return;
   try {
     const now = Date.now();
-    const who = to === "all" ? "" : ` AND u.id IN (${to.map(() => "?").join(",")})`;
+    // 모두에게: 사람마다 한 번 (본캐에게. 부캐 알림은 본캐 알림함에 합쳐 보이므로 캐릭터마다 넣으면 같은 공지가 여러 번 떴다)
+    const who = to === "all" ? " AND u.main_id IS NULL" : ` AND u.id IN (${to.map(() => "?").join(",")})`;
     await env.DB.prepare(
       "INSERT INTO alerts (user_id, kind, text, link, created_at) SELECT u.id, ?, ?, ?, ? FROM users u WHERE u.id != ? " +
         "AND COALESCE((SELECT p.enabled FROM alert_prefs p WHERE p.user_id = u.id AND p.kind = ?), ?) = 1" + who,

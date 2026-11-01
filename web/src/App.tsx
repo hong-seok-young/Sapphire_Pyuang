@@ -3,6 +3,7 @@ import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as Reac
 import { NEED_LOGIN, loadWiki, useAsync } from "./data";
 import { go, useRoute } from "./router";
 import { goCharacter, justSwitched, personOf, setMyCharacters } from "./characters";
+import { resetFavorites } from "./favorites";
 import { FitLine, PixelIcon, Loading, NotFound } from "./ui";
 import { Home, InfoPage, TileIcon } from "./pages/Home";
 import { canSee, clickItem, isUpdated, itemOf, loadLayout, pressItem, setEditing, useLauncher } from "./launcher";
@@ -37,7 +38,7 @@ import { Opening, shouldCelebrate } from "./pages/Opening";
 import { reportOpen, reportView } from "./activity";
 import { markMenuVisit } from "./updates";
 import { ensurePush, reportPush } from "./push";
-import { RANK, TEST_IDS, errorText, fetchMe, switchAccount } from "./auth";
+import { ApiError, RANK, TEST_IDS, errorText, fetchMe, switchAccount } from "./auth";
 import { appMenu } from "./platform";
 import type { Me } from "./auth";
 
@@ -76,9 +77,34 @@ export function App() {
   const [iconNotice, setIconNotice] = useState(iconNoticeNeeded);
   // 앱 안 '검토 후 오픈' 화면에서 '개발자 로그인'을 눌렀는지
   const [appLogin, setAppLogin] = useState(false);
+  // 로그인 확인이 인터넷이나 서버 문제로 안 됐을 때 (로그아웃이 아니다)
+  const [bootError, setBootError] = useState("");
+  const [bootTry, setBootTry] = useState(0);
   useEffect(() => {
-    fetchMe().then(setMe, () => setMe(null));
-  }, []);
+    // 위키 자료도 같이 받기 시작한다 (로그인 확인이 끝나기를 기다리지 않게)
+    void loadWiki().catch(() => undefined);
+    fetchMe().then(setMe, (e) => {
+      // 로그인이 풀린 것(401)만 로그인 화면으로. 인터넷이 잠깐 끊기거나 서버 오류면 다시 시도한다
+      // (제작자 요청: 로그인은 직접 로그아웃하기 전까지 유지. 2026-11-01 검토)
+      if (e instanceof ApiError && e.status === 401) setMe(null);
+      else setBootError(errorText(e));
+    });
+  }, [bootTry]);
+  // 다시 연결되거나 앱으로 돌아오면 저절로 다시
+  useEffect(() => {
+    if (!bootError) return;
+    const retry = () => {
+      setBootError("");
+      setBootTry((n) => n + 1);
+    };
+    const onVisible = () => !document.hidden && retry();
+    window.addEventListener("online", retry);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("online", retry);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [bootError]);
 
   if (guide) return <InstallGuide onLater={later} />;
 
@@ -86,7 +112,13 @@ export function App() {
     return (
       <div className="app">
         <main className="page">
-          <Loading />
+          <Loading
+            error={bootError || undefined}
+            onRetry={() => {
+              setBootError("");
+              setBootTry((n) => n + 1);
+            }}
+          />
         </main>
       </div>
     );
@@ -114,17 +146,32 @@ export function App() {
 
 function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; onLogout: () => void }) {
   const route = useRoute();
-  const { data: wiki, error } = useAsync(useCallback(() => loadWiki(), []));
+  // 위키 자료 (못 받으면 '다시 시도', 다시 연결되거나 앱으로 돌아올 때도 다시 받는다: 한 번 실패하면 앱을 껐다 켜야 했다)
+  const [wikiTry, setWikiTry] = useState(0);
+  const { data: wiki, error } = useAsync(useCallback(() => loadWiki(), [wikiTry]));
+  useEffect(() => {
+    if (!error || error.includes(NEED_LOGIN)) return;
+    const retry = () => setWikiTry((n) => n + 1);
+    const onVisible = () => !document.hidden && retry();
+    window.addEventListener("online", retry);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("online", retry);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [error]);
   const [page = "", arg = ""] = route.parts;
 
   // 부캐 묶기: 👤 단추가 어느 화면에서든 내 캐릭터 목록을 보도록
   useEffect(() => setMyCharacters(me), [me]);
+  // 즐겨찾기는 사람마다 (다른 계정으로 들어오면 앞 사람 것을 버린다)
+  useEffect(() => resetFavorites(me.id), [me.id]);
   // 사용 기록: 웹이나 앱을 새로 열었으면 접속 하나, 그리고 지금 보는 화면
   useEffect(() => reportOpen(me.id), [me.id]);
   useEffect(() => reportView(location.hash), [route]);
   // 폰이 이미 알림을 허락했으면 폰 알림을 저절로 켠다 (제작자 요청: 기본은 허용)
   // 그 뒤 이 폰의 알림 허용 상태를 알린다 ('길드원 관리'에 보인다)
-  useEffect(() => void ensurePush().then(() => reportPush(me.id)), [me.id]);
+  useEffect(() => void ensurePush(me.id).then(() => reportPush(me.id)), [me.id]);
   // 업데이트된 메뉴에 처음 들어간 때 (홈 칸의 'UPDATE' 가 그때부터 하루 동안 보인다)
   useEffect(() => markMenuVisit(me.id, location.hash), [route, me.id]);
   // 홈 칸과 아래 탭 배치 (계정마다). 홈을 떠나면 배치 편집은 끝낸다
@@ -170,8 +217,12 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "official") body = <OfficialPage tab={isOfficialTab(route.query.get("t")) ? (route.query.get("t") as "notice" | "maint" | "event") : "notice"} />;
   else if (page === "odds") body = arg ? <OddsTablePage id={arg} q={route.query.get("q") ?? ""} /> : <OddsPage q={route.query.get("q") ?? ""} cat={route.query.get("c") ?? ""} />;
   else if (page === "board") body = <BoardPage me={me} arg={arg} sub={route.parts[2] ?? ""} query={route.query} />;
-  else if (!wiki) body = <Loading error={loggedOut ? undefined : error} />;
   else if (page === "") body = <Home me={me} />;
+  else if (page === "info") body = <InfoPage me={me} />;
+  // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
+  else if (page === "app" || page === "timer") body = <AppPage />;
+  else if (page === "gaps") body = me.role === "developer" ? <ChatGapsPage /> : <NotFound what="페이지" />;
+  else if (!wiki) body = <Loading error={loggedOut ? undefined : error} onRetry={() => setWikiTry((n) => n + 1)} />;
   else if (page === "search") body = <Search wiki={wiki} q={route.query.get("q") ?? ""} />;
   else if (page === "places") body = <Places wiki={wiki} region={route.query.get("r") ?? ""} />;
   else if (page === "place") body = <PlacePage wiki={wiki} id={arg} />;
@@ -179,14 +230,10 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "item") body = <ItemPage wiki={wiki} name={arg} />;
   else if (page === "equip") body = arg ? <EquipSlot wiki={wiki} slot={arg} /> : <EquipSlots wiki={wiki} />;
   else if (page === "menu") body = <MenuPage wiki={wiki} title={arg} me={me} />;
-  else if (page === "info") body = <InfoPage me={me} />;
   else if (page === "post") body = <PostPage wiki={wiki} id={arg} />;
   else if (page === "chat") body = <ChatPage wiki={wiki} arg={arg} query={route.query} me={me} />;
-  else if (page === "gaps") body = me.role === "developer" ? <ChatGapsPage /> : <NotFound what="페이지" />;
   else if (page === "market") body = <MarketPage wiki={wiki} me={me} />;
   else if (page === "log") body = me.role === "developer" ? <ActivityLogPage wiki={wiki} /> : <NotFound what="페이지" />;
-  // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
-  else if (page === "app" || page === "timer") body = <AppPage />;
   else body = <Home me={me} />;
 
   return (

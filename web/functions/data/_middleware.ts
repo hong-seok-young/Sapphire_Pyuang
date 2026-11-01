@@ -9,6 +9,7 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, next }) => {
   if (!me) return NEED_LOGIN();
   const res = await next();
   const out = new Response(res.body, res);
-  out.headers.set("cache-control", "private, no-cache"); // 공용 캐시에 남기지 않고, 매번 바뀌었는지 확인
+  // 공용 캐시에 남기지 않는다. 자료(JSON)는 매번 바뀌었는지 확인하고, 그림(랭킹 마크, 상점·중개인 그림)은 하루 둔다 (그림마다 매번 로그인을 확인하던 것)
+  out.headers.set("cache-control", new URL(request.url).pathname.endsWith(".json") ? "private, no-cache" : "private, max-age=86400, stale-while-revalidate=604800");
   return out;
 };

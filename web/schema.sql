@@ -429,3 +429,17 @@ CREATE TABLE IF NOT EXISTS official_news (
   fetched_at INTEGER NOT NULL             -- 받거나 바뀐 때
 );
 CREATE INDEX IF NOT EXISTS official_news_kind ON official_news (kind, id);
+
+-- 자주 부르는 곳이 표 전체를 읽지 않게 하는 색인 (2026-11-01 오픈 전 검토: D1 무료 한도 하루 500만 줄 읽기)
+CREATE INDEX IF NOT EXISTS users_main ON users (main_id);                          -- 로그인 확인마다 같은 사람의 캐릭터 찾기
+CREATE INDEX IF NOT EXISTS alerts_created ON alerts (created_at, kind);            -- 알림을 넣은 뒤 폰 알림 보낼 곳 찾기
+CREATE INDEX IF NOT EXISTS alerts_unread ON alerts (user_id) WHERE read_at IS NULL; -- 안 읽은 알림 수 (1분마다)
+CREATE INDEX IF NOT EXISTS board_posts_created ON board_posts (created_at);        -- 새 글 숫자 배지 (2분마다)
+CREATE INDEX IF NOT EXISTS board_posts_author ON board_posts (author, created_at); -- 1분에 글 수 제한
+CREATE INDEX IF NOT EXISTS listings_status_created ON listings (status, created_at);
+CREATE INDEX IF NOT EXISTS gold_offers_status_created ON gold_offers (status, created_at);
+CREATE INDEX IF NOT EXISTS requests_created ON requests (created_at);
+CREATE INDEX IF NOT EXISTS board_comments_user ON board_comments (user_id, created_at);
+CREATE INDEX IF NOT EXISTS listing_talk_user ON listing_talk (user_id, created_at);
+CREATE INDEX IF NOT EXISTS listing_wants_user ON listing_wants (user_id);
+CREATE INDEX IF NOT EXISTS listing_bids_user ON listing_bids (user_id);

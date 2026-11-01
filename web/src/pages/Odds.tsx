@@ -168,12 +168,7 @@ export function OddsTablePage({ id, q }: { id: string; q: string }) {
       </a>
       {t.sections.map((s, i) =>
         fold ? (
-          <details key={i} className="odds-sec" open={!!hits?.has(i)}>
-            <summary>
-              {s.t || name} <small>{s.r.length}</small>
-            </summary>
-            <SectionTable s={s} q={q} />
-          </details>
+          <FoldedSection key={i} s={s} name={name} q={q} open={!!hits?.has(i)} />
         ) : (
           <section key={i} className="odds-sec">
             {s.t && s.t !== name && <h2 className="odds-sec-title">{s.t}</h2>}
@@ -183,6 +178,19 @@ export function OddsTablePage({ id, q }: { id: string; q: string }) {
       )}
       <p className="odds-note">{odds.note}</p>
     </>
+  );
+}
+
+/** 접힌 칸: 펼친 적이 있을 때만 표를 그린다 */
+function FoldedSection({ s, name, q, open }: { s: OddsSection; name: string; q: string; open: boolean }) {
+  const [shown, setShown] = useState(open);
+  return (
+    <details className="odds-sec" open={open} onToggle={(e) => (e.currentTarget as HTMLDetailsElement).open && setShown(true)}>
+      <summary>
+        {s.t || name} <small>{s.r.length}</small>
+      </summary>
+      {shown && <SectionTable s={s} q={q} />}
+    </details>
   );
 }
 

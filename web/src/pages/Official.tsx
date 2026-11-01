@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { errorText } from "../auth";
 import { OFFICIAL_TABS, TYPE_NAME, fetchOfficial, officialUrl } from "../official";
 import type { OfficialItem, OfficialTab } from "../official";
@@ -17,10 +17,13 @@ export function OfficialPage({ tab }: { tab: OfficialTab }) {
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
 
   useEffect(() => {
     let alive = true;
     setItems(null);
+    setMore(false);
     setError("");
     fetchOfficial(tab).then(
       (r) => {
@@ -40,7 +43,8 @@ export function OfficialPage({ tab }: { tab: OfficialTab }) {
     setBusy(true);
     try {
       const r = await fetchOfficial(tab, items[items.length - 1].id);
-      setItems([...items, ...r.items.filter((it) => !items.some((x) => x.id === it.id))]);
+      if (tabRef.current !== tab) return; // 그사이 다른 칸으로 옮겼다
+      setItems((prev) => (prev ? [...prev, ...r.items.filter((it) => !prev.some((x) => x.id === it.id))] : prev));
       setMore(r.more);
     } catch (x) {
       setError(errorText(x));

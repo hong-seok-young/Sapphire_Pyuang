@@ -27,7 +27,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .bind(id, pw.pw_hash, pw.pw_salt, pw.pw_iter, Date.now())
     .run();
   // 길드마스터와 오피서에게 (앱개발자도 관리하므로 같이)
-  const { results } = await env.DB.prepare("SELECT id FROM users WHERE role IN ('developer', 'master', 'officer')").all<{ id: string }>();
+  const { results } = await env.DB.prepare("SELECT DISTINCT COALESCE(main_id, id) AS id FROM users WHERE role IN ('developer', 'master', 'officer')").all<{ id: string }>();
   await notify(env, results.map((r) => r.id), "account", `${id} 님이 아이디 생성을 요청했어요`, "#/admin", id);
   return json({ ok: true }, 201);
 };

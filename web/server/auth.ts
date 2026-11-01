@@ -264,7 +264,7 @@ export async function meInfo(env: Env, user: User) {
     // 같은 사람의 캐릭터들 (본캐 먼저, 부캐는 묶은 순서). 하나뿐이면 자기만
     env.DB.prepare(
       "SELECT u.id AS id, u.role AS role, u.main_id AS main_id, p.job AS job, p.level AS level, p.guild AS guild FROM users u " +
-        `LEFT JOIN profiles p ON p.user_id = u.id WHERE COALESCE(u.main_id, u.id) = ${owner} ORDER BY u.main_id IS NOT NULL, u.created_at`,
+        `LEFT JOIN profiles p ON p.user_id = u.id WHERE u.id = ${owner} OR u.main_id = ${owner} ORDER BY u.main_id IS NOT NULL, u.created_at`,
     ).bind(user.id),
     env.DB.prepare(`SELECT id FROM signup_requests WHERE owner = ${owner} ORDER BY created_at`).bind(user.id),
   ]);
@@ -377,6 +377,23 @@ export async function userOfToken(env: Env, token: string): Promise<User | null>
   if (!row || row.expires_at < Date.now()) return null;
   // 부캐를 묶은 사람은 캐릭터 중 가장 높은 역할로 (오피서의 부캐로 바꿔 들어와도 길드원 관리는 그대로)
   return { id: row.id, role: ROLE_AT[row.top ?? -1] ?? row.role, must_change: row.must_change, owner: row.owner };
+}
+
+/**
+ * 그 캐릭터가 속한 사람의 가장 높은 역할 (부캐 묶기). 다른 사람의 계정을 다룰 수 있는지는 캐릭터 하나의 역할이 아니라 이것으로 따진다:
+ * 길드마스터가 길드원 역할의 부캐를 본캐로 바꿔도 오피서가 그 계정을 묶거나 비밀번호를 초기화해 가로채지 못하게 (2026-11-01 검토)
+ */
+export async function groupRole(env: Env, id: string): Promise<Role | null> {
+  const owner = "(SELECT COALESCE(main_id, id) FROM users WHERE id = ?1)";
+  const r = await env.DB.prepare(`SELECT ${TOP_ROLE} AS top FROM users r WHERE r.id = ${owner} OR r.main_id = ${owner}`)
+    .bind(id)
+    .first<{ top: number | null }>();
+  return r?.top === null || r?.top === undefined ? null : ROLE_AT[r.top] ?? null;
+}
+
+/** actor 가 target 캐릭터(가 속한 사람)를 다룰 수 있는지 */
+export async function canManageUser(env: Env, actor: Role, targetId: string, fallback: Role): Promise<boolean> {
+  return canManage(actor, (await groupRole(env, targetId)) ?? fallback);
 }
 
 /** 지금 로그인을 같은 사람의 다른 캐릭터로 바꾼다 (부캐 묶기). 바꿨으면 true */

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
-  ROLE_NAME, canManage, createAccount, decideSignup, deleteAccount, errorText, linkAccounts, listAccounts, listSignups, positionOf, renameAccount,
+  RANK, ROLE_NAME, canManage, createAccount, decideSignup, deleteAccount, errorText, linkAccounts, listAccounts, listSignups, positionOf, renameAccount,
   resetPassword, setMainCharacter, setRole, unlinkAccount,
 } from "../auth";
 import type { SignupRequest } from "../auth";
@@ -274,9 +274,16 @@ function AccountRow({
   const [newId, setNewId] = useState("");
   // 내 캐릭터(부캐 묶기)는 내 계정처럼 다루지 못한다
   const isMine = (a: Account) => (me.characters?.some((c) => c.id === a.id) ?? false) || a.id === me.id;
-  const manageable = !isMine(account) && canManage(me.role, account.role);
+  // 다룰 수 있는지는 그 사람(묶인 캐릭터) 중 가장 높은 역할로 (서버 canManageUser 와 같다: 길드마스터의 부캐를 오피서가 가로채지 못하게)
+  const topRole = (a: Account): Role => {
+    const owner = a.mainId ?? a.id;
+    return accounts
+      .filter((x) => (x.mainId ?? x.id) === owner)
+      .reduce<Role>((top, x) => (RANK[x.role] > RANK[top] ? x.role : top), a.role);
+  };
+  const manageable = !isMine(account) && canManage(me.role, topRole(account));
   // 계정 통합 (부캐 묶기): 내 캐릭터이거나 다룰 수 있는 계정끼리. 부캐는 본캐를 골라서 묶는다
-  const linkable = (a: Account) => !a.mainId && (isMine(a) || canManage(me.role, a.role));
+  const linkable = (a: Account) => !a.mainId && (isMine(a) || canManage(me.role, topRole(a)));
   const [linking, setLinking] = useState(false);
   // 역할 바꾸기 (오피서 임명/해제): 다룰 수 있는 사람이면 된다 (오피서도 길드마스터와 같다)
   const canRole = manageable;
@@ -353,7 +360,7 @@ function AccountRow({
                 계정 통합
               </button>
             )}
-            {account.mainId && (isMine(account) || canManage(me.role, account.role)) && (
+            {account.mainId && (isMine(account) || canManage(me.role, topRole(account))) && (
               <>
                 {/* 주력 캐릭터가 바뀌면 이 부캐를 본캐로 (비밀번호는 그대로, 로그인 아이디만 바뀐다) */}
                 <button

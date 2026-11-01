@@ -130,6 +130,10 @@ const secs = (ms: number | null | undefined) => Math.max(1, Math.round((ms ?? 0)
 
 export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; query: URLSearchParams; me?: Me }) {
   const { data: posts, error: postsError } = useAsync(useCallback(() => loadPosts(), []));
+  // 공식 확률 표는 첫 질문 전에 미리 받아 둔다 (첫 질문이 늦게 시작하지 않게)
+  useEffect(() => {
+    void loadOdds().catch(() => undefined);
+  }, []);
   const listing = arg === "list";
   const wanted = /^\d+$/.test(arg) ? Number(arg) : null;
 
@@ -298,15 +302,20 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
     const lastUser = base[base.length - 1];
     // 사진 질문은 사진 속 직업, 레벨, 보이는 이름을 먼저 읽고 그 값으로 자료를 고른다 (챗봇 개선 2026-11-01, chat.ts Seen)
     let seen: Seen | null = null;
+    // 자료를 고르는 동안에도 바로 답 자리와 '답하는 중'을 보인다 (그사이 두 번 눌러 같은 질문을 두 번 묻지 않게, 2026-11-01 검토)
+    setTurns([...base, { role: "assistant", text: "", thinking: "", found: [lastUser?.images?.length ? "📷 사진 읽는 중" : "📚 자료 찾는 중"], streaming: true }]);
+    setBusy(true);
     if (lastUser?.images?.length) {
-      setTurns([...base, { role: "assistant", text: "", thinking: "", found: ["📷 사진 읽는 중"], streaming: true }]);
-      setBusy(true);
       seen = await peekPhotos(lastUser.images);
       if (!live()) return;
     }
     // 공식 확률 표 (못 받으면 없이 묻는다)
     const odds = await loadOdds().catch(() => undefined);
-    const ctx = wikiContext(wiki, posts, question, asker, !!(lastUser?.images?.length || lastUser?.photos), odds, seen ?? undefined);
+    if (!live()) return;
+    // 글 본문은 아직 받는 중일 수 있어서 기다린다 (못 받으면 없이)
+    const allPosts = posts ?? (await loadPosts().catch(() => undefined));
+    if (!live()) return;
+    const ctx = wikiContext(wiki, allPosts, question, asker, !!(lastUser?.images?.length || lastUser?.photos), odds, seen ?? undefined);
     const startedAt = Date.now();
     let firstText: number | null = null;
     let text = "";
@@ -398,6 +407,10 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
     }
   }
 
+  // 답 속 추천 질문 단추가 부르는 묻기: 늘 같은 함수라 끝난 답은 다시 그리지 않는다 (ChatAnswer 는 memo)
+  const sendRef = useRef<(e?: FormEvent, asked?: string) => void>(() => undefined);
+  const askFromAnswer = useCallback((q: string) => sendRef.current(undefined, q), []);
+  sendRef.current = send;
   function send(e?: FormEvent, asked?: string) {
     e?.preventDefault();
     const question = (asked ?? input).trim();
@@ -585,7 +598,7 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
             ))}
             {t.text ? (
               t.role === "assistant" && !t.error ? (
-                <ChatAnswer wiki={wiki} text={t.text} done={!t.streaming} onAsk={(q) => send(undefined, q)} />
+                <ChatAnswer wiki={wiki} text={t.text} done={!t.streaming} onAsk={askFromAnswer} />
               ) : (
                 <span className="bubble-text">{t.text}</span>
               )

@@ -75,7 +75,7 @@ export function startNews(id: string) {
   emit();
   void refreshNews();
   window.clearInterval(timer);
-  timer = window.setInterval(() => void refreshNews(), POLL_MS);
+  timer = window.setInterval(() => !document.hidden && void refreshNews(), POLL_MS);
   if (listening) return;
   listening = true;
   document.addEventListener("visibilitychange", () => {

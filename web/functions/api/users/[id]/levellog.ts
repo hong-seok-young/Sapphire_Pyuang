@@ -2,7 +2,7 @@
 // GET    /api/users/:id/levellog        -> 그 사람의 레벨·경험치 기록 (최근 60개)과 레벨업 표시(prev_level)
 // DELETE /api/users/:id/levellog?at=    -> 기록 하나 지우기 (성장 랭킹이 다시 계산된다)
 // PATCH  /api/users/:id/levellog { clearBadge: true } -> 레벨업 ▲ 표시 지우기
-import { FORBIDDEN, NEED_LOGIN, canManage, currentUser, json, paramId, readJson } from "../../../../server/auth";
+import { FORBIDDEN, NEED_LOGIN, canManageUser, currentUser, json, paramId, readJson } from "../../../../server/auth";
 import type { Env, Role } from "../../../../server/auth";
 
 async function target(env: Env, request: Request, params: Record<string, string | string[]>) {
@@ -10,7 +10,7 @@ async function target(env: Env, request: Request, params: Record<string, string 
   if (!me) return { error: NEED_LOGIN() };
   const user = await env.DB.prepare("SELECT id, role FROM users WHERE id = ?").bind(paramId(params)).first<{ id: string; role: Role }>();
   if (!user) return { error: json({ error: "없는 아이디예요" }, 404) };
-  if (!canManage(me.role, user.role)) return { error: FORBIDDEN() };
+  if (!(await canManageUser(env, me.role, user.id, user.role))) return { error: FORBIDDEN() };
   return { user };
 }
 

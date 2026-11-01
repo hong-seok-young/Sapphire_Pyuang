@@ -12,7 +12,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const mine = "user_id IN (SELECT id FROM users WHERE id = ?1 OR main_id = ?1)";
   const owner = me.owner ?? me.id;
   const [rows, unread, prefs] = await env.DB.batch([
-    env.DB.prepare(`SELECT id, kind, text, link, created_at AS at, read_at AS readAt, user_id AS who FROM alerts WHERE ${mine} ORDER BY id DESC LIMIT 60`)
+    env.DB.prepare(`SELECT id, kind, text, link, created_at AS at, read_at AS readAt, user_id AS who FROM alerts INDEXED BY alerts_user WHERE ${mine} ORDER BY id DESC LIMIT 60`)
       .bind(owner),
     env.DB.prepare(`SELECT COUNT(*) AS n FROM alerts WHERE ${mine} AND read_at IS NULL`).bind(owner),
     env.DB.prepare("SELECT kind, enabled, push FROM alert_prefs WHERE user_id = ?").bind(me.id),

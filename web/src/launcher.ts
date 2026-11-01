@@ -176,7 +176,10 @@ function save(layout: Layout) {
   void api("/api/layout", "PUT", layout).catch(() => undefined);
 }
 
-export const setEditing = (editing: boolean) => set({ editing, drag: null, preview: null });
+export const setEditing = (editing: boolean) => {
+  if (!editing) swallowClick = false;
+  set({ editing, drag: null, preview: null });
+};
 export const resetLayout = () => save(normalize(DEFAULT_LAYOUT));
 
 // ---------- 옮기기 ----------
@@ -260,6 +263,7 @@ function cancelPress() {
  * 편집 중이 아니면 꾹 누르기를 재고, 편집 중이면 끌기를 시작한다 (홈은 끌 수 없다)
  */
 export function pressItem(e: ReactPointerEvent<HTMLElement>, key: string, editable: boolean) {
+  swallowClick = false;
   if (!editable || (e.pointerType === "mouse" && e.button !== 0)) return;
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp);

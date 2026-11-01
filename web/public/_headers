@@ -5,3 +5,9 @@
   Cache-Control: no-cache
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+# 위키 글 속 아이템 그림: 파일 이름이 내용의 해시라 바뀌지 않는다 (scripts/build_data.py)
+/img/*
+  Cache-Control: public, max-age=31536000, immutable
+# 아래 탭, 🔔 같은 픽셀 그림 (scripts/make_pixel_icons.py)
+/icons/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800

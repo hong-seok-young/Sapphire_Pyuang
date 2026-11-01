@@ -15,6 +15,16 @@ export interface Favorite {
 
 let cache: Favorite[] | null = null;
 let loading: Promise<Favorite[]> | null = null;
+let owner = "";
+
+/** 로그인한 사람이 바뀌면 (로그아웃 뒤 다른 계정) 앞 사람의 즐겨찾기를 버린다 */
+export function resetFavorites(user: string) {
+  if (owner === user) return;
+  owner = user;
+  cache = null;
+  loading = null;
+  emit();
+}
 const listeners = new Set<(f: Favorite[]) => void>();
 const emit = () => listeners.forEach((l) => l(cache ?? []));
 

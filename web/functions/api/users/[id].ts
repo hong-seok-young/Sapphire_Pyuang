@@ -1,6 +1,6 @@
 // DELETE /api/users/:id         -> 계정 지우기 (자기보다 낮은 역할만). 부캐가 있는 본캐를 지우면 가장 먼저 묶은 부캐가 본캐가 되고 비밀번호를 이어받는다
 // PATCH  /api/users/:id { role } -> 역할 바꾸기 (오피서 이상: 오피서 임명/해제 등. 오피서도 길드마스터와 같다)
-import { FORBIDDEN, NEED_LOGIN, canManage, currentUser, isRole, json, paramId, readJson, samePerson } from "../../../server/auth";
+import { FORBIDDEN, NEED_LOGIN, canManage, canManageUser, currentUser, isRole, json, paramId, readJson, samePerson } from "../../../server/auth";
 import { notify } from "../../../server/alerts";
 import type { Env, Role } from "../../../server/auth";
 
@@ -14,7 +14,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
   if (!me) return NEED_LOGIN();
   const user = await target(env, params);
   if (!user) return json({ error: "없는 아이디예요" }, 404);
-  if (samePerson(me, user) || !canManage(me.role, user.role)) return FORBIDDEN();
+  if (samePerson(me, user) || !(await canManageUser(env, me.role, user.id, user.role))) return FORBIDDEN();
   // 본캐를 지우는데 부캐가 있으면: 가장 먼저 묶은 부캐가 본캐가 되고 비밀번호를 이어받는다 (그 사람은 새 본캐 아이디로 로그인)
   const heir = user.main_id
     ? null
@@ -39,6 +39,8 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
     env.DB.prepare("DELETE FROM activity WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM alerts WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM alert_prefs WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM push_subs WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM cutout_log WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM favorites WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM chat_msgs WHERE thread_id IN (SELECT id FROM chat_threads WHERE user_id = ?)").bind(user.id),
     env.DB.prepare("DELETE FROM chat_threads WHERE user_id = ?").bind(user.id),
@@ -82,7 +84,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
   if (!user) return json({ error: "없는 아이디예요" }, 404);
   const body = await readJson<{ role: string }>(request);
   const role = body.role;
-  if (!isRole(role) || samePerson(me, user) || !canManage(me.role, user.role) || !canManage(me.role, role)) {
+  if (!isRole(role) || samePerson(me, user) || !(await canManageUser(env, me.role, user.id, user.role)) || !canManage(me.role, role)) {
     return FORBIDDEN();
   }
   await env.DB.prepare("UPDATE users SET role = ? WHERE id = ?").bind(role, user.id).run();

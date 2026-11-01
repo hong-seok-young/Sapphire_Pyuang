@@ -36,6 +36,12 @@ async function download(url: string, guess: number, onPart: (part: number) => vo
   onPart(1);
 }
 
+/** 저절로 새로고침해도 되는 화면: 홈과 정보 (다른 화면은 쓰던 칸, 고른 것, 읽던 자리가 날아간다. 2026-11-01 검토) */
+function safePage(): boolean {
+  const h = location.hash.replace(/^#\/?/, "").split("?")[0];
+  return h === "" || h === "info";
+}
+
 /** 글을 쓰는 중인지 (칸에 글이 있거나 손가락이 칸에 있다): 그러면 저절로 새로고침하지 않는다 */
 function typing(): boolean {
   const a = document.activeElement;
@@ -71,13 +77,23 @@ export function useUpdate(): UpdateState {
         await download(latest.js, guess, (p) => setState({ pct: Math.round(5 + p * 85), label: "새 화면 받는 중", waiting: false }));
         if (latest.css) await download(latest.css, 60_000, (p) => setState({ pct: Math.round(90 + p * 9), label: "모양 받는 중", waiting: false }));
         setState({ pct: 100, label: "다 받았어요", waiting: false });
-        const reload = () => {
-          if (typing()) {
-            setState({ pct: 100, label: "업데이트 준비 끝", waiting: true });
-            return;
-          }
+        const open = () => {
           setState({ pct: 100, label: "새 버전으로 여는 중…", waiting: false });
           window.setTimeout(() => location.reload(), 400);
+        };
+        const reload = () => {
+          if (typing() || !safePage()) {
+            // '새로고침' 단추를 보이고, 홈(이나 정보)으로 오면 그때 새로 연다
+            setState({ pct: 100, label: "업데이트 준비 끝", waiting: true });
+            const onRoute = () => {
+              if (!safePage() || typing()) return;
+              window.removeEventListener("hashchange", onRoute);
+              open();
+            };
+            window.addEventListener("hashchange", onRoute);
+            return;
+          }
+          open();
         };
         window.setTimeout(reload, 300);
         stopped = true;

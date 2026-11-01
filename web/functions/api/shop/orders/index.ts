@@ -28,7 +28,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   )
     .bind(me.id, item.id, item.name, item.plat, high ? e.highGold : e.gold, high ? e.highRatio : e.ratio, now)
     .first<{ id: number }>();
-  const staff = await env.DB.prepare("SELECT id FROM users WHERE role IN ('developer', 'master', 'officer')").all<{ id: string }>();
+  const staff = await env.DB.prepare("SELECT DISTINCT COALESCE(main_id, id) AS id FROM users WHERE role IN ('developer', 'master', 'officer')").all<{ id: string }>();
   await notify(
     env,
     staff.results.map((u) => u.id),

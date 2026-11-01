@@ -1,7 +1,7 @@
 // POST /api/users/:id/reset { password? } -> 비밀번호를 처음 비밀번호(정한 것이나 임시)로 (자기보다 낮은 역할만).
 // 그 사람의 로그인은 모두 끝내고, 다음 로그인 때 비밀번호를 바꾸게 한다. 부캐를 고르면 그 사람의 본캐 비밀번호를 초기화한다 (로그인은 본캐로)
 import {
-  FORBIDDEN, NEED_LOGIN, canManage, currentUser, firstPassword, json, paramId, passwordFields, readJson, samePerson,
+  FORBIDDEN, NEED_LOGIN, canManageUser, currentUser, firstPassword, json, paramId, passwordFields, readJson, samePerson,
 } from "../../../../server/auth";
 import type { Env, Role } from "../../../../server/auth";
 
@@ -13,7 +13,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   if (!picked) return json({ error: "없는 아이디예요" }, 404);
   const user = await env.DB.prepare("SELECT id, role FROM users WHERE id = ?").bind(picked.main_id ?? picked.id).first<{ id: string; role: Role }>();
   if (!user) return json({ error: "없는 아이디예요" }, 404);
-  if (samePerson(me, picked) || !canManage(me.role, user.role)) return FORBIDDEN();
+  if (samePerson(me, picked) || !(await canManageUser(env, me.role, user.id, user.role))) return FORBIDDEN();
 
   const body = await readJson<{ password: string }>(request);
   const temp = firstPassword(body.password);

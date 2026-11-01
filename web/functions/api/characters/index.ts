@@ -27,7 +27,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   await env.DB.prepare("INSERT INTO signup_requests (id, pw_hash, pw_salt, pw_iter, created_at, owner) VALUES (?, ?, ?, ?, ?, ?)")
     .bind(id, pw.pw_hash, pw.pw_salt, pw.pw_iter, Date.now(), owner)
     .run();
-  const { results } = await env.DB.prepare("SELECT id FROM users WHERE role IN ('developer', 'master', 'officer')").all<{ id: string }>();
+  const { results } = await env.DB.prepare("SELECT DISTINCT COALESCE(main_id, id) AS id FROM users WHERE role IN ('developer', 'master', 'officer')").all<{ id: string }>();
   await notify(env, results.map((r) => r.id), "account", `${owner} 님이 캐릭터 ${id} 추가를 요청했어요`, "#/admin", me.id);
   return json({ ok: true, id }, 201);
 };

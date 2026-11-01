@@ -4,7 +4,7 @@
 // 그 사람은 본캐 아이디와 비밀번호로 로그인하고 👤 에서 캐릭터를 바꾼다. 캐릭터(랭킹, 거래, 글)는 그대로 따로 있다.
 // 묶을 때 고른 본캐가 아닌 쪽(과 그 부캐들)은 로그인이 끝난다 (본캐 아이디로 다시 들어온다)
 import {
-  FORBIDDEN, NEED_LOGIN, canManage, currentUser, json, paramId, passwordFields, readJson, samePerson,
+  FORBIDDEN, NEED_LOGIN, canManageUser, currentUser, json, paramId, passwordFields, readJson, samePerson,
 } from "../../../../server/auth";
 import type { Env, Role, User } from "../../../../server/auth";
 import { notify } from "../../../../server/alerts";
@@ -19,8 +19,8 @@ interface Row {
 }
 
 const find = (env: Env, id: string) => env.DB.prepare("SELECT id, role, main_id FROM users WHERE id = ?").bind(id).first<Row>();
-/** 이 계정을 묶거나 뗄 수 있는지: 내 캐릭터이거나 다룰 수 있는 역할 */
-const mayTouch = (me: User, u: Row) => samePerson(me, u) || canManage(me.role, u.role);
+/** 이 계정을 묶거나 뗄 수 있는지: 내 캐릭터이거나, 그 사람(묶인 캐릭터 중 가장 높은 역할)을 다룰 수 있을 때 */
+const mayTouch = async (env: Env, me: User, u: Row) => samePerson(me, u) || (await canManageUser(env, me.role, u.id, u.role));
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
   const me = await currentUser(env, request);
@@ -33,7 +33,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   // 부캐는 본캐를 골라서 묶는다 (부캐끼리 이어지지 않게)
   if (a.main_id || b.main_id) return json({ error: "이미 다른 본캐에 묶인 부캐예요. 본캐 계정으로 묶어 주세요" }, 400);
   if (body.main !== a.id && body.main !== b.id) return json({ error: "본캐를 골라 주세요" }, 400);
-  if (!mayTouch(me, a) || !mayTouch(me, b)) return FORBIDDEN();
+  if (!(await mayTouch(env, me, a)) || !(await mayTouch(env, me, b))) return FORBIDDEN();
   const main = body.main === a.id ? a : b;
   const sub = main === a ? b : a;
   await env.DB.batch([
@@ -52,7 +52,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
   const user = await find(env, paramId(params));
   if (!user) return json({ error: "없는 아이디예요" }, 404);
   if (!user.main_id) return json({ error: "묶인 부캐가 아니에요" }, 400);
-  if (!mayTouch(me, user)) return FORBIDDEN();
+  if (!(await mayTouch(env, me, user))) return FORBIDDEN();
   const pw = await passwordFields(FIRST_PASSWORD);
   await env.DB.batch([
     // 본캐에서 이 캐릭터로 바꿔 들어와 있던 로그인은 끝낸다

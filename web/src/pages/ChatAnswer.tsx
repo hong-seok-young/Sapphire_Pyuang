@@ -1,4 +1,4 @@
-import { Fragment, useMemo } from "react";
+import { Fragment, memo, useMemo } from "react";
 import type { ReactNode } from "react";
 import type { Wiki } from "../types";
 import { monstersByName } from "../data";
@@ -131,7 +131,7 @@ function inline(text: string, resolve: ReturnType<typeof useResolver>, seen: Tar
   return out;
 }
 
-export function ChatAnswer({ wiki, text, done, onAsk }: { wiki: Wiki; text: string; done: boolean; onAsk: (q: string) => void }) {
+function ChatAnswerView({ wiki, text, done, onAsk }: { wiki: Wiki; text: string; done: boolean; onAsk: (q: string) => void }) {
   const resolve = useResolver(wiki);
   const seen: Target[] = [];
   const asks = [...text.matchAll(TOKEN)].filter((m) => m[1] === "질문").map((m) => m[2].trim());
@@ -197,3 +197,6 @@ export function ChatAnswer({ wiki, text, done, onAsk }: { wiki: Wiki; text: stri
     </div>
   );
 }
+
+/** 답 하나 (글이 바뀔 때만 다시 그린다: 답이 흘러 들어오는 동안 앞의 답들은 그대로 둔다) */
+export const ChatAnswer = memo(ChatAnswerView);

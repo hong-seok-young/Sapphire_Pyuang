@@ -7,10 +7,20 @@ const BASE = "data/";
 export const NEED_LOGIN = "NeedLogin";
 
 export async function getJson<T>(name: string): Promise<T> {
-  const res = await fetch(BASE + name + ".json");
-  if (res.status === 401) throw new Error(NEED_LOGIN);
-  if (!res.ok) throw new Error(`${name}.json: ${res.status}`);
-  return res.json();
+  // 오래 멈춘 요청은 끊는다 (느린 망에서 '불러오는 중'에만 머물지 않고 '다시 시도'가 뜨게)
+  const ctrl = new AbortController();
+  const timer = window.setTimeout(() => ctrl.abort(), 30_000);
+  try {
+    const res = await fetch(BASE + name + ".json", { signal: ctrl.signal });
+    if (res.status === 401) throw new Error(NEED_LOGIN);
+    if (!res.ok) throw new Error(`${name}.json: ${res.status}`);
+    return (await res.json()) as T;
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") throw new Error("인터넷이 느려요");
+    throw e;
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 let wikiPromise: Promise<Wiki> | null = null;

@@ -1,7 +1,7 @@
 // POST /api/users/:id/main -> 이 캐릭터를 본캐로 (부캐 묶기, 제작자 요청 2026-11-01: 키우다 보면 주력 캐릭터가 바뀐다).
 // 본인('내 정보'의 내 캐릭터) 또는 그 사람을 다룰 수 있는 관리자('길드원 관리'). 비밀번호는 그대로 이어받고
 // 로그인 아이디만 새 본캐로 바뀐다. 캐릭터(랭킹, 거래, 글)와 지금 로그인은 그대로다
-import { FORBIDDEN, NEED_LOGIN, canManage, currentUser, json, paramId, samePerson } from "../../../../server/auth";
+import { FORBIDDEN, NEED_LOGIN, canManageUser, currentUser, json, paramId, samePerson } from "../../../../server/auth";
 import type { Env, Role } from "../../../../server/auth";
 import { notify } from "../../../../server/alerts";
 
@@ -19,7 +19,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   if (!user.main_id) return json({ error: "이미 본캐예요" }, 400);
   const main = await env.DB.prepare("SELECT id, role, main_id FROM users WHERE id = ?").bind(user.main_id).first<Row>();
   if (!main) return json({ error: "본캐를 찾지 못했어요" }, 404);
-  if (!samePerson(me, user) && !(canManage(me.role, main.role) && canManage(me.role, user.role))) return FORBIDDEN();
+  if (!samePerson(me, user) && !(await canManageUser(env, me.role, user.id, main.role))) return FORBIDDEN();
   await env.DB.batch([
     // 새 본캐가 비밀번호(와 '바꿔야 함')를 이어받는다: 로그인 아이디만 바뀐다
     env.DB.prepare(

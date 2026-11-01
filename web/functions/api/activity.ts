@@ -44,7 +44,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const binds: (string | number)[] = [];
   const user = q.get("user");
   if (user) {
-    where.push("user_id IN (SELECT id FROM users WHERE COALESCE(main_id, id) = (SELECT COALESCE(main_id, id) FROM users WHERE id = ?1))");
+    const owner = "(SELECT COALESCE(main_id, id) FROM users WHERE id = ?1)";
+    where.push(`user_id IN (SELECT id FROM users WHERE id = ${owner} OR main_id = ${owner})`);
     binds.push(user);
   }
   const kind = q.get("kind");
@@ -73,7 +74,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       "(SELECT COUNT(*) FROM activity a WHERE a.user_id = u.id AND a.kind = 'view' AND a.at > ?1) AS views7, " +
       "(SELECT COUNT(*) FROM activity a WHERE a.user_id = u.id AND a.kind = 'act' AND a.at > ?1) AS acts7, " +
       "(SELECT MAX(a.at) FROM activity a WHERE a.user_id = u.id) AS last, " +
-      "(SELECT a.via FROM activity a WHERE a.user_id = u.id ORDER BY a.id DESC LIMIT 1) AS lastVia " +
+      "(SELECT a.via FROM activity a WHERE a.user_id = u.id ORDER BY a.at DESC LIMIT 1) AS lastVia " +
       "FROM users u ORDER BY last IS NULL, last DESC, u.id",
   )
     .bind(now - 7 * DAY, now - 30 * DAY)

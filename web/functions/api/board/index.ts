@@ -40,7 +40,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       "(SELECT COUNT(*) FROM board_views v WHERE v.post_id = p.id) AS views, " +
       "(SELECT COUNT(*) FROM board_files f WHERE f.post_id = p.id AND f.image = 0) AS files, " +
       "(SELECT f.id FROM board_files f WHERE f.post_id = p.id AND f.image = 1 ORDER BY f.id LIMIT 1) AS thumb " +
-      "FROM board_posts p" + (where.length ? " WHERE " + where.join(" AND ") : "") + ` ORDER BY ${order} LIMIT ${PAGE}`,
+      "FROM (SELECT * FROM board_posts p" + (where.length ? " WHERE " + where.join(" AND ") : "") + ` ORDER BY ${order} LIMIT ${PAGE}) p ORDER BY ${order}`,
   )
     .bind(...binds)
     .all<{ id: number; pinned: number }>();
@@ -70,7 +70,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (b.cat === "notice" || b.cat === "event") {
     await notify(env, "all", "board_notice", `[${CAT_NAME[b.cat]}] ${title} · ${me.id}${lead ? "\n" + lead : ""}`, `#/board/${row.id}`, me.id);
   } else if (b.cat === "suggest") {
-    const { results } = await env.DB.prepare("SELECT id FROM users WHERE role IN ('developer', 'master', 'officer')").all<{ id: string }>();
+    const { results } = await env.DB.prepare("SELECT DISTINCT COALESCE(main_id, id) AS id FROM users WHERE role IN ('developer', 'master', 'officer')").all<{ id: string }>();
     await notify(env, results.map((r) => r.id), "board", `[건의 사항] ${title} · ${me.id}${lead ? "\n" + lead : ""}`, `#/board/${row.id}`, me.id);
   }
   return json({ id: row.id }, 201);
