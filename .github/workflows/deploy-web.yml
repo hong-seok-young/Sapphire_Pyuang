@@ -98,10 +98,12 @@ jobs:
           FIRST_PASSWORD: ${{ secrets.FIRST_PASSWORD }}
         run: node scripts/ci-d1.mjs
 
-      # 컴투스 공식 소식 중 한국 전용 글 (withhive 는 한국 밖 서버에는 빼고 준다): 한국 PC에서 받아 둔 파일을 넣는다 (scripts/fetch-official.mjs)
+      # 컴투스 공식 소식: 최근 글을 새로 받고(30분마다 도는 공식 소식 작업과 같다), 한국 전용 글은 한국 PC에서 받아 둔 파일로 넣는다
+      # (withhive 는 한국 밖 서버에는 빼고 준다. 파일은 저장한 때보다 늦게 새로 받은 글을 덮지 않는다, scripts/fetch-official.mjs)
       - name: Official news (Korea snapshot)
         working-directory: web
         run: |
+          node --experimental-strip-types scripts/fetch-official.mjs || echo "::warning::공식 소식을 새로 받지 못했어요"
           if [ -f "../자료/공식/소식.json" ]; then node --experimental-strip-types scripts/fetch-official.mjs --load "../자료/공식/소식.json"; fi
 
       # 챗봇(functions/api/chat.ts)의 Claude API 키를 Cloudflare Pages 비밀값으로 넣는다. 없으면 챗봇은 '준비 중'이라고 답한다

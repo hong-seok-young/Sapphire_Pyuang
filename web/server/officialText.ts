@@ -199,14 +199,15 @@ export function rowOf(item: HiveItem, kind: "notice" | "event"): OfficialRow {
 /**
  * 표에 넣는 SQL (값은 ?1 … ?11 순서: id, kind, type, title, start_date, end_date, image, body, fetched_at, html, src).
  * 원문이 바뀌었을 때만 고친다 (그대로면 쓰지 않아서 D1 쓰기 한도를 아낀다). 예전 방법(src 앞자리가 작은 것)으로 바꾼 것이 새 방법으로 바꾼 것을
- * 덮지 않는다 (한국 PC에서 예전에 받아 둔 파일을 배포가 넣을 때). 원문이 바뀌면 To do 정리(official_todo)는 src 를 보고 다시 한다
+ * 덮지 않는다 (한국 PC에서 예전에 받아 둔 파일을 배포가 넣을 때). 받은 때(fetched_at)가 더 늦은 글도 덮지 않는다: 파일은 받은 때를 저장한 때로 넣어서,
+ * 그 뒤에 새로 받아 고친 글(연장된 점검 등)이 예전 내용으로 돌아가지 않는다. 원문이 바뀌면 To do 정리(official_todo)는 src 를 보고 다시 한다
  */
 export const UPSERT_SQL =
   "INSERT INTO official_news (id, kind, type, title, start_date, end_date, image, body, fetched_at, html, src) " +
   "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11) " +
   "ON CONFLICT (id) DO UPDATE SET kind = excluded.kind, type = excluded.type, title = excluded.title, start_date = excluded.start_date, " +
   "end_date = excluded.end_date, image = excluded.image, body = excluded.body, fetched_at = excluded.fetched_at, html = excluded.html, src = excluded.src " +
-  "WHERE excluded.src IS NOT NULL AND (official_news.src IS NULL OR " +
+  "WHERE excluded.src IS NOT NULL AND official_news.fetched_at <= excluded.fetched_at AND (official_news.src IS NULL OR " +
   "(official_news.src IS NOT excluded.src AND substr(excluded.src, 1, 1) >= substr(official_news.src, 1, 1)))";
 
 /** UPSERT_SQL 에 넣는 값 (순서대로) */

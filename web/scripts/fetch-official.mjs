@@ -138,15 +138,18 @@ runFile(CREATE + "\n");
 }
 let all = false;
 let found;
+// 받은 때: 파일이면 그 파일을 저장한 때 (그 뒤에 새로 받아 고친 글을 덮지 않게, server/officialText.ts UPSERT_SQL)
+let now = Date.now();
 if (loadFrom) {
-  found = JSON.parse(readFileSync(loadFrom, "utf8")).rows;
+  const file = JSON.parse(readFileSync(loadFrom, "utf8"));
+  found = file.rows;
+  now = Date.parse(file.savedAt) || now;
   console.log(`파일에서 ${found.length}개를 읽었어요`);
 } else {
   const count = Number(parseJson(wrangler("d1", "execute", DB, where, "--json", "--command", "SELECT COUNT(*) AS n FROM official_news"))[0]?.results?.[0]?.n ?? 0);
   all = process.argv.includes("--all") || count === 0;
   found = await fetchRows(all);
 }
-const now = Date.now();
 const statements = found.filter((r) => Number.isInteger(r?.id) && r.title).map((r) => upsert(r, now));
 
 // 너무 큰 파일은 나눠 넣는다 (D1 한 번에 넣는 크기)

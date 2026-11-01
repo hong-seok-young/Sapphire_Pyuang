@@ -210,7 +210,8 @@
   D1 은 SQL 한 줄 100KB 까지라 바이트로 자른다).
 - GitHub Actions `.github/workflows/official-news.yml` 이 30분마다 최근 것(쪽마다 30개)을 받고, 표가 비었거나 '모든 쪽 다시 받기'로 돌리면 전부 받는다
   (비밀값은 배포와 같은 CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, 그리고 To do 정리에 ANTHROPIC_API_KEY). 2026-11-01 에 만든 뒤 예약 실행이 한동안 돌지 않아
-  배포마다 한 번씩도 돈다 (deploy-web.yml 끝의 To do 정리). Pages Functions 는 무료 요금제 CPU 한도(10ms) 때문에 점검 글만 받는다:
+  배포 때도 최근 글을 새로 받고(deploy-web.yml 'Official news') To do 를 정리한다(끝의 'To do digest').
+  한국 PC 파일(--load)은 받은 때를 파일을 저장한 때로 넣어, 그 뒤에 새로 받아 고친 글(연장된 점검 등)을 예전 내용으로 덮지 않는다 (`UPSERT_SQL` 의 fetched_at). Pages Functions 는 무료 요금제 CPU 한도(10ms) 때문에 점검 글만 받는다:
   점검 글(종류 C) 3개, 30KB 쯤을 2분에 한 번 (`server/official.ts` `refreshMaint`, `/api/news` 가 뒤에서 부른다, D1 `setup` 'official_maint_checked').
   이벤트·공지는 크다(이벤트 글 하나가 400KB 도 있다).
 - 글을 바꾸는 방법(본문 글자, 간단한 HTML, 원문 해시 `src`)은 `web/server/officialText.ts` 하나를 받기 스크립트와 서버가 같이 쓴다
