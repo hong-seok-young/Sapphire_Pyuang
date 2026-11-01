@@ -42,7 +42,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     env.DB.prepare("UPDATE users SET main_id = ?1 WHERE id = ?2 OR main_id = ?2").bind(main.id, sub.id),
     env.DB.prepare("UPDATE signup_requests SET owner = ? WHERE owner = ?").bind(main.id, sub.id),
   ]);
-  await notify(env, [main.id], "account", `${sub.id} 캐릭터를 ${main.id} 계정에 묶었어요. 👤 를 눌러 캐릭터를 바꿔요`, "#/me", me.id);
+  await notify(env, [main.id], "account", `${sub.id} 캐릭터를 ${main.id} 계정에 묶었어요. 홈의 닉네임을 눌러 캐릭터를 바꿔요`, "#/me", me.id);
   return json({ ok: true, main: main.id, sub: sub.id });
 };
 

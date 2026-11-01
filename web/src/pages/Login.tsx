@@ -146,19 +146,32 @@ function SignupForm({ onDone, onCancel }: { onDone: (id: string) => void; onCanc
  * 화면의 '◀ 다른 아이디로 로그인'(history.back())과 폰의 뒤로 가기 모두: 기록을 하나 넣어 두고,
  * 뒤로 가서 그 기록이 빠지면(popstate) 로그아웃한 뒤 onBack 을 부른다.
  */
+let popTimer = 0;
+
 export function useBackToLogin(active: boolean, onBack?: () => void) {
   const backRef = useRef(onBack);
   backRef.current = onBack;
   useEffect(() => {
     if (!active) return;
-    history.pushState({ backToLogin: true }, "");
+    // 바로 앞 화면(비밀번호 바꾸기 -> 직업과 레벨 정하기)이 넣어 둔 기록이 있으면 그대로 쓴다
+    if (popTimer) {
+      window.clearTimeout(popTimer);
+      popTimer = 0;
+    } else history.pushState({ ...(history.state ?? {}), backToLogin: true }, "");
     const onPop = () => {
       void logout()
         .catch(() => undefined)
         .then(() => backRef.current?.());
     };
     window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      // 이 화면을 마치고 들어가면 넣어 둔 기록을 뺀다 (남겨 두면 나중에 뒤로 가기가 한 번 헛돈다, 제작자 요청 2026-11-01)
+      popTimer = window.setTimeout(() => {
+        popTimer = 0;
+        if (history.state?.backToLogin) history.back();
+      }, 0);
+    };
   }, [active]);
 }
 

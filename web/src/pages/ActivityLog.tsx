@@ -71,7 +71,7 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
   }
 
   const q = squash(query);
-  const found = people.filter((p) => !q || squash(p.id).includes(q));
+  const found = people.filter((p) => !q || [p.id, ...(p.alts ?? [])].some((id) => squash(id).includes(q)));
   const shownPeople = q || allPeople ? found : found.slice(0, SHOWN_PEOPLE);
   let lastDay = "";
 
@@ -90,7 +90,11 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
                 <span>
                   접속 {p.visits7}번 <small>(30일 {p.visits30})</small> · 화면 {p.views7} · 한 일 {p.acts7}
                 </span>
-                <small>{p.last ? `${ago(p.last)}${p.lastVia ? ` · ${VIA_NAME[p.lastVia]}` : ""}` : "기록 없음"}</small>
+                <small>
+                  {p.last ? `${ago(p.last)}${p.lastVia ? ` · ${VIA_NAME[p.lastVia]}` : ""}` : "기록 없음"}
+                  {/* 부캐 묶기: 같은 사람의 캐릭터를 합친 줄 */}
+                  {p.alts?.length ? ` · 부캐 ${p.alts.join(", ")}` : ""}
+                </small>
               </button>
             </li>
           ))}

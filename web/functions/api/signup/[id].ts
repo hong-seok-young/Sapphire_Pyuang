@@ -38,7 +38,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
       ).bind(id, req.pw_hash, req.pw_salt, req.pw_iter, Date.now(), me.id, owner.id),
       env.DB.prepare("DELETE FROM signup_requests WHERE id = ?").bind(id),
     ]);
-    await notify(env, [owner.id], "account", `캐릭터 ${id} 추가를 승낙했어요. 👤 를 눌러 바꿔요`, "#/me", me.id);
+    await notify(env, [owner.id], "account", `캐릭터 ${id} 추가를 승낙했어요. 홈의 닉네임을 눌러 바꿔요`, "#/me", me.id);
     return json({ ok: true, id }, 201);
   }
   // 본인이 정한 비밀번호라 처음 로그인 때 바꾸게 하지 않는다. 직업, 레벨, 길드는 처음 들어오면 정한다

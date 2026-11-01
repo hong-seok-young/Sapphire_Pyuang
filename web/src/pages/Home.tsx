@@ -1,5 +1,5 @@
 import type { Me } from "../auth";
-import { Bell, FitLine, HeroTitle, MeButton, PixelIcon, TopBar } from "../ui";
+import { Bell, CharacterSwitch, FitLine, HeroTitle, MeButton, PixelIcon, TopBar } from "../ui";
 import { VERSION } from "../patchnotes";
 import { useState } from "react";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
@@ -102,8 +102,8 @@ export function Home({ me }: { me: Me }) {
             <span className="hero-user">
               {/* 알림: 닉네임 앞 작은 🔔 (위의 단추 줄은 좁은 폰에서 'web' 과 겹쳐서) */}
               <Bell className="hero-bell" size={16} />
-              <i className="online-dot" aria-label="로그인 중" />
-              {me.id}
+              {/* 초록 점과 닉네임: 캐릭터를 묶었으면 눌러서 캐릭터 바꾸기 (부캐 묶기) */}
+              <CharacterSwitch />
             </span>
           </p>
         </div>

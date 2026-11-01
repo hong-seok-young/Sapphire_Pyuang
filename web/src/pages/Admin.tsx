@@ -377,9 +377,12 @@ function AccountRow({
                 <button className="pill" disabled={busy} onClick={() => setRenaming((v) => !v)}>
                   닉네임 변경
                 </button>
-                <button className="pill" disabled={busy} onClick={onReset}>
-                  비밀번호 초기화
-                </button>
+                {/* 부캐는 로그인이 없다: 비밀번호 초기화는 본캐 줄에서 */}
+                {!account.mainId && (
+                  <button className="pill" disabled={busy} onClick={onReset}>
+                    비밀번호 초기화
+                  </button>
+                )}
                 {confirmDelete ? (
                   <>
                     <button className="pill pill-danger" disabled={busy} onClick={onDelete}>

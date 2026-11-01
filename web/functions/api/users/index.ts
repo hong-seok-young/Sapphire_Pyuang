@@ -22,7 +22,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   }>();
   const users = results
     .map((u) => ({
-      id: u.id, role: u.role, mustChange: u.must_change === 1, createdAt: u.created_at, createdBy: u.created_by,
+      // 부캐는 로그인이 없다 (본캐 아이디와 비밀번호로 들어온다): '비밀번호 바꾸기 전'은 본캐에만
+      id: u.id, role: u.role, mustChange: u.must_change === 1 && !u.main_id, createdAt: u.created_at, createdBy: u.created_by,
       job: u.job, level: u.level, guild: u.guild, avatar: u.avatar, highSpec: u.high_spec === 1, push: u.push_perm, pushAt: u.push_at,
       // 부캐면 본캐 아이디 (부캐 묶기)
       mainId: u.main_id,

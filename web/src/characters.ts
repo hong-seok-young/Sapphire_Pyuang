@@ -39,7 +39,7 @@ export async function goCharacter(id: string, to = "#/me"): Promise<void> {
   } catch {
     // 못 적으면 오픈 축하가 한 번 더 뜰 뿐
   }
-  history.replaceState(null, "", to);
+  history.replaceState(history.state, "", to);
   location.reload();
 }
 

@@ -1571,6 +1571,8 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 @keyframes char-menu-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .char-menu { animation: none; } }
 .char-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.char-switch { display: inline-flex; align-items: center; gap: 5px; padding: 2px 4px; margin: -2px -4px; color: var(--text); font: inherit; cursor: pointer; }
+.char-switch-arrow { font-size: 10px; color: var(--muted); }
 .char-row { display: flex; align-items: center; gap: 6px; }
 .char-row .char-item { flex: 1; min-width: 0; }
 .char-row .pill { flex: none; font-size: 12px; padding: 6px 9px; }

@@ -29,6 +29,8 @@ export interface Person {
   acts7: number;
   last: number | null;
   lastVia: Via | null;
+  /** 같은 사람의 부캐 (부캐 묶기: 기록을 본캐 한 줄로 합친다) */
+  alts?: string[];
 }
 
 export const VIA_NAME: Record<Via, string> = {

@@ -337,7 +337,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
       ROLE[p.role] ?? "",
       p.high_spec ? "고스펙" : "",
       p.prev_level !== null && p.level !== null && p.prev_level < p.level && p.level_at !== null && p.level_at >= week ? `이번 주 Lv.${p.prev_level}→${p.level}` : "",
-      officer && p.must_change ? "비밀번호 바꾸기 전" : "",
+      officer && p.must_change && !p.main_id ? "비밀번호 바꾸기 전" : "",
       // 누구의 부캐인지는 길드원 관리와 같이 오피서 이상과 본인에게만
       p.main_id && (officer || p.main_id === (me.owner ?? me.id)) ? `${p.main_id}의 부캐` : "",
     ].filter(Boolean);

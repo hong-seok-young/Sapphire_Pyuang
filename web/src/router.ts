@@ -15,6 +15,29 @@ function read(): Route {
   };
 }
 
+/**
+ * 앱 안에서 몇 번째 화면인지 (history.state.depth, 처음 연 화면이 0). 위 줄 ◀ 는 앱 안의 앞 화면이 있을 때만 뒤로 가고,
+ * 없으면 홈으로 간다 (제작자 요청 2026-11-01: 내 정보에서 ◀ 가 엉뚱한 화면으로 갔다. 카톡 링크로 열었으면 앱 밖으로 나갔다)
+ */
+let depth = typeof history.state?.depth === "number" ? (history.state.depth as number) : 0;
+if (typeof history.state?.depth !== "number") history.replaceState({ ...(history.state ?? {}), depth }, "");
+function markDepth() {
+  const s = history.state;
+  if (s && typeof s.depth === "number") depth = s.depth;
+  else {
+    depth += 1;
+    history.replaceState({ ...(s ?? {}), depth }, "");
+  }
+}
+window.addEventListener("hashchange", markDepth);
+window.addEventListener("popstate", markDepth);
+
+/** 위 줄 ◀: 앱 안의 앞 화면으로, 없으면 홈 */
+export function goBack() {
+  if (depth > 0) history.back();
+  else go("#/", true);
+}
+
 export function useRoute(): Route {
   const [route, setRoute] = useState(read);
   useEffect(() => {
@@ -29,7 +52,7 @@ export function useRoute(): Route {
 }
 
 export function go(to: string, replace = false) {
-  if (replace) history.replaceState(null, "", to);
+  if (replace) history.replaceState(history.state, "", to);
   else location.hash = to.replace(/^#/, "");
   if (replace) window.dispatchEvent(new HashChangeEvent("hashchange"));
 }

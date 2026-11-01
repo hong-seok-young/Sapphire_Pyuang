@@ -7,6 +7,7 @@ import { EDITION } from "./platform";
 import { useUnread } from "./alerts";
 import { JOB_NAME, errorText } from "./auth";
 import { goCharacter, useMyCharacters } from "./characters";
+import { goBack } from "./router";
 import type { Pic } from "./types";
 
 /**
@@ -48,7 +49,7 @@ export function TopBar({ title, back = true, right, star }: { title: ReactNode; 
   return (
     <header className="topbar">
       {back ? (
-        <button className="topbar-back" onClick={() => (history.length > 1 ? history.back() : (location.hash = "#/"))} aria-label="뒤로">
+        <button className="topbar-back" onClick={goBack} aria-label="뒤로">
           ◀
         </button>
       ) : (
@@ -66,32 +67,40 @@ export function TopBar({ title, back = true, right, star }: { title: ReactNode; 
   );
 }
 
-/**
- * '내 정보' 단추 (👤). 캐릭터를 묶은 사람(부캐 묶기)은 누르면 캐릭터 목록이 뜨고, 고르면 그 캐릭터의 내 정보로 간다 (제작자 요청 2026-11-01).
- * 캐릭터가 하나면 바로 내 정보
- */
+/** '내 정보' 단추 (👤): 누르면 늘 내 정보 (제작자 요청 2026-11-01. 캐릭터 바꾸기는 홈의 초록 점과 닉네임) */
 export function MeButton({ className, size }: { className: string; size: number }) {
+  return (
+    <a className={className} href="#/me" aria-label="내 정보" title="내 정보">
+      <PixelIcon name="me" size={size} />
+    </a>
+  );
+}
+
+/**
+ * 홈의 초록 점과 닉네임. 캐릭터를 묶은 사람(부캐 묶기)은 누르면 캐릭터 목록이 뜨고, 고르면 그 캐릭터로 바꿔 지금 화면을 다시 연다
+ * (제작자 요청 2026-11-01: 캐릭터 바꾸기만). 캐릭터가 하나면 그냥 글자
+ */
+export function CharacterSwitch() {
   const { current, list } = useMyCharacters();
-  const [open, setOpen] = useState(false);
+  const [at, setAt] = useState<number | null>(null);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  if (list.length < 2) {
-    return (
-      <a className={className} href="#/me" aria-label="내 정보" title="내 정보">
-        <PixelIcon name="me" size={size} />
-      </a>
-    );
-  }
+  const label = (
+    <>
+      <i className="online-dot" aria-label="로그인 중" />
+      {current}
+    </>
+  );
+  if (list.length < 2) return label;
   async function pick(id: string) {
     if (id === current) {
-      setOpen(false);
-      location.hash = "#/me";
+      setAt(null);
       return;
     }
     setBusy(id);
     setError("");
     try {
-      await goCharacter(id);
+      await goCharacter(id, location.hash || "#/");
     } catch (x) {
       setError(errorText(x));
       setBusy("");
@@ -99,13 +108,19 @@ export function MeButton({ className, size }: { className: string; size: number 
   }
   return (
     <>
-      <button className={className} onClick={() => setOpen((o) => !o)} aria-label="내 캐릭터" aria-expanded={open} title="내 캐릭터">
-        <PixelIcon name="me" size={size} />
+      <button
+        className="char-switch"
+        onClick={(e) => setAt(at === null ? e.currentTarget.getBoundingClientRect().bottom + 6 : null)}
+        aria-label="캐릭터 바꾸기"
+        aria-expanded={at !== null}
+      >
+        {label}
+        <span className="char-switch-arrow" aria-hidden="true">▾</span>
       </button>
-      {open && (
+      {at !== null && (
         <>
-          <div className="char-menu-back" onClick={() => setOpen(false)} />
-          <div className="char-menu" role="menu">
+          <div className="char-menu-back" onClick={() => setAt(null)} />
+          <div className="char-menu" role="menu" style={{ top: at }}>
             {list.map((c) => (
               <button key={c.id} className={"char-item" + (c.id === current ? " char-on" : "")} disabled={!!busy} onClick={() => pick(c.id)} role="menuitem">
                 <span className="char-name">
