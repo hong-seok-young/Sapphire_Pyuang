@@ -4,7 +4,7 @@
 // 사용자가 직접 누르는 체크일 뿐 게임은 읽지 않는다 (CLAUDE.md 게임 안전 규칙).
 import type { Env } from "./auth";
 import { weekStart } from "./week";
-import { DIGEST_TAG, NO_TODO_TITLE, digestClient, digestPost, mergeSignature, mergeTasks, tasksUntil } from "./todoDigest";
+import { DIGEST_TAG, NO_TODO_TITLE, digestClient, digestPost, mergeSignature, mergeTasks, signatureSources, tasksUntil } from "./todoDigest";
 import type { DigestOfPost, TodoTask } from "./todoDigest";
 import type Anthropic from "@anthropic-ai/sdk";
 
@@ -94,7 +94,7 @@ export async function eventTasks(env: Env, profile: { job: string | null; level:
   const madeAt = new Map(digests.map((d) => [d.id, d.made_at]));
   const titleOf = new Map(digests.map((d) => [d.id, d.title]));
   // 모은 목록이 어느 정리로 만든 것인지: 그 뒤에 다시 정리된 글은 모은 목록 대신 그 글의 할 일을 쓴다
-  const included = new Map<number, number>(merged ? (JSON.parse(merged.src) as [number, number][]) : []);
+  const included = new Map<number, number>(merged ? signatureSources(merged.src) : []);
   const fresh = (id: number) => included.has(id) && included.get(id) === madeAt.get(id);
   const out: TodoItemOut[] = [];
   for (const t of merged?.tasks ?? []) {

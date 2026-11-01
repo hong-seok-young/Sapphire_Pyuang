@@ -77,7 +77,7 @@ export function TodoPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   );
 
   const routine = routineItems(wiki, me.level);
-  const events = eventItems(data.tasks);
+  const events = eventItems(data.tasks, data.dayEnd);
   const today = [...routine.today, ...events.today];
   const week = [...routine.week, ...events.week];
 

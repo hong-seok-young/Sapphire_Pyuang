@@ -92,8 +92,8 @@ export function shortDate(ms: number): string {
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}` + (hm === "23:59" || hm === "00:00" ? "" : ` ${hm}`);
 }
 
-/** 서버의 이벤트 할 일 -> 오늘 / 이번 주 / 이벤트(한 번) 줄 */
-export function eventItems(tasks: TodoTaskOut[]): { today: TodoItem[]; week: TodoItem[]; once: TodoItem[] } {
+/** 서버의 이벤트 할 일 -> 오늘 / 이번 주 / 이벤트(한 번) 줄. 오늘 끝나는 한 번짜리(오늘 하루 핫타임 등)는 오늘 칸에 */
+export function eventItems(tasks: TodoTaskOut[], dayEnd: number): { today: TodoItem[]; week: TodoItem[]; once: TodoItem[] } {
   const out = { today: [] as TodoItem[], week: [] as TodoItem[], once: [] as TodoItem[] };
   const seen = new Set<string>();
   for (const t of tasks) {
@@ -106,7 +106,9 @@ export function eventItems(tasks: TodoTaskOut[]): { today: TodoItem[]; week: Tod
       right: t.at ?? (t.until ? "~" + shortDate(t.until) : null),
       to: `#/official/${t.post.id}`,
     };
-    (t.cycle === "d" ? out.today : t.cycle === "w" ? out.week : out.once).push(item);
+    const endsToday = t.cycle === "o" && t.until !== null && t.until <= dayEnd;
+    if (endsToday) item.right = "오늘까지";
+    (t.cycle === "d" || endsToday ? out.today : t.cycle === "w" ? out.week : out.once).push(item);
   }
   // 정해진 시각에 열리는 일은 시각 순서로 맨 아래, 마감이 가까운 이벤트가 위로
   out.today.sort((a, b) => (a.right && /^\d\d:\d\d$/.test(a.right) ? 1 : 0) - (b.right && /^\d\d:\d\d$/.test(b.right) ? 1 : 0));

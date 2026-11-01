@@ -220,7 +220,8 @@ const MERGE_SYSTEM = `너는 길드 앱 'To do' 의 이벤트 할 일을 마지�
 - 같은 이벤트의 같은 일은 한 줄로 합친다. 기간·장소·조건은 가장 정확한 것(구체적인 날짜, 더 짧은 장소 이름)을 남기고, posts 에 합친 줄의 글 번호를 모두 적는다.
 - 한 이벤트의 여러 단계는 한 줄로 (예: "김선달 주차 퀘스트", "김선달 콜라보 퀘스트", "또봉이 콜라보 퀘스트" → "김선달 콜라보 퀘스트").
 - 다른 일은 합치지 않는다. 이름이 같거나 비슷한데 다른 이벤트면(출석판이 둘 등) 이벤트 이름을 앞에 붙여 구분한다 (예: "11월 출석 보상", "또봉이 출석 보상").
-- 끝난 일(end 가 지금보다 앞)은 뺀다. 없던 일을 새로 만들지 않는다. 회차마다 기간이 다른 줄(1회차, 2회차)은 합치지 않는다.
+- 끝난 일(end 가 지금보다 앞)은 뺀다. 없던 일을 새로 만들지 않는다. 회차마다 기간이 다른 줄(1회차, 2회차)은 합치지 않고,
+  같은 이벤트를 전체 기간 한 줄로도 적은 줄이 있으면 그 줄은 빼고 회차 줄만 남긴다 (기간이 겹쳐 두 번 보이지 않게).
 - text 는 6~14자 명사형, note 는 어디서 하는지 하나만 12자 안팎. 나머지 칸(cycle, days, time, start, end, minLevel, maxLevel, jobs)은 받은 값의 뜻을 그대로 둔다.`;
 
 const MERGE_SCHEMA = {
@@ -249,10 +250,23 @@ export interface DigestOfPost {
   tasks: TodoTask[];
 }
 
-/** 모은 목록이 어느 정리들로 만든 것인지 (글 번호와 정리한 때). 같으면 다시 모으지 않는다 */
+/** 모으는 지시문의 판: 고치면 올린다 (글마다 다시 정리하지 않고 모으기만 다시 한다) */
+const MERGE_VERSION = 2;
+
+/** 모은 목록이 어느 정리들로 만든 것인지 (모으기 판, 글 번호와 정리한 때). 같으면 다시 모으지 않는다 */
 export function mergeSignature(digests: DigestOfPost[], now = Date.now()): string {
   const live = digests.filter((d) => d.tasks.some((t) => t.e === null || t.e > now)).map((d) => [d.id, d.made_at]);
-  return JSON.stringify(live.sort((a, b) => a[0] - b[0]));
+  return JSON.stringify([MERGE_VERSION, ...live.sort((a, b) => a[0] - b[0])]);
+}
+
+/** mergeSignature 에서 [글 번호, 정리한 때] 들 (예전 모양 [[id, made_at], …] 도 읽는다) */
+export function signatureSources(sig: string): [number, number][] {
+  try {
+    const v = JSON.parse(sig) as unknown[];
+    return v.filter((x): x is [number, number] => Array.isArray(x) && x.length === 2);
+  } catch {
+    return [];
+  }
 }
 
 const JOB_KO_OF: Record<string, string> = { warrior: "전사", ranger: "레인저", mage: "마법사", monk: "무도가" };
