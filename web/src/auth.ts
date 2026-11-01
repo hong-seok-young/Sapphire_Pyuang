@@ -19,9 +19,12 @@ export const switchAccount = (to: string) => api<Me>("/api/dev/switch", "POST", 
 /** 길드 안의 직책 (랭킹 마크, 내 정보, 길드원 관리). 앱개발자는 앱을 관리하는 권한일 뿐 길드 직책이 아니라서 길드원으로 보인다 (제작자 요청) */
 export const positionOf = (role: Role): Role => (role === "developer" ? "member" : role);
 
+/** 길드원 관리에서의 높이: 길드마스터와 오피서는 같다 (제작자 요청 2026-11-01) */
+const MANAGE: Record<Role, number> = { developer: 3, master: 2, officer: 2, member: 0 };
+
 /** actor 가 target 역할의 계정을 다룰 수 있는지 (서버와 같은 규칙. 화면에서 버튼을 보일지 정하는 데만 쓴다) */
 export function canManage(actor: Role, target: Role): boolean {
-  return RANK[actor] >= 1 && RANK[actor] > RANK[target];
+  return MANAGE[actor] >= 1 && MANAGE[actor] > RANK[target];
 }
 
 /** 직업 (길드 랭킹). 서버 server/auth.ts 와 같다 */

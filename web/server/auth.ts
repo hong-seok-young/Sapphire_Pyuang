@@ -1,9 +1,9 @@
 // 길드 계정: 로그인, 세션, 권한. Cloudflare Pages Functions(functions/)가 같이 쓴다.
 //
-// 역할과 권한 (높은 역할이 낮은 역할의 계정을 만들고, 지우고, 비밀번호를 초기화하고, 역할을 바꾼다)
+// 역할과 권한 (계정을 만들고, 지우고, 비밀번호를 초기화하고, 역할을 바꾼다)
 //   developer 앱개발자 (퓨앙)   : 길드마스터, 오피서, 길드원 모두
 //   master    길드마스터        : 오피서 임명/해제, 오피서와 길드원 계정
-//   officer   오피서            : 길드원 계정
+//   officer   오피서            : 길드마스터와 같다 (제작자 요청 2026-11-01: 길드원 관리는 길드마스터와 오피서가 같은 권한)
 //   member    길드원            : 없음 (자기 비밀번호만 바꾼다)
 //
 // 비밀번호는 원문을 저장하지 않고 PBKDF2-SHA256 해시만 저장한다.
@@ -290,9 +290,12 @@ export function isRole(r: unknown): r is Role {
   return typeof r === "string" && (ROLES as string[]).includes(r);
 }
 
-/** actor 가 target 역할의 계정을 다룰 수 있는지 (만들기, 지우기, 초기화, 그 역할 주기) */
+/** 길드원 관리에서의 높이: 길드마스터와 오피서는 같다 (제작자 요청 2026-11-01). 화면 web/src/auth.ts 와 같다 */
+const MANAGE: Record<Role, number> = { developer: 3, master: 2, officer: 2, member: 0 };
+
+/** actor 가 target 역할의 계정을 다룰 수 있는지 (만들기, 지우기, 초기화, 그 역할 주기). 길드마스터와 오피서는 오피서와 길드원을 다룬다 */
 export function canManage(actor: Role, target: Role): boolean {
-  return RANK[actor] >= 1 && RANK[actor] > RANK[target];
+  return MANAGE[actor] >= 1 && MANAGE[actor] > RANK[target];
 }
 
 /** 앱개발자가 혼자 시험할 때 바꿔 들어가는 테스트 계정 (functions/api/dev/switch.ts). 랭킹과 성장 랭킹에는 나오지 않는다 */

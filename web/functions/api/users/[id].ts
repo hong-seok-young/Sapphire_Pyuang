@@ -1,6 +1,6 @@
 // DELETE /api/users/:id         -> 계정 지우기 (자기보다 낮은 역할만)
-// PATCH  /api/users/:id { role } -> 역할 바꾸기 (길드마스터, 앱개발자: 오피서 임명/해제 등)
-import { FORBIDDEN, NEED_LOGIN, RANK, canManage, currentUser, isRole, json, paramId, readJson } from "../../../server/auth";
+// PATCH  /api/users/:id { role } -> 역할 바꾸기 (오피서 이상: 오피서 임명/해제 등. 오피서도 길드마스터와 같다)
+import { FORBIDDEN, NEED_LOGIN, canManage, currentUser, isRole, json, paramId, readJson } from "../../../server/auth";
 import { notify } from "../../../server/alerts";
 import type { Env, Role } from "../../../server/auth";
 
@@ -63,7 +63,6 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
 export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  if (RANK[me.role] < 2) return FORBIDDEN(); // 오피서는 역할을 바꾸지 못한다
   const user = await target(env, params);
   if (!user) return json({ error: "없는 아이디예요" }, 404);
   const body = await readJson<{ role: string }>(request);
