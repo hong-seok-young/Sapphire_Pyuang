@@ -28,6 +28,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (before > 0) {
     where.push("p.id < ?");
     binds.push(before);
+    // 고정 글은 첫 쪽에 이미 나왔다 (검색은 고정 글을 따로 올리지 않아서 그대로)
+    if (!q) where.push("p.pinned = 0");
   }
   // 첫 쪽(검색 아님)만 고정 글을 맨 위에
   const order = before === 0 && !q ? "p.pinned DESC, p.id DESC" : "p.id DESC";

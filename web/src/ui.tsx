@@ -157,8 +157,11 @@ export function FitLine({ text, shrink = 1, wrap = true, className }: {
     if (!el || !box) return;
     const fits = () => el.scrollWidth <= el.clientWidth;
     const fit = () => {
-      el.dataset.fit = "";
-      el.style.fontSize = "";
+      // 바꾼 적이 있을 때만 되돌린다 (글자 하나하나마다 레이아웃을 다시 재지 않게: 랭킹은 줄마다 두 개씩 있다)
+      if (el.dataset.fit || el.style.fontSize) {
+        el.dataset.fit = "";
+        el.style.fontSize = "";
+      }
       if (fits()) return;
       const base = parseFloat(getComputedStyle(el).fontSize);
       el.dataset.fit = "tight";
@@ -183,7 +186,8 @@ export function FitLine({ text, shrink = 1, wrap = true, className }: {
     });
     watch.observe(box);
     let alive = true;
-    document.fonts.ready.then(() => alive && fit());
+    // 글꼴을 아직 받는 중일 때만 다 받은 뒤에 한 번 더 맞춘다
+    if (document.fonts.status !== "loaded") document.fonts.ready.then(() => alive && fit());
     return () => {
       alive = false;
       watch.disconnect();

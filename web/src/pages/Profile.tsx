@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import {
   EXP_MAX, GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, MAX_LEVEL, ROLE_NAME, avatarUrl, deleteMyAvatar, errorText, expText,
-  TEST_IDS, logout, positionOf, renameAccount, requestCharacter, saveMyProfile, setMainCharacter, switchAccount,
+  TEST_IDS, fetchMe, logout, positionOf, renameAccount, requestCharacter, saveMyProfile, setMainCharacter, switchAccount,
 } from "../auth";
 import type { ChangeKind, Guild, Job, Me } from "../auth";
 import { JobEmblem, JobGlyph } from "../emblems";
@@ -459,6 +459,8 @@ function RenamePanel({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
     try {
       const r = await renameAccount(me.id, name, character);
       onMe({ id: r.id, ...(character ?? {}) });
+      // 묶은 캐릭터 목록(👤, 내 캐릭터)도 새 닉네임으로: 서버의 내 정보를 다시 받는다
+      void fetchMe().then(onMe, () => undefined);
       setDone(`'${r.id}'(으)로 바꿨어요. 다음 로그인부터 새 닉네임으로 들어와요.`);
       setNewId("");
       setSwitched(false);

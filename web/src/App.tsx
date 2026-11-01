@@ -162,7 +162,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "admin") body = RANK[me.role] >= 1 ? <AdminPage me={me} /> : <NotFound what="페이지" />;
   else if (page === "me") body = <MePage me={me} onMe={onMe} onLogout={onLogout} />;
   else if (page === "as") body = <SwitchTo me={me} who={arg} to={route.query.get("to") ?? ""} />;
-  else if (page === "ranking") body = <RankingPage me={me} />;
+  else if (page === "ranking") body = <RankingPage me={me} onMe={onMe} />;
   else if (page === "requests") body = <RequestsPage me={me} />;
   else if (page === "alerts") body = <AlertsPage developer={me.role === "developer"} />;
   else if (page === "shop") body = <PlatShopPage />;

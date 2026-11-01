@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
-import { RANK, errorText } from "../auth";
+import { ApiError, RANK, errorText } from "../auth";
 import type { Me } from "../auth";
 import {
   CATS, CAT_ICON, CAT_NAME, URL_RE, addComment, createPost, deleteComment, deleteFile, deletePost, fetchPost, fetchPosts,
@@ -59,7 +59,7 @@ function List({ me, cat }: { me: Me; cat: Cat | null }) {
     setBusy(true);
     try {
       const r = await fetchPosts({ cat, q, before: posts[posts.length - 1].id });
-      setPosts([...posts, ...r.posts]);
+      setPosts([...posts, ...r.posts.filter((p) => !posts.some((x) => x.id === p.id))]);
       setMore(r.more);
     } catch (x) {
       setError(errorText(x));
@@ -117,7 +117,7 @@ function List({ me, cat }: { me: Me; cat: Cat | null }) {
                     {p.files > 0 && ` · 📎 ${p.files}`}
                   </small>
                 </span>
-                {p.thumb && <img className="bd-thumb" src={fileUrl(p.thumb)} alt="" loading="lazy" />}
+                {p.thumb && <img className="bd-thumb" src={fileUrl(p.thumb)} alt="" loading="lazy" decoding="async" width={56} height={56} />}
               </a>
             </li>
           ))}
@@ -432,6 +432,9 @@ function Write({ me, cat: startCat, editId }: { me: Me; cat?: Cat; editId?: numb
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [loaded, setLoaded] = useState(!editId);
+  // 이미 만든 글 번호: 사진 올리기가 중간에 실패해도 다시 누르면 글을 또 만들지 않고 이어서 올린다
+  const created = useRef<number | null>(null);
+  const previews = useRef(new Set<string>());
 
   useEffect(() => {
     if (!editId) return;
@@ -446,41 +449,67 @@ function Write({ me, cat: startCat, editId }: { me: Me; cat?: Cat; editId?: numb
       (x) => setError(errorText(x)),
     );
   }, [editId]);
-  useEffect(() => () => added.forEach((f) => f.preview && URL.revokeObjectURL(f.preview)), [added]);
+  useEffect(() => () => previews.current.forEach((u) => URL.revokeObjectURL(u)), []);
+  function dropAdded(key: string) {
+    setAdded((list) => {
+      const f = list.find((x) => x.key === key);
+      if (f?.preview) {
+        URL.revokeObjectURL(f.preview);
+        previews.current.delete(f.preview);
+      }
+      return list.filter((x) => x.key !== key);
+    });
+  }
 
   const count = old.length - removed.length + added.length;
   function pick(list: FileList | null, photo: boolean) {
     if (!list) return;
     const room = 10 - count;
-    const next = [...list].slice(0, Math.max(0, room)).map((file) => ({
-      key: `${file.name}-${file.size}-${Math.random()}`,
-      file,
-      photo: photo && file.type.startsWith("image/"),
-      preview: photo && file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
-    }));
+    const next = [...list].slice(0, Math.max(0, room)).map((file) => {
+      const preview = photo && file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
+      if (preview) previews.current.add(preview);
+      return { key: `${file.name}-${file.size}-${Math.random()}`, file, photo: photo && file.type.startsWith("image/"), preview };
+    });
     if (list.length > room) setError("사진과 파일은 글 하나에 10개까지예요");
     setAdded([...added, ...next]);
   }
 
   async function save() {
     if (!title.trim()) return setError("제목을 적어 주세요");
+    // 글을 올리기 전에 먼저 확인한다: 큰 파일, 줄이지 못하는 사진 (글만 올라가고 멈추지 않게)
+    const big = added.find((f) => !f.photo && f.file.size > 1_900_000);
+    if (big) return setError(`${big.file.name}: 파일은 1.9MB 까지예요`);
     setError("");
     try {
-      setBusy("글을 올리는 중…");
-      let id = editId;
-      if (id) await updatePost(id, { title, body });
-      else id = (await createPost(cat, title, body)).id;
-      for (const fid of removed) await deleteFile(fid);
+      const ready: { key: string; blob: Blob; name: string; photo: boolean }[] = [];
       for (let i = 0; i < added.length; i++) {
         const f = added[i];
-        setBusy(`${f.photo ? "사진" : "파일"} 올리는 중… ${i + 1}/${added.length}`);
         if (f.photo) {
+          setBusy(`사진 준비 중… ${i + 1}/${added.length}`);
           const { blob, name } = await shrinkPhoto(f.file);
-          await uploadFile(id, blob, name);
-        } else {
-          if (f.file.size > 1_900_000) throw new Error(`${f.file.name}: 파일은 1.9MB 까지예요`);
-          await uploadFile(id, f.file, f.file.name);
-        }
+          ready.push({ key: f.key, blob, name, photo: true });
+        } else ready.push({ key: f.key, blob: f.file, name: f.file.name, photo: false });
+      }
+      setBusy("글을 올리는 중…");
+      let id = editId ?? created.current;
+      if (id) await updatePost(id, { title, body });
+      else {
+        id = (await createPost(cat, title, body)).id;
+        created.current = id;
+      }
+      // 한 단계씩 끝날 때마다 화면에서도 빼서, 실패한 뒤 다시 누르면 남은 것만 한다
+      for (const fid of removed) {
+        await deleteFile(fid).catch((x) => {
+          if (!(x instanceof ApiError && x.status === 404)) throw x; // 이미 지운 파일
+        });
+        setRemoved((r) => r.filter((v) => v !== fid));
+        setOld((o) => o.filter((f) => f.id !== fid));
+      }
+      for (let i = 0; i < ready.length; i++) {
+        const r = ready[i];
+        setBusy(`${r.photo ? "사진" : "파일"} 올리는 중… ${i + 1}/${ready.length}`);
+        await uploadFile(id, r.blob, r.name);
+        dropAdded(r.key);
       }
       go(`#/board/${id}`, true);
     } catch (x) {
@@ -541,7 +570,7 @@ function Write({ me, cat: startCat, editId }: { me: Me; cat?: Cat; editId?: numb
             {added.map((f) => (
               <li key={f.key}>
                 {f.preview ? <img src={f.preview} alt="" /> : <span>📎 {f.file.name} <small>{sizeText(f.file.size)}</small></span>}
-                <button type="button" aria-label="빼기" onClick={() => setAdded(added.filter((x) => x.key !== f.key))}>
+                <button type="button" aria-label="빼기" onClick={() => dropAdded(f.key)}>
                   ✕
                 </button>
               </li>

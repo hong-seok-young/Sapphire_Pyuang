@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { RANK, errorText } from "../auth";
+import { ApiError, RANK, errorText } from "../auth";
 import type { Me } from "../auth";
 import { useAsync } from "../data";
 import { MARKET_PIC, MAX_PRICE, ago, goldText, goldWords } from "../market";
@@ -106,7 +106,7 @@ function RequestForm({ onDone }: { onDone: () => void }) {
 }
 
 /** 누른 의뢰: 자세히, 진행 상황, 할 일 (수락, 포기, 수락 취소, 완료, 다시 모집, 내리기) */
-function RequestDetail({ me, r, onChanged }: { me: Me; r: GuildRequest; onChanged: (next: GuildRequest | null) => void }) {
+function RequestDetail({ me, r, onChanged, onStale }: { me: Me; r: GuildRequest; onChanged: (next: GuildRequest | null) => void; onStale?: () => void }) {
   const mine = r.owner === me.id;
   const accepter = r.accepter === me.id;
   const manager = RANK[me.role] >= 1;
@@ -121,6 +121,8 @@ function RequestDetail({ me, r, onChanged }: { me: Me; r: GuildRequest; onChange
       onChanged(await actOnRequest(r.id, action));
     } catch (x) {
       setError(errorText(x));
+      // 그사이 다른 길드원이 수락했거나 끝났으면 목록을 다시 받는다 (수락 단추가 남아 있지 않게)
+      if (x instanceof ApiError && x.status === 409) onStale?.();
     } finally {
       setBusy(false);
     }
@@ -270,7 +272,7 @@ export function RequestsPage({ me }: { me: Me }) {
                   <small>{ago(r.createdAt)}</small>
                 </span>
               </button>
-              {open === r.id && <RequestDetail me={me} r={r} onChanged={(next) => changed(r.id, next)} />}
+              {open === r.id && <RequestDetail me={me} r={r} onChanged={(next) => changed(r.id, next)} onStale={() => setReload((n) => n + 1)} />}
             </li>
           ))}
         </ul>

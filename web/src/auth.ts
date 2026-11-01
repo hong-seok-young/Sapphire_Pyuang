@@ -121,6 +121,8 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** 서버가 오류와 같이 준 값 (예: 입찰이 밀렸을 때 지금 최고가) */
+    readonly data?: Record<string, unknown>,
   ) {
     super(message);
   }
@@ -140,7 +142,7 @@ export async function api<T>(path: string, method = "GET", body?: unknown): Prom
     throw new ApiError(0, "인터넷 연결을 확인해 주세요");
   }
   const data = (await res.json().catch(() => ({}))) as { error?: string };
-  if (!res.ok) throw new ApiError(res.status, data.error ?? `문제가 생겼어요 (${res.status})`);
+  if (!res.ok) throw new ApiError(res.status, data.error ?? `문제가 생겼어요 (${res.status})`, data as Record<string, unknown>);
   return data as T;
 }
 

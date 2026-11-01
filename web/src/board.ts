@@ -108,19 +108,31 @@ export async function uploadFile(postId: number, file: Blob, name: string): Prom
 /** 사진은 긴 변 1600px, JPEG 로 줄여서 올린다 (움직이는 GIF 는 그대로). 1.9MB 를 넘으면 더 줄인다 */
 export async function shrinkPhoto(file: File): Promise<{ blob: Blob; name: string }> {
   if (file.type === "image/gif" && file.size <= 1_900_000) return { blob: file, name: file.name };
-  const bitmap = await createImageBitmap(file);
-  let side = 1600;
-  for (let i = 0; i < 4; i++) {
-    const k = Math.min(1, side / Math.max(bitmap.width, bitmap.height));
-    const c = document.createElement("canvas");
-    c.width = Math.round(bitmap.width * k);
-    c.height = Math.round(bitmap.height * k);
-    c.getContext("2d")!.drawImage(bitmap, 0, 0, c.width, c.height);
-    const blob = await new Promise<Blob | null>((ok) => c.toBlob(ok, "image/jpeg", 0.85));
-    if (blob && blob.size <= 1_900_000) return { blob, name: file.name.replace(/\.\w+$/, "") + ".jpg" };
-    side = Math.round(side * 0.7);
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error(`${file.name}: 열 수 없는 사진이에요`);
   }
-  throw new Error("사진이 너무 커요");
+  try {
+    let side = 1600;
+    for (let i = 0; i < 4; i++) {
+      const k = Math.min(1, side / Math.max(bitmap.width, bitmap.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(bitmap.width * k);
+      c.height = Math.round(bitmap.height * k);
+      const ctx = c.getContext("2d");
+      if (!ctx) throw new Error("사진을 줄이지 못했어요. 사진 수를 줄여 다시 해 주세요");
+      ctx.drawImage(bitmap, 0, 0, c.width, c.height);
+      const blob = await new Promise<Blob | null>((ok) => c.toBlob(ok, "image/jpeg", 0.85));
+      c.width = c.height = 0;
+      if (blob && blob.size <= 1_900_000) return { blob, name: file.name.replace(/\.\w+$/, "") + ".jpg" };
+      side = Math.round(side * 0.7);
+    }
+    throw new Error("사진이 너무 커요");
+  } finally {
+    bitmap.close();
+  }
 }
 
 export const sizeText = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1000))}KB`);

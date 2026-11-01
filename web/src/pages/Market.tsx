@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { JOB_NAME, RANK, ROLE_NAME, errorText, positionOf } from "../auth";
+import { ApiError, JOB_NAME, RANK, ROLE_NAME, errorText, positionOf } from "../auth";
 import type { Me } from "../auth";
 import { useAsync } from "../data";
 import {
@@ -301,10 +301,21 @@ function Detail({ wiki, me, l, rate, onChanged }: {
                     disabled={busy || bidN <= (l.highestBid ?? l.price - 1)}
                     onClick={() =>
                       run(async () => {
-                        const r = await bidListing(l.id, bidN);
-                        const next = { ...l, ...r };
-                        onChanged(next);
-                        setBid(String(nextBid(next)));
+                        try {
+                          const r = await bidListing(l.id, bidN);
+                          const next = { ...l, ...r };
+                          onChanged(next);
+                          setBid(String(nextBid(next)));
+                        } catch (x) {
+                          // 그사이 누가 더 높게 불렀으면 지금 최고가로 바꾸고 다음 입찰가를 다시 권한다
+                          const top = x instanceof ApiError ? x.data?.highestBid : undefined;
+                          if (typeof top === "number") {
+                            const next = { ...l, highestBid: top };
+                            onChanged(next);
+                            setBid(String(nextBid(next)));
+                          }
+                          throw x;
+                        }
                       })
                     }
                   >

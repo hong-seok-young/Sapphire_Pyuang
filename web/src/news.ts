@@ -44,16 +44,27 @@ function save(seen: Record<NewsKey, number>) {
   }
 }
 
-/** 서버에 새 것의 수를 묻는다 (실패하면 그대로) */
-export async function refreshNews() {
-  if (!user) return;
+let inflight: { q: string; p: Promise<void> } | null = null;
+
+/** 서버에 새 것의 수를 묻는다 (실패하면 그대로). 같은 것을 이미 묻는 중이면 그 답을 같이 쓴다 (앱을 열 때 두 번 물었다) */
+export function refreshNews(): Promise<void> {
+  if (!user) return Promise.resolve();
   const seen = seenAll();
   const q = KEYS.map((k) => `${k}=${seen[k]}`).join("&");
-  const r = await api<Counts>(`/api/news?${q}`).catch(() => null);
-  if (r && user) {
-    counts = { board: r.board ?? 0, market: r.market ?? 0, requests: r.requests ?? 0 };
-    emit();
-  }
+  if (inflight?.q === q) return inflight.p;
+  const p = api<Counts>(`/api/news?${q}`)
+    .catch(() => null)
+    .then((r) => {
+      if (r && user) {
+        counts = { board: r.board ?? 0, market: r.market ?? 0, requests: r.requests ?? 0 };
+        emit();
+      }
+    })
+    .finally(() => {
+      if (inflight?.p === p) inflight = null;
+    });
+  inflight = { q, p };
+  return p;
 }
 
 /** 로그인한 사람으로 시작 (2분마다, 앱으로 돌아올 때 다시 묻는다) */

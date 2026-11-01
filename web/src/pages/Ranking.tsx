@@ -98,7 +98,7 @@ function NickButton({ open, onToggle, ...nick }: { id: string; high?: boolean; c
   );
 }
 
-function Row({ r, me, now, open, onToggle }: { r: Ranked; me: Me; now: number; open: boolean; onToggle: () => void }) {
+function Row({ r, me, now, open, onToggle, onMe }: { r: Ranked; me: Me; now: number; open: boolean; onToggle: () => void; onMe?: (p: Partial<Me>) => void }) {
   const up = recentUp(r, now);
   return (
     <li className={"rank-row" + (r.rank <= 3 ? " rank-top-" + r.rank : "") + (r.id === me.id ? " rank-mine" : "")}>
@@ -111,7 +111,7 @@ function Row({ r, me, now, open, onToggle }: { r: Ranked; me: Me; now: number; o
         <FitLine className="rank-sub" text={`${guildText(r.guild)} · ${JOB_NAME[r.job]}`} wrap={false} />
         {/* 닉네임은 10글자까지: 넘치면 글자를 줄여서 한 줄에 다 보인다 (자르지 않는다) */}
         <NickButton className="rank-nick" id={r.id} high={r.highSpec} open={open} onToggle={onToggle} />
-        <ExpBar r={r} mine={r.id === me.id} />
+        <ExpBar r={r} mine={r.id === me.id} onMe={onMe} />
       </span>
       {/* 레벨업 표시 자리는 늘 비워 두어서 표시가 떠도 닉네임이 밀리지 않는다 */}
       <span className="rank-up-slot">
@@ -131,7 +131,7 @@ function Row({ r, me, now, open, onToggle }: { r: Ranked; me: Me; now: number; o
  * 닉네임 아래 경험치 막대 (0~100%, 제작자 요청). 안 적었으면 막대 없이 '경험치 입력 안 했어요'.
  * 내 줄이면 눌러서 랭킹 화면에서 바로 적는다 (직업, 레벨, 길드는 그대로 두고 경험치만 저장)
  */
-function ExpBar({ r, mine }: { r: Ranked; mine: boolean }) {
+function ExpBar({ r, mine, onMe }: { r: Ranked; mine: boolean; onMe?: (p: Partial<Me>) => void }) {
   const [exp, setExp] = useState<number | null>(r.exp ?? null);
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(r.exp != null ? (r.exp / 1000).toFixed(3) : "");
@@ -152,6 +152,7 @@ function ExpBar({ r, mine }: { r: Ranked; mine: boolean }) {
     setError("");
     try {
       await saveMyProfile(r.job, r.level, value, r.guild, change);
+      onMe?.({ exp: value });
       setAsking(false);
       setExp(value);
       setEditing(false);
@@ -209,7 +210,9 @@ function ExpBar({ r, mine }: { r: Ranked; mine: boolean }) {
 }
 
 /** 레벨 랭킹: 게임의 경험치 랭킹 목록처럼 (메달, 엠블럼, 맨 아래 '내순위'). 길드(통합/1군/2군)와 직업으로 거른다 */
-function LevelRanking({ me, data, guild, onGuild }: { me: Me; data: RankEntry[]; guild: GuildFilter; onGuild: (g: GuildFilter) => void }) {
+function LevelRanking({ me, data, guild, onGuild, onMe }: {
+  me: Me; data: RankEntry[]; guild: GuildFilter; onGuild: (g: GuildFilter) => void; onMe?: (p: Partial<Me>) => void;
+}) {
   const [filter, setFilter] = useState<Job | "all">("all");
   const [openId, setOpenId] = useState<string | null>(null);
   const now = Date.now();
@@ -282,7 +285,7 @@ function LevelRanking({ me, data, guild, onGuild }: { me: Me; data: RankEntry[];
         <ul className="rank-list">
           {list.map((r) => (
             <Fragment key={r.id}>
-              <Row r={r} me={me} now={now} open={openId === r.id} onToggle={() => setOpenId(openId === r.id ? null : r.id)} />
+              <Row r={r} me={me} now={now} open={openId === r.id} onToggle={() => setOpenId(openId === r.id ? null : r.id)} onMe={onMe} />
               {openId === r.id && (
                 <li className="rank-chart">
                   <GrowthChart id={r.id} />
@@ -336,7 +339,7 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
   const { data, error } = useAsync(useCallback(() => fetchGrowth(period), [period]));
   const [openId, setOpenId] = useState<string | null>(null);
   const toggle = (id: string) => setOpenId(openId === id ? null : id);
-  if (!data) return <Loading error={error} />;
+  if (!data || data.period !== period) return <Loading error={error} />;
   const entries = guild === "all" ? data.entries : data.entries.filter((e) => e.guild === guild);
   const [first, ...rest] = entries;
   const mine = entries.findIndex((e) => e.id === me.id);
@@ -411,7 +414,7 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
  * 그 사람의 레벨·경험치 그래프가 그 줄 아래에 펼쳐진다 (GrowthChart).
  */
 
-export function RankingPage({ me }: { me: Me }) {
+export function RankingPage({ me, onMe }: { me: Me; onMe?: (p: Partial<Me>) => void }) {
   const { data, error } = useAsync(useCallback(() => fetchRanking(), []));
   const [view, setView] = useState<View>("level");
   const [guild, setGuild] = useState<GuildFilter>("all");
@@ -438,7 +441,7 @@ export function RankingPage({ me }: { me: Me }) {
       {view !== "level" ? (
         <GrowthRanking me={me} period={view} guild={guild} onGuild={setGuild} />
       ) : data ? (
-        <LevelRanking me={me} data={data} guild={guild} onGuild={setGuild} />
+        <LevelRanking me={me} data={data} guild={guild} onGuild={setGuild} onMe={onMe} />
       ) : (
         <Loading error={error} />
       )}

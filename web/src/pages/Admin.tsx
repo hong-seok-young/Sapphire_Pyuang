@@ -72,18 +72,24 @@ export function AdminPage({ me }: { me: Me }) {
   }
 
   const [signups, setSignups] = useState<SignupRequest[]>([]);
-  const reload = useCallback(() => {
-    listAccounts().then(setAccounts, (e) => setError(errorText(e)));
-    listSignups().then(setSignups, () => setSignups([]));
-  }, []);
-  useEffect(reload, [reload]);
+  const reload = useCallback(
+    () =>
+      Promise.all([
+        listAccounts().then(setAccounts, (e) => setError(errorText(e))),
+        listSignups().then(setSignups, () => setSignups([])),
+      ]).then(() => undefined),
+    [],
+  );
+  useEffect(() => {
+    void reload();
+  }, [reload]);
 
   async function run(action: () => Promise<void>) {
     setBusy(true);
     setError("");
     try {
       await action();
-      reload();
+      await reload();
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -244,11 +250,25 @@ function AccountRow({
   onDelete: () => void;
   onLink: (other: string, main: string) => void;
   onUnlink: () => void;
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
   const [photoError, setPhotoError] = useState("");
+  // 이 줄에서 하는 일 (고스펙, 사진 삭제, 본캐 지정, 닉네임 변경): 끝나고 목록을 다시 받을 때까지 단추를 막는다
+  const [acting, setActing] = useState(false);
+  async function act(fn: () => Promise<unknown>) {
+    setActing(true);
+    setPhotoError("");
+    try {
+      await fn();
+      await onChanged();
+    } catch (x) {
+      setPhotoError(errorText(x));
+    } finally {
+      setActing(false);
+    }
+  }
   const [growthLog, setGrowthLog] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [newId, setNewId] = useState("");
@@ -314,32 +334,16 @@ function AccountRow({
             {/* 고스펙 표시: 랭킹에 '고스펙', 플래티넘 상점에서 고스펙 할인가 (제작자 요청) */}
             <button
               className={"pill" + (account.highSpec ? " pill-on" : "")}
-              disabled={busy}
-              onClick={async () => {
-                setPhotoError("");
-                try {
-                  await setHighSpec(account.id, !account.highSpec);
-                  onChanged();
-                } catch (x) {
-                  setPhotoError(errorText(x));
-                }
-              }}
+              disabled={busy || acting}
+              onClick={() => act(() => setHighSpec(account.id, !account.highSpec))}
             >
               고스펙
             </button>
             {account.avatar && (
               <button
                 className="pill"
-                disabled={busy}
-                onClick={async () => {
-                  setPhotoError("");
-                  try {
-                    await deleteAvatarOf(account.id);
-                    onChanged();
-                  } catch (x) {
-                    setPhotoError(errorText(x));
-                  }
-                }}
+                disabled={busy || acting}
+                onClick={() => act(() => deleteAvatarOf(account.id))}
               >
                 사진 삭제
               </button>
@@ -354,16 +358,8 @@ function AccountRow({
                 {/* 주력 캐릭터가 바뀌면 이 부캐를 본캐로 (비밀번호는 그대로, 로그인 아이디만 바뀐다) */}
                 <button
                   className="pill"
-                  disabled={busy}
-                  onClick={async () => {
-                    setPhotoError("");
-                    try {
-                      await setMainCharacter(account.id);
-                      onChanged();
-                    } catch (x) {
-                      setPhotoError(errorText(x));
-                    }
-                  }}
+                  disabled={busy || acting}
+                  onClick={() => act(() => setMainCharacter(account.id))}
                 >
                   본캐 지정
                 </button>
@@ -412,17 +408,13 @@ function AccountRow({
               />
               <button
                 className="pill"
-                disabled={busy || !newId.trim()}
-                onClick={async () => {
-                  setPhotoError("");
-                  try {
+                disabled={busy || acting || !newId.trim()}
+                onClick={() =>
+                  act(async () => {
                     await renameAccount(account.id, newId.trim());
                     setRenaming(false);
-                    onChanged();
-                  } catch (x) {
-                    setPhotoError(errorText(x));
-                  }
-                }}
+                  })
+                }
               >
                 변경
               </button>
@@ -451,7 +443,7 @@ function AccountRow({
               onSave={async (job, level, _exp, guild, change) => {
                 await saveProfileOf(account.id, job, level, guild, change);
                 setEditing(false);
-                onChanged();
+                await onChanged();
               }}
             />
           )}
@@ -519,7 +511,7 @@ const stamp = (t: number) => {
  * 성장 기록 바로잡기 (제작자 요청: 잘못 쓴 것을 고쳤는데 레벨업·경험치 오름으로 잡힌 기록).
  * 레벨·경험치를 저장한 기록을 최근 것부터 보이고, 잘못 들어간 기록을 지우면 성장 랭킹이 다시 계산된다. 레벨업 ▲ 표시도 지울 수 있다
  */
-function GrowthLog({ id, onChanged }: { id: string; onChanged: () => void }) {
+function GrowthLog({ id, onChanged }: { id: string; onChanged: () => Promise<void> }) {
   const [log, setLog] = useState<LevelLogEntry[] | null>(null);
   const [badge, setBadge] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -541,7 +533,7 @@ function GrowthLog({ id, onChanged }: { id: string; onChanged: () => void }) {
     try {
       await fn();
       load();
-      onChanged();
+      await onChanged();
     } catch (x) {
       setError(errorText(x));
     } finally {
