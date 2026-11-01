@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import {
   EXP_MAX, GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, MAX_LEVEL, ROLE_NAME, avatarUrl, deleteMyAvatar, errorText, expText,
-  TEST_IDS, logout, positionOf, renameAccount, requestCharacter, saveMyProfile, switchAccount,
+  TEST_IDS, logout, positionOf, renameAccount, requestCharacter, saveMyProfile, setMainCharacter, switchAccount,
 } from "../auth";
 import type { ChangeKind, Guild, Job, Me } from "../auth";
 import { JobEmblem, JobGlyph } from "../emblems";
@@ -336,7 +336,7 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
 }
 
 /**
- * 내 캐릭터 (부캐 묶기, 제작자 요청 2026-11-01): 묶은 캐릭터 목록(눌러서 바꾸기)과 '캐릭터 추가' 요청.
+ * 내 캐릭터 (부캐 묶기, 제작자 요청 2026-11-01): 묶은 캐릭터 목록(눌러서 바꾸기, 부캐 옆 '본캐 지정')과 '캐릭터 추가' 요청.
  * 추가한 캐릭터는 길드마스터·오피서가 '길드원 관리'에서 승낙해야 생긴다. 로그인은 본캐 아이디와 비밀번호로
  */
 function CharactersPanel({ me }: { me: Me }) {
@@ -365,22 +365,38 @@ function CharactersPanel({ me }: { me: Me }) {
       {list.length > 1 && (
         <div className="char-list">
           {list.map((c) => (
-            <button
-              key={c.id}
-              className={"char-item" + (c.id === me.id ? " char-on" : "")}
-              disabled={busy}
-              onClick={() => c.id !== me.id && run(() => goCharacter(c.id))}
-            >
-              <span className="char-name">
-                <b>{c.id}</b>
-                <small>
-                  {c.main ? "본캐 (로그인 아이디)" : "부캐"}
-                  {c.level ? ` · Lv.${c.level}` : ""}
-                  {c.job ? ` ${JOB_NAME[c.job]}` : ""}
-                </small>
-              </span>
-              <span className="char-mark">{c.id === me.id ? "✓" : ""}</span>
-            </button>
+            <div key={c.id} className="char-row">
+              <button
+                className={"char-item" + (c.id === me.id ? " char-on" : "")}
+                disabled={busy}
+                onClick={() => c.id !== me.id && run(() => goCharacter(c.id))}
+              >
+                <span className="char-name">
+                  <b>{c.id}</b>
+                  <small>
+                    {c.main ? "본캐 (로그인 아이디)" : "부캐"}
+                    {c.level ? ` · Lv.${c.level}` : ""}
+                    {c.job ? ` ${JOB_NAME[c.job]}` : ""}
+                  </small>
+                </span>
+                <span className="char-mark">{c.id === me.id ? "✓" : ""}</span>
+              </button>
+              {/* 주력 캐릭터가 바뀌면 본캐를 바꾼다 (제작자 요청): 비밀번호는 그대로, 로그인 아이디만 이 캐릭터로 */}
+              {!c.main && (
+                <button
+                  className="pill"
+                  disabled={busy}
+                  onClick={() =>
+                    run(async () => {
+                      await setMainCharacter(c.id);
+                      await goCharacter(me.id); // 지금 캐릭터 그대로 새로 연다 (캐릭터를 바꾼 것처럼 오픈 축하는 다시 안 띄운다)
+                    })
+                  }
+                >
+                  본캐 지정
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}

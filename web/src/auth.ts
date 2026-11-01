@@ -171,6 +171,8 @@ export const linkAccounts = (id: string, other: string, main: string) =>
 /** 부캐를 떼어 따로 로그인하게 (처음 비밀번호 123123) */
 export const unlinkAccount = (id: string) =>
   api<{ id: string; tempPassword: string }>(`/api/users/${encodeURIComponent(id)}/link`, "DELETE");
+/** 이 부캐를 본캐로 (본인 또는 관리자). 비밀번호는 그대로, 로그인 아이디만 바뀐다 */
+export const setMainCharacter = (id: string) => api<{ ok: true; main: string }>(`/api/users/${encodeURIComponent(id)}/main`, "POST");
 /** 내 캐릭터 추가 요청 (운영진이 승낙하면 부캐가 된다) */
 export const requestCharacter = (id: string) => api<{ ok: true; id: string }>("/api/characters", "POST", { id });
 /** 내 다른 캐릭터로 바꾸기 */

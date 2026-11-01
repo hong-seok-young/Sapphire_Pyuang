@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
   ROLE_NAME, canManage, createAccount, decideSignup, deleteAccount, errorText, linkAccounts, listAccounts, listSignups, positionOf, renameAccount,
-  resetPassword, setRole, unlinkAccount,
+  resetPassword, setMainCharacter, setRole, unlinkAccount,
 } from "../auth";
 import type { SignupRequest } from "../auth";
 import type { Account, Me, Role } from "../auth";
@@ -350,9 +350,27 @@ function AccountRow({
               </button>
             )}
             {account.mainId && (isMine(account) || canManage(me.role, account.role)) && (
-              <button className="pill" disabled={busy} onClick={onUnlink}>
-                통합 해제
-              </button>
+              <>
+                {/* 주력 캐릭터가 바뀌면 이 부캐를 본캐로 (비밀번호는 그대로, 로그인 아이디만 바뀐다) */}
+                <button
+                  className="pill"
+                  disabled={busy}
+                  onClick={async () => {
+                    setPhotoError("");
+                    try {
+                      await setMainCharacter(account.id);
+                      onChanged();
+                    } catch (x) {
+                      setPhotoError(errorText(x));
+                    }
+                  }}
+                >
+                  본캐 지정
+                </button>
+                <button className="pill" disabled={busy} onClick={onUnlink}>
+                  통합 해제
+                </button>
+              </>
             )}
             {manageable && (
               <>
