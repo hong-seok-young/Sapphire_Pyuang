@@ -1,0 +1,47 @@
+# 컴투스 공식 소식 받기 (제작자 요청 2026-11-01): 아이모 공식 홈페이지(withhive.com)의 공지사항·점검·이벤트를
+# 30분마다 받아 계정 DB(D1)의 official_news 에 넣는다 (web/scripts/fetch-official.mjs). 처음이거나 '모든 쪽'을 고르면 전부 받는다.
+# 위키의 '정보 > 공식 소식'과 챗봇이 이 자료를 쓴다. 비밀값은 배포(deploy-web.yml)와 같은 CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID.
+# 공개 저장소라 실행 기록에는 받은 개수만 찍는다.
+name: Official news
+
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+    inputs:
+      all:
+        description: "모든 쪽 다시 받기"
+        type: boolean
+        default: false
+
+concurrency:
+  group: official-news
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        working-directory: web
+        run: npm ci
+
+      - name: Fetch official news
+        working-directory: web
+        run: node scripts/fetch-official.mjs ${{ inputs.all && '--all' || '' }}

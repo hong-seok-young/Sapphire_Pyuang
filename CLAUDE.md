@@ -200,6 +200,20 @@
 - 챗봇: 확률을 묻거나 질문의 이름이 공식 표에 나오면 그 표를 '[컴투스 공식 확률: …]' 로 붙인다 (`chat.ts` 3-1, 표 2개, 1500자씩).
 - 확률이 바뀌면(패치, 새 상자) 스크립트로 다시 받아 자료 저장소에 올리고 배포한다.
 
+## 공식 소식 (제작자 요청 2026-11-01: 공홈의 공지사항, 이벤트, 정기 점검도 읽어 오게)
+- 아이모 공식 홈페이지의 공지·이벤트는 HIVE(withhive.com, 아이모 게임 번호 32)에 있다 (미니사이트 event.com2us.com 은 링크만).
+  공개 페이지가 쓰는 목록 주소 `POST https://withhive.com/api/notice/list/32` (`page=&type=&rows=`, type 비움 = 공지사항(공지 N, 점검 C, 안내 I, 오류 D),
+  E = 이벤트, 한국어는 쿠키 `language=ko`, 본문 HTML 이 같이 온다)를 `web/scripts/fetch-official.mjs` 가 불러 D1 `official_news` 에 넣는다
+  (본문은 그림과 꾸밈을 뺀 글자만, 바뀐 것만 고침, 지우지 않음).
+- GitHub Actions `.github/workflows/official-news.yml` 이 30분마다 최근 것(쪽마다 30개)을 받고, 표가 비었거나 '모든 쪽 다시 받기'로 돌리면 전부 받는다
+  (비밀값은 배포와 같은 CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID). Pages Functions 는 무료 요금제 CPU 한도 때문에 받아 오기를 하지 않는다.
+- 화면: '정보' > '📢 공식 소식' (`#/official?t=notice|maint|event`, `web/src/pages/Official.tsx`, `/api/official`): 공지사항·점검·이벤트 칸,
+  종류 표, 제목, 날짜(이벤트 끝나는 날이 있으면 진행 중/종료), 이틀 안의 글은 NEW, 누르면 공식 페이지(withhive.com/notice|event/32/번호)가 새 창으로.
+  본문은 앱에 띄우지 않는다 (공식 글은 공식 페이지에서 본다).
+- 챗봇: 질문에 점검, 패치, 이벤트, 쿠폰, 공지 같은 말이 있으면 서버가 최근 공식 글 30개 목록과 맞는 글 3개까지의 본문을
+  `<컴투스 공식 소식>` 으로 붙인다 (`server/official.ts` `officialContext`). 답에 공식 주소를 출처로 밝힌다.
+- 공식 홈페이지의 공개 글을 읽을 뿐 게임은 읽지 않아서 게임 안전 규칙에 맞는다.
+
 ## 패치 내역 (제작자 요청 2026-10-31)
 - 홈의 아래 탭 챗봇 아이콘 바로 위에 아주 작게 'v1.0' (`.home-version`, 화면에 고정, 그 탭 오른쪽 끝에 맞춰 잘리지 않게, 제작자 요청 2026-11-01) (`web/src/patchnotes.ts` 의 맨 위 버전). 누르면 `#/patch` 에서 처음 버전(v1.1)부터의 패치 내역.
 - 2026-11-01 클로즈베타(v1.1 ~ v1.26)를 끝내고 정식 오픈 v1.0 (제작자 요청). 그 뒤 새 버전은 v1.01, v1.02 … 로 올린다.

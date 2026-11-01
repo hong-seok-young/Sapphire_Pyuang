@@ -1594,3 +1594,19 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 .link-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .link-list .pill { font-size: 12px; padding: 5px 9px; }
 .alert-who { flex: none; margin-right: 6px; padding: 1px 6px; font-size: 11px; color: var(--sapphire); border: 1px solid var(--sapphire); }
+/* official news from the IMO homepage (Official.tsx) */
+.off-list { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; }
+.off-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; background: var(--panel); border: var(--px) solid var(--edge); color: var(--text); }
+.off-ended { opacity: 0.6; }
+.off-thumb { flex: none; width: 84px; height: 47px; object-fit: cover; border: 1px solid var(--edge); background: var(--lo); }
+.off-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.off-head { display: flex; align-items: center; gap: 6px; }
+.off-type { font-size: 11px; padding: 1px 6px; border: 1px solid var(--edge); background: var(--panel-2); color: var(--muted); }
+.off-type-N { color: var(--sapphire); }
+.off-type-C { color: #ffb36b; }
+.off-type-D { color: var(--red); }
+.off-type-E { color: var(--gold); }
+.off-new { font-size: 10px; padding: 1px 5px; color: var(--edge); background: #7fe0a0; }
+.off-title { font-size: 14px; font-weight: 400; line-height: 1.35; }
+.off-main small { font-size: 11px; color: var(--muted); }
+.off-go { flex: none; color: var(--muted); }

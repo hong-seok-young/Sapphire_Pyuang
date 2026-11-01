@@ -411,3 +411,18 @@ CREATE TABLE IF NOT EXISTS signup_requests (
   created_at INTEGER NOT NULL,
   owner TEXT                              -- '내 정보'의 캐릭터 추가 요청이면 요청한 사람의 본캐 (승낙하면 그 사람의 부캐가 된다)
 );
+
+-- 컴투스 공식 소식 (제작자 요청 2026-11-01): withhive.com 아이모 공지사항·점검·이벤트. scripts/fetch-official.mjs 가 30분마다 받아 넣는다
+-- (.github/workflows/official-news.yml). 화면 '정보 > 공식 소식'은 제목과 날짜만 보이고 누르면 공식 페이지, 챗봇은 본문 글자로 답한다. 지우지 않는다
+CREATE TABLE IF NOT EXISTS official_news (
+  id INTEGER PRIMARY KEY,                 -- withhive 글 번호 (공식 페이지 주소의 번호)
+  kind TEXT NOT NULL,                     -- notice | event
+  type TEXT NOT NULL,                     -- N 공지사항, C 점검, I 안내, D 오류, E 이벤트
+  title TEXT NOT NULL,
+  start_date TEXT,                        -- 'YYYY-MM-DD' 올린 날 (이벤트는 시작일)
+  end_date TEXT,                          -- 이벤트 끝나는 날 (있으면)
+  image TEXT,                             -- 대표 그림 주소 (이벤트)
+  body TEXT NOT NULL,                     -- 본문 글자만 (그림, 꾸밈은 뺐다. 3만 자까지)
+  fetched_at INTEGER NOT NULL             -- 받거나 바뀐 때
+);
+CREATE INDEX IF NOT EXISTS official_news_kind ON official_news (kind, id);

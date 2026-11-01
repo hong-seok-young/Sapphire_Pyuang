@@ -48,7 +48,7 @@ export const ITEMS: LaunchItem[] = [
   { key: "board", title: "게시판", to: "#/board", icon: "📢", match: ["board"] },
   { key: "search", title: "검색", to: "#/search", icon: "🔍", pic: "search", match: ["search"] },
   // 위키 자료. 사냥터와 장비도 이 안에 (제작자 요청 2026-11-01)
-  { key: "info", title: "정보", to: "#/info", icon: "📚", pic: "info", match: ["info", "menu", "post", "places", "place", "equip", "odds"] },
+  { key: "info", title: "정보", to: "#/info", icon: "📚", pic: "info", match: ["info", "menu", "post", "places", "place", "equip", "odds", "official"] },
   { key: "chat", title: "챗봇", to: "#/chat", icon: "💬", pic: "chat", match: ["chat"] },
   // 1군 전용 플래티넘 할인 상점 (제작자 요청). 아이콘은 게임 첫 화면의 상점 그림. '1군 전용'은 왼쪽 위 띠로
   { key: "shop", title: "플래티넘 할인 상점", short: "상점", to: "#/shop", icon: "🏪", iconPic: "/data/shop/shop_icon.png", ribbon: "1군 전용", ring: "gold", match: ["shop"] },
@@ -79,6 +79,8 @@ export const INFO_TILES: LaunchItem[] = [
   { key: "dungeon", title: "인던 · 길드던전", to: "#/menu/인던 · 길드던전", icon: "🏰", match: [] },
   { key: "war", title: "전장 · 헌팅그라운드", to: "#/menu/전장 · 헌팅그라운드", icon: "🚩", match: [] },
   { key: "quest", title: "퀘스트 · 지도", to: "#/menu/퀘스트 · 지도", icon: "📜", match: [] },
+  // 컴투스 공식 소식: 아이모 공식 홈페이지의 공지사항, 점검, 이벤트 (제작자 요청 2026-11-01, pages/Official.tsx)
+  { key: "official", title: "공식 소식", to: "#/official", icon: "📢", match: [] },
   // 컴투스 공식 확률 정보 (제작자 요청 2026-10-31, pages/Odds.tsx)
   { key: "odds", title: "공식 확률", to: "#/odds", icon: "🎲", match: [] },
 ];
