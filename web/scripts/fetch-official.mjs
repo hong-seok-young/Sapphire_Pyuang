@@ -3,9 +3,13 @@
 // 공개 페이지가 쓰는 목록 주소(POST /api/notice/list/32, 한국어는 language=ko 쿠키)를 그대로 부르고 요청 사이를 띄운다.
 // 본문은 그림과 꾸밈을 빼고 글자만 둔다 (챗봇이 읽는다). 화면은 제목과 날짜만 보이고 누르면 공식 페이지를 연다.
 // 기록은 지우지 않는다 (CLAUDE.md '기록은 평생'). 공개 저장소라 실행 기록에는 개수만 찍는다.
+// withhive 는 한국 밖에서 부르면 한국 전용 글(원스토어 프로모션, 국내 콜라보 등)을 빼고 준다. GitHub 서버와 Cloudflare 서버는 모두 한국 밖으로 잡혀서,
+// 한국 전용 글은 한국 PC에서 --save 로 비공개 자료 저장소(자료/공식/소식.json)에 받아 두고 배포가 --load 로 넣는다 (공식 확률과 같은 길).
 //   node scripts/fetch-official.mjs          최근 것만 (쪽마다 30개)
 //   node scripts/fetch-official.mjs --all    모든 쪽
 //   node scripts/fetch-official.mjs --local  로컬 D1 에 (시험용)
+//   node scripts/fetch-official.mjs --save ../자료/공식/소식.json   모든 쪽을 파일로만 (한국 PC에서)
+//   node scripts/fetch-official.mjs --load ../자료/공식/소식.json   그 파일을 DB 에 (배포가 한다)
 import { execFileSync } from "node:child_process";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -108,10 +112,17 @@ const clean = (s) => String(s ?? "").replace(/[​-‍﻿]/g, "").replace(/\s+/g
 const q = (s) => (s === null || s === undefined || s === "" ? "NULL" : "'" + String(s).replace(/\u0000/g, "").replace(/'/g, "''") + "'");
 const day = (s) => (typeof s === "string" && /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : null);
 
-function upsert(item, kind, now) {
+/** withhive 목록의 글 하나 -> 표의 한 줄 */
+function rowOf(item, kind) {
   const image = item.cropImage ? (String(item.cropImage).startsWith("//") ? "https:" + item.cropImage : item.cropImage) : null;
-  const body = htmlToText(item.content).slice(0, 30_000);
-  const values = [Number(item.noticeId), q(kind), q(item.type || (kind === "event" ? "E" : "N")), q(clean(item.noticeTitle)), q(day(item.startTime)), q(day(item.endTime)), q(image), q(body), now];
+  return {
+    id: Number(item.noticeId), kind, type: item.type || (kind === "event" ? "E" : "N"), title: clean(item.noticeTitle),
+    start_date: day(item.startTime), end_date: day(item.endTime), image, body: htmlToText(item.content).slice(0, 30_000),
+  };
+}
+
+function upsert(r, now) {
+  const values = [r.id, q(r.kind), q(r.type), q(r.title), q(r.start_date), q(r.end_date), q(r.image), q(r.body), now];
   // 바뀐 것만 고친다 (그대로면 쓰지 않아서 D1 쓰기 한도를 아낀다)
   return (
     "INSERT INTO official_news (id, kind, type, title, start_date, end_date, image, body, fetched_at) VALUES (" + values.join(", ") + ") " +
@@ -122,27 +133,55 @@ function upsert(item, kind, now) {
   );
 }
 
-ensureDbId();
-runFile(CREATE + "\n");
-const count = Number(parseJson(wrangler("d1", "execute", DB, where, "--json", "--command", "SELECT COUNT(*) AS n FROM official_news"))[0]?.results?.[0]?.n ?? 0);
-const all = process.argv.includes("--all") || count === 0;
-const rows = all ? 50 : 30;
-const now = Date.now();
-const statements = [];
-for (const { type, kind } of KINDS) {
-  let page = 1;
-  let got = 0;
-  for (;;) {
-    const { total, list } = await fetchPage(type, page, rows);
-    for (const item of list) if (item?.noticeId) statements.push(upsert(item, kind, now));
-    got += list.length;
-    if (!all || list.length < rows || got >= total || page >= 40) break;
-    page += 1;
+const arg = (name) => {
+  const i = process.argv.indexOf(name);
+  return i >= 0 ? process.argv[i + 1] : undefined;
+};
+const saveTo = arg("--save");
+const loadFrom = arg("--load");
+
+/** withhive 에서 받는다 (all: 모든 쪽, 아니면 쪽마다 30개) */
+async function fetchRows(all) {
+  const rows = all ? 50 : 30;
+  const out = [];
+  for (const { type, kind } of KINDS) {
+    let page = 1;
+    let got = 0;
+    for (;;) {
+      const { total, list } = await fetchPage(type, page, rows);
+      for (const item of list) if (item?.noticeId) out.push(rowOf(item, kind));
+      got += list.length;
+      if (!all || list.length < rows || got >= total || page >= 40) break;
+      page += 1;
+      await sleep(800);
+    }
+    console.log(`${kind === "event" ? "이벤트" : "공지사항"} ${got}개를 받았어요`);
     await sleep(800);
   }
-  console.log(`${kind === "event" ? "이벤트" : "공지사항"} ${got}개를 받았어요`);
-  await sleep(800);
+  return out;
 }
+
+if (saveTo) {
+  const rows = await fetchRows(true);
+  writeFileSync(saveTo, JSON.stringify({ savedAt: new Date().toISOString(), rows }, null, 0) + "\n");
+  console.log(`${rows.length}개를 ${saveTo} 에 적었어요`);
+  process.exit(0);
+}
+
+ensureDbId();
+runFile(CREATE + "\n");
+let all = false;
+let found;
+if (loadFrom) {
+  found = JSON.parse(readFileSync(loadFrom, "utf8")).rows;
+  console.log(`파일에서 ${found.length}개를 읽었어요`);
+} else {
+  const count = Number(parseJson(wrangler("d1", "execute", DB, where, "--json", "--command", "SELECT COUNT(*) AS n FROM official_news"))[0]?.results?.[0]?.n ?? 0);
+  all = process.argv.includes("--all") || count === 0;
+  found = await fetchRows(all);
+}
+const now = Date.now();
+const statements = found.filter((r) => Number.isInteger(r?.id) && r.title).map((r) => upsert(r, now));
 
 // 너무 큰 파일은 나눠 넣는다 (D1 한 번에 넣는 크기)
 let chunk = [];
@@ -157,5 +196,5 @@ for (const s of statements) {
   size += s.length;
 }
 if (chunk.length) runFile(chunk.join("\n") + "\n");
-runFile(`INSERT OR REPLACE INTO setup (key, done_at) VALUES ('official_checked', ${now});\n`);
-console.log(`공식 소식 ${statements.length}개를 맞췄어요 (${all ? "모든 쪽" : "최근 것"})`);
+if (!loadFrom) runFile(`INSERT OR REPLACE INTO setup (key, done_at) VALUES ('official_checked', ${now});\n`);
+console.log(`공식 소식 ${statements.length}개를 맞췄어요 (${loadFrom ? "한국 PC에서 받아 둔 것" : all ? "모든 쪽" : "최근 것"})`);

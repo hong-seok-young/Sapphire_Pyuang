@@ -207,6 +207,10 @@
   (본문은 그림과 꾸밈을 뺀 글자만, 바뀐 것만 고침, 지우지 않음).
 - GitHub Actions `.github/workflows/official-news.yml` 이 30분마다 최근 것(쪽마다 30개)을 받고, 표가 비었거나 '모든 쪽 다시 받기'로 돌리면 전부 받는다
   (비밀값은 배포와 같은 CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID). Pages Functions 는 무료 요금제 CPU 한도 때문에 받아 오기를 하지 않는다.
+- withhive 는 한국 밖에서 부르면 한국 전용 글(원스토어 프로모션, 국내 콜라보, 카카오 채널 이벤트 등)을 빼고 준다 (2026-11-01 시험: 한국 PC 공지 285·이벤트 361,
+  GitHub 서버와 Cloudflare 서울(ICN) 서버 모두 283·304. CORS 가 없어 폰 브라우저에서 바로 읽지도 못한다). 그래서 한국 PC에서
+  `node scripts/fetch-official.mjs --save ../자료/공식/소식.json` 으로 받아 비공개 자료 저장소에 올리면 배포가 `--load` 로 넣는다 (공식 확률과 같은 길).
+  PC에서 작업할 때 한 번씩 다시 받아 올린다 (한국 전용 새 글은 그때 들어간다).
 - 화면: '정보' > '📢 공식 소식' (`#/official?t=notice|maint|event`, `web/src/pages/Official.tsx`, `/api/official`): 공지사항·점검·이벤트 칸,
   종류 표, 제목, 날짜(이벤트 끝나는 날이 있으면 진행 중/종료), 이틀 안의 글은 NEW, 누르면 공식 페이지(withhive.com/notice|event/32/번호)가 새 창으로.
   본문은 앱에 띄우지 않는다 (공식 글은 공식 페이지에서 본다).
