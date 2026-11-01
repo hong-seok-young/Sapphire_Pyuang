@@ -6,6 +6,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 export const DIGEST_MODEL = "claude-opus-5-5";
+/** 정리한 모델과 지시문의 판 (official_todo.model). 지시문을 고치면 판을 올린다: 예전 판으로 정리한 글은 모두 다시 정리된다 */
+export const DIGEST_TAG = `${DIGEST_MODEL}#2`;
 
 const JOBS_KO = ["전사", "레인저", "마법사", "무도가"] as const;
 const JOB_KEY: Record<string, string> = { 전사: "warrior", 레인저: "ranger", 마법사: "mage", 무도가: "monk" };
@@ -22,10 +24,13 @@ const SYSTEM = `너는 모바일 MMORPG 아이모(IMO: The World Of Magic)의 �
 - 유료 결제, 패키지·상품·상자 판매와 뽑기, 원스토어 결제 프로모션과 포인트백, 결제 인증
 - 확률 안내, 당첨·결과 발표, 보상 지급 안내(받는 사람이 따로 할 일이 없는 것), 오류 수정, 점검, 운영정책, 기능 설명
 - 상시 콘텐츠의 기본 안내(인스턴스 던전, 길드 임무, 길드 출석, 길드 던전, 헌팅 그라운드 이용 시간): 앱이 따로 보여 준다
+- 길드장이나 특정 직책만 할 수 있는 일 (예: 점령 길드의 마력회수)
 
 쓰는 법
-- text: 할 일만 명사형으로 아주 짧게 (6~14자, 끝맺는 말 없이). 예: "출석 보상 수령", "으스스한장난감 교환", "해골가면 제작", "경험치 핫타임 사냥", "헌터증서 교환", "스크린샷 이벤트 응모"
-- note: 어디서·무엇으로 하는지 아주 짧게 (예: "NPC 빅터", "이벤트 팝업", "해변의 전장"). 좌표는 쓰지 않는다. 없으면 null
+- text: 할 일만 명사형으로 아주 짧게 (6~14자, 끝맺는 말 없이). 예: "으스스한장난감 교환", "해골가면 제작", "경험치 핫타임 사냥", "헌터증서 교환", "스크린샷 이벤트 응모".
+  다른 글에서 뽑은 비슷한 일과 한 화면에 같이 보이므로, 흔한 이름은 이벤트 이름을 앞에 붙여 구분한다 (예: "11월 출석 보상", "또봉이 출석 보상", "김선달 콜라보 퀘스트", "카톡 즉석당첨 응모")
+- note: 어디서 하는지 하나만, 12자 안팎 (예: "NPC 빅터", "이벤트 탭", "해변의 전장", "카카오톡 채널"). 설명, 조건, 좌표는 쓰지 않는다. 없으면 null
+- 한 이벤트의 여러 단계(주차별 퀘스트, 재료 모으기와 교환)는 한 줄로 합친다. 회차마다 기간이 다르면(1회차, 2회차) 회차마다 한 줄
 - cycle: 기간 동안 매일 할 수 있으면 daily, 매주면 weekly, 한 번이면 once
 - days, time: 정해진 요일·시각에만 열리는 것 (예: 화·토 22:30 길드 점령전 → days [2, 6], time "22:30", cycle daily). 요일 번호는 0 일, 1 월 … 6 토. 아니면 [] 와 null
 - start, end: 그 일을 할 수 있는 때, "YYYY-MM-DD HH:MM" 한국 시간. 연도는 글 올린 날로 짐작한다.
@@ -82,6 +87,8 @@ export interface TodoTask {
   lv: [number | null, number | null];
   /** 직업 (warrior, ranger, mage, monk). 비면 모두 */
   jobs: string[];
+  /** 모은 할 일(mergeTasks)만: 이 일을 안내한 공식 글 번호들 (새 글 먼저) */
+  p?: number[];
 }
 
 /** 정리할 글 */
@@ -103,17 +110,26 @@ function kstTime(s: unknown): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 const level = (v: unknown) => (Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 200 ? (v as number) : null);
-const short = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
+/** 글자 수를 넘으면 낱말이나 쉼표 사이에서 자른다 (낱말 가운데에서 자르지 않는다, CLAUDE.md '글자와 줄바꿈') */
+function short(v: unknown, max: number): string {
+  const s = typeof v === "string" ? v.replace(/\s+/g, " ").trim() : "";
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max + 1);
+  const at = Math.max(cut.lastIndexOf(","), cut.lastIndexOf("·"), cut.lastIndexOf("("), cut.lastIndexOf(" "));
+  return (at > max / 3 ? cut.slice(0, at) : s.slice(0, max)).replace(/[\s,·(]+$/, "");
+}
 
-/** 모델 답 -> 할 일 목록 (맞지 않는 줄은 버린다) */
-export function normalizeTasks(raw: unknown): TodoTask[] {
+/** 모델 답 -> 할 일 목록 (맞지 않는 줄은 버린다). posts: 모은 할 일이면 그 줄이 가리킬 수 있는 글 번호, max: 줄 수 */
+export function normalizeTasks(raw: unknown, posts?: Set<number>, max = 6): TodoTask[] {
   const list = raw && typeof raw === "object" && Array.isArray((raw as { tasks?: unknown }).tasks) ? (raw as { tasks: unknown[] }).tasks : [];
   const out: TodoTask[] = [];
   for (const x of list) {
     if (!x || typeof x !== "object") continue;
     const r = x as Record<string, unknown>;
-    const t = short(r.text, 30);
+    const t = short(r.text, 24);
     if (!t) continue;
+    const p = posts && Array.isArray(r.posts) ? [...new Set(r.posts.filter((id): id is number => Number.isInteger(id) && posts.has(id as number)))].sort((a, b) => b - a) : undefined;
+    if (posts && !p?.length) continue;
     const cycle = r.cycle === "daily" ? "d" : r.cycle === "weekly" ? "w" : "o";
     const days = Array.isArray(r.days) ? [...new Set(r.days.filter((d): d is number => Number.isInteger(d) && d >= 0 && d <= 6))].sort() : [];
     const at = typeof r.time === "string" && /^\d{1,2}:\d{2}$/.test(r.time.trim()) ? r.time.trim().padStart(5, "0") : null;
@@ -122,7 +138,7 @@ export function normalizeTasks(raw: unknown): TodoTask[] {
     if (s !== null && e !== null && e <= s) e = null;
     out.push({
       t,
-      n: short(r.note, 24) || null,
+      n: short(r.note, 16) || null,
       // 정해진 요일에 열리는 일은 그날 할 일
       c: days.length ? "d" : cycle,
       days,
@@ -131,8 +147,9 @@ export function normalizeTasks(raw: unknown): TodoTask[] {
       e,
       lv: [level(r.minLevel), level(r.maxLevel)],
       jobs: Array.isArray(r.jobs) ? r.jobs.map((j) => JOB_KEY[String(j)]).filter((j): j is string => !!j) : [],
+      ...(p ? { p } : {}),
     });
-    if (out.length >= 6) break;
+    if (out.length >= max) break;
   }
   return out;
 }
@@ -144,20 +161,14 @@ export function tasksUntil(tasks: TodoTask[], postDate: string | null): number {
   return Math.max(...tasks.map((t) => t.e ?? Math.max(posted, t.s ?? 0) + 30 * 86_400_000));
 }
 
-/** 글 하나를 Claude 에 맡겨 할 일을 뽑는다. 거절당하면 빈 목록, API 오류는 던진다 (나중에 다시) */
-export async function digestPost(client: Anthropic, post: DigestPost): Promise<TodoTask[]> {
-  const posted = post.start_date ?? "";
-  const dow = /^\d{4}-\d{2}-\d{2}$/.test(posted) ? DOW[new Date(posted + "T00:00:00Z").getUTCDay()] : "";
-  const messages: Anthropic.MessageParam[] = [
-    {
-      role: "user",
-      content:
-        `글 올린 날: ${posted}${dow ? ` (${dow})` : ""}\n종류: ${post.kind === "event" ? "이벤트" : "공지사항"}\n제목: ${post.title}\n\n본문:\n` +
-        post.body.slice(0, 20_000),
-    },
-  ];
-  // 제작자 요청: 품질이 먼저 (기간·조건을 잘못 읽으면 할 일이 틀린다). 안전 필터가 거절하면 서버가 알맞은 다른 모델로 이어서 한다 (fallbacks)
-  const format = { type: "json_schema" as const, schema: TASKS_SCHEMA };
+/**
+ * Claude 에 묻고 JSON 을 받는다 (제작자 요청: 품질이 먼저. 답 모양 지정, 안전 필터가 거절하면 서버가 알맞은 다른 모델로 이어서 한다).
+ * 이 계정이나 모델이 그 조합을 받지 않으면 거절 이어받기 없이, 그래도 안 되면 답 모양 지정 없이 글에서 JSON 을 꺼낸다.
+ * 거절당하면 null, API 오류는 던진다 (나중에 다시)
+ */
+async function askJson(client: Anthropic, system: string, user: string, schema: object, shape: string): Promise<unknown> {
+  const messages: Anthropic.MessageParam[] = [{ role: "user", content: user }];
+  const format = { type: "json_schema" as const, schema: schema as Record<string, unknown> };
   let res: Anthropic.Beta.BetaMessage | Anthropic.Message;
   try {
     res = await client.beta.messages.create({
@@ -166,29 +177,111 @@ export async function digestPost(client: Anthropic, post: DigestPost): Promise<T
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       output_config: { effort: "high", format },
-      system: SYSTEM,
+      system,
       messages,
     });
   } catch (e) {
-    // 이 계정이나 모델이 그 조합을 받지 않으면: 대신 거절 이어받기 없이, 그래도 안 되면 답 모양 지정 없이 글에서 JSON 을 꺼낸다
     if (!(e instanceof Anthropic.BadRequestError)) throw e;
     try {
-      res = await client.messages.create({ model: DIGEST_MODEL, max_tokens: 16000, output_config: { effort: "high", format }, system: SYSTEM, messages });
+      res = await client.messages.create({ model: DIGEST_MODEL, max_tokens: 16000, output_config: { effort: "high", format }, system, messages });
     } catch (e2) {
       if (!(e2 instanceof Anthropic.BadRequestError)) throw e2;
       res = await client.messages.create({
         model: DIGEST_MODEL,
         max_tokens: 16000,
         output_config: { effort: "high" },
-        system: SYSTEM + `\n\n답은 다른 말 없이 JSON 한 덩어리로만: {"tasks": [{"text", "note", "cycle", "days", "time", "start", "end", "minLevel", "maxLevel", "jobs"}]}`,
+        system: system + `\n\n답은 다른 말 없이 JSON 한 덩어리로만: ${shape}`,
         messages,
       });
     }
   }
-  if (res.stop_reason === "refusal") return [];
+  if (res.stop_reason === "refusal") return null;
   if (res.stop_reason === "max_tokens") throw new Error("답이 길어 잘렸어요");
   const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-  return normalizeTasks(JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)));
+  return JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1));
+}
+
+const SHAPE = `{"tasks": [{"text", "note", "cycle", "days", "time", "start", "end", "minLevel", "maxLevel", "jobs"}]}`;
+
+/** 글 하나를 Claude 에 맡겨 할 일을 뽑는다. 거절당하면 빈 목록, API 오류는 던진다 (나중에 다시) */
+export async function digestPost(client: Anthropic, post: DigestPost): Promise<TodoTask[]> {
+  const posted = post.start_date ?? "";
+  const dow = /^\d{4}-\d{2}-\d{2}$/.test(posted) ? DOW[new Date(posted + "T00:00:00Z").getUTCDay()] : "";
+  const user =
+    `글 올린 날: ${posted}${dow ? ` (${dow})` : ""}\n종류: ${post.kind === "event" ? "이벤트" : "공지사항"}\n제목: ${post.title}\n\n본문:\n` + post.body.slice(0, 20_000);
+  const raw = await askJson(client, SYSTEM, user, TASKS_SCHEMA, SHAPE);
+  return raw ? normalizeTasks(raw) : [];
+}
+
+// ---------- 모으기: 여러 글이 같은 이벤트를 다시 안내해서 겹친 할 일을 하나로 ----------
+
+const MERGE_SYSTEM = `너는 길드 앱 'To do' 의 이벤트 할 일을 마지막으로 정리한다. 아래는 모바일 MMORPG 아이모 공식 글마다 따로 뽑은 할 일이다.
+여러 글이 같은 이벤트를 다시 안내해서(이벤트 글, 패치노트, 콜라보 안내) 같은 일이 여러 줄로 겹친다. 한 화면에 그대로 보이므로 깔끔한 목록으로 만든다.
+- 같은 이벤트의 같은 일은 한 줄로 합친다. 기간·장소·조건은 가장 정확한 것(구체적인 날짜, 더 짧은 장소 이름)을 남기고, posts 에 합친 줄의 글 번호를 모두 적는다.
+- 한 이벤트의 여러 단계는 한 줄로 (예: "김선달 주차 퀘스트", "김선달 콜라보 퀘스트", "또봉이 콜라보 퀘스트" → "김선달 콜라보 퀘스트").
+- 다른 일은 합치지 않는다. 이름이 같거나 비슷한데 다른 이벤트면(출석판이 둘 등) 이벤트 이름을 앞에 붙여 구분한다 (예: "11월 출석 보상", "또봉이 출석 보상").
+- 끝난 일(end 가 지금보다 앞)은 뺀다. 없던 일을 새로 만들지 않는다. 회차마다 기간이 다른 줄(1회차, 2회차)은 합치지 않는다.
+- text 는 6~14자 명사형, note 는 어디서 하는지 하나만 12자 안팎. 나머지 칸(cycle, days, time, start, end, minLevel, maxLevel, jobs)은 받은 값의 뜻을 그대로 둔다.`;
+
+const MERGE_SCHEMA = {
+  type: "object",
+  properties: {
+    tasks: {
+      type: "array",
+      items: {
+        ...TASKS_SCHEMA.properties.tasks.items,
+        properties: { ...TASKS_SCHEMA.properties.tasks.items.properties, posts: { type: "array", items: { type: "integer" } } },
+        required: [...TASKS_SCHEMA.properties.tasks.items.required, "posts"],
+      },
+    },
+  },
+  required: ["tasks"],
+  additionalProperties: false,
+};
+
+/** 글 하나에서 뽑아 둔 할 일 */
+export interface DigestOfPost {
+  id: number;
+  title: string;
+  start_date: string | null;
+  /** 정리한 때 (모은 목록이 이 정리들로 만든 것인지 알아보는 표시) */
+  made_at: number;
+  tasks: TodoTask[];
+}
+
+/** 모은 목록이 어느 정리들로 만든 것인지 (글 번호와 정리한 때). 같으면 다시 모으지 않는다 */
+export function mergeSignature(digests: DigestOfPost[], now = Date.now()): string {
+  const live = digests.filter((d) => d.tasks.some((t) => t.e === null || t.e > now)).map((d) => [d.id, d.made_at]);
+  return JSON.stringify(live.sort((a, b) => a[0] - b[0]));
+}
+
+const JOB_KO_OF: Record<string, string> = { warrior: "전사", ranger: "레인저", mage: "마법사", monk: "무도가" };
+const kstText = (ms: number | null) => (ms === null ? null : new Date(ms + 9 * 3_600_000).toISOString().slice(0, 16).replace("T", " "));
+
+/** 지금 할 수 있는 할 일을 모두 모아 겹친 것을 합친다 (30줄까지). 할 일이 없으면 빈 목록, 거절당하면 null (그때는 글마다 뽑은 그대로 보인다) */
+export async function mergeTasks(client: Anthropic, digests: DigestOfPost[], now = Date.now()): Promise<TodoTask[] | null> {
+  const live = digests.map((d) => ({ ...d, tasks: d.tasks.filter((t) => t.e === null || t.e > now) })).filter((d) => d.tasks.length);
+  if (!live.length) return [];
+  const blocks = live.map(
+    (d) =>
+      `#${d.id} (${d.start_date ?? ""}) ${d.title}\n` +
+      d.tasks
+        .map((t) =>
+          JSON.stringify({
+            text: t.t, note: t.n, cycle: t.c === "d" ? "daily" : t.c === "w" ? "weekly" : "once", days: t.days, time: t.at,
+            start: kstText(t.s), end: kstText(t.e), minLevel: t.lv[0], maxLevel: t.lv[1], jobs: t.jobs.map((j) => JOB_KO_OF[j] ?? j),
+          }),
+        )
+        .join("\n"),
+  );
+  const raw = await askJson(
+    client,
+    MERGE_SYSTEM,
+    `지금: ${kstText(now)} (한국 시간)\n\n${blocks.join("\n\n")}`,
+    MERGE_SCHEMA,
+    SHAPE.replace('"jobs"}', '"jobs", "posts"}'),
+  );
+  return raw ? normalizeTasks(raw, new Set(live.map((d) => d.id)), 30) : null;
 }
 
 /** 정리할 글인지 (제목만 봐도 할 일이 없는 글은 모델에 보내지 않는다) */

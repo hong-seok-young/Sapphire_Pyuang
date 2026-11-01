@@ -10,7 +10,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { DIGEST_MODEL, NO_TODO_TITLE, digestClient, digestPost, tasksUntil } from "../server/todoDigest.ts";
+import { DIGEST_TAG, NO_TODO_TITLE, digestClient, digestPost, mergeSignature, mergeTasks, tasksUntil } from "../server/todoDigest.ts";
 
 const DB = "sapphire-accounts";
 const local = process.argv.includes("--local");
@@ -67,14 +67,14 @@ CREATE INDEX IF NOT EXISTS official_todo_until ON official_todo (until);
 `);
 
 const now = Date.now();
-const stale = "(t.id IS NULL OR t.made_at = 0 OR substr(t.src, 3) IS NOT substr(n.src, 3)) AND COALESCE(t.claimed_at, 0) < " + (now - CLAIM_MS);
+// 아직 안 했거나, 원문이 바뀌었거나, 예전 지시문으로 정리한 글 (서버가 맡은 지 10분 안의 글은 빼고)
+const stale = `(t.id IS NULL OR t.made_at = 0 OR substr(t.src, 3) IS NOT substr(n.src, 3) OR t.model IS NOT '${DIGEST_TAG}') AND COALESCE(t.claimed_at, 0) < ${now - CLAIM_MS}`;
 const pending = select(
   `SELECT n.id, n.title FROM official_news n LEFT JOIN official_todo t ON t.id = n.id WHERE n.kind = 'event' AND n.start_date >= '${kstDate(now - 120 * DAY)}' AND ${stale} ` +
     `UNION ALL SELECT n.id, n.title FROM official_news n LEFT JOIN official_todo t ON t.id = n.id WHERE n.kind = 'notice' AND n.type IN ('N', 'I') ` +
     `AND n.start_date >= '${kstDate(now - 60 * DAY)}' AND ${stale} ORDER BY 1 DESC`,
 );
 console.log(`정리할 공식 글 ${pending.length}개`);
-if (!pending.length) process.exit(0);
 
 const client = digestClient(key, process.env.ANTHROPIC_WORKSPACE_ID);
 const save = (rows) =>
@@ -83,7 +83,7 @@ const save = (rows) =>
     rows
       .map(
         (r) =>
-          `INSERT INTO official_todo (id, src, tasks, until, made_at, claimed_at, model) VALUES (${r.id}, ${q(r.src)}, ${q(JSON.stringify(r.tasks))}, ${tasksUntil(r.tasks, r.start_date)}, ${r.at}, ${r.at}, ${q(DIGEST_MODEL)}) ` +
+          `INSERT INTO official_todo (id, src, tasks, until, made_at, claimed_at, model) VALUES (${r.id}, ${q(r.src)}, ${q(JSON.stringify(r.tasks))}, ${tasksUntil(r.tasks, r.start_date)}, ${r.at}, ${r.at}, ${q(DIGEST_TAG)}) ` +
           "ON CONFLICT (id) DO UPDATE SET src = excluded.src, tasks = excluded.tasks, until = excluded.until, made_at = excluded.made_at, claimed_at = excluded.claimed_at, model = excluded.model;",
       )
       .join("\n") + "\n",
@@ -117,4 +117,25 @@ for (let i = 0; i < pending.length; i += PARALLEL) {
   done += ok.length;
   empty += ok.filter((r) => !r.tasks.length).length;
 }
-console.log(`To do 정리 ${done}개 (할 일 없는 글 ${empty}개), 실패 ${failed}개`);
+if (pending.length) console.log(`To do 정리 ${done}개 (할 일 없는 글 ${empty}개), 실패 ${failed}개`);
+
+// 모으기: 여러 글이 같은 이벤트를 다시 안내해서 겹친 할 일을 하나로 (글 번호 0 줄, server/todo.ts mergeIfStale 과 같다)
+const at = Date.now();
+const digests = select(
+  `SELECT t.id, t.tasks, t.made_at, n.title, n.start_date FROM official_todo t JOIN official_news n ON n.id = t.id WHERE t.until > ${at} ORDER BY t.id DESC LIMIT 80`,
+).map((r) => ({ id: r.id, title: r.title, start_date: r.start_date, made_at: r.made_at, tasks: JSON.parse(r.tasks) }));
+const sig = mergeSignature(digests, at);
+if (select("SELECT src FROM official_todo WHERE id = 0")[0]?.src === sig) {
+  console.log("모은 목록은 그대로예요");
+} else {
+  try {
+    const merged = await mergeTasks(client, digests, at);
+    if (merged === null) console.log("모으기를 거절당해서 글마다 뽑은 그대로 보여요");
+    else {
+      save([{ id: 0, src: sig, tasks: merged, start_date: new Date(at + 9 * 3_600_000).toISOString().slice(0, 10), at: Date.now() }]);
+      console.log(`할 일 ${digests.reduce((n, d) => n + d.tasks.length, 0)}줄을 ${merged.length}줄로 모았어요`);
+    }
+  } catch (e) {
+    console.log(`모으지 못했어요 (${e?.status ?? ""} ${String(e?.message ?? e).slice(0, 120)})`);
+  }
+}
