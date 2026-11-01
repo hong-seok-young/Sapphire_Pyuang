@@ -5,6 +5,8 @@ import type { FavKind } from "./favorites";
 import type { ReactNode } from "react";
 import { EDITION } from "./platform";
 import { useUnread } from "./alerts";
+import { JOB_NAME, errorText } from "./auth";
+import { goCharacter, useMyCharacters } from "./characters";
 import type { Pic } from "./types";
 
 /**
@@ -57,14 +59,71 @@ export function TopBar({ title, back = true, right, star }: { title: ReactNode; 
         <span className="topbar-right">
           {star}
           {!location.hash.startsWith("#/alerts") && <Bell className="topbar-me" />}
-          {!location.hash.startsWith("#/me") && (
-            <a className="topbar-me" href="#/me" aria-label="내 정보" title="내 정보">
-              <PixelIcon name="me" size={24} />
-            </a>
-          )}
+          {!location.hash.startsWith("#/me") && <MeButton className="topbar-me" size={24} />}
         </span>
       )}
     </header>
+  );
+}
+
+/**
+ * '내 정보' 단추 (👤). 캐릭터를 묶은 사람(부캐 묶기)은 누르면 캐릭터 목록이 뜨고, 고르면 그 캐릭터의 내 정보로 간다 (제작자 요청 2026-11-01).
+ * 캐릭터가 하나면 바로 내 정보
+ */
+export function MeButton({ className, size }: { className: string; size: number }) {
+  const { current, list } = useMyCharacters();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  if (list.length < 2) {
+    return (
+      <a className={className} href="#/me" aria-label="내 정보" title="내 정보">
+        <PixelIcon name="me" size={size} />
+      </a>
+    );
+  }
+  async function pick(id: string) {
+    if (id === current) {
+      setOpen(false);
+      location.hash = "#/me";
+      return;
+    }
+    setBusy(id);
+    setError("");
+    try {
+      await goCharacter(id);
+    } catch (x) {
+      setError(errorText(x));
+      setBusy("");
+    }
+  }
+  return (
+    <>
+      <button className={className} onClick={() => setOpen((o) => !o)} aria-label="내 캐릭터" aria-expanded={open} title="내 캐릭터">
+        <PixelIcon name="me" size={size} />
+      </button>
+      {open && (
+        <>
+          <div className="char-menu-back" onClick={() => setOpen(false)} />
+          <div className="char-menu" role="menu">
+            {list.map((c) => (
+              <button key={c.id} className={"char-item" + (c.id === current ? " char-on" : "")} disabled={!!busy} onClick={() => pick(c.id)} role="menuitem">
+                <span className="char-name">
+                  <b>{c.id}</b>
+                  <small>
+                    {c.main ? "본캐" : "부캐"}
+                    {c.level ? ` · Lv.${c.level}` : ""}
+                    {c.job ? ` ${JOB_NAME[c.job]}` : ""}
+                  </small>
+                </span>
+                <span className="char-mark">{busy === c.id ? "…" : c.id === current ? "✓" : ""}</span>
+              </button>
+            ))}
+            {error && <small className="form-error">{error}</small>}
+          </div>
+        </>
+      )}
+    </>
   );
 }
 

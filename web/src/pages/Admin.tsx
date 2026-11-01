@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
-  ROLE_NAME, canManage, createAccount, decideSignup, deleteAccount, errorText, listAccounts, listSignups, positionOf, renameAccount,
-  resetPassword, setRole,
+  ROLE_NAME, canManage, createAccount, decideSignup, deleteAccount, errorText, linkAccounts, listAccounts, listSignups, positionOf, renameAccount,
+  resetPassword, setRole, unlinkAccount,
 } from "../auth";
 import type { SignupRequest } from "../auth";
 import type { Account, Me, Role } from "../auth";
@@ -72,6 +72,16 @@ export function AdminPage({ me }: { me: Me }) {
   const q = query.replace(/\s+/g, "").toLowerCase();
   const test = FILTERS.find((f) => f.key === filter)!.test;
   const shown = (accounts ?? []).filter((a) => test(a) && (!q || a.id.replace(/\s+/g, "").toLowerCase().includes(q)));
+  // 부캐 묶기: 부캐는 본캐 바로 아래에 (본캐가 목록에 있을 때)
+  const altsOf = new Map<string, Account[]>();
+  for (const a of accounts ?? []) if (a.mainId) altsOf.set(a.mainId, [...(altsOf.get(a.mainId) ?? []), a]);
+  const shownIds = new Set(shown.map((a) => a.id));
+  const ordered: Account[] = [];
+  for (const a of shown) {
+    if (a.mainId && shownIds.has(a.mainId)) continue;
+    ordered.push(a);
+    for (const s of altsOf.get(a.id) ?? []) if (shownIds.has(s.id)) ordered.push(s);
+  }
 
   const [signups, setSignups] = useState<SignupRequest[]>([]);
   const reload = useCallback(() => {
@@ -128,7 +138,11 @@ export function AdminPage({ me }: { me: Me }) {
           <h2 className="panel-title">아이디 생성 요청 {signups.length}</h2>
           {signups.map((s) => (
             <div key={s.id} className="signup-row">
-              <b>{s.id}</b>
+              <span className="signup-who">
+                <b>{s.id}</b>
+                {/* '내 정보'의 캐릭터 추가 요청: 승낙하면 그 사람의 부캐 */}
+                {s.owner && <small className="account-link">{s.owner}의 부캐</small>}
+              </span>
               <small>{new Date(s.createdAt).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</small>
               <button className="pill pill-on" disabled={busy} onClick={() => run(() => decideSignup(s.id, "approve").then(() => undefined))}>
                 승낙
@@ -179,10 +193,12 @@ export function AdminPage({ me }: { me: Me }) {
             ))}
           </div>
           <ul className="list account-list">
-            {shown.slice(0, limit).map((a) => (
+            {ordered.slice(0, limit).map((a) => (
               <AccountRow
                 key={a.id}
                 account={a}
+                accounts={accounts}
+                alts={altsOf.get(a.id)?.length ?? 0}
                 me={me}
                 busy={busy}
                 open={open === a.id}
@@ -195,6 +211,13 @@ export function AdminPage({ me }: { me: Me }) {
                 }
                 onRole={(role) => run(async () => void (await setRole(a.id, role)))}
                 onDelete={() => run(async () => void (await deleteAccount(a.id)))}
+                onLink={(other, main) => run(async () => void (await linkAccounts(a.id, other, main)))}
+                onUnlink={() =>
+                  run(async () => {
+                    const r = await unlinkAccount(a.id);
+                    setNotice({ title: "통합을 해제했어요", id: r.id, password: r.tempPassword });
+                  })
+                }
                 onChanged={reload}
               />
             ))}
@@ -218,9 +241,12 @@ export function AdminPage({ me }: { me: Me }) {
  * 역할은 드롭다운 대신 세 칸 단추 (게임 위 위키 창 WebView 에서는 <select> 가 안 열려서)
  */
 function AccountRow({
-  account, me, busy, open, onOpen, onReset, onRole, onDelete, onChanged,
+  account, accounts, alts, me, busy, open, onOpen, onReset, onRole, onDelete, onLink, onUnlink, onChanged,
 }: {
   account: Account;
+  accounts: Account[];
+  /** 이 본캐에 묶인 부캐 수 */
+  alts: number;
   me: Me;
   busy: boolean;
   open: boolean;
@@ -228,6 +254,8 @@ function AccountRow({
   onReset: () => void;
   onRole: (role: Role) => void;
   onDelete: () => void;
+  onLink: (other: string, main: string) => void;
+  onUnlink: () => void;
   onChanged: () => void;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -236,16 +264,23 @@ function AccountRow({
   const [growthLog, setGrowthLog] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [newId, setNewId] = useState("");
-  const manageable = account.id !== me.id && canManage(me.role, account.role);
+  // 내 캐릭터(부캐 묶기)는 내 계정처럼 다루지 못한다
+  const isMine = (a: Account) => (me.characters?.some((c) => c.id === a.id) ?? false) || a.id === me.id;
+  const manageable = !isMine(account) && canManage(me.role, account.role);
+  // 계정 통합 (부캐 묶기): 내 캐릭터이거나 다룰 수 있는 계정끼리. 부캐는 본캐를 골라서 묶는다
+  const linkable = (a: Account) => !a.mainId && (isMine(a) || canManage(me.role, a.role));
+  const [linking, setLinking] = useState(false);
   // 역할 바꾸기 (오피서 임명/해제): 다룰 수 있는 사람이면 된다 (오피서도 길드마스터와 같다)
   const canRole = manageable;
 
   return (
-    <li className={"account" + (open ? " account-open" : "")}>
+    <li className={"account" + (open ? " account-open" : "") + (account.mainId ? " account-alt" : "")}>
       <button className="account-row" onClick={onOpen} aria-expanded={open}>
         {account.job && account.level ? <JobEmblem job={account.job} level={account.level} size={30} /> : <span className="account-noemblem" />}
         <span className="account-main">
           <b className={account.highSpec ? "hs-text" : undefined}>{account.id}</b>
+          {/* 부캐 묶기: 부캐는 본캐 아이디, 본캐는 부캐 수 */}
+          {account.mainId ? <small className="account-link">↳ {account.mainId}의 부캐</small> : alts > 0 && <small className="account-link">본캐 · 부캐 {alts}</small>}
           <small>
             {account.guild ? `${GUILD_TIER[account.guild]} ${GUILD_NAME[account.guild]}` : "길드 안 정함"}
             {account.job && account.level ? ` · Lv.${account.level} ${JOB_NAME[account.job]}` : " · 직업·레벨 안 정함"}
@@ -331,6 +366,16 @@ function AccountRow({
                 사진 삭제
               </button>
             )}
+            {linkable(account) && (
+              <button className={"pill" + (linking ? " pill-on" : "")} disabled={busy} onClick={() => setLinking((v) => !v)}>
+                계정 통합
+              </button>
+            )}
+            {account.mainId && (isMine(account) || canManage(me.role, account.role)) && (
+              <button className="pill" disabled={busy} onClick={onUnlink}>
+                통합 해제
+              </button>
+            )}
             {manageable && (
               <>
                 <button className="pill" disabled={busy} onClick={() => setRenaming((v) => !v)}>
@@ -384,6 +429,17 @@ function AccountRow({
               </button>
             </div>
           )}
+          {linking && (
+            <LinkPicker
+              account={account}
+              candidates={accounts.filter((a) => a.id !== account.id && linkable(a))}
+              busy={busy}
+              onLink={(other, main) => {
+                setLinking(false);
+                onLink(other, main);
+              }}
+            />
+          )}
           {photoError && <p className="form-error">{photoError}</p>}
           {growthLog && <GrowthLog id={account.id} onChanged={onChanged} />}
           {editing && (
@@ -403,6 +459,55 @@ function AccountRow({
         </div>
       )}
     </li>
+  );
+}
+
+/**
+ * 계정 통합 (부캐 묶기, 제작자 요청 2026-11-01): 같은 사람의 다른 계정을 고르고, 무엇을 본캐로 할지 고른다.
+ * 본캐 아이디와 비밀번호로 로그인하고, 부캐가 된 쪽의 로그인은 끝난다. 캐릭터(랭킹, 거래, 글)는 그대로 따로 있다
+ */
+function LinkPicker({ account, candidates, busy, onLink }: {
+  account: Account;
+  candidates: Account[];
+  busy: boolean;
+  onLink: (other: string, main: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [other, setOther] = useState<Account | null>(null);
+  const q = query.replace(/\s+/g, "").toLowerCase();
+  const found = candidates.filter((a) => !q || a.id.replace(/\s+/g, "").toLowerCase().includes(q)).slice(0, 20);
+  const label = (a: Account) => `${a.id}${a.level ? ` · Lv.${a.level}` : ""}${a.job ? ` ${JOB_NAME[a.job]}` : ""}`;
+  if (other) {
+    return (
+      <div className="link-picker">
+        <b>무엇을 본캐로 할까요?</b>
+        <small>본캐 아이디와 비밀번호로 로그인해요</small>
+        <div className="link-list">
+          {[account, other].map((a) => (
+            <button key={a.id} className="pill" disabled={busy} onClick={() => onLink(other.id, a.id)}>
+              {label(a)}
+            </button>
+          ))}
+        </div>
+        <button className="pill" disabled={busy} onClick={() => setOther(null)}>
+          ◀ 다른 계정
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="link-picker">
+      <b>통합할 계정</b>
+      <input className="mk-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="🔍 닉네임 찾기" aria-label="통합할 닉네임 찾기" />
+      <div className="link-list">
+        {found.map((a) => (
+          <button key={a.id} className="pill" disabled={busy} onClick={() => setOther(a)}>
+            {label(a)}
+          </button>
+        ))}
+        {found.length === 0 && <small className="muted">고를 수 있는 계정이 없어요</small>}
+      </div>
+    </div>
   );
 }
 

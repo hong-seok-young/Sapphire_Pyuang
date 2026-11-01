@@ -45,6 +45,8 @@ interface Person {
   id: string;
   role: Role;
   high_spec: number;
+  /** 부캐면 본캐 아이디 (부캐 묶기) */
+  main_id: string | null;
   must_change: number;
   push_perm: string | null;
   job: Job | null;
@@ -107,7 +109,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
   const [peopleR, listingsR, myWantersR, myBidsR, myWantsR, rateR, goldR, myGoldWantsR, requestsR, boardR, platR, myOrdersR, openOrdersR] =
     await env.DB.batch([
       env.DB.prepare(
-        "SELECT u.id AS id, u.role AS role, u.high_spec AS high_spec, u.must_change AS must_change, u.push_perm AS push_perm, " +
+        "SELECT u.id AS id, u.role AS role, u.high_spec AS high_spec, u.must_change AS must_change, u.push_perm AS push_perm, u.main_id AS main_id, " +
           "p.job AS job, p.level AS level, p.prev_level AS prev_level, p.level_at AS level_at, p.exp AS exp, p.guild AS guild " +
           "FROM users u LEFT JOIN profiles p ON p.user_id = u.id " +
           "ORDER BY p.level IS NULL, p.level DESC, p.exp IS NULL, p.exp DESC, p.level_at ASC, u.id ASC",
@@ -339,6 +341,8 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
       p.prev_level !== null && p.level !== null && p.prev_level < p.level && p.level_at !== null && p.level_at >= week ? `이번 주 Lv.${p.prev_level}→${p.level}` : "",
       officer && p.must_change ? "비밀번호 바꾸기 전" : "",
       officer && p.push_perm ? PUSH[p.push_perm] ?? "" : "",
+      // 누구의 부캐인지는 길드원 관리와 같이 오피서 이상과 본인에게만
+      p.main_id && (officer || p.main_id === (me.owner ?? me.id)) ? `${p.main_id}의 부캐` : "",
     ].filter(Boolean);
     return `${i + 1}. ${p.id} | ${p.guild ? GUILD[p.guild] : "길드 안 정함"} | ${JOB[p.job as Job]} Lv.${p.level} ${expText(p.exp)}${extra.length ? ` | ${extra.join(" | ")}` : ""}`;
   });

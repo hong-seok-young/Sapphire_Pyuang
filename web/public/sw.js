@@ -42,7 +42,8 @@ self.addEventListener("push", (e) => {
         // 글을 못 가져오면 '새 알림'만 알린다
       }
       await self.registration.showNotification((latest && KIND_TITLE[latest.kind]) || "Sapphire", {
-        body: latest ? latest.text : "새 알림이 있어요",
+        // 묶은 부캐의 알림이면 어느 캐릭터 것인지 앞에 (누르면 그 캐릭터로 바꿔서 연다, link 가 #/as/...)
+        body: latest ? (latest.who ? "[" + latest.who + "] " : "") + latest.text : "새 알림이 있어요",
         icon: "/icon-192.png",
         // 상태바 작은 아이콘: 안드로이드는 한 가지 색(모양)만 그려서, 하얀 사파이어 보석 모양 (badge-96.png)
         badge: "/badge-96.png",

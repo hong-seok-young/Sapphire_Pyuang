@@ -2,7 +2,7 @@
 // 본인, 또는 그 사람을 다룰 수 있는 관리자(canManage). 아이디가 여러 표의 키라서 한 번에 모두 바꾼다. 로그인은 그대로 이어진다.
 // fresh: 다른 캐릭터로 바꿨으면(본인만) 새 직업, 레벨로 프로필을 바꾸고 성장 기록을 그 상태부터 새로 시작한다 (산 캐릭터로 성장이 튀지 않게).
 //        예전 캐릭터의 기록은 지우지 않고 level_log_archive 로 옮긴다 (제작자 요청 2026-11-01: 레벨과 경험치 추이는 평생 기록)
-import { FORBIDDEN, NEED_LOGIN, canManage, currentUser, json, paramId, readJson, readProfile, validId } from "../../../../server/auth";
+import { FORBIDDEN, NEED_LOGIN, canManage, currentUser, json, paramId, readJson, readProfile, samePerson, validId } from "../../../../server/auth";
 import type { Env, Role } from "../../../../server/auth";
 
 /** 닉네임이 들어 있는 칸 (표, 칸) */
@@ -13,15 +13,17 @@ const ID_COLUMNS: [string, string][] = [
   ["activity", "user_id"], ["alerts", "user_id"], ["alert_prefs", "user_id"], ["listing_talk", "user_id"], ["plat_orders", "user_id"],
   ["favorites", "user_id"], ["board_posts", "author"], ["board_comments", "user_id"], ["board_likes", "user_id"], ["board_views", "user_id"],
   ["chat_threads", "user_id"], ["chat_gaps", "user_id"], ["plat_wallets", "user_id"], ["layouts", "user_id"],
+  ["users", "main_id"], ["signup_requests", "owner"],
 ];
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   const id = paramId(params);
-  const user = await env.DB.prepare("SELECT id, role FROM users WHERE id = ?").bind(id).first<{ id: string; role: Role }>();
+  const user = await env.DB.prepare("SELECT id, role, main_id FROM users WHERE id = ?").bind(id).first<{ id: string; role: Role; main_id: string | null }>();
   if (!user) return json({ error: "없는 아이디예요" }, 404);
-  const self = user.id === me.id;
+  // 본인: 지금 캐릭터 (같은 사람의 다른 캐릭터도 본인처럼)
+  const self = samePerson(me, user);
   if (!self && !canManage(me.role, user.role)) return FORBIDDEN();
 
   const body = await readJson<{ newId: unknown; fresh: unknown; job: unknown; level: unknown; exp: unknown; guild: unknown }>(request);

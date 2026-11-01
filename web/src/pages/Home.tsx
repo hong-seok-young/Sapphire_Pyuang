@@ -1,5 +1,5 @@
 import type { Me } from "../auth";
-import { Bell, FitLine, HeroTitle, PixelIcon, TopBar } from "../ui";
+import { Bell, FitLine, HeroTitle, MeButton, PixelIcon, TopBar } from "../ui";
 import { VERSION } from "../patchnotes";
 import { useState } from "react";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
@@ -108,9 +108,7 @@ export function Home({ me }: { me: Me }) {
           </p>
         </div>
         {/* 내 정보 (직업, 레벨, 캐릭터 사진, 비밀번호, 로그아웃): 'web' 오른쪽의 사람 단추 (제작자 요청) */}
-        <a className="pill hero-me" href="#/me" aria-label="내 정보" title="내 정보">
-          <PixelIcon name="me" size={32} />
-        </a>
+        <MeButton className="pill hero-me" size={32} />
       </header>
 
       {/* 배치 편집 중 (홈 칸을 꾹 누르면): 끌어서 홈 칸끼리, 홈 칸과 아래 탭 사이를 옮긴다 (launcher.ts) */}

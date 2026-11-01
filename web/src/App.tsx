@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { NEED_LOGIN, loadWiki, useAsync } from "./data";
-import { useRoute } from "./router";
+import { go, useRoute } from "./router";
+import { goCharacter, justSwitched, personOf, setMyCharacters } from "./characters";
 import { FitLine, PixelIcon, Loading, NotFound } from "./ui";
 import { Home, InfoPage, TileIcon } from "./pages/Home";
 import { canSee, clickItem, isUpdated, itemOf, loadLayout, pressItem, setEditing, useLauncher } from "./launcher";
@@ -34,7 +35,7 @@ import { Opening, shouldCelebrate } from "./pages/Opening";
 import { reportOpen, reportView } from "./activity";
 import { markMenuVisit } from "./updates";
 import { ensurePush, reportPush } from "./push";
-import { RANK, TEST_IDS, fetchMe, switchAccount } from "./auth";
+import { RANK, TEST_IDS, errorText, fetchMe, switchAccount } from "./auth";
 import { appMenu } from "./platform";
 import type { Me } from "./auth";
 
@@ -114,6 +115,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   const { data: wiki, error } = useAsync(useCallback(() => loadWiki(), []));
   const [page = "", arg = ""] = route.parts;
 
+  // 부캐 묶기: 👤 단추가 어느 화면에서든 내 캐릭터 목록을 보도록
+  useEffect(() => setMyCharacters(me), [me]);
   // 사용 기록: 웹이나 앱을 새로 열었으면 접속 하나, 그리고 지금 보는 화면
   useEffect(() => reportOpen(me.id), [me.id]);
   useEffect(() => reportView(location.hash), [route]);
@@ -126,7 +129,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   useEffect(() => loadLayout(me.id), [me.id]);
   const launcher = useLauncher();
   // 정식 오픈 축하 (폭죽과 길드마스터의 오픈 글, 오픈 뒤 2주 동안 이 기기에서 한 번. pages/Opening.tsx)
-  const [celebrate, setCelebrate] = useState(() => shouldCelebrate(me.id));
+  // '더 이상 보지 않기'는 사람마다 (부캐로 바꿔도 같다), 캐릭터를 바꿔 새로 연 것은 들어온 것으로 치지 않는다
+  const [celebrate, setCelebrate] = useState(() => !justSwitched() && shouldCelebrate(personOf(me)));
   // 새 글·새 물건 숫자 배지 (news.ts): 그 메뉴를 열면 지우고, 홈으로 올 때 다시 묻는다
   useEffect(() => startNews(me.id), [me.id]);
   useEffect(() => {
@@ -155,6 +159,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   if (page === "password") body = <PasswordPage onDone={() => (location.hash = "#/")} />;
   else if (page === "admin") body = RANK[me.role] >= 1 ? <AdminPage me={me} /> : <NotFound what="페이지" />;
   else if (page === "me") body = <MePage me={me} onMe={onMe} onLogout={onLogout} />;
+  else if (page === "as") body = <SwitchTo me={me} who={arg} to={route.query.get("to") ?? ""} />;
   else if (page === "ranking") body = <RankingPage me={me} />;
   else if (page === "requests") body = <RequestsPage me={me} />;
   else if (page === "alerts") body = <AlertsPage developer={me.role === "developer"} />;
@@ -243,7 +248,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
           );
         })}
       </nav>
-      {celebrate && <Opening user={me.id} onClose={() => setCelebrate(false)} />}
+      {celebrate && <Opening user={personOf(me)} onClose={() => setCelebrate(false)} />}
       {/* 끌고 있는 칸 (손가락을 따라온다) */}
       {dragItem && launcher.drag && (
         <div className="launch-ghost" style={{ left: launcher.drag.x, top: launcher.drag.y }} aria-hidden>
@@ -255,4 +260,15 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
       )}
     </div>
   );
+}
+
+/** 묶은 부캐의 알림을 누르면 (#/as/캐릭터?to=그 알림의 주소): 그 캐릭터로 바꾸고 그 화면을 연다 (부캐 묶기, 폰 알림도 같다) */
+function SwitchTo({ me, who, to }: { me: Me; who: string; to: string }) {
+  const [error, setError] = useState("");
+  useEffect(() => {
+    const next = to.startsWith("#/") && !to.startsWith("#/as/") ? to : "#/alerts";
+    if (who === me.id) go(next, true);
+    else goCharacter(who, next).catch((x) => setError(errorText(x)));
+  }, [me.id, who, to]);
+  return <Loading error={error} />;
 }

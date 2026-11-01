@@ -13,6 +13,8 @@ export interface Alert {
   link: string | null;
   at: number;
   readAt: number | null;
+  /** 묶은 부캐의 알림이면 그 캐릭터 (link 는 그 캐릭터로 바꾸고 여는 #/as/...) */
+  who?: string;
 }
 
 /** 메뉴별 알림 종류 (켜고 끄기 칸). 이름은 짧은 명사로 */

@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS users (
   created_by TEXT,
   high_spec INTEGER NOT NULL DEFAULT 0,   -- 고스펙 길드원 (길드마스터, 오피서가 표시. 플래티넘 상점에서 더 할인)
   push_perm TEXT,                         -- 폰 알림 허용 상태 (functions/api/alerts/device.ts): on / app_off / denied / ask / none
-  push_at INTEGER                         -- 그 상태를 마지막으로 확인한 때
+  push_at INTEGER,                        -- 그 상태를 마지막으로 확인한 때
+  main_id TEXT                            -- 부캐면 본캐 아이디 (부캐 묶기, 본캐 아이디와 비밀번호로 로그인). 본캐와 혼자인 계정은 비어 있다
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -407,5 +408,6 @@ CREATE TABLE IF NOT EXISTS signup_requests (
   pw_hash TEXT NOT NULL,
   pw_salt TEXT NOT NULL,
   pw_iter INTEGER NOT NULL,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  owner TEXT                              -- '내 정보'의 캐릭터 추가 요청이면 요청한 사람의 본캐 (승낙하면 그 사람의 부캐가 된다)
 );

@@ -62,7 +62,11 @@ export function AlertsPage({ developer = false }: { developer?: boolean }) {
           {alerts.map((a) => (
             <li key={a.id} className={a.readAt ? "" : "alert-new"}>
               <a href={a.link ?? "#/alerts"}>
-                <span className="alert-text">{a.text}</span>
+                <span className="alert-text">
+                  {/* 묶은 부캐의 알림: 어느 캐릭터 것인지 (누르면 그 캐릭터로 바꿔서 연다) */}
+                  {a.who && <span className="alert-who">{a.who}</span>}
+                  {a.text}
+                </span>
                 <small>{ago(a.at)}</small>
               </a>
             </li>

@@ -1,5 +1,5 @@
 // POST /api/signup { id, password } -> 아이디 생성 요청 (로그인 전, 누구나). 길드마스터·오피서가 '길드원 관리'에서 승낙하면 그 비밀번호로 들어온다
-// GET  /api/signup -> 승낙을 기다리는 요청 목록 (오피서 이상)
+// GET  /api/signup -> 승낙을 기다리는 요청 목록 (오피서 이상). '내 정보'의 캐릭터 추가 요청(owner: 요청한 사람의 본캐)도 같이
 // 제작자 요청 2026-11-01: 매번 운영진이 아이디를 만들어 알려 주기 귀찮으니, 로그인 화면에서 본인이 닉네임과 비밀번호를 넣어 요청하고
 // 운영진이 확인해 승낙하게. 비밀번호는 원문을 두지 않고 해시만 둔다 (승낙하면 그대로 계정 비밀번호가 된다, 바꾸라고 하지 않는다).
 import { NEED_LOGIN, FORBIDDEN, RANK, currentUser, json, passwordFields, readJson, validId, validPassword } from "../../../server/auth";
@@ -36,6 +36,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (RANK[me.role] < 1) return FORBIDDEN();
-  const { results } = await env.DB.prepare("SELECT id, created_at FROM signup_requests ORDER BY created_at").all<{ id: string; created_at: number }>();
-  return json(results.map((r) => ({ id: r.id, createdAt: r.created_at })));
+  const { results } = await env.DB.prepare("SELECT id, created_at, owner FROM signup_requests ORDER BY created_at")
+    .all<{ id: string; created_at: number; owner: string | null }>();
+  return json(results.map((r) => ({ id: r.id, createdAt: r.created_at, owner: r.owner })));
 };

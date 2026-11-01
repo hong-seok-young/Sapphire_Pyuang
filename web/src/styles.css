@@ -1512,6 +1512,8 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 .signup-requests { margin-bottom: 12px; border-color: #3fe0a0; }
 .signup-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid rgba(169, 162, 207, 0.18); }
 .signup-row b { flex: 1; min-width: 0; font-size: 15px; }
+.signup-who { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.signup-who .account-link { color: var(--sapphire); }
 .signup-row small { font-size: 11px; color: var(--muted); white-space: nowrap; }
 
 /* new posts and listings from other members (src/news.ts, 제작자 요청 2026-11-01): a red count bubble, apart from the mint
@@ -1560,3 +1562,32 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 @keyframes opening-blink { 50% { opacity: 0.35; } }
 @keyframes opening-hero { 0% { opacity: 0; transform: scale(0.6); } 18% { opacity: 1; transform: scale(1.08); } 30% { transform: scale(1); } 100% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .opening, .opening-card, .opening-mark, .opening-hero { animation: none; } }
+/* linked characters (main + alts): 👤 menu, 내 캐릭터, admin merge, alert tag */
+.char-menu-back { position: fixed; inset: 0; z-index: 59; }
+.char-menu {
+  position: fixed; z-index: 60; right: 10px; top: calc(62px + env(safe-area-inset-top)); min-width: 200px; max-width: calc(100vw - 20px);
+  display: flex; flex-direction: column; gap: 4px; padding: 6px;
+  background: var(--panel); border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 var(--hi), 0 8px 24px rgba(0, 0, 0, 0.5);
+  animation: char-menu-in 0.14s ease-out;
+}
+@keyframes char-menu-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .char-menu { animation: none; } }
+.char-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.char-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; text-align: left; cursor: pointer;
+  background: var(--panel-2); border: var(--px) solid var(--edge); color: var(--text);
+}
+.char-item:disabled { opacity: 0.6; }
+.char-on { box-shadow: inset 0 0 0 2px var(--gold); }
+.char-name { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.char-name b { font-size: 14px; }
+.char-name small { font-size: 11px; color: var(--muted); }
+.char-mark { flex: none; width: 16px; color: var(--gold); text-align: center; }
+.account-alt { margin-left: 18px; }
+.account-main .account-link { color: var(--sapphire); }
+.link-picker { display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--panel-2); border: var(--px) solid var(--edge); }
+.link-picker b { font-size: 13px; }
+.link-picker small { font-size: 11px; color: var(--muted); }
+.link-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.link-list .pill { font-size: 12px; padding: 5px 9px; }
+.alert-who { flex: none; margin-right: 6px; padding: 1px 6px; font-size: 11px; color: var(--sapphire); border: 1px solid var(--sapphire); }

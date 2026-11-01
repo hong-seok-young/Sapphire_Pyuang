@@ -61,6 +61,21 @@ export interface Me {
   avatar: number | null;
   /** 계정을 만든 때 (아이콘 다시 설치 안내: 아이콘이 바뀌기 전부터 있던 계정에만) */
   createdAt?: number | null;
+  /** 내 캐릭터들 (부캐 묶기: 본캐 먼저). 하나뿐이면 자기만. role 은 그 사람 전체의 권한, 캐릭터마다의 직책은 여기 role */
+  characters?: Character[];
+  /** 운영진 승낙을 기다리는 캐릭터 추가 요청 (닉네임) */
+  pendingCharacters?: string[];
+}
+
+/** 같은 사람의 캐릭터 하나 (부캐 묶기, 제작자 요청 2026-11-01) */
+export interface Character {
+  id: string;
+  role: Role;
+  /** 본캐 (로그인하는 아이디) */
+  main: boolean;
+  job: Job | null;
+  level: number | null;
+  guild: Guild | null;
 }
 
 export interface RankEntry {
@@ -98,6 +113,8 @@ export interface Account {
   /** 폰 알림 허용 상태 (앱을 열 때 확인): on / app_off / denied / ask / none. 아직 모르면 null */
   push: "on" | "app_off" | "denied" | "ask" | "none" | null;
   pushAt: number | null;
+  /** 부캐면 본캐 아이디 (부캐 묶기). 본캐와 혼자인 계정은 null */
+  mainId?: string | null;
 }
 
 export class ApiError extends Error {
@@ -145,6 +162,19 @@ export const setHighSpec = (id: string, on: boolean) =>
   api<{ id: string; highSpec: boolean }>(`/api/users/${encodeURIComponent(id)}/highspec`, "PUT", { on });
 export const resetPassword = (id: string, password?: string) =>
   api<{ id: string; tempPassword: string }>(`/api/users/${encodeURIComponent(id)}/reset`, "POST", { password });
+
+// ---------- 부캐 묶기 (제작자 요청 2026-11-01: 같은 사람의 캐릭터를 하나의 계정으로) ----------
+
+/** 두 계정을 묶는다 (오피서 이상). main 이 본캐(로그인 아이디), 다른 쪽은 부캐 */
+export const linkAccounts = (id: string, other: string, main: string) =>
+  api<{ ok: true; main: string; sub: string }>(`/api/users/${encodeURIComponent(id)}/link`, "POST", { with: other, main });
+/** 부캐를 떼어 따로 로그인하게 (처음 비밀번호 123123) */
+export const unlinkAccount = (id: string) =>
+  api<{ id: string; tempPassword: string }>(`/api/users/${encodeURIComponent(id)}/link`, "DELETE");
+/** 내 캐릭터 추가 요청 (운영진이 승낙하면 부캐가 된다) */
+export const requestCharacter = (id: string) => api<{ ok: true; id: string }>("/api/characters", "POST", { id });
+/** 내 다른 캐릭터로 바꾸기 */
+export const switchCharacter = (to: string) => api<Me>("/api/characters/switch", "POST", { to });
 /**
  * 닉네임 바꾸기 (본인, 또는 다룰 수 있는 관리자). character 를 주면(본인만) 다른 캐릭터로 바꾼 것:
  * 직업, 레벨을 그 캐릭터로 바꾸고 성장 기록을 새로 시작한다
@@ -244,6 +274,8 @@ export const deleteAvatarOf = (id: string) => api<{ ok: boolean }>(`/api/users/$
 export interface SignupRequest {
   id: string;
   createdAt: number;
+  /** '내 정보'의 캐릭터 추가 요청이면 요청한 사람의 본캐 (승낙하면 부캐가 된다) */
+  owner?: string | null;
 }
 
 /** 로그인 전에 아이디 생성 요청 (닉네임, 비밀번호). 운영진이 승낙하면 그 비밀번호로 들어온다 */

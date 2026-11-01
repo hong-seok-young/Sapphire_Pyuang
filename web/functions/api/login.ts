@@ -22,11 +22,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     if (!pending) await hashPassword(password, DUMMY_SALT); // 없는 아이디도 같은 시간이 걸리게
     return json({ error: "아이디나 비밀번호가 맞지 않아요" }, 401);
   }
-  if (!(await verifyPassword(password, row))) return json({ error: "아이디나 비밀번호가 맞지 않아요" }, 401);
+  // 부캐(본캐에 묶인 캐릭터)는 본캐 비밀번호로 들어온다. 들어오면 그 캐릭터로 시작한다 (부캐 묶기)
+  const login = row.main_id ? await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(row.main_id).first<UserRow>() : row;
+  if (!login || !(await verifyPassword(password, login))) return json({ error: "아이디나 비밀번호가 맞지 않아요" }, 401);
 
   await env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(Date.now()).run(); // 끝난 세션 정리
   const token = await createSession(env, row.id);
-  return json(await meInfo(env, row), 200, {
+  return json(await meInfo(env, { ...row, must_change: login.must_change }), 200, {
     "set-cookie": sessionCookie(token),
   });
 };

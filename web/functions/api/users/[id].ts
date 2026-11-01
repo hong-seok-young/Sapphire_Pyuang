@@ -1,12 +1,12 @@
-// DELETE /api/users/:id         -> 계정 지우기 (자기보다 낮은 역할만)
+// DELETE /api/users/:id         -> 계정 지우기 (자기보다 낮은 역할만). 부캐가 있는 본캐를 지우면 가장 먼저 묶은 부캐가 본캐가 되고 비밀번호를 이어받는다
 // PATCH  /api/users/:id { role } -> 역할 바꾸기 (오피서 이상: 오피서 임명/해제 등. 오피서도 길드마스터와 같다)
-import { FORBIDDEN, NEED_LOGIN, canManage, currentUser, isRole, json, paramId, readJson } from "../../../server/auth";
+import { FORBIDDEN, NEED_LOGIN, canManage, currentUser, isRole, json, paramId, readJson, samePerson } from "../../../server/auth";
 import { notify } from "../../../server/alerts";
 import type { Env, Role } from "../../../server/auth";
 
 async function target(env: Env, params: Record<string, string | string[]>) {
   const id = paramId(params);
-  return env.DB.prepare("SELECT id, role FROM users WHERE id = ?").bind(id).first<{ id: string; role: Role }>();
+  return env.DB.prepare("SELECT id, role, main_id FROM users WHERE id = ?").bind(id).first<{ id: string; role: Role; main_id: string | null }>();
 }
 
 export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params }) => {
@@ -14,8 +14,23 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
   if (!me) return NEED_LOGIN();
   const user = await target(env, params);
   if (!user) return json({ error: "없는 아이디예요" }, 404);
-  if (user.id === me.id || !canManage(me.role, user.role)) return FORBIDDEN();
+  if (samePerson(me, user) || !canManage(me.role, user.role)) return FORBIDDEN();
+  // 본캐를 지우는데 부캐가 있으면: 가장 먼저 묶은 부캐가 본캐가 되고 비밀번호를 이어받는다 (그 사람은 새 본캐 아이디로 로그인)
+  const heir = user.main_id
+    ? null
+    : await env.DB.prepare("SELECT id FROM users WHERE main_id = ? ORDER BY created_at LIMIT 1").bind(user.id).first<{ id: string }>();
+  const promote = heir
+    ? [
+        env.DB.prepare(
+          "UPDATE users SET main_id = NULL, pw_hash = (SELECT pw_hash FROM users WHERE id = ?1), pw_salt = (SELECT pw_salt FROM users WHERE id = ?1), " +
+            "pw_iter = (SELECT pw_iter FROM users WHERE id = ?1), must_change = (SELECT must_change FROM users WHERE id = ?1) WHERE id = ?2",
+        ).bind(user.id, heir.id),
+        env.DB.prepare("UPDATE users SET main_id = ? WHERE main_id = ?").bind(heir.id, user.id),
+        env.DB.prepare("UPDATE signup_requests SET owner = ? WHERE owner = ?").bind(heir.id, user.id),
+      ]
+    : [env.DB.prepare("DELETE FROM signup_requests WHERE owner = ?").bind(user.id)];
   await env.DB.batch([
+    ...promote,
     env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM profiles WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM level_log WHERE user_id = ?").bind(user.id),
@@ -67,7 +82,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
   if (!user) return json({ error: "없는 아이디예요" }, 404);
   const body = await readJson<{ role: string }>(request);
   const role = body.role;
-  if (!isRole(role) || user.id === me.id || !canManage(me.role, user.role) || !canManage(me.role, role)) {
+  if (!isRole(role) || samePerson(me, user) || !canManage(me.role, user.role) || !canManage(me.role, role)) {
     return FORBIDDEN();
   }
   await env.DB.prepare("UPDATE users SET role = ? WHERE id = ?").bind(role, user.id).run();

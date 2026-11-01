@@ -14,16 +14,18 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const { results } = await env.DB.prepare(
     "SELECT u.id AS id, u.role AS role, u.must_change AS must_change, u.created_at AS created_at, u.created_by AS created_by, " +
       "p.job AS job, p.level AS level, p.guild AS guild, u.high_spec AS high_spec, u.push_perm AS push_perm, u.push_at AS push_at, " +
-      "a.updated_at AS avatar FROM users u LEFT JOIN profiles p ON p.user_id = u.id " +
+      "a.updated_at AS avatar, u.main_id AS main_id FROM users u LEFT JOIN profiles p ON p.user_id = u.id " +
       "LEFT JOIN avatars a ON a.user_id = u.id",
   ).all<{
     id: string; role: Role; must_change: number; created_at: number; created_by: string | null; job: Job | null; level: number | null;
-    guild: Guild | null; avatar: number | null; high_spec: number; push_perm: string | null; push_at: number | null;
+    guild: Guild | null; avatar: number | null; high_spec: number; push_perm: string | null; push_at: number | null; main_id: string | null;
   }>();
   const users = results
     .map((u) => ({
       id: u.id, role: u.role, mustChange: u.must_change === 1, createdAt: u.created_at, createdBy: u.created_by,
       job: u.job, level: u.level, guild: u.guild, avatar: u.avatar, highSpec: u.high_spec === 1, push: u.push_perm, pushAt: u.push_at,
+      // 부캐면 본캐 아이디 (부캐 묶기)
+      mainId: u.main_id,
     }))
     // 길드 직책 순서: 길드마스터, 오피서, 길드원 (앱개발자는 길드 직책이 아니라 길드원 자리. 제작자 요청)
     .sort((a, b) => POSITION[b.role] - POSITION[a.role] || a.id.localeCompare(b.id, "ko"));

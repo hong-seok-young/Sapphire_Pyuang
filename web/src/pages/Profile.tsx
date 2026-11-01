@@ -2,13 +2,14 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import {
   EXP_MAX, GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, MAX_LEVEL, ROLE_NAME, avatarUrl, deleteMyAvatar, errorText, expText,
-  TEST_IDS, logout, positionOf, renameAccount, saveMyProfile, switchAccount,
+  TEST_IDS, logout, positionOf, renameAccount, requestCharacter, saveMyProfile, switchAccount,
 } from "../auth";
 import type { ChangeKind, Guild, Job, Me } from "../auth";
 import { JobEmblem, JobGlyph } from "../emblems";
 import { ChangeAsk, HeroTitle, TopBar } from "../ui";
 import { AvatarMaker } from "./AvatarMaker";
 import { useBackToLogin } from "./Login";
+import { goCharacter } from "../characters";
 
 /** "12.345" -> 12345, 비었으면 null, 틀렸으면 undefined */
 function parseExp(text: string): number | null | undefined {
@@ -253,6 +254,8 @@ function AvatarPanel({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
 /** 내 정보: 직업, 레벨, 경험치 바꾸기 (레벨업하면 여기서), 캐릭터 사진, 비밀번호, 로그아웃 */
 export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; onLogout: () => void }) {
   const [saved, setSaved] = useState(false);
+  // 직책은 지금 캐릭터의 것 (me.role 은 묶은 캐릭터 중 가장 높은 권한)
+  const myRole = me.characters?.find((c) => c.id === me.id)?.role ?? me.role;
   return (
     <>
       <TopBar title="내 정보" />
@@ -262,7 +265,7 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
           <div className="me-name">{me.id}</div>
           <div className="muted">
             {me.guild && `${GUILD_TIER[me.guild]} ${GUILD_NAME[me.guild]} · `}
-            {ROLE_NAME[positionOf(me.role)]}
+            {ROLE_NAME[positionOf(myRole)]}
             {me.job && ` · ${JOB_NAME[me.job]}`}
             {me.level && ` · Lv.${me.level}`}
             {me.exp !== null && ` · ${expText(me.exp)}`}
@@ -315,6 +318,7 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
         <a className="btn btn-ghost" href="#/ranking">🏆 길드 랭킹</a>
         <a className="btn btn-ghost" href="#/password">비밀번호 변경</a>
       </div>
+      <CharactersPanel me={me} />
       <div className="links">
         <button
           type="button"
@@ -328,6 +332,96 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
         </button>
       </div>
     </>
+  );
+}
+
+/**
+ * 내 캐릭터 (부캐 묶기, 제작자 요청 2026-11-01): 묶은 캐릭터 목록(눌러서 바꾸기)과 '캐릭터 추가' 요청.
+ * 추가한 캐릭터는 길드마스터·오피서가 '길드원 관리'에서 승낙해야 생긴다. 로그인은 본캐 아이디와 비밀번호로
+ */
+function CharactersPanel({ me }: { me: Me }) {
+  const list = me.characters ?? [];
+  const [pending, setPending] = useState(me.pendingCharacters ?? []);
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function run(fn: () => Promise<void>) {
+    setBusy(true);
+    setError("");
+    try {
+      await fn();
+    } catch (x) {
+      setError(errorText(x));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="panel profile-panel">
+      <h2 className="panel-title">내 캐릭터</h2>
+      {list.length > 1 && (
+        <div className="char-list">
+          {list.map((c) => (
+            <button
+              key={c.id}
+              className={"char-item" + (c.id === me.id ? " char-on" : "")}
+              disabled={busy}
+              onClick={() => c.id !== me.id && run(() => goCharacter(c.id))}
+            >
+              <span className="char-name">
+                <b>{c.id}</b>
+                <small>
+                  {c.main ? "본캐 (로그인 아이디)" : "부캐"}
+                  {c.level ? ` · Lv.${c.level}` : ""}
+                  {c.job ? ` ${JOB_NAME[c.job]}` : ""}
+                </small>
+              </span>
+              <span className="char-mark">{c.id === me.id ? "✓" : ""}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {pending.length > 0 && <p className="form-note">승낙 대기: {pending.join(", ")}</p>}
+      {adding ? (
+        <div className="mk-actions">
+          <input
+            className="mk-input"
+            value={name}
+            onChange={(e) => setName(e.target.value.slice(0, 20))}
+            placeholder="캐릭터 닉네임"
+            aria-label="캐릭터 닉네임"
+            autoCapitalize="off"
+          />
+          <button
+            className="pill pill-on"
+            disabled={busy || !name.trim()}
+            onClick={() =>
+              run(async () => {
+                const r = await requestCharacter(name.trim());
+                setPending((p) => [...p, r.id]);
+                setName("");
+                setAdding(false);
+              })
+            }
+          >
+            요청
+          </button>
+          <button className="pill" disabled={busy} onClick={() => setAdding(false)}>
+            취소
+          </button>
+        </div>
+      ) : (
+        <div className="links">
+          <button className="btn btn-ghost" onClick={() => setAdding(true)}>
+            ＋ 캐릭터 추가
+          </button>
+        </div>
+      )}
+      {error && <p className="form-error">{error}</p>}
+    </section>
   );
 }
 
