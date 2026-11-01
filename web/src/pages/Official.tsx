@@ -1,18 +1,22 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, createElement, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { errorText } from "../auth";
-import { OFFICIAL_TABS, TYPE_NAME, fetchOfficial, officialUrl } from "../official";
-import type { OfficialItem, OfficialTab } from "../official";
+import { OFFICIAL_TABS, TYPE_NAME, fetchOfficial, fetchOfficialPost, officialLink, officialUrl } from "../official";
+import type { OfficialItem, OfficialPost, OfficialTab } from "../official";
 import { go } from "../router";
 import { Loading, TopBar } from "../ui";
 
 /** 한국 날짜 'YYYY-MM-DD' (며칠 전) */
 const kstDay = (daysAgo = 0) => new Date(Date.now() + 9 * 3_600_000 - daysAgo * 86_400_000).toISOString().slice(0, 10);
 
+const dates = (it: Pick<OfficialItem, "start" | "end">, today: string) =>
+  (it.start ?? "") + (it.end ? ` ~ ${it.end}${it.end < today ? " · 종료" : " · 진행 중"}` : "");
+
 /**
- * 공식 소식 (제작자 요청 2026-11-01): 아이모 공식 홈페이지의 공지사항, 점검, 이벤트 (정보 안의 칸).
- * 제목과 날짜만 보이고 누르면 공식 페이지가 새 창으로 열린다. 고른 칸은 주소 ?t= 에 남는다
+ * 게시판 '아이모 소식' (제작자 요청 2026-11-01): 아이모 공식 홈페이지의 공지사항, 점검, 이벤트를 칸으로 나눠 보인다.
+ * 누르면 앱 안에서 읽는다 (#/official/번호). 고른 칸은 주소 ?t= 에 남는다
  */
-export function OfficialPage({ tab }: { tab: OfficialTab }) {
+export function OfficialList({ tab }: { tab: OfficialTab }) {
   const [items, setItems] = useState<OfficialItem[] | null>(null);
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -57,10 +61,9 @@ export function OfficialPage({ tab }: { tab: OfficialTab }) {
   const fresh = kstDay(2);
   return (
     <>
-      <TopBar title="공식 소식" />
-      <div className="filter">
+      <div className="filter off-tabs">
         {OFFICIAL_TABS.map((t) => (
-          <button key={t.key} className={"pill" + (tab === t.key ? " pill-on" : "")} onClick={() => go(`#/official?t=${t.key}`, true)}>
+          <button key={t.key} className={"pill" + (tab === t.key ? " pill-on" : "")} onClick={() => go(`#/board?cat=imo&t=${t.key}`, true)}>
             {t.label}
           </button>
         ))}
@@ -75,7 +78,7 @@ export function OfficialPage({ tab }: { tab: OfficialTab }) {
             const ended = !!it.end && it.end < today;
             return (
               <li key={it.id}>
-                <a className={"off-row" + (ended ? " off-ended" : "")} href={officialUrl(it)} target="_blank" rel="noopener noreferrer">
+                <a className={"off-row" + (ended ? " off-ended" : "")} href={`#/official/${it.id}`}>
                   {it.image && <img className="off-thumb" src={it.image} alt="" loading="lazy" decoding="async" width={84} height={47} />}
                   <span className="off-main">
                     <span className="off-head">
@@ -83,14 +86,7 @@ export function OfficialPage({ tab }: { tab: OfficialTab }) {
                       {!ended && it.start && it.start >= fresh && <span className="off-new">NEW</span>}
                     </span>
                     <b className="off-title">{it.title}</b>
-                    <small>
-                      {it.start}
-                      {it.end ? ` ~ ${it.end}` : ""}
-                      {it.end ? (ended ? " · 종료" : " · 진행 중") : ""}
-                    </small>
-                  </span>
-                  <span className="off-go" aria-hidden="true">
-                    ↗
+                    <small>{dates(it, today)}</small>
                   </span>
                 </a>
               </li>
@@ -106,6 +102,100 @@ export function OfficialPage({ tab }: { tab: OfficialTab }) {
           </button>
         </div>
       )}
+    </>
+  );
+}
+
+/** 남겨서 그리는 태그 (공식 글의 HTML 은 서버가 이미 걸렀지만, 여기서도 이것만 만든다: 속성은 그림 주소와 링크만) */
+const TAGS: Record<string, string> = {
+  P: "p", BR: "br", B: "b", I: "i", U: "u", H4: "h4", UL: "ul", OL: "ol", LI: "li", TABLE: "table", THEAD: "thead", TBODY: "tbody",
+  TR: "tr", TD: "td", TH: "th", HR: "hr", BLOCKQUOTE: "blockquote", IMG: "img", A: "a",
+};
+
+function renderNode(node: Node, key: number): ReactNode {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+  if (node.nodeType !== Node.ELEMENT_NODE) return null;
+  const el = node as Element;
+  const tag = TAGS[el.tagName];
+  const kids = [...el.childNodes].map(renderNode);
+  if (!tag) return <Fragment key={key}>{kids}</Fragment>;
+  if (tag === "img") {
+    const src = el.getAttribute("src") ?? "";
+    return /^https?:\/\//.test(src) ? <img key={key} src={src} alt="" loading="lazy" decoding="async" /> : null;
+  }
+  if (tag === "a") {
+    const href = el.getAttribute("href") ?? "";
+    if (!/^https?:\/\//.test(href)) return <Fragment key={key}>{kids}</Fragment>;
+    // 다른 공식 글로 가는 링크는 앱 안에서
+    const inApp = officialLink(href);
+    return inApp ? (
+      <a key={key} href={inApp}>
+        {kids}
+      </a>
+    ) : (
+      <a key={key} href={href} target="_blank" rel="noopener noreferrer">
+        {kids}
+      </a>
+    );
+  }
+  if (tag === "br" || tag === "hr") return createElement(tag, { key });
+  if (tag === "table") return createElement("div", { key, className: "off-table" }, createElement("table", null, kids));
+  return createElement(tag, { key }, kids);
+}
+
+/** 공식 글 하나를 앱 안에서 읽는다 (그림 포함, 맨 위에 원문 링크) */
+export function OfficialPostPage({ id }: { id: number }) {
+  const [post, setPost] = useState<OfficialPost | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let alive = true;
+    setPost(null);
+    setError("");
+    fetchOfficialPost(id).then(
+      (p) => alive && setPost(p),
+      (x) => alive && setError(errorText(x)),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+  const body = useMemo(() => {
+    if (!post?.html) return null;
+    const doc = new DOMParser().parseFromString(`<body>${post.html}</body>`, "text/html");
+    return [...doc.body.childNodes].map(renderNode);
+  }, [post?.html]);
+
+  if (!post) {
+    return (
+      <>
+        <TopBar title="아이모 소식" />
+        <Loading error={error} />
+        {error && (
+          <div className="links">
+            <a className="btn btn-ghost" href={`https://withhive.com/notice/32/${id}`} target="_blank" rel="noopener noreferrer">
+              공식 페이지 ↗
+            </a>
+          </div>
+        )}
+      </>
+    );
+  }
+  const today = kstDay();
+  return (
+    <>
+      <TopBar title="아이모 소식" />
+      <a className="orig-link" href={officialUrl(post)} target="_blank" rel="noopener noreferrer">
+        <span>📄 컴투스 공식 {TYPE_NAME[post.type] ?? ""}</span>
+        <b>원문 보기 ↗</b>
+      </a>
+      <article className="panel off-post">
+        <div className="off-head">
+          <span className={"off-type off-type-" + post.type}>{TYPE_NAME[post.type] ?? post.type}</span>
+          <small>{dates(post, today)}</small>
+        </div>
+        <h2 className="off-post-title">{post.title}</h2>
+        <div className="off-body">{body ?? <p className="off-text">{post.body}</p>}</div>
+      </article>
     </>
   );
 }

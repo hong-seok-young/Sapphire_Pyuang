@@ -426,7 +426,8 @@ CREATE TABLE IF NOT EXISTS official_news (
   end_date TEXT,                          -- 이벤트 끝나는 날 (있으면)
   image TEXT,                             -- 대표 그림 주소 (이벤트)
   body TEXT NOT NULL,                     -- 본문 글자만 (그림, 꾸밈은 뺐다. 3만 자까지)
-  fetched_at INTEGER NOT NULL             -- 받거나 바뀐 때
+  fetched_at INTEGER NOT NULL,            -- 받거나 바뀐 때
+  html TEXT                               -- 간단히 한 본문 HTML (문단, 굵게, 표, 목록, 그림, 링크만. 게시판 '아이모 소식'에서 읽는다, 58KB 넘으면 비움)
 );
 CREATE INDEX IF NOT EXISTS official_news_kind ON official_news (kind, id);
 

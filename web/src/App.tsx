@@ -30,8 +30,7 @@ import { AlertsPage } from "./pages/Alerts";
 import { ChatGapsPage } from "./pages/ChatGaps";
 import { PlatShopPage } from "./pages/PlatShop";
 import { BoardPage } from "./pages/Board";
-import { OfficialPage } from "./pages/Official";
-import { isOfficialTab } from "./official";
+import { OfficialPostPage } from "./pages/Official";
 import { PatchNotesPage } from "./pages/PatchNotes";
 import { OddsPage, OddsTablePage } from "./pages/Odds";
 import { Opening, shouldCelebrate } from "./pages/Opening";
@@ -234,7 +233,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "alerts") body = <AlertsPage developer={me.role === "developer"} />;
   else if (page === "shop") body = <PlatShopPage />;
   else if (page === "patch") body = <PatchNotesPage />;
-  else if (page === "official") body = <OfficialPage tab={isOfficialTab(route.query.get("t")) ? (route.query.get("t") as "notice" | "maint" | "event") : "notice"} />;
+  // 아이모 소식 글 읽기 (#/official/번호). 예전 목록 주소(#/official)는 게시판 '아이모 소식'으로
+  else if (page === "official") body = Number(arg) ? <OfficialPostPage id={Number(arg)} /> : <GoTo to="#/board?cat=imo" />;
   else if (page === "odds") body = arg ? <OddsTablePage id={arg} q={route.query.get("q") ?? ""} /> : <OddsPage q={route.query.get("q") ?? ""} cat={route.query.get("c") ?? ""} />;
   else if (page === "board") body = <BoardPage me={me} arg={arg} sub={route.parts[2] ?? ""} query={route.query} />;
   else if (page === "") body = <Home me={me} />;
@@ -341,4 +341,10 @@ function SwitchTo({ me, who, to }: { me: Me; who: string; to: string }) {
     else goCharacter(who, next).catch((x) => setError(errorText(x)));
   }, [me.id, who, to]);
   return <Loading error={error} />;
+}
+
+/** 예전 주소를 새 주소로 바꾼다 (기록을 남기지 않게 replace) */
+function GoTo({ to }: { to: string }) {
+  useEffect(() => go(to, true), [to]);
+  return <Loading />;
 }

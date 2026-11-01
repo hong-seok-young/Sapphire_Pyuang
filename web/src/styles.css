@@ -1615,3 +1615,19 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 .off-title { font-size: 14px; font-weight: 400; line-height: 1.35; }
 .off-main small { font-size: 11px; color: var(--muted); }
 .off-go { flex: none; color: var(--muted); }
+/* official post read in the app (Official.tsx OfficialPostPage) */
+.pill-imo { border-color: var(--sapphire); }
+.off-post { padding: 12px; }
+.off-post .off-head { margin-bottom: 6px; }
+.off-post .off-head small { font-size: 11px; color: var(--muted); }
+.off-post-title { margin: 0 0 10px; font-size: 16px; line-height: 1.4; }
+.off-body { font-size: 14px; line-height: 1.6; word-break: keep-all; overflow-wrap: anywhere; }
+.off-body p { margin: 0; min-height: 0.6em; }
+.off-body img { display: block; max-width: 100%; height: auto; margin: 6px 0; }
+.off-body h4 { margin: 10px 0 4px; font-size: 15px; color: var(--gold); }
+.off-body ul, .off-body ol { margin: 4px 0; padding-left: 20px; }
+.off-body a { color: var(--sapphire); text-decoration: underline; }
+.off-body .off-table { overflow-x: auto; margin: 6px 0; }
+.off-body table { border-collapse: collapse; font-size: 12px; min-width: 100%; }
+.off-body td, .off-body th { border: 1px solid var(--hi); padding: 4px 6px; }
+.off-text { white-space: pre-line; }

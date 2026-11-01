@@ -202,20 +202,23 @@
 - 챗봇: 확률을 묻거나 질문의 이름이 공식 표에 나오면 그 표를 '[컴투스 공식 확률: …]' 로 붙인다 (`chat.ts` 3-1, 표 2개, 1500자씩).
 - 확률이 바뀌면(패치, 새 상자) 스크립트로 다시 받아 자료 저장소에 올리고 배포한다.
 
-## 공식 소식 (제작자 요청 2026-11-01: 공홈의 공지사항, 이벤트, 정기 점검도 읽어 오게)
+## 아이모 소식 (제작자 요청 2026-11-01: 공홈의 공지사항, 이벤트, 정기 점검도 읽어 오게. 게시판의 '아이모 소식' 버튼 안에 세분화)
 - 아이모 공식 홈페이지의 공지·이벤트는 HIVE(withhive.com, 아이모 게임 번호 32)에 있다 (미니사이트 event.com2us.com 은 링크만).
   공개 페이지가 쓰는 목록 주소 `POST https://withhive.com/api/notice/list/32` (`page=&type=&rows=`, type 비움 = 공지사항(공지 N, 점검 C, 안내 I, 오류 D),
   E = 이벤트, 한국어는 쿠키 `language=ko`, 본문 HTML 이 같이 온다)를 `web/scripts/fetch-official.mjs` 가 불러 D1 `official_news` 에 넣는다
-  (본문은 그림과 꾸밈을 뺀 글자만, 바뀐 것만 고침, 지우지 않음).
+  (본문은 글자만(body, 챗봇용)과 간단히 한 HTML(html: 문단, 굵게, 표, 목록, 그림, 링크만, 58KB 넘으면 비움) 두 가지, 바뀐 것만 고침, 지우지 않음.
+  D1 은 SQL 한 줄 100KB 까지라 바이트로 자른다).
 - GitHub Actions `.github/workflows/official-news.yml` 이 30분마다 최근 것(쪽마다 30개)을 받고, 표가 비었거나 '모든 쪽 다시 받기'로 돌리면 전부 받는다
   (비밀값은 배포와 같은 CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID). Pages Functions 는 무료 요금제 CPU 한도 때문에 받아 오기를 하지 않는다.
 - withhive 는 한국 밖에서 부르면 한국 전용 글(원스토어 프로모션, 국내 콜라보, 카카오 채널 이벤트 등)을 빼고 준다 (2026-11-01 시험: 한국 PC 공지 285·이벤트 361,
   GitHub 서버와 Cloudflare 서울(ICN) 서버 모두 283·304. CORS 가 없어 폰 브라우저에서 바로 읽지도 못한다). 그래서 한국 PC에서
   `node scripts/fetch-official.mjs --save ../자료/공식/소식.json` 으로 받아 비공개 자료 저장소에 올리면 배포가 `--load` 로 넣는다 (공식 확률과 같은 길).
   PC에서 작업할 때 한 번씩 다시 받아 올린다 (한국 전용 새 글은 그때 들어간다).
-- 화면: '정보' > '📢 공식 소식' (`#/official?t=notice|maint|event`, `web/src/pages/Official.tsx`, `/api/official`): 공지사항·점검·이벤트 칸,
-  종류 표, 제목, 날짜(이벤트 끝나는 날이 있으면 진행 중/종료), 이틀 안의 글은 NEW, 누르면 공식 페이지(withhive.com/notice|event/32/번호)가 새 창으로.
-  본문은 앱에 띄우지 않는다 (공식 글은 공식 페이지에서 본다).
+- 화면: 게시판의 '🎮 아이모 소식' 버튼 (`#/board?cat=imo&t=all|notice|maint|event`, `web/src/pages/Official.tsx` `OfficialList`, `/api/official`):
+  안에 전체 · 공지사항 · 점검 · 이벤트 버튼, 종류 표, 제목, 날짜(이벤트 끝나는 날이 있으면 진행 중/종료), 이틀 안의 글은 NEW.
+  누르면 앱 안에서 읽는다 (`#/official/번호`, `OfficialPostPage`, `/api/official/:id`): 맨 위 '📄 컴투스 공식 · 원문 보기 ↗',
+  본문은 html 을 화면이 한 번 더 걸러서(정한 태그와 그림 주소, 링크만) 그린다. 다른 공식 글 링크는 앱 안으로. 정보의 '공식 소식' 칸은 게시판으로 옮겼다
+  (예전 주소 `#/official` 은 게시판 아이모 소식으로).
 - 챗봇: 질문에 점검, 패치, 이벤트, 쿠폰, 공지 같은 말이 있으면 서버가 최근 공식 글 30개 목록과 맞는 글 3개까지의 본문을
   `<컴투스 공식 소식>` 으로 붙인다 (`server/official.ts` `officialContext`). 답에 공식 주소를 출처로 밝힌다.
 - 공식 홈페이지의 공개 글을 읽을 뿐 게임은 읽지 않아서 게임 안전 규칙에 맞는다.

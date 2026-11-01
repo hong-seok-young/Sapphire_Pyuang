@@ -1,5 +1,5 @@
-// GET /api/official?tab=notice|maint|event&before= -> 컴투스 공식 소식 목록 (로그인한 길드원 누구나, 30개씩, 새 것 먼저)
-// notice: 공지사항 전부(점검, 안내 포함), maint: 점검만, event: 이벤트. 본문은 주지 않는다 (누르면 공식 페이지를 연다)
+// GET /api/official?tab=all|notice|maint|event&before= -> 컴투스 공식 소식 목록 (로그인한 길드원 누구나, 30개씩, 새 것 먼저)
+// all: 전부, notice: 공지사항(공지, 안내, 오류), maint: 점검, event: 이벤트. 본문은 /api/official/:id (게시판 '아이모 소식')
 // 자료는 scripts/fetch-official.mjs 가 30분마다 받아 둔다 (server/official.ts)
 import { NEED_LOGIN, currentUser, json } from "../../server/auth";
 import type { Env } from "../../server/auth";
@@ -11,7 +11,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (!me) return NEED_LOGIN();
   const p = new URL(request.url).searchParams;
   const tab = p.get("tab");
-  const where = [tab === "event" ? "kind = 'event'" : tab === "maint" ? "type = 'C'" : "kind = 'notice'"];
+  const where = [
+    tab === "event" ? "kind = 'event'" : tab === "maint" ? "type = 'C'" : tab === "notice" ? "kind = 'notice' AND type != 'C'" : "1 = 1",
+  ];
   const binds: number[] = [];
   const before = Number(p.get("before")) || 0;
   if (before > 0) {

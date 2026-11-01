@@ -12,6 +12,8 @@ import { RoleBadge } from "../emblems";
 import { ago } from "../market";
 import { go } from "../router";
 import { Loading, TopBar } from "../ui";
+import { OfficialList } from "./Official";
+import { isOfficialTab } from "../official";
 
 /** 공지사항과 이벤트는 오피서 이상만 쓴다 (서버 server/board.ts canWrite 와 같다) */
 const canWrite = (me: Me, cat: Cat) => cat === "free" || cat === "suggest" || RANK[me.role] >= 1;
@@ -22,11 +24,41 @@ const staff = (me: Me) => RANK[me.role] >= 1;
  * 사진과 첨부 파일, 링크(유튜브는 글 안에서 바로 재생, 다른 링크는 제목과 그림 미리보기), 댓글과 답글, 좋아요, 본 사람 수, 고정
  */
 export function BoardPage({ me, arg, sub, query }: { me: Me; arg: string; sub: string; query: URLSearchParams }) {
+  // 아이모 소식: 공식 홈페이지의 공지사항, 점검, 이벤트 (제작자 요청 2026-11-01)
+  if (query.get("cat") === "imo") {
+    const t = query.get("t");
+    return (
+      <>
+        <TopBar title="게시판" />
+        <BoardCats cat="imo" />
+        <OfficialList tab={isOfficialTab(t) ? t : "all"} />
+      </>
+    );
+  }
   if (arg === "write") return <Write me={me} cat={(query.get("cat") as Cat) || "free"} />;
   const id = Number(arg);
   if (id && sub === "edit") return <Write me={me} editId={id} />;
   if (id) return <PostView me={me} id={id} />;
   return <List me={me} cat={(query.get("cat") as Cat | null) ?? null} />;
+}
+
+/** 게시판 칸 줄: 전체, 공지사항, 길드 이벤트, 자유, 건의 사항, 그리고 아이모 소식 */
+function BoardCats({ cat }: { cat: Cat | "imo" | null }) {
+  return (
+    <div className="filter">
+      <button className={"pill" + (!cat ? " pill-on" : "")} onClick={() => go("#/board", true)}>
+        전체
+      </button>
+      {CATS.map((c) => (
+        <button key={c} className={"pill" + (cat === c ? " pill-on" : "")} onClick={() => go(`#/board?cat=${c}`, true)}>
+          {CAT_ICON[c]} {CAT_NAME[c]}
+        </button>
+      ))}
+      <button className={"pill pill-imo" + (cat === "imo" ? " pill-on" : "")} onClick={() => go("#/board?cat=imo", true)}>
+        🎮 아이모 소식
+      </button>
+    </div>
+  );
 }
 
 function List({ me, cat }: { me: Me; cat: Cat | null }) {
@@ -72,16 +104,7 @@ function List({ me, cat }: { me: Me; cat: Cat | null }) {
   return (
     <>
       <TopBar title="게시판" />
-      <div className="filter">
-        <button className={"pill" + (!cat ? " pill-on" : "")} onClick={() => go("#/board", true)}>
-          전체
-        </button>
-        {CATS.map((c) => (
-          <button key={c} className={"pill" + (cat === c ? " pill-on" : "")} onClick={() => go(`#/board?cat=${c}`, true)}>
-            {CAT_ICON[c]} {CAT_NAME[c]}
-          </button>
-        ))}
-      </div>
+      <BoardCats cat={cat} />
       <form
         className="bd-search"
         onSubmit={(e) => {
