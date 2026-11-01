@@ -4,7 +4,7 @@
 //   중개인·골드·의뢰소·게시판을 한 줄씩 줄인 것
 // - 질문에 맞으면 (ASK, 또는 질문에 나온 닉네임·물건 이름): 성장 랭킹, 중개인 매물, 골드 거래, 의뢰소, 게시판, 플래티넘 상점.
 //   살래요·입찰·골드 글의 명단과 흥정 가격은 올린 본인에게만 (화면과 같은 규칙)
-// - 오피서 이상: 비밀번호 바꾸기 전, 폰 알림 상태 ('길드원 관리'에서 보이는 값)
+// - 오피서 이상: 비밀번호 바꾸기 전 ('길드원 관리'에서 보이는 값)
 // - 앱개발자만: 사용 기록(접속, 화면, 한 일, IP, 위치, 기기), 챗봇 개선 목록과 오늘 질문 수.
 //   사용 기록은 앱개발자만 보는 기능이라 (CLAUDE.md '사용 기록') 다른 사람의 질문에는 붙이지 않는다
 // 칸마다 글자 수를 정해 두어 질문이 너무 길어지지 않게 한다.
@@ -26,7 +26,6 @@ const GUILD: Record<Guild, string> = { main: "1군 Sapphire", second: "2군 Fair
 /** 앱개발자는 길드 직책이 아니라 길드원으로 보인다 (제작자 요청) */
 const ROLE: Partial<Record<Role, string>> = { master: "길드마스터", officer: "오피서" };
 const ENCHANT: Record<string, string> = { str: "힘", dex: "민첩", int: "지능", hp: "체력", mp: "마나" };
-const PUSH: Record<string, string> = { on: "폰 알림 켬", app_off: "폰 알림 앱에서 끔", denied: "폰 알림 거부", ask: "폰 알림 묻기 전", none: "폰 알림 안 되는 기기" };
 const VIA: Record<string, string> = { app: "안드로이드 앱", float: "게임 위 창", ios: "아이폰 웹", android: "안드로이드 웹", pc: "PC 웹" };
 
 /** 이런 말이 있으면 그 칸을 자세히 붙인다 */
@@ -48,7 +47,6 @@ interface Person {
   /** 부캐면 본캐 아이디 (부캐 묶기) */
   main_id: string | null;
   must_change: number;
-  push_perm: string | null;
   job: Job | null;
   level: number | null;
   prev_level: number | null;
@@ -109,7 +107,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
   const [peopleR, listingsR, myWantersR, myBidsR, myWantsR, rateR, goldR, myGoldWantsR, requestsR, boardR, platR, myOrdersR, openOrdersR] =
     await env.DB.batch([
       env.DB.prepare(
-        "SELECT u.id AS id, u.role AS role, u.high_spec AS high_spec, u.must_change AS must_change, u.push_perm AS push_perm, u.main_id AS main_id, " +
+        "SELECT u.id AS id, u.role AS role, u.high_spec AS high_spec, u.must_change AS must_change, u.main_id AS main_id, " +
           "p.job AS job, p.level AS level, p.prev_level AS prev_level, p.level_at AS level_at, p.exp AS exp, p.guild AS guild " +
           "FROM users u LEFT JOIN profiles p ON p.user_id = u.id " +
           "ORDER BY p.level IS NULL, p.level DESC, p.exp IS NULL, p.exp DESC, p.level_at ASC, u.id ASC",
@@ -340,7 +338,6 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
       p.high_spec ? "고스펙" : "",
       p.prev_level !== null && p.level !== null && p.prev_level < p.level && p.level_at !== null && p.level_at >= week ? `이번 주 Lv.${p.prev_level}→${p.level}` : "",
       officer && p.must_change ? "비밀번호 바꾸기 전" : "",
-      officer && p.push_perm ? PUSH[p.push_perm] ?? "" : "",
       // 누구의 부캐인지는 길드원 관리와 같이 오피서 이상과 본인에게만
       p.main_id && (officer || p.main_id === (me.owner ?? me.id)) ? `${p.main_id}의 부캐` : "",
     ].filter(Boolean);
