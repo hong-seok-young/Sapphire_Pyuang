@@ -18,6 +18,9 @@ import { ACCEPT_MS } from "./requests";
 import { weekStart } from "./week";
 import { doneKeys, eventTasks } from "./todo";
 
+/** To do 를 길드원에게 열었는지 (지금은 개발 중이라 앱개발자만, 제작자 요청 2026-11-01. 열 때 true 와 챗봇 안내 줄, src/launcher.ts) */
+const TODO_OPEN = false;
+
 /** 길드 앱 자료 전체 글자 수 */
 export const MAX_APP = 24000;
 const KST = 9 * 3_600_000;
@@ -318,7 +321,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
   }
 
   // ---------- To do (홈 'To do' 화면과 같은 값: 이 사람의 레벨·직업에 맞는 할 일과 이번 주기에 체크한 것) ----------
-  if (ASK.todo.test(q)) {
+  if (ASK.todo.test(q) && (TODO_OPEN || dev)) {
     const mine = people.find((p) => p.id === me.id);
     const [tasks, done] = await Promise.all([eventTasks(env, { job: mine?.job ?? null, level: mine?.level ?? null }, now), doneKeys(env, me.id, now)]);
     const checked = new Set(done);

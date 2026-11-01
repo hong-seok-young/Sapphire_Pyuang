@@ -4,9 +4,9 @@ import { NEED_LOGIN, loadWiki, useAsync } from "./data";
 import { go, useRoute } from "./router";
 import { goCharacter, justSwitched, onRefreshMe, personOf, setMyCharacters } from "./characters";
 import { resetFavorites } from "./favorites";
-import { FitLine, PixelIcon, Loading, NotFound } from "./ui";
+import { DevSoon, FitLine, PixelIcon, Loading, NotFound } from "./ui";
 import { Home, InfoPage, TileIcon } from "./pages/Home";
-import { canSee, clickItem, isUpdated, itemOf, loadLayout, pressItem, setEditing, useLauncher } from "./launcher";
+import { canSee, clickItem, isLocked, isUpdated, itemOf, loadLayout, pressItem, setEditing, useLauncher } from "./launcher";
 import type { LaunchItem } from "./launcher";
 import { markNewsSeen, newsFor, refreshNews, startNews, useNews } from "./news";
 import { Search } from "./pages/Search";
@@ -34,6 +34,7 @@ import { OfficialPostPage } from "./pages/Official";
 import { PatchNotesPage } from "./pages/PatchNotes";
 import { OddsPage, OddsTablePage } from "./pages/Odds";
 import { TodoPage } from "./pages/Todo";
+import { RentalPage } from "./pages/Rental";
 import { Opening, shouldCelebrate } from "./pages/Opening";
 import { reportOpen, reportView } from "./activity";
 import { markMenuVisit } from "./updates";
@@ -243,6 +244,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
   else if (page === "app" || page === "timer") body = <AppPage />;
   else if (page === "gaps") body = me.role === "developer" ? <ChatGapsPage /> : <NotFound what="페이지" />;
+  // 개발 중인 칸 (장비대여, 매칭, To do): 길드원에게는 '개발 중' 화면. 앱개발자는 만든 화면이 있으면 그 화면 (제작자 요청 2026-11-01)
+  else if (page === "match" || ((page === "rent" || page === "todo") && me.role !== "developer")) body = <DevSoon title={itemOf(page)?.title ?? ""} />;
   else if (!wiki) body = <Loading error={loggedOut ? undefined : error} onRetry={() => setWikiTry((n) => n + 1)} />;
   else if (page === "search") body = <Search wiki={wiki} q={route.query.get("q") ?? ""} />;
   else if (page === "places") body = <Places wiki={wiki} region={route.query.get("r") ?? ""} />;
@@ -256,6 +259,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "market") body = <MarketPage wiki={wiki} me={me} />;
   // To do: 오늘·이번 주·이벤트 할 일 (제작자 요청 2026-11-01). 인던 목록이 위키 자료라서 위키를 기다린다
   else if (page === "todo") body = <TodoPage wiki={wiki} me={me} />;
+  // 장비대여: 대여 무기 목록, 신청, 마일리지 (제작자 요청 2026-11-01, 개발 중이라 앱개발자만). 무기 그림과 레벨이 위키 자료라서 위키를 기다린다
+  else if (page === "rent") body = <RentalPage wiki={wiki} me={me} />;
   else if (page === "log") body = me.role === "developer" ? <ActivityLogPage wiki={wiki} /> : <NotFound what="페이지" />;
   else body = <Home me={me} />;
 
@@ -290,7 +295,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
           // 아래 탭도 고친 메뉴면 'UPDATE' (제작자 요청 2026-11-01, 홈 칸과 같은 updates.ts)
           const updated = t !== APP_TAB && isUpdated(me.id, t);
           const className =
-            "tab" + (t.match.includes(page) ? " tab-on" : "") + (t.locked ? " tab-locked" : "") + (dragKey === t.key ? " launch-drag-src" : "");
+            "tab" + (t.match.includes(page) ? " tab-on" : "") + (isLocked(t, me) ? " tab-locked" : "") + (dragKey === t.key ? " launch-drag-src" : "");
           const fresh = newsFor(news, t.key);
           const inside = (
             <>
@@ -310,7 +315,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
                   onClick: clickItem,
                   onContextMenu: (e: ReactMouseEvent) => editable && e.preventDefault(),
                 };
-          return t.locked ? (
+          return isLocked(t, me) ? (
             <span key={t.key} className={className} aria-disabled="true" {...handlers}>
               {inside}
             </span>

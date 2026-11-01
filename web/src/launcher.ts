@@ -32,7 +32,7 @@ export interface LaunchItem {
   soon?: boolean;
   /** soon 일 때 오른쪽 위 표 (없으면 '준비 중') */
   badge?: string;
-  /** 아직 못 들어가는 칸 (개발 중): 눌러도 열리지 않는다 */
+  /** 아직 못 들어가는 칸 (개발 중): 길드원은 눌러도 열리지 않는다. 앱개발자는 들어간다 (제작자 요청 2026-11-01, isLocked) */
   locked?: boolean;
   /** 안드로이드 폰 브라우저에서만 보인다 (앱 안, 아이폰에서는 숨김) */
   androidOnly?: boolean;
@@ -53,13 +53,14 @@ export const ITEMS: LaunchItem[] = [
   // 1군 전용 플래티넘 할인 상점 (제작자 요청). 아이콘은 게임 첫 화면의 상점 그림. '1군 전용'은 왼쪽 위 띠로
   { key: "shop", title: "플래티넘 할인 상점", short: "상점", to: "#/shop", icon: "🏪", iconPic: "/data/shop/shop_icon.png", ribbon: "1군 전용", ring: "gold", match: ["shop"] },
   // To do: 이벤트를 안 읽어도 내 직업·레벨에 맞는 오늘·이번 주 할 일 (제작자 요청 2026-11-01, pages/Todo.tsx)
-  { key: "todo", title: "To do", to: "#/todo", icon: "✅", match: ["todo"] },
+  // 지금은 개발 중 (제작자 요청 2026-11-01): 길드원은 못 들어가고 앱개발자만. 열 때는 soon, badge, locked 를 빼고 CLAUDE.md 'To do' 의 순서대로
+  { key: "todo", title: "To do", to: "#/todo", icon: "✅", soon: true, badge: "개발 중", locked: true, match: ["todo"] },
   { key: "ranking", title: "길드 랭킹", short: "랭킹", to: "#/ranking", icon: "🏆", match: ["ranking"] },
   { key: "market", title: "사파이어 중개인", short: "중개인", to: "#/market", icon: "💰", match: ["market"] },
   { key: "requests", title: "길드원 의뢰소", short: "의뢰소", to: "#/requests", icon: "📋", match: ["requests"] },
   // 길드원끼리 장비 빌려주기, 길드던전과 인던 같이 갈 사람 찾기 (제작자 요청: 칸만 먼저 두고 개발 중으로 막는다)
-  { key: "rent", title: "장비대여", to: "", icon: "🤝", soon: true, badge: "개발 중", locked: true, match: [] },
-  { key: "match", title: "길던&인던 매칭", short: "매칭", to: "", icon: "⚔️", soon: true, badge: "개발 중", locked: true, match: [] },
+  { key: "rent", title: "장비대여", to: "#/rent", icon: "🤝", soon: true, badge: "개발 중", locked: true, match: ["rent"] },
+  { key: "match", title: "길던&인던 매칭", short: "매칭", to: "#/match", icon: "⚔️", soon: true, badge: "개발 중", locked: true, match: ["match"] },
   // 시계와 보스 타이머는 안드로이드 앱에만 있다. 앱은 검토 후 오픈 (제작자 요청 2026-10-31: 지금은 웹만)
   { key: "app", title: "안드로이드 앱 받기", short: "앱 받기", to: "#/app", icon: "📲", androidOnly: true, soon: !APP_OPEN, badge: "검토 후 오픈", match: [] },
   { key: "admin", title: "길드원 관리", short: "관리", to: "#/admin", icon: "👥", managers: true, ribbon: "운영진", ring: "blue", match: ["admin"] },
@@ -84,6 +85,9 @@ export const INFO_TILES: LaunchItem[] = [
   // 컴투스 공식 확률 정보 (제작자 요청 2026-10-31, pages/Odds.tsx)
   { key: "odds", title: "공식 확률", to: "#/odds", icon: "🎲", match: [] },
 ];
+
+/** 눌러도 안 열리는 칸인지: 개발 중인 칸은 길드원에게만 막고, 앱개발자는 다 들어간다 (제작자 요청 2026-11-01) */
+export const isLocked = (item: LaunchItem, me: Me) => !!item.locked && me.role !== "developer";
 
 /** 이 사람에게 보이는 칸인지 */
 export const canSee = (item: LaunchItem, me: Me) =>

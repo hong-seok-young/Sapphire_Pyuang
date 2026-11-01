@@ -1687,3 +1687,41 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 /* official post: struck-out text (a maintenance end time that was extended) */
 .off-body s { opacity: 0.6; }
 
+/* equipment rental (pages/Rental.tsx): my mileage card, staff panel, job pills, sections per rental term like the guild's KakaoTalk list */
+.rent-me { display: flex; flex-direction: column; gap: 6px; }
+.rent-me-top { display: flex; align-items: baseline; gap: 8px; }
+.rent-me-top .pill { margin-left: auto; }
+.rent-dia { font-size: 20px; color: #7fd8ff; text-shadow: 1px 1px 0 var(--edge); }
+.rent-me-top small { font-size: 12px; color: var(--muted); }
+.rent-me-line { margin: 0; font-size: 13px; }
+.rent-muted { font-size: 12px; color: var(--muted); }
+.rent-admin { display: flex; flex-direction: column; gap: 8px; }
+.rent-admin-title { align-self: center; font-size: 14px; color: var(--gold); margin-right: 4px; }
+.rent-waits { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.rent-wait { width: 100%; padding: 6px 8px; text-align: left; font-size: 13px; color: var(--text); background: var(--night-2); border: 1px solid var(--edge); cursor: pointer; }
+.rent-jobs { margin-bottom: 10px; }
+.rent-free { margin-left: auto; }
+.rent-term-head { display: flex; align-items: baseline; gap: 8px; margin: 4px 2px 6px; font-size: 15px; color: var(--gold); text-shadow: 1px 1px 0 var(--edge); }
+.rent-term-head small { margin-left: auto; font-size: 11px; color: var(--muted); text-shadow: none; }
+.rent-lv { font-size: 11px; color: #6fb6ff; }
+.rent-free-text { color: #7fe0a0; }
+.rent-busy { color: var(--muted); }
+.rent-late { color: var(--red); }
+.rent-out .mk-row { opacity: 0.72; }
+.rent-ask, .rent-manage { display: flex; flex-direction: column; gap: 8px; }
+.rent-use { min-width: 44px; text-align: center; color: #7fd8ff; }
+.rent-req span { flex: 1; min-width: 0; font-size: 13px; }
+.rent-form { padding: 8px 0 0; }
+.rent-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.rent-paste { height: 140px; padding: 8px 10px; font-size: 13px; line-height: 1.4; resize: vertical; }
+.rent-balances { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.rent-balance { width: 100%; display: flex; justify-content: space-between; padding: 6px 8px; font-size: 13px; color: var(--text); background: var(--night-2); border: 1px solid var(--edge); cursor: pointer; }
+.rent-balance b { color: #7fd8ff; font-weight: 400; }
+.rent-view { display: flex; flex-direction: column; gap: 4px; }
+.rent-ledger { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 12px; }
+.rent-ledger li { display: flex; gap: 8px; align-items: baseline; }
+.rent-ledger li span:nth-child(2) { flex: 1; min-width: 0; color: var(--muted); }
+.rent-ledger small { color: var(--muted); }
+.rent-plus { color: #7fe0a0; }
+.rent-minus { color: #ff8fa3; }
+

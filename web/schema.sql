@@ -457,6 +457,60 @@ CREATE TABLE IF NOT EXISTS todo_checks (
   PRIMARY KEY (user_id, item, period)
 );
 
+-- 장비대여 (제작자 요청 2026-11-01): 길드가 기부받은 무기를 길드원에게 빌려준다. 실제로 주고받는 것은 게임 안에서 하고 앱은 목록과 장부만.
+-- 가격은 💎 (1개 = 10만 골드). 장비를 기부하면 대여 담당이 옵션 시세를 보고 마일리지 💎 를 적립하고, 빌릴 때 골드 대신 쓴다.
+-- 처음 목록은 카카오톡 목록 글(비공개 자료 길드/장비대여)로 채운다 (scripts/rental-seed.mjs). 지우지 않고 내린 물건은 status 'gone'
+CREATE TABLE IF NOT EXISTS rental_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  job TEXT NOT NULL,                      -- warrior | ranger | mage | monk
+  level INTEGER NOT NULL,                 -- 요구 레벨 (목록에 적힌 것. 화면은 위키 레벨제한을 먼저 쓴다)
+  weapon TEXT NOT NULL,                   -- 무기 이름 (위키 아이템 이름과 같으면 그림과 옵션 범위가 붙는다)
+  options TEXT NOT NULL,                  -- 옵션 줄임말 그대로 ('명6크3', '지4마11마재1'), 화면이 명중 6 · 크리티컬 3 으로
+  enhance INTEGER NOT NULL,               -- +강
+  term TEXT NOT NULL,                     -- none 기한 없음 | 4w 4주 | 2w 2주
+  price INTEGER NOT NULL,                 -- 💎
+  donor TEXT,                             -- 기부한 사람 (닉네임 글자, 앱 계정이 아닐 수도 있다)
+  renter TEXT,                            -- 지금 빌려 간 사람 (닉네임 글자). 비면 대여 가능
+  rented_at INTEGER,
+  due_at INTEGER,                         -- 돌려줄 때 (기한 없음이면 NULL)
+  note TEXT,
+  status TEXT NOT NULL DEFAULT 'open',    -- open | gone (내림)
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  updated_by TEXT
+);
+CREATE INDEX IF NOT EXISTS rental_items_status ON rental_items (status, job);
+
+-- 대여 신청과 대여 기록 (운영진이 직접 빌려준 것도 status 'done' 으로 남긴다). 지우지 않는다
+CREATE TABLE IF NOT EXISTS rental_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,                  -- 빌리는 사람 (닉네임)
+  use_dia INTEGER NOT NULL DEFAULT 0,     -- 마일리지에서 쓰는 💎 (나머지는 골드)
+  note TEXT,
+  status TEXT NOT NULL DEFAULT 'wait',    -- wait 신청 | done 빌려줌 | no 거절 | cancel 취소
+  created_at INTEGER NOT NULL,
+  done_at INTEGER,
+  done_by TEXT,
+  returned_at INTEGER                     -- 돌려받은 때
+);
+CREATE INDEX IF NOT EXISTS rental_requests_item ON rental_requests (item_id, status);
+CREATE INDEX IF NOT EXISTS rental_requests_user ON rental_requests (user_id, status);
+
+-- 마일리지 장부: 줄마다 더하거나 뺀 💎 (합이 그 사람의 마일리지, 묶은 캐릭터는 합쳐서). 닉네임 글자로 두어 아직 앱에 없는 기부자도 적립할 수 있다. 지우지 않는다
+CREATE TABLE IF NOT EXISTS rental_mileage (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  who TEXT NOT NULL,                      -- 길드원 닉네임
+  delta INTEGER NOT NULL,                 -- 💎 (+ 기부 적립, - 대여에 씀, 운영진 고침)
+  gold INTEGER,                           -- 대여 때 골드로 낸 몫 (골드)
+  reason TEXT NOT NULL,                   -- donate | rent | adjust
+  item_id INTEGER,
+  note TEXT,
+  by_user TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS rental_mileage_who ON rental_mileage (who, created_at);
+
 -- 자주 부르는 곳이 표 전체를 읽지 않게 하는 색인 (2026-11-01 오픈 전 검토: D1 무료 한도 하루 500만 줄 읽기)
 CREATE INDEX IF NOT EXISTS users_main ON users (main_id);                          -- 로그인 확인마다 같은 사람의 캐릭터 찾기
 CREATE INDEX IF NOT EXISTS alerts_created ON alerts (created_at, kind);            -- 알림을 넣은 뒤 폰 알림 보낼 곳 찾기

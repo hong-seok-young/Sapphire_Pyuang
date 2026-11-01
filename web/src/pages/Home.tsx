@@ -4,7 +4,7 @@ import { VERSION } from "../patchnotes";
 import { useEffect, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { enablePush, markPushAsked, shouldAskPush } from "../push";
-import { INFO_TILES, canSee, clickItem, isUpdated, itemOf, pressItem, resetLayout, setEditing, useLauncher } from "../launcher";
+import { INFO_TILES, canSee, clickItem, isLocked, isUpdated, itemOf, pressItem, resetLayout, setEditing, useLauncher } from "../launcher";
 import type { LaunchItem } from "../launcher";
 import { newsFor, useMaint, useNews } from "../news";
 import type { Maint } from "../news";
@@ -27,10 +27,12 @@ function Tiles({ me, tiles, editable = false, dragKey }: { me: Me; tiles: Launch
       {tiles.map((t) => {
         // 고친 메뉴: 다른 색 테두리와 'UPDATE' (처음 들어간 뒤 하루 동안, updates.ts). '정보'는 안의 메뉴가 고쳐졌을 때도
         const updated = isUpdated(me.id, t);
+        // 개발 중인 칸: 길드원은 못 들어가고 앱개발자는 들어간다 (표시는 같이 보인다)
+        const locked = isLocked(t, me);
         const className =
           "tile" +
           (t.soon ? " tile-soon" : "") +
-          (t.locked ? " tile-locked" : "") +
+          (locked ? " tile-locked" : "") +
           (t.ring ? ` tile-ring tile-ring-${t.ring}` : "") +
           (updated ? " tile-new" : "") +
           (dragKey === t.key ? " launch-drag-src" : "");
@@ -57,7 +59,7 @@ function Tiles({ me, tiles, editable = false, dragKey }: { me: Me; tiles: Launch
               onContextMenu: (e: ReactMouseEvent) => e.preventDefault(),
             }
           : {};
-        return t.locked ? (
+        return locked ? (
           <span key={t.key} className={className} aria-disabled="true" {...handlers}>
             {inside}
           </span>

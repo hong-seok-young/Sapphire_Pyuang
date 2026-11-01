@@ -4,7 +4,7 @@ import { api } from "./auth";
 
 export type AlertKind =
   | "market_want" | "market_bid" | "market_outbid" | "market_auction" | "market_new" | "gold_want" | "request" | "request_new" | "talk" | "account" | "shop"
-  | "board" | "board_notice" | "chat_fixed" | "chat_gap" | "chat_done";
+  | "board" | "board_notice" | "chat_fixed" | "chat_gap" | "chat_done" | "rent";
 
 export interface Alert {
   id: number;
@@ -37,6 +37,8 @@ export const ALERT_GROUPS: { menu: string; kinds: { kind: AlertKind; name: strin
     kinds: [{ kind: "chat_done", name: "답변 완료" }, { kind: "chat_fixed", name: "개선됨" }, { kind: "chat_gap", name: "모르는 질문", developer: true }],
   },
   { menu: "계정", kinds: [{ kind: "account", name: "역할" }] },
+  // 장비대여: 신청, 대여, 마일리지 (개발 중이라 앱개발자만 보인다. 열면 developer 를 뺀다, server/rental.ts RENT_OPEN)
+  { menu: "장비대여", kinds: [{ kind: "rent", name: "대여·마일리지", developer: true }] },
 ];
 
 export const fetchAlerts = () =>

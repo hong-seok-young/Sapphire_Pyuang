@@ -21,6 +21,7 @@ const KIND_TITLE = {
   chat_fixed: "🧙 챗봇 · 개선됨",
   chat_done: "🧙 챗봇 · 답변 완료",
   chat_gap: "🧙 챗봇 · 모르는 질문",
+  rent: "🤝 장비대여",
 };
 
 self.addEventListener("install", () => self.skipWaiting());

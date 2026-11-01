@@ -304,6 +304,16 @@ export function Loading({ error, onRetry }: { error?: string; onRetry?: () => vo
   );
 }
 
+/** 개발 중인 칸을 길드원이 열었을 때 (앱개발자만 들어가는 동안, 제작자 요청 2026-11-01) */
+export function DevSoon({ title }: { title: string }) {
+  return (
+    <>
+      <TopBar title={title} />
+      <div className="empty">🚧 개발 중이에요</div>
+    </>
+  );
+}
+
 export function NotFound({ what }: { what: string }) {
   return (
     <>

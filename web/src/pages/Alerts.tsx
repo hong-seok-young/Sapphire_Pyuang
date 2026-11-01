@@ -77,7 +77,7 @@ export function AlertsPage({ developer = false }: { developer?: boolean }) {
         <section className="panel alert-prefs">
           <h2 className="panel-title">알림 설정</h2>
           <PhonePush />
-          {ALERT_GROUPS.map((g) => (
+          {ALERT_GROUPS.filter((g) => g.kinds.some((k) => !k.developer || developer)).map((g) => (
             <div key={g.menu} className="alert-pref-row">
               <span>{g.menu}</span>
               <div className="mk-chips">
