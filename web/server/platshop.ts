@@ -119,7 +119,7 @@ export async function wallet(env: Env, userId: string, main: boolean, high: bool
     if (res.meta.changes) w = { ...w, granted: w.granted + add, granted_until: week };
   }
   const spent = await env.DB.prepare(
-    "SELECT COALESCE(SUM(plat), 0) AS n FROM plat_orders WHERE user_id = ? AND status != 'cancelled' AND created_at >= ?",
+    "SELECT COALESCE(SUM(plat), 0) AS n FROM plat_orders WHERE user_id = ? AND status != 'cancelled' AND voided_at IS NULL AND created_at >= ?",
   )
     .bind(userId, w.started_at)
     .first<{ n: number }>();

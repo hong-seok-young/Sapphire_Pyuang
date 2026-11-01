@@ -884,6 +884,11 @@ button { font: inherit; color: inherit; }
 .ps-status { font-size: 11px; color: var(--muted); }
 .ps-done .ps-status { color: #8ff0b0; }
 .ps-cancelled { opacity: 0.6; }
+.ps-voided { opacity: 0.5; }
+.ps-voided .ps-order-main b { text-decoration: line-through; }
+.ps-order-side .pill { font-size: 12px; padding: 4px 8px; }
+.ps-gold-edit { display: flex; align-items: center; gap: 4px; }
+.ps-gold-edit .mk-input { width: 92px; padding: 4px 6px; font-size: 13px; }
 .ps-ledger { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
 .ps-ledger .panel { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 0; font-size: 13px; }
 .ps-ledger .panel span { display: flex; align-items: center; gap: 4px; }

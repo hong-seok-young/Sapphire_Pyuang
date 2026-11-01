@@ -245,7 +245,10 @@ CREATE TABLE IF NOT EXISTS plat_orders (
   status TEXT NOT NULL DEFAULT 'requested', -- requested 신청 | done 거래 완료 | cancelled 취소
   created_at INTEGER NOT NULL,
   done_at INTEGER,
-  done_by TEXT
+  done_by TEXT,
+  voided_at INTEGER,                      -- 정산에서 지운 때 (시험 거래 등, 오피서 이상. 기록은 남기고 정산과 이용한도에서 뺀다, 복구할 수 있다)
+  voided_by TEXT,
+  gold_paid INTEGER                       -- 실제로 받은 골드 (오피서 이상이 적는다. 비면 신청 때 골드)
 );
 CREATE INDEX IF NOT EXISTS plat_orders_user ON plat_orders (user_id, item_id, created_at);
 

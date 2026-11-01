@@ -28,23 +28,29 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
   let manage = null;
   if (manager) {
-    const month = new Date();
-    month.setDate(1);
-    month.setHours(0, 0, 0, 0);
+    // 이번 달은 한국 시간 1일 0시부터 (서버는 UTC 라서 setDate/setHours 로 하면 오전 9시부터가 됐다)
+    const kst = new Date(now + 9 * 3_600_000);
+    const month = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), 1) - 9 * 3_600_000;
     const [pending, recent, total, thisMonth] = await env.DB.batch([
       env.DB.prepare(
         "SELECT id, user_id AS user, item_name AS itemName, plat, gold, ratio, created_at AS at FROM plat_orders WHERE status = 'requested' ORDER BY id",
       ),
       env.DB.prepare(
-        "SELECT id, user_id AS user, item_name AS itemName, plat, gold, status, created_at AS at, done_at AS doneAt, done_by AS doneBy " +
-          "FROM plat_orders WHERE status != 'requested' ORDER BY id DESC LIMIT 60",
+        "SELECT id, user_id AS user, item_name AS itemName, plat, gold, gold_paid AS goldPaid, status, created_at AS at, done_at AS doneAt, " +
+          "done_by AS doneBy, voided_at IS NOT NULL AS voided, voided_by AS voidedBy FROM plat_orders WHERE status != 'requested' ORDER BY id DESC LIMIT 60",
       ),
-      env.DB.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(plat), 0) AS plat, COALESCE(SUM(gold), 0) AS gold FROM plat_orders WHERE status = 'done'"),
+      // 정산: 거래 완료한 것 중 지우지 않은 것, 받은 골드는 직접 적은 값이 있으면 그 값
       env.DB.prepare(
-        "SELECT COUNT(*) AS n, COALESCE(SUM(plat), 0) AS plat, COALESCE(SUM(gold), 0) AS gold FROM plat_orders WHERE status = 'done' AND done_at >= ?",
-      ).bind(month.getTime()),
+        "SELECT COUNT(*) AS n, COALESCE(SUM(plat), 0) AS plat, COALESCE(SUM(COALESCE(gold_paid, gold)), 0) AS gold FROM plat_orders " +
+          "WHERE status = 'done' AND voided_at IS NULL",
+      ),
+      env.DB.prepare(
+        "SELECT COUNT(*) AS n, COALESCE(SUM(plat), 0) AS plat, COALESCE(SUM(COALESCE(gold_paid, gold)), 0) AS gold FROM plat_orders " +
+          "WHERE status = 'done' AND voided_at IS NULL AND done_at >= ?",
+      ).bind(month),
     ]);
-    manage = { pending: pending.results, recent: recent.results, total: total.results[0], month: thisMonth.results[0] };
+    const recentRows = (recent.results as { voided: number }[]).map((r) => ({ ...r, voided: r.voided === 1 }));
+    manage = { pending: pending.results, recent: recentRows, total: total.results[0], month: thisMonth.results[0] };
   }
   return json({
     open: settings.open, settings, items, orders: mine.results, main: guild?.guild === "main", highSpec: flags?.high_spec === 1, manager, manage, wallet: purse,

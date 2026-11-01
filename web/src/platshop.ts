@@ -55,6 +55,11 @@ export interface ShopOrder {
   doneAt?: number | null;
   user?: string;
   doneBy?: string | null;
+  /** 정산에서 지웠는지 (시험 거래 등, 복구할 수 있다) */
+  voided?: boolean;
+  voidedBy?: string | null;
+  /** 실제로 받은 골드 (오피서 이상이 적은 값, 없으면 gold) */
+  goldPaid?: number | null;
 }
 
 export interface Ledger {
@@ -78,7 +83,9 @@ export interface ShopData {
 
 export const fetchShop = () => api<ShopData>("/api/shop");
 export const orderItem = (itemId: string) => api<{ id: number }>("/api/shop/orders", "POST", { itemId });
-export const actOrder = (id: number, action: "done" | "cancel") => api<{ status: string }>(`/api/shop/orders/${id}`, "PATCH", { action });
+export const actOrder = (id: number, action: "done" | "cancel" | "void" | "restore") => api<{ status?: string }>(`/api/shop/orders/${id}`, "PATCH", { action });
+/** 실제로 받은 골드 적기 (거래 완료한 것) */
+export const setOrderGold = (id: number, gold: number) => api<{ goldPaid: number | null }>(`/api/shop/orders/${id}`, "PATCH", { action: "gold", gold });
 export const saveShopSettings = (s: ShopSettings) => api<ShopSettings>("/api/shop", "PUT", s);
 export const saveShopItem = (id: string, r: { enabled: boolean; ratio: number | null; highRatio: number | null }) =>
   api<{ ok: boolean }>(`/api/shop/items/${id}`, "PUT", { ...r, limitCount: null, limitWeeks: null });

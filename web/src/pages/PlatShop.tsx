@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import { errorText } from "../auth";
 import { ago, goldText, goldWords } from "../market";
-import { PLAT_PACKS, SHOP_PIC, actOrder, budget, discount, fetchShop, goldOf, orderItem, packsFor, packsOf, packsWithin, saveShopItem, saveShopSettings } from "../platshop";
+import { PLAT_PACKS, SHOP_PIC, actOrder, budget, discount, fetchShop, goldOf, orderItem, packsFor, packsOf, packsWithin, saveShopItem, saveShopSettings, setOrderGold } from "../platshop";
 import type { ShopData, ShopItem, ShopOrder, ShopSettings, Wallet } from "../platshop";
 import { Loading, TopBar } from "../ui";
 import { WEEK } from "../week";
@@ -277,7 +277,8 @@ export function PlatShopPage() {
               </div>
             ))}
           </div>
-          <OrderList orders={data.manage.recent} empty="아직 기록이 없어요." />
+          {/* 정산에서 지우기·복구, 받은 골드 적기 (제작자 요청 2026-11-01: 시험 거래나 공짜로 준 것, 49,500 대신 5만을 받은 것) */}
+          <OrderList orders={data.manage.recent} empty="아직 기록이 없어요." action={(o) => <LedgerActions o={o} busy={busy} run={run} />} />
         </>
       )}
 
@@ -294,23 +295,82 @@ function OrderList({ orders, empty, action }: { orders: ShopOrder[]; empty: stri
   if (!orders.length) return <div className="empty">{empty}</div>;
   return (
     <ul className="ps-orders">
-      {orders.map((o) => (
-        <li key={o.id} className={"panel ps-order ps-" + o.status}>
-          <span className="ps-order-main">
-            <b>{o.itemName}</b>
-            <small>
-              {o.user && `${o.user} · `}
-              {goldText(o.gold)} 골드 · 플래티넘 {o.plat.toLocaleString("ko-KR")} · {ago(o.doneAt ?? o.at)}
-              {o.doneBy && ` · ${o.doneBy}`}
-            </small>
-          </span>
-          <span className="ps-order-side">
-            <small className="ps-status">{STATUS[o.status]}</small>
-            {action?.(o)}
-          </span>
-        </li>
-      ))}
+      {orders.map((o) => {
+        const paid = o.goldPaid ?? o.gold;
+        return (
+          <li key={o.id} className={"panel ps-order ps-" + o.status + (o.voided ? " ps-voided" : "")}>
+            <span className="ps-order-main">
+              <b>{o.itemName}</b>
+              <small>
+                {o.user && `${o.user} · `}
+                {goldText(paid)} 골드
+                {/* 받은 골드를 직접 적었으면 신청 때 골드도 작게 */}
+                {o.goldPaid != null && o.goldPaid !== o.gold && ` (신청 ${goldText(o.gold)})`} · 플래티넘 {o.plat.toLocaleString("ko-KR")} · {ago(o.doneAt ?? o.at)}
+                {o.doneBy && ` · ${o.doneBy}`}
+                {o.voided && ` · 정산 삭제${o.voidedBy && o.voidedBy !== o.doneBy ? ` (${o.voidedBy})` : ""}`}
+              </small>
+            </span>
+            <span className="ps-order-side">
+              <small className="ps-status">{o.voided ? "삭제됨" : STATUS[o.status]}</small>
+              {action?.(o)}
+            </span>
+          </li>
+        );
+      })}
     </ul>
+  );
+}
+
+/** 정산 줄의 단추: 삭제(정산과 이용한도에서 뺀다)·복구, 거래 완료한 것은 받은 골드 수정 */
+function LedgerActions({ o, busy, run }: { o: ShopOrder; busy: boolean; run: (fn: () => Promise<unknown>, done?: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(String(o.goldPaid ?? o.gold));
+  if (o.voided) {
+    return (
+      <button className="pill" disabled={busy} onClick={() => run(() => actOrder(o.id, "restore"), "정산에 다시 넣었어요.")}>
+        복구
+      </button>
+    );
+  }
+  if (editing) {
+    const value = Number(text.replace(/[^\d]/g, ""));
+    return (
+      <span className="ps-gold-edit">
+        <input
+          className="mk-input"
+          inputMode="numeric"
+          value={text}
+          onChange={(e) => setText(e.target.value.replace(/[^\d,]/g, "").slice(0, 13))}
+          aria-label="받은 골드"
+          autoFocus
+        />
+        <button
+          className="pill pill-on"
+          disabled={busy || !text.trim()}
+          onClick={() => {
+            setEditing(false);
+            run(() => setOrderGold(o.id, value), "받은 골드를 고쳤어요.");
+          }}
+        >
+          저장
+        </button>
+        <button className="pill" onClick={() => setEditing(false)}>
+          취소
+        </button>
+      </span>
+    );
+  }
+  return (
+    <>
+      {o.status === "done" && (
+        <button className="pill" disabled={busy} onClick={() => (setText(String(o.goldPaid ?? o.gold)), setEditing(true))}>
+          골드 수정
+        </button>
+      )}
+      <button className="pill" disabled={busy} onClick={() => run(() => actOrder(o.id, "void"), "정산에서 뺐어요. 복구할 수 있어요.")}>
+        삭제
+      </button>
+    </>
   );
 }
 
