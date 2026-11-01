@@ -9,6 +9,7 @@ import type { Account, Me, Role } from "../auth";
 import { GUILD_NAME, GUILD_TIER, JOB_NAME, clearLevelBadge, deleteAvatarOf, deleteLevelLog, expText, fetchLevelLog, saveProfileOf, setHighSpec } from "../auth";
 import type { LevelLogEntry } from "../auth";
 import { JobEmblem } from "../emblems";
+import { refreshMe } from "../characters";
 import { ProfileForm } from "./Profile";
 import { Loading, Panel, TopBar } from "../ui";
 
@@ -90,6 +91,7 @@ export function AdminPage({ me }: { me: Me }) {
     try {
       await action();
       await reload();
+      refreshMe(); // 내 캐릭터를 묶거나 뗐을 수도 있다 (👤, 내 캐릭터 목록을 맞춘다)
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -263,6 +265,7 @@ function AccountRow({
     try {
       await fn();
       await onChanged();
+      refreshMe();
     } catch (x) {
       setPhotoError(errorText(x));
     } finally {

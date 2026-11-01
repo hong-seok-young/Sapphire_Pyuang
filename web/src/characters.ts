@@ -30,6 +30,17 @@ export function useMyCharacters(): Mine {
 }
 
 const SWITCHED = "sapphire.charSwitched";
+const ME_EVENT = "sapphire-me-refresh";
+
+/**
+ * 내 정보(캐릭터 목록)를 서버에서 다시 받게 한다 (App 이 듣는다). 길드원 관리에서 내 캐릭터를 묶거나 떼거나 본캐를 바꾼 뒤,
+ * 캐릭터 바꾸기가 '내 캐릭터가 아니에요'로 실패했을 때 (예전 목록이 남아 뗀 부캐가 계속 보이던 것, 2026-11-01)
+ */
+export const refreshMe = () => window.dispatchEvent(new Event(ME_EVENT));
+export const onRefreshMe = (fn: () => void) => {
+  window.addEventListener(ME_EVENT, fn);
+  return () => window.removeEventListener(ME_EVENT, fn);
+};
 
 /** 그 캐릭터로 바꾸고 to 화면을 새로 연다 (알림, 새 글 숫자, 배치가 모두 그 캐릭터 것으로 바뀌게 새로고침) */
 export async function goCharacter(id: string, to = "#/me"): Promise<void> {

@@ -9,7 +9,7 @@ import { JobEmblem, JobGlyph } from "../emblems";
 import { ChangeAsk, HeroTitle, TopBar } from "../ui";
 import { AvatarMaker } from "./AvatarMaker";
 import { useBackToLogin } from "./Login";
-import { goCharacter } from "../characters";
+import { goCharacter, refreshMe } from "../characters";
 
 /** "12.345" -> 12345, 비었으면 null, 틀렸으면 undefined */
 function parseExp(text: string): number | null | undefined {
@@ -369,7 +369,7 @@ function CharactersPanel({ me }: { me: Me }) {
               <button
                 className={"char-item" + (c.id === me.id ? " char-on" : "")}
                 disabled={busy}
-                onClick={() => c.id !== me.id && run(() => goCharacter(c.id))}
+                onClick={() => c.id !== me.id && run(() => goCharacter(c.id).catch((x) => (refreshMe(), Promise.reject(x))))}
               >
                 <span className="char-name">
                   <b>{c.id}</b>
@@ -388,7 +388,7 @@ function CharactersPanel({ me }: { me: Me }) {
                   disabled={busy}
                   onClick={() =>
                     run(async () => {
-                      await setMainCharacter(c.id);
+                      await setMainCharacter(c.id).catch((x) => (refreshMe(), Promise.reject(x)));
                       await goCharacter(me.id); // 지금 캐릭터 그대로 새로 연다 (캐릭터를 바꾼 것처럼 오픈 축하는 다시 안 띄운다)
                     })
                   }

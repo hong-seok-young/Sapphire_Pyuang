@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { EDITION } from "./platform";
 import { useUnread } from "./alerts";
 import { JOB_NAME, errorText } from "./auth";
-import { goCharacter, useMyCharacters } from "./characters";
+import { goCharacter, refreshMe, useMyCharacters } from "./characters";
 import { goBack } from "./router";
 import type { Pic } from "./types";
 
@@ -104,6 +104,7 @@ export function CharacterSwitch() {
     } catch (x) {
       setError(errorText(x));
       setBusy("");
+      refreshMe(); // 목록이 예전 것이었으면 (뗀 부캐 등) 맞춘다
     }
   }
   return (

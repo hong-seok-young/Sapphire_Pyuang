@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { NEED_LOGIN, loadWiki, useAsync } from "./data";
 import { go, useRoute } from "./router";
-import { goCharacter, justSwitched, personOf, setMyCharacters } from "./characters";
+import { goCharacter, justSwitched, onRefreshMe, personOf, setMyCharacters } from "./characters";
 import { resetFavorites } from "./favorites";
 import { FitLine, PixelIcon, Loading, NotFound } from "./ui";
 import { Home, InfoPage, TileIcon } from "./pages/Home";
@@ -90,6 +90,26 @@ export function App() {
       else setBootError(errorText(e));
     });
   }, [bootTry]);
+  // 내 정보를 다시 받는다: 부탁받았을 때(길드원 관리에서 내 캐릭터를 묶거나 뗀 뒤 등)와 앱으로 돌아올 때(1분에 한 번까지).
+  // 다른 사람이 내 캐릭터를 묶거나 떼도 앱을 껐다 켜지 않아도 맞춰진다
+  useEffect(() => {
+    let last = Date.now();
+    const refresh = (force: boolean) => {
+      if (!force && Date.now() - last < 60_000) return;
+      last = Date.now();
+      fetchMe().then(
+        (fresh) => setMe((cur) => (cur ? fresh : cur)),
+        (e) => e instanceof ApiError && e.status === 401 && setMe(null),
+      );
+    };
+    const onVisible = () => !document.hidden && refresh(false);
+    document.addEventListener("visibilitychange", onVisible);
+    const stop = onRefreshMe(() => refresh(true));
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      stop();
+    };
+  }, []);
   // 다시 연결되거나 앱으로 돌아오면 저절로 다시
   useEffect(() => {
     if (!bootError) return;
