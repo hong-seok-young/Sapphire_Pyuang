@@ -8,6 +8,7 @@
   menu.json       홈 화면 메뉴 (육성 공략, 스킬, 장비, 조합책, 기타)
   regions.json    지역 -> 사냥터 목록
   places.json     사냥터: 레벨, 배너 그림, 몬스터, 원글에서 그대로 그릴 칸 (지도, 이동, 퀘스트, 참고)
+  place/<글>.json 사냥터 화면이 그리는 원글 칸 그대로 (above, below 블록, 그 칸에서 링크하는 글 번호 posts): 사냥터 화면이 posts.json 을 받지 않게
   monsters.json   몬스터: 레벨, HP, 특징, 드랍, 재부활, 스킬, 그림
   items.json      아이템: 아이콘, 떨구는 몬스터, 장비 정보
   rank/*.png      길드 랭킹 화면 그림 (자료/이미지/랭킹 을 그대로 복사)
@@ -867,10 +868,29 @@ def main():
     for name, value in data.items():
         (OUT / "data" / f"{name}.json").write_text(json.dumps(value, ensure_ascii=False, separators=(",", ":")),
                                                    encoding="utf-8")
+    write_place_parts(posts, places)
     size = sum(f.stat().st_size for f in (OUT / "img").iterdir())
     print("완료", meta["counts"], f"그림 {size / 1e6:.1f}MB")
     copy_rank_pictures()
     build_odds()
+
+
+def write_place_parts(posts: dict, places: dict) -> None:
+    """사냥터마다 화면이 그리는 원글 칸(지도, 옆 사냥터, 이동, 퀘스트, NPC ...)을 따로 둔다 (2026-11-01 오픈 전 검토: 사냥터를 처음 열 때
+    글 전체(posts.json 1.4MB)를 받아서 느린 폰에서 늦게 떴다). posts 는 그 칸이 링크하는 글 중 위키에 있는 글 번호 (앱 안에서 연다)"""
+    out = OUT / "data" / "place"
+    out.mkdir(parents=True, exist_ok=True)
+    for f in out.glob("*.json"):
+        f.unlink()
+    for aid, pl in places.items():
+        post = posts.get(aid)
+        if not post:
+            continue
+        above = [post["blocks"][i] for i in pl["above"]]
+        below = [post["blocks"][i] for i in pl["below"]]
+        linked = set(re.findall(r'"post:([^"]+)"', json.dumps(above + below, ensure_ascii=False)))
+        part = {"above": above, "below": below, "posts": sorted(linked & set(posts))}
+        (out / f"{aid}.json").write_text(json.dumps(part, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
 
 ODDS_GAME = "5960bb5afe064cdfbc9063dedc97f646ccf5346cdb4a9636c19810330d95ce1a"

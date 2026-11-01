@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useEntryState } from "../router";
 import type { ChangeEvent, ReactNode } from "react";
 import { errorText } from "../auth";
 import { ago, goldText, goldWords } from "../market";
@@ -74,7 +75,7 @@ function WalletBox({ wallet, high, onDue }: { wallet: Wallet; high: boolean; onD
 export function PlatShopPage() {
   const [data, setData] = useState<ShopData | null>(null);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<Tab>("shop");
+  const [tab, setTab] = useEntryState<Tab>("tab", "shop");
   const [picked, setPicked] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");

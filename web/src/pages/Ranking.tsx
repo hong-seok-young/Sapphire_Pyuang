@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useState } from "react";
+import { useEntryState } from "../router";
 import {
   GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, avatarUrl, errorText, expText, fetchGrowth, fetchRanking, growthText, saveMyProfile,
 } from "../auth";
@@ -213,7 +214,7 @@ function ExpBar({ r, mine, onMe }: { r: Ranked; mine: boolean; onMe?: (p: Partia
 function LevelRanking({ me, data, guild, onGuild, onMe }: {
   me: Me; data: RankEntry[]; guild: GuildFilter; onGuild: (g: GuildFilter) => void; onMe?: (p: Partial<Me>) => void;
 }) {
-  const [filter, setFilter] = useState<Job | "all">("all");
+  const [filter, setFilter] = useEntryState<Job | "all">("job", "all");
   const [openId, setOpenId] = useState<string | null>(null);
   const now = Date.now();
   const overall = new Map(data.map((r, i) => [r.id, i + 1]));
@@ -416,8 +417,8 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
 
 export function RankingPage({ me, onMe }: { me: Me; onMe?: (p: Partial<Me>) => void }) {
   const { data, error } = useAsync(useCallback(() => fetchRanking(), []));
-  const [view, setView] = useState<View>("level");
-  const [guild, setGuild] = useState<GuildFilter>("all");
+  const [view, setView] = useEntryState<View>("view", "level");
+  const [guild, setGuild] = useEntryState<GuildFilter>("guild", "all");
   return (
     <>
       <TopBar title="길드 랭킹" />

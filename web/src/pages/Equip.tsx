@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEntryState } from "../router";
 import { OriginalLink } from "../Blocks";
 import type { Wiki } from "../types";
 import { PicImg, TopBar, NotFound } from "../ui";
@@ -25,7 +25,7 @@ export function EquipSlots({ wiki }: { wiki: Wiki }) {
 const JOBS = ["전체", "전사", "레인저", "마법사", "무도가", "공용"];
 
 export function EquipSlot({ wiki, slot }: { wiki: Wiki; slot: string }) {
-  const [job, setJob] = useState("전체");
+  const [job, setJob] = useEntryState("job", "전체");
   const table = wiki.equipment.find((e) => e.slot === slot);
   if (!table) return <NotFound what="장비" />;
   // 한 글 안에서도 표마다 칸이 다를 수 있어서 (보조 장비: 방패 / 마법 / 정밀) 줄마다 자기 머리줄로 읽는다

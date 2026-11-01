@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useEntryState } from "../router";
 import type { FormEvent } from "react";
 import { RANK, errorText } from "../auth";
 import type { Me } from "../auth";
@@ -243,7 +244,7 @@ export function GoldBoard({ me }: { me: Me }) {
   const [reload, setReload] = useState(0);
   const { data, error } = useAsync(useCallback(() => fetchGold(), [reload]));
   const [offers, setOffers] = useState<GoldOffer[] | null>(null);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useEntryState<Filter>("filter", "all");
   const [writing, setWriting] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
   useEffect(() => {

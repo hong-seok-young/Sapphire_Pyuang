@@ -10,7 +10,7 @@ import {
 import type { BoardComment, BoardFile, Cat, LinkPreview, PostDetail, PostSummary } from "../board";
 import { RoleBadge } from "../emblems";
 import { ago } from "../market";
-import { go } from "../router";
+import { go, useEntryState } from "../router";
 import { Loading, TopBar } from "../ui";
 import { OfficialList } from "./Official";
 import { isOfficialTab } from "../official";
@@ -65,8 +65,8 @@ function List({ me, cat }: { me: Me; cat: Cat | null }) {
   const [posts, setPosts] = useState<PostSummary[] | null>(null);
   const [more, setMore] = useState(false);
   const [error, setError] = useState("");
-  const [text, setText] = useState("");
-  const [q, setQ] = useState("");
+  const [text, setText] = useEntryState("text", "");
+  const [q, setQ] = useEntryState("q", "");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {

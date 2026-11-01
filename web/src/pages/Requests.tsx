@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useEntryState } from "../router";
 import type { FormEvent } from "react";
 import { ApiError, RANK, errorText } from "../auth";
 import type { Me } from "../auth";
@@ -206,7 +207,7 @@ export function RequestsPage({ me }: { me: Me }) {
   const [reload, setReload] = useState(0);
   const { data, error } = useAsync(useCallback(() => fetchRequests(), [reload]));
   const [list, setList] = useState<GuildRequest[] | null>(null);
-  const [filter, setFilter] = useState<Filter>("open");
+  const [filter, setFilter] = useEntryState<Filter>("filter", "open");
   const [writing, setWriting] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
   useEffect(() => {

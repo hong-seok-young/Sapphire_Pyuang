@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useEntryState } from "../router";
 import type { FormEvent } from "react";
 import {
   RANK, ROLE_NAME, canManage, createAccount, decideSignup, deleteAccount, errorText, linkAccounts, listAccounts, listSignups, positionOf, renameAccount,
@@ -54,8 +55,8 @@ export function AdminPage({ me }: { me: Me }) {
   const [busy, setBusy] = useState(false);
 
   const creatable = ASSIGNABLE.filter((r) => canManage(me.role, r));
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<FilterKey>("all");
+  const [query, setQuery] = useEntryState("query", "");
+  const [filter, setFilter] = useEntryState<FilterKey>("filter", "all");
   const [open, setOpen] = useState<string | null>(null);
   const [limit, setLimit] = useState(PAGE_SIZE);
   const q = query.replace(/\s+/g, "").toLowerCase();

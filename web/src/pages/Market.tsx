@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEntryState } from "../router";
 import type { FormEvent, ReactNode } from "react";
 import { ApiError, JOB_NAME, RANK, ROLE_NAME, errorText, positionOf } from "../auth";
 import type { Me } from "../auth";
@@ -905,11 +906,11 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const { data, error } = useAsync(useCallback(() => fetchMarket(), [reload]));
   const [listings, setListings] = useState<Listing[] | null>(null);
   const [rate, setRate] = useState(75);
-  const [onlyAuction, setOnlyAuction] = useState(false);
-  const [tab, setTab] = useState<Tab>("buy");
-  const [query, setQuery] = useState("");
-  const [cat, setCat] = useState<Category | "전체">("전체");
-  const [onlyWanted, setOnlyWanted] = useState(false);
+  const [onlyAuction, setOnlyAuction] = useEntryState("onlyAuction", false);
+  const [tab, setTab] = useEntryState<Tab>("tab", "buy");
+  const [query, setQuery] = useEntryState("query", "");
+  const [cat, setCat] = useEntryState<Category | "전체">("cat", "전체");
+  const [onlyWanted, setOnlyWanted] = useEntryState("onlyWanted", false);
   useEffect(() => {
     if (data) {
       setListings(data.listings);
