@@ -1683,34 +1683,103 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 .todo-done .todo-note, .todo-done .todo-right { opacity: 0.6; }
 .todo-go { flex: none; display: flex; align-items: center; padding: 0 4px 0 10px; font-size: 22px; color: var(--muted); }
 .todo-empty { margin: 6px 2px 10px; font-size: 13px; color: var(--muted); }
+.todo-fold { display: block; width: 100%; margin: 2px 0 6px; padding: 6px 2px; text-align: left; font-size: 12px; color: var(--muted); background: none; border: none; border-top: 1px solid rgba(74, 63, 134, 0.6); cursor: pointer; }
 .todo-working { margin: 0 4px 12px; font-size: 12px; color: var(--muted); }
 /* official post: struck-out text (a maintenance end time that was extended) */
 .off-body s { opacity: 0.6; }
 
-/* equipment rental (pages/Rental.tsx): my mileage card, staff panel, job pills, sections per rental term like the guild's KakaoTalk list */
-.rent-me { display: flex; flex-direction: column; gap: 6px; }
+/* equipment rental (pages/Rental.tsx): my card, staff panel, then one thin row per weapon grouped by level (2026-11-02: rows were too tall) */
+.rent-me, .rent-admin { display: flex; flex-direction: column; gap: 6px; }
 .rent-me-top { display: flex; align-items: baseline; gap: 8px; }
 .rent-me-top .pill { margin-left: auto; }
 .rent-dia { font-size: 20px; color: #7fd8ff; text-shadow: 1px 1px 0 var(--edge); }
+.rent-dia-sm { color: #7fd8ff; }
 .rent-me-top small { font-size: 12px; color: var(--muted); }
 .rent-me-line { margin: 0; font-size: 13px; }
 .rent-muted { font-size: 12px; color: var(--muted); }
-.rent-admin { display: flex; flex-direction: column; gap: 8px; }
-.rent-admin-title { align-self: center; font-size: 14px; color: var(--gold); margin-right: 4px; }
-.rent-waits { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.rent-wait { width: 100%; padding: 6px 8px; text-align: left; font-size: 13px; color: var(--text); background: var(--night-2); border: 1px solid var(--edge); cursor: pointer; }
-.rent-jobs { margin-bottom: 10px; }
-.rent-free { margin-left: auto; }
-.rent-term-head { display: flex; align-items: baseline; gap: 8px; margin: 4px 2px 6px; font-size: 15px; color: var(--gold); text-shadow: 1px 1px 0 var(--edge); }
-.rent-term-head small { margin-left: auto; font-size: 11px; color: var(--muted); text-shadow: none; }
-.rent-lv { font-size: 11px; color: #6fb6ff; }
-.rent-free-text { color: #7fe0a0; }
-.rent-busy { color: var(--muted); }
+.rent-warn { font-weight: 400; color: var(--sunset); }
 .rent-late { color: var(--red); }
-.rent-out .mk-row { opacity: 0.72; }
-.rent-ask, .rent-manage { display: flex; flex-direction: column; gap: 8px; }
+.rent-admin-title { align-self: center; font-size: 14px; color: var(--gold); margin-right: 4px; }
+.rent-jobs { margin-bottom: 8px; }
+.rent-lv { margin-bottom: 6px; }
+.rent-lv-head { margin: 8px 2px 3px; font-size: 13px; color: #6fb6ff; text-shadow: 1px 1px 0 var(--edge); }
+.rent-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.rent-li { background: var(--panel); border: var(--px) solid var(--edge); }
+.rent-open { box-shadow: inset 0 0 0 2px var(--sapphire); }
+.rent-held .rent-main { opacity: 0.7; }
+.rent-row { display: flex; align-items: stretch; }
+/* pick box: a small pixel square in the left column */
+.rent-pick {
+  flex: none; width: 30px; display: flex; align-items: center; justify-content: center; padding: 0;
+  background: none; border: none; border-right: 1px solid rgba(74, 63, 134, 0.6); cursor: pointer;
+}
+.rent-pick::after {
+  content: ""; width: 16px; height: 16px; background: var(--lo); border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 #0b0a1a;
+}
+.rent-pick-on::after { content: "✓"; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--edge); background: var(--gold); box-shadow: inset var(--px) var(--px) 0 #fff1c9; }
+.rent-pick-off { cursor: default; font-size: 13px; }
+.rent-pick-off::after { display: none; }
+.rent-main {
+  flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; padding: 4px 6px 4px 5px; min-height: 36px;
+  text-align: left; color: var(--text); background: none; border: none; cursor: pointer;
+}
+.rent-slot { flex: none; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: var(--lo); border: 1px solid var(--edge); color: var(--muted); }
+.rent-nm { font-size: 13px; white-space: nowrap; }
+.rent-nm em { margin-left: 2px; font-style: normal; color: var(--gold); }
+.rent-op { font-size: 11px; color: #ff9f43; }
+.rent-tg { font-size: 11px; padding: 0 4px; color: var(--muted); border: 1px solid var(--hi); }
+.rent-tg-2w { color: #ff8fa3; border-color: #8a3a52; }
+.rent-tg-4w { color: #ffd27a; border-color: #8a6a2e; }
+.rent-pr { margin-left: auto; font-size: 13px; color: var(--gold); white-space: nowrap; }
+.rent-st { text-align: right; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.rent-st-free { color: #7fe0a0; }
+.rent-st-me { color: #7fd8ff; }
+.rent-detail { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 10px; background: var(--night-2); border-top: 1px solid var(--edge); }
+.rent-line { margin: 0; font-size: 13px; }
+.rent-next { margin: 0; font-size: 13px; color: #7fd8ff; }
+.rent-manage, .rent-ask { display: flex; flex-direction: column; gap: 8px; }
 .rent-use { min-width: 44px; text-align: center; color: #7fd8ff; }
-.rent-req span { flex: 1; min-width: 0; font-size: 13px; }
+/* picked weapons: a bar fixed above the tab bar, opens upward into the application form */
+.rent-cart {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tab-h) + 6px + env(safe-area-inset-bottom)); z-index: 6;
+  width: min(616px, calc(100% - 24px)); display: flex; flex-direction: column; gap: 6px; padding: 8px 10px;
+  background: #1f1a44; border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 var(--hi), 0 4px 0 rgba(0, 0, 0, 0.35);
+}
+.rent-cart-bar { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.rent-cart-bar span { flex: 1; min-width: 0; }
+.rent-cart-bar small { font-size: 11px; color: var(--muted); }
+.rent-cart-form { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; }
+.rent-cart-line { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 13px; }
+.rent-cart-line b { font-weight: 400; }
+.rent-cart-line span { font-size: 12px; color: var(--muted); }
+.rent-cart-line small { flex-basis: 100%; font-size: 12px; color: #7fd8ff; }
+.page:has(.rent-cart) { padding-bottom: calc(var(--tab-h) + 120px + env(safe-area-inset-bottom)); }
+/* applications (my card, staff panel): each weapon's state, staff buttons, and a small chat */
+.rent-app { display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--night-2); border: 1px solid var(--edge); }
+.rent-app-head { display: flex; align-items: baseline; gap: 8px; }
+.rent-app-head small { font-size: 11px; color: var(--muted); }
+.rent-talk-btn { margin-left: auto; padding: 2px 8px; }
+.rent-app-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rent-req { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px solid rgba(74, 63, 134, 0.6); }
+.rent-req:first-child { padding-top: 0; border-top: none; }
+.rent-req-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.rent-req-name { font-size: 14px; }
+.rent-req-name small { font-size: 11px; color: var(--muted); }
+.rent-req-st { margin-left: auto; font-size: 12px; color: var(--muted); }
+.rent-req-wait { color: var(--sunset); }
+.rent-req-ok { color: #7fd8ff; }
+.rent-req-hold { color: #7fe0a0; }
+.rent-req-no, .rent-req-cancel { color: var(--muted); text-decoration: line-through; }
+.rent-hand { padding: 6px; background: var(--panel); border: 1px solid var(--edge); }
+.rent-talk { display: flex; flex-direction: column; gap: 6px; }
+.rent-talk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 220px; overflow-y: auto; }
+.rent-talk-list li { padding: 4px 8px; font-size: 13px; background: var(--panel); border: 1px solid var(--edge); }
+.rent-talk-list li.rent-talk-staff { border-color: #3b4f8a; }
+.rent-talk-list b { font-weight: 400; color: var(--gold); }
+.rent-talk-list small { font-size: 10px; color: var(--muted); }
+.rent-talk-list p { margin: 2px 0 0; white-space: pre-line; overflow-wrap: anywhere; }
+.rent-talk-input { display: flex; gap: 6px; }
+.rent-talk-input .mk-input { flex: 1; min-width: 0; height: 36px; font-size: 14px; }
 .rent-form { padding: 8px 0 0; }
 .rent-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .rent-paste { height: 140px; padding: 8px 10px; font-size: 13px; line-height: 1.4; resize: vertical; }

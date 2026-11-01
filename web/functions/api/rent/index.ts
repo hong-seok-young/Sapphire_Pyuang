@@ -1,18 +1,29 @@
-// GET /api/rent -> 장비대여 목록, 내 마일리지와 장부, 내 신청 (운영진은 신청 명단, 사람마다 마일리지, 닉네임 목록도)
+// GET /api/rent -> 장비대여 목록(무기마다 쓰는 사람, 줄, 새로 신청하면 받을 수 있는 때), 신청서(대화 포함), 내 마일리지와 장부
+//   길드원: 내 신청서 최근 10개. 운영진: 줄 서는 신청이 있는 신청서 모두와 무기마다 줄 명단, 사람마다 마일리지, 닉네임 목록
 // POST /api/rent { job, level, weapon, options, enhance, term, price, donor, note } -> 물건 더하기 (운영진)
-// 제작자 요청 2026-11-01. 지금은 개발 중이라 앱개발자만 (server/rental.ts RENT_OPEN)
+// 제작자 요청 2026-11-01, 신청서·줄·대화창 2026-11-02. 지금은 개발 중이라 앱개발자만 (server/rental.ts RENT_OPEN)
 import { FORBIDDEN, NEED_LOGIN, TEST_IDS, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { DIA_GOLD, canEnter, checkItem, isManager, mileageOf } from "../../../server/rental";
-import type { RentalRow } from "../../../server/rental";
+import { DIA_GOLD, TERM_DAYS, canEnter, checkItem, expectedTimes, isManager, mileageOf } from "../../../server/rental";
+import type { QueueRow, RentalRow } from "../../../server/rental";
 
-interface WaitRow {
+interface ReqRow {
   id: number;
   item_id: number;
   user_id: string;
+  status: string;
+  created_at: number;
+  done_at: number | null;
+  returned_at: number | null;
+  app_id: number | null;
   use_dia: number;
+}
+interface AppRow {
+  id: number;
+  user_id: string;
   note: string | null;
   created_at: number;
+  updated_at: number;
 }
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
@@ -21,23 +32,38 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (!canEnter(me)) return FORBIDDEN();
   const manager = isManager(me);
   const owner = me.owner ?? me.id;
-  const [itemsR, waitR, charsR, ledgerR] = await env.DB.batch([
+  const now = Date.now();
+  const [itemsR, queueR, charsR, ledgerR, myAppsR] = await env.DB.batch([
     env.DB.prepare(
-      "SELECT id, job, level, weapon, options, enhance, term, price, donor, renter, rented_at, due_at, note FROM rental_items WHERE status = 'open' " +
-        "ORDER BY job, level, weapon, enhance, price, id",
+      "SELECT id, job, level, weapon, options, enhance, term, price, donor, renter, rented_at, due_at, note FROM rental_items WHERE status = 'open' ORDER BY job, level, weapon, enhance, id",
     ),
-    env.DB.prepare("SELECT id, item_id, user_id, use_dia, note, created_at FROM rental_requests WHERE status = 'wait' ORDER BY created_at"),
+    env.DB.prepare("SELECT id, item_id, user_id, status, created_at, app_id FROM rental_requests WHERE status IN ('wait', 'ok') ORDER BY created_at, id"),
     env.DB.prepare("SELECT id FROM users WHERE id = ?1 OR main_id = ?1").bind(owner),
     env.DB.prepare(
       "SELECT who, delta, gold, reason, note, created_at AS at FROM rental_mileage WHERE who IN (SELECT id FROM users WHERE id = ?1 OR main_id = ?1) " +
         "ORDER BY created_at DESC LIMIT 30",
     ).bind(owner),
+    env.DB.prepare("SELECT id, user_id, note, created_at, updated_at FROM rental_apps WHERE user_id IN (SELECT id FROM users WHERE id = ?1 OR main_id = ?1) ORDER BY created_at DESC LIMIT 10").bind(owner),
   ]);
   const mine = new Set((charsR.results as { id: string }[]).map((r) => r.id));
-  const waits = waitR.results as WaitRow[];
-  const items = (itemsR.results as RentalRow[]).map((it) => {
-    const w = waits.filter((x) => x.item_id === it.id);
-    const my = w.find((x) => mine.has(x.user_id));
+  const rows = itemsR.results as RentalRow[];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  // 무기마다 줄 (신청한 순서)과 차례마다 받을 수 있는 때
+  const lines = new Map<number, QueueRow[]>();
+  for (const q of queueR.results as QueueRow[]) lines.set(q.item_id, [...(lines.get(q.item_id) ?? []), q]);
+  const when = new Map<number, (number | null)[]>();
+  for (const r of rows) when.set(r.id, expectedTimes(r, (lines.get(r.id)?.length ?? 0) + 1, now));
+  /** 그 신청의 차례(1부터)와 받을 수 있는 때 */
+  const placeOf = (q: { id: number; item_id: number }) => {
+    const line = lines.get(q.item_id) ?? [];
+    const i = line.findIndex((x) => x.id === q.id);
+    return i < 0 ? null : { pos: i + 1, at: when.get(q.item_id)?.[i] ?? null };
+  };
+
+  const items = rows.map((it) => {
+    const line = lines.get(it.id) ?? [];
+    const my = line.find((q) => mine.has(q.user_id));
+    const days = TERM_DAYS[it.term];
     return {
       id: it.id,
       job: it.job,
@@ -48,18 +74,77 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       term: it.term,
       price: it.price,
       donor: it.donor,
+      note: it.note,
       renter: it.renter,
       rentedAt: it.rented_at,
-      dueAt: it.due_at,
-      note: it.note,
-      waiting: w.length,
-      mine: my ? { id: my.id, useDia: my.use_dia, note: my.note } : null,
-      // 누가 신청했는지와 마일리지 쓸 양은 운영진만
-      ...(manager ? { requests: w.map((x) => ({ id: x.id, user: x.user_id, useDia: x.use_dia, note: x.note, at: x.created_at })) } : {}),
+      // 기한이 끝나는 날 (줄이 있으면 이날 담당자에게 돌려준다)
+      dueAt: it.renter && it.rented_at && days ? it.rented_at + days * 86_400_000 : null,
+      queue: line.length,
+      // 지금 새로 신청하면 받을 수 있는 때 (null 은 앞사람이 반납하면)
+      next: when.get(it.id)?.[line.length] ?? null,
+      mine: my ? { rid: my.id, status: my.status, ...placeOf(my)! } : null,
+      // 누가 줄을 섰는지는 운영진만 (길드원은 수와 내 차례만)
+      ...(manager ? { line: line.map((q) => ({ rid: q.id, user: q.user_id, status: q.status, appId: q.app_id, ...placeOf(q)! })) } : {}),
     };
   });
+
+  // 신청서: 길드원은 내 것, 운영진은 줄 서는 신청이 있는 것 모두 (와 내 것)
+  const openAppIds = [...new Set((queueR.results as QueueRow[]).map((q) => q.app_id).filter((a): a is number => a !== null))];
+  const appIds = [...new Set([...(myAppsR.results as AppRow[]).map((a) => a.id), ...(manager ? openAppIds : [])])];
+  let apps: unknown[] = [];
+  if (appIds.length) {
+    const marks = appIds.map(() => "?").join(",");
+    const [appsR, reqsR, talkR] = await env.DB.batch([
+      env.DB.prepare(`SELECT id, user_id, note, created_at, updated_at FROM rental_apps WHERE id IN (${marks})`).bind(...appIds),
+      env.DB.prepare(`SELECT id, item_id, user_id, status, created_at, done_at, returned_at, app_id, use_dia FROM rental_requests WHERE app_id IN (${marks}) ORDER BY id`).bind(...appIds),
+      env.DB.prepare(`SELECT id, app_id, user_id, text, created_at FROM rental_talk WHERE app_id IN (${marks}) ORDER BY id`).bind(...appIds),
+    ]);
+    const reqs = reqsR.results as ReqRow[];
+    const talk = talkR.results as { id: number; app_id: number; user_id: string; text: string; created_at: number }[];
+    // 운영진에게는 신청한 사람의 마일리지도 (건넬 때 쓸 💎 를 고르게)
+    const people = manager ? [...new Set((appsR.results as AppRow[]).map((a) => a.user_id))] : [];
+    const mileage = new Map<string, number>();
+    for (const who of people) {
+      const u = await env.DB.prepare("SELECT COALESCE(main_id, id) AS owner FROM users WHERE id = ?").bind(who).first<{ owner: string }>();
+      mileage.set(who, await mileageOf(env, u?.owner ?? who));
+    }
+    apps = (appsR.results as AppRow[])
+      .sort((a, b) => b.updated_at - a.updated_at)
+      .map((a) => ({
+        id: a.id,
+        user: a.user_id,
+        note: a.note,
+        createdAt: a.created_at,
+        updatedAt: a.updated_at,
+        mine: mine.has(a.user_id),
+        ...(manager ? { mileage: mileage.get(a.user_id) ?? 0 } : {}),
+        requests: reqs
+          .filter((r) => r.app_id === a.id)
+          .map((r) => {
+            const it = byId.get(r.item_id);
+            return {
+              rid: r.id,
+              itemId: r.item_id,
+              weapon: it?.weapon ?? null,
+              enhance: it?.enhance ?? null,
+              term: it?.term ?? null,
+              price: it?.price ?? null,
+              status: r.status,
+              doneAt: r.done_at,
+              returnedAt: r.returned_at,
+              useDia: r.use_dia,
+              // 지금 그 무기를 이 사람이 쓰고 있는지
+              holding: r.status === "done" && !r.returned_at && it?.renter === r.user_id,
+              ...(r.status === "wait" || r.status === "ok" ? placeOf(r) ?? {} : {}),
+            };
+          }),
+        talk: talk.filter((t) => t.app_id === a.id).slice(-50).map((t) => ({ id: t.id, user: t.user_id, text: t.text, at: t.created_at })),
+      }));
+  }
+
   const out: Record<string, unknown> = {
     items,
+    apps,
     manager,
     rate: DIA_GOLD,
     mine: [...mine],

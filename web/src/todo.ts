@@ -1,5 +1,5 @@
 // To do (제작자 요청 2026-11-01): 이벤트를 안 읽어도 본인 직업·레벨에 맞는 할 일을 명사형으로 딱.
-// - 늘 하는 일은 여기서 만든다: 매일 길드 출석, 매주(목요일 오전 10시 초기화) 길드 임무, 들어갈 수 있는 인스턴스 던전(위키 '인스턴스 던전' 지역,
+// - 늘 하는 일은 여기서 만든다: 매일 길드 출석, 매주(목요일 오전 10시 초기화) 길드 임무, 들어갈 수 있는 인스턴스 던전 중 위쪽 2곳(위키 '인스턴스 던전' 지역,
 //   이름의 숫자가 들어가는 레벨), 길드던전, 헌팅 그라운드 이용 시간.
 // - 이벤트 할 일은 서버가 공식 글에서 Claude 로 뽑아 둔 것 중 지금 이 캐릭터의 레벨·직업에 맞는 것 (/api/todo, server/todo.ts).
 // - 체크는 계정(캐릭터)마다 서버에 두고, 그 주기 안에서만 남는다 (오늘은 한국 시간 0시, 이번 주는 목요일 오전 10시에 비워진다).
@@ -75,8 +75,8 @@ export function routineItems(wiki: Wiki, level: number | null): { today: TodoIte
       week.push({ key: "w:guild-dungeon", text: "길드던전", note: name, to: `#/place/${id}` });
     }
   }
-  // 들어갈 수 있는 인던: 높은 것부터 (지금 레벨에 맞는 것이 위로)
-  week.push(...dungeons.sort((a, b) => b.lv - a.lv).map((d) => d.item));
+  // 들어갈 수 있는 인던 중 지금 레벨에 맞는 위쪽 2곳만 (제작자 요청 2026-11-02: 할 일이 너무 많다. 낮은 인던은 빼고)
+  week.push(...dungeons.sort((a, b) => b.lv - a.lv).slice(0, 2).map((d) => d.item));
   if (lv >= HUNTING_LV) {
     const hunting = Object.values(wiki.places).find((p) => /헌팅\s*그라운드/.test(p.name));
     week.push({ key: "w:hunting", text: "헌팅 그라운드", note: "주간 이용 시간", to: hunting ? `#/place/${hunting.id}` : null });

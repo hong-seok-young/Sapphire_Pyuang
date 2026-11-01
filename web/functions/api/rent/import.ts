@@ -85,7 +85,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
   for (const g of gone) {
     stmts.push(env.DB.prepare("UPDATE rental_items SET status = 'gone', updated_at = ?, updated_by = ? WHERE id = ?").bind(now, me.id, g.id));
-    stmts.push(env.DB.prepare("UPDATE rental_requests SET status = 'no', done_at = ?, done_by = ? WHERE item_id = ? AND status = 'wait'").bind(now, me.id, g.id));
+    stmts.push(env.DB.prepare("UPDATE rental_requests SET status = 'no', done_at = ?, done_by = ? WHERE item_id = ? AND status IN ('wait', 'ok')").bind(now, me.id, g.id));
   }
   // 한 번에 너무 많이 보내지 않게 나눠서
   for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));

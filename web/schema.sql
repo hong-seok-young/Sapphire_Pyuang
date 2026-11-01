@@ -481,21 +481,43 @@ CREATE TABLE IF NOT EXISTS rental_items (
 );
 CREATE INDEX IF NOT EXISTS rental_items_status ON rental_items (status, job);
 
--- 대여 신청과 대여 기록 (운영진이 직접 빌려준 것도 status 'done' 으로 남긴다). 지우지 않는다
+-- 신청서: 한 번에 무기 여러 개를 신청한다 (제작자 요청 2026-11-02). 운영진은 무기마다 수락·거절하고, 신청서마다 대화창(rental_talk)이 있다
+CREATE TABLE IF NOT EXISTS rental_apps (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,                  -- 신청한 사람 (닉네임)
+  note TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL             -- 마지막으로 무엇이 바뀐 때 (대화, 수락 등)
+);
+CREATE INDEX IF NOT EXISTS rental_apps_user ON rental_apps (user_id, created_at);
+
+-- 무기마다의 신청과 대여 기록. 무기마다 선착순으로 줄을 선다 (wait, ok 를 신청한 순서로). 운영진이 직접 빌려준 것도 status 'done' 으로 남긴다. 지우지 않는다
 CREATE TABLE IF NOT EXISTS rental_requests (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   item_id INTEGER NOT NULL,
   user_id TEXT NOT NULL,                  -- 빌리는 사람 (닉네임)
-  use_dia INTEGER NOT NULL DEFAULT 0,     -- 마일리지에서 쓰는 💎 (나머지는 골드)
+  use_dia INTEGER NOT NULL DEFAULT 0,     -- 건넬 때 마일리지에서 쓴 💎 (나머지는 골드)
   note TEXT,
-  status TEXT NOT NULL DEFAULT 'wait',    -- wait 신청 | done 빌려줌 | no 거절 | cancel 취소
+  status TEXT NOT NULL DEFAULT 'wait',    -- wait 신청(확인 전) | ok 수락(차례 기다림) | done 건네받음 | no 거절 | cancel 취소
   created_at INTEGER NOT NULL,
-  done_at INTEGER,
+  done_at INTEGER,                        -- 건넨 때 (거절·취소면 그때)
   done_by TEXT,
-  returned_at INTEGER                     -- 돌려받은 때
+  returned_at INTEGER,                    -- 돌려받은 때
+  app_id INTEGER                          -- 신청서 (처음 목록과 직접 대여는 없다)
 );
 CREATE INDEX IF NOT EXISTS rental_requests_item ON rental_requests (item_id, status);
 CREATE INDEX IF NOT EXISTS rental_requests_user ON rental_requests (user_id, status);
+CREATE INDEX IF NOT EXISTS rental_requests_status ON rental_requests (status, created_at);
+
+-- 신청서 대화창: 신청한 사람과 운영진이 건네받을 때, 마일리지 같은 것을 이야기한다. 지우지 않는다 (계정을 지우면 그 사람 글만)
+CREATE TABLE IF NOT EXISTS rental_talk (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS rental_talk_app ON rental_talk (app_id, id);
 
 -- 마일리지 장부: 줄마다 더하거나 뺀 💎 (합이 그 사람의 마일리지, 묶은 캐릭터는 합쳐서). 닉네임 글자로 두어 아직 앱에 없는 기부자도 적립할 수 있다. 지우지 않는다
 CREATE TABLE IF NOT EXISTS rental_mileage (

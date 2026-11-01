@@ -33,10 +33,10 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
   if (!item) return json({ error: "없는 물건이에요" }, 404);
   if (item.renter) return json({ error: "대여 중인 물건은 반납한 뒤에 내려요" }, 400);
   const now = Date.now();
-  const { results: waits } = await env.DB.prepare("SELECT user_id FROM rental_requests WHERE item_id = ? AND status = 'wait'").bind(id).all<{ user_id: string }>();
+  const { results: waits } = await env.DB.prepare("SELECT user_id FROM rental_requests WHERE item_id = ? AND status IN ('wait', 'ok')").bind(id).all<{ user_id: string }>();
   await env.DB.batch([
     env.DB.prepare("UPDATE rental_items SET status = 'gone', updated_at = ?, updated_by = ? WHERE id = ?").bind(now, me.id, id),
-    env.DB.prepare("UPDATE rental_requests SET status = 'no', done_at = ?, done_by = ? WHERE item_id = ? AND status = 'wait'").bind(now, me.id, id),
+    env.DB.prepare("UPDATE rental_requests SET status = 'no', done_at = ?, done_by = ? WHERE item_id = ? AND status IN ('wait', 'ok')").bind(now, me.id, id),
   ]);
   if (waits.length) await notify(env, waits.map((w) => w.user_id), "rent", `${itemLabel(item)} 이 대여 목록에서 내려가 신청이 취소됐어요`, "#/rent", me.id);
   return json({ ok: true });

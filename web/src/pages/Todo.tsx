@@ -125,40 +125,51 @@ function Section({ title, reset, items, done, onToggle, empty }: {
   onToggle: (key: string) => void;
   empty?: string;
 }) {
+  const [showDone, setShowDone] = useState(false);
   if (!items.length && !empty) return null;
-  const count = items.filter((i) => done.has(i.key)).length;
+  // 끝낸 일은 아래로 접는다 (제작자 요청 2026-11-02: 할 일이 너무 많아 보인다). 누르면 펼쳐 다시 풀 수 있다
+  const left = items.filter((i) => !done.has(i.key));
+  const finished = items.filter((i) => done.has(i.key));
+  const row = (i: TodoItem) => {
+    const on = done.has(i.key);
+    return (
+      <li key={i.key} className={"todo-row" + (on ? " todo-done" : "")}>
+        <button className="todo-hit" onClick={() => onToggle(i.key)} aria-pressed={on}>
+          <span className="todo-box" aria-hidden>
+            {on ? "✓" : ""}
+          </span>
+          <span className="todo-text">
+            <span className="todo-name">{i.text}</span>
+            {i.note && <span className="todo-note">{i.note}</span>}
+          </span>
+          {i.right && <span className="todo-right">{i.right}</span>}
+        </button>
+        {i.to && (
+          <a className="todo-go" href={i.to} aria-label="자세히">
+            ›
+          </a>
+        )}
+      </li>
+    );
+  };
   return (
     <section className="panel todo">
       <h2 className="todo-head">
         <span>{title}</span>
-        {items.length > 0 && <b className={count === items.length ? "todo-all" : ""}>{count}/{items.length}</b>}
+        {items.length > 0 && <b className={finished.length === items.length ? "todo-all" : ""}>{finished.length}/{items.length}</b>}
         {reset && <small>{reset}</small>}
       </h2>
       {!items.length && <p className="todo-empty">{empty}</p>}
-      <ul className="todo-list">
-        {items.map((i) => {
-          const on = done.has(i.key);
-          return (
-            <li key={i.key} className={"todo-row" + (on ? " todo-done" : "")}>
-              <button className="todo-hit" onClick={() => onToggle(i.key)} aria-pressed={on}>
-                <span className="todo-box" aria-hidden>
-                  {on ? "✓" : ""}
-                </span>
-                <span className="todo-text">
-                  <span className="todo-name">{i.text}</span>
-                  {i.note && <span className="todo-note">{i.note}</span>}
-                </span>
-                {i.right && <span className="todo-right">{i.right}</span>}
-              </button>
-              {i.to && (
-                <a className="todo-go" href={i.to} aria-label="자세히">
-                  ›
-                </a>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      {items.length > 0 && !left.length && <p className="todo-empty">다 했어요 ✓</p>}
+      <ul className="todo-list">{left.map(row)}</ul>
+      {finished.length > 0 && (
+        <>
+          <button className="todo-fold" onClick={() => setShowDone((v) => !v)}>
+            ✓ 끝낸 일 {finished.length} {showDone ? "▴" : "▾"}
+          </button>
+          {showDone && <ul className="todo-list">{finished.map(row)}</ul>}
+        </>
+      )}
     </section>
   );
 }

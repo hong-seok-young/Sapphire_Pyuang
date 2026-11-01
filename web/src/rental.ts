@@ -8,6 +8,9 @@ export type RentTerm = "none" | "4w" | "2w";
 export const TERMS: RentTerm[] = ["none", "4w", "2w"];
 export const TERM_NAME: Record<RentTerm, string> = { none: "기한 없음", "4w": "4주", "2w": "2주" };
 
+export type ReqStatus = "wait" | "ok" | "done" | "no" | "cancel";
+export const STATUS_NAME: Record<ReqStatus, string> = { wait: "확인 전", ok: "수락", done: "건네받음", no: "거절", cancel: "취소" };
+
 export interface RentItem {
   id: number;
   job: Job;
@@ -20,16 +23,53 @@ export interface RentItem {
   /** 💎 */
   price: number;
   donor: string | null;
+  note: string | null;
+  /** 지금 쓰는 사람 */
   renter: string | null;
   rentedAt: number | null;
+  /** 기한이 끝나는 날 (줄이 있으면 이날 담당자에게 돌려준다) */
   dueAt: number | null;
+  /** 줄 선 사람 수 */
+  queue: number;
+  /** 지금 새로 신청하면 받을 수 있는 때 (null: 앞사람이 반납하면) */
+  next: number | null;
+  /** 내 신청: 차례와 받을 수 있는 때 */
+  mine: { rid: number; status: ReqStatus; pos: number; at: number | null } | null;
+  /** 운영진만: 줄 명단 */
+  line?: { rid: number; user: string; status: ReqStatus; appId: number | null; pos: number; at: number | null }[];
+}
+
+export interface AppRequest {
+  rid: number;
+  itemId: number;
+  weapon: string | null;
+  enhance: number | null;
+  term: RentTerm | null;
+  price: number | null;
+  status: ReqStatus;
+  doneAt: number | null;
+  returnedAt: number | null;
+  useDia: number;
+  /** 지금 이 사람이 쓰고 있는지 */
+  holding: boolean;
+  /** 줄 서는 중이면 차례와 받을 수 있는 때 */
+  pos?: number;
+  at?: number | null;
+}
+
+/** 신청서 (한 번에 여러 개, 대화창) */
+export interface RentApp {
+  id: number;
+  user: string;
   note: string | null;
-  /** 기다리는 신청 수 */
-  waiting: number;
-  /** 내 신청 */
-  mine: { id: number; useDia: number; note: string | null } | null;
-  /** 운영진만: 신청 명단 */
-  requests?: { id: number; user: string; useDia: number; note: string | null; at: number }[];
+  createdAt: number;
+  updatedAt: number;
+  /** 내 신청서인지 */
+  mine: boolean;
+  /** 운영진만: 신청한 사람의 마일리지 */
+  mileage?: number;
+  requests: AppRequest[];
+  talk: { id: number; user: string; text: string; at: number }[];
 }
 
 export interface LedgerLine {
@@ -44,6 +84,7 @@ export interface LedgerLine {
 
 export interface RentData {
   items: RentItem[];
+  apps: RentApp[];
   manager: boolean;
   /** 💎 1개의 골드 */
   rate: number;
@@ -58,12 +99,16 @@ export interface RentData {
 }
 
 export const fetchRent = () => api<RentData>("/api/rent");
-export const requestRent = (id: number, useDia: number, note: string) => api<{ ok: boolean }>(`/api/rent/${id}/request`, "POST", { useDia, note });
-export const cancelRent = (id: number) => api<{ ok: boolean }>(`/api/rent/${id}/request`, "DELETE");
-export const lendRent = (id: number, body: { requestId: number } | { renter: string; useDia: number; date?: string }) =>
+/** 신청서: 무기 여러 개를 한 번에 (무기마다 선착순으로 줄을 선다) */
+export const applyRent = (items: number[], note: string) => api<{ appId: number }>("/api/rent/apply", "POST", { items, note });
+/** 신청 하나: accept 수락 / reject 거절 / hand 건네줌(마일리지 💎) — 운영진, cancel 취소 — 신청한 사람 */
+export const actRequest = (rid: number, action: "accept" | "reject" | "cancel" | "hand", useDia = 0) =>
+  api<{ ok: boolean }>(`/api/rent/requests/${rid}`, "POST", { action, useDia });
+export const talkRent = (aid: number, text: string) => api<{ id: number; at: number }>(`/api/rent/apps/${aid}/talk`, "POST", { text });
+/** 직접 대여 (카톡 등 앱 밖 신청) */
+export const lendRent = (id: number, body: { renter: string; useDia: number; date?: string }) =>
   api<{ ok: boolean; dueAt: number | null }>(`/api/rent/${id}/lend`, "POST", body);
 export const returnRent = (id: number) => api<{ ok: boolean }>(`/api/rent/${id}/return`, "POST");
-export const rejectRent = (rid: number) => api<{ ok: boolean }>(`/api/rent/requests/${rid}`, "POST", { action: "reject" });
 export interface RentFields {
   job: Job;
   level: number;
@@ -93,8 +138,8 @@ export const fetchMileage = (who: string) =>
 export const addMileage = (who: string, delta: number, reason: "donate" | "adjust", note: string) =>
   api<{ ok: boolean; mileage: number }>("/api/rent/mileage", "POST", { who, delta, reason, note });
 
-/** 옵션 줄임말 -> [이름, 값] (server/rentalParse.ts optionParts 와 같다). 마재(마나재생)를 마(마나)보다 먼저 */
-const OPTION_NAME: Record<string, string> = { 마재: "마나재생", 명: "명중", 크: "크리티컬", 힘: "힘", 민: "민첩", 지: "지능", 마: "마나" };
+/** 옵션 줄임말 -> [짧은 이름, 값] ('명6크3' -> 명중 6, 크리 3). 한 줄에 들어가게 짧게 (제작자 요청 2026-11-02). 마재(마나재생)를 마(마나)보다 먼저 */
+const OPTION_NAME: Record<string, string> = { 마재: "마재", 명: "명중", 크: "크리", 힘: "힘", 민: "민첩", 지: "지능", 마: "마나" };
 export function optionParts(options: string): [string, number][] {
   const out: [string, number][] = [];
   const re = /(마재|명|크|힘|민|지|마)\s*(\d{1,3})/g;
