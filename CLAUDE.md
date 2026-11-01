@@ -210,10 +210,11 @@
   D1 은 SQL 한 줄 100KB 까지라 바이트로 자른다).
 - GitHub Actions `.github/workflows/official-news.yml` 이 30분마다 최근 것(쪽마다 30개)을 받고, 표가 비었거나 '모든 쪽 다시 받기'로 돌리면 전부 받는다
   (비밀값은 배포와 같은 CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, 그리고 To do 정리에 ANTHROPIC_API_KEY). 2026-11-01 에 만든 뒤 예약 실행이 한동안 돌지 않아
-  배포 때도 최근 글을 새로 받고(deploy-web.yml 'Official news') To do 를 정리한다(끝의 'To do digest').
+  배포 때도 최근 글을 새로 받고(deploy-web.yml 'Official news') To do 를 정리한다(끝의 'To do digest'). 서버는 15분에 한 번 새 이벤트 글을 찾아
+  처음 보는 글만 넣는다 (`refreshEvents`, setup 'official_event_checked': 이미 있는 글은 건드리지 않아 CPU 를 거의 안 쓴다. 본문은 그림 자료(data:)를 빼고 바꾼다).
   한국 PC 파일(--load)은 받은 때를 파일을 저장한 때로 넣어, 그 뒤에 새로 받아 고친 글(연장된 점검 등)을 예전 내용으로 덮지 않는다 (`UPSERT_SQL` 의 fetched_at). Pages Functions 는 무료 요금제 CPU 한도(10ms) 때문에 점검 글만 받는다:
   점검 글(종류 C) 3개, 30KB 쯤을 2분에 한 번 (`server/official.ts` `refreshMaint`, `/api/news` 가 뒤에서 부른다, D1 `setup` 'official_maint_checked').
-  이벤트·공지는 크다(이벤트 글 하나가 400KB 도 있다).
+  이벤트·공지는 크다(이벤트 글 하나가 400KB 도 있다): 고친 글은 GitHub Actions·배포가 받는다.
 - 글을 바꾸는 방법(본문 글자, 간단한 HTML, 원문 해시 `src`)은 `web/server/officialText.ts` 하나를 받기 스크립트와 서버가 같이 쓴다
   (둘이 다르면 서로 고쳐 쓰기를 되풀이한다. Node 는 `node --experimental-strip-types` 로 그 .ts 를 그대로 읽는다). 원문이 그대로면(src 같음) 쓰지 않는다.
   공식 점검 글은 연장되면 처음 시간을 줄 긋고(`<strike>`, `line-through`) 새 시간을 옆에 적는다: 본문 글자에서는 줄 그은 글자를 빼고(챗봇, 전광판),

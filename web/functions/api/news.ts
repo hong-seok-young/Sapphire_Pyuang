@@ -6,7 +6,7 @@
 import { NEED_LOGIN, currentUser, json } from "../../server/auth";
 import type { Env } from "../../server/auth";
 import { activeMaint } from "../../server/maint";
-import { MAINT_EVERY, refreshMaint } from "../../server/official";
+import { EVENT_EVERY, MAINT_EVERY, refreshEvents, refreshMaint } from "../../server/official";
 
 const since = (url: URL, k: string) => {
   const n = Number(url.searchParams.get(k));
@@ -25,13 +25,20 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
     env.DB.prepare("SELECT COUNT(*) AS n FROM requests WHERE created_at > ? AND owner != ? AND status != 'done'").bind(since(url, "requests"), me.id),
     // 점검 글 최근 3개 (색인 official_news_type, 본문은 점검 시간·서버·인던 제한이 있는 앞부분만)
     env.DB.prepare("SELECT id, title, start_date, substr(body, 1, 3000) AS body FROM official_news WHERE type = 'C' ORDER BY id DESC LIMIT 3"),
-    env.DB.prepare("SELECT done_at FROM setup WHERE key = 'official_maint_checked'"),
+    env.DB.prepare("SELECT key, done_at FROM setup WHERE key IN ('official_maint_checked', 'official_event_checked')"),
   ]);
   const n = (r: D1Result) => (r.results[0] as { n: number } | undefined)?.n ?? 0;
-  const lastAt = (checked.results[0] as { done_at: number } | undefined)?.done_at ?? null;
-  if (lastAt === null || lastAt < now - MAINT_EVERY) {
-    waitUntil(refreshMaint(env, lastAt, now).catch((e) => console.error("maint refresh", e instanceof Error ? e.message : e)));
-  }
+  // 뒤에서 공식 글 새로 받기: 점검 글(2분마다)을 먼저, 아니면 새 이벤트 글(15분마다). 한 번에 하나만 (CPU 한도)
+  const last = new Map((checked.results as { key: string; done_at: number }[]).map((r) => [r.key, r.done_at]));
+  const maintAt = last.get("official_maint_checked") ?? null;
+  const eventAt = last.get("official_event_checked") ?? null;
+  const job =
+    maintAt === null || maintAt < now - MAINT_EVERY
+      ? refreshMaint(env, maintAt, now)
+      : eventAt === null || eventAt < now - EVENT_EVERY
+        ? refreshEvents(env, eventAt, now)
+        : null;
+  if (job) waitUntil(job.catch((e) => console.error("official refresh", e instanceof Error ? e.message : e)));
   return json(
     {
       board: n(board),

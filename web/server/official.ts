@@ -73,20 +73,21 @@ export async function officialContext(env: Env, question: string): Promise<strin
   return parts.join("\n\n");
 }
 
-/** 점검 글을 새로 받는 간격 (2분) */
+/** 점검 글을 새로 받는 간격 (2분), 새 이벤트 글을 찾는 간격 (15분) */
 export const MAINT_EVERY = 120_000;
+export const EVENT_EVERY = 15 * 60_000;
 
-/**
- * 점검 글(종류 C) 최근 3개를 새로 받는다 (점검 전광판: 새 점검, 연장, 종료가 몇 분 안에 보이게. 제작자 요청 2026-11-01).
- * /api/news 가 2분에 한 번 뒤에서 부른다 (lastAt: 지난번 때, 그 값일 때만 맡아 여럿이 같이 와도 한 번). 받는 글은 30KB 쯤이고
- * 원문이 그대로면 바꾸지 않아 무료 요금제 CPU 한도(10ms) 안에 든다. 이벤트·공지는 크고(글 하나 400KB 도 있다) GitHub Actions 가 받는다
- */
-export async function refreshMaint(env: Env, lastAt: number | null, now = Date.now()): Promise<void> {
-  const claim =
+/** setup 의 key 를 지난번 때(lastAt)일 때만 지금으로 바꿔 맡는다 (여럿이 같이 와도 하나만). 맡았으면 true */
+async function claim(env: Env, key: string, lastAt: number | null, now: number): Promise<boolean> {
+  const r =
     lastAt === null
-      ? await env.DB.prepare("INSERT OR IGNORE INTO setup (key, done_at) VALUES ('official_maint_checked', ?)").bind(now).run()
-      : await env.DB.prepare("UPDATE setup SET done_at = ? WHERE key = 'official_maint_checked' AND done_at = ?").bind(now, lastAt).run();
-  if (!claim.meta.changes) return;
+      ? await env.DB.prepare("INSERT OR IGNORE INTO setup (key, done_at) VALUES (?, ?)").bind(key, now).run()
+      : await env.DB.prepare("UPDATE setup SET done_at = ? WHERE key = ? AND done_at = ?").bind(now, key, lastAt).run();
+  return !!r.meta.changes;
+}
+
+/** withhive 목록 첫 쪽 (type: C 점검, E 이벤트) */
+async function hiveList(type: "C" | "E", rows: number): Promise<HiveItem[]> {
   const res = await fetch("https://withhive.com/api/notice/list/32", {
     method: "POST",
     headers: {
@@ -95,12 +96,22 @@ export async function refreshMaint(env: Env, lastAt: number | null, now = Date.n
       accept: "application/json",
       cookie: "language=ko",
     },
-    body: "page=1&type=C&rows=3",
+    body: `page=1&type=${type}&rows=${rows}`,
     signal: AbortSignal.timeout(8000),
   });
-  if (!res.ok) return;
+  if (!res.ok) return [];
   const list = ((await res.json()) as { data?: { notice_list?: HiveItem[] } }).data?.notice_list ?? [];
-  const items = list.filter((i) => Number(i?.noticeId) > 0 && i.noticeTitle);
+  return list.filter((i) => Number(i?.noticeId) > 0 && i.noticeTitle);
+}
+
+/**
+ * 점검 글(종류 C) 최근 3개를 새로 받는다 (점검 전광판: 새 점검, 연장, 종료가 몇 분 안에 보이게. 제작자 요청 2026-11-01).
+ * /api/news 가 2분에 한 번 뒤에서 부른다 (lastAt: 지난번 때, 그 값일 때만 맡아 여럿이 같이 와도 한 번). 받는 글은 30KB 쯤이고
+ * 원문이 그대로면 바꾸지 않아 무료 요금제 CPU 한도(10ms) 안에 든다. 이벤트·공지는 크고(글 하나 400KB 도 있다) GitHub Actions 가 받는다
+ */
+export async function refreshMaint(env: Env, lastAt: number | null, now = Date.now()): Promise<void> {
+  if (!(await claim(env, "official_maint_checked", lastAt, now))) return;
+  const items = await hiveList("C", 3);
   if (!items.length) return;
   const ids = items.map((i) => Number(i.noticeId));
   const { results } = await env.DB.prepare(`SELECT id, src FROM official_news WHERE id IN (${ids.map(() => "?").join(", ")})`)
@@ -111,3 +122,26 @@ export async function refreshMaint(env: Env, lastAt: number | null, now = Date.n
   if (changed.length) await env.DB.batch(changed.map((i) => env.DB.prepare(UPSERT_SQL).bind(...upsertValues(rowOf(i, "notice"), now))));
 }
 
+/**
+ * 새 이벤트 글을 찾아 넣는다 (15분에 한 번, To do 의 이벤트 할 일이 GitHub 예약 작업을 기다리지 않게). 처음 보는 글만 넣고 이미 있는 글은 건드리지 않는다:
+ * 이벤트 글은 본문에 그림이 통째로 들어 있어 크고(400KB 도 있다) 무료 요금제 CPU 한도(10ms)에 걸릴 수 있어서, 고친 글은 GitHub Actions·배포가 받는다.
+ * 본문 글자와 HTML 은 그림 자료(data:)를 뺀 본문으로 만든다 (어차피 둘 다 그림 자료를 버려서 결과가 같다). 원문 표시(src)는 받는 스크립트와 같게 전체로
+ */
+export async function refreshEvents(env: Env, lastAt: number | null, now = Date.now()): Promise<void> {
+  if (!(await claim(env, "official_event_checked", lastAt, now))) return;
+  const items = await hiveList("E", 3);
+  if (!items.length) return;
+  const ids = items.map((i) => Number(i.noticeId));
+  const { results } = await env.DB.prepare(`SELECT id FROM official_news WHERE id IN (${ids.map(() => "?").join(", ")})`)
+    .bind(...ids)
+    .all<{ id: number }>();
+  const known = new Set(results.map((r) => r.id));
+  const fresh = items.filter((i) => !known.has(Number(i.noticeId)));
+  if (!fresh.length) return;
+  await env.DB.batch(
+    fresh.map((i) => {
+      const light = String(i.content ?? "").replace(/(<img[^>]*?\ssrc\s*=\s*["'])data:[^"']*/gi, "$1");
+      return env.DB.prepare(UPSERT_SQL).bind(...upsertValues({ ...rowOf({ ...i, content: light }, "event"), src: srcOf(i) }, now));
+    }),
+  );
+}
