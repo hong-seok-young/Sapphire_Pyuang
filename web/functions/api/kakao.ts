@@ -1,9 +1,10 @@
 // 카톡 오픈프로필 링크 (제작자 요청 2026-11-02: 대화를 카톡 오픈프로필로 바로 그 사람 카톡이 켜지게. 앱 안 대화는 그대로 두고 단추를 같이 단다).
 // 카카오는 일반 카톡 1:1 대화창을 여는 공개 링크가 없어서, 각자 만든 오픈프로필(또는 1:1 오픈채팅) 링크를 적어 두고 이름 옆 '카톡' 단추로 연다.
-// GET /api/kakao -> { links: { 닉네임: 링크 }, staff: [링크가 있는 운영진 닉네임] } (로그인한 길드원. 부캐는 자기 것이 없으면 본캐 것)
+// GET /api/kakao -> { links: { 닉네임: 링크 }, staff: [링크가 있는 장비대여 담당 닉네임] } (로그인한 길드원. 부캐는 자기 것이 없으면 본캐 것)
 // PUT /api/kakao { link, user? } -> 내 링크 (user 를 주면 그 사람 것: 길드원 관리를 할 수 있는 사람만). 빈 글이면 지운다
 import { FORBIDDEN, NEED_LOGIN, RANK, TEST_IDS, canManageUser, currentUser, json, readJson, samePerson } from "../../server/auth";
 import type { Env, Role } from "../../server/auth";
+import { RENT_STAFF } from "../../server/rental";
 
 /** open.kakao.com 의 오픈프로필(/me/…)·오픈채팅(/o/…) 링크만 받는다 */
 export function readKakao(v: unknown): string | null | "bad" {
@@ -24,8 +25,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   return json(
     {
       links: Object.fromEntries(rows.map((r) => [r.id, r.link])),
-      // 운영진(길드마스터·오피서) 중 링크가 있는 사람: 장비대여 신청함의 '담당자 카톡' (앱개발자는 길드 직책이 아니라 빼고, 자기 것은 적은 캐릭터만)
-      staff: rows.filter((r) => r.role === "master" || r.role === "officer").map((r) => r.id),
+      // 장비대여 담당(길드마스터, server/rental.ts RENT_STAFF) 중 링크가 있는 사람: 장비대여 신청함의 '담당자 카톡'
+      // (앱개발자는 길드 직책이 아니라 빼고, 다른 오피서도 빼고. 제작자 요청 2026-11-02)
+      staff: rows.filter((r) => r.role === "master" || RENT_STAFF.includes(r.id)).map((r) => r.id),
     },
     200,
     { "cache-control": "no-store" },

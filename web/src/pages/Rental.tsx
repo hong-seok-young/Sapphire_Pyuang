@@ -10,7 +10,7 @@
 //   신청함(#/rent?v=apps: 내 마일리지와 장부, 쓰는 무기, 내 신청서), 운영(#/rent?v=staff: 신청 · 물건 추가 · 붙여넣기 · 마일리지).
 // - 단추에 이모지를 넣지 않고 같은 줄 단추는 폭을 같게 (.pill-row). 💎 는 값의 단위로만 쓴다.
 // - 기부 마일리지: 물건 더하기·고치기에서 '기부 💎' 를 적으면 기부자에게 적립 (server/rental.ts setDonation, 고치면 차이만).
-// 실제 주고받기는 게임 안에서. 지금은 개발 중이라 운영진과 앱개발자만 미리 본다 (src/launcher.ts canPreview, server/rental.ts canEnter)
+// 실제 주고받기는 게임 안에서. 2026-11-02 길드원에게 열었다. 운영은 길드마스터·대여 담당(멍멍)·앱개발자 (server/rental.ts isManager)
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { go, useEntryState } from "../router";
@@ -1153,7 +1153,7 @@ function Num({ label, value, min, max, onChange }: { label: ReactNode; value: nu
   );
 }
 
-/** 신청함 맨 위: 링크를 적어 둔 운영진에게 바로 카톡 (제작자 요청 2026-11-02, 앱 안 대화와 같이) */
+/** 신청함 맨 위: 링크를 적어 둔 장비대여 담당(길드마스터, server/rental.ts RENT_STAFF)에게 바로 카톡 (제작자 요청 2026-11-02, 앱 안 대화와 같이) */
 function StaffKakao() {
   const { staff } = useKakao();
   if (!staff.length) return null;

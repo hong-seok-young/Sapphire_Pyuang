@@ -29,6 +29,8 @@ export interface User {
   must_change: number;
   /** 그 사람의 본캐 아이디 (부캐를 묶었으면 본캐, 아니면 자기). currentUser 가 채운다 */
   owner?: string;
+  /** 그 사람의 캐릭터 아이디 모두 (본캐와 부캐). currentUser 가 채운다 (장비대여 담당처럼 사람으로 정하는 권한, server/rental.ts isManager) */
+  chars?: string[];
 }
 
 /** 부캐 묶기 (제작자 요청 2026-11-01): 같은 사람의 캐릭터들. 본캐는 users.main_id 가 비어 있고, 부캐는 본캐 아이디를 갖는다 */
@@ -369,14 +371,21 @@ export async function userOfToken(env: Env, token: string): Promise<User | null>
     // 비밀번호는 사람마다 하나(본캐 것)라 '바꿔야 함'도 본캐를 본다
     "SELECT u.id AS id, u.role AS role, (SELECT m.must_change FROM users m WHERE m.id = COALESCE(u.main_id, u.id)) AS must_change, " +
       "s.expires_at AS expires_at, COALESCE(u.main_id, u.id) AS owner, " +
-      `(SELECT ${TOP_ROLE} FROM users r WHERE r.id = COALESCE(u.main_id, u.id) OR r.main_id = COALESCE(u.main_id, u.id)) AS top ` +
+      `(SELECT ${TOP_ROLE} FROM users r WHERE r.id = COALESCE(u.main_id, u.id) OR r.main_id = COALESCE(u.main_id, u.id)) AS top, ` +
+      "(SELECT GROUP_CONCAT(r.id, char(10)) FROM users r WHERE r.id = COALESCE(u.main_id, u.id) OR r.main_id = COALESCE(u.main_id, u.id)) AS chars " +
       "FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?",
   )
     .bind(await sha256(token))
-    .first<User & { expires_at: number; owner: string; top: number | null }>();
+    .first<Omit<User, "chars"> & { expires_at: number; owner: string; top: number | null; chars: string | null }>();
   if (!row || row.expires_at < Date.now()) return null;
   // 부캐를 묶은 사람은 캐릭터 중 가장 높은 역할로 (오피서의 부캐로 바꿔 들어와도 길드원 관리는 그대로)
-  return { id: row.id, role: ROLE_AT[row.top ?? -1] ?? row.role, must_change: row.must_change, owner: row.owner };
+  return {
+    id: row.id,
+    role: ROLE_AT[row.top ?? -1] ?? row.role,
+    must_change: row.must_change,
+    owner: row.owner,
+    chars: row.chars ? row.chars.split("\n") : [row.id],
+  };
 }
 
 /**

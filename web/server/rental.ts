@@ -61,8 +61,19 @@ export function expectedTimes(item: { term: RentTerm; renter: string | null; ren
 /** 들어올 수 있는 사람 (개발 중에는 앱개발자만) */
 /** 들어갈 수 있는지: 열기 전에는 운영진(길드마스터, 오피서)과 앱개발자, 테스트 계정(길드원 권한으로)만 미리 본다 (제작자 요청 2026-11-02, 화면 src/launcher.ts canPreview) */
 export const canEnter = (me: User) => RENT_OPEN || RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
-/** 목록, 신청, 마일리지를 다루는 사람: 길드마스터·오피서·앱개발자 */
-export const isManager = (me: User) => RANK[me.role] >= 1;
+/**
+ * 장비대여 담당 (제작자 요청 2026-11-02: '성민 님 ID 가 멍멍이야. 길드마스터와 멍멍 님만 있으면 돼, 다른 오피서는 필요 없어').
+ * 게임 닉네임(아이디)이라 담당이 바뀌거나 닉네임을 바꾸면 여기를 고친다. 그 사람의 어느 캐릭터로 들어와도 담당이다
+ */
+export const RENT_STAFF = ["멍멍"];
+/** 목록, 신청, 마일리지를 다루는 사람(운영): 길드마스터·장비대여 담당·앱개발자. 다른 오피서는 아니다 */
+export const isManager = (me: User) =>
+  me.role === "developer" || me.role === "master" || (me.chars ?? [me.id, me.owner ?? me.id]).some((c) => RENT_STAFF.includes(c));
+/** 운영을 볼 사람을 고르는 SQL 조건 (users 표, 담당은 그 사람의 캐릭터 모두로 찾는다) */
+const STAFF_WHERE =
+  "role IN ('developer', 'master') OR COALESCE(main_id, id) IN (SELECT COALESCE(main_id, id) FROM users WHERE id IN (" +
+  RENT_STAFF.map((n) => `'${n.replace(/'/g, "''")}'`).join(", ") +
+  "))";
 
 /** 표 rental_items 한 줄 */
 export interface RentalRow {
@@ -107,10 +118,10 @@ export async function mileageOfName(env: Env, who: string): Promise<number> {
   return r?.dia ?? 0;
 }
 
-/** 운영진에게 알림 (개발 중에는 앱개발자에게만). 사람마다 한 번 (본캐에게) */
+/** 운영(길드마스터·장비대여 담당·앱개발자)에게 알림 (열기 전에는 앱개발자에게만). 사람마다 한 번 (본캐에게) */
 export async function notifyManagers(env: Env, text: string, from: string): Promise<void> {
-  const roles = RENT_OPEN ? "('developer', 'master', 'officer')" : "('developer')";
-  const { results } = await env.DB.prepare(`SELECT DISTINCT COALESCE(main_id, id) AS id FROM users WHERE role IN ${roles}`).all<{ id: string }>();
+  const where = RENT_OPEN ? STAFF_WHERE : "role = 'developer'";
+  const { results } = await env.DB.prepare(`SELECT DISTINCT COALESCE(main_id, id) AS id FROM users WHERE ${where}`).all<{ id: string }>();
   await notify(env, results.map((r) => r.id), "rent", text, "#/rent?v=staff", from);
 }
 
