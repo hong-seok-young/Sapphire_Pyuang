@@ -45,7 +45,47 @@ export function PicImg({ pic, scale = 1, max, fit, alt = "", className }: {
 }
 
 /** 화면 위 줄: 뒤로, 제목, 오른쪽에는 따로 준 것이 없으면 '내 정보' 단추 (내 정보 화면에서는 빼고) */
+/**
+ * 메뉴 화면 제목의 영문 (제작자 요청 2026-11-02, 4안: 화면 아래 따로 두던 배너를 없애고 위 줄 가운데 제목을 작은 배너 모양으로).
+ * 여기 있는 제목만 배너로 그리고, 아이템·글·사냥터 이름 같은 제목은 글자 그대로. 새 메뉴 화면을 만들면 여기에 더한다
+ */
+export const TITLE_EN: Record<string, string> = {
+  "사파이어 중개인": "SAPPHIRE BROKER",
+  게시판: "NOTICE BOARD",
+  장비대여: "EQUIPMENT RENTAL",
+  "길드 랭킹": "RANKING",
+  "플래티넘 할인 상점": "PLATINUM SHOP",
+  "길드원 의뢰소": "REQUESTS",
+  "To do": "CHECKLIST",
+  정보: "GUILD WIKI",
+  사냥터: "HUNTING GROUNDS",
+  장비: "EQUIPMENT",
+  검색: "SEARCH",
+  "공식 확률": "OFFICIAL ODDS",
+  "아이모 소식": "IMO NEWS",
+  알림: "NOTIFICATIONS",
+  "내 정보": "MY PAGE",
+  "길드원 관리": "MEMBERS",
+  "사용 기록": "ACTIVITY LOG",
+  "챗봇 개선": "CHATBOT FIXES",
+  "패치 내역": "PATCH NOTES",
+  "안드로이드 앱": "ANDROID APP",
+  "앱 기능": "APP SETTINGS",
+  "AI 챗봇": "SAPPHIRE GUIDE",
+  "육성 공략": "GROWTH GUIDE",
+  "직업별 스킬": "CLASS SKILLS",
+  조합책: "RECIPES",
+  "강화 · 보석 · 성장": "ENHANCE · GEMS",
+  "인던 · 길드던전": "DUNGEONS",
+  "전장 · 헌팅그라운드": "BATTLEFIELD",
+  "퀘스트 · 지도": "QUESTS · MAPS",
+  "길던&인던 매칭": "PARTY MATCHING",
+};
+/** 제목 배너 모양: 제작자가 고른 시안 (A 보라 육각, B 금테 리본, C 사파이어 보석 판, D 양피지, E 금빛 글자와 보석 장식) */
+const TITLE_STYLE: "A" | "B" | "C" | "D" | "E" = "B";
+
 export function TopBar({ title, back = true, right, star }: { title: ReactNode; back?: boolean; right?: ReactNode; star?: ReactNode }) {
+  const en = typeof title === "string" ? TITLE_EN[title] : undefined;
   return (
     <header className="topbar">
       {back ? (
@@ -55,7 +95,20 @@ export function TopBar({ title, back = true, right, star }: { title: ReactNode; 
       ) : (
         <img className="topbar-logo" src="guild-mark.png" alt="" />
       )}
-      <h1 className="topbar-title">{typeof title === "string" ? <FitLine text={title} shrink={2} /> : title}</h1>
+      {en ? (
+        <h1 className="topbar-title topbar-title-banner">
+          <span className={"tb-banner tb-" + TITLE_STYLE}>
+            <span className="tb-b">
+              <span className="tb-i">
+                <span className="tb-en">{en}</span>
+                <FitLine className="tb-ko" text={title as string} wrap={false} />
+              </span>
+            </span>
+          </span>
+        </h1>
+      ) : (
+        <h1 className="topbar-title">{typeof title === "string" ? <FitLine text={title} shrink={2} /> : title}</h1>
+      )}
       {right ?? (
         <span className="topbar-right">
           {star}

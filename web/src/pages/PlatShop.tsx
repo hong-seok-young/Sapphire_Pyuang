@@ -140,10 +140,6 @@ export function PlatShopPage() {
   return (
     <>
       <TopBar title="플래티넘 할인 상점" />
-      <div className="rank-banner">
-        <span className="rank-banner-en">PLATINUM SHOP</span>
-        <span className="rank-banner-ko">1군 전용 할인 상점</span>
-      </div>
       {!data.open && <p className="ps-closed">오픈 전 · 오피서 이상만 보여요</p>}
       <p className="ps-rate">
         <img src={SHOP_PIC + "plat.png"} alt="플래티넘" /> 100 = <s>{s.market}만</s> <span className={high ? "ps-dim" : "ps-strong"}>1군 {s.ratio}만</span>{" "}

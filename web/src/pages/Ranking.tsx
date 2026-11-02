@@ -422,10 +422,6 @@ export function RankingPage({ me, onMe }: { me: Me; onMe?: (p: Partial<Me>) => v
   return (
     <>
       <TopBar title="길드 랭킹" />
-      <div className="rank-banner">
-        <span className="rank-banner-en">RANKING</span>
-        <span className="rank-banner-ko">길드 랭킹</span>
-      </div>
       <div className="rank-views" role="tablist">
         {VIEWS.map((v) => (
           <button

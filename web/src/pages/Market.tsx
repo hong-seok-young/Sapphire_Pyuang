@@ -939,10 +939,6 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   return (
     <>
       <TopBar title="사파이어 중개인" />
-      <div className="rank-banner">
-        <span className="rank-banner-en">SAPPHIRE BROKER</span>
-        <span className="rank-banner-ko">사파이어 중개인</span>
-      </div>
       <div className="mk-tabs" role="tablist">
         {TABS.map((t) => (
           <button key={t.key} role="tab" aria-selected={tab === t.key} className={"pill mk-tab" + (tab === t.key ? " pill-on" : "")} onClick={() => setTab(t.key)}>
