@@ -17,7 +17,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     .first<{ id: number; weapon: string; enhance: number; price: number; renter: string }>();
   if (!item) return json({ error: "대여 중인 물건이 아니에요" }, 404);
   const r = await env.DB.prepare(
-    "UPDATE rental_items SET renter = NULL, rented_at = NULL, due_at = NULL, return_req_at = NULL, updated_at = ?, updated_by = ? WHERE id = ? AND renter IS NOT NULL",
+    "UPDATE rental_items SET renter = NULL, rented_at = NULL, due_at = NULL, return_req_at = NULL, return_app_id = NULL, updated_at = ?, updated_by = ? WHERE id = ? AND renter IS NOT NULL",
   )
     .bind(now, me.id, id)
     .run();

@@ -152,7 +152,7 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
           {showLedger && <Ledger lines={data.ledger} rate={data.rate} />}
           {/* 쓰는 무기: 줄이 있으면 기한이 끝나는 날 담당자에게 반납, 없으면 계속 쓴다 */}
           {myHeld.map((i) => (
-            <HeldLine key={i.id} item={i} now={now} onDone={() => void load()} />
+            <HeldLine key={i.id} item={i} now={now} apps={data.apps} onDone={() => void load()} />
           ))}
           {myApps.map((a) => (
             <AppCard key={a.id} app={a} data={data} byId={byId} onDone={() => void load()} />
@@ -187,7 +187,7 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
             (lent.length ? (
               <ul className="rent-backs">
                 {lent.map((i) => (
-                  <ReturnRow key={i.id} wiki={wiki} item={i} onDone={() => void load()} />
+                  <ReturnRow key={i.id} wiki={wiki} item={i} apps={data.apps} onDone={() => void load()} />
                 ))}
               </ul>
             ) : (
@@ -1105,14 +1105,22 @@ function Num({ label, value, min, max, onChange }: { label: ReactNode; value: nu
  * 신청함의 내가 쓰는 무기 한 줄: 기한, 보증금, 그리고 '반납 신청' (제작자 요청 2026-11-02: 장비 반납도 신청하게).
  * 신청하면 운영진에게 알림이 가고 '운영 > 장비반납' 맨 위에 보인다. 게임 안에서 돌려준 뒤 담당자가 '반납'을 누르면 끝난다
  */
-function HeldLine({ item: i, now, onDone }: { item: RentItem; now: number; onDone: () => void }) {
+function HeldLine({ item: i, now, apps, onDone }: { item: RentItem; now: number; apps: RentApp[]; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // 반납 신청: 언제 돌려줄 수 있는지 한마디(안 적어도 된다)를 적고 신청하면 대화창 첫 줄로 (제작자 요청 2026-11-02: 신청하고 나서 언제 할지 정하게)
+  const [asking, setAsking] = useState(false);
+  const [when, setWhen] = useState("");
+  const [talkOpen, setTalkOpen] = useState(false);
+  const app = i.returnAppId ? apps.find((a) => a.id === i.returnAppId) : undefined;
   const ask = async (cancel: boolean) => {
     setBusy(true);
     setError("");
     try {
-      await requestReturn(i.id, cancel);
+      await requestReturn(i.id, cancel ? { cancel: true } : { when: when.trim() });
+      setAsking(false);
+      setWhen("");
+      if (!cancel) setTalkOpen(true);
       onDone();
     } catch (e) {
       setError(errorText(e));
@@ -1121,38 +1129,59 @@ function HeldLine({ item: i, now, onDone }: { item: RentItem; now: number; onDon
     }
   };
   return (
-    <div className="rent-me-line">
-      <span>
-        {i.weapon} +{i.enhance} <small className="rent-muted">대여 중</small>
-        {i.deposit && (i.deposit.dia > 0 || i.deposit.gold > 0) && (
-          <small className="rent-muted">
-            {" "}
-            · 보증금 {[i.deposit.dia ? `💎${i.deposit.dia}` : "", i.deposit.gold ? `골드 ${manGold(i.deposit.gold)}` : ""].filter(Boolean).join(" + ")}
-          </small>
-        )}
-        <br />
-        {!i.dueAt ? (
-          <small className="rent-muted">기한 없음</small>
-        ) : i.queue ? (
-          <small className={i.dueAt < now ? "rent-late" : "rent-warn"}>
-            {md(i.dueAt)} 반납 · 대기 {i.queue}
-          </small>
+    <div className="rent-held">
+      <div className="rent-me-line">
+        <span>
+          {i.weapon} +{i.enhance} <small className="rent-muted">대여 중</small>
+          {i.deposit && (i.deposit.dia > 0 || i.deposit.gold > 0) && (
+            <small className="rent-muted">
+              {" "}
+              · 보증금 {[i.deposit.dia ? `💎${i.deposit.dia}` : "", i.deposit.gold ? `골드 ${manGold(i.deposit.gold)}` : ""].filter(Boolean).join(" + ")}
+            </small>
+          )}
+          <br />
+          {!i.dueAt ? (
+            <small className="rent-muted">기한 없음</small>
+          ) : i.queue ? (
+            <small className={i.dueAt < now ? "rent-late" : "rent-warn"}>
+              {md(i.dueAt)} 반납 · 대기 {i.queue}
+            </small>
+          ) : (
+            <small className="rent-muted">기한 {md(i.dueAt)} · 대기 없음</small>
+          )}
+        </span>
+        {i.returnReqAt ? (
+          <span className="rent-btns">
+            <small className="rent-back-asked">반납 신청함</small>
+            {app && (
+              <button className={"pill" + (talkOpen ? " pill-on" : "")} onClick={() => setTalkOpen((v) => !v)}>
+                대화
+              </button>
+            )}
+            <button className="pill" disabled={busy} onClick={() => void ask(true)}>
+              취소
+            </button>
+          </span>
         ) : (
-          <small className="rent-muted">기한 {md(i.dueAt)} · 대기 없음</small>
+          !asking && (
+            <button className="pill" disabled={busy} onClick={() => setAsking(true)}>
+              반납 신청
+            </button>
+          )
         )}
-      </span>
-      {i.returnReqAt ? (
-        <span className="rent-btns">
-          <small className="rent-back-asked">반납 신청함</small>
-          <button className="pill" disabled={busy} onClick={() => void ask(true)}>
+      </div>
+      {asking && !i.returnReqAt && (
+        <div className="rent-ask">
+          <input className="mk-input" maxLength={40} value={when} onChange={(e) => setWhen(e.target.value)} placeholder="언제 드릴까요? (예: 오늘 밤 10시)" aria-label="반납할 때" />
+          <button className="pill pill-on" disabled={busy} onClick={() => void ask(false)}>
+            신청
+          </button>
+          <button className="pill" onClick={() => (setAsking(false), setWhen(""))}>
             취소
           </button>
-        </span>
-      ) : (
-        <button className="pill" disabled={busy} onClick={() => void ask(false)}>
-          반납 신청
-        </button>
+        </div>
       )}
+      {talkOpen && app && <Talk app={app} onDone={onDone} />}
       {error && <p className="form-error">{error}</p>}
     </div>
   );
@@ -1162,8 +1191,11 @@ function HeldLine({ item: i, now, onDone }: { item: RentItem; now: number; onDon
  * 장비반납 칸의 한 줄 (제작자 요청 2026-11-02: '대여 완료를 눌렀으면 장비 반납 단추를'): 무기, 빌려 간 사람, 빌린 날, 기한(지나면 빨강),
  * 받은 보증금, 대기. '반납'은 한 번 더 묻고, 쓴 마일리지는 저절로 돌려주고 골드는 게임 안에서 돌려준다
  */
-function ReturnRow({ wiki, item, onDone }: { wiki: Wiki; item: RentItem; onDone: () => void }) {
+function ReturnRow({ wiki, item, apps, onDone }: { wiki: Wiki; item: RentItem; apps: RentApp[]; onDone: () => void }) {
   const [sure, setSure] = useState(false);
+  // 반납 날짜를 정하는 대화창 (빌린 사람이 반납 신청하면 생긴다)
+  const [talkOpen, setTalkOpen] = useState(false);
+  const app = item.returnAppId ? apps.find((a) => a.id === item.returnAppId) : undefined;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const late = item.dueAt !== null && item.dueAt < Date.now();
@@ -1190,20 +1222,29 @@ function ReturnRow({ wiki, item, onDone }: { wiki: Wiki; item: RentItem; onDone:
           <em>+{item.enhance}</em>
         </span>
         <b className="rent-back-who">{item.renter}</b>
-        {item.returnReqAt && <small className="rent-back-asked">반납 신청</small>}
+        {/* 폰 폭에서 넘치지 않게 단추는 한 묶음으로 (자리가 모자라면 다음 줄로) */}
         {!sure && (
-          <button className="pill" onClick={() => setSure(true)}>
-            반납
-          </button>
+          <span className="rent-back-acts">
+            {app && (
+              <button className={"pill" + (talkOpen ? " pill-on" : "")} onClick={() => setTalkOpen((v) => !v)}>
+                대화
+              </button>
+            )}
+            <button className="pill" onClick={() => setSure(true)}>
+              반납
+            </button>
+          </span>
         )}
       </div>
       <p className="rent-back-info">
+        {item.returnReqAt && <small className="rent-back-asked">반납 신청</small>} 
         {item.rentedAt ? `${md(item.rentedAt)} 대여` : "대여 중"}
         {" · "}
         {item.dueAt ? <span className={late ? "rent-late" : ""}>기한 {md(item.dueAt)}{late ? " 지남" : ""}</span> : "기한 없음"}
         {item.queue > 0 && ` · 대기 ${item.queue}`}
         {deposit && ` · 보증금 ${deposit}`}
       </p>
+      {talkOpen && app && <Talk app={app} onDone={onDone} />}
       {sure && (
         <div className="rent-return">
           <p className="rent-muted">

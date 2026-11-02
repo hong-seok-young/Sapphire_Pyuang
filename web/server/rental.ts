@@ -82,6 +82,8 @@ export interface RentalRow {
   status: string;
   /** 빌린 사람이 '반납 신청'을 누른 때 */
   return_req_at?: number | null;
+  /** 반납 날짜를 정하는 대화창 (rental_apps) */
+  return_app_id?: number | null;
 }
 
 /** 알림에 쓰는 이름: '카타나 +7' */

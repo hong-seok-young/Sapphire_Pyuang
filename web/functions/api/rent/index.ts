@@ -35,7 +35,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const now = Date.now();
   const [itemsR, queueR, depositR, charsR, ledgerR, myAppsR] = await env.DB.batch([
     env.DB.prepare(
-      "SELECT id, job, level, weapon, options, enhance, term, price, donor, renter, rented_at, due_at, note, return_req_at FROM rental_items WHERE status = 'open' ORDER BY job, level, weapon, enhance, id",
+      "SELECT id, job, level, weapon, options, enhance, term, price, donor, renter, rented_at, due_at, note, return_req_at, return_app_id FROM rental_items WHERE status = 'open' ORDER BY job, level, weapon, enhance, id",
     ),
     env.DB.prepare("SELECT id, item_id, user_id, status, created_at, app_id FROM rental_requests WHERE status IN ('wait', 'ok') ORDER BY created_at, id"),
     // 지금 대여 중인 무기마다 받은 보증금 (가장 최근의 반납 전 대여)
@@ -87,7 +87,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       renter: it.renter,
       rentedAt: it.rented_at,
       // 빌린 사람이 반납 신청한 때 (운영진과 빌린 사람에게만)
-      ...(it.renter && (manager || mine.has(it.renter)) ? { returnReqAt: it.return_req_at ?? null } : {}),
+      ...(it.renter && (manager || mine.has(it.renter)) ? { returnReqAt: it.return_req_at ?? null, returnAppId: it.return_app_id ?? null } : {}),
       // 기한이 끝나는 날 (줄이 있으면 이날 담당자에게 돌려준다)
       dueAt: it.renter && it.rented_at && days ? it.rented_at + days * 86_400_000 : null,
       queue: line.length,
@@ -109,7 +109,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
   // 신청서: 길드원은 내 것, 운영진은 줄 서는 신청이 있는 것 모두 (와 내 것)
   const openAppIds = [...new Set((queueR.results as QueueRow[]).map((q) => q.app_id).filter((a): a is number => a !== null))];
-  const appIds = [...new Set([...(myAppsR.results as AppRow[]).map((a) => a.id), ...(manager ? openAppIds : [])])];
+  // 반납 날짜를 정하는 대화창 (운영진은 반납 신청한 것 모두, 빌린 사람은 자기 것)
+  const returnAppIds = rows
+    .filter((r) => r.return_app_id && r.renter && (manager || mine.has(r.renter)))
+    .map((r) => r.return_app_id as number);
+  const appIds = [...new Set([...(myAppsR.results as AppRow[]).map((a) => a.id), ...(manager ? openAppIds : []), ...returnAppIds])];
   let apps: unknown[] = [];
   if (appIds.length) {
     const marks = appIds.map(() => "?").join(",");

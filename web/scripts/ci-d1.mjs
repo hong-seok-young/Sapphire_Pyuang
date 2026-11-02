@@ -93,7 +93,7 @@ const ADDED_COLUMNS = [
   ["official_news", "html", "TEXT"], ["official_news", "src", "TEXT"],
   ["rental_requests", "app_id", "INTEGER"],
   ["rental_requests", "gold", "INTEGER"],
-  ["rental_items", "return_req_at", "INTEGER"],
+  ["rental_items", "return_req_at", "INTEGER"], ["rental_items", "return_app_id", "INTEGER"],
 ];
 for (const [table, column, type] of ADDED_COLUMNS) {
   const columns = parseJson(wrangler("d1", "execute", DB, "--remote", "--json", "--command", `PRAGMA table_info(${table})`))[0]?.results ?? [];

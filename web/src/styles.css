@@ -2088,4 +2088,15 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .rent-back-ask { border-color: #ffb454; }
 .sub-tab { position: relative; }
 /* 어두운 띠 단추의 숫자 표는 글자를 가리지 않게 칸 오른쪽 위 밖으로 */
-.sub-tab .in-news { top: -7px; right: -3px; }
+.sub-tab .in-news { top: -9px; right: -9px; }
+/* 반납 신청: 언제 줄지 한마디 줄, 대화창 (제작자 요청 2026-11-02) */
+.rent-held { display: grid; gap: 6px; padding: 2px 0; }
+.rent-ask { display: flex; align-items: center; gap: 6px; }
+.rent-ask .mk-input { flex: 1; min-width: 0; padding: 6px 8px; font-size: 13px; }
+.rent-ask .pill { flex: none; padding: 4px 10px; font-size: 12px; }
+.rent-back-top .pill + .pill { margin-left: 0; }
+.rent-back-top { flex-wrap: wrap; }
+.rent-back-top .rent-nm { flex: 1 1 auto; }
+.rent-back-acts { flex: none; margin-left: auto; display: flex; gap: 4px; }
+.rent-back-acts .pill { padding: 3px 10px; }
+.rent-back-info .rent-back-asked { margin-right: 4px; }
