@@ -8,6 +8,7 @@ import { useUnread } from "./alerts";
 import { JOB_NAME, errorText } from "./auth";
 import { goCharacter, refreshMe, useMyCharacters } from "./characters";
 import { goBack } from "./router";
+import { hasGuide, openGuide } from "./tutorial";
 import type { Pic } from "./types";
 
 /**
@@ -82,8 +83,11 @@ export const TITLE_EN: Record<string, string> = {
   "길드 던전": "GUILD DUNGEON",
 };
 
-export function TopBar({ title, back = true, right, star }: { title: ReactNode; back?: boolean; right?: ReactNode; star?: ReactNode }) {
+export function TopBar({ title, back = true, right, star, guide }: { title: ReactNode; back?: boolean; right?: ReactNode; star?: ReactNode; guide?: string }) {
   const en = typeof title === "string" ? TITLE_EN[title] : undefined;
+  // 설명이 있는 메뉴: 제목을 누르면 단추별 기능·흐름·튜토리얼 (제작자 요청 2026-11-02, src/tutorial.tsx). guide 를 주면 그 이름의 설명 (챗봇은 대화 제목이 뜰 때도)
+  const gname = guide ?? (typeof title === "string" && hasGuide(title) ? title : null);
+  const tap = gname ? { role: "button", tabIndex: 0, title: "눌러서 이 메뉴 설명 보기", onClick: () => openGuide(gname), onKeyDown: (e: { key: string }) => (e.key === "Enter" || e.key === " ") && openGuide(gname) } : {};
   return (
     // 위 줄 (제작자 요청 2026-11-02): 왼쪽 ◀, 가운데 제목(메뉴 화면은 작은 배너, 화면 가운데), 오른쪽 🔔 과 👤. 단추는 상자 없이 작게
     <header className={"topbar" + (right ? "" : " topbar-std")}>
@@ -96,8 +100,9 @@ export function TopBar({ title, back = true, right, star }: { title: ReactNode; 
       )}
       {en ? (
         <h1 className="topbar-title topbar-title-banner">
-          {/* 제작자가 고른 E: 판 없이 금빛 글자, 양옆 보석 장식과 밑줄, 잔잔한 움직임 (2026-11-02, styles.css .tb-banner) */}
-          <span className="tb-banner">
+          {/* 제작자가 고른 E: 판 없이 금빛 글자, 양옆 보석 장식과 밑줄, 잔잔한 움직임 (2026-11-02, styles.css .tb-banner).
+              설명이 있는 메뉴는 제목을 누르면 단추별 기능·흐름·튜토리얼 (제작자 요청 2026-11-02, src/tutorial.tsx) */}
+          <span className={"tb-banner" + (gname ? " tb-guide" : "")} {...tap}>
             <span className="tb-b">
               <span className="tb-i">
                 <span className="tb-en">{en}</span>
@@ -107,7 +112,9 @@ export function TopBar({ title, back = true, right, star }: { title: ReactNode; 
           </span>
         </h1>
       ) : (
-        <h1 className="topbar-title">{typeof title === "string" ? <FitLine text={title} shrink={2} /> : title}</h1>
+        <h1 className={"topbar-title" + (gname ? " tb-guide" : "")} {...tap}>
+          {typeof title === "string" ? <FitLine text={title} shrink={2} /> : title}
+        </h1>
       )}
       {right ?? (
         <span className="topbar-right">

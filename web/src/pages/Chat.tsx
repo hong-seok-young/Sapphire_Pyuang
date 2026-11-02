@@ -561,6 +561,7 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
     <>
       <TopBar
         title={title || "AI 챗봇"}
+        guide="AI 챗봇"
         right={
           <span className="topbar-right">
             <a className="topbar-action" href="#/chat/list">

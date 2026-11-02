@@ -37,6 +37,7 @@ import { OddsPage, OddsTablePage } from "./pages/Odds";
 import { TodoPage } from "./pages/Todo";
 import { RentalPage } from "./pages/Rental";
 import { GuildDungeonPage } from "./pages/GuildDungeon";
+import { GuideHost } from "./tutorial";
 import { Opening, shouldCelebrate } from "./pages/Opening";
 import { reportOpen, reportView } from "./activity";
 import { markMenuVisit } from "./updates";
@@ -297,6 +298,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
       {body.type === Home && <HomeCorner />}
       {/* 내 지역 날씨로 비·눈 (초안, 앱개발자만. pages/Weather.tsx) */}
       {body.type === Home && <HomeWeather me={me} />}
+      {/* 메뉴 설명 칸과 튜토리얼 (제목을 누르면, src/tutorial.tsx) */}
+      <GuideHost me={me} />
       <nav className={"tabbar" + (launcher.editing && editable ? " launch-editing" : "")} data-zone="dock">
         {tabs.map((t) => {
           // 아래 탭도 고친 메뉴면 'UPDATE' (제작자 요청 2026-11-01, 홈 칸과 같은 updates.ts)

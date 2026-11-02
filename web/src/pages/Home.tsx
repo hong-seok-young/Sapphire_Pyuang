@@ -8,6 +8,7 @@ import { INFO_TILES, canPreview, canSee, clickItem, isLocked, isUpdated, itemOf,
 import type { LaunchItem } from "../launcher";
 import { newsFor, useMaint, useNews } from "../news";
 import type { Maint } from "../news";
+import { openGuide } from "../tutorial";
 
 /**
  * 칸 그림: 이모지 (상점 칸만 게임 상점 그림). 제작자 요청 2026-10-31: 게임 아이템 그림을 키운 아이콘은 뭉개져서
@@ -102,7 +103,10 @@ export function Home({ me }: { me: Me }) {
         {/* 앱 안에서는 게임 속 1군 길드마크 (12칸 그대로), 폰 홈 화면 아이콘은 고화질 원본 (제작자 요청) */}
         <img className="hero-mark" src="guild-mark.png" alt="" width={72} height={72} />
         <div>
-          <HeroTitle />
+          {/* 제목을 누르면 홈 설명 (단추별 기능, 튜토리얼. src/tutorial.tsx) */}
+          <button className="hero-title-btn" onClick={() => openGuide("홈")} aria-label="홈 설명 보기">
+            <HeroTitle />
+          </button>
           <p className="hero-sub">
             사파이어 길드 포탈
             {/* 로그인한 사람: 초록 점과 닉네임. 닉네임은 10글자까지라 자르지 않고, 자리가 모자라면 다음 줄로 */}

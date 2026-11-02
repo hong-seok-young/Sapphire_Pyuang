@@ -86,9 +86,9 @@ export const GUIDES: Guide[] = [
     ],
     tutorial: [
       { sel: ".tiles", text: "메뉴 칸이에요. 누르면 그 메뉴로 가요. 왼쪽 위 띠는 누가 들어갈 수 있는지, 빨간 숫자는 새 글 수예요." },
-      { sel: ".bell-btn, .home-bell", text: "알림함이에요. 살래요, 댓글, 길드 던전 확정 같은 소식이 여기 와요." },
+      { sel: ".hero-bell", text: "알림함이에요. 살래요, 댓글, 길드 던전 확정 같은 소식이 여기 와요." },
       { sel: ".home-edit", text: "배치 편집. 눌러서 칸을 끌어 옮겨 보세요. 끝나면 '완료'.", tap: true },
-      { sel: ".launch-done, .home-edit-done", text: "다 옮겼으면 완료를 누르세요.", tap: true },
+      { sel: ".launch-bar .pill-on", text: "다 옮겼으면 완료를 누르세요.", tap: true },
       { sel: ".home-weather", text: "우리 동네 날씨예요. 비·눈이면 화면에 내려요. 내 정보 > 앱 설정에서 켜고 끌 수 있어요." },
       { sel: ".tabbar", text: "아래 탭이에요. 홈 · 게시판 · 정보 · 검색 · 챗봇. 배치 편집에서 홈 칸과 바꿀 수 있어요." },
     ],
@@ -178,10 +178,10 @@ export const GUIDES: Guide[] = [
       { title: "의뢰 맡기", steps: ["모집 중에서 줄을 눌러 펼치기", "✋ 수락 → 의뢰한 사람에게 알림", "게임 안에서 건네고 의뢰한 사람이 완료를 눌러요. 못 하겠으면 포기"] },
     ],
     tutorial: [
-      { sel: ".filter, .pill-row", text: "모집 중 · 진행 중 · 완료 · 내 의뢰로 걸러 봐요." },
+      { sel: ".mk-cats", text: "모집 중 · 진행 중 · 완료 · 내 의뢰로 걸러 봐요." },
       { sel: ".mk-list .mk-row", text: "의뢰 줄이에요. 눌러서 펼쳐 보세요.", tap: true },
       { sel: ".mk-open .mk-detail", text: "보상과 한마디, 의뢰한 사람 카톡. '✋ 수락'으로 맡아요 (지금은 안 눌러도 돼요)." },
-      { sel: ".rq-write, .mk-write-btn, button:has-text('의뢰 등록')", text: "'의뢰 등록'으로 내 의뢰를 올려요. 무엇을, 보상, 한마디." },
+      { sel: "button:has-text('의뢰 등록')", text: "'의뢰 등록'으로 내 의뢰를 올려요. 무엇을, 보상, 한마디." },
     ],
   },
   // ---------------------------------------------------------------- 게시판
@@ -208,8 +208,8 @@ export const GUIDES: Guide[] = [
       { sel: ".main-tabs", text: "칸이에요. 공지사항 · 길드 이벤트 · 자유 · 건의 사항 · 아이모 소식. '아이모 소식'을 눌러 보세요.", tap: true },
       { sel: ".sub-tabs", text: "전체 · 공지사항 · 점검 · 이벤트. 컴투스 공식 글이 앱 안에 들어와요." },
       { sel: ".off-row", text: "글을 누르면 앱 안에서 읽고, 위에 '핵심 요약'이 떠요.", tap: true },
-      { sel: ".summary-box, .off-summary", text: "핵심 요약이에요. 패치노트면 내 직업 변경점도 같이." },
-      { go: "#/board?cat=free", sel: ".bd-write, a:has-text('글쓰기'), button:has-text('글쓰기')", text: "자유 게시판이에요. '✏️ 글쓰기'로 글을 써요. 사진·파일·링크도 돼요." },
+      { sel: ".summary-box, .off-summary, .official-body, main", text: "핵심 요약이에요. 패치노트면 내 직업 변경점도 같이." },
+      { go: "#/board?cat=free", sel: ".bd-write", text: "자유 게시판이에요. '✏️ 글쓰기'로 글을 써요. 사진·파일·링크도 돼요." },
       { sel: ".bd-list .bd-row", text: "글을 누르면 읽어요. 아래에 댓글·답글, 좋아요." },
     ],
   },
@@ -230,12 +230,12 @@ export const GUIDES: Guide[] = [
       { title: "신청 처리와 정산", steps: ["신청에서 거래 완료 또는 취소", "정산의 기록·구매자·아이템. 줄을 누르면 정산 삭제·복구·골드 수정", "설정에서 비율(1군, 고스펙, 시중)과 물건마다 판매 중지", "예산 검토로 충전 금액 대비 손익"], who: "officer" },
     ],
     tutorial: [
-      { sel: ".ps-tabs, .pill-row", text: "상점 · 내 신청 칸이에요. 운영진은 신청 · 정산 · 설정 · 예산도.", who: "all" },
-      { sel: ".wallet-box, .ps-wallet", text: "플래티넘 이용한도. 매주 목요일 10시에 300이 더해지고 안 쓰면 쌓여요." },
-      { sel: ".ps-item, .ps-list li", text: "물건 칸이에요. 눌러서 안에 뭐가 들었는지 보세요.", tap: true },
-      { sel: ".ps-contents, .ps-info", text: "획득 가능한 아이템. 아래 '구매 신청'을 누르면 운영진에게 가요 (지금은 안 눌러도 돼요)." },
-      { go: "#/shop?v=orders", sel: ".ps-order", text: "신청 칸: 게임에서 거래한 뒤 '거래 완료'를 눌러 정산에 넣어요.", who: "officer" },
-      { go: "#/shop?v=settle", sel: ".st-list, .ps-settle", text: "정산: 이번 달·전체, 기록·구매자·아이템. 줄을 누르면 삭제·복구·골드 수정.", who: "officer" },
+      { sel: ".ps-tabs", text: "상점 · 내 신청 칸이에요. 운영진은 신청 · 정산 · 설정 · 예산도." },
+      { sel: ".ps-limit, .ps-week", text: "플래티넘 이용한도. 매주 목요일 10시에 300이 더해지고 안 쓰면 쌓여요." },
+      { sel: ".ps-grid li", text: "물건 칸이에요. 눌러서 안에 뭐가 들었는지 보세요.", tap: true },
+      { sel: ".ps-contents", text: "획득 가능한 아이템. 아래 '구매 신청'을 누르면 운영진에게 가요 (지금은 안 눌러도 돼요)." },
+      { go: "#/shop?v=orders", sel: ".ps-orders, .ps-order", text: "신청 칸: 게임에서 거래한 뒤 '거래 완료'를 눌러 정산에 넣어요.", who: "officer" },
+      { go: "#/shop?v=settle", sel: ".st-list, .st-sum, main", text: "정산: 이번 달·전체, 기록·구매자·아이템. 줄을 누르면 삭제·복구·골드 수정.", who: "officer" },
     ],
   },
   // ---------------------------------------------------------------- 장비대여
@@ -324,11 +324,11 @@ export const GUIDES: Guide[] = [
       { title: "함께 하기", steps: ["할 일 이름을 눌러 펼치고 '함께'", "언제와 같이 할 사람(닉네임 찾기)", "그 사람들에게 알림. 각자 체크하면 이름 옆 ✓"] },
     ],
     tutorial: [
-      { sel: ".todo-head, .todo-sec:first-of-type", text: "일간 칸. 0시에 초기화돼요. 머리에 '1/3'과 남은 때." },
+      { sel: ".todo-head", text: "일간 칸. 0시에 초기화돼요. 머리에 '1/3'과 남은 때." },
       { sel: ".todo-row .todo-check", text: "체크 칸을 눌러 끝낸 일로 보내요. 눌러 보세요 (다시 누르면 풀려요).", tap: true },
       { sel: ".todo-row .todo-hit", text: "이름을 누르면 펼쳐져요. 눌러 보세요.", tap: true },
-      { sel: ".todo-acts, .todo-open", text: "펼친 칸: 할 것과 손해 주의, 아래에 수정 · 함께 · 숨김." },
-      { sel: ".todo-add, button:has-text('할 일 추가')", text: "'+ 할 일 추가'로 내 할 일을 넣어요. 일간·주간·한 번." },
+      { sel: ".todo-detail, .todo-acts", text: "펼친 칸: 할 것과 손해 주의, 아래에 수정 · 함께 · 숨김." },
+      { sel: ".todo-add", text: "'+ 할 일 추가'로 내 할 일을 넣어요. 일간·주간·한 번." },
     ],
   },
   // ---------------------------------------------------------------- 내 정보
@@ -377,8 +377,7 @@ export const GUIDES: Guide[] = [
     ],
     tutorial: [
       { sel: ".alert-list", text: "알림이에요. 누르면 그 화면으로 가요." },
-      { sel: ".alert-prefs-btn, button:has-text('알림 설정')", text: "알림 설정을 눌러 보세요.", tap: true },
-      { sel: ".alert-prefs", text: "메뉴별로 켜고 꺼요. 맨 위 📱 폰 알림을 켜면 앱을 안 열어도 폰에 떠요." },
+      { sel: ".alert-prefs", text: "알림 설정. 메뉴별로 켜고 꺼요. 맨 위 📱 폰 알림을 켜면 앱을 안 열어도 폰에 떠요." },
     ],
   },
   // ---------------------------------------------------------------- 검색
@@ -393,8 +392,8 @@ export const GUIDES: Guide[] = [
     ],
     flows: [{ title: "찾기", steps: ["이름 입력 (초성도 됨)", "결과를 누르면 아이템·몬스터·사냥터 화면", "☆로 즐겨찾기에 두면 다음에 바로"] }],
     tutorial: [
-      { sel: ".search-box, .search input", text: "여기에 이름을 적어요. 초성 'ㅎㅇㅇㅈㄱ'도 돼요." },
-      { sel: ".search-recent, .search-favs", text: "칸이 비면 최근 검색과 즐겨찾기가 보여요." },
+      { sel: ".search-box", text: "여기에 이름을 적어요. 초성 'ㅎㅇㅇㅈㄱ'도 돼요." },
+      { sel: ".search-recent, .panel", text: "칸이 비면 최근 검색과 즐겨찾기가 보여요." },
     ],
   },
   // ---------------------------------------------------------------- 정보
@@ -414,13 +413,13 @@ export const GUIDES: Guide[] = [
     tutorial: [
       { sel: ".tiles", text: "위키 메뉴 칸이에요. 'UPDATE'는 고친 메뉴." },
       { sel: ".tile:has-text('사냥터')", text: "사냥터를 눌러 보세요.", tap: true },
-      { sel: ".region, main", text: "지역별 사냥터. 사냥터를 누르면 몬스터와 드랍, 지도." },
+      { sel: ".region-tabs, .region", text: "지역별 사냥터. 사냥터를 누르면 몬스터와 드랍, 지도." },
     ],
   },
   // ---------------------------------------------------------------- 챗봇
   {
     key: "chat",
-    title: "챗봇",
+    title: "AI 챗봇",
     intro: "사파이어 길잡이. 위키와 길드 앱 자료로 답하고, 없으면 웹을 찾아요.",
     buttons: [
       { name: "입력 칸 · 전송", what: "질문. '나', '내가 지금 할 것'처럼 물으면 내 레벨·직업으로 답해요" },
@@ -432,9 +431,9 @@ export const GUIDES: Guide[] = [
     ],
     flows: [{ title: "묻기", steps: ["질문 (예: '45렙 마법사 어디서 사냥해?', '길던 언제야?')", "📚 위키에서 찾음 · 💭 생각하는 중이 보이고 답", "답 속 단추로 위키 화면. 별로면 👎"] }],
     tutorial: [
-      { sel: ".chat-input, .chat-form", text: "여기에 물어요. '내가 지금 할 것'처럼 나를 물으면 내 레벨·직업으로 답해요." },
-      { sel: ".chat-attach, button[aria-label='첨부']", text: "📎로 게임 스샷을 주면 직업·레벨을 읽어 맞는 공략을 붙여요." },
-      { sel: ".chat-list-btn, button:has-text('목록')", text: "☰ 목록: 지난 대화. 고정, 이름 변경, 삭제." },
+      { sel: ".chat-compose", text: "여기에 물어요. '내가 지금 할 것'처럼 나를 물으면 내 레벨·직업으로 답해요." },
+      { sel: "button[aria-label='첨부']", text: "📎로 게임 스샷을 주면 직업·레벨을 읽어 맞는 공략을 붙여요." },
+      { sel: ".topbar-action:has-text('목록')", text: "☰ 목록: 지난 대화. 고정, 이름 변경, 삭제." },
     ],
   },
   // ---------------------------------------------------------------- 길드원 관리
@@ -460,8 +459,8 @@ export const GUIDES: Guide[] = [
       { title: "부캐 묶기", steps: ["본캐 줄 → 계정 통합 → 같은 사람의 다른 계정 고르기", "무엇을 본캐로 할지", "부캐 로그인은 끝나고 본캐 아이디로 들어와 캐릭터를 바꿔요"] },
     ],
     tutorial: [
-      { sel: ".signup-list, .admin-requests", text: "아이디 생성 요청과 계정 삭제 요청. 승낙·거절." },
-      { sel: ".admin-filters, .filter", text: "닉네임 찾기와 거르기 칩." },
+      { sel: ".signup-row, .admin-requests", text: "아이디 생성 요청과 계정 삭제 요청. 승낙·거절." },
+      { sel: ".admin-search, .filter", text: "닉네임 찾기와 거르기 칩." },
       { sel: ".account-list .account-row", text: "사람 줄을 눌러 보세요.", tap: true },
       { sel: ".account-panel", text: "관리 칸: 역할, 정보 수정, 성장 기록, 고스펙, 비밀번호 초기화, 계정 통합, 닉네임 변경, 계정 삭제." },
     ],
@@ -483,7 +482,7 @@ export const GUIDES: Guide[] = [
     tutorial: [
       { sel: ".log-storage", text: "기록 수와 DB. 사용 기록은 DB 2~10을 차례로 써요." },
       { sel: ".log-people", text: "사람별 7일 요약. 닉네임을 눌러 보세요.", tap: true },
-      { sel: ".log-rows, .log-list", text: "그 사람의 기록. 📚 묶음을 누르면 그 메뉴에서 한 일이 차례로 펼쳐져요." },
+      { sel: ".log-list", text: "그 사람의 기록. 📚 묶음을 누르면 그 메뉴에서 한 일이 차례로 펼쳐져요." },
     ],
   },
   // ---------------------------------------------------------------- 챗봇 개선
@@ -500,7 +499,7 @@ export const GUIDES: Guide[] = [
     flows: [{ title: "고치기", steps: ["대기 목록 → 📋 목록 복사", "개발자가 자료나 프롬프트를 고쳐 배포", "개선 완료 → 물은 사람에게 알림"] }],
     tutorial: [
       { sel: ".pill-row", text: "대기와 개선함." },
-      { sel: ".gap-item, .gaps-list li", text: "모르는 질문 하나. '답 보기'로 그때 답, 고쳤으면 '개선 완료'." },
+      { sel: ".gap-card", text: "모르는 질문 하나. '답 보기'로 그때 답, 고쳤으면 '개선 완료'." },
     ],
   },
   // ---------------------------------------------------------------- 공식 확률
@@ -517,11 +516,11 @@ export const GUIDES: Guide[] = [
     flows: [{ title: "확률 보기", steps: ["분류를 누르거나 이름 찾기", "표를 누르면 항목과 확률", "챗봇에게 '○○ 확률'이라고 물어도 돼요"] }],
     tutorial: [
       { sel: ".odds-cats", text: "분류 칸. 눌러 보세요.", tap: true },
-      { sel: ".odds-list", text: "그 분류의 표 목록. 표를 누르면 확률." },
+      { sel: ".odds-panel, .odds-group", text: "그 분류의 표 목록. 표를 누르면 확률." },
     ],
   },
 ];
 
 export const guideOf = (key: string) => GUIDES.find((g) => g.key === key) ?? null;
 /** 제목으로 (TopBar 가 title 만 안다) */
-export const guideByTitle = (title: string) => GUIDES.find((g) => g.title === title) ?? null;
+export const guideByTitle = (title: string) => GUIDES.find((g) => g.title === title || (g.key === "chat" && title === "챗봇")) ?? null;
