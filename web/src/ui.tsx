@@ -275,14 +275,18 @@ export function FitLine({ text, shrink = 1, wrap = true, className, hs = false }
       el.dataset.fit = "wrap";
     };
     fit();
-    // 폰을 돌리는 등 너비가 바뀔 때와 글꼴을 다 받았을 때 다시 맞춘다 (높이만 바뀐 건 무시)
+    // 폰을 돌리는 등 너비가 바뀔 때와 글꼴을 다 받았을 때 다시 맞춘다 (높이만 바뀐 건 무시).
+    // 옆에 나중에 붙는 것(카톡 단추 등)에 자리를 내줘 이 글자 칸만 좁아진 때도 (2026-11-02: 길드 던전 파티원 카드의 긴 닉네임이 잘렸다)
     let width = box.clientWidth;
+    let own = el.clientWidth;
     const watch = new ResizeObserver(() => {
-      if (box.clientWidth === width) return;
+      if (box.clientWidth === width && el.clientWidth === own) return;
       width = box.clientWidth;
       fit();
+      own = el.clientWidth;
     });
     watch.observe(box);
+    watch.observe(el);
     let alive = true;
     // 글꼴을 아직 받는 중일 때만 다 받은 뒤에 한 번 더 맞춘다
     if (document.fonts.status !== "loaded") document.fonts.ready.then(() => alive && fit());

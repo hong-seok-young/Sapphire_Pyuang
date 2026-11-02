@@ -2402,9 +2402,9 @@ input, textarea { min-width: 0; max-width: 100%; }
 .gd-party-head > .bd-mini { margin-left: auto; }
 .gd-party-head > small { flex: 1; min-width: 0; font-size: 11px; color: var(--muted); }
 .gd-members { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
-.gd-members > li { min-width: 0; padding: 5px 6px; background: rgba(11, 10, 26, 0.45); border: 1px solid var(--edge); }
+.gd-members > li { min-width: 0; padding: 5px 4px; background: rgba(11, 10, 26, 0.45); border: 1px solid var(--edge); }
 .gd-member-name { flex: 0 1 auto; min-width: 0; font-size: 13px; }
-.gd-member-row { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 0; padding: 0; color: inherit; font: inherit; text-align: left; background: none; border: 0; }
+.gd-member-row { display: flex; align-items: center; gap: 3px; width: 100%; min-width: 0; padding: 0; color: inherit; font: inherit; text-align: left; background: none; border: 0; }
 button.gd-member-row { cursor: pointer; }
 .gd-member-open { border-color: var(--gold) !important; }
 .gd-member-acts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: -2px 0 8px; padding: 8px; background: rgba(11, 10, 26, 0.45); border: 1px solid var(--gold); }
@@ -2413,10 +2413,10 @@ button.gd-member-row { cursor: pointer; }
 .gd-member-add { border-style: dashed !important; }
 .gd-member-add > .gd-member-row { justify-content: center; min-height: 20px; font-size: 12px; color: var(--muted); }
 
-.gd-member-row > small { margin-left: auto; flex: none; font-size: 10px; color: var(--muted); }
+.gd-member-row > small { margin-left: auto; flex: none; font-size: 9.5px; color: var(--muted); }
 .gd-member-row > small.gd-st-yes { color: #7ee0a8; }
-.gd-member-row > .kakao-btn { flex: none; padding: 0 3px; font-size: 10px; line-height: 15px; }
-.gd-leader { flex: none; padding: 0 2px; font-size: 9px; font-style: normal; line-height: 14px; color: var(--edge); background: var(--gold); }
+.gd-member-row > .kakao-btn { flex: none; padding: 0 2px; font-size: 9px; line-height: 14px; }
+.gd-leader { flex: none; padding: 0 1px; font-size: 8.5px; font-style: normal; line-height: 14px; color: var(--edge); background: var(--gold); }
 .gd-new-name { margin: 0; font-size: 14px; color: var(--gold); }
 .gd-state { margin: 4px 0; font-size: 13px; }
 .gd-state small { color: var(--muted); }
