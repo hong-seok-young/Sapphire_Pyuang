@@ -30,9 +30,10 @@ const SNOW: Partial<Record<Sky, { n: number; v: [number, number]; wind: number; 
 };
 /**
  * 아래 탭 위 선에 고이는 빗물 (제작자 요청 2026-11-02: '퐁당거리는 그 도트가 땅에 남아서 점점 좌우로 퍼지면 되잖아, 물처럼'):
- * 튄 물방울 도트가 떨어지면 그 자리에 남고(KEEP 만큼), 옆으로 흘러 퍼져 한 줄씩 차오른다. 도트 칸 수로 WATER_MAX 까지 (한 칸 2px)
+ * 빗방울 자리에 한 칸, 튄 물방울 도트도 떨어지면 다 그 자리에 남고, 옆으로 흘러 퍼져 한 줄씩 차오른다. 도트 칸 수로 WATER_MAX 까지 (한 칸 2px).
+ * 홈에서 몇 초 안에 차오르게 (제작자 요청 2026-11-02 '좀 더 빨리 팍팍, 절반 남기지 말고 다 남겨, 누가 홈 화면에서 1분이나 멍때리냐')
  */
-const KEEP = 0.55;
+const KEEP = 1;
 const WATER_MAX = 5;
 /** 아래 탭 위 선에 쌓이는 눈의 가장 높은 곳 (도트 칸 수, 한 칸 2px). 그 위로는 더 안 쌓인다 */
 const PILE_MAX = 20;
@@ -168,7 +169,7 @@ export function WeatherFx({ sky }: { sky: Sky }) {
         const low = l < r ? c - 1 : l > r ? c + 1 : Math.random() < 0.5 ? c - 1 : c + 1;
         if (low < 0 || low >= cols) continue;
         const diff = water[c] - water[low];
-        if (diff >= 2 || (diff === 1 && Math.random() < 0.06)) {
+        if (diff >= 2 || (diff === 1 && Math.random() < 0.2)) {
           water[c]--;
           water[low]++;
         }
@@ -216,6 +217,7 @@ export function WeatherFx({ sky }: { sky: Sky }) {
           const surface = ground - (water[wc] ?? 0) * P;
           if (d.y + d.len >= surface) {
             splash(snap(d.x), surface);
+            drip(d.x);
             Object.assign(d, newDrop(true));
             continue;
           }
