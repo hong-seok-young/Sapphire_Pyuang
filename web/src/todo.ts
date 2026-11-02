@@ -1,5 +1,5 @@
 // To do (제작자 요청 2026-11-01): 이벤트를 안 읽어도 본인 직업·레벨에 맞는 할 일을 명사형으로 딱.
-// - 늘 하는 일은 여기서 만든다: 매일 길드 출석, 매주(목요일 오전 10시 초기화) 길드 임무, 들어갈 수 있는 인스턴스 던전 한 줄(위키 '인스턴스 던전' 지역,
+// - 늘 하는 일은 여기서 만든다: 매일 길드 출석과 잠깬쿠이인형, 매주(목요일 오전 10시 초기화) 길드 임무, 들어갈 수 있는 인스턴스 던전 한 줄(위키 '인스턴스 던전' 지역,
 //   이름의 숫자가 들어가는 레벨), 길드던전(1군만), 헌팅 그라운드 이용 시간.
 // - 이벤트 할 일은 서버가 공식 글에서 Claude 로 뽑아 둔 것 중 지금 이 캐릭터의 레벨·직업에 맞는 것 (/api/todo, server/todo.ts).
 // - 체크는 계정(캐릭터)마다 서버에 두고, 그 주기 안에서만 남는다 (오늘은 한국 시간 0시, 이번 주는 목요일 오전 10시에 비워진다).
@@ -121,7 +121,18 @@ const HUNTING_LV = 30;
 /** 늘 하는 일: 오늘(매일)과 이번 주(매주) */
 export function routineItems(wiki: Wiki, level: number | null, guild: Guild | null): { today: TodoItem[]; week: TodoItem[] } {
   const lv = level ?? 0;
-  const today: TodoItem[] = [{ key: "d:guild-attend", text: "길드 출석" }];
+  // 잠깬쿠이인형: 샌드백 아래 일일퀘스트 NPC 에게 말 걸면 하루 1개 (제작자 요청 2026-11-02). 위키에 그 아이템이 생기면 '›' 로 연다
+  const doll = "잠깬쿠이인형";
+  const today: TodoItem[] = [
+    { key: "d:guild-attend", text: "길드 출석" },
+    {
+      key: "d:kui-doll",
+      text: doll,
+      note: "일일퀘스트 NPC",
+      steps: ["샌드백 아래 일일퀘스트 NPC 에게 말 걸기 (하루 1개)"],
+      to: wiki.items[doll] ? "#/item/" + encodeURIComponent(doll) : null,
+    },
+  ];
   const week: TodoItem[] = [{ key: "w:guild-mission", text: "길드 임무" }];
   const region = wiki.regions.find((r) => r.name.includes("인스턴스 던전"));
   const dungeons: { lv: number; name: string }[] = [];
@@ -196,7 +207,7 @@ export function eventItems(tasks: TodoTaskOut[], dayEnd: number): TodoItem[] {
 }
 
 /** 늘 하는 일 키 (그 칸을 정할 때) */
-const ROUTINE_KEYS = new Set(["d:guild-attend", "w:guild-mission", "w:dungeons", "w:guild-dungeon", "w:hunting"]);
+const ROUTINE_KEYS = new Set(["d:guild-attend", "d:kui-doll", "w:guild-mission", "w:dungeons", "w:guild-dungeon", "w:hunting"]);
 const CUSTOM_KEY = /^([dwo]):c:\d+$/;
 
 /** 화면의 칸들: 일간, 주간(늘 하는 일과 매일·매주 내 할 일), 이벤트, 내 할 일(한 번), 숨긴 일 */
