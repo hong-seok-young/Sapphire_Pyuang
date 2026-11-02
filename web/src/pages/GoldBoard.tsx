@@ -11,6 +11,7 @@ import {
 import type { GoldOffer, GoldSide } from "../gold";
 import { MARKET_PIC, MAX_NOTE, ago } from "../market";
 import { Loading } from "../ui";
+import { KakaoButton } from "../kakao";
 
 type Filter = "all" | GoldSide | "mine";
 const FILTERS: { key: Filter; label: string }[] = [
@@ -133,7 +134,8 @@ function GoldDetail({ me, o, onChanged }: { me: Me; o: GoldOffer; onChanged: (ne
     <div className="mk-detail">
       {o.note && <p className="mk-note">“{o.note}”</p>}
       <p className="mk-meta">
-        {o.owner} · {ago(o.createdAt)} 올림 · 시세 {o.rate}:1{o.status === "done" && " · 거래 완료"}
+        {/* 올린 사람과 카톡은 바로 위 목록 줄에 있어서 여기서는 뺀다 (제작자 요청 2026-11-02) */}
+        {ago(o.createdAt)} 올림 · 시세 {o.rate}:1{o.status === "done" && " · 거래 완료"}
       </p>
       {mine ? (
         <>
@@ -141,7 +143,7 @@ function GoldDetail({ me, o, onChanged }: { me: Me; o: GoldOffer; onChanged: (ne
             <ul className="mk-wanters">
               {o.wanters!.map((w) => (
                 <li key={w.id}>
-                  ♥ <b>{w.id}</b> <small>{ago(w.at)}</small>
+                  ♥ <b>{w.id}</b> <KakaoButton name={w.id} /> <small>{ago(w.at)}</small>
                   {w.note && <span> “{w.note}”</span>}
                 </li>
               ))}
@@ -322,7 +324,9 @@ export function GoldBoard({ me }: { me: Me }) {
                   </small>
                 </span>
                 <span className="mk-price">
-                  <small>{o.owner}</small>
+                  <small>
+                    {o.owner} <KakaoButton name={o.owner} nested />
+                  </small>
                   <b className="gold-won">{wonText(wonOf(o.gold, o.rate))}</b>
                 </span>
               </button>

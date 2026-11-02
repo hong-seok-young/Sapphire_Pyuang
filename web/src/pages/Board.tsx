@@ -15,6 +15,7 @@ import { FitLine, Loading, NewsDot, TopBar } from "../ui";
 import { markNewsSeen, newsSum, useNews, useNewsSeen } from "../news";
 import type { NewsKey } from "../news";
 import { OfficialList } from "./Official";
+import { KakaoButton } from "../kakao";
 import { isOfficialTab } from "../official";
 
 /** 공지사항과 이벤트는 오피서 이상만 쓴다 (서버 server/board.ts canWrite 와 같다) */
@@ -158,7 +159,7 @@ function List({ me, cat }: { me: Me; cat: Cat | null }) {
                   </span>
                   {p.snippet && <span className="bd-row-snippet">{p.snippet.replace(/\s+/g, " ")}</span>}
                   <small>
-                    {p.author} · {ago(p.at)} · 👁 {p.views}
+                    {p.author} <KakaoButton name={p.author} nested /> · {ago(p.at)} · 👁 {p.views}
                     {p.likes > 0 && ` · ♥ ${p.likes}`}
                     {p.comments > 0 && ` · 💬 ${p.comments}`}
                     {p.files > 0 && ` · 📎 ${p.files}`}
@@ -306,6 +307,7 @@ function PostView({ me, id }: { me: Me; id: number }) {
         </h1>
         <div className="bd-meta">
           <b>{post.author}</b>
+          <KakaoButton name={post.author} mine={post.author === me.id} />
           {d.roles[post.author] && <RoleBadge role={d.roles[post.author]} />}
           <span>
             {ago(post.created_at)}
@@ -418,6 +420,7 @@ function Comments({ me, id, comments, roles, onChange }: {
     <li key={c.id} className={"bd-comment" + (child ? " bd-reply" : "")}>
       <div className="bd-comment-head">
         <b>{c.user}</b>
+        <KakaoButton name={c.user} />
         {roles[c.user] && <RoleBadge role={roles[c.user]} />}
         <small>{ago(c.at)}</small>
         {!child && (

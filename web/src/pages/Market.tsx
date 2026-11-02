@@ -158,7 +158,8 @@ function Detail({ wiki, me, l, rate, onChanged }: {
       </div>
       {l.note && <p className="mk-note">“{l.note}”</p>}
       <p className="mk-meta">
-        {l.seller} <KakaoButton name={l.seller} mine={mine} /> · {ago(l.createdAt)} 올림{l.qty > 1 && ` · ${l.qty}개 한꺼번에`}
+        {/* 판 사람과 카톡은 바로 위 목록 줄에 있어서 여기서는 뺀다 (제작자 요청 2026-11-02) */}
+        {ago(l.createdAt)} 올림{l.qty > 1 && ` · ${l.qty}개 한꺼번에`}
         {l.status === "sold" && " · 거래 완료"}
       </p>
       {auction ? (
@@ -184,7 +185,7 @@ function Detail({ wiki, me, l, rate, onChanged }: {
                 {l.bids!.map((b, i) => (
                   <li key={b.id + b.at}>
                     {i === 0 ? (over ? "🏆 낙찰 " : "🔨 최고 ") : "· "}
-                    <b>{b.id}</b> <Coin /> {goldText(b.amount)} <small>{ago(b.at)}</small>
+                    <b>{b.id}</b> <KakaoButton name={b.id} /> <Coin /> {goldText(b.amount)} <small>{ago(b.at)}</small>
                   </li>
                 ))}
               </ul>
@@ -195,7 +196,7 @@ function Detail({ wiki, me, l, rate, onChanged }: {
             <ul className="mk-wanters">
               {l.wanters!.map((w) => (
                 <li key={w.id}>
-                  ♥ <b>{w.id}</b> <small>{ago(w.at)}</small>
+                  ♥ <b>{w.id}</b> <KakaoButton name={w.id} /> <small>{ago(w.at)}</small>
                   {w.offer ? (
                     <span className="mk-offer">
                       {" "}
@@ -463,6 +464,7 @@ function Talk({ l, me, onCount }: { l: Listing; me: Me; onCount: (n: number) => 
       <li key={t.id} className={(reply ? "mk-talk-reply" : "") + (t.user === l.seller ? " mk-talk-seller" : "")}>
         {reply && <span className="mk-talk-arrow">↳</span>}
         <b>{t.user}</b>
+        <KakaoButton name={t.user} />
         {t.user === l.seller && <span className="mk-talk-tag">판매자</span>}
         {position !== "member" && <span className="mk-talk-tag mk-talk-staff">{ROLE_NAME[position]}</span>}
         <span className="mk-talk-text">{t.text}</span>
@@ -565,7 +567,9 @@ function Rows({ wiki, me, list, rate, onChanged, empty }: {
                 </small>
               </span>
               <span className="mk-price">
-                <small>{l.seller}</small>
+                <small>
+                  {l.seller} <KakaoButton name={l.seller} nested />
+                </small>
                 <b key={shownPrice} className={changed ? "mk-flash" : undefined}>
                   <Coin /> {goldText(shownPrice)}
                 </b>

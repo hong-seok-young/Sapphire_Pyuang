@@ -2228,6 +2228,15 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .kakao-field .pill { flex: none; }
 .kakao-note { width: 100%; font-size: 12px; color: var(--muted); }
 .rent-kakao { margin: 2px 0 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+/* 닉네임 오른쪽 카톡 (제작자 요청 2026-11-02: 닉네임이 뜨는 곳마다). 줄을 펼치는 단추 안에서는 span 으로 그린다 (kakao.tsx nested) */
+.account-nick { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.account-nick > b { min-width: 0; }
+.account-nick > .kakao-btn { flex: none; }
+.rent-log-whoc { display: flex; align-items: center; gap: 3px; min-width: 0; }
+.rent-log-whoc > .fit-line { flex: 0 1 auto; min-width: 0; }
+.rent-log-whoc > .kakao-btn { flex: none; padding: 0 3px; font-size: 10px; line-height: 15px; }
+.mk-price .kakao-btn { margin-left: 2px; }
+.todo-with .kakao-btn { padding: 0 4px; font-size: 10px; line-height: 14px; }
 
 /* 화면 폭 대원칙 (제작자 요청 2026-11-02: 갤럭시 울트라에서 장비반납 칸이 화면 밖으로 넘쳤다. 폰 기종·글자 크기와 상관없이 320px 폭까지 가로로 넘치지 않는다)
    한 칸짜리 grid 목록은 칸 폭이 안의 가장 긴 줄(줄 바꿈 없는 이름, 단추)만큼 커져 화면 밖으로 밀렸다: 칸을 화면 폭 안에 묶는다 */

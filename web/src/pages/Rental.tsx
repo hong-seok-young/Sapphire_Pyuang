@@ -11,7 +11,7 @@
 // - 단추에 이모지를 넣지 않고 같은 줄 단추는 폭을 같게 (.pill-row). 💎 는 값의 단위로만 쓴다.
 // - 기부 마일리지: 물건 더하기·고치기에서 '기부 💎' 를 적으면 기부자에게 적립 (server/rental.ts setDonation, 고치면 차이만).
 // 실제 주고받기는 게임 안에서. 2026-11-02 길드원에게 열었다. 운영은 길드마스터·대여 담당(멍멍)·앱개발자 (server/rental.ts isManager)
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { go, useEntryState } from "../router";
 import { JOBS, JOB_NAME, errorText } from "../auth";
@@ -370,7 +370,7 @@ function ItemPopup({ wiki, item, data, picked, onPick, onClose, onDone }: {
           {item.donor && <p className="rent-muted">기부 {item.donor}</p>}
           {item.renter && (
             <p>
-              <b className="rent-st">대여 중</b> {item.renter}
+              <b className="rent-st">대여 중</b> {item.renter} <KakaoButton name={item.renter} />
               {item.dueAt ? ` · ${md(item.dueAt)}까지` : " · 기한 없음"}
               {item.deposit && (
                 <small className="rent-muted">
@@ -384,7 +384,16 @@ function ItemPopup({ wiki, item, data, picked, onPick, onClose, onDone }: {
           {item.queue > 0 && (
             <p>
               대기 {item.queue}명{waitText(item) && ` · 새 신청은 ${waitText(item)}`}
-              {item.line && <small className="rent-muted"> · {item.line.map((q) => `${q.pos}. ${q.user}(${STATUS_NAME[q.status]})`).join(", ")}</small>}
+              {item.line && (
+                <small className="rent-muted">
+                  {item.line.map((q, i) => (
+                    <Fragment key={q.pos + q.user}>
+                      {i === 0 ? " · " : ", "}
+                      {`${q.pos}. ${q.user}(${STATUS_NAME[q.status]})`} <KakaoButton name={q.user} />
+                    </Fragment>
+                  ))}
+                </small>
+              )}
             </p>
           )}
           {item.note && <p className="mk-note">{item.note}</p>}
@@ -725,7 +734,7 @@ function Talk({ app, onDone }: { app: RentApp; onDone: () => void }) {
         <ul ref={list} className="rent-talk-list">
           {app.talk.map((t) => (
             <li key={t.id} className={t.user === app.user ? "rent-talk-them" : "rent-talk-staff"}>
-              <b>{t.user}</b> <small>{when(t.at)}</small>
+              <b>{t.user}</b> <KakaoButton name={t.user} /> <small>{when(t.at)}</small>
               <p>{t.text}</p>
             </li>
           ))}
@@ -1420,7 +1429,9 @@ function DonationPanel({ wiki, data, onDone }: { wiki: Wiki; data: RentData; onD
           return (
             <li key={b.person} className={open === b.person ? "rent-don-open" : ""}>
               <button className="rent-don-row" onClick={() => toggle(b.person)} aria-expanded={open === b.person}>
-                <span className="rent-don-name">{b.person}</span>
+                <span className="rent-don-name">
+                  {b.person} <KakaoButton name={b.person} nested />
+                </span>
                 <small>
                   기부 {b.count ?? 0}건 · 적립 💎{Math.max(0, b.donated ?? 0)}
                 </small>
@@ -1683,7 +1694,10 @@ function RentLog({ wiki }: { wiki: Wiki }) {
           <div key={r.id} className={"rent-log-row" + (r.returnedAt ? "" : " rent-log-now")} role="row" title={r.by ? `건넨 사람 ${r.by}` : undefined}>
             <span>{r.weapon && <Slot wiki={wiki} item={{ weapon: r.weapon }} />}</span>
             <FitLine text={`${r.weapon ?? "지운 물건"}${r.enhance !== null ? ` +${r.enhance}` : ""}`} wrap={false} />
-            <FitLine className="rent-log-who" text={r.user} wrap={false} />
+            <span className="rent-log-whoc">
+              <FitLine className="rent-log-who" text={r.user} wrap={false} />
+              <KakaoButton name={r.user} />
+            </span>
             <span>{day(r.rentedAt)}</span>
             <span className={r.returnedAt ? "" : "rent-log-on"}>{r.returnedAt ? day(r.returnedAt) : "대여 중"}</span>
             {r.returnedAt ? (

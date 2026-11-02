@@ -146,7 +146,8 @@ function RequestDetail({ me, r, onChanged, onStale }: { me: Me; r: GuildRequest;
     <div className="mk-detail">
       {r.detail && <p className="mk-note rq-detail-text">{r.detail}</p>}
       <p className="mk-meta">
-        {r.owner} <KakaoButton name={r.owner} mine={mine} /> · {ago(r.createdAt)} 의뢰
+        {/* 의뢰한 사람과 카톡은 바로 위 목록 줄에 있어서 여기서는 뺀다 (제작자 요청 2026-11-02) */}
+        {ago(r.createdAt)} 의뢰
         {r.status === "accepted" && r.accepter && r.dueAt && (
           <>
             {` · ${r.accepter} `}
@@ -268,11 +269,17 @@ export function RequestsPage({ me }: { me: Me }) {
                   <b>{r.title}</b>
                   <small>
                     <Reward r={r} />
-                    {r.status === "accepted" && r.accepter && <span>✋ {r.accepter}</span>}
+                    {r.status === "accepted" && r.accepter && (
+                      <span>
+                        ✋ {r.accepter} <KakaoButton name={r.accepter} nested />
+                      </span>
+                    )}
                   </small>
                 </span>
                 <span className="mk-price">
-                  <small>{r.owner}</small>
+                  <small>
+                    {r.owner} <KakaoButton name={r.owner} nested />
+                  </small>
                   <small>{ago(r.createdAt)}</small>
                 </span>
               </button>

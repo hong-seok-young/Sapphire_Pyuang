@@ -44,9 +44,40 @@ export const saveKakao = (link: string, user?: string) => api<{ ok: boolean; lin
  * mine 이면 내 글의 내 이름 옆에도 보인다 (제작자 요청 2026-11-02: 내 판매의 '퓨앙 · 방금 올림'에도): 적어 두었으면 눌러서 내 링크를 확인하고,
  * 안 적었으면 흐린 '카톡'을 눌러 내 정보의 카톡 오픈프로필로 간다
  */
-export function KakaoButton({ name, label = "카톡", mine = false }: { name: string | null | undefined; label?: string; mine?: boolean }) {
+export function KakaoButton({ name, label = "카톡", mine = false, nested = false }: {
+  name: string | null | undefined;
+  label?: string;
+  mine?: boolean;
+  /** 누르면 펼쳐지는 줄(단추)이나 링크 안에 둘 때: <a> 대신 span 으로 그리고, 눌러도 바깥 줄은 열리지 않는다 */
+  nested?: boolean;
+}) {
   const { links } = useKakao();
   const link = name ? links[name] : undefined;
+  if (nested) {
+    if (!link) return null;
+    const open = (e: { preventDefault: () => void; stopPropagation: () => void }) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // 진짜 링크를 눌러 연다 (앱 WebView 도 바깥 주소를 브라우저·카톡으로 넘기는 같은 길)
+      const a = document.createElement("a");
+      a.href = link;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.click();
+    };
+    return (
+      <span
+        className="kakao-btn"
+        role="link"
+        tabIndex={0}
+        aria-label={`${name} 카톡 오픈프로필`}
+        onClick={open}
+        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && open(e)}
+      >
+        {label}
+      </span>
+    );
+  }
   if (!link) {
     if (!mine) return null;
     return (

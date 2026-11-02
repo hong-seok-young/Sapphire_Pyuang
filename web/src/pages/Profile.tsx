@@ -464,15 +464,17 @@ function KakaoWhere({ me, link }: { me: Me; link: boolean }) {
     <div className="me-kw">
       <p className="me-kw-head">{link ? "다른 길드원 화면에서 이렇게 보여요" : "링크를 저장하면 이렇게 보여요"}</p>
       <div className="me-kw-card">
-        <small className="me-kw-where">중개인 · 내 물건 정보창</small>
-        <p className="mk-meta">
-          {me.id} {btn} · 3분 전 올림
-        </p>
+        <small className="me-kw-where">게시판 · 내 글과 댓글</small>
+        <div className="bd-meta">
+          <b>{me.id}</b>
+          {btn}
+          <span>3분 전 · 👁 12</span>
+        </div>
       </div>
       <div className="me-kw-card">
-        <small className="me-kw-where">의뢰소 · 내가 올린 의뢰</small>
+        <small className="me-kw-where">중개인 · 골드 · 의뢰소 · 내 줄</small>
         <p className="mk-meta">
-          {me.id} {btn} · 1시간 전 의뢰
+          {me.id} {btn}
         </p>
       </div>
       <div className="me-kw-card">
