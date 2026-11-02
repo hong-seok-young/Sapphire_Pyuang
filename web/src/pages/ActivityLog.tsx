@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { errorText } from "../auth";
-import { KIND_NAME, VIA_NAME, actionText, fetchActivity, pageName } from "../activity";
+import { KIND_NAME, VIA_NAME, actionText, fetchActivity, pageName, sectionOf } from "../activity";
 import type { ActivityRow, DeviceInfo, Kind, Person } from "../activity";
 import { ago } from "../market";
 import type { Wiki } from "../types";
@@ -23,6 +23,35 @@ function dayText(t: number): string {
 const timeText = (t: number) => new Date(t).toTimeString().slice(0, 5);
 const mdText = (t: number) => `${new Date(t).getMonth() + 1}/${new Date(t).getDate()}`;
 const squash = (s: string) => s.replace(/\s+/g, "").toLowerCase();
+/** 무료 요금제의 DB 하나 크기 한도 (Cloudflare D1 Free 500MB, Workers Paid 10GB) */
+const DB_LIMIT = 500 * 1024 * 1024;
+const mbText = (b: number) => `${(b / 1024 / 1024).toFixed(b < 10 * 1024 * 1024 ? 1 : 0)}MB`;
+
+/**
+ * 같은 사람이 같은 메뉴(게시판, 중개인 …)에서 잇달아 한 기록은 한 묶음으로 (제작자 요청 2026-11-02: '게시판 안에서 뭐 했는지 기록을 묶어서').
+ * 사람마다 따로 이어 붙여서, 여럿이 같은 때 쓴 기록이 섞여도 끊기지 않는다. 그 사람이 다른 메뉴로 가거나 접속이 새로 되거나,
+ * 날짜가 바뀌거나 30분 넘게 비면 끊는다. 하나뿐이면 그냥 한 줄. 묶음은 그 안에서 가장 나중 기록 자리에 보인다
+ */
+type Item = { one: ActivityRow } | { group: ActivityRow[]; section: string };
+const GAP = 30 * 60_000;
+function groupRows(rows: ActivityRow[]): Item[] {
+  const slots: { rows: ActivityRow[]; section: string | null }[] = [];
+  const open = new Map<string, { rows: ActivityRow[]; section: string | null }>();
+  for (const r of rows) {
+    const section = sectionOf(r);
+    const cur = open.get(r.user);
+    const prev = cur?.rows[cur.rows.length - 1];
+    if (cur && section && cur.section === section && prev && dayText(prev.at) === dayText(r.at) && prev.at - r.at < GAP) {
+      cur.rows.push(r);
+      continue;
+    }
+    const slot = { rows: [r], section };
+    slots.push(slot);
+    if (section) open.set(r.user, slot);
+    else open.delete(r.user);
+  }
+  return slots.map((g) => (g.rows.length > 1 && g.section ? { group: g.rows, section: g.section } : { one: g.rows[0] }));
+}
 
 /**
  * 사용 기록 (앱개발자만, 제작자 요청): 사람별 접속 수와 마지막으로 쓴 때, 그리고 누가 어디서 무엇을 했는지.
@@ -31,6 +60,11 @@ const squash = (s: string) => s.replace(/\s+/g, "").toLowerCase();
  * 대신 사람마다 기기 표로 센 기기 수, '새 기기', '같은 때 다른 곳'(10분 안에 다른 기기가 다른 도시에서)을 보인다. 기록에는 그대로 남긴다
  */
 export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
+  /** 묶음 요약에 쓰는 짧은 이름 ('게시판: 자유' -> '자유', '게시판 글: 제목' -> '제목') */
+  const itemText = (r: ActivityRow) =>
+    r.kind === "view" ? pageName(r.what, wiki, r.detail).replace(/^(게시판|게시판 글|아이모 소식 글|글|사냥터|몬스터|아이템|메뉴|장비|검색): /, "") : actionText(r.what, r.detail);
+  const lineText = (r: ActivityRow) =>
+    r.kind === "visit" ? "🟢 접속" : r.kind === "view" ? `📖 ${pageName(r.what, wiki, r.detail)}` : `✏️ ${actionText(r.what, r.detail)}`;
   const [user, setUser] = useState<string | null>(null);
   const [kind, setKind] = useState<Kind | null>(null);
   const [rows, setRows] = useState<ActivityRow[] | null>(null);
@@ -41,6 +75,9 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
   const [query, setQuery] = useState("");
   const [allPeople, setAllPeople] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [storage, setStorage] = useState<{ rows: number; bytes: number | null } | null>(null);
+  /** 펼친 묶음 (그 묶음 맨 위 기록 번호) */
+  const [opened, setOpened] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     let alive = true;
@@ -52,6 +89,7 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
         setRows(r.rows);
         setMore(r.more);
         if (r.people) setPeople(r.people);
+        if (r.storage) setStorage(r.storage);
         setDevices(r.devices ?? null);
       },
       (x) => alive && setError(errorText(x)),
@@ -83,6 +121,19 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
   return (
     <>
       <TopBar title="사용 기록" />
+      {/* 기록은 지우지 않고 쌓는다. 한도는 DB 크기뿐이라 얼마나 찼는지 (제작자 2026-11-02 '사용 기록 무제한으로 못 쌓아?') */}
+      {storage && (
+        <div className="log-storage">
+          <span>
+            기록 {storage.rows.toLocaleString()}건{storage.bytes !== null && ` · 저장 ${mbText(storage.bytes)} / ${mbText(DB_LIMIT)}`}
+          </span>
+          {storage.bytes !== null && (
+            <span className="log-storage-bar">
+              <i style={{ width: `${Math.min(100, (storage.bytes / DB_LIMIT) * 100)}%` }} />
+            </span>
+          )}
+        </div>
+      )}
 
       <section className="panel">
         <h2 className="panel-title">사람별 (7일)</h2>
@@ -129,7 +180,7 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
                   {mdText(d.first)} ~ {ago(d.last)} · 접속 {d.visits} · 기록 {d.n}
                   {d.cities.length > 0 && ` · ${d.cities.join(", ")}`}
                   {d.chars.length > 1 && ` · ${d.chars.join(", ")}`}
-                  {d.legacy && " · 기기 표 전"}
+                  {d.legacy && " · 11/2 전 기록이라 같은 기종 폰이 하나로 묶임"}
                 </small>
               </li>
             ))}
@@ -156,22 +207,83 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
         <div className="empty">아직 기록이 없어요.</div>
       ) : (
         <ol className="log-list">
-          {rows.map((r) => {
-            const day = dayText(r.at);
+          {groupRows(rows).map((it) => {
+            const first = "one" in it ? it.one : it.group[0];
+            const day = dayText(first.at);
             const head = day !== lastDay;
             lastDay = day;
+            if ("one" in it) {
+              const r = it.one;
+              return (
+                <li key={r.id}>
+                  {head && <h3 className="log-day">{day}</h3>}
+                  <div className={"log-row log-" + r.kind}>
+                    <time>{timeText(r.at)}</time>
+                    <span>
+                      <b>{r.user}</b>
+                      {r.via && <small> · {VIA_NAME[r.via]}</small>}
+                      <br />
+                      {lineText(r)}
+                    </span>
+                  </div>
+                </li>
+              );
+            }
+            // 묶음: 메뉴 이름과 화면·한 일 수, 무엇을 봤는지 짧게. 누르면 그 안의 기록을 처음부터 차례로
+            const g = it.group;
+            const last = g[g.length - 1];
+            const views = g.filter((r) => r.kind === "view").length;
+            const acts = g.length - views;
+            const names = [...new Set([...g].reverse().map(itemText).filter((t) => t !== it.section))];
+            const open = opened.has(first.id);
             return (
-              <li key={r.id}>
+              <li key={first.id}>
                 {head && <h3 className="log-day">{day}</h3>}
-                <div className={"log-row log-" + r.kind}>
-                  <time>{timeText(r.at)}</time>
+                <button
+                  className={"log-row log-group" + (open ? " log-group-open" : "")}
+                  aria-expanded={open}
+                  onClick={() =>
+                    setOpened((o) => {
+                      const n = new Set(o);
+                      if (n.has(first.id)) n.delete(first.id);
+                      else n.add(first.id);
+                      return n;
+                    })
+                  }
+                >
+                  <time>
+                    {timeText(first.at)}
+                    <small>~{timeText(last.at)}</small>
+                  </time>
                   <span>
-                    <b>{r.user}</b>
-                    {r.via && <small> · {VIA_NAME[r.via]}</small>}
+                    <b>{first.user}</b>
+                    {first.via && <small> · {VIA_NAME[first.via]}</small>}
                     <br />
-                    {r.kind === "visit" ? "🟢 접속" : r.kind === "view" ? `📖 ${pageName(r.what, wiki)}` : `✏️ ${actionText(r.what, r.detail)}`}
+                    📚 {it.section}
+                    <small className="log-group-n">
+                      {" "}
+                      · 화면 {views}
+                      {acts > 0 && ` · 한 일 ${acts}`}
+                    </small>
+                    {names.length > 0 && (
+                      <small className="log-group-sum">
+                        {names.slice(0, 3).join(" · ")}
+                        {names.length > 3 && ` 외 ${names.length - 3}`}
+                      </small>
+                    )}
                   </span>
-                </div>
+                  <i className="log-chev" aria-hidden />
+                </button>
+                {open && (
+                  <ol className="log-sub">
+                    {[...g].reverse().map((r) => (
+                      <li key={r.id} className={"log-" + r.kind}>
+                        <time>{timeText(r.at)}</time>
+                        <span>{lineText(r)}</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
               </li>
             );
           })}

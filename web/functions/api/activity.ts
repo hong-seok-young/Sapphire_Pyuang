@@ -45,6 +45,22 @@ interface Stat {
 }
 const DAY = 86_400_000;
 
+/**
+ * 게시판 글과 아이모 소식 글을 본 기록에는 그 글 제목을 같이 남긴다 (제작자 요청 2026-11-02: '게시판 들어간 사람이 그 안에서 뭘 봤는지까지').
+ * 글 번호로 한 줄만 읽는다. 지운 글이면 비운다
+ */
+async function viewTitle(env: Env, path: string): Promise<string | null> {
+  const m = /^#\/(board|official)\/(\d+)(?:$|[/?])/.exec(path);
+  if (!m || m[0].endsWith("/")) return null;
+  const table = m[1] === "board" ? "board_posts" : "official_news";
+  try {
+    const row = await env.DB.prepare(`SELECT title FROM ${table} WHERE id = ?`).bind(Number(m[2])).first<{ title: string }>();
+    return row?.title ? row.title.slice(0, 120) : null;
+  } catch {
+    return null;
+  }
+}
+
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
@@ -54,7 +70,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return json({ ok: true });
   }
   if (typeof path !== "string" || !path.startsWith("#/") || path.length > 200) return json({ error: "화면 주소가 맞지 않아요" }, 400);
-  await record(env, me.id, "view", path, null, whereOf(request));
+  await record(env, me.id, "view", path, await viewTitle(env, path), whereOf(request));
   return json({ ok: true });
 };
 
@@ -89,6 +105,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     .all();
   const more = rows.results.length === PAGE;
   if (before > 0) return json({ rows: rows.results, more });
+  // 쌓인 기록 수(지우지 않아 번호가 곧 수)와 DB 크기 (제작자 2026-11-02 '사용 기록 무제한으로 못 쌓아?': 무료 요금제는 DB 하나에 500MB 까지)
+  const top = await env.DB.prepare("SELECT MAX(id) AS n FROM activity").first<{ n: number | null }>();
+  const storage = { rows: top?.n ?? 0, bytes: (rows.meta as { size_after?: number } | undefined)?.size_after ?? null };
   const devices = user ? await devicesOf(env, user) : undefined;
   const now = Date.now();
   const people = await env.DB.prepare(
@@ -127,7 +146,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const merged = [...byOwner.values()]
     .map(({ main_id: _m, ...p }) => ({ ...p, ...(flags.get(p.id) ?? { devices7: 0, newDev: false, together: 0 }) }))
     .sort((a, b) => (a.last === null ? 1 : 0) - (b.last === null ? 1 : 0) || (b.last ?? 0) - (a.last ?? 0) || a.id.localeCompare(b.id));
-  return json({ rows: rows.results, more, people: merged, devices });
+  return json({ rows: rows.results, more, people: merged, devices, storage });
 };
 
 /** 기기마다 묶은 기록 (사람의 모든 캐릭터, 최근 60일). 기기 표가 없던 예전 기록은 기기 글로 */

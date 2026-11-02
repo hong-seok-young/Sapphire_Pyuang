@@ -811,6 +811,22 @@ button { font: inherit; color: inherit; }
 .log-person > small { grid-column: 1 / -1; font-size: 11px; color: var(--muted); }
 .log-person-on { box-shadow: inset 0 0 0 2px var(--sunset); }
 .log-list { list-style: none; margin: 0; padding: 0; }
+/* 사용 기록: 같은 메뉴에서 잇달아 한 기록의 묶음 (제작자 요청 2026-11-02), 쌓인 기록과 DB 크기 */
+.log-group { width: 100%; align-items: center; font: inherit; font-size: 13px; color: var(--text); text-align: left; background: none; border: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); box-shadow: none; cursor: pointer; }
+.log-group time { display: flex; flex-direction: column; line-height: 1.3; }
+.log-group time small { font-size: 10px; }
+.log-group-n { white-space: nowrap; }
+.log-group-sum { display: block; margin-top: 2px; overflow-wrap: anywhere; }
+.log-group-open { background: rgba(255, 195, 92, 0.06); }
+.log-group .log-chev { flex: none; align-self: center; width: 7px; height: 7px; margin-right: 4px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform 0.15s; }
+.log-group-open .log-chev, .log-group[aria-expanded="true"] .log-chev { transform: rotate(45deg); }
+.log-sub { list-style: none; margin: 0 0 4px 50px; padding: 4px 0 4px 10px; border-left: 2px solid var(--hi); display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; }
+.log-sub li { display: flex; gap: 8px; font-size: 12px; }
+.log-sub time { flex: none; width: 36px; color: var(--muted); font-size: 11px; }
+.log-sub span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.log-storage { display: grid; gap: 4px; margin: 0 0 10px; font-size: 11px; color: var(--muted); }
+.log-storage-bar { height: 4px; overflow: hidden; background: var(--night); border: 1px solid var(--edge); }
+.log-storage-bar i { display: block; height: 100%; background: var(--sapphire); }
 .log-day { margin: 12px 0 4px; font-size: 13px; color: var(--gold); }
 .log-row { display: flex; gap: 10px; padding: 6px 2px; font-size: 13px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
 .log-row time { flex: none; width: 40px; color: var(--muted); font-size: 12px; }

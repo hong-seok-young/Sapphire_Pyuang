@@ -3,6 +3,8 @@
 import { api, apiHeaders } from "./auth";
 import type { Role } from "./auth";
 import type { Wiki } from "./types";
+import { CAT_NAME } from "./board";
+import type { Cat } from "./board";
 
 export type Kind = "visit" | "view" | "act";
 export type Via = "app" | "float" | "ios" | "android" | "pc";
@@ -69,7 +71,9 @@ export function fetchActivity(q: { user?: string | null; kind?: Kind | null; bef
   if (q.user) p.set("user", q.user);
   if (q.kind) p.set("kind", q.kind);
   if (q.before) p.set("before", String(q.before));
-  return api<{ rows: ActivityRow[]; more: boolean; people?: Person[]; devices?: DeviceInfo[] }>(`/api/activity?${p}`);
+  return api<{ rows: ActivityRow[]; more: boolean; people?: Person[]; devices?: DeviceInfo[]; storage?: { rows: number; bytes: number | null } }>(
+    `/api/activity?${p}`,
+  );
 }
 
 let lastSent = "";
@@ -123,8 +127,10 @@ const PAGE_NAME: Record<string, string> = {
   requests: "길드원 의뢰소", alerts: "알림", shop: "플래티넘 할인 상점", board: "게시판", me: "내 정보", admin: "길드원 관리", app: "앱", password: "비밀번호 바꾸기", log: "사용 기록", patch: "패치 내역", odds: "공식 확률",
 };
 
-/** 화면 주소를 이름으로: 글은 제목, 사냥터와 몬스터는 이름 */
-export function pageName(path: string, wiki: Wiki): string {
+const IMO_TAB: Record<string, string> = { all: "", notice: "공지사항", maint: "점검", event: "이벤트" };
+
+/** 화면 주소를 이름으로: 글은 제목, 사냥터와 몬스터는 이름. detail 은 서버가 같이 남긴 글 제목 (게시판·아이모 소식 글) */
+export function pageName(path: string, wiki: Wiki, detail?: string | null): string {
   const [raw, query = ""] = path.replace(/^#\/?/, "").split("?");
   const [page = "", arg = ""] = raw.split("/").map((p) => {
     try {
@@ -137,6 +143,20 @@ export function pageName(path: string, wiki: Wiki): string {
     for (const s of wiki.menu) for (const p of s.posts) if (p.id === arg) return `글: ${p.title}`;
     return `글 ${arg}`;
   }
+  // 게시판 안에서 무엇을 봤는지 (제작자 요청 2026-11-02): 칸, 읽은 글 제목, 글쓰기
+  if (page === "board") {
+    const sub = raw.split("/")[2];
+    if (arg === "write") return "게시판 글쓰기";
+    if (/^\d+$/.test(arg)) return sub === "edit" ? `게시판 글 고치기 #${arg}` : `게시판 글: ${detail ?? `#${arg}`}`;
+    const qs = new URLSearchParams(query);
+    const cat = qs.get("cat");
+    if (cat === "imo") {
+      const t = IMO_TAB[qs.get("t") ?? "all"];
+      return `게시판: 아이모 소식${t ? ` · ${t}` : ""}`;
+    }
+    return cat && cat in CAT_NAME ? `게시판: ${CAT_NAME[cat as Cat]}` : "게시판";
+  }
+  if (page === "official") return `아이모 소식 글: ${detail ?? `#${arg}`}`;
   if (page === "place") return `사냥터: ${wiki.places[arg]?.name ?? arg}`;
   if (page === "monster") return `몬스터: ${wiki.monsters[arg]?.name ?? arg}`;
   if (page === "item") return `아이템: ${arg}`;
@@ -264,4 +284,34 @@ export function actionText(what: string, detail: string | null): string {
   // 나머지 칸도 모두 (제작자 요청: 비밀번호 빼고 다 본다)
   for (const [k, v] of Object.entries(d)) if (!READ.has(k) && v !== null && v !== "") bits.push(fieldText(k, v));
   return bits.length ? `${name} · ${bits.join(" · ")}` : name;
+}
+
+/**
+ * 기록을 메뉴로 묶는 이름 (사용 기록 화면에서 같은 사람이 같은 메뉴에서 잇달아 한 것을 한 줄로, 제작자 요청 2026-11-02).
+ * 화면은 주소의 첫 칸, 한 일은 API 경로로 정한다. 접속은 묶지 않는다
+ */
+const VIEW_SECTION: Record<string, string> = {
+  board: "게시판", official: "게시판", market: "중개인", rent: "장비대여", requests: "의뢰소", shop: "플래티넘 상점", chat: "챗봇",
+  ranking: "길드 랭킹", admin: "길드원 관리", me: "내 정보", password: "내 정보", alerts: "알림", todo: "To do", log: "사용 기록",
+  info: "정보", menu: "정보", post: "정보", place: "정보", places: "정보", monster: "정보", item: "정보", equip: "정보", odds: "정보", search: "검색",
+};
+const ACT_SECTION: [RegExp, string][] = [
+  [/^\w+ \/api\/board/, "게시판"],
+  [/^\w+ \/api\/(market|gold)/, "중개인"],
+  [/^\w+ \/api\/rent/, "장비대여"],
+  [/^\w+ \/api\/requests/, "의뢰소"],
+  [/^\w+ \/api\/shop/, "플래티넘 상점"],
+  [/^\w+ \/api\/chat/, "챗봇"],
+  [/^\w+ \/api\/(users|signup)/, "길드원 관리"],
+  [/^\w+ \/api\/(profile|avatar|password|kakao|characters)/, "내 정보"],
+  [/^\w+ \/api\/todo/, "To do"],
+  [/^\w+ \/api\/favorites/, "정보"],
+];
+export function sectionOf(r: ActivityRow): string | null {
+  if (r.kind === "view") {
+    const page = r.what.replace(/^#\/?/, "").split(/[/?]/)[0];
+    return VIEW_SECTION[page] ?? null;
+  }
+  if (r.kind === "act") return ACT_SECTION.find(([re]) => re.test(r.what))?.[1] ?? null;
+  return null;
 }
