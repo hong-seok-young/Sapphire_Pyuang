@@ -1071,6 +1071,11 @@ button { font: inherit; color: inherit; }
 .tile-ring-purple { --ring-a: #b98cff; --ring-b: #efe2ff; }
 .tile-ring > * { position: relative; z-index: 2; }
 .tile-ring > .tile-ribbon { position: absolute; z-index: 3; }
+/* 띠도 있고 개발 중이기도 한 칸 (길드 던전: 1군 전용 + 개발 중): 개발 중 표는 오른쪽 위 그대로, 둘 다 조금 작게 해서 좁은 폰에서도 겹치지 않게 */
+.tile-ring > .tile-badge { position: absolute; z-index: 3; }
+.tile-ring.tile-soon > .tile-ribbon, .tile-ring.tile-soon > .tile-badge { padding: 0 3px; font-size: 9px; line-height: 14px; }
+.tile-ring.tile-soon > .tile-ribbon { left: 3px; }
+.tile-ring.tile-soon > .tile-badge { right: 3px; }
 .tile-ring::before {
   content: ""; position: absolute; z-index: 0; left: 50%; top: 50%; width: 220%; aspect-ratio: 1; pointer-events: none;
   background: conic-gradient(transparent 0 62%, var(--ring-a) 74%, var(--ring-b) 80%, var(--ring-a) 86%, transparent 96%);

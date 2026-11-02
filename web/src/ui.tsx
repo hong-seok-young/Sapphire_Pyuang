@@ -79,7 +79,7 @@ export const TITLE_EN: Record<string, string> = {
   "인던 · 길드던전": "DUNGEONS",
   "전장 · 헌팅그라운드": "BATTLEFIELD",
   "퀘스트 · 지도": "QUESTS · MAPS",
-  "길던&인던 매칭": "PARTY MATCHING",
+  "길드 던전": "GUILD DUNGEON",
 };
 
 export function TopBar({ title, back = true, right, star }: { title: ReactNode; back?: boolean; right?: ReactNode; star?: ReactNode }) {
@@ -400,11 +400,11 @@ export function Loading({ error, onRetry }: { error?: string; onRetry?: () => vo
 }
 
 /** 개발 중인 칸을 길드원이 열었을 때 (앱개발자만 들어가는 동안, 제작자 요청 2026-11-01) */
-export function DevSoon({ title }: { title: string }) {
+export function DevSoon({ title, text = "🚧 개발 중이에요" }: { title: string; text?: string }) {
   return (
     <>
       <TopBar title={title} />
-      <div className="empty">🚧 개발 중이에요</div>
+      <div className="empty">{text}</div>
     </>
   );
 }

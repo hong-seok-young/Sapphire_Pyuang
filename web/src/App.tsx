@@ -247,6 +247,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "app" || page === "timer") body = <AppPage />;
   else if (page === "gaps") body = me.role === "developer" ? <ChatGapsPage /> : <NotFound what="페이지" />;
   // 개발 중인 칸 (장비대여, 매칭, To do): 길드원에게는 '개발 중' 화면. 운영진과 앱개발자는 만든 화면이 있으면 그 화면 (제작자 요청 2026-11-02, canPreview)
+  // 길드 던전은 1군 전용 (제작자 요청 2026-11-02): 2군은 들어와도 안내만 (앱개발자는 길드와 상관없이 본다)
+  else if (page === "match" && me.guild !== "main" && me.role !== "developer") body = <DevSoon title={itemOf(page)?.title ?? ""} text="1군 전용이에요" />;
   else if (page === "match" || (page === "todo" && !canPreview(me))) body = <DevSoon title={itemOf(page)?.title ?? ""} />;
   else if (!wiki) body = <Loading error={loggedOut ? undefined : error} onRetry={() => setWikiTry((n) => n + 1)} />;
   else if (page === "search") body = <Search wiki={wiki} q={route.query.get("q") ?? ""} />;
