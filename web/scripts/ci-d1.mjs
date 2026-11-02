@@ -123,11 +123,15 @@ for (const [table, column, type] of ADDED_COLUMNS) {
   const LOG_NUMS = [2, 3, 4, 5, 6, 7, 8, 9, 10];
   const LOG_FULL = 450 * 1024 * 1024; // server/logdb.ts 와 같게
   const logName = (n) => `sapphire-log-${n}`;
+  // wrangler 는 DB 이름을 wrangler.toml 에서 먼저 찾아서, 그 바인딩의 id 를 진짜 id 로 바꾼 뒤에 그 DB 에 무엇을 한다
+  // (2026-11-02 첫 배포: 자리 표시 id 로 표를 넣으려다 실패했다)
+  const schemaLog = (n) => wrangler("d1", "execute", logName(n), "--remote", "--yes", "--file=schema-log.sql");
   const makeLog = (n) => {
     wrangler("d1", "create", logName(n), "--location=apac", "--update-config=false");
     const uuid = findDb(logName(n));
     if (!uuid) throw new Error("사용 기록 DB를 만들지 못했어요: " + logName(n));
-    wrangler("d1", "execute", logName(n), "--remote", "--yes", "--file=schema-log.sql");
+    setDbId(`LOG${n}`, uuid);
+    schemaLog(n);
     return uuid;
   };
   const list = dbList();
@@ -146,7 +150,14 @@ for (const [table, column, type] of ADDED_COLUMNS) {
         continue;
       }
     }
+    setDbId(`LOG${n}`, uuid);
     ids.set(n, uuid);
+  }
+  // 표는 한 번만 모두에 넣는다 (DB 마다 몇 초씩 걸려서 배포 때마다 하지 않는다. 새로 만든 DB 는 위에서 넣었다)
+  if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'log_schema_v1'")) {
+    for (const n of ids.keys()) schemaLog(n);
+    runSql([`INSERT OR REPLACE INTO setup (key, done_at) VALUES ('log_schema_v1', ${Date.now()});`]);
+    console.log(`사용 기록 DB ${[...ids.keys()].join(", ")}에 표를 넣었어요`);
   }
   const ring = parseJson(
     wrangler("d1", "execute", DB, "--remote", "--json", "--command", "SELECT n, started_at FROM log_ring WHERE started_at IS NOT NULL ORDER BY started_at DESC"),
@@ -163,7 +174,6 @@ for (const [table, column, type] of ADDED_COLUMNS) {
       console.log(`다음 차례 DB ${next}의 가장 오래된 사용 기록을 비웠어요`);
     }
   }
-  for (const [n, uuid] of ids) setDbId(`LOG${n}`, uuid);
 }
 
 // 더한 칸의 색인 (schema.sql 은 칸이 생기기 전에 돌아서 여기서 만든다)
