@@ -23,12 +23,22 @@ const RAIN: Partial<Record<Sky, typeof LIGHT_RAIN>> = {
  * 눈: 송이 수, 내려오는 빠르기, 바람, 큰 송이 비율, 쌓이는 빠르기(송이 하나가 쌓는 높이 px).
  * 함박눈은 바람에 날리는 눈보라가 아니라 큰 송이가 화면 가득 천천히 내리는 것 (제작자 2026-11-02: 오른쪽으로 쏠려 머리카락처럼 꺾였다, 화면 전체가 채워져야지)
  */
-const SNOW: Partial<Record<Sky, { n: number; v: [number, number]; wind: number; big: number; pile: number }>> = {
-  snow: { n: 90, v: [0.5, 1.2], wind: 0.1, big: 0.12, pile: 1.4 },
-  blizzard: { n: 170, v: [0.7, 1.6], wind: 0.2, big: 0.4, pile: 1.6 },
+const SNOW: Partial<Record<Sky, { n: number; v: [number, number]; wind: number; big: number }>> = {
+  snow: { n: 90, v: [0.5, 1.2], wind: 0.1, big: 0.12 },
+  blizzard: { n: 170, v: [0.7, 1.6], wind: 0.2, big: 0.4 },
 };
-/** 아래 탭 위 선에 쌓이는 눈의 가장 높은 곳 (px). 그 위로는 더 안 쌓인다 */
-const PILE_MAX = 34;
+/** 아래 탭 위 선에 쌓이는 눈의 가장 높은 곳 (도트 칸 수, 한 칸 2px). 그 위로는 더 안 쌓인다 */
+const PILE_MAX = 20;
+/**
+ * 눈송이 크기마다 쌓이는 도트 (가운데 칸을 0 으로 옆 칸까지): 닿는 그 순간 그 자리에 한 톨씩 보이게 쌓인다
+ * (제작자 요청 2026-11-02: '1분 말고 실시간으로 눈 한 톨 한 톨 점점 쌓이게')
+ */
+const FLAKE_CELLS: Record<number, [number, number][]> = {
+  1: [[0, 1]],
+  2: [[0, 1], [1, 1]],
+  3: [[-1, 1], [0, 2], [1, 1]],
+  4: [[-2, 1], [-1, 2], [0, 3], [1, 2], [2, 1]],
+};
 
 /** 효과가 있는 날씨 (맑음·흐림·안개는 그리지 않는다. 안개는 제작자 요청 2026-11-02 '안개 있으면 빼'로 뺐다) */
 const hasFx = (sky: Sky) => !!(RAIN[sky] || SNOW[sky]);
@@ -89,7 +99,7 @@ export function WeatherFx({ sky }: { sky: Sky }) {
     type Drop = { x: number; y: number; v: number; len: number };
     type Flake = { x: number; y: number; v: number; s: number; ph: number; f: number };
     /** 빗방울이 선에 닿아 튀는 물방울 */
-    type Bit = { x: number; y: number; vx: number; vy: number; life: number };
+    type Bit = { x: number; y: number; vx: number; vy: number; life: number; big: boolean };
     /** 닿은 자리의 짧은 물결 */
     type Ring = { x: number; life: number };
     const drops: Drop[] = [];
@@ -117,34 +127,35 @@ export function WeatherFx({ sky }: { sky: Sky }) {
     if (rain) for (let i = 0; i < rain.n * area(); i++) drops.push(newDrop(false));
     if (snow) for (let i = 0; i < snow.n * area(); i++) flakes.push(newFlake(false));
 
-    /** 빗방울이 선에 닿으면 퐁당: 양옆 위로 튀는 물방울 두셋과 짧은 물결 */
+    /** 빗방울이 선에 닿으면 퐁당: 양옆 위로 크게 튀는 물방울 서넛과 양옆으로 퍼지는 물결 (폰에서도 잘 보이게) */
     const splash = (x: number) => {
-      if (bits.length > 140) return;
-      const n = Math.random() < 0.5 ? 2 : 3;
-      for (let i = 0; i < n; i++) bits.push({ x, y: ground - P, vx: rnd(-1.3, 1.3), vy: rnd(-2.6, -1.4), life: 1 });
+      if (bits.length > 200) return;
+      const n = Math.random() < 0.5 ? 3 : 4;
+      for (let i = 0; i < n; i++) {
+        bits.push({ x, y: ground - P, vx: rnd(0.6, 2.2) * (i % 2 ? 1 : -1), vy: rnd(-3.8, -2.2), life: 1, big: i < 2 });
+      }
       rings.push({ x, life: 1 });
     };
-    /** 눈송이가 쌓인 눈 위에 닿으면 그 자리를 가운데로 둥글게 조금 쌓는다 (뾰족하지 않게 양옆 세 칸까지 나눠서) */
-    const SPREAD = [0.2, 0.45, 0.75, 1, 0.75, 0.45, 0.2];
-    const land = (x: number, amount: number) => {
-      const c0 = Math.floor(x / P) - 3;
-      SPREAD.forEach((wgt, i) => {
-        const c = c0 + i;
-        if (c >= 0 && c < cols) pile[c] = Math.min(PILE_MAX, pile[c] + amount * wgt * 0.6);
-      });
+    /** 눈송이가 닿으면 그 자리에 그 송이만큼 도트를 바로 얹는다 (한 톨 한 톨 보이게) */
+    const land = (x: number, size: number) => {
+      const c0 = Math.floor(x / P);
+      for (const [dx, n] of FLAKE_CELLS[size]) {
+        const c = c0 + dx;
+        if (c >= 0 && c < cols) pile[c] = Math.min(PILE_MAX, pile[c] + n);
+      }
     };
+    /** 옆 칸보다 두 칸 넘게 높으면 맨 위 한 톨이 낮은 쪽으로 굴러 내린다 (뾰족하지 않은 둔덕). 매번 방향을 바꿔 한쪽으로 쏠리지 않게 */
+    let sweep = 1;
     const settle = () => {
-      // 옆 칸보다 한 칸 넘게 높으면 조금씩 옆으로 흘러 소복한 둔덕이 된다
-      for (let c = 0; c < cols; c++) {
-        for (const d of [-1, 1]) {
-          const n = c + d;
-          if (n < 0 || n >= cols) continue;
-          const diff = pile[c] - pile[n];
-          if (diff > P) {
-            const move = (diff - P) * 0.3;
-            pile[c] -= move;
-            pile[n] += move;
-          }
+      sweep = -sweep;
+      for (let i = 0; i < cols; i++) {
+        const c = sweep > 0 ? i : cols - 1 - i;
+        const l = c > 0 ? pile[c - 1] : Infinity;
+        const r = c < cols - 1 ? pile[c + 1] : Infinity;
+        const low = l < r ? c - 1 : l > r ? c + 1 : Math.random() < 0.5 ? c - 1 : c + 1;
+        if (low >= 0 && low < cols && pile[c] - pile[low] >= 2) {
+          pile[c]--;
+          pile[low]++;
         }
       }
     };
@@ -175,32 +186,34 @@ export function WeatherFx({ sky }: { sky: Sky }) {
           ctx.fillRect(x, y + half, P, half);
         }
         // 튀는 물방울: 위로 튀었다가 떨어지며 흐려진다
-        ctx.fillStyle = "rgba(190, 220, 255, 0.9)";
+        ctx.fillStyle = "rgba(210, 232, 255, 1)";
         for (let i = bits.length - 1; i >= 0; i--) {
           const b = bits[i];
           b.x += b.vx * k;
           b.y += b.vy * k;
-          b.vy += 0.28 * k;
-          b.life -= 0.045 * k;
+          b.vy += 0.3 * k;
+          b.life -= 0.03 * k;
           if (b.life <= 0 || b.y > ground) {
             bits.splice(i, 1);
             continue;
           }
-          ctx.globalAlpha = Math.max(0, b.life);
-          ctx.fillRect(snap(b.x), snap(b.y), P, P);
+          ctx.globalAlpha = Math.min(1, b.life * 1.3);
+          const sz = b.big ? P * 2 : P;
+          ctx.fillRect(snap(b.x), snap(b.y), sz, sz);
         }
-        // 물결: 닿은 자리 양옆으로 짧게 퍼지는 선
+        // 물결: 닿은 자리에서 양옆으로 퍼지는 짧은 선 (처음엔 가운데가 반짝)
         for (let i = rings.length - 1; i >= 0; i--) {
           const r = rings[i];
-          r.life -= 0.06 * k;
+          r.life -= 0.045 * k;
           if (r.life <= 0) {
             rings.splice(i, 1);
             continue;
           }
-          const spread = snap((1 - r.life) * 8) + P;
-          ctx.globalAlpha = r.life * 0.7;
-          ctx.fillRect(r.x - spread, ground - P, P, P);
-          ctx.fillRect(r.x + spread, ground - P, P, P);
+          const spread = snap((1 - r.life) * 14) + P;
+          ctx.globalAlpha = Math.min(1, r.life * 1.1);
+          if (r.life > 0.75) ctx.fillRect(r.x - P, ground - P * 2, P * 3, P);
+          ctx.fillRect(r.x - spread - P * 2, ground - P, P * 3, P);
+          ctx.fillRect(r.x + spread, ground - P, P * 3, P);
         }
         ctx.globalAlpha = 1;
       }
@@ -214,8 +227,8 @@ export function WeatherFx({ sky }: { sky: Sky }) {
           else if (f.x < -24) f.x += w + 48;
           // 쌓인 눈 위에 닿으면 소복이 쌓인다 (큰 송이는 더)
           const c = Math.max(0, Math.min(cols - 1, Math.floor(f.x / P)));
-          if (f.x >= 0 && f.x < w && f.y >= ground - pile[c] - P) {
-            land(f.x, snow.pile * (f.s >= 3 ? 1.6 : f.s === 2 ? 1 : 0.6));
+          if (f.x >= 0 && f.x < w && f.y >= ground - pile[c] * P - P) {
+            land(f.x, f.s);
             Object.assign(f, newFlake(true));
             continue;
           }
@@ -233,17 +246,17 @@ export function WeatherFx({ sky }: { sky: Sky }) {
           } else ctx.fillRect(x, y, P * f.s, P * f.s);
         }
         settle();
-        // 쌓인 눈: 칸마다 도트로 (맨 위 한 칸은 더 밝게, 아래로 갈수록 살짝 푸르게)
+        // 쌓인 눈: 칸마다 도트로 (맨 위 한 칸은 더 밝게, 맨 아래는 살짝 푸르게)
         for (let c = 0; c < cols; c++) {
-          const ph = snap(pile[c]);
-          if (ph < P) continue;
+          const ph = pile[c] * P;
+          if (!ph) continue;
           const x = c * P;
-          ctx.fillStyle = "rgba(226, 234, 255, 0.92)";
+          ctx.fillStyle = "rgba(226, 234, 255, 0.95)";
           ctx.fillRect(x, ground - ph, P, ph);
-          ctx.fillStyle = "rgba(255, 255, 255, 0.98)";
+          ctx.fillStyle = "rgba(255, 255, 255, 1)";
           ctx.fillRect(x, ground - ph, P, P);
-          if (ph > P * 3) {
-            ctx.fillStyle = "rgba(176, 196, 240, 0.55)";
+          if (ph > P * 2) {
+            ctx.fillStyle = "rgba(176, 196, 240, 0.6)";
             ctx.fillRect(x, ground - P, P, P);
           }
         }
