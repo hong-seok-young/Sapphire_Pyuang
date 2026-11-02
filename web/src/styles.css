@@ -51,7 +51,8 @@ body {
   line-height: 1.5;
   /* Korean: break lines only between words ('성장' never splits into '성/장'); cut a word only when it alone is wider than the line */
   word-break: keep-all;
-  overflow-wrap: break-word;
+  /* anywhere: 긴 낱말도 칸 폭을 넓히지 못하게 (break-word 는 칸 폭 계산에 안 들어가서 목록이 화면 밖으로 밀렸다). 자르는 것은 그 낱말이 한 줄보다 길 때만 */
+  overflow-wrap: anywhere;
   -webkit-font-smoothing: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -199,7 +200,7 @@ button { font: inherit; color: inherit; }
 .region-tabs { position: sticky; top: calc(56px + env(safe-area-inset-top)); z-index: 4; margin: -4px -12px 6px; padding: 6px 12px 8px;
   background: rgba(20, 24, 49, 0.94); }
 .region-title { margin: 6px 2px 8px; font-size: 15px; color: var(--gold); text-shadow: 1px 1px 0 var(--edge); }
-.place-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.place-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .place-card { display: flex; flex-direction: column; padding: 4px; background: var(--night-2); }
 .place-banner { width: 100%; height: auto; display: block; }
 .place-meta { font-size: 11px; color: var(--muted); padding: 4px 2px 0; }
@@ -231,7 +232,7 @@ button { font: inherit; color: inherit; }
 .panel { padding: 10px; margin-bottom: 12px; }
 .panel-title { margin: 0 0 8px; font-size: 14px; color: var(--gold); }
 .kv { margin: 0; display: grid; gap: 4px; }
-.kv div { display: grid; grid-template-columns: 76px 1fr; gap: 8px; font-size: 13px; }
+.kv div { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; font-size: 13px; }
 .kv dt { color: var(--muted); }
 .kv dd { margin: 0; white-space: pre-line; }
 .more { display: block; margin-top: 8px; font-size: 12px; color: var(--sapphire); text-align: right; }
@@ -416,16 +417,16 @@ button { font: inherit; color: inherit; }
 /* guild ranking: colours taken from the game ranking screen */
 .rank-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 12px; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
 .rank-stats b { color: var(--gold); }
-.rank-views { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+.rank-views { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 10px; }
 .rank-view { padding: 8px 2px; font-size: 12px; text-align: center; }
-.job-filter { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 10px; }
+.job-filter { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-bottom: 10px; }
 .job-chip {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 52px; padding: 6px 2px;
   color: var(--muted); background: var(--night-2); cursor: pointer;
   border: var(--px) solid var(--edge);
   box-shadow: inset var(--px) var(--px) 0 var(--hi), inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--lo);
 }
-.job-chip small { font-size: 10px; white-space: nowrap; }
+.job-chip small { font-size: 10px; line-height: 1.25; text-align: center; }
 /* 직업 단추의 평균 레벨: 길드 칸의 '평균 Lv.' 와 같은 금색, 고른 단추는 어두운 글자 (제작자 요청 2026-11-01) */
 .job-chip .job-chip-avg { font-size: 10px; color: var(--gold); }
 .job-chip-on .job-chip-avg { color: var(--edge); }
@@ -534,7 +535,7 @@ button { font: inherit; color: inherit; }
   -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
   -webkit-mask-position: center; mask-position: center;
 }
-.mk-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+.mk-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 10px; }
 .mk-tab { position: relative; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 2px; font-size: 13px; }
 .mk-tab img { height: 22px; width: auto; }
 .mk-badge {
@@ -600,7 +601,7 @@ button { font: inherit; color: inherit; }
 .mk-form { display: flex; flex-direction: column; gap: 12px; padding: 12px; }
 .mk-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .mk-field > span { font-size: 12px; color: var(--muted); }
-.mk-two { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; }
+.mk-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 8px; }
 .mk-words { color: var(--gold); font-weight: 400; }
 .mk-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .mk-enhance { min-width: 64px; text-align: center; font-size: 18px; color: var(--gold); }
@@ -614,7 +615,7 @@ button { font: inherit; color: inherit; }
 .mk-picked > span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .mk-picked b { font-weight: 400; font-size: 15px; }
 .mk-picked small { font-size: 11px; color: var(--muted); }
-.mk-opt { display: grid; grid-template-columns: 72px 90px 1fr; align-items: center; gap: 8px; }
+.mk-opt { display: grid; grid-template-columns: 72px 90px minmax(0, 1fr); align-items: center; gap: 8px; }
 .mk-opt b { font-weight: 400; font-size: 14px; }
 .mk-opt .mk-input { height: 36px; text-align: center; }
 .mk-opt small { font-size: 11px; color: var(--muted); }
@@ -663,7 +664,7 @@ button { font: inherit; color: inherit; }
 .rq-detail { height: 72px; padding: 8px 10px; resize: vertical; line-height: 1.4; }
 .rq-detail-text { white-space: pre-line; }
 /* 1군 Sapphire / 2군 FairyTale (ranking cards, profile picker) */
-.guild-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px; }
+.guild-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; }
 .guild-stat {
   display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 2px; cursor: pointer;
   color: var(--muted); background: var(--night-2); border: var(--px) solid var(--edge);
@@ -675,7 +676,7 @@ button { font: inherit; color: inherit; }
 .guild-stat strong { font-size: 13px; font-weight: 400; color: var(--gold); }
 .guild-stat-on { color: var(--edge); background: var(--sunset); box-shadow: inset 2px 2px 0 #ffc35c; }
 .guild-stat-on b, .guild-stat-on strong { color: var(--edge); }
-.guild-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.guild-pick { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
 .guild-btn { flex-direction: row; justify-content: center; gap: 6px; padding: 6px 4px; }
 .guild-btn b { font-size: 13px; }
 /* broker: cash value, offers, auctions */
@@ -733,7 +734,7 @@ button { font: inherit; color: inherit; }
 .log-search { width: 100%; margin-bottom: 8px; }
 .log-people { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; }
 .log-person {
-  width: 100%; display: grid; grid-template-columns: auto 1fr; gap: 0 8px; padding: 6px 8px; text-align: left; cursor: pointer;
+  width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 8px; padding: 6px 8px; text-align: left; cursor: pointer;
   background: var(--panel-2); border: var(--px) solid var(--edge);
 }
 .log-person b { font-weight: 400; color: var(--text); }
@@ -744,6 +745,7 @@ button { font: inherit; color: inherit; }
 .log-day { margin: 12px 0 4px; font-size: 13px; color: var(--gold); }
 .log-row { display: flex; gap: 10px; padding: 6px 2px; font-size: 13px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
 .log-row time { flex: none; width: 40px; color: var(--muted); font-size: 12px; }
+.log-row > span { flex: 1; min-width: 0; }
 .log-row small { color: var(--muted); font-size: 11px; }
 .log-visit { color: #8ff0b0; }
 
@@ -934,7 +936,7 @@ button { font: inherit; color: inherit; }
 .ps-order-side .pill { font-size: 12px; padding: 4px 8px; }
 .ps-gold-edit { display: flex; align-items: center; gap: 4px; }
 .ps-gold-edit .mk-input { width: 92px; padding: 4px 6px; font-size: 13px; }
-.ps-ledger { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.ps-ledger { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; margin-bottom: 8px; }
 .ps-ledger .panel { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 0; font-size: 13px; }
 .ps-ledger .panel span { display: flex; align-items: center; gap: 4px; }
 .ps-gold { color: var(--gold); }
@@ -983,7 +985,7 @@ button { font: inherit; color: inherit; }
 .ps-ledger small { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); }
 .ps-ledger small img { width: 12px; height: auto; }
 .rank-name .rank-sub { font-size: 12px; font-weight: 700; color: #6b84a0; }
-.rank-name .rank-exp-none { white-space: nowrap; }
+.rank-name .rank-exp-none { white-space: normal; }
 .ps-tabs { flex-wrap: nowrap; gap: 5px; }
 .ps-tabs .pill { flex: 1 1 auto; padding: 6px 4px; font-size: 12px; }
 /* high-spec nickname (제작자 요청): only the letters shimmer, all the time. The letters keep their usual colour;
@@ -1123,7 +1125,7 @@ button { font: inherit; color: inherit; }
 .bd-comment-form .mk-input { flex: 1; min-width: 0; width: 0; height: 36px; }
 .bd-write-form { display: flex; flex-direction: column; gap: 8px; }
 .bd-textarea { min-height: 220px; padding: 8px; resize: vertical; font-size: 15px; line-height: 1.6; }
-.bd-pickers { display: flex; align-items: center; gap: 6px; }
+.bd-pickers { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .bd-pickers .pill { cursor: pointer; }
 .bd-pickers small { color: var(--muted); }
 /* AI 로 다듬기 (운영진, 공지·이벤트): 같은 줄 오른쪽 끝 */
@@ -1379,12 +1381,12 @@ button { font: inherit; color: inherit; }
 .ps-review img, .ps-review-groups img { width: 12px; height: 12px; margin-right: 2px; vertical-align: -1px; image-rendering: pixelated; }
 .ps-up { color: #8ff0b0; }
 .ps-down { color: #ff8a7a; }
-.ps-review-groups { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.ps-review-groups { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
 .ps-review-groups li { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 0; font-size: 12px; font-weight: 700; text-align: center; }
 .ps-review-groups small { font-size: 11px; color: var(--muted); }
 .ps-review-groups { margin-bottom: 90px; }
 /* charge amount at the top of the budget review, and the chosen game packs like the game's platinum shop */
-.ps-charge { font-size: 15px; font-weight: 700; }
+.ps-charge { font-size: 15px; font-weight: 700; flex-wrap: wrap; }
 .ps-settings .ps-charge-input { width: 120px; height: 34px; font-size: 16px; }
 .ps-packs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 4px; }
 .ps-packs li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 2px 4px; font-size: 12px; font-weight: 700; background: #d6e2f0; color: #2d4f6a; border: var(--px) solid var(--edge); }
@@ -1978,10 +1980,11 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .rent-form .pill-row { margin-bottom: 0; }
 .rent-paste { height: 120px; padding: 8px 10px; font-size: 13px; line-height: 1.4; resize: vertical; }
 /* 장비반납 칸 (운영, 제작자 요청 2026-11-02): 빌려 간 무기 한 줄씩, 오른쪽 '반납' */
-.rent-backs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.rent-backs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
 .rent-back { padding: 5px 7px; background: var(--night-2); border: 1px solid var(--edge); }
 .rent-back-late { border-color: #e63946; }
-.rent-back-top { display: flex; align-items: center; gap: 6px; }
+.rent-back-top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.rent-back-side { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .rent-back-top .rent-nm { flex: 1; min-width: 0; font-size: 13px; }
 .rent-back-who { font-weight: 400; font-size: 13px; color: #ffd166; white-space: nowrap; }
 .rent-back-top .pill { flex: none; padding: 3px 12px; }
@@ -1993,7 +1996,7 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .rent-don-form { margin-bottom: 8px; padding: 8px; background: var(--night-2); border: 1px solid var(--edge); }
 .rent-don-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
 .rent-don-row {
-  width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 8px; padding: 6px 8px;
+  width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 8px; padding: 6px 8px;
   text-align: left; color: var(--text); background: var(--night-2); border: 1px solid var(--edge); cursor: pointer;
 }
 .rent-don-name { font-size: 13px; }
@@ -2018,7 +2021,7 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .soon-fold .in-news { position: static; display: inline-block; margin-left: 6px; vertical-align: 1px; }
 
 /* 플래티넘 상점 정산 (제작자 요청 2026-11-02: 누가 무슨 템을 사고 누가 전달했는지 글줄 말고 보기 좋게, PlatShop.tsx Settlement) */
-.st-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.st-cards { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; margin-bottom: 8px; }
 .st-card { margin: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 10px; text-align: left; color: var(--text); cursor: pointer; opacity: 0.7; }
 .st-card-on { opacity: 1; border-color: var(--gold); box-shadow: inset 0 0 0 1px rgba(255, 209, 102, 0.35); }
 .st-card-label { font-size: 11px; color: var(--muted); }
@@ -2096,7 +2099,7 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .rent-ask .pill { flex: none; padding: 4px 10px; font-size: 12px; }
 .rent-back-top .pill + .pill { margin-left: 0; }
 .rent-back-top { flex-wrap: wrap; }
-.rent-back-top .rent-nm { flex: 1 1 auto; }
+.rent-back-top .rent-nm { flex: 1 1 auto; white-space: normal; overflow-wrap: anywhere; }
 .rent-back-acts { flex: none; margin-left: auto; display: flex; gap: 4px; }
 .rent-back-acts .pill { padding: 3px 10px; }
 .rent-back-info .rent-back-asked { margin-right: 4px; }
@@ -2111,3 +2114,51 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .kakao-field .pill { flex: none; }
 .kakao-note { width: 100%; font-size: 12px; color: var(--muted); }
 .rent-kakao { margin: 2px 0 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+
+/* 화면 폭 대원칙 (제작자 요청 2026-11-02: 갤럭시 울트라에서 장비반납 칸이 화면 밖으로 넘쳤다. 폰 기종·글자 크기와 상관없이 320px 폭까지 가로로 넘치지 않는다)
+   한 칸짜리 grid 목록은 칸 폭이 안의 가장 긴 줄(줄 바꿈 없는 이름, 단추)만큼 커져 화면 밖으로 밀렸다: 칸을 화면 폭 안에 묶는다 */
+.list,
+.kv,
+.rank-list,
+.growth-list,
+.mk-list,
+.mk-wanters,
+.log-people,
+.alert-list,
+.mk-talk-list,
+.ps-orders,
+.ps-item-rules,
+.bd-list,
+.bd-files,
+.bd-comments ul,
+.lv-log,
+.patch-list,
+.mn-jobs,
+.off-list,
+.todo-detail,
+.todo-form,
+.rent-list,
+.rent-app-list,
+.rent-talk-list,
+.rent-pop-info,
+.rent-cart-sum,
+.rent-deposit,
+.rent-return,
+.rent-don-list,
+.rent-don-detail,
+.rent-ledger,
+.st-list,
+.bd-suggest,
+.rent-held { grid-template-columns: minmax(0, 1fr); }
+/* 입력 칸은 flex 줄 안에서 줄어들 수 있게 (기본 폭이 커서 옆 단추를 밀어냈다) */
+input, textarea { min-width: 0; max-width: 100%; }
+/* 랭킹 줄: 좁은 폰(360px 아래, 큰 글씨 설정 포함)에서는 메달 칸과 엠블럼을 줄여 '길드 · 직업'과 닉네임 자리를 넓힌다 (화면 폭 대원칙) */
+@media (max-width: 359px) {
+  .rank-list { padding: 4px; }
+  .rank-row, .rank-mine-bar { gap: 5px; padding-right: 5px; }
+  .rank-cell { width: 46px; }
+  .rank-cell .medal { width: 38px; height: auto; }
+  .rank-row .emblem, .rank-mine-bar .emblem { width: 40px !important; height: 40px !important; }
+  .rank-row .emblem img, .rank-mine-bar .emblem img { width: 40px; height: 40px; }
+  .rank-up-slot { width: 34px; }
+}

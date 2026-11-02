@@ -1238,21 +1238,23 @@ function ReturnRow({ wiki, item, apps, onDone }: { wiki: Wiki; item: RentItem; a
           {item.weapon}
           <em>+{item.enhance}</em>
         </span>
-        <b className="rent-back-who">{item.renter}</b>
-        <KakaoButton name={item.renter} />
-        {/* 폰 폭에서 넘치지 않게 단추는 한 묶음으로 (자리가 모자라면 다음 줄로) */}
-        {!sure && (
-          <span className="rent-back-acts">
-            {app && (
-              <button className={"pill" + (talkOpen ? " pill-on" : "")} onClick={() => setTalkOpen((v) => !v)}>
-                대화
+        {/* 빌린 사람과 단추는 한 묶음: 폰 폭에서 자리가 모자라면 묶음째 다음 줄 오른쪽으로 (제작자 2026-11-02: 화면 폭을 넘었다) */}
+        <span className="rent-back-side">
+          <b className="rent-back-who">{item.renter}</b>
+          <KakaoButton name={item.renter} />
+          {!sure && (
+            <span className="rent-back-acts">
+              {app && (
+                <button className={"pill" + (talkOpen ? " pill-on" : "")} onClick={() => setTalkOpen((v) => !v)}>
+                  대화
+                </button>
+              )}
+              <button className="pill" onClick={() => setSure(true)}>
+                반납
               </button>
-            )}
-            <button className="pill" onClick={() => setSure(true)}>
-              반납
-            </button>
-          </span>
-        )}
+            </span>
+          )}
+        </span>
       </div>
       <p className="rent-back-info">
         {item.returnReqAt && <small className="rent-back-asked">반납 신청</small>} 

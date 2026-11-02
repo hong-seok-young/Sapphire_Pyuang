@@ -11,7 +11,7 @@ import type { BoardComment, BoardFile, Cat, LinkPreview, PostDetail, PostSummary
 import { RoleBadge } from "../emblems";
 import { ago } from "../market";
 import { go, useEntryState } from "../router";
-import { Loading, NewsDot, TopBar } from "../ui";
+import { FitLine, Loading, NewsDot, TopBar } from "../ui";
 import { markNewsSeen, newsSum, useNews, useNewsSeen } from "../news";
 import type { NewsKey } from "../news";
 import { OfficialList } from "./Official";
@@ -602,7 +602,8 @@ function Write({ me, cat: startCat, editId }: { me: Me; cat?: Cat; editId?: numb
           <div className="pill-row">
             {CATS.filter((c) => canWrite(me, c)).map((c) => (
               <button key={c} type="button" className={"pill" + (cat === c ? " pill-on" : "")} aria-pressed={cat === c} onClick={() => setCat(c)}>
-                {CAT_NAME[c]}
+                {/* 좁은 폰(320px)에서 '길드 이벤트'가 단추를 넘었다: 글자를 줄여 한 줄에 (화면 폭 대원칙) */}
+                <FitLine text={CAT_NAME[c]} wrap={false} />
               </button>
             ))}
           </div>
