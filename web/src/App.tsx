@@ -204,7 +204,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   // 새 글·새 물건 숫자 배지 (news.ts): 그 메뉴를 열면 지우고, 홈으로 올 때 다시 묻는다
   useEffect(() => startNews(me.id), [me.id]);
   useEffect(() => {
-    markNewsSeen(page);
+    // 의뢰소는 칸이 하나라 열면 본 것. 게시판, 중개인, 장비대여는 그 화면 안의 단추마다 (useNewsSeen)
+    if (page === "requests") markNewsSeen("requests");
     if (page === "") void refreshNews();
   }, [page]);
   const news = useNews();

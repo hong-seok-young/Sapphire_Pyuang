@@ -46,6 +46,6 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
     env.DB.prepare("UPDATE rental_items SET status = 'gone', updated_at = ?, updated_by = ? WHERE id = ?").bind(now, me.id, id),
     env.DB.prepare("UPDATE rental_requests SET status = 'no', done_at = ?, done_by = ? WHERE item_id = ? AND status IN ('wait', 'ok')").bind(now, me.id, id),
   ]);
-  if (waits.length) await notify(env, waits.map((w) => w.user_id), "rent", `${itemLabel(item)} 이 대여 목록에서 내려가 신청이 취소됐어요`, "#/rent", me.id);
+  if (waits.length) await notify(env, waits.map((w) => w.user_id), "rent", `${itemLabel(item)} 이 대여 목록에서 내려가 신청이 취소됐어요`, "#/rent?v=apps", me.id);
   return json({ ok: true });
 };

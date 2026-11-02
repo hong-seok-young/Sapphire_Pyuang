@@ -4,7 +4,7 @@
 //   Lv.20[카타나]
 //   [민초]명9 +7강 💎12                  ([기부자]옵션 +강 💎가격)
 //   [오믈렛]명5 +6강 💎4 🆙춘천다크갈비 10.29   (🆙 빌린 사람과 날짜: 지금 대여 중. '🆙26.10.22 혈천도마' 처럼 날짜가 앞이어도)
-// 서버(/api/rent/import)와 처음 채우는 스크립트(scripts/rental-seed.mjs, 비공개 자료 길드/장비대여/*.txt)가 같이 쓴다.
+// 처음 채우는 스크립트(scripts/rental-seed.mjs, 비공개 자료 길드/장비대여/*.txt)가 같이 쓴다.
 // Node 가 타입을 지우고 읽으므로 상대 경로 import 는 두지 않는다.
 
 export type RentJob = "warrior" | "ranger" | "mage" | "monk";

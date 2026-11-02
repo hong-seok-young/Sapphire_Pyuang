@@ -57,7 +57,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const days = TERM_DAYS[i.term];
     if (!i.renter || !i.rented_at || !days || queued.get(i.id)) continue;
     const due = i.rented_at + days * 86_400_000;
-    await notify(env, [i.renter], "rent", `${itemLabel(i)} 다음 신청이 있어요 · ${due > now ? `${md(due)}에` : "지금"} 대여 담당자에게 돌려주세요`, "#/rent", me.id);
+    await notify(env, [i.renter], "rent", `${itemLabel(i)} 다음 신청이 있어요 · ${due > now ? `${md(due)}에` : "지금"} 대여 담당자에게 돌려주세요`, "#/rent?v=apps", me.id);
   }
   return json({ appId });
 };

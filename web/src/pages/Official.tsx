@@ -4,7 +4,9 @@ import { errorText } from "../auth";
 import { OFFICIAL_TABS, TYPE_NAME, fetchOfficial, fetchOfficialPost, officialLink, officialUrl } from "../official";
 import type { OfficialItem, OfficialPost, OfficialTab } from "../official";
 import { go } from "../router";
-import { Loading, TopBar } from "../ui";
+import { Loading, NewsDot, TopBar } from "../ui";
+import { markNewsSeen, newsSum, useNews, useNewsSeen } from "../news";
+import type { NewsKey } from "../news";
 
 /** 한국 날짜 'YYYY-MM-DD' (며칠 전) */
 const kstDay = (daysAgo = 0) => new Date(Date.now() + 9 * 3_600_000 - daysAgo * 86_400_000).toISOString().slice(0, 10);
@@ -16,7 +18,12 @@ const dates = (it: Pick<OfficialItem, "start" | "end">, today: string) =>
  * 게시판 '아이모 소식' (제작자 요청 2026-11-01): 아이모 공식 홈페이지의 공지사항, 점검, 이벤트를 칸으로 나눠 보인다.
  * 누르면 앱 안에서 읽는다 (#/official/번호). 고른 칸은 주소 ?t= 에 남는다
  */
+/** 아이모 소식 칸마다 새 글 수 (news.ts) */
+const TAB_NEWS: Record<OfficialTab, NewsKey[]> = { all: ["imo.notice", "imo.maint", "imo.event"], notice: ["imo.notice"], maint: ["imo.maint"], event: ["imo.event"] };
+
 export function OfficialList({ tab }: { tab: OfficialTab }) {
+  const news = useNews();
+  useNewsSeen(tab === "all" ? [] : TAB_NEWS[tab]); // '전체'는 지우지 않는다 (어느 칸에 새 글이 있는지 보이게)
   const [items, setItems] = useState<OfficialItem[] | null>(null);
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -71,6 +78,7 @@ export function OfficialList({ tab }: { tab: OfficialTab }) {
             onClick={() => go(`#/board?cat=imo&t=${t.key}`, true)}
           >
             {t.label}
+            {t.key !== "all" && <NewsDot n={newsSum(news, TAB_NEWS[t.key])} />}
           </button>
         ))}
       </nav>
@@ -158,7 +166,12 @@ export function OfficialPostPage({ id }: { id: number }) {
     setPost(null);
     setError("");
     fetchOfficialPost(id).then(
-      (p) => alive && setPost(p),
+      (p) => {
+        if (!alive) return;
+        setPost(p);
+        // 새 공식 글을 열면 그 종류의 숫자를 지운다
+        markNewsSeen(p.type === "C" ? "imo.maint" : p.type === "E" ? "imo.event" : "imo.notice");
+      },
       (x) => alive && setError(errorText(x)),
     );
     return () => {

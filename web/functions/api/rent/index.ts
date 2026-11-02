@@ -172,8 +172,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     // 사람마다 마일리지 (묶은 캐릭터는 본캐 하나로, 앱에 없는 기부자는 닉네임 그대로)와 닉네임 고르기 목록
     const [balR, usersR] = await env.DB.batch([
       env.DB.prepare(
-        "SELECT COALESCE(u.main_id, u.id, m.who) AS person, SUM(m.delta) AS dia, MAX(m.created_at) AS at FROM rental_mileage m " +
-          "LEFT JOIN users u ON u.id = m.who GROUP BY person ORDER BY dia DESC",
+        // 기부 현황 (제작자 요청 2026-11-02: 운영 '기부 현황'): 남은 💎, 기부로 적립한 💎, 기부 건수 (물건으로 적립한 것은 물건마다 한 번, 손으로 적립한 것은 줄마다)
+        "SELECT COALESCE(u.main_id, u.id, m.who) AS person, SUM(m.delta) AS dia, MAX(m.created_at) AS at, " +
+          "SUM(CASE WHEN m.reason = 'donate' THEN m.delta ELSE 0 END) AS donated, " +
+          "COUNT(DISTINCT CASE WHEN m.reason = 'donate' AND m.item_id IS NOT NULL THEN m.item_id END) + SUM(m.reason = 'donate' AND m.item_id IS NULL AND m.delta > 0) AS count " +
+          "FROM rental_mileage m LEFT JOIN users u ON u.id = m.who GROUP BY person ORDER BY donated DESC, dia DESC",
       ),
       env.DB.prepare("SELECT id FROM users ORDER BY id"),
     ]);

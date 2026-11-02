@@ -505,3 +505,10 @@ export function ChangeAsk({ onPick, onCancel, busy, compact }: {
   );
 }
 
+
+/**
+ * 단추 안의 새 것 수 (제작자 요청 2026-11-02: 홈 칸의 빨간 숫자처럼 그 안의 어느 단추에서 새로 올라왔는지도). src/news.ts 의 단추 key 하나나 여럿의 합
+ */
+export function NewsDot({ n }: { n: number }) {
+  return n > 0 ? <span className="news-badge in-news">{n > 99 ? "99+" : n}</span> : null;
+}

@@ -27,6 +27,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     env.DB.prepare("UPDATE rental_apps SET updated_at = ? WHERE id = ?").bind(now, aid),
   ]);
   if (applicant) await notifyManagers(env, `대여 대화 · ${me.id}: ${text}`, me.id);
-  else await notify(env, [app.user_id], "rent", `대여 대화 · ${me.id}: ${text}`, "#/rent", me.id);
+  else await notify(env, [app.user_id], "rent", `대여 대화 · ${me.id}: ${text}`, "#/rent?v=apps", me.id);
   return json({ id: r[0].meta.last_row_id, at: now });
 };

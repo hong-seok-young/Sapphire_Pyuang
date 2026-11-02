@@ -1,5 +1,5 @@
 import type { Me } from "../auth";
-import { Bell, CharacterSwitch, FitLine, HeroTitle, MeButton, PixelIcon, TopBar } from "../ui";
+import { Bell, CharacterSwitch, FitLine, HeroTitle, MeButton, NewsDot, PixelIcon, TopBar } from "../ui";
 import { VERSION } from "../patchnotes";
 import { useEffect, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
@@ -93,6 +93,7 @@ export function Home({ me }: { me: Me }) {
   const tiles = grid.filter((t) => t.key !== "search" && !t.soon);
   const soon = grid.filter((t) => t.soon);
   const [showSoon, setShowSoon] = useState(false);
+  const foldNews = useNews();
   const dragKey = L.drag?.moved ? L.drag.key : undefined;
 
   return (
@@ -156,6 +157,8 @@ export function Home({ me }: { me: Me }) {
         <>
           <button className="soon-fold" onClick={() => setShowSoon((v) => !v)} aria-expanded={showSoon}>
             개발 중 {soon.length} {showSoon ? "▴" : "▾"}
+            {/* 접힌 칸 안의 새 것 수 (장비대여 새 신청 등, 미리 보는 사람만) */}
+            {canPreview(me) && !showSoon && <NewsDot n={soon.reduce((n, t) => n + newsFor(foldNews, t.key), 0)} />}
           </button>
           {/* 안의 칸은 운영진(길드마스터, 오피서)과 앱개발자만 (제작자 요청 2026-11-02). 길드원은 단추만 */}
           {showSoon && (canPreview(me) ? <Tiles me={me} tiles={soon} /> : <p className="soon-closed">운영진에게만 보여요</p>)}

@@ -107,7 +107,7 @@ export async function mileageOfName(env: Env, who: string): Promise<number> {
 export async function notifyManagers(env: Env, text: string, from: string): Promise<void> {
   const roles = RENT_OPEN ? "('developer', 'master', 'officer')" : "('developer')";
   const { results } = await env.DB.prepare(`SELECT DISTINCT COALESCE(main_id, id) AS id FROM users WHERE role IN ${roles}`).all<{ id: string }>();
-  await notify(env, results.map((r) => r.id), "rent", text, "#/rent", from);
+  await notify(env, results.map((r) => r.id), "rent", text, "#/rent?v=staff", from);
 }
 
 /** 돌려줄 때 (기한 없음이면 null) */
@@ -190,7 +190,7 @@ export async function setDonation(env: Env, item: { id: number; weapon: string; 
     ),
   );
   for (const c of changes) {
-    await notify(env, [c.who], "rent", `마일리지 💎${c.delta > 0 ? "+" : ""}${c.delta} (${label} 기부) · 지금 💎${left.get(c.who)}`, "#/rent", by);
+    await notify(env, [c.who], "rent", `마일리지 💎${c.delta > 0 ? "+" : ""}${c.delta} (${label} 기부) · 지금 💎${left.get(c.who)}`, "#/rent?v=apps", by);
   }
   return null;
 }

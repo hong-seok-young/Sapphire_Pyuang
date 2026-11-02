@@ -98,7 +98,8 @@ export interface RentData {
   mileage: number;
   ledger: LedgerLine[];
   /** 운영진만: 사람마다 마일리지, 닉네임 고르기 목록 */
-  balances?: { person: string; dia: number; at: number }[];
+  /** 운영진: 기부 현황 (남은 💎, 기부로 적립한 💎, 기부 건수) */
+  balances?: { person: string; dia: number; at: number; donated: number; count: number }[];
   members?: string[];
 }
 
@@ -129,16 +130,6 @@ export interface RentFields {
 export const addRent = (f: RentFields) => api<{ id: number; warning?: string }>("/api/rent", "POST", f);
 export const editRent = (id: number, f: RentFields) => api<{ ok: boolean }>(`/api/rent/${id}`, "PUT", f);
 export const removeRent = (id: number) => api<{ ok: boolean }>(`/api/rent/${id}`, "DELETE");
-export interface ImportSummary {
-  jobs: Job[];
-  add: number;
-  keep: number;
-  gone: number;
-  goneRented: number;
-  skipped: string[];
-  applied?: boolean;
-}
-export const importRent = (text: string, apply: boolean) => api<ImportSummary>("/api/rent/import", "POST", { text, apply });
 export const fetchMileage = (who: string) =>
   api<{ who: string; names: string[]; mileage: number; ledger: LedgerLine[] }>(`/api/rent/mileage?who=${encodeURIComponent(who)}`);
 export const addMileage = (who: string, delta: number, reason: "donate" | "adjust", note: string) =>

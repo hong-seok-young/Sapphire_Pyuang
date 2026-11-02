@@ -8,7 +8,25 @@ import { detailOf, record, subjectOf, whereOf } from "../../server/activity";
 /** 본문이 JSON 이 아닌 곳: 캐릭터 사진, AI 지우기(그림 파일)는 크기만 적는다 */
 const BINARY = /^\/api\/(avatar(\/cutout)?|board\/\d+\/files)$/;
 
+/**
+ * 처리하다 예외가 나면 빈 500 대신 알 수 있는 글로 (2026-11-02: 장비대여 기부 적립이 '문제가 생겼어요 (500)'만 보여 원인을 몰랐다).
+ * 앱개발자에게는 원인을 같이 보인다 (CLAUDE.md 챗봇 errorCause 와 같은 생각)
+ */
 export const onRequest: PagesFunction<Env> = async (context) => {
+  try {
+    return await handle(context);
+  } catch (e) {
+    console.error("api failed", new URL(context.request.url).pathname, e);
+    const me = await currentUser(context.env, context.request).catch(() => null);
+    const cause = e instanceof Error ? e.message : String(e);
+    return new Response(
+      JSON.stringify({ error: me?.role === "developer" ? `서버에서 문제가 생겼어요 (원인: ${cause.slice(0, 300)})` : "서버에서 문제가 생겼어요. 잠시 뒤에 다시 해 주세요" }),
+      { status: 500, headers: { "content-type": "application/json; charset=utf-8" } },
+    );
+  }
+};
+
+const handle: PagesFunction<Env> = async (context) => {
   const { request, env } = context;
   const path = new URL(request.url).pathname;
   const method = request.method;

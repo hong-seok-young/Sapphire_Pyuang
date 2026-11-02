@@ -11,7 +11,9 @@ import type { BoardComment, BoardFile, Cat, LinkPreview, PostDetail, PostSummary
 import { RoleBadge } from "../emblems";
 import { ago } from "../market";
 import { go, useEntryState } from "../router";
-import { Loading, TopBar } from "../ui";
+import { Loading, NewsDot, TopBar } from "../ui";
+import { markNewsSeen, newsSum, useNews, useNewsSeen } from "../news";
+import type { NewsKey } from "../news";
 import { OfficialList } from "./Official";
 import { isOfficialTab } from "../official";
 
@@ -50,7 +52,14 @@ const CAT_SHORT: Record<Cat, string> = { notice: "공지", event: "길드 이벤
  * 아이모 소식 안의 전체·공지사항·점검·이벤트와 위아래가 구분되게). 이모지는 이름 위에, 이름 글자 크기는 모두 같게(줄이지 않고 칸 좌우 여백을 줄인다).
  * 아래 칸 줄은 Official.tsx 의 .pill-row
  */
+const IMO_NEWS: NewsKey[] = ["imo.notice", "imo.maint", "imo.event"];
+
 function BoardCats({ cat }: { cat: Cat | "imo" | null }) {
+  // 칸마다 새 글 수 (제작자 요청 2026-11-02: 홈의 게시판 숫자가 어느 칸에서 왔는지). 그 칸을 열거나 새 글을 열면 본 것으로.
+  // '전체'는 지우지 않는다 (열자마자 다 지워져 어느 칸에 새 글이 있는지 못 봤다), 아이모 소식은 Official.tsx
+  const news = useNews();
+  useNewsSeen(cat && cat !== "imo" ? [`board.${cat}` as NewsKey] : []);
+  const countOf = (key: Cat | "imo" | null) => (key === null ? 0 : newsSum(news, key === "imo" ? IMO_NEWS : [`board.${key}` as NewsKey]));
   const tabs: { key: Cat | "imo" | null; icon: string; name: string; to: string }[] = [
     { key: null, icon: "📋", name: "전체", to: "#/board" },
     ...CATS.map((c) => ({ key: c, icon: CAT_ICON[c], name: CAT_SHORT[c], to: `#/board?cat=${c}` })),
@@ -69,6 +78,7 @@ function BoardCats({ cat }: { cat: Cat | "imo" | null }) {
             {t.icon}
           </span>
           <span className="main-tab-name">{t.name}</span>
+          <NewsDot n={countOf(t.key)} />
         </button>
       ))}
     </nav>
@@ -253,7 +263,13 @@ function PostView({ me, id }: { me: Me; id: number }) {
   const [viewing, setViewing] = useState<number | null>(null);
 
   const reload = useCallback(() => {
-    fetchPost(id).then(setD, (x) => setError(errorText(x)));
+    fetchPost(id).then(
+      (r) => {
+        setD(r);
+        markNewsSeen(`board.${r.post.cat}` as NewsKey); // 새 글을 열면 그 칸의 숫자를 지운다
+      },
+      (x) => setError(errorText(x)),
+    );
   }, [id]);
   useEffect(reload, [reload]);
 

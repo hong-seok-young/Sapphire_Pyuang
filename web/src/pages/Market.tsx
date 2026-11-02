@@ -12,7 +12,8 @@ import {
 } from "../market";
 import type { Category, Enchant, Listing, ListingOption, TalkLine } from "../market";
 import type { Wiki } from "../types";
-import { Loading, PicImg, TopBar } from "../ui";
+import { Loading, NewsDot, PicImg, TopBar } from "../ui";
+import { useNews, useNewsSeen } from "../news";
 import { timeLeft } from "../requests";
 import { GoldBoard } from "./GoldBoard";
 
@@ -908,6 +909,9 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const [rate, setRate] = useState(75);
   const [onlyAuction, setOnlyAuction] = useEntryState("onlyAuction", false);
   const [tab, setTab] = useEntryState<Tab>("tab", "buy");
+  // 새 물건·새 골드 글 수는 '사기'와 '골드' 단추에 (news.ts, 제작자 요청 2026-11-02). 보고 있는 칸은 본 것으로
+  const news = useNews();
+  useNewsSeen(tab === "buy" ? ["market.items"] : tab === "gold" ? ["market.gold"] : []);
   const [query, setQuery] = useEntryState("query", "");
   const [cat, setCat] = useEntryState<Category | "전체">("cat", "전체");
   const [onlyWanted, setOnlyWanted] = useEntryState("onlyWanted", false);
@@ -945,6 +949,8 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
             <img src={t.key === "gold" ? `${MARKET_PIC}coin.png` : `${MARKET_PIC}tab_${t.key}_${tab === t.key ? "on" : "off"}.png`} alt="" />
             {t.label}
             {t.key === "mine" && wantsOnMine > 0 && <span className="mk-badge">♥{wantsOnMine}</span>}
+            {t.key === "buy" && <NewsDot n={news["market.items"]} />}
+            {t.key === "gold" && <NewsDot n={news["market.gold"]} />}
           </button>
         ))}
       </div>

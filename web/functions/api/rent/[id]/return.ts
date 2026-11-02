@@ -37,16 +37,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     ...(useDia > 0
       ? [
           env.DB.prepare("INSERT INTO rental_mileage (who, delta, gold, reason, item_id, note, by_user, created_at) VALUES (?, ?, ?, 'return', ?, ?, ?, ?)").bind(
-            who, useDia, gold, id, `${label} 반납 · 보증금 돌려받음`, me.id, now,
+            who, useDia, gold, id, label, me.id, now,
           ),
         ]
       : []),
   ]);
   const back = [useDia ? `마일리지 💎${useDia}는 돌려받았고` : "", gold ? `골드 ${manText(gold)}은 담당자에게 돌려받아요` : ""].filter(Boolean).join(" ");
-  await notify(env, [who], "rent", `${label} 반납 완료${back ? ` · ${back}` : ""}`, "#/rent", me.id);
+  await notify(env, [who], "rent", `${label} 반납 완료${back ? ` · ${back}` : ""}`, "#/rent?v=apps", me.id);
   const first = await env.DB.prepare("SELECT user_id FROM rental_requests WHERE item_id = ? AND status IN ('wait', 'ok') ORDER BY created_at, id LIMIT 1")
     .bind(id)
     .first<{ user_id: string }>();
-  if (first) await notify(env, [first.user_id], "rent", `${label} 이 담당자에게 돌아왔어요 · 곧 받아요`, "#/rent", me.id);
+  if (first) await notify(env, [first.user_id], "rent", `${label} 이 담당자에게 돌아왔어요 · 곧 받아요`, "#/rent?v=apps", me.id);
   return json({ ok: true, refund: { dia: useDia, gold } });
 };

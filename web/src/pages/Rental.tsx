@@ -18,6 +18,7 @@ import { JOBS, JOB_NAME, errorText } from "../auth";
 import type { Job, Me } from "../auth";
 import type { Wiki } from "../types";
 import { Loading, PicImg, TopBar } from "../ui";
+import { useNews, useNewsSeen } from "../news";
 import {
   STATUS_NAME,
   TERMS,
@@ -30,7 +31,6 @@ import {
   editRent,
   fetchMileage,
   fetchRent,
-  importRent,
   lendRent,
   levelOf,
   manGold,
@@ -43,7 +43,7 @@ import {
   talkRent,
   weaponOf,
 } from "../rental";
-import type { AppRequest, ImportSummary, LedgerLine, RentApp, RentData, RentFields, RentItem, RentTerm } from "../rental";
+import type { AppRequest, LedgerLine, RentApp, RentData, RentFields, RentItem, RentTerm } from "../rental";
 import { MARKET_PIC, itemFacts, jobsFor, rollHint } from "../market";
 
 const REASON: Record<LedgerLine["reason"], string> = { donate: "기부", rent: "대여 보증금", adjust: "고침", return: "반납 · 보증금 돌려받음" };
@@ -57,13 +57,22 @@ function when(ms: number): string {
 }
 
 
+/** 운영의 아래 칸: 장비대여(신청) · 장비반납 · 물건 추가 · 기부 현황 */
+type Panel = "apps" | "back" | "add" | "mileage";
+const PANELS: Panel[] = ["apps", "back", "add", "mileage"];
+
 export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: string }) {
   const [data, setData] = useState<RentData | null>(null);
   const [error, setError] = useState("");
   const [job, setJob] = useEntryState<Job>("job", me.job ?? "warrior");
   const [open, setOpen] = useState<number | null>(null);
   const [picked, setPicked] = useState<number[]>([]);
-  const [panel, setPanel] = useEntryState<"apps" | "add" | "paste" | "mileage">("panel", "apps");
+  const [panelRaw, setPanel] = useEntryState<Panel>("panel", "apps");
+  // 예전에 고른 칸('paste' 등)이 남아 있으면 처음 칸으로
+  const panel: Panel = PANELS.includes(panelRaw) ? panelRaw : "apps";
+  // 새 것 수 (news.ts, 제작자 요청 2026-11-02: 장비대여에 숫자 -> 안에서 목록·신청함·운영 어디에 새로 생겼는지). 보고 있는 칸은 본 것으로
+  const news = useNews();
+  useNewsSeen([view === "apps" ? "rent.apps" : view === "staff" ? "rent.staff" : "rent.list"]);
   const [showLedger, setShowLedger] = useState(false);
 
   const load = useCallback(async () => {
@@ -89,6 +98,8 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
   const myHeld = data.items.filter((i) => i.renter && mine.has(i.renter));
   const myApps = data.apps.filter((a) => a.mine && a.requests.some((r) => r.status === "wait" || r.status === "ok" || r.holding));
   const openApps = data.manager ? data.apps.filter((a) => a.requests.some((r) => r.status === "wait" || r.status === "ok")) : [];
+  // 빌려 간 무기 (장비반납 칸): 기한이 먼저 끝나는 것부터, 기한 없는 것은 뒤로
+  const lent = data.items.filter((i) => i.renter).sort((a, b) => (a.dueAt ?? Infinity) - (b.dueAt ?? Infinity) || (a.rentedAt ?? 0) - (b.rentedAt ?? 0));
   const waitCount = openApps.reduce((n, a) => n + a.requests.filter((r) => r.status === "wait").length, 0);
   const ofJob = data.items.filter((i) => i.job === job);
   // 레벨별로 쭉 (같은 레벨 안에서는 무기, 강화, 기한 순서)
@@ -98,9 +109,10 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
 
   const tab = view === "apps" || (view === "staff" && data.manager) ? view : "list";
   const views: { key: string; name: string; to: string; badge?: number }[] = [
-    { key: "list", name: "목록", to: "#/rent" },
-    { key: "apps", name: myApps.length ? `신청함 ${myApps.length}` : "신청함", to: "#/rent?v=apps" },
-    ...(data.manager ? [{ key: "staff", name: "운영", to: "#/rent?v=staff", badge: waitCount }] : []),
+    { key: "list", name: "목록", to: "#/rent", badge: news["rent.list"] },
+    { key: "apps", name: myApps.length ? `신청함 ${myApps.length}` : "신청함", to: "#/rent?v=apps", badge: news["rent.apps"] },
+    // 운영: 확인 전 신청 수 (없으면 새 대화 같은 새 것 수)
+    ...(data.manager ? [{ key: "staff", name: "운영", to: "#/rent?v=staff", badge: waitCount || news["rent.staff"] }] : []),
   ];
 
   return (
@@ -162,13 +174,15 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
         </section>
       )}
 
-      {/* 운영: 신청 관리, 물건 추가, 카톡 목록 붙여넣기, 마일리지 */}
+      {/* 운영: 장비대여(신청 관리), 장비반납(빌려 간 무기), 물건 추가, 기부 현황 */}
       {tab === "staff" && (
         // 아래 단계 단추는 위 단추 바로 아래 어두운 띠의 작은 글자 단추로 (제작자 요청 2026-11-02: 맨 위 단추와 하위 단추가 구분되게)
         <nav className="sub-tabs rent-sub">
-          {(["apps", "add", "paste", "mileage"] as const).map((p) => (
+          {/* 카톡 목록 붙여넣기는 뺐다 (제작자 요청 2026-11-02: '이걸로 운영할 거임, 카톡으로 안 함').
+              '신청'은 '장비대여'로, 그 오른쪽에 '장비반납', '마일리지'는 '기부 현황'으로 (제작자 요청 2026-11-02) */}
+          {PANELS.map((p) => (
             <button key={p} className={"sub-tab" + (panel === p ? " sub-tab-on" : "")} aria-pressed={panel === p} onClick={() => setPanel(p)}>
-              {p === "apps" ? `신청 ${openApps.length}` : p === "add" ? "물건 추가" : p === "paste" ? "붙여넣기" : "마일리지"}
+              {p === "apps" ? `장비대여 ${openApps.length}` : p === "back" ? `장비반납 ${lent.length}` : p === "add" ? "물건 추가" : "기부 현황"}
             </button>
           ))}
         </nav>
@@ -181,9 +195,18 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
             ) : (
               <p className="rent-muted">기다리는 신청이 없어요</p>
             ))}
+          {panel === "back" &&
+            (lent.length ? (
+              <ul className="rent-backs">
+                {lent.map((i) => (
+                  <ReturnRow key={i.id} wiki={wiki} item={i} onDone={() => void load()} />
+                ))}
+              </ul>
+            ) : (
+              <p className="rent-muted">빌려 간 무기가 없어요</p>
+            ))}
           {panel === "add" && <ItemForm wiki={wiki} data={data} start={{ job }} onDone={() => (setPanel("apps"), void load())} />}
-          {panel === "paste" && <PasteImport onDone={() => void load()} />}
-          {panel === "mileage" && <MileagePanel data={data} onDone={() => void load()} />}
+          {panel === "mileage" && <DonationPanel wiki={wiki} data={data} onDone={() => void load()} />}
         </section>
       )}
 
@@ -1045,19 +1068,23 @@ function Num({ label, value, min, max, onChange }: { label: ReactNode; value: nu
   );
 }
 
-/** 카톡 목록 붙여넣기: 미리 보기(새로, 그대로, 내림) 뒤 적용 */
-function PasteImport({ onDone }: { onDone: () => void }) {
-  const [text, setText] = useState("");
-  const [sum, setSum] = useState<ImportSummary | null>(null);
+/**
+ * 장비반납 칸의 한 줄 (제작자 요청 2026-11-02: '대여 완료를 눌렀으면 장비 반납 단추를'): 무기, 빌려 간 사람, 빌린 날, 기한(지나면 빨강),
+ * 받은 보증금, 대기. '반납'은 한 번 더 묻고, 쓴 마일리지는 저절로 돌려주고 골드는 게임 안에서 돌려준다
+ */
+function ReturnRow({ wiki, item, onDone }: { wiki: Wiki; item: RentItem; onDone: () => void }) {
+  const [sure, setSure] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const run = async (apply: boolean) => {
+  const late = item.dueAt !== null && item.dueAt < Date.now();
+  const deposit = item.deposit ? [item.deposit.dia ? `💎${item.deposit.dia}` : "", item.deposit.gold ? `골드 ${manGold(item.deposit.gold)}` : ""].filter(Boolean).join(" + ") : "";
+  const back = async () => {
     setBusy(true);
     setError("");
     try {
-      const r = await importRent(text, apply);
-      setSum(r);
-      if (r.applied) onDone();
+      await returnRent(item.id);
+      setSure(false);
+      onDone();
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -1065,113 +1092,241 @@ function PasteImport({ onDone }: { onDone: () => void }) {
     }
   };
   return (
-    <div className="mk-form rent-form">
-      <textarea
-        className="mk-input rent-paste"
-        placeholder="[sapphire 대여무기 목록] 전사 … 카톡 목록 글을 그대로"
-        value={text}
-        onChange={(e) => {
-          setText(e.target.value);
-          setSum(null);
-        }}
-      />
-      {sum && (
-        <p className="mk-meta">
-          {sum.jobs.map((j) => JOB_NAME[j]).join(", ")} · 새로 {sum.add} · 그대로 {sum.keep} · 내림 {sum.gone}
-          {sum.goneRented ? ` (대여 중 ${sum.goneRented})` : ""}
-          {sum.skipped.length ? ` · 읽지 못한 줄 ${sum.skipped.length}: ${sum.skipped.slice(0, 3).join(" / ")}` : ""}
-          {sum.applied ? " · 적용했어요" : ""}
-        </p>
-      )}
-      <div className="mk-actions">
-        <button className="btn btn-ghost" disabled={busy || !text.trim()} onClick={() => void run(false)}>
-          미리 보기
-        </button>
-        <button className="btn" disabled={busy || !sum || !!sum.applied} onClick={() => void run(true)}>
-          적용
-        </button>
+    <li className={"rent-back" + (late ? " rent-back-late" : "")}>
+      <div className="rent-back-top">
+        <Slot wiki={wiki} item={item} />
+        <span className="rent-nm">
+          {item.weapon}
+          <em>+{item.enhance}</em>
+        </span>
+        <b className="rent-back-who">{item.renter}</b>
+        {!sure && (
+          <button className="pill" onClick={() => setSure(true)}>
+            반납
+          </button>
+        )}
       </div>
+      <p className="rent-back-info">
+        {item.rentedAt ? `${md(item.rentedAt)} 대여` : "대여 중"}
+        {" · "}
+        {item.dueAt ? <span className={late ? "rent-late" : ""}>기한 {md(item.dueAt)}{late ? " 지남" : ""}</span> : "기한 없음"}
+        {item.queue > 0 && ` · 대기 ${item.queue}`}
+        {deposit && ` · 보증금 ${deposit}`}
+      </p>
+      {sure && (
+        <div className="rent-return">
+          <p className="rent-muted">
+            게임 안에서 돌려받았어요?
+            {deposit && ` 보증금 돌려주기: ${[item.deposit?.dia ? `마일리지 💎${item.deposit.dia} (저절로)` : "", item.deposit?.gold ? `골드 ${manGold(item.deposit.gold)} (게임 안에서)` : ""].filter(Boolean).join(" · ")}`}
+          </p>
+          <div className="pill-row">
+            <button className="pill pill-on" disabled={busy} onClick={() => void back()}>
+              반납
+            </button>
+            <button className="pill" onClick={() => setSure(false)}>
+              취소
+            </button>
+          </div>
+        </div>
+      )}
       {error && <p className="form-error">{error}</p>}
-    </div>
+    </li>
   );
 }
 
-/** 마일리지: 사람마다 남은 💎, 적립(기부)·차감, 그 사람 장부 */
-function MileagePanel({ data, onDone }: { data: RentData; onDone: () => void }) {
-  const [who, setWho] = useState("");
-  const [amount, setAmount] = useState(1);
-  const [reason, setReason] = useState<"donate" | "adjust">("donate");
-  const [minus, setMinus] = useState(false);
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+/**
+ * 기부 현황 (제작자 요청 2026-11-02: '마일리지가 아니라 기부 현황으로, 기부 현황을 보는 게 메인'): 위에 모두의 합, 사람마다 한 줄
+ * (기부 건수, 기부로 적립한 💎, 남은 💎). 줄을 누르면 기부한 무기와 장부, 그 사람의 적립·고침·차감. '기부 적립'은 칸을 열어서
+ */
+function DonationPanel({ wiki, data, onDone }: { wiki: Wiki; data: RentData; onDone: () => void }) {
+  const [open, setOpen] = useState<string | null>(null);
   const [view, setView] = useState<{ who: string; mileage: number; ledger: LedgerLine[] } | null>(null);
+  const [form, setForm] = useState<{ who: string; mode: DonationMode } | null>(null);
+  const [error, setError] = useState("");
+  const donors = data.balances ?? [];
   const show = async (name: string) => {
+    setError("");
     try {
       setView(await fetchMileage(name));
     } catch (e) {
       setError(errorText(e));
     }
   };
+  const toggle = (name: string) => {
+    if (open === name) return setOpen(null);
+    setOpen(name);
+    setView(null);
+    void show(name);
+  };
+  const donated = donors.reduce((n, b) => n + Math.max(0, b.donated ?? 0), 0);
+  const left = donors.reduce((n, b) => n + b.dia, 0);
+  return (
+    <div className="rent-don">
+      <div className="rent-don-head">
+        <span>
+          기부 <b>{donors.filter((b) => b.count > 0).length}</b>명 · 적립 <b>💎{donated}</b> · 남은 <b>💎{left}</b>
+        </span>
+        <button className={"pill" + (form && !form.who ? " pill-on" : "")} onClick={() => setForm(form && !form.who ? null : { who: "", mode: "donate" })}>
+          기부 적립
+        </button>
+      </div>
+      {form && !form.who && (
+        <DonationForm wiki={wiki} data={data} start={form} onClose={() => setForm(null)} onDone={(who) => (setForm(null), onDone(), setOpen(who), void show(who))} />
+      )}
+      {error && <p className="form-error">{error}</p>}
+      <ul className="rent-don-list">
+        {donors.map((b) => {
+          const items = data.items.filter((i) => i.donor === b.person);
+          return (
+            <li key={b.person} className={open === b.person ? "rent-don-open" : ""}>
+              <button className="rent-don-row" onClick={() => toggle(b.person)} aria-expanded={open === b.person}>
+                <span className="rent-don-name">{b.person}</span>
+                <small>
+                  기부 {b.count ?? 0}건 · 적립 💎{Math.max(0, b.donated ?? 0)}
+                </small>
+                <b className="rent-don-left">💎{b.dia}</b>
+              </button>
+              {open === b.person && (
+                <div className="rent-don-detail">
+                  {items.length > 0 && (
+                    <p className="rent-don-items">
+                      {items.map((i) => (
+                        <span key={i.id} className="rent-don-item">
+                          <Slot wiki={wiki} item={i} />
+                          {i.weapon} +{i.enhance}
+                        </span>
+                      ))}
+                    </p>
+                  )}
+                  {view?.who === b.person ? <Ledger lines={view.ledger} rate={data.rate} /> : <p className="rent-muted">불러오는 중…</p>}
+                  <div className="pill-row">
+                    {(["donate", "adjust", "minus"] as const).map((m) => (
+                      <button
+                        key={m}
+                        className={"pill" + (form?.who === b.person && form.mode === m ? " pill-on" : "")}
+                        onClick={() => setForm(form?.who === b.person && form.mode === m ? null : { who: b.person, mode: m })}
+                      >
+                        {MODE_NAME[m]}
+                      </button>
+                    ))}
+                  </div>
+                  {form?.who === b.person && (
+                    <DonationForm
+                      key={form.mode}
+                      wiki={wiki}
+                      data={data}
+                      start={form}
+                      onClose={() => setForm(null)}
+                      onDone={(who) => (setForm(null), onDone(), void show(who))}
+                    />
+                  )}
+                </div>
+              )}
+            </li>
+          );
+        })}
+        {!donors.length && <li className="rent-muted">아직 기부한 사람이 없어요</li>}
+      </ul>
+    </div>
+  );
+}
+
+type DonationMode = "donate" | "adjust" | "minus";
+const MODE_NAME: Record<DonationMode, string> = { donate: "기부 적립", adjust: "고침", minus: "차감" };
+
+/**
+ * 기부 적립·고침·차감 칸. 기부는 장비 이름을 위키에서 찾아 고르고, 위키에 없으면 적은 그대로 (제작자 요청 2026-11-02: 우리 데이터 넘겨서 검색,
+ * 없으면 그냥 입력). 기부는 장비 이름이 있어야 적립된다 (서버도 막는다)
+ */
+function DonationForm({ wiki, data, start, onClose, onDone }: {
+  wiki: Wiki;
+  data: RentData;
+  start: { who: string; mode: DonationMode };
+  onClose: () => void;
+  onDone: (who: string) => void;
+}) {
+  const [who, setWho] = useState(start.who);
+  const [mode, setMode] = useState<DonationMode>(start.mode);
+  const [item, setItem] = useState("");
+  const [enhance, setEnhance] = useState(0);
+  const [amount, setAmount] = useState(1);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  // 위키 장비 (무기, 갑옷, 장신구 …) 이름 찾기
+  const gear = useMemo(
+    () =>
+      Object.values(wiki.items)
+        .filter((it) => it.equip?.length)
+        .map((it) => ({ name: it.name, level: Number(it.equip[0].info["레벨제한"]) || 0, slot: it.equip[0].slot })),
+    [wiki],
+  );
+  const q = item.trim().replace(/\s+/g, "");
+  const hits = q ? gear.filter((g) => g.name.replace(/\s+/g, "").includes(q) && g.name !== item.trim()).sort((a, b) => a.name.length - b.name.length || a.level - b.level).slice(0, 6) : [];
+  const known = gear.some((g) => g.name === item.trim());
   const save = async () => {
     setBusy(true);
     setError("");
     try {
-      await addMileage(who.trim(), minus ? -amount : amount, reason, note.trim());
-      setNote("");
-      onDone();
-      void show(who.trim());
+      const name = who.trim();
+      const text = mode === "donate" ? `${enhance ? `+${enhance} ` : ""}${item.trim()}` : note.trim();
+      await addMileage(name, mode === "minus" ? -amount : amount, mode === "donate" ? "donate" : "adjust", text);
+      onDone(name);
     } catch (e) {
       setError(errorText(e));
     } finally {
       setBusy(false);
     }
   };
+  const ready = !!who.trim() && (mode !== "donate" || !!item.trim());
   return (
-    <div className="mk-form rent-form">
-      <NameInput value={who} onChange={setWho} members={data.members ?? []} placeholder="닉네임" />
-      <div className="pill-row">
-        <button type="button" className={"pill" + (!minus && reason === "donate" ? " pill-on" : "")} onClick={() => (setMinus(false), setReason("donate"))}>
-          기부 적립
-        </button>
-        <button type="button" className={"pill" + (!minus && reason === "adjust" ? " pill-on" : "")} onClick={() => (setMinus(false), setReason("adjust"))}>
-          고침
-        </button>
-        <button type="button" className={"pill" + (minus ? " pill-on" : "")} onClick={() => (setMinus(true), setReason("adjust"))}>
-          차감
-        </button>
-      </div>
-      {/* 💎 와 메모를 한 줄에 */}
-      <div className="rent-mile">
-        <Num label="💎" value={amount} min={1} max={9999} onChange={setAmount} />
-        <label className="mk-field">
-          <span>메모</span>
-          <input className="mk-input" placeholder={reason === "donate" ? "기부한 장비 (+8 글라디우스)" : "까닭"} maxLength={100} value={note} onChange={(e) => setNote(e.target.value)} />
-        </label>
-      </div>
-      <button className="btn" disabled={busy || !who.trim()} onClick={() => void save()}>
-        {minus ? "차감" : "적립"}
-      </button>
-      {error && <p className="form-error">{error}</p>}
-      {view && (
-        <div className="rent-view">
-          <b>
-            {view.who} 💎{view.mileage}
-          </b>
-          <Ledger lines={view.ledger} rate={data.rate} />
+    <div className="mk-form rent-form rent-don-form">
+      {!start.who && <NameInput value={who} onChange={setWho} members={data.members ?? []} placeholder="닉네임" />}
+      {!start.who && (
+        <div className="pill-row">
+          {(["donate", "adjust", "minus"] as const).map((m) => (
+            <button key={m} type="button" className={"pill" + (mode === m ? " pill-on" : "")} onClick={() => setMode(m)}>
+              {MODE_NAME[m]}
+            </button>
+          ))}
         </div>
       )}
-      <ul className="rent-balances">
-        {(data.balances ?? []).map((b) => (
-          <li key={b.person}>
-            <button className="rent-balance" onClick={() => (setWho(b.person), void show(b.person))}>
-              <span>{b.person}</span>
-              <b>💎{b.dia}</b>
-            </button>
-          </li>
-        ))}
-        {!(data.balances ?? []).length && <li className="rent-muted">아직 적립한 사람이 없어요</li>}
-      </ul>
+      {mode === "donate" && (
+        <>
+          <label className="mk-field">
+            <span>기부한 장비{item.trim() && <small className="rent-muted">{known ? " · 위키 장비" : " · 위키에 없어서 적은 그대로"}</small>}</span>
+            <input className="mk-input" placeholder="장비 이름" maxLength={30} value={item} onChange={(e) => setItem(e.target.value)} />
+          </label>
+          {hits.length > 0 && (
+            <div className="mk-chips">
+              {hits.map((g) => (
+                <button key={g.name} type="button" className="pill" onClick={() => setItem(g.name)}>
+                  {g.name} <small>{g.level ? `Lv.${g.level}` : g.slot}</small>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+      <div className="rent-mile">
+        {mode === "donate" && <Num label="+강" value={enhance} min={0} max={20} onChange={setEnhance} />}
+        <Num label="💎" value={amount} min={1} max={9999} onChange={setAmount} />
+        {mode !== "donate" && (
+          <label className="mk-field">
+            <span>까닭</span>
+            <input className="mk-input" maxLength={100} value={note} onChange={(e) => setNote(e.target.value)} />
+          </label>
+        )}
+      </div>
+      <div className="pill-row">
+        <button className="pill pill-on" disabled={busy || !ready} onClick={() => void save()}>
+          {MODE_NAME[mode]}
+        </button>
+        <button className="pill" onClick={onClose}>
+          취소
+        </button>
+      </div>
+      {error && <p className="form-error">{error}</p>}
     </div>
   );
 }
@@ -1189,7 +1344,8 @@ function Ledger({ lines, rate }: { lines: LedgerLine[]; rate: number }) {
           </span>
           <span>
             {REASON[l.reason]}
-            {l.note ? ` · ${l.note}` : ""}
+            {/* 예전 줄은 메모 끝에 까닭이 한 번 더 적혀 있다 ('참나무지팡이 +6 대여 보증금') */}
+            {l.note ? ` · ${l.note.replace(/ (대여 보증금|반납 · 보증금 돌려받음)$/, "")}` : ""}
             {l.gold ? ` · 골드 ${diaGold(l.gold / rate, rate)}` : ""}
           </span>
           <small>{md(l.at)}</small>

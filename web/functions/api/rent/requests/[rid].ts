@@ -46,13 +46,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     const pos = line.findIndex((l) => l.id === rid);
     const at = expectedTimes(item, pos + 1, now)[pos];
     const when = at === null ? "앞사람이 반납하면 받아요" : at <= now + 60_000 ? "곧 받아요" : `${md(at)}부터 받을 수 있어요`;
-    await notify(env, [req.user_id], "rent", `${itemLabel(item)} 신청 수락 · ${when}`, "#/rent", me.id);
+    await notify(env, [req.user_id], "rent", `${itemLabel(item)} 신청 수락 · ${when}`, "#/rent?v=apps", me.id);
     return json({ ok: true });
   }
 
   if (b.action === "reject") {
     await env.DB.batch([env.DB.prepare("UPDATE rental_requests SET status = 'no', done_at = ?, done_by = ? WHERE id = ?").bind(now, me.id, rid), ...touch]);
-    await notify(env, [req.user_id], "rent", `${itemLabel(item)} 신청이 거절됐어요`, "#/rent", me.id);
+    await notify(env, [req.user_id], "rent", `${itemLabel(item)} 신청이 거절됐어요`, "#/rent?v=apps", me.id);
     return json({ ok: true });
   }
 
@@ -75,7 +75,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
       ...(useDia > 0
         ? [
             env.DB.prepare("INSERT INTO rental_mileage (who, delta, gold, reason, item_id, note, by_user, created_at) VALUES (?, ?, ?, 'rent', ?, ?, ?, ?)").bind(
-              req.user_id, -useDia, gold, item.id, `${itemLabel(item)} 대여 보증금`, me.id, now,
+              req.user_id, -useDia, gold, item.id, itemLabel(item), me.id, now,
             ),
           ]
         : []),
@@ -84,7 +84,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     const days = TERM_DAYS[item.term];
     const tail = !days || !due ? "기한 없음" : next?.n ? `다음 신청이 있어서 ${md(due)}에 대여 담당자에게 돌려주세요` : `기한 ${md(due)} · 다음 신청이 없으면 계속 써요`;
     const deposit = [useDia ? `마일리지 💎${useDia}` : "", gold ? `골드 ${manText(gold)}` : ""].filter(Boolean).join(" + ") || "없음";
-    await notify(env, [req.user_id], "rent", `${itemLabel(item)} 대여 완료 · 보증금 ${deposit} (반납하면 돌려받아요) · ${tail}`, "#/rent", me.id);
+    await notify(env, [req.user_id], "rent", `${itemLabel(item)} 대여 완료 · 보증금 ${deposit} (반납하면 돌려받아요) · ${tail}`, "#/rent?v=apps", me.id);
     return json({ ok: true, dueAt: due });
   }
 

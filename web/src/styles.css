@@ -1969,9 +1969,32 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .rent-return p { margin: 0; font-size: 12px; }
 .rent-form .pill-row { margin-bottom: 0; }
 .rent-paste { height: 120px; padding: 8px 10px; font-size: 13px; line-height: 1.4; resize: vertical; }
-.rent-balances { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
-.rent-balance { width: 100%; display: flex; justify-content: space-between; padding: 5px 8px; font-size: 13px; color: var(--text); background: var(--night-2); border: 1px solid var(--edge); cursor: pointer; }
-.rent-balance b { color: #7fd8ff; font-weight: 400; }
+/* 장비반납 칸 (운영, 제작자 요청 2026-11-02): 빌려 간 무기 한 줄씩, 오른쪽 '반납' */
+.rent-backs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.rent-back { padding: 5px 7px; background: var(--night-2); border: 1px solid var(--edge); }
+.rent-back-late { border-color: #e63946; }
+.rent-back-top { display: flex; align-items: center; gap: 6px; }
+.rent-back-top .rent-nm { flex: 1; min-width: 0; font-size: 13px; }
+.rent-back-who { font-weight: 400; font-size: 13px; color: #ffd166; white-space: nowrap; }
+.rent-back-top .pill { flex: none; padding: 3px 12px; }
+.rent-back-info { margin: 3px 0 0 30px; font-size: 11px; color: var(--muted); }
+/* 기부 현황 (운영, 제작자 요청 2026-11-02 '기부 현황을 보는 게 메인'): 합계 줄, 사람마다 한 줄 (누르면 기부한 무기와 장부) */
+.rent-don-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-size: 12px; color: var(--muted); }
+.rent-don-head b { color: var(--text); font-weight: 400; }
+.rent-don-head .pill { flex: none; padding: 4px 12px; }
+.rent-don-form { margin-bottom: 8px; padding: 8px; background: var(--night-2); border: 1px solid var(--edge); }
+.rent-don-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.rent-don-row {
+  width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 8px; padding: 6px 8px;
+  text-align: left; color: var(--text); background: var(--night-2); border: 1px solid var(--edge); cursor: pointer;
+}
+.rent-don-name { font-size: 13px; }
+.rent-don-row small { font-size: 11px; color: var(--muted); }
+.rent-don-left { font-weight: 400; font-size: 13px; color: #7fd8ff; }
+.rent-don-open > .rent-don-row { border-color: #6fb6ff; }
+.rent-don-detail { padding: 6px 4px 8px; display: grid; gap: 6px; }
+.rent-don-items { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; }
+.rent-don-item { display: inline-flex; align-items: center; gap: 3px; }
 .rent-view { display: flex; flex-direction: column; gap: 4px; }
 .rent-ledger { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 12px; }
 .rent-ledger li { display: flex; gap: 8px; align-items: baseline; }
@@ -1980,3 +2003,8 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .rent-plus { color: #7fe0a0; }
 .rent-minus { color: #ff8fa3; }
 
+
+/* 단추 안의 새 것 수 (ui.tsx NewsDot, 제작자 요청 2026-11-02: 홈 칸의 숫자가 안의 어느 단추에서 왔는지). 단추 오른쪽 위 안쪽에 */
+.main-tab, .mk-tab, .rent-views .pill, .pill-row .pill, .soon-fold { position: relative; }
+.in-news { position: absolute; z-index: 3; top: 2px; right: 2px; pointer-events: none; }
+.soon-fold .in-news { position: static; display: inline-block; margin-left: 6px; vertical-align: 1px; }
