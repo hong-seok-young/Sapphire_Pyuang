@@ -25,7 +25,7 @@ function Tiles({ me, tiles, editable = false, dragKey }: { me: Me; tiles: Launch
   return (
     <nav className="tiles" {...(editable ? { "data-zone": "grid" } : {})}>
       {tiles.map((t) => {
-        // 고친 메뉴: 다른 색 테두리와 'UPDATE' (처음 들어간 뒤 하루 동안, updates.ts). '정보'는 안의 메뉴가 고쳐졌을 때도
+        // 고친 메뉴: 다른 색 테두리와 'UPDATE' (그 메뉴에 처음 들어가면 사라진다, updates.ts). '정보'는 안의 메뉴가 고쳐졌을 때도
         const updated = isUpdated(me.id, t);
         // 개발 중인 칸: 길드원은 못 들어가고 앱개발자는 들어간다 (표시는 같이 보인다)
         const locked = isLocked(t, me);

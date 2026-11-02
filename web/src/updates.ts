@@ -1,5 +1,5 @@
 // 메뉴 업데이트 표 (제작자 요청): 고친 메뉴는 홈 칸에 'UPDATE' 표와 다른 색 테두리를 단다.
-// 그 사람이 업데이트 뒤 처음 그 메뉴에 들어간 때부터 하루 동안 보이고 사라진다. 안 들어가도 7일이 지나면 사라진다.
+// 그 사람이 업데이트 뒤 그 메뉴에 처음 들어가면 바로 사라진다 (제작자 요청 2026-11-02, 예전에는 하루 동안). 안 들어가도 7일이 지나면 사라진다.
 // 들어간 때는 그 기기에 계정별로 적어 둔다 (localStorage, 못 쓰면 표만 계속 보인다).
 // 메뉴를 고쳐서 올릴 때마다 여기 그 메뉴의 시각을 바꾼다 (홈 칸의 주소 그대로, 한국 시간).
 // 2026-11-01 정식 오픈 v1.0 때 모두 비웠다 (제작자 요청: 오픈하면 업데이트 표시는 다 지우기). 그 뒤 고친 메뉴만 다시 넣는다.
@@ -23,12 +23,11 @@ function load(user: string): Record<string, Seen> {
   }
 }
 
-/** 홈 칸에 'UPDATE' 를 달지: 업데이트 뒤 아직 안 들어갔거나, 처음 들어간 지 하루가 안 됐으면 */
+/** 홈 칸에 'UPDATE' 를 달지: 업데이트 뒤 아직 그 메뉴에 안 들어갔으면 */
 export function showUpdate(user: string, to: string, now = Date.now()): boolean {
   const stamp = MENU_UPDATES[to];
   if (!stamp || now - Date.parse(stamp) > SHOW_DAYS * DAY) return false;
-  const seen = load(user)[to];
-  return !seen || seen.stamp !== stamp || now - seen.at < DAY;
+  return load(user)[to]?.stamp !== stamp;
 }
 
 /** 지금 들어간 화면이 업데이트된 메뉴면 처음 들어간 때를 적는다 (이미 적었으면 그대로) */
