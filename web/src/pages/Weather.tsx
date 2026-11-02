@@ -173,8 +173,11 @@ export function WeatherFx({ sky }: { sky: Sky }) {
  * 제작자 2026-11-02), 켜면 아래 가운데 작은 날씨 표('🌧️ 비 12°')와 효과. 못 받았으면 '위치를 못 받았어요 ↻' / '날씨 연결이 안 돼요 ↻',
  * 누르면 다시 받는다. 초안이라 앱개발자와 테스트 계정만 (WEATHER_OPEN). 그동안 날씨 표를 누르면 효과를 하나씩 미리 본다 (마지막 다음은 실제 날씨)
  */
+/** 날씨 기능을 쓰는 사람 (초안: 앱개발자와 테스트 계정, 열면 모두) */
+export const canUseWeather = (me: Me) => WEATHER_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
+
 export function HomeWeather({ me }: { me: Me }) {
-  const allowed = WEATHER_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
+  const allowed = canUseWeather(me);
   const wx = useWeather(allowed);
   const [preview, setPreview] = useState<number>(-1);
   if (!allowed) return null;

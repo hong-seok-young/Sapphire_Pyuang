@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { KakaoButton, KakaoField, useKakao } from "../kakao";
 import type { FormEvent, ReactNode } from "react";
 import {
@@ -10,6 +10,9 @@ import { JobEmblem, JobGlyph } from "../emblems";
 import { ChangeAsk, HeroTitle, TopBar } from "../ui";
 import { AvatarMaker } from "./AvatarMaker";
 import { useBackToLogin } from "./Login";
+import { canUseWeather } from "./Weather";
+import { SKY_NAME, WxError, disableWeather, enableWeather, isDenied, loadWeather, permission, weatherOn } from "../weather";
+import type { Weather } from "../weather";
 import { goCharacter, refreshMe } from "../characters";
 
 /** "12.345" -> 12345, 비었으면 null, 틀렸으면 undefined */
@@ -196,7 +199,7 @@ export function ProfileSetupPage({
   );
 }
 
-type MenuKey = "info" | "photo" | "chars" | "rename" | "kakao" | "test";
+type MenuKey = "info" | "photo" | "chars" | "rename" | "kakao" | "weather" | "test";
 
 /** 펼치는 줄의 오른쪽 꺾쇠 (이모지·글자 대신 선으로 그린다, 펼치면 아래로) */
 const Chevron = () => <span className="me-chev" aria-hidden />;
@@ -247,6 +250,7 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
   const [saved, setSaved] = useState(false);
   const [open, setOpen] = useState<MenuKey | null>(null);
   const { links } = useKakao();
+  const [wxOn, setWxOn] = useState(weatherOn);
   const row = (k: MenuKey) => ({ open: open === k, onToggle: () => setOpen((o) => (o === k ? null : k)) });
   // 직책은 지금 캐릭터의 것 (me.role 은 묶은 캐릭터 중 가장 높은 권한)
   const myRole = me.characters?.find((c) => c.id === me.id)?.role ?? me.role;
@@ -330,14 +334,18 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
         {/* 카톡 오픈프로필 링크 (제작자 요청 2026-11-02): 장비대여·중개인·의뢰소에서 이름 옆 '카톡' 단추로 열린다 */}
         <MeRow label="카톡 오픈프로필" value={links[me.id] ? "등록됨" : "없음"} {...row("kakao")}>
           <KakaoField name={me.id} />
-          <p className="me-hint">
-            중개인·의뢰소·장비대여에서 내 이름 옆에 보여요{" "}
-            <span className="me-kakao-demo">
-              {me.id} {links[me.id] ? <KakaoButton name={me.id} /> : <span className="kakao-btn">카톡</span>}
-            </span>
-          </p>
+          <KakaoWhere me={me} link={!!links[me.id]} />
         </MeRow>
       </MeGroup>
+
+      {/* 날씨 반영 (제작자 요청 2026-11-02 '내 정보에서 위치 허용하게, 날씨 반영된다고'). 날씨가 초안인 동안은 쓰는 사람에게만 (canUseWeather) */}
+      {canUseWeather(me) && (
+        <MeGroup title="앱 설정">
+          <MeRow label="날씨 반영" value={wxOn ? "켜짐" : "꺼짐"} {...row("weather")}>
+            <WeatherBody on={wxOn} onChange={setWxOn} />
+          </MeRow>
+        </MeGroup>
+      )}
 
       {/* 앱개발자만: 테스트 계정으로 바꿔서 상대방 쪽 화면과 알림을 혼자 시험한다 (제작자 요청) */}
       {me.role === "developer" && (
@@ -372,6 +380,100 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
       >
         로그아웃
       </button>
+    </>
+  );
+}
+
+/**
+ * 카톡 오픈프로필 단추가 다른 길드원 화면에서 실제로 어떻게 보이는지 (제작자 요청 2026-11-02: '그게 보이는 메뉴에서 실제로 그 화면에서 어케 보이는지').
+ * 그 화면들의 줄을 같은 모양(.mk-meta, .rent-app-head)으로 작게 그린다. 저장해 두었으면 단추를 눌러 열어 본다
+ */
+function KakaoWhere({ me, link }: { me: Me; link: boolean }) {
+  const btn = link ? <KakaoButton name={me.id} /> : <span className="kakao-btn kakao-btn-off">카톡</span>;
+  return (
+    <div className="me-kw">
+      <p className="me-kw-head">{link ? "다른 길드원 화면에서 이렇게 보여요" : "링크를 저장하면 이렇게 보여요"}</p>
+      <div className="me-kw-card">
+        <small className="me-kw-where">중개인 · 내 물건 정보창</small>
+        <p className="mk-meta">
+          {me.id} {btn} · 3분 전 올림
+        </p>
+      </div>
+      <div className="me-kw-card">
+        <small className="me-kw-where">의뢰소 · 내가 올린 의뢰</small>
+        <p className="mk-meta">
+          {me.id} {btn} · 1시간 전 의뢰
+        </p>
+      </div>
+      <div className="me-kw-card">
+        <small className="me-kw-where">장비대여 · 운영진이 보는 내 신청서와 반납</small>
+        <div className="rent-app-head">
+          <b>{me.id}</b>
+          {btn}
+          <small>11/2 21:40</small>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 날씨 반영 켜기·끄기: 켜면 폰이 위치 허락을 묻고, 우리 동네 날씨가 홈 화면에 반영된다 (pages/Weather.tsx, src/weather.ts) */
+function WeatherBody({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [now, setNow] = useState<Weather | null>(null);
+  const [note, setNote] = useState("");
+  const [blocked, setBlocked] = useState(false);
+  useEffect(() => {
+    void permission().then((p) => setBlocked(p === "denied"));
+    if (on) loadWeather().then(setNow, () => undefined);
+  }, [on]);
+  async function enable() {
+    setBusy(true);
+    setNote("");
+    try {
+      setNow(await enableWeather());
+      onChange(true);
+    } catch (e) {
+      if (isDenied(e)) {
+        setBlocked(true);
+        onChange(false);
+      } else {
+        // 위치나 날씨 서버가 잠깐 안 되는 것: 켜 둔 채로 두면 홈이 다시 받는다
+        onChange(true);
+        setNote(e instanceof WxError && e.kind === "net" ? "날씨 연결이 안 돼요. 홈에서 다시 받아요." : "위치를 못 받았어요. 홈에서 다시 받아요.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      <p className="me-hint me-hint-top">위치를 허용하면 우리 동네 날씨(비·눈·천둥)가 홈 화면에 반영돼요.</p>
+      {on && now && (
+        <p className="me-wx-now">
+          지금 <b>{SKY_NAME[now.sky]}</b>
+          {now.temp !== null && ` ${now.temp}°`}
+        </p>
+      )}
+      {blocked && !on && <p className="form-error">위치가 막혀 있어요. 브라우저 설정에서 이 사이트의 위치를 허용해 주세요.</p>}
+      {note && <p className="form-note">{note}</p>}
+      {on ? (
+        <button
+          className="btn btn-ghost me-wide"
+          onClick={() => {
+            disableWeather();
+            onChange(false);
+            setNow(null);
+          }}
+        >
+          끄기
+        </button>
+      ) : (
+        <button className="btn me-wide" disabled={busy} onClick={() => void enable()}>
+          {busy ? "위치 받는 중…" : "위치 허용"}
+        </button>
+      )}
+      <p className="me-hint">위치는 날씨를 묻는 데만 쓰고 서버에 저장하지 않아요.</p>
     </>
   );
 }

@@ -81,7 +81,7 @@ export class WxError extends Error {
 }
 
 /** 위치 거절 (폰이 묻는 창에서 '차단' 또는 브라우저 설정에서 막힘) */
-const isDenied = (e: unknown) => typeof e === "object" && e !== null && !(e instanceof WxError) && (e as GeolocationPositionError).code === 1;
+export const isDenied = (e: unknown) => typeof e === "object" && e !== null && !(e instanceof WxError) && (e as GeolocationPositionError).code === 1;
 
 type Pos = { lat: number; lon: number };
 const round = (v: number) => Math.round(v * 100) / 100;
@@ -182,7 +182,7 @@ export async function loadWeather(force = false): Promise<Weather> {
 }
 
 /** 폰이 위치를 이미 허락했는지 ('granted' | 'denied' | 'prompt', 모르면 null: 아이폰 예전 사파리 등) */
-async function permission(): Promise<PermissionState | null> {
+export async function permission(): Promise<PermissionState | null> {
   try {
     const p = await navigator.permissions?.query({ name: "geolocation" as PermissionName });
     return p?.state ?? null;
@@ -190,6 +190,20 @@ async function permission(): Promise<PermissionState | null> {
     return null;
   }
 }
+
+/** 내 정보의 '날씨 반영' (제작자 요청 2026-11-02 '내 정보에서 위치 허용하게, 날씨 반영된다고'): 켜 두었는지 */
+export const weatherOn = () => read(PREF) === "1";
+/** 켜기: 여기서 폰이 위치 허락을 묻는다. 거절하면 꺼 둔다 (홈 카드의 '켜기'와 같다) */
+export async function enableWeather(): Promise<Weather> {
+  write(PREF, "1");
+  try {
+    return await loadWeather(true);
+  } catch (e) {
+    if (isDenied(e)) write(PREF, "0");
+    throw e;
+  }
+}
+export const disableWeather = () => write(PREF, "0");
 
 export type WxState =
   | { status: "off" }

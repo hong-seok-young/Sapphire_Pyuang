@@ -448,7 +448,16 @@ button { font: inherit; color: inherit; }
 .me-row-body > .me-pills:first-child { margin-top: 0; }
 .me-row-body > .me-pills:last-child { margin-bottom: 0; }
 .me-hint { margin: 10px 0 0; font-size: 12px; line-height: 1.8; color: var(--muted); }
-.me-kakao-demo { display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; color: var(--text); background: var(--night-2); white-space: nowrap; }
+.me-hint-top { margin: 0 0 10px; }
+.me-wx-now { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
+.me-wx-now b { font-weight: 400; color: var(--gold); }
+/* 카톡 단추가 다른 길드원 화면에서 보이는 모양 (KakaoWhere): 그 화면의 줄을 작은 카드로 */
+.me-kw { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin-top: 12px; }
+.me-kw-head { margin: 0; font-size: 12px; color: var(--muted); }
+.me-kw-card { display: grid; gap: 4px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--edge); box-shadow: inset 1px 1px 0 var(--hi); }
+.me-kw-where { font-size: 10px; letter-spacing: 0.5px; color: var(--gold); opacity: 0.85; }
+.me-kw-card .mk-meta { font-size: 12px; }
+.kakao-btn-off { opacity: 0.55; }
 .me-logout { display: block; width: 100%; margin-top: 18px; color: #ff8fa3; }
 .account-sub { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 12px; }
 .account .profile-form { margin-top: 10px; }
