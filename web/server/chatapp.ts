@@ -7,6 +7,9 @@
 // - 오피서 이상: 비밀번호 바꾸기 전 ('길드원 관리'에서 보이는 값)
 // - 앱개발자만: 사용 기록(접속, 화면, 한 일, IP, 위치, 기기), 챗봇 개선 목록과 오늘 질문 수.
 //   사용 기록은 앱개발자만 보는 기능이라 (CLAUDE.md '사용 기록') 다른 사람의 질문에는 붙이지 않는다
+// - 내 정보 (늘, 2026-11-02 제작자 요청: '내가 지금 할 것' 치면 내 레벨, 직업 등 내 데이터를 다 읽고): 캐릭터, 묶은 캐릭터, 순위, 알림 수,
+//   중개인·골드·의뢰소·상점에서 내가 한 것, 장비대여 내 것 (server/chatmine.ts). 아이모 소식(진행 중 이벤트, 점검)도 늘 짧게
+// - 장비대여와 To do 는 개발 중이라 미리 보는 사람(운영진, 앱개발자, 테스트 계정)에게만
 // 칸마다 글자 수를 정해 두어 질문이 너무 길어지지 않게 한다.
 import { RANK, TEST_IDS } from "./auth";
 import type { Env, Guild, Job, Role, User } from "./auth";
@@ -17,11 +20,12 @@ import type { Period } from "./growth";
 import { ACCEPT_MS } from "./requests";
 import { weekStart } from "./week";
 import { TODO_OPEN, doneKeys, eventTasks, todoExtras } from "./todo";
+import { ASK_MORE, mineExtras, newsNow, shopCatalog } from "./chatmine";
 
 /** To do 를 길드원에게 열었는지 (지금은 개발 중이라 앱개발자만, 제작자 요청 2026-11-01. 열 때 true 와 챗봇 안내 줄, src/launcher.ts) */
 
-/** 길드 앱 자료 전체 글자 수 */
-export const MAX_APP = 24000;
+/** 길드 앱 자료 전체 글자 수 (내 정보, 아이모 소식, 장비대여를 더해 늘렸다. 2026-11-02) */
+export const MAX_APP = 36000;
 const KST = 9 * 3_600_000;
 const DAY = 86_400_000;
 const JOB: Record<Job, string> = { warrior: "전사", ranger: "레인저", mage: "마법사", monk: "무도가" };
@@ -100,7 +104,7 @@ function optionsText(raw: string | null): string {
 }
 
 /** 이 질문(앞 질문 포함)에 붙일 길드 앱 자료. 묻는 사람(me)이 앱에서 볼 수 있는 것만 */
-export async function appContext(env: Env, me: User, question: string, now = Date.now()): Promise<string> {
+export async function appContext(env: Env, me: User, question: string, now = Date.now(), request?: Request): Promise<string> {
   const officer = RANK[me.role] >= 1;
   const dev = me.role === "developer";
   const q = question;
@@ -201,6 +205,33 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
     parts.push(`[물어본 길드원: ${id}] 이 길드의 길드원(게임 닉네임)이다. ${facts.join(" · ")}`);
   }
 
+  // ---------- 내 정보 (늘): '나', '내'는 이 사람. '내가 지금 할 것' 같은 질문은 이 값으로 답한다 ----------
+  const owner = me.owner ?? me.id;
+  const chars = people
+    .filter((p) => (p.main_id ?? p.id) === owner)
+    .map((p) => ({ id: p.id, main: !p.main_id, job: p.job, level: p.level }));
+  const extra = await mineExtras(env, me, q, chars, mentioned, now).catch((e) => {
+    console.error("chat mine failed", e);
+    return { me: [] as string[], parts: [] as string[] };
+  });
+  {
+    const lines: string[] = [];
+    if (meP?.level)
+      lines.push(
+        [
+          `캐릭터: ${me.id} · ${meP.guild ? GUILD[meP.guild] : "길드 안 정함"} · ${ROLE[me.role] ?? "길드원"}${dev ? " (이 앱의 앱개발자)" : ""} · ${JOB[meP.job as Job]} Lv.${meP.level} ${expText(meP.exp)}`,
+          `레벨 랭킹 통합 ${rankIn(ranked, me.id)}위${meP.guild ? `, ${meP.guild === "main" ? "1군" : "2군"} ${rankIn(byGuild(meP.guild), me.id)}위` : ""}`,
+          meP.high_spec ? "고스펙" : "",
+          meP.prev_level !== null && meP.prev_level < meP.level && meP.level_at !== null && meP.level_at >= week ? `이번 주 Lv.${meP.prev_level}→${meP.level}` : "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      );
+    else lines.push(`캐릭터: ${me.id} · 직업·레벨을 아직 안 정함 ('내 정보'에서 정한다)`);
+    lines.push(...extra.me);
+    parts.push(section(`내 정보: 묻는 사람 ${me.id} (질문의 '나', '내', '제'는 이 사람. 레벨·직업을 안 말해도 이 값으로 답한다)`, lines, 2500));
+  }
+
   // ---------- 성장 랭킹 ----------
   if (ASK.growth.test(q) || mentioned.length) {
     const periods: [Period, string][] = [["week", "이번 주(목요일 오전 10시부터)"]];
@@ -252,6 +283,19 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
       return `#${l.id} ${what} · ${price} · 판매 ${l.seller}${l.wants ? ` · 살래요 ${l.wants}명` : ""}${l.talk ? ` · 토론방 글 ${l.talk}` : ""}${l.note ? ` · 한마디 "${oneLine(l.note)}"` : ""}${optionsText(l.options)}${mine.has(l.id) ? ` · ${mine.get(l.id)}` : ""}${own} · ${when(l.created_at)} 올림`;
     });
     parts.push(section(`사파이어 중개인: 판매 중 ${listings.length}개 (새 글 먼저, 골드 시세 1만 원 = ${Math.round(rate)}만 골드). 살래요·입찰한 사람과 흥정 가격은 판 사람만 본다`, lines, 6000));
+    // 질문에 이름이 나온 물건의 종목 토론방 (모든 길드원이 본다)
+    for (const l of listings.filter((x) => x.talk && x.item.length >= 2 && q.includes(x.item)).slice(0, 2)) {
+      const { results } = await env.DB.prepare("SELECT user_id, parent_id, text, created_at FROM listing_talk WHERE listing_id = ? ORDER BY id DESC LIMIT 20")
+        .bind(l.id)
+        .all<{ user_id: string; parent_id: number | null; text: string; created_at: number }>();
+      parts.push(
+        section(
+          `중개인 #${l.id} ${l.item} 토론방 (최근 글)`,
+          results.reverse().map((t) => `${t.parent_id ? "  └ " : ""}${t.user_id}${t.user_id === l.seller ? "(판매자)" : ""}: ${oneLine(t.text)} (${when(t.created_at)})`),
+          1500,
+        ),
+      );
+    }
   }
 
   // ---------- 골드 거래 ----------
@@ -300,10 +344,31 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
     );
     parts.push(section("게시판: 고정 글과 최근 글", lines, 4000));
   }
+  // 질문이 가리키는 글 (제목 낱말이 둘 넘게 맞거나 '#번호'): 본문과 댓글까지 (게시판은 모든 길드원이 본다)
+  {
+    const words = (t: string) => t.split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 2);
+    const hit = posts
+      .map((p) => ({ p, n: q.includes(`#${p.id}`) ? 9 : words(p.title).filter((w) => q.includes(w)).length }))
+      .filter((x) => x.n >= 2)
+      .sort((a, b) => b.n - a.n)
+      .slice(0, 2)
+      .map((x) => x.p);
+    for (const p of hit) {
+      const [bodyR, commentsR] = await env.DB.batch([
+        env.DB.prepare("SELECT substr(body, 1, 2500) AS body FROM board_posts WHERE id = ?").bind(p.id),
+        env.DB.prepare("SELECT user_id, parent_id, text, created_at FROM board_comments WHERE post_id = ? ORDER BY id LIMIT 40").bind(p.id),
+      ]);
+      const body = (bodyR.results[0] as { body: string } | undefined)?.body ?? "";
+      const comments = (commentsR.results as { user_id: string; parent_id: number | null; text: string; created_at: number }[]).map(
+        (c) => `${c.parent_id ? "  └ 답글 " : "댓글 "}${c.user_id}: ${oneLine(c.text).slice(0, 200)} (${when(c.created_at)})`,
+      );
+      parts.push(section(`게시판 글 #${p.id} "${oneLine(p.title)}" (${p.author}) 본문과 댓글`, [body, ...comments], 3500));
+    }
+  }
 
   // ---------- 플래티넘 상점 ----------
   const plat = platR.results[0] as { ratio: number; high_ratio: number; market: number; open: number; week_plat: number; high_week_plat: number } | undefined;
-  if (plat && ASK.shop.test(q) && (plat.open || officer)) {
+  if (plat && (ASK.shop.test(q) || ASK_MORE.shop.test(q)) && (plat.open || officer)) {
     const lines = [
       `${plat.open ? "열려 있음" : "아직 오픈 전 (운영진만 들어감)"} · 1군 전용. 비율은 플래티넘 100당 몇 만 골드: 1군 할인 ${plat.ratio}, 고스펙 할인 ${plat.high_ratio}, 시중 ${plat.market}`,
       `매주 목요일 오전 10시에 1군 한 사람에게 가상 플래티넘 ${plat.week_plat} (고스펙 ${plat.high_week_plat}) 지급, 안 쓴 것은 쌓인다. 구매 신청하면 플래티넘이 빠지고, 게임 안에서 할인된 골드를 내고 거래한다`,
@@ -317,10 +382,17 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
         : []),
     ];
     parts.push(section("플래티넘 할인 상점", lines, 2000));
+    if (request)
+      parts.push(
+        await shopCatalog(env, request, me, meP?.guild === "main", !!meP?.high_spec, now).catch((e) => {
+          console.error("chat shop catalog failed", e);
+          return "";
+        }),
+      );
   }
 
   // ---------- To do (홈 'To do' 화면과 같은 값: 이 사람의 레벨·직업에 맞는 할 일과 이번 주기에 체크한 것) ----------
-  if (ASK.todo.test(q) && (TODO_OPEN || officer || TEST_IDS.includes(me.id))) {
+  if ((ASK.todo.test(q) || ASK_MORE.doNow.test(q)) && (TODO_OPEN || officer || TEST_IDS.includes(me.id))) {
     const mine = people.find((p) => p.id === me.id);
     const [all, done, extras] = await Promise.all([
       eventTasks(env, { job: mine?.job ?? null, level: mine?.level ?? null }, now),
@@ -371,6 +443,28 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
     parts.push(section("앱개발자 전용: 챗봇 개선 목록 (아직 안 고친 것)", gaps.length ? gaps : ["없음"], 2000));
     parts.push(`[앱개발자 전용: 오늘 챗봇 질문 수] ${usage || "아직 없음"}`);
   }
+
+  // ---------- 내가 한 것 (늘): 중개인, 골드, 의뢰소, 상점 신청 ----------
+  {
+    const lines: string[] = [];
+    const selling = listings.filter((l) => l.seller === me.id);
+    if (selling.length) lines.push(`중개인에 파는 것: ${selling.map((l) => `${l.item}${l.enhance ? ` +${l.enhance}` : ""} ${l.mode === "auction" ? `경매 ${l.top_bid ? `최고가 ${gold(l.top_bid)}` : "입찰 없음"}` : gold(l.price)}${l.wants ? ` 살래요 ${l.wants}명` : ""}`).join(", ")}`);
+    const wanted = (myWantsR.results as { listing_id: number }[]).length;
+    if (wanted) lines.push(`중개인에서 내가 살래요·입찰한 물건 ${wanted}개`);
+    const myGold = goldOffers.filter((o) => o.owner === me.id);
+    if (myGold.length) lines.push(`골드 거래 내 글: ${myGold.map((o) => `${o.side === "sell" ? "팝니다" : "삽니다"} ${o.gold.toLocaleString("ko-KR")}만${o.wants ? ` (${o.wants}명)` : ""}`).join(", ")}`);
+    const myReqs = reqs.filter((r) => r.owner === me.id);
+    if (myReqs.length) lines.push(`의뢰소 내 의뢰: ${myReqs.map((r) => `${oneLine(r.title)} (${r.status === "accepted" ? `수락 ${r.accepter}` : "모집 중"})`).join(", ")}`);
+    const took = reqs.filter((r) => r.accepter === me.id && r.status === "accepted");
+    if (took.length) lines.push(`의뢰소 내가 수락한 의뢰 (수락하고 이틀 안에 끝내야 한다): ${took.map((r) => `${oneLine(r.title)} (의뢰 ${r.owner}, ${when((r.accepted_at ?? 0) + ACCEPT_MS)}까지)`).join(", ")}`);
+    const orders = (myOrdersR.results as { item_name: string; status: string }[]).filter((o) => o.status === "requested");
+    if (orders.length) lines.push(`플래티넘 상점 거래 기다리는 신청: ${orders.map((o) => o.item_name).join(", ")}`);
+    if (lines.length) parts.push(section(`${me.id}가 앱에서 한 것 (진행 중)`, lines, 1500));
+  }
+
+  // ---------- 아이모 소식 지금 (늘), 장비대여·알림·기록 등 (server/chatmine.ts) ----------
+  parts.push(await newsNow(env, now).catch(() => ""));
+  parts.push(...extra.parts);
 
   // ---------- 길드원 명단 (늘) ----------
   const lines = ranked.map((p, i) => {

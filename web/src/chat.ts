@@ -6,6 +6,7 @@ import { search } from "./search";
 import { levelText } from "./ui";
 import { matchedSections, oddsName } from "./odds";
 import type { Odds } from "./odds";
+import { PATCHES } from "./patchnotes";
 
 export interface ChatImage {
   type: string;
@@ -126,6 +127,9 @@ function words(q: string): string[] {
 /** 묻는 말 (본문 찾기에 쓰지 않는다): '어디서', '사냥해', '추천해줘', '뭐가' ... */
 const ASK_WORD = /^(어디|어디서|어디가|어떻게|어떤|무엇|뭐|뭐가|뭘|언제|누가|왜|좋은|좋아|추천|가면|사냥|사냥해|사냥하|사냥터|해야|해줘|알려|알려줘|있어|있나|있나요|되나|되나요|할까|하나요|가요|해요|돼|좀|지금|이제|그럼|이거|저거|이건|나|내|제)$|(해|해요|해줘|할까|하나|하나요|나요|까요|줘|요)$/;
 
+/** 자기 캐릭터를 묻는 말 ('내가 지금 할 것', '나 뭐 해', '내 렙에 맞는 사냥터', '추천') */
+const ABOUT_ME = /(^|[\s,.])(나|내|난|내가|제가|저|전|제)(는|가|한테|에게|게)?(\s|$)|내 ?(렙|레벨|직업|캐릭|장비|스펙)|할 ?것|할 ?거|해야|뭐 ?(하|해|할)|뭘 ?(하|해|할)|추천|다음 ?(목표|단계)|어디서 ?사냥|사냥 ?어디/;
+
 /** 사냥터, 장비, 육성을 묻는 말. 이런 질문에서는 홀로 선 숫자를 레벨로 본다 */
 const HUNT_WORD = /사냥|어디|렙업|레벨업|육성|장비|세팅|추천|스킬|퀘스트|전사|레인저|마법사|무도가|법사|궁수/;
 
@@ -203,8 +207,10 @@ export function wikiContext(
   };
   const askedLevel = levelOf(question);
   const askedJob = jobOf(question);
-  const level = askedLevel ?? (photo ? (seen?.level ?? asker?.level ?? null) : null);
-  const job = askedJob ?? (photo ? (seen?.job ?? asker?.job ?? null) : askedLevel !== null ? (asker?.job ?? null) : null);
+  // '내가 지금 할 것', '나 어디서 사냥해' 처럼 자기를 물으면 레벨·직업을 안 말해도 물은 사람의 값으로 고른다 (제작자 요청 2026-11-02)
+  const aboutMe = ABOUT_ME.test(question);
+  const level = askedLevel ?? (photo ? (seen?.level ?? asker?.level ?? null) : aboutMe ? (asker?.level ?? null) : null);
+  const job = askedJob ?? (photo ? (seen?.job ?? asker?.job ?? null) : askedLevel !== null || aboutMe ? (asker?.job ?? null) : null);
   if (asker?.job || asker?.level) add(`[물은 사람] ${[asker.job, asker.level && `Lv.${asker.level}`].filter(Boolean).join(" ")} (길드원이 스스로 적은 값)`);
   if (seen) {
     const who = [seen.job, seen.level && `Lv.${seen.level}`].filter(Boolean).join(" ");
@@ -420,6 +426,12 @@ export function wikiContext(
         add(`[${t.title} 중에서]\n` + around);
       }
     }
+  }
+
+  // 3-2. 길드 앱 패치 내역 (홈 'v1.0' 을 누르면 보이는 화면과 같다. 2026-11-02 제작자 요청: 웹에서 볼 수 있는 모든 정보를 챗봇이)
+  if (/패치 ?내역|앱 ?(업데이트|패치|버전)|새 ?기능|새로 ?생긴|바뀐 ?(거|것|점)|v\d+\.\d+/i.test(question)) {
+    found.push("패치 내역");
+    add("[길드 앱 패치 내역 (새 버전 먼저)]\n" + PATCHES.slice(0, 4).map((p) => `v${p.version} (${p.date})\n` + p.items.map((i) => `- ${i}`).join("\n")).join("\n"));
   }
 
   // 4. 위키 메뉴 이름 (답에서 [[메뉴:이름]] 으로 보낼 수 있게)
