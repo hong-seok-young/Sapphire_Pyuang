@@ -124,3 +124,64 @@ export function checkItem(b: Record<string, unknown>): { error: string } | { ite
   if (options.length > 30 || donor.length > 20 || note.length > 100) return { error: "글이 너무 길어요" };
   return { item: { job, level, weapon, options, enhance, term, price, donor: donor || null, note: note || null } };
 }
+
+/** 물건 고치기·더하기의 기부 마일리지 💎 (0 이면 적립 없음). 맞지 않으면 null */
+export function donorDiaOf(b: Record<string, unknown>): number | null {
+  const v = b.donorDia === undefined || b.donorDia === null || b.donorDia === "" ? 0 : Number(b.donorDia);
+  return Number.isInteger(v) && v >= 0 && v <= 9999 ? v : null;
+}
+
+/** 물건마다 그 물건으로 기부 적립한 💎 (장부 rental_mileage 의 reason 'donate', item_id), 사람마다 */
+export async function donations(env: Env, itemIds?: number[]): Promise<Map<number, Map<string, number>>> {
+  const where = itemIds ? ` AND item_id IN (${itemIds.map(() => "?").join(",") || "NULL"})` : " AND item_id IS NOT NULL";
+  const { results } = await env.DB.prepare(`SELECT item_id, who, SUM(delta) AS n FROM rental_mileage WHERE reason = 'donate'${where} GROUP BY item_id, who`)
+    .bind(...(itemIds ?? []))
+    .all<{ item_id: number; who: string; n: number }>();
+  const out = new Map<number, Map<string, number>>();
+  for (const r of results) {
+    if (!out.has(r.item_id)) out.set(r.item_id, new Map());
+    out.get(r.item_id)!.set(r.who, r.n);
+  }
+  return out;
+}
+
+/**
+ * 기부 마일리지를 정한다 (제작자 요청 2026-11-02: 장비를 기부하면 대여 담당이 '이 장비는 몇 마일리지'라고 적고, 기부자에게 쌓인다).
+ * 그 물건으로 이미 적립한 만큼과 견주어 차이만 장부에 더한다. 기부자를 바꾸면 예전 기부자 몫을 빼고 새 기부자에게 넣는다.
+ * 빼서 남는 마일리지가 0 아래가 되면(이미 대여에 썼으면) 아무것도 하지 않고 오류 글을 돌려준다
+ */
+export async function setDonation(env: Env, item: { id: number; weapon: string; enhance: number }, donor: string | null, dia: number, by: string): Promise<string | null> {
+  if (dia > 0 && !donor) return "기부한 사람을 적어 주세요";
+  const had = (await donations(env, [item.id])).get(item.id) ?? new Map<string, number>();
+  const changes: { who: string; delta: number }[] = [];
+  for (const [who, n] of had) if (who !== donor && n !== 0) changes.push({ who, delta: -n });
+  if (donor) {
+    const diff = dia - (had.get(donor) ?? 0);
+    if (diff !== 0) changes.push({ who: donor, delta: diff });
+  }
+  if (!changes.length) return null;
+  const left = new Map<string, number>();
+  for (const c of changes) {
+    const now = await mileageOfName(env, c.who);
+    if (now + c.delta < 0) return `${c.who} 님은 마일리지를 이미 써서 💎${-c.delta} 를 뺄 수 없어요 (지금 💎${now})`;
+    left.set(c.who, now + c.delta);
+  }
+  const label = itemLabel(item);
+  const at = Date.now();
+  await env.DB.batch(
+    changes.map((c) =>
+      env.DB.prepare("INSERT INTO rental_mileage (who, delta, reason, item_id, note, by_user, created_at) VALUES (?, ?, 'donate', ?, ?, ?, ?)").bind(
+        c.who,
+        c.delta,
+        item.id,
+        `${label} 기부${had.size ? " (고침)" : ""}`,
+        by,
+        at,
+      ),
+    ),
+  );
+  for (const c of changes) {
+    await notify(env, [c.who], "rent", `마일리지 💎${c.delta > 0 ? "+" : ""}${c.delta} (${label} 기부) · 지금 💎${left.get(c.who)}`, "#/rent", by);
+  }
+  return null;
+}

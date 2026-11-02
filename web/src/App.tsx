@@ -260,7 +260,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   // To do: 오늘·이번 주·이벤트 할 일 (제작자 요청 2026-11-01). 인던 목록이 위키 자료라서 위키를 기다린다
   else if (page === "todo") body = <TodoPage wiki={wiki} me={me} />;
   // 장비대여: 대여 무기 목록, 신청, 마일리지 (제작자 요청 2026-11-01, 개발 중이라 앱개발자만). 무기 그림과 레벨이 위키 자료라서 위키를 기다린다
-  else if (page === "rent") body = <RentalPage wiki={wiki} me={me} />;
+  else if (page === "rent") body = <RentalPage wiki={wiki} me={me} view={route.query.get("v") ?? ""} />;
   else if (page === "log") body = me.role === "developer" ? <ActivityLogPage wiki={wiki} /> : <NotFound what="페이지" />;
   else body = <Home me={me} />;
 

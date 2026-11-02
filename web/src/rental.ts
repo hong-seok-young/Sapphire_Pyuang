@@ -35,6 +35,8 @@ export interface RentItem {
   next: number | null;
   /** 내 신청: 차례와 받을 수 있는 때 */
   mine: { rid: number; status: ReqStatus; pos: number; at: number | null } | null;
+  /** 운영진만: 이 물건으로 기부자에게 적립한 💎 */
+  donorDia?: number;
   /** 운영진만: 줄 명단 */
   line?: { rid: number; user: string; status: ReqStatus; appId: number | null; pos: number; at: number | null }[];
 }
@@ -118,9 +120,11 @@ export interface RentFields {
   term: RentTerm;
   price: number;
   donor: string;
+  /** 기부자에게 적립할 마일리지 💎 (고치면 차이만 장부에) */
+  donorDia: number;
   note: string;
 }
-export const addRent = (f: RentFields) => api<{ id: number }>("/api/rent", "POST", f);
+export const addRent = (f: RentFields) => api<{ id: number; warning?: string }>("/api/rent", "POST", f);
 export const editRent = (id: number, f: RentFields) => api<{ ok: boolean }>(`/api/rent/${id}`, "PUT", f);
 export const removeRent = (id: number) => api<{ ok: boolean }>(`/api/rent/${id}`, "DELETE");
 export interface ImportSummary {

@@ -1750,103 +1750,140 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 /* official post: struck-out text (a maintenance end time that was extended) */
 .off-body s { opacity: 0.6; }
 
-/* equipment rental (pages/Rental.tsx): my card, staff panel, then one thin row per weapon grouped by level (2026-11-02: rows were too tall) */
-.rent-me, .rent-admin { display: flex; flex-direction: column; gap: 6px; }
-.rent-me-top { display: flex; align-items: baseline; gap: 8px; }
+/* equipment rental (pages/Rental.tsx): my card, staff panel, then one thin row per weapon grouped by level (2026-11-02: rows were too tall).
+   compact for a 360px phone (2026-11-02 제작자 요청: buttons on two lines looked bad): small pills, each button row on one line */
+.rent-me, .rent-admin { display: flex; flex-direction: column; gap: 6px; padding: 8px; margin-bottom: 8px; }
+.rent-me .pill, .rent-admin .pill, .rent-detail .pill, .rent-cart .pill { padding: 3px 8px; font-size: 12px; line-height: 1.4; }
+.rent-detail .mk-input, .rent-admin .mk-input, .rent-cart .mk-input { height: 36px; }
+.rent-me-top { display: flex; align-items: center; gap: 8px; }
 .rent-me-top .pill { margin-left: auto; }
-.rent-dia { font-size: 20px; color: #7fd8ff; text-shadow: 1px 1px 0 var(--edge); }
+.rent-dia { font-size: 18px; line-height: 1.2; color: #7fd8ff; text-shadow: 1px 1px 0 var(--edge); }
 .rent-dia-sm { color: #7fd8ff; }
 .rent-me-top small { font-size: 12px; color: var(--muted); }
-.rent-me-line { margin: 0; font-size: 13px; }
+/* a weapon I hold: name on the left, due date / queue on the right */
+.rent-me-line { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 8px; font-size: 13px; }
 .rent-muted { font-size: 12px; color: var(--muted); }
-.rent-warn { font-weight: 400; color: var(--sunset); }
-.rent-late { color: var(--red); }
-.rent-admin-title { align-self: center; font-size: 14px; color: var(--gold); margin-right: 4px; }
-.rent-jobs { margin-bottom: 8px; }
-.rent-lv { margin-bottom: 6px; }
-.rent-lv-head { margin: 8px 2px 3px; font-size: 13px; color: #6fb6ff; text-shadow: 1px 1px 0 var(--edge); }
-.rent-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.rent-warn { font-size: 12px; font-weight: 400; color: var(--sunset); }
+.rent-late { font-size: 12px; font-weight: 400; color: var(--red); }
+/* staff tabs: one line, the unconfirmed count is a red badge on the 신청 pill */
+.rent-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.rent-tabs .pill { position: relative; }
+/* 목록 · 신청함 · 운영 (같은 폭, 확인 전 신청 수는 '운영' 모서리의 빨간 숫자) */
+.rent-views { margin-bottom: 8px; }
+.rent-views .pill { position: relative; }
+.rent-admin .pill-row { margin-bottom: 2px; }
+.rent-admin-title { font-size: 13px; color: var(--gold); margin-right: 2px; }
+.rent-new {
+  position: absolute; top: -8px; right: -6px; min-width: 16px; padding: 0 3px; font-size: 10px; line-height: 14px; text-align: center;
+  color: #fff; background: var(--red); border: 1px solid var(--edge);
+}
+.rent-jobs { margin-bottom: 4px; gap: 5px; }
+.rent-jobs .pill { padding: 4px 4px; }
+.rent-lv { margin-bottom: 4px; }
+.rent-lv-head { margin: 6px 2px 2px; font-size: 12px; color: #6fb6ff; text-shadow: 1px 1px 0 var(--edge); }
+.rent-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .rent-li { background: var(--panel); border: var(--px) solid var(--edge); }
 .rent-open { box-shadow: inset 0 0 0 2px var(--sapphire); }
 .rent-held .rent-main { opacity: 0.7; }
 .rent-row { display: flex; align-items: stretch; }
 /* pick box: a small pixel square in the left column */
 .rent-pick {
-  flex: none; width: 30px; display: flex; align-items: center; justify-content: center; padding: 0;
+  flex: none; width: 28px; display: flex; align-items: center; justify-content: center; padding: 0;
   background: none; border: none; border-right: 1px solid rgba(74, 63, 134, 0.6); cursor: pointer;
 }
 .rent-pick::after {
-  content: ""; width: 16px; height: 16px; background: var(--lo); border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 #0b0a1a;
+  content: ""; width: 14px; height: 14px; background: var(--lo); border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 #0b0a1a;
 }
-.rent-pick-on::after { content: "✓"; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--edge); background: var(--gold); box-shadow: inset var(--px) var(--px) 0 #fff1c9; }
-.rent-pick-off { cursor: default; font-size: 13px; }
+.rent-pick-on::after { content: "✓"; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--edge); background: var(--gold); box-shadow: inset var(--px) var(--px) 0 #fff1c9; }
+.rent-pick-off { cursor: default; font-size: 10px; color: var(--muted); }
 .rent-pick-off::after { display: none; }
 .rent-main {
-  flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; padding: 4px 6px 4px 5px; min-height: 36px;
+  flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 5px; padding: 2px 6px 2px 4px; min-height: 30px;
   text-align: left; color: var(--text); background: none; border: none; cursor: pointer;
 }
-.rent-slot { flex: none; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: var(--lo); border: 1px solid var(--edge); color: var(--muted); }
+.rent-slot { flex: none; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; background: var(--lo); border: 1px solid var(--edge); color: var(--muted); }
 .rent-nm { font-size: 13px; white-space: nowrap; }
 .rent-nm em { margin-left: 2px; font-style: normal; color: var(--gold); }
 .rent-op { font-size: 11px; color: #ff9f43; }
-.rent-tg { font-size: 11px; padding: 0 4px; color: var(--muted); border: 1px solid var(--hi); }
+.rent-tg { font-size: 11px; line-height: 1.3; padding: 0 4px; color: var(--muted); border: 1px solid var(--hi); }
 .rent-tg-2w { color: #ff8fa3; border-color: #8a3a52; }
 .rent-tg-4w { color: #ffd27a; border-color: #8a6a2e; }
 .rent-pr { margin-left: auto; font-size: 13px; color: var(--gold); white-space: nowrap; }
+/* only '대여 중' (free weapons show nothing) */
 .rent-st { text-align: right; font-size: 11px; color: var(--muted); white-space: nowrap; }
-.rent-st-free { color: #7fe0a0; }
-.rent-st-me { color: #7fd8ff; }
-.rent-detail { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 10px; background: var(--night-2); border-top: 1px solid var(--edge); }
-.rent-line { margin: 0; font-size: 13px; }
-.rent-next { margin: 0; font-size: 13px; color: #7fd8ff; }
-.rent-manage, .rent-ask { display: flex; flex-direction: column; gap: 8px; }
-.rent-use { min-width: 44px; text-align: center; color: #7fd8ff; }
+.rent-detail { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px 8px; background: var(--night-2); border-top: 1px solid var(--edge); }
+.rent-line { margin: 0; font-size: 12px; }
+.rent-next { margin: 0; font-size: 12px; color: #7fd8ff; }
+.rent-manage, .rent-ask { display: flex; flex-direction: column; gap: 6px; }
+/* a row of buttons (wraps only on very narrow screens) */
+.rent-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+/* text on the left (wraps inside), one button on the right */
+.rent-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.rent-bar .rent-next { flex: 1 1 0; min-width: 0; }
+.rent-full { grid-column: 1 / -1; flex-basis: 100%; }
+/* mileage stepper: 마일리지 − 💎2 + 골드 80만 */
+.rent-step { display: flex; align-items: center; gap: 4px; }
+.rent-step .pill { min-width: 26px; padding: 2px 0; text-align: center; }
+.rent-use { min-width: 34px; text-align: center; color: #7fd8ff; }
+.rent-lend { display: flex; align-items: flex-end; gap: 6px; }
+.rent-lend .mk-field { flex: 1; gap: 3px; }
+.rent-lend .pill { height: 36px; }
 /* picked weapons: a bar fixed above the tab bar, opens upward into the application form */
 .rent-cart {
   position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tab-h) + 6px + env(safe-area-inset-bottom)); z-index: 6;
-  width: min(616px, calc(100% - 24px)); display: flex; flex-direction: column; gap: 6px; padding: 8px 10px;
+  width: min(616px, calc(100% - 24px)); display: flex; flex-direction: column; gap: 6px; padding: 6px 8px;
   background: #1f1a44; border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 var(--hi), 0 4px 0 rgba(0, 0, 0, 0.35);
 }
-.rent-cart-bar { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.rent-cart-bar { display: flex; align-items: center; gap: 4px; font-size: 13px; }
 .rent-cart-bar span { flex: 1; min-width: 0; }
+.rent-cart-bar b { font-weight: 400; color: var(--gold); }
 .rent-cart-bar small { font-size: 11px; color: var(--muted); }
-.rent-cart-form { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; }
-.rent-cart-line { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 13px; }
+.rent-cart-form { display: flex; flex-direction: column; gap: 4px; max-height: 50vh; overflow-y: auto; }
+.rent-cart-line { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; font-size: 13px; }
 .rent-cart-line b { font-weight: 400; }
 .rent-cart-line span { font-size: 12px; color: var(--muted); }
-.rent-cart-line small { flex-basis: 100%; font-size: 12px; color: #7fd8ff; }
-.page:has(.rent-cart) { padding-bottom: calc(var(--tab-h) + 120px + env(safe-area-inset-bottom)); }
-/* applications (my card, staff panel): each weapon's state, staff buttons, and a small chat */
-.rent-app { display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--night-2); border: 1px solid var(--edge); }
-.rent-app-head { display: flex; align-items: baseline; gap: 8px; }
+.rent-cart-line small { flex-basis: 100%; font-size: 11px; color: #7fd8ff; }
+.page:has(.rent-cart) { padding-bottom: calc(var(--tab-h) + 100px + env(safe-area-inset-bottom)); }
+/* applications (신청함, 운영 > 신청): per weapon two short lines on the left and its buttons on the right, a chat opened with 💬 */
+.rent-app { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; background: var(--night-2); border: 1px solid var(--edge); }
+.rent-app-head { display: flex; align-items: center; gap: 6px; }
 .rent-app-head small { font-size: 11px; color: var(--muted); }
-.rent-talk-btn { margin-left: auto; padding: 2px 8px; }
-.rent-app-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.rent-req { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px solid rgba(74, 63, 134, 0.6); }
+.rent-talk-btn { margin-left: auto; }
+.rent-talk-fresh { color: var(--edge); background: var(--gold); }
+.rent-app-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.rent-req { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 6px; padding-top: 4px; border-top: 1px solid rgba(74, 63, 134, 0.6); }
 .rent-req:first-child { padding-top: 0; border-top: none; }
-.rent-req-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
-.rent-req-name { font-size: 14px; }
+.rent-req-info { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
+.rent-req-name { font-size: 13px; }
 .rent-req-name small { font-size: 11px; color: var(--muted); }
-.rent-req-st { margin-left: auto; font-size: 12px; color: var(--muted); }
+.rent-req-st { font-size: 11px; color: var(--muted); }
+.rent-req .rent-btns { flex-wrap: nowrap; }
+.rent-req-acts { margin: 0; gap: 4px; }
 .rent-req-wait { color: var(--sunset); }
 .rent-req-ok { color: #7fd8ff; }
 .rent-req-hold { color: #7fe0a0; }
 .rent-req-no, .rent-req-cancel { color: var(--muted); text-decoration: line-through; }
-.rent-hand { padding: 6px; background: var(--panel); border: 1px solid var(--edge); }
-.rent-talk { display: flex; flex-direction: column; gap: 6px; }
-.rent-talk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 220px; overflow-y: auto; }
-.rent-talk-list li { padding: 4px 8px; font-size: 13px; background: var(--panel); border: 1px solid var(--edge); }
+.rent-hand { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 4px 6px; background: var(--panel); border: 1px solid var(--edge); }
+.rent-talk { display: flex; flex-direction: column; gap: 4px; }
+.rent-talk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; max-height: 220px; overflow-y: auto; }
+.rent-talk-list li { padding: 3px 8px; font-size: 13px; background: var(--panel); border: 1px solid var(--edge); }
 .rent-talk-list li.rent-talk-staff { border-color: #3b4f8a; }
 .rent-talk-list b { font-weight: 400; color: var(--gold); }
 .rent-talk-list small { font-size: 10px; color: var(--muted); }
-.rent-talk-list p { margin: 2px 0 0; white-space: pre-line; overflow-wrap: anywhere; }
+.rent-talk-list p { margin: 1px 0 0; white-space: pre-line; overflow-wrap: anywhere; }
 .rent-talk-input { display: flex; gap: 6px; }
-.rent-talk-input .mk-input { flex: 1; min-width: 0; height: 36px; font-size: 14px; }
-.rent-form { padding: 8px 0 0; }
-.rent-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.rent-paste { height: 140px; padding: 8px 10px; font-size: 13px; line-height: 1.4; resize: vertical; }
-.rent-balances { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.rent-balance { width: 100%; display: flex; justify-content: space-between; padding: 6px 8px; font-size: 13px; color: var(--text); background: var(--night-2); border: 1px solid var(--edge); cursor: pointer; }
+.rent-talk-input .mk-input { flex: 1; min-width: 0; height: 34px; font-size: 14px; }
+.rent-form { gap: 8px; padding: 4px 0 0; }
+.rent-form .mk-field { gap: 3px; }
+.rent-form .btn { padding: 7px; }
+.rent-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.rent-mile { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 6px; }
+/* 기부한 사람과 기부 💎 를 한 줄에 */
+.rent-donor { display: grid; grid-template-columns: minmax(0, 1fr) 84px; gap: 6px; }
+.rent-form .pill-row { margin-bottom: 0; }
+.rent-paste { height: 120px; padding: 8px 10px; font-size: 13px; line-height: 1.4; resize: vertical; }
+.rent-balances { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.rent-balance { width: 100%; display: flex; justify-content: space-between; padding: 5px 8px; font-size: 13px; color: var(--text); background: var(--night-2); border: 1px solid var(--edge); cursor: pointer; }
 .rent-balance b { color: #7fd8ff; font-weight: 400; }
 .rent-view { display: flex; flex-direction: column; gap: 4px; }
 .rent-ledger { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 12px; }

@@ -1,10 +1,10 @@
 // GET /api/rent -> 장비대여 목록(무기마다 쓰는 사람, 줄, 새로 신청하면 받을 수 있는 때), 신청서(대화 포함), 내 마일리지와 장부
 //   길드원: 내 신청서 최근 10개. 운영진: 줄 서는 신청이 있는 신청서 모두와 무기마다 줄 명단, 사람마다 마일리지, 닉네임 목록
-// POST /api/rent { job, level, weapon, options, enhance, term, price, donor, note } -> 물건 더하기 (운영진)
+// POST /api/rent { job, level, weapon, options, enhance, term, price, donor, donorDia, note } -> 물건 더하기 (운영진). donorDia: 기부자에게 적립할 💎 (server/rental.ts setDonation)
 // 제작자 요청 2026-11-01, 신청서·줄·대화창 2026-11-02. 지금은 개발 중이라 앱개발자만 (server/rental.ts RENT_OPEN)
 import { FORBIDDEN, NEED_LOGIN, TEST_IDS, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { DIA_GOLD, TERM_DAYS, canEnter, checkItem, expectedTimes, isManager, mileageOf } from "../../../server/rental";
+import { DIA_GOLD, TERM_DAYS, canEnter, checkItem, donations, donorDiaOf, expectedTimes, isManager, mileageOf, setDonation } from "../../../server/rental";
 import type { QueueRow, RentalRow } from "../../../server/rental";
 
 interface ReqRow {
@@ -60,6 +60,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     return i < 0 ? null : { pos: i + 1, at: when.get(q.item_id)?.[i] ?? null };
   };
 
+  // 운영진: 물건마다 기부자에게 적립한 💎 (물건 고치기 칸에 채운다)
+  const donated = manager ? await donations(env) : new Map<number, Map<string, number>>();
   const items = rows.map((it) => {
     const line = lines.get(it.id) ?? [];
     const my = line.find((q) => mine.has(q.user_id));
@@ -83,6 +85,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       // 지금 새로 신청하면 받을 수 있는 때 (null 은 앞사람이 반납하면)
       next: when.get(it.id)?.[line.length] ?? null,
       mine: my ? { rid: my.id, status: my.status, ...placeOf(my)! } : null,
+      ...(manager ? { donorDia: it.donor ? (donated.get(it.id)?.get(it.donor) ?? 0) : 0 } : {}),
       // 누가 줄을 섰는지는 운영진만 (길드원은 수와 내 차례만)
       ...(manager ? { line: line.map((q) => ({ rid: q.id, user: q.user_id, status: q.status, appId: q.app_id, ...placeOf(q)! })) } : {}),
     };
@@ -170,9 +173,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!canEnter(me) || !isManager(me)) return FORBIDDEN();
-  const checked = checkItem(await readJson<Record<string, unknown>>(request));
+  const body = await readJson<Record<string, unknown>>(request);
+  const checked = checkItem(body);
   if ("error" in checked) return json({ error: checked.error }, 400);
   const it = checked.item;
+  const dia = donorDiaOf(body);
+  if (dia === null) return json({ error: "기부 💎 가 맞지 않아요" }, 400);
+  if (dia > 0 && !it.donor) return json({ error: "기부한 사람을 적어 주세요" }, 400);
   const now = Date.now();
   const r = await env.DB.prepare(
     "INSERT INTO rental_items (job, level, weapon, options, enhance, term, price, donor, note, status, created_at, updated_at, updated_by) " +
@@ -180,5 +187,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   )
     .bind(it.job, it.level, it.weapon, it.options, it.enhance, it.term, it.price, it.donor, it.note, now, now, me.id)
     .run();
-  return json({ id: r.meta.last_row_id });
+  const id = Number(r.meta.last_row_id);
+  const err = dia > 0 ? await setDonation(env, { id, weapon: it.weapon, enhance: it.enhance }, it.donor, dia, me.id) : null;
+  return json({ id, ...(err ? { warning: err } : {}) });
 };
