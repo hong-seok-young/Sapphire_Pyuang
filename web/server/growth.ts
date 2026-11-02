@@ -45,22 +45,30 @@ export interface GrowthEntry {
   highSpec: boolean;
 }
 
-/** 오른 사람만 많이 오른 순 (같으면 먼저 적은 사람이 위). 테스트 계정은 뺀다 */
-export async function growthEntries(env: Env, period: Period, now = Date.now()): Promise<{ start: number; entries: GrowthEntry[] }> {
-  const start = periodStart(period, now);
-  const [before, during, current] = await env.DB.batch([
+/** 기간 시작 때의 레벨·경험치 (사람마다): 시작 전 마지막 기록, 없으면 기간 안 첫 기록 */
+export async function startPoints(env: Env, start: number): Promise<Map<string, Point>> {
+  const [before, during] = await env.DB.batch([
     // SQLite: MAX/MIN 과 같이 고른 칸은 그 줄의 값이다
     env.DB.prepare("SELECT user_id, level, exp, MAX(at) AS at FROM level_log WHERE at <= ? GROUP BY user_id").bind(start),
     env.DB.prepare("SELECT user_id, level, exp, MIN(at) AS at FROM level_log WHERE at > ? GROUP BY user_id").bind(start),
-    env.DB.prepare(
-      "SELECT u.id AS id, u.role AS role, p.job AS job, p.level AS level, p.exp AS exp, p.guild AS guild, a.updated_at AS avatar, u.high_spec AS high_spec, " +
-        "(SELECT MAX(at) FROM level_log l WHERE l.user_id = p.user_id) AS last_at " +
-        "FROM profiles p JOIN users u ON u.id = p.user_id AND u.id NOT IN ('테스트1', '테스트2') LEFT JOIN avatars a ON a.user_id = p.user_id",
-    ),
   ]);
   const base = new Map<string, Point>();
   for (const p of during.results as Point[]) base.set(p.user_id, p);
   for (const p of before.results as Point[]) base.set(p.user_id, p); // 기간 전 기록이 있으면 그것부터
+  return base;
+}
+
+/** 오른 사람만 많이 오른 순 (같으면 먼저 적은 사람이 위). 테스트 계정은 뺀다 */
+export async function growthEntries(env: Env, period: Period, now = Date.now()): Promise<{ start: number; entries: GrowthEntry[] }> {
+  const start = periodStart(period, now);
+  const [base, current] = await Promise.all([
+    startPoints(env, start),
+    env.DB.prepare(
+      "SELECT u.id AS id, u.role AS role, p.job AS job, p.level AS level, p.exp AS exp, p.guild AS guild, a.updated_at AS avatar, u.high_spec AS high_spec, " +
+        "(SELECT MAX(at) FROM level_log l WHERE l.user_id = p.user_id) AS last_at " +
+        "FROM profiles p JOIN users u ON u.id = p.user_id AND u.id NOT IN ('테스트1', '테스트2') LEFT JOIN avatars a ON a.user_id = p.user_id",
+    ).all(),
+  ]);
   const entries = (current.results as {
     id: string; role: Role; job: Job; level: number; exp: number | null; guild: Guild | null; avatar: number | null; last_at: number | null; high_spec: number;
   }[])

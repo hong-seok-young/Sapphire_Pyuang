@@ -4,38 +4,22 @@
 import { NEED_LOGIN, currentUser, json } from "../../server/auth";
 import type { Env, Guild, Job, Role } from "../../server/auth";
 import { weekStart } from "../../server/week";
+import { startPoints } from "../../server/growth";
 
 /**
- * 이번 주(목요일 오전 10시부터, 제작자 요청) 경험치만 오른 만큼 (% x 1000, 제작자 요청: 레벨업 ▲ 처럼 '+2%'). 성장 기록(level_log)의 마지막 기록과
- * 그 앞의 다른 값 기록을 비교한다. '오타 수정'은 새 기록 대신 마지막 기록을 고치므로 여기에 잡히지 않는다. 레벨이 바뀌었으면 ▲ 가 맡는다
+ * 이번 주(목요일 오전 10시부터, 제작자 요청)에 경험치만 오른 만큼 (% x 1000, 제작자 요청: 레벨업 ▲ 처럼 '+2%').
+ * 주간 성장 랭킹과 같은 계산: 주가 시작할 때의 기록(시작 전 마지막, 없으면 이번 주 첫 기록)과 지금을 비교한다
+ * (2026-11-02 제작자: 마지막 한 번만 비교해서 이번 주 +7.761% 인데 +0.41% 로 떴다). '오타 수정'은 새 기록 대신 마지막 기록을 고치므로
+ * 성장으로 잡히지 않는다. 처음 적은 경험치(시작 때 경험치가 없었음)는 오른 게 아니다. 레벨이 바뀌었으면 ▲ 가 맡는다
  */
-async function expUps(env: Env): Promise<Map<string, number>> {
-  const { results } = await env.DB.prepare(
-    "SELECT user_id, at, level, exp FROM (SELECT user_id, at, level, exp, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY at DESC) AS rn FROM level_log) " +
-      "WHERE rn <= 8 ORDER BY user_id, at DESC",
-  ).all<{ user_id: string; at: number; level: number; exp: number | null }>();
-  const ups = new Map<string, number>();
-  const start = weekStart();
-  let i = 0;
-  while (i < results.length) {
-    const user = results[i].user_id;
-    const rows: typeof results = [];
-    while (i < results.length && results[i].user_id === user) rows.push(results[i++]);
-    const last = rows[0];
-    if (last.at < start) continue;
-    const before = rows.find((r) => r.level !== last.level || r.exp !== last.exp);
-    // 앞 기록에 경험치가 없었으면(처음 적은 것) 오른 게 아니다
-    if (before && before.level === last.level && before.exp !== null && last.exp !== null && last.exp > before.exp) {
-      ups.set(user, last.exp - before.exp);
-    }
-  }
-  return ups;
+function expUp(from: { level: number; exp: number | null } | undefined, now: { level: number; exp: number | null }): number {
+  return from && from.level === now.level && from.exp !== null && now.exp !== null && now.exp > from.exp ? now.exp - from.exp : 0;
 }
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  const ups = await expUps(env);
+  const base = await startPoints(env, weekStart());
   const { results } = await env.DB.prepare(
     "SELECT u.id AS id, u.role AS role, p.job AS job, p.level AS level, p.prev_level AS prev_level, p.level_at AS level_at, " +
       "p.exp AS exp, p.guild AS guild, u.high_spec AS high_spec, a.updated_at AS avatar FROM profiles p JOIN users u ON u.id = p.user_id AND u.id NOT IN ('테스트1', '테스트2') " +
@@ -49,7 +33,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       id: r.id, role: r.role, job: r.job, level: r.level, prevLevel: r.prev_level, levelAt: r.level_at, guild: r.guild, avatar: r.avatar,
       highSpec: r.high_spec === 1,
       exp: r.exp, // 모두에게 보인다 (제작자 요청: 성장 순위 보상 이벤트를 확인하려고)
-      expUp: ups.get(r.id) ?? 0,
+      expUp: expUp(base.get(r.id), r),
     })),
   );
 };
