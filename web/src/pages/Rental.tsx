@@ -481,7 +481,10 @@ function Talk({ app, onDone }: { app: RentApp; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => end.current?.scrollIntoView({ block: "nearest" }), [app.talk.length]);
+  // scrollIntoView 는 요즘 크롬에서 Promise 를 돌려준다: 화살표로 그대로 돌려주면 React 가 정리 함수로 불러 화면이 비었다 (대화 보내기, 장비대여에서 홈)
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "nearest" });
+  }, [app.talk.length]);
   const send = async () => {
     const t = text.trim();
     if (!t) return;
