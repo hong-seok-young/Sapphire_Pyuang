@@ -1,6 +1,7 @@
 // To do (#/todo, 제작자 요청 2026-11-01): 이벤트를 안 읽어도 본인 직업·레벨에 맞는 할 일을 명사형으로 딱.
 // 오늘(한국 시간 0시 초기화) · 이번 주(목요일 오전 10시 초기화) · 이벤트(기간 안에 한 번) 칸에 체크 칸과 함께 보인다.
-// 줄을 누르면 체크, 오른쪽 '›' 는 인던·길드던전의 위키 화면이나 이벤트 공식 글. 늘 하는 일과 이벤트 할 일은 src/todo.ts
+// 체크 칸을 눌러야 끝낸 일로 가고, 이름을 누르면 무엇을 하라는지 요약이 펼쳐진다 (제작자 요청 2026-11-02).
+// 오른쪽 '›' 는 인던·길드던전의 위키 화면이나 이벤트 공식 글. 늘 하는 일과 이벤트 할 일은 src/todo.ts
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Me } from "../auth";
 import { GUILD_NAME, JOB_NAME, errorText } from "../auth";
@@ -76,7 +77,7 @@ export function TodoPage({ wiki, me }: { wiki: Wiki; me: Me }) {
     </>
   );
 
-  const routine = routineItems(wiki, me.level);
+  const routine = routineItems(wiki, me.level, me.guild);
   const events = eventItems(data.tasks, data.dayEnd);
   const today = [...routine.today, ...events.today];
   const week = [...routine.week, ...events.week];
@@ -126,28 +127,60 @@ function Section({ title, reset, items, done, onToggle, empty }: {
   empty?: string;
 }) {
   const [showDone, setShowDone] = useState(false);
+  // 요약을 펼친 줄
+  const [open, setOpen] = useState<Set<string>>(new Set());
   if (!items.length && !empty) return null;
+  const toggleOpen = (key: string) =>
+    setOpen((cur) => {
+      const next = new Set(cur);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   // 끝낸 일은 아래로 접는다 (제작자 요청 2026-11-02: 할 일이 너무 많아 보인다). 누르면 펼쳐 다시 풀 수 있다
   const left = items.filter((i) => !done.has(i.key));
   const finished = items.filter((i) => done.has(i.key));
   const row = (i: TodoItem) => {
     const on = done.has(i.key);
+    const more = !!(i.steps?.length || i.warns?.length);
+    const opened = more && open.has(i.key);
     return (
       <li key={i.key} className={"todo-row" + (on ? " todo-done" : "")}>
-        <button className="todo-hit" onClick={() => onToggle(i.key)} aria-pressed={on}>
-          <span className="todo-box" aria-hidden>
-            {on ? "✓" : ""}
-          </span>
-          <span className="todo-text">
-            <span className="todo-name">{i.text}</span>
-            {i.note && <span className="todo-note">{i.note}</span>}
-          </span>
-          {i.right && <span className="todo-right">{i.right}</span>}
-        </button>
-        {i.to && (
-          <a className="todo-go" href={i.to} aria-label="자세히">
-            ›
-          </a>
+        <div className="todo-line">
+          {/* 체크 칸만 끝낸 일로 보낸다 */}
+          <button className="todo-check" onClick={() => onToggle(i.key)} aria-pressed={on} aria-label={i.text + (on ? " 끝냄 취소" : " 끝냄")}>
+            <span className="todo-box" aria-hidden>
+              {on ? "✓" : ""}
+            </span>
+          </button>
+          {/* 이름: 요약 펼치기 */}
+          <button className={"todo-hit" + (more ? "" : " todo-hit-plain")} onClick={() => more && toggleOpen(i.key)} aria-expanded={more ? opened : undefined}>
+            <span className="todo-text">
+              <span className="todo-name">{i.text}</span>
+              {i.note && <span className="todo-note">{i.note}</span>}
+            </span>
+            {i.right && <span className="todo-right">{i.right}</span>}
+            {more && <span className="todo-more" aria-hidden>{opened ? "▴" : "▾"}</span>}
+          </button>
+          {i.to && (
+            <a className="todo-go" href={i.to} aria-label="자세히">
+              ›
+            </a>
+          )}
+        </div>
+        {opened && (
+          <div className="todo-detail">
+            {i.steps?.map((s) => (
+              <p key={"s" + s} className="todo-step">
+                {s}
+              </p>
+            ))}
+            {i.warns?.map((w) => (
+              <p key={"w" + w} className="todo-warn">
+                ⚠️ {w}
+              </p>
+            ))}
+          </div>
         )}
       </li>
     );

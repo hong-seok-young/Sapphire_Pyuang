@@ -7,7 +7,7 @@ import Anthropic from "@anthropic-ai/sdk";
 
 export const DIGEST_MODEL = "claude-opus-5-5";
 /** 정리한 모델과 지시문의 판 (official_todo.model). 지시문을 고치면 판을 올린다: 예전 판으로 정리한 글은 모두 다시 정리된다 */
-export const DIGEST_TAG = `${DIGEST_MODEL}#3`;
+export const DIGEST_TAG = `${DIGEST_MODEL}#4`;
 
 const JOBS_KO = ["전사", "레인저", "마법사", "무도가"] as const;
 const JOB_KEY: Record<string, string> = { 전사: "warrior", 레인저: "ranger", 마법사: "mage", 무도가: "monk" };
@@ -41,7 +41,15 @@ const SYSTEM = `너는 모바일 MMORPG 아이모(IMO: The World Of Magic)의 �
   '점검 후'는 그날 12:00, '점검 전(까지)'는 그날 10:00, 끝 시각이 없으면 그날 23:59. 시작이 글에 없으면 글 올린 날 00:00. 끝을 모르면 null
 - minLevel, maxLevel, jobs: 글에 참여 조건으로 적혀 있을 때만 (예: "Lv.30 이상" → minLevel 30, "마법사 전용" → jobs ["마법사"]). 아니면 null, null, []
 - 한 글에서 4줄까지, 꼭 할 만한 것부터. 같은 일을 여러 줄로 나누지 않는다. 한 글 안에 이벤트가 여럿이면 각각 (패치노트 안의 출석 이벤트 등)
-- 할 일이 없으면 빈 배열`;
+- 할 일이 없으면 빈 배열
+
+줄을 누르면 펼쳐지는 요약 (제작자 요청 2026-11-02: '어떤 이벤트인데, 그래서 내가 뭘 하라고?' 를 글을 안 읽어도 알게)
+- steps: 게임 안에서 실제로 할 것만 1~3줄, 한 줄 25자 안팎의 '~하기' 없는 명사형. 횟수·주기·장소를 붙인다.
+  예 (김선달 이벤트): ["매일 출석", "하루 1회 맵치킨 교환 (NPC 김선달)"]. 예: ["이벤트 몬스터 사냥해 해골가면 모으기", "NPC 빅터에게 해골가면 교환"]
+  보상 목록, 교환 목록, 확률, 재료 개수표, 이벤트 소개·인사말은 쓰지 않는다. text 를 그대로 되풀이하지 않는다
+- warns: 기간을 몰라서 손해 보는 것만 0~2줄, 날짜·시각과 함께 (한국 시간, '11/19 10:00' 처럼 짧게).
+  예: 주차마다 재료가 바뀌면 "2주차 재료(밀가루·고기)는 3주차 시작 11/19 10:00 전에 다 쓰기", 아이템이 사라지면 "이벤트 재료는 11/26 점검 때 사라짐",
+  교환 마감이 이벤트 끝보다 빠르면 "교환은 11/30 23:59까지". 그냥 끝나는 날만 되풀이하는 줄(end 와 같은 말)은 쓰지 않는다. 없으면 []`;
 
 /** 답 모양 (API 가 이 모양을 지키게 한다) */
 const TASKS_SCHEMA = {
@@ -62,8 +70,10 @@ const TASKS_SCHEMA = {
           minLevel: { anyOf: [{ type: "integer" }, { type: "null" }] },
           maxLevel: { anyOf: [{ type: "integer" }, { type: "null" }] },
           jobs: { type: "array", items: { type: "string", enum: [...JOBS_KO] } },
+          steps: { type: "array", items: { type: "string" } },
+          warns: { type: "array", items: { type: "string" } },
         },
-        required: ["text", "note", "cycle", "days", "time", "start", "end", "minLevel", "maxLevel", "jobs"],
+        required: ["text", "note", "cycle", "days", "time", "start", "end", "minLevel", "maxLevel", "jobs", "steps", "warns"],
         additionalProperties: false,
       },
     },
@@ -91,6 +101,9 @@ export interface TodoTask {
   lv: [number | null, number | null];
   /** 직업 (warrior, ranger, mage, monk). 비면 모두 */
   jobs: string[];
+  /** 펼치면 보이는 요약: 게임 안에서 할 것 (1~3줄), 기간을 몰라 손해 보는 것 (0~2줄). #4 전에 정리한 글에는 없다 */
+  d?: string[];
+  w?: string[];
   /** 모은 할 일(mergeTasks)만: 이 일을 안내한 공식 글 번호들 (새 글 먼저) */
   p?: number[];
 }
@@ -123,6 +136,17 @@ function short(v: unknown, max: number): string {
   return (at > max / 3 ? cut.slice(0, at) : s.slice(0, max)).replace(/[\s,·(]+$/, "");
 }
 
+/** 요약 줄들: 글자만, 겹친 줄 빼고 max 줄까지 */
+function lines(v: unknown, max: number, len: number): string[] {
+  const out: string[] = [];
+  for (const x of Array.isArray(v) ? v : []) {
+    const s = short(x, len);
+    if (s && !out.includes(s)) out.push(s);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 /** 모델 답 -> 할 일 목록 (맞지 않는 줄은 버린다). posts: 모은 할 일이면 그 줄이 가리킬 수 있는 글 번호, max: 줄 수 */
 export function normalizeTasks(raw: unknown, posts?: Set<number>, max = 6): TodoTask[] {
   const list = raw && typeof raw === "object" && Array.isArray((raw as { tasks?: unknown }).tasks) ? (raw as { tasks: unknown[] }).tasks : [];
@@ -151,6 +175,8 @@ export function normalizeTasks(raw: unknown, posts?: Set<number>, max = 6): Todo
       e,
       lv: [level(r.minLevel), level(r.maxLevel)],
       jobs: Array.isArray(r.jobs) ? r.jobs.map((j) => JOB_KEY[String(j)]).filter((j): j is string => !!j) : [],
+      d: lines(r.steps, 3, 40),
+      w: lines(r.warns, 2, 60),
       ...(p ? { p } : {}),
     });
     if (out.length >= max) break;
@@ -205,7 +231,7 @@ async function askJson(client: Anthropic, system: string, user: string, schema: 
   return JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1));
 }
 
-const SHAPE = `{"tasks": [{"text", "note", "cycle", "days", "time", "start", "end", "minLevel", "maxLevel", "jobs"}]}`;
+const SHAPE = `{"tasks": [{"text", "note", "cycle", "days", "time", "start", "end", "minLevel", "maxLevel", "jobs", "steps", "warns"}]}`;
 
 /** 글 하나를 Claude 에 맡겨 할 일을 뽑는다. 거절당하면 빈 목록, API 오류는 던진다 (나중에 다시) */
 export async function digestPost(client: Anthropic, post: DigestPost): Promise<TodoTask[]> {
@@ -229,7 +255,9 @@ const MERGE_SYSTEM = `너는 길드 앱 'To do' 의 이벤트 할 일을 마지�
 - 핫타임, 경험치·드랍 증가 효과, 게임 밖 응모(SNS, 스크린샷, 설문, 카카오톡)는 할 일이 아니라서 뺀다.
 - 끝난 일(end 가 지금보다 앞)은 뺀다. 없던 일을 새로 만들지 않는다. 회차마다 기간이 다른 줄(1회차, 2회차)은 합치지 않고,
   같은 이벤트를 전체 기간 한 줄로도 적은 줄이 있으면 그 줄은 빼고 회차 줄만 남긴다 (기간이 겹쳐 두 번 보이지 않게).
-- text 는 6~14자 명사형, note 는 어디서 하는지 하나만 12자 안팎. 나머지 칸(cycle, days, time, start, end, minLevel, maxLevel, jobs)은 받은 값의 뜻을 그대로 둔다.`;
+- text 는 6~14자 명사형, note 는 어디서 하는지 하나만 12자 안팎. 나머지 칸(cycle, days, time, start, end, minLevel, maxLevel, jobs)은 받은 값의 뜻을 그대로 둔다.
+- steps(게임 안에서 할 것 1~3줄)와 warns(기간을 몰라서 손해 보는 것 0~2줄, 날짜와 함께)는 합친 줄들의 것을 모아 겹친 말을 빼고 남긴다.
+  묶은 줄이면 이벤트마다 무엇을 하는지 짧게 (예: ["11월 출석판 매일 출석", "또봉이 출석판 매일 출석"]). 보상·교환 목록은 쓰지 않는다. 받은 줄에 없던 내용을 새로 만들지 않는다.`;
 
 const MERGE_SCHEMA = {
   type: "object",
@@ -258,7 +286,7 @@ export interface DigestOfPost {
 }
 
 /** 모으는 지시문의 판: 고치면 올린다 (글마다 다시 정리하지 않고 모으기만 다시 한다) */
-const MERGE_VERSION = 3;
+const MERGE_VERSION = 4;
 
 /** 모은 목록이 어느 정리들로 만든 것인지 (모으기 판, 글 번호와 정리한 때). 같으면 다시 모으지 않는다 */
 export function mergeSignature(digests: DigestOfPost[], now = Date.now()): string {
@@ -291,6 +319,7 @@ export async function mergeTasks(client: Anthropic, digests: DigestOfPost[], now
           JSON.stringify({
             text: t.t, note: t.n, cycle: t.c === "d" ? "daily" : t.c === "w" ? "weekly" : "once", days: t.days, time: t.at,
             start: kstText(t.s), end: kstText(t.e), minLevel: t.lv[0], maxLevel: t.lv[1], jobs: t.jobs.map((j) => JOB_KO_OF[j] ?? j),
+            steps: t.d ?? [], warns: t.w ?? [],
           }),
         )
         .join("\n"),

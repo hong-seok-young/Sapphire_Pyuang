@@ -49,6 +49,9 @@ export interface TodoItemOut {
   until: number | null;
   /** 공식 글 (모은 할 일은 그 일을 안내한 가장 새 글) */
   post: { id: number; title: string };
+  /** 펼치면 보이는 요약: 게임 안에서 할 것, 기간을 몰라 손해 보는 것 (todoDigest.ts) */
+  steps: string[];
+  warns: string[];
 }
 
 /** 지금 할 수 있는 할 일이 남은 글의 정리 (표 official_todo, 글 번호 0 은 모은 목록이라 official_news 와 이어지지 않아 빠진다) */
@@ -77,6 +80,9 @@ async function liveDigests(env: Env, now: number): Promise<{ digests: DigestOfPo
   return { digests, merged: m ? { tasks: parse(m.tasks), src: m.src } : null };
 }
 
+/** 할 일 하나의 보이는 칸 */
+const shown = (t: TodoTask) => ({ text: t.t, note: t.n, cycle: t.c, at: t.at, until: t.e, steps: t.d ?? [], warns: t.w ?? [] });
+
 /**
  * 지금 이 사람에게 보일 이벤트 할 일: 시작했고 안 끝난 것, 정해진 요일이면 오늘인 것, 레벨·직업이 맞는 것.
  * 여러 글에서 겹친 일을 합친 모은 목록(글 번호 0, mergeIfStale)을 쓰고, 모은 뒤에 정리된 글의 할 일은 그대로 붙인다
@@ -99,11 +105,11 @@ export async function eventTasks(env: Env, profile: { job: string | null; level:
   const out: TodoItemOut[] = [];
   for (const t of merged?.tasks ?? []) {
     const src = (t.p ?? []).filter(fresh);
-    if (src.length && keep(t)) out.push({ key: taskKey("m", t), text: t.t, note: t.n, cycle: t.c, at: t.at, until: t.e, post: { id: src[0], title: titleOf.get(src[0]) ?? "" } });
+    if (src.length && keep(t)) out.push({ ...shown(t), key: taskKey("m", t), post: { id: src[0], title: titleOf.get(src[0]) ?? "" } });
   }
   for (const d of digests) {
     if (merged && fresh(d.id)) continue;
-    for (const t of d.tasks) if (keep(t)) out.push({ key: taskKey(d.id, t), text: t.t, note: t.n, cycle: t.c, at: t.at, until: t.e, post: { id: d.id, title: d.title } });
+    for (const t of d.tasks) if (keep(t)) out.push({ ...shown(t), key: taskKey(d.id, t), post: { id: d.id, title: d.title } });
   }
   return out;
 }

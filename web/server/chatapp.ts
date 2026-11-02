@@ -329,11 +329,12 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
     const lines = [
       `늘 하는 일: 매일(한국 시간 0시 초기화) 길드 출석${mark("d:guild-attend")} · 매주(목요일 오전 10시 초기화) 길드 임무${mark("w:guild-mission")}, ` +
         `들어갈 수 있는 인스턴스 던전 한 줄(파티로 한 번에 다 돈다. 위키 '인스턴스 던전' 지역, 이름의 숫자가 입장 레벨: 인던20 ~ 인던44)${mark("w:dungeons")}, ` +
-        `길드던전(Lv.30부터)${mark("w:guild-dungeon")}, 헌팅 그라운드 주간 이용 시간(Lv.30부터)${mark("w:hunting")}`,
+        `길드던전(1군 Sapphire 만, Lv.30부터)${mark("w:guild-dungeon")}, 헌팅 그라운드 주간 이용 시간(Lv.30부터)${mark("w:hunting")}`,
       ...tasks.map(
         (t) =>
           `이벤트 할 일: ${t.text}${t.note ? ` (${t.note})` : ""} · ${t.cycle === "d" ? "매일" : t.cycle === "w" ? "매주" : "기간 안에 한 번"}` +
-          `${t.at ? ` · ${t.at}` : ""}${t.until ? ` · ${when(t.until)}까지` : ""} · 공식 글 '${t.post.title}'${mark(t.key)}`,
+          `${t.at ? ` · ${t.at}` : ""}${t.until ? ` · ${when(t.until)}까지` : ""} · 공식 글 '${t.post.title}'${mark(t.key)}` +
+          `${t.steps.length ? ` · 할 것: ${t.steps.join(", ")}` : ""}${t.warns.length ? ` · 주의: ${t.warns.join(", ")}` : ""}`,
       ),
     ];
     if (!tasks.length) lines.push("이벤트 할 일: 지금 이 사람에게 맞는 것 없음");

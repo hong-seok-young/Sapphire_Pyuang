@@ -29,6 +29,7 @@ export interface LaunchItem {
   ribbon?: string;
   /** 특정 사람만 들어가는 칸: 테두리에 빛이 돈다 (gold 1군 전용, blue 운영진, purple 개발자) */
   ring?: "gold" | "blue" | "purple";
+  /** 개발 중·검토 후 오픈: 홈에서는 열린 칸 아래 접힌 '개발 중' 묶음에 들어간다 (제작자 요청 2026-11-02, Home.tsx) */
   soon?: boolean;
   /** soon 일 때 오른쪽 위 표 (없으면 '준비 중') */
   badge?: string;

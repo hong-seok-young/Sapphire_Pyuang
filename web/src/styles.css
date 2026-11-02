@@ -114,6 +114,11 @@ button { font: inherit; color: inherit; }
 .tile-title { font-size: 13px; line-height: 17px; }
 .tile-count { font-size: 11px; color: var(--muted); }
 .tile-soon { opacity: 0.6; }
+/* 홈 아래 접힌 '개발 중' 묶음 (제작자 요청 2026-11-02): 개발 중·검토 후 오픈 칸, 평소에는 접힘 */
+.soon-fold {
+  display: block; width: 100%; margin: 12px 0 8px; padding: 6px 2px; text-align: left; font-size: 12px;
+  color: var(--muted); background: none; border: 0; border-top: 1px solid rgba(74, 63, 134, 0.6); cursor: pointer;
+}
 .tile-locked { cursor: default; }
 .tile-locked:active { transform: none; }
 .tile-badge {
@@ -1663,13 +1668,26 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 .todo-head b.todo-all { color: #7dffb0; }
 .todo-head small { margin-left: auto; font-size: 11px; font-weight: 400; color: var(--muted); text-shadow: none; }
 .todo-list { list-style: none; margin: 0; padding: 0; }
-.todo-row { display: flex; align-items: stretch; border-top: 1px solid rgba(74, 63, 134, 0.6); }
+.todo-row { border-top: 1px solid rgba(74, 63, 134, 0.6); }
 .todo-row:first-child { border-top: none; }
+.todo-line { display: flex; align-items: stretch; }
+/* 체크 칸만 끝낸 일로 보낸다 (제작자 요청 2026-11-02). 누르기 쉽게 칸 둘레까지 */
+.todo-check { flex: none; display: flex; align-items: center; padding: 0 10px 0 2px; min-height: 44px; background: none; border: none; cursor: pointer; }
+.todo-check:active .todo-box { transform: translate(1px, 1px); }
 .todo-hit {
-  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 9px 2px; min-height: 44px;
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 9px 2px; min-height: 44px;
   background: none; border: none; text-align: left; cursor: pointer;
 }
 .todo-hit:active { transform: translate(1px, 1px); }
+.todo-hit-plain { cursor: default; }
+.todo-hit-plain:active { transform: none; }
+.todo-more { flex: none; font-size: 11px; color: var(--muted); }
+/* 이름을 누르면 펼쳐지는 요약: 할 것, 기간을 몰라 손해 보는 것 */
+.todo-detail { margin: -4px 0 8px 32px; padding: 6px 8px; display: grid; gap: 3px; background: rgba(11, 10, 26, 0.35); border-left: 2px solid var(--hi); }
+.todo-step { margin: 0; font-size: 13px; color: var(--text); }
+.todo-step::before { content: "· "; color: var(--muted); }
+.todo-warn { margin: 0; font-size: 13px; color: var(--sunset); }
+.todo-done .todo-detail { opacity: 0.6; }
 .todo-box {
   flex: none; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1;
   background: var(--lo); border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 #0b0a1a; color: var(--edge);

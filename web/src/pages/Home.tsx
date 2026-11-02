@@ -89,7 +89,10 @@ export function Home({ me }: { me: Me }) {
   const grid = layout.grid.map(itemOf).filter((t): t is LaunchItem => !!t && canSee(t, me));
   // 검색은 아래 탭에 있으면 홈에 검색 칸을 두지 않고, 홈으로 올리면 맨 위에 검색 칸이 생긴다 (제작자 요청 2026-11-01)
   const searchUp = grid.some((t) => t.key === "search");
-  const tiles = grid.filter((t) => t.key !== "search");
+  // 열린 칸만 홈에 보이고, 개발 중·검토 후 오픈 칸은 그 아래 접힌 '개발 중' 묶음에 (제작자 요청 2026-11-02: 평소에는 접혀서 안 보이게)
+  const tiles = grid.filter((t) => t.key !== "search" && !t.soon);
+  const soon = grid.filter((t) => t.soon);
+  const [showSoon, setShowSoon] = useState(false);
   const dragKey = L.drag?.moved ? L.drag.key : undefined;
 
   return (
@@ -148,6 +151,15 @@ export function Home({ me }: { me: Me }) {
       )}
 
       <Tiles me={me} tiles={tiles} editable dragKey={dragKey} />
+
+      {soon.length > 0 && !L.editing && (
+        <>
+          <button className="soon-fold" onClick={() => setShowSoon((v) => !v)} aria-expanded={showSoon}>
+            🚧 개발 중 {soon.length} {showSoon ? "▴" : "▾"}
+          </button>
+          {showSoon && <Tiles me={me} tiles={soon} />}
+        </>
+      )}
 
       {/* 배치 편집: 아래 탭 왼쪽 끝 바로 위에 작게 (제작자 요청 2026-11-01: 꾹 누르기와 함께, 버전 글씨의 반대편) */}
       {!L.editing && (

@@ -439,7 +439,7 @@ CREATE INDEX IF NOT EXISTS official_news_date ON official_news (kind, start_date
 CREATE TABLE IF NOT EXISTS official_todo (
   id INTEGER PRIMARY KEY,                 -- official_news.id
   src TEXT,                               -- 정리한 원문의 표시 (official_news.src)
-  tasks TEXT NOT NULL,                    -- JSON [{t 할 일, n 어디서, c d|w|o, days 요일, at 시각, s 시작, e 끝, lv [최소, 최대], jobs}]
+  tasks TEXT NOT NULL,                    -- JSON [{t 할 일, n 어디서, c d|w|o, days 요일, at 시각, s 시작, e 끝, lv [최소, 최대], jobs, d 할 것, w 손해 주의}]
   until INTEGER NOT NULL,                 -- 할 일이 끝나는 가장 늦은 때 (없으면 0): To do 는 이것이 지금보다 뒤인 글만 읽는다
   made_at INTEGER NOT NULL,               -- 정리한 때 (0 이면 아직)
   claimed_at INTEGER,                     -- 정리를 맡은 때 (10분 안이면 다른 곳이 손대지 않는다)
