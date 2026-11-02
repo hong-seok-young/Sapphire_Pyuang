@@ -123,6 +123,29 @@ export function WeatherFx({ sky }: { sky: Sky }) {
     const flakes: Flake[] = [];
     const bits: Bit[] = [];
     const rings: Ring[] = [];
+    /**
+     * 빈 곳을 누르면 그 자리에서 눈송이·빗방울이 폭죽처럼 팡 터졌다가 그대로 바닥으로 떨어진다 (제작자 요청 2026-11-02).
+     * 바닥에 닿으면 눈은 쌓인 눈에, 비는 고인 빗물에 더해진다
+     */
+    type Spark = { x: number; y: number; vx: number; vy: number; s: number };
+    const sparks: Spark[] = [];
+    const flashes: { x: number; y: number; life: number }[] = [];
+    /** 누르는 곳: 칸·단추·링크·입력·아래 탭 위는 그 일을 하게 두고 빈 곳만 */
+    const BUSY = "a, button, input, textarea, select, label, [role=button], [role=link], .tile, .tabbar, .home-corner, .home-weather, .wx-ask, .topbar";
+    const onTap = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (!t || t.closest(BUSY) || e.clientY >= ground) return;
+      if (sparks.length > 400) return;
+      const n = snow ? 30 : 24;
+      for (let i = 0; i < n; i++) {
+        const a = (Math.PI * 2 * i) / n + rnd(-0.2, 0.2);
+        const sp = rnd(3, 7);
+        sparks.push({ x: e.clientX, y: e.clientY, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1.5, s: snow ? (Math.random() < 0.3 ? 3 : Math.random() < 0.5 ? 2 : 1) : 1 });
+      }
+      // 터지는 순간 가운데가 반짝
+      flashes.push({ x: e.clientX, y: e.clientY, life: 1 });
+    };
+    window.addEventListener("pointerdown", onTap);
     const newDrop = (top: boolean): Drop => ({
       x: rnd(0, w),
       y: top ? rnd(-ground * 0.3, -10) : rnd(-20, ground),
@@ -319,6 +342,61 @@ export function WeatherFx({ sky }: { sky: Sky }) {
           }
         }
       }
+      // 폭죽: 사방으로 터졌다가(공기에 느려지고) 무게로 바닥까지 쭉 떨어진다
+      for (let i = flashes.length - 1; i >= 0; i--) {
+        const f = flashes[i];
+        f.life -= 0.12 * k;
+        if (f.life <= 0) {
+          flashes.splice(i, 1);
+          continue;
+        }
+        const r = snap((1 - f.life) * 10) + P;
+        ctx.globalAlpha = f.life;
+        ctx.fillStyle = snow ? "#ffffff" : "rgba(210, 232, 255, 1)";
+        ctx.fillRect(snap(f.x) - r, snap(f.y), P, P);
+        ctx.fillRect(snap(f.x) + r, snap(f.y), P, P);
+        ctx.fillRect(snap(f.x), snap(f.y) - r, P, P);
+        ctx.fillRect(snap(f.x), snap(f.y) + r, P, P);
+        ctx.fillRect(snap(f.x) - P, snap(f.y) - P, P * 3, P * 3);
+      }
+      ctx.globalAlpha = 1;
+      for (let i = sparks.length - 1; i >= 0; i--) {
+        const sp = sparks[i];
+        sp.vx *= Math.pow(0.95, k);
+        sp.vy = sp.vy * Math.pow(0.97, k) + 0.22 * k;
+        sp.x += sp.vx * k;
+        sp.y += sp.vy * k;
+        const c = Math.max(0, Math.min(cols - 1, Math.floor(sp.x / P)));
+        const floor = ground - (snow ? pile[c] ?? 0 : water[c] ?? 0) * P;
+        if (sp.x < -6 || sp.x > w + 6) {
+          sparks.splice(i, 1);
+          continue;
+        }
+        if (sp.vy > 0 && sp.y >= floor - P) {
+          if (snow) land(sp.x, sp.s);
+          else {
+            drip(sp.x);
+            splash(snap(sp.x), floor);
+          }
+          sparks.splice(i, 1);
+          continue;
+        }
+        const x = snap(sp.x);
+        const y = snap(sp.y);
+        if (snow) {
+          ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+          if (sp.s === 3) {
+            ctx.fillRect(x - P, y, P * 3, P);
+            ctx.fillRect(x, y - P, P, P * 3);
+          } else ctx.fillRect(x, y, P * sp.s, P * sp.s);
+        } else {
+          // 빗방울: 움직이는 쪽으로 짧은 꼬리
+          ctx.fillStyle = "rgba(190, 220, 255, 0.95)";
+          ctx.fillRect(x, y, P, P);
+          ctx.fillStyle = "rgba(165, 205, 255, 0.5)";
+          ctx.fillRect(snap(sp.x - sp.vx), snap(sp.y - sp.vy), P, P);
+        }
+      }
     };
     raf = requestAnimationFrame(frame);
     // 다른 앱·탭에 가 있으면 멈춘다
@@ -335,6 +413,7 @@ export function WeatherFx({ sky }: { sky: Sky }) {
       window.clearInterval(remeasure);
       window.removeEventListener("resize", size);
       document.removeEventListener("visibilitychange", vis);
+      window.removeEventListener("pointerdown", onTap);
     };
   }, [sky]);
   return <canvas className="wx-fx" ref={ref} aria-hidden />;
