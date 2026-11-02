@@ -412,6 +412,25 @@ function MyTimes({ me, data, onSaved, onError }: { me: string; data: GdData; onS
   bitsRef.current = bits;
   const drag = useRef<{ val: boolean; changed: boolean } | null>(null);
   const grid = useRef<HTMLDivElement>(null);
+  // 확정: 다 칠한 뒤 누르면 시간표가 잠겨 스크롤하다 잘못 눌러도 안 바뀐다. '수정'을 누르면 풀린다
+  // (제작자 요청 2026-11-02 '자꾸 스크롤하다가 막 누르게 된다'). 이 기기에 계정·주마다 기억한다
+  const lockKey = `sapphire.gd.lock.${me}.${data.week}`;
+  const [lock, setLockState] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(lockKey) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setLock = (v: boolean) => {
+    setLockState(v);
+    try {
+      if (v) localStorage.setItem(lockKey, "1");
+      else localStorage.removeItem(lockKey);
+    } catch {
+      // 저장 못 해도 이번에 연 동안은 잠긴다
+    }
+  };
   // 지난 칸도 칠할 수 있다: 매주 같은 루틴을 그대로 적어 두려고 (제작자 요청 2026-11-02 '시간 지났다고 비활성화하지 마'). 후보는 앞으로 올 때만 (서버)
   const locked = (i: number) => !validSlot(i);
 
@@ -439,6 +458,7 @@ function MyTimes({ me, data, onSaved, onError }: { me: string; data: GdData; onS
     return v === undefined ? null : Number(v);
   };
   const down = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (lock) return;
     const i = cellAt(e.clientX, e.clientY);
     if (i === null || locked(i)) return;
     e.preventDefault();
@@ -472,23 +492,37 @@ function MyTimes({ me, data, onSaved, onError }: { me: string; data: GdData; onS
 
   return (
     <section className="panel gd-times">
-      <div className="gd-times-head">
+      {/* 한 줄: 내 시간표 · 시간 · (전주 복사 · 모두 지우기) · 확정/수정 (제작자 요청 2026-11-02) */}
+      <div className="gd-times-head gd-mine-head">
         <b>내 시간표</b>
-        <small>{count ? `${count / 2}시간` : "칠한 때 없음"}{state === "saving" ? " · 저장 중" : state === "saved" ? " · 저장됨" : ""}</small>
-      </div>
-      <div className="gd-tools">
-        {data.prev && data.prev !== bits && (
-          <button className="bd-mini" onClick={() => fill(data.prev!)}>
-            전주 복사
+        <small>
+          {count ? `${count / 2}시간` : "칠한 때 없음"}
+          {lock ? " · 확정" : state === "saving" ? " · 저장 중" : state === "saved" ? " · 저장됨" : ""}
+        </small>
+        <span className="gd-tools">
+          {!lock && data.prev && data.prev !== bits && (
+            <button className="bd-mini" onClick={() => fill(data.prev!)}>
+              전주 복사
+            </button>
+          )}
+          {!lock && count > 0 && (
+            <button className="bd-mini" onClick={() => fill(EMPTY)}>
+              모두 지우기
+            </button>
+          )}
+          <button className={"pill gd-lock" + (lock ? "" : " pill-on")} onClick={() => setLock(!lock)}>
+            {lock ? "수정" : "확정"}
           </button>
-        )}
-        {count > 0 && (
-          <button className="bd-mini" onClick={() => fill(EMPTY)}>
-            모두 지우기
-          </button>
-        )}
+        </span>
       </div>
-      <div ref={grid} className="gd-grid gd-grid-edit" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
+      <div
+        ref={grid}
+        className={"gd-grid" + (lock ? " gd-grid-locked" : " gd-grid-edit")}
+        onPointerDown={down}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={up}
+      >
         <Head week={data.week} />
         {Array.from({ length: ROWS }, (_, r) => (
           <Row key={r} row={r}>

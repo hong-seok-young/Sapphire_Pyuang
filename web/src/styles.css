@@ -2454,7 +2454,12 @@ button.gd-member-row { cursor: pointer; }
 .gd-times-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin-bottom: 4px; }
 .gd-times-head b { font-size: 14px; color: var(--gold); font-weight: 400; }
 .gd-times-head small { font-size: 11px; color: var(--muted); }
-.gd-tools { display: flex; flex-wrap: wrap; gap: 8px; min-height: 4px; margin-bottom: 4px; }
+.gd-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* 내 시간표 머리 한 줄: 제목 · 시간 · 단추들 (단추는 오른쪽, 자리가 모자라면 다음 줄 오른쪽으로) */
+.gd-mine-head { flex-wrap: wrap; align-items: center; justify-content: flex-start; row-gap: 4px; margin-bottom: 6px; }
+.gd-mine-head > .gd-tools { margin-left: auto; }
+.gd-lock { padding: 3px 12px; font-size: 12px; }
+.gd-grid-locked .gd-cell { cursor: default; }
 /* 시간표: 왼쪽 시간 줄 + 7일. 칸 높이는 손가락으로 칠하기 좋게 */
 .gd-grid { display: grid; grid-template-columns: 26px repeat(7, minmax(0, 1fr)); gap: 1px; user-select: none; -webkit-user-select: none; }
 .gd-corner { display: block; }
