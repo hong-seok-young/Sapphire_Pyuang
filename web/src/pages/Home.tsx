@@ -165,6 +165,18 @@ export function Home({ me }: { me: Me }) {
         </>
       )}
 
+    </div>
+  );
+}
+
+/**
+ * 홈의 아래 탭 바로 위 작은 글씨 둘. 화면이 떠오르는 효과(.page 의 transform) 밖에 두어야 처음부터 아래에 있다
+ * (제작자 요청 2026-11-02: 위에 있다가 확 내려왔다). App.tsx 가 홈일 때 <main> 옆에 그린다
+ */
+export function HomeCorner() {
+  const L = useLauncher();
+  return (
+    <>
       {/* 배치 편집: 아래 탭 왼쪽 끝 바로 위에 작게 (제작자 요청 2026-11-01: 꾹 누르기와 함께, 버전 글씨의 반대편) */}
       {!L.editing && (
         <button className="home-edit" onClick={() => setEditing(true)}>
@@ -176,7 +188,7 @@ export function Home({ me }: { me: Me }) {
       <a className="home-version" href="#/patch">
         v{VERSION}
       </a>
-    </div>
+    </>
   );
 }
 
