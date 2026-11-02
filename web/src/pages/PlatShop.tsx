@@ -5,7 +5,7 @@ import { errorText } from "../auth";
 import { ago, goldText, goldWords } from "../market";
 import { PLAT_PACKS, SHOP_PIC, actOrder, budget, discount, fetchShop, goldOf, orderItem, packsOf, packsWithin, saveShopItem, saveShopSettings, setOrderGold } from "../platshop";
 import type { ShopData, ShopItem, ShopOrder, ShopSettings, Wallet } from "../platshop";
-import { Loading, TopBar } from "../ui";
+import { FitLine, Loading, TopBar } from "../ui";
 import { WEEK } from "../week";
 
 type Tab = "shop" | "mine" | "pending" | "ledger" | "settings" | "budget";
@@ -714,8 +714,7 @@ function ItemRule({ it, settings, busy, run }: {
   );
 }
 
-/** 원스토어 할인율 빠른 고르기 (그때그때 달라서 직접 적을 수도 있다) */
-const STORE_OFFS = [18, 20, 30];
+/** 원스토어 할인율 (그때그때 달라서 손으로 적는다, 이 폰에 기억) */
 const OFF_KEY = "sapphire-store-off";
 /** 현금 1원이 몇 골드인지 (제작자 요청: 처음 75) */
 const RATE_KEY = "sapphire-won-gold";
@@ -793,16 +792,15 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
   };
   const step = (i: number, d: number) => setCounts(counts.map((c, j) => (j === i ? Math.max(0, Math.min(99, c + d)) : c)));
   /** 쓴 돈과 그 골드, 길드원이 사 가는 만큼(산 것보다 많이는 못 산다)과 남는 플래티넘(1군 비율로 골드로, 제작자 요청) */
-  const { paid, spentGold, soldPart, left, leftGold, inGold } = now;
+  const { paid, spentGold, soldPart, left, inGold } = now;
   /** 1군, 고스펙 따로: 쓴 돈을 산 플래티넘 중 그쪽이 사 간 만큼으로 나눠 친다 */
   const share = (plat: number) => (buy.plat > 0 ? (paid * plat) / buy.plat : 0);
   const gem = <img src={SHOP_PIC + "plat.png"} alt="" />;
   return (
     <>
-      <section className="panel ps-settings">
-        <h2 className="panel-title">예산 검토</h2>
-        {/* 충전할 양이 맨 위 (제작자 요청): 현금으로 얼마어치, 또는 상품마다 개수 고르기 */}
-        <div className="mk-chips">
+      {/* 칸을 작게 두 줄씩 (제작자 요청 2026-11-02: '예산 쪽도 콤팩트하게', 할인율은 손으로만 적는다) */}
+      <section className="panel ps-settings ps-budget">
+        <div className="pill-row">
           <button className={"pill" + (mode === "won" ? " pill-on" : "")} onClick={() => setMode("won")}>
             현금으로 충전
           </button>
@@ -810,157 +808,148 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
             상품 고르기
           </button>
         </div>
-        {mode === "won" ? (
-          <>
-            <label className="ps-charge">
-              충전
-              <input
-                className="ps-charge-input"
-                inputMode="numeric"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value.replace(/\D/g, "").slice(0, 9))}
-                placeholder="110000"
-              />{" "}
-              원어치
-            </label>
-          </>
-        ) : (
-          <>
-            {/* 게임 상점 상품마다 − + (제작자 요청) */}
-            <ul className="ps-packs ps-pick">
-              {PLAT_PACKS.map((k, i) => (
-                <li key={k.plat} className={counts[i] ? "ps-pick-on" : ""}>
-                  <span>
-                    {gem}
-                    {k.plat.toLocaleString("ko-KR")}개
-                  </span>
-                  <b>{won(k.won)}</b>
-                  <span className="ps-step">
-                    <button onClick={() => step(i, -1)} disabled={!counts[i]} aria-label={`${k.plat}개 하나 빼기`}>
-                      −
-                    </button>
-                    <em>{counts[i]}</em>
-                    <button onClick={() => step(i, 1)} aria-label={`${k.plat}개 하나 더`}>
-                      +
-                    </button>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </>
+        {mode === "pick" && (
+          // 게임 상점 상품마다 − + (제작자 요청)
+          <ul className="ps-packs ps-pick">
+            {PLAT_PACKS.map((k, i) => (
+              <li key={k.plat} className={counts[i] ? "ps-pick-on" : ""}>
+                <span>
+                  {gem}
+                  {k.plat.toLocaleString("ko-KR")}개
+                </span>
+                <b>{won(k.won)}</b>
+                <span className="ps-step">
+                  <button onClick={() => step(i, -1)} disabled={!counts[i]} aria-label={`${k.plat}개 하나 빼기`}>
+                    −
+                  </button>
+                  <em>{counts[i]}</em>
+                  <button onClick={() => step(i, 1)} aria-label={`${k.plat}개 하나 더`}>
+                    +
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
-        <label>
-          원스토어 할인
-          <input
-            inputMode="decimal"
-            value={off}
-            onChange={(e) => {
-              const v = e.target.value.replace(/[^\d.]/g, "").slice(0, 4);
-              setOff(v);
-              remember(OFF_KEY, v);
-            }}
-          />{" "}
-          %
-        </label>
-        <div className="mk-chips">
-          {STORE_OFFS.map((v) => (
-            <button
-              key={v}
-              className={"pill" + (rate === v ? " pill-on" : "")}
-              onClick={() => {
-                setOff(String(v));
-                remember(OFF_KEY, String(v));
+        <div className="ps-fields">
+          {mode === "won" && (
+            <label className="ps-f ps-f-wide">
+              <FitLine text="충전" wrap={false} />
+              <input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, "").slice(0, 9))} placeholder="110000" />
+              <em>원</em>
+            </label>
+          )}
+          <label className="ps-f">
+            <FitLine text="원스토어 할인" wrap={false} />
+            <input
+              inputMode="decimal"
+              value={off}
+              onChange={(e) => {
+                const v = e.target.value.replace(/[^\d.]/g, "").slice(0, 4);
+                setOff(v);
+                remember(OFF_KEY, v);
               }}
-            >
-              {v}%
-            </button>
-          ))}
+            />
+            <em>%</em>
+          </label>
+          <label className="ps-f">
+            <FitLine text="기간" wrap={false} />
+            <input inputMode="numeric" value={weeks} onChange={(e) => setWeeks(e.target.value.replace(/\D/g, ""))} />
+            <em>주</em>
+          </label>
+          <label className="ps-f">
+            <FitLine text="1군" wrap={false} />
+            <input inputMode="numeric" value={n} onChange={(e) => setN(e.target.value.replace(/\D/g, ""))} />
+            <em>명</em>
+          </label>
+          <label className="ps-f">
+            <FitLine text="고스펙" wrap={false} />
+            <input inputMode="numeric" value={h} onChange={(e) => setH(e.target.value.replace(/\D/g, ""))} />
+            <em>명</em>
+          </label>
+          <label className="ps-f ps-f-wide">
+            <FitLine text="현금 : 골드" wrap={false} />
+            <em>1 :</em>
+            <input
+              inputMode="decimal"
+              value={goldRate}
+              onChange={(e) => {
+                const v = e.target.value.replace(/[^\d.]/g, "").slice(0, 6);
+                setGoldRate(v);
+                remember(RATE_KEY, v);
+              }}
+            />
+          </label>
         </div>
-        <label>
-          1군 <input inputMode="numeric" value={n} onChange={(e) => setN(e.target.value.replace(/\D/g, ""))} /> 명 · 고스펙
-          <input inputMode="numeric" value={h} onChange={(e) => setH(e.target.value.replace(/\D/g, ""))} /> 명
-        </label>
-        <label>
-          기간 <input inputMode="numeric" value={weeks} onChange={(e) => setWeeks(e.target.value.replace(/\D/g, ""))} /> 주
-        </label>
-        <label>
-          현금 : 골드 = 1 :
-          <input
-            inputMode="decimal"
-            value={goldRate}
-            onChange={(e) => {
-              const v = e.target.value.replace(/[^\d.]/g, "").slice(0, 6);
-              setGoldRate(v);
-              remember(RATE_KEY, v);
-            }}
-          />
-        </label>
       </section>
+      {/* 결과: 카드마다 이름 · 큰 숫자 · 작은 한 줄 (제작자 요청 2026-11-02: 콤팩트하게) */}
       <div className="ps-review">
         <div className="panel">
           <b>구매</b>
-          <span>
-            {gem}
-            {buy.plat.toLocaleString("ko-KR")}
-          </span>
           <span className="ps-review-big">{won(paid)}</span>
           <small>
-            원스토어 {rate}% · 정가 {won(buy.won)}
+            {gem}
+            {buy.plat.toLocaleString("ko-KR")} · 정가 {won(buy.won)}
           </small>
         </div>
         <div className="panel">
           <b>판매</b>
-          <span>길드원이 다 사 가면</span>
           <span className="ps-review-big">{man(inGold)}</span>
-          {left > 0 && (
-            <small>
-              남는 {gem}
-              {left.toLocaleString("ko-KR")} = {man(leftGold)} 포함
-            </small>
-          )}
-          {buy.plat < b.plat && (
+          {buy.plat < b.plat ? (
             <small className="ps-down">
               {gem}
               {(b.plat - buy.plat).toLocaleString("ko-KR")} 모자라요
+            </small>
+          ) : (
+            <small>
+              {left > 0 ? (
+                <>
+                  남는 {gem}
+                  {left.toLocaleString("ko-KR")} 포함
+                </>
+              ) : (
+                "다 사 가면"
+              )}
             </small>
           )}
         </div>
         <div className="panel">
           <b>손익</b>
-          <span>쓴 돈 = {man(spentGold)}</span>
           <Gain v={inGold - spentGold} className="ps-review-big" />
-          <small>1원 = {perWon}골드</small>
+          <small>쓴 돈 {man(spentGold)}</small>
         </div>
       </div>
-      {/* 사는 상품: 결과 카드 바로 아래, 게임 상점 칸처럼 '13,000개 ×7' (제작자 요청) */}
-      <section className="panel ps-buy-packs">
-        <h3>
-          사는 상품 <small>{gem}
-          {buy.plat.toLocaleString("ko-KR")} · 정가 {won(buy.won)}</small>
-        </h3>
-        <ul className="ps-packs">
-          {buy.packs.map((k) => (
-            <li key={k.plat}>
-              <span>
-                {gem}
-                {k.plat.toLocaleString("ko-KR")}개
-              </span>
-              <b>{won(k.won)}</b>
-              <em>×{k.count}</em>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {/* 사는 상품: 게임 상점 칸처럼 '13,000개 ×7' (제작자 요청), 작게 */}
+      {buy.packs.length > 0 && (
+        <section className="panel ps-buy-packs">
+          <h3>사는 상품</h3>
+          <ul className="ps-packs">
+            {buy.packs.map((k) => (
+              <li key={k.plat}>
+                <span>
+                  {gem}
+                  {k.plat.toLocaleString("ko-KR")}개
+                </span>
+                <b>{won(k.won)}</b>
+                <em>×{k.count}</em>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {/* 1군, 고스펙 따로: 한 줄씩 */}
       <ul className="ps-review-groups">
         {b.rows.map((r) => (
           <li key={r.name} className="panel">
-            <b>
-              {r.name} {r.people}명
-            </b>
-            <small>
-              {gem}
-              {Math.round(r.plat * soldPart).toLocaleString("ko-KR")} · {r.ratio}:100 · 들어오는 골드 {man(r.gold * soldPart)}
-            </small>
+            <span>
+              <b>
+                {r.name} {r.people}명
+              </b>
+              <small>
+                {gem}
+                {Math.round(r.plat * soldPart).toLocaleString("ko-KR")} · {r.ratio}:100 · {man(r.gold * soldPart)}
+              </small>
+            </span>
             <Gain v={r.gold * soldPart - share(r.plat * soldPart) * perWon} />
           </li>
         ))}

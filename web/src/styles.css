@@ -2203,3 +2203,28 @@ input, textarea { min-width: 0; max-width: 100%; }
 .rent-due { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
 .rent-due b { min-width: 52px; font-size: 15px; color: var(--gold); }
 .rent-due .pill { padding: 3px 9px; }
+/* 예산 검토 (제작자 요청 2026-11-02: 콤팩트하게): 칸 이름 · 입력 · 단위를 두 칸씩, 결과 카드도 작게 */
+.ps-budget { padding: 8px; }
+.ps-budget .pill-row { margin-bottom: 8px; }
+.ps-budget .pill-row .pill { padding-top: 5px; padding-bottom: 5px; }
+.ps-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 10px; }
+.ps-settings label.ps-f { display: flex; align-items: center; gap: 4px; margin: 0; font-size: 12px; min-width: 0; }
+.ps-f > .fit-line { flex: 1; min-width: 0; color: var(--muted); }
+.ps-f > em { flex: none; font-style: normal; font-size: 12px; color: var(--muted); }
+.ps-settings .ps-f input { flex: none; width: 52px; height: 26px; font-size: 13px; }
+.ps-settings .ps-f-wide { grid-column: 1 / -1; }
+.ps-settings .ps-f-wide input { width: 110px; }
+.ps-budget .ps-pick { margin-bottom: 8px; }
+.ps-review .panel { padding: 6px 3px; gap: 2px; }
+.ps-review-big { font-size: 13px; }
+.ps-budget ~ .ps-review { margin-top: 0; }
+.ps-budget ~ .ps-review .panel { padding: 6px 3px 5px; }
+.ps-budget ~ .ps-buy-packs { padding: 6px 8px 8px; }
+.ps-budget ~ .ps-buy-packs h3 { margin-bottom: 4px; font-size: 12px; }
+.ps-budget ~ .ps-buy-packs .ps-packs { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); }
+.ps-budget ~ .ps-buy-packs .ps-packs li { padding: 3px 2px; font-size: 11px; }
+.ps-budget ~ .ps-buy-packs .ps-packs li em { font-size: 13px; }
+.ps-budget ~ .ps-review-groups { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.ps-budget ~ .ps-review-groups li { flex-direction: row; justify-content: space-between; gap: 8px; padding: 6px 10px; text-align: left; }
+.ps-budget ~ .ps-review-groups li > span { display: grid; min-width: 0; }
+.ps-budget ~ .ps-review-groups li .ps-review-gain { flex: none; font-size: 12px; }
