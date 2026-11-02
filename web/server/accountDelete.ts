@@ -1,6 +1,7 @@
 // 계정 지우기 (길드원 관리의 '계정 삭제'와, 본인이 '내 정보'에서 요청한 계정 삭제를 운영진이 승낙할 때 같이 쓴다)
 // 본캐를 지우는데 부캐가 있으면 가장 먼저 묶은 부캐가 본캐가 되고 비밀번호를 이어받는다. 기록은 그 사람 것만 지우고 길드 장부(장비대여)는 남긴다
 import type { Env } from "./auth";
+import { eachLog } from "./logdb";
 
 export async function deleteAccountData(env: Env, user: { id: string; main_id: string | null }): Promise<void> {
   // 본캐를 지우는데 부캐가 있으면: 가장 먼저 묶은 부캐가 본캐가 되고 비밀번호를 이어받는다 (그 사람은 새 본캐 아이디로 로그인)
@@ -73,4 +74,6 @@ export async function deleteAccountData(env: Env, user: { id: string; main_id: s
     env.DB.prepare("DELETE FROM delete_requests WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM users WHERE id = ?").bind(user.id),
   ]);
+  // 사용 기록 DB 2~10 의 그 사람 기록 (server/logdb.ts)
+  await eachLog(env, "DELETE FROM activity WHERE user_id = ?", user.id);
 }

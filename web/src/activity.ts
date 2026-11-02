@@ -69,12 +69,29 @@ export const KIND_NAME: Record<Kind, string> = { visit: "접속", view: "화면"
 /** DB 를 무엇이 얼마나 쓰는지 (사용 기록의 '자세히', 앱개발자만) */
 export const fetchUsage = () => api<{ total: number | null; limit: number; parts: { name: string; bytes: number }[] }>("/api/activity?usage=1");
 
+/** 사용 기록 DB 2~10 하나 (server/logdb.ts): 크기, 남은 기록 수, 쓰기 시작한 때, 지금 쓰는 곳 */
+export interface LogDbInfo {
+  n: number;
+  bytes: number | null;
+  rows: number;
+  since: number | null;
+  cur: boolean;
+}
+export interface Storage {
+  rows: number;
+  /** DB 1 (계정·글·사진) 크기 */
+  bytes: number | null;
+  logs?: LogDbInfo[];
+  /** 사용 기록 DB 하나를 이만큼 채우면 다음 DB 로 */
+  logFull?: number;
+}
+
 export function fetchActivity(q: { user?: string | null; kind?: Kind | null; before?: number }) {
   const p = new URLSearchParams();
   if (q.user) p.set("user", q.user);
   if (q.kind) p.set("kind", q.kind);
   if (q.before) p.set("before", String(q.before));
-  return api<{ rows: ActivityRow[]; more: boolean; people?: Person[]; devices?: DeviceInfo[]; storage?: { rows: number; bytes: number | null } }>(
+  return api<{ rows: ActivityRow[]; more: boolean; people?: Person[]; devices?: DeviceInfo[]; storage?: Storage }>(
     `/api/activity?${p}`,
   );
 }

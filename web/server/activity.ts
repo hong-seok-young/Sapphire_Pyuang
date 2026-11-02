@@ -4,6 +4,7 @@
 // IP, 대략의 위치(Cloudflare 가 아는 도시), 기기. 사진은 그림 대신 장 수와 크기만 적는다.
 import type { Env } from "./auth";
 import { notify } from "./alerts";
+import { LOG_FULL, advanceLog, currentLog } from "./logdb";
 
 /** 남기지 않는 칸: 비밀번호 (로그인, 계정 만들기, 초기화의 password, 비밀번호 바꾸기의 current, next) */
 const SECRET = /pass|^current$|^next$/i;
@@ -109,30 +110,59 @@ export function whereOf(request: Request): Where {
   };
 }
 
-/** 기록 하나. 접속은 화면이 열릴 때 따로 보낸다 (POST /api/activity { open: true }) */
+/**
+ * 기록 하나. 접속은 화면이 열릴 때 따로 보낸다 (POST /api/activity { open: true }).
+ * 사용 기록 DB 2~10 중 지금 쓰는 곳에 쓴다 (server/logdb.ts). 번호는 DB 를 넘어가도 이어진다. 기록이 안 돼도 하던 일은 그대로 끝난다
+ */
 export async function record(env: Env, userId: string, kind: Kind, what: string, detail: string | null, where: Where): Promise<void> {
   const { via, ip, place, device, dev } = where;
-  const res = await env.DB.prepare("INSERT INTO activity (user_id, kind, what, detail, via, ip, place, device, dev, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    .bind(userId, kind, what.slice(0, 200), detail, via, ip, place, device, dev, Date.now())
-    .run();
-  const size = (res.meta as { size_after?: number } | undefined)?.size_after;
-  if (size && size > DB_LIMIT * 0.7) await sizeAlarm(env, size);
+  try {
+    const cur = await currentLog(env);
+    const res = await cur.db
+      .prepare(
+        "INSERT INTO activity (id, user_id, kind, what, detail, via, ip, place, device, dev, at) " +
+          "VALUES (COALESCE((SELECT MAX(id) FROM activity), ?) + 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      )
+      .bind(cur.base, userId, kind, what.slice(0, 200), detail, via, ip, place, device, dev, Date.now())
+      .run();
+    const size = (res.meta as { size_after?: number } | undefined)?.size_after;
+    if (cur.n === 1) {
+      if (size && size > DB_LIMIT * 0.7) await sizeAlarm(env, size);
+    } else {
+      if (size && size > LOG_LIMIT) await advanceLog(env, cur, (text) => toDeveloper(env, text));
+      // 계정 DB(DB 1)는 이제 기록을 쓰지 않아서 50번에 한 번 크기를 본다 (게시판 사진 등이 쌓인다)
+      if (Math.random() < 0.02) {
+        const main = await env.DB.prepare("SELECT 1").run();
+        const mainSize = (main.meta as { size_after?: number } | undefined)?.size_after;
+        if (mainSize && mainSize > DB_LIMIT * 0.7) await sizeAlarm(env, mainSize);
+      }
+    }
+  } catch {
+    // 기록 실패는 무시한다
+  }
 }
 
 /** Cloudflare 무료 요금제의 DB 하나 크기 한도 (D1 Free 500MB). 무료로만 쓴다 (제작자 2026-11-02 '무조건 무료로') */
 export const DB_LIMIT = 500 * 1024 * 1024;
+/** 사용 기록 DB 하나를 이만큼 채우면 다음 DB 로 (server/logdb.ts LOG_FULL) */
+const LOG_LIMIT = LOG_FULL;
 
 /**
- * DB 가 70%, 90% 를 넘으면 앱개발자에게 한 번씩 알린다 (setup 에 적어 두어 한 번만). 그때 사용 기록의 '자세히'로 무엇이 큰지 보고
- * 큰 것을 무료로 따로 쓸 수 있는 다른 D1 DB(무료 10개, 합쳐 5GB)로 옮긴다. 기록은 지우지 않는다
+ * DB 1(계정·글·사진)이 70%, 90% 를 넘으면 앱개발자에게 한 번씩 알린다 (setup 에 적어 두어 한 번만). 그때 사용 기록의 '자세히'로 무엇이 큰지 본다.
+ * 사용 기록은 이미 DB 2~10 에 따로 쓴다 (server/logdb.ts)
  */
 async function sizeAlarm(env: Env, size: number): Promise<void> {
   const level = size > DB_LIMIT * 0.9 ? 90 : 70;
   const res = await env.DB.prepare("INSERT OR IGNORE INTO setup (key, done_at) VALUES (?, ?)").bind(`db_size_${level}`, Date.now()).run();
   if (!res.meta.changes) return;
-  const { results } = await env.DB.prepare("SELECT id FROM users WHERE role = 'developer' AND main_id IS NULL").all<{ id: string }>();
   const mb = Math.round(size / 1024 / 1024);
-  await notify(env, results.map((r) => r.id), "account", `DB 저장 공간이 ${level}%를 넘었어요 (${mb}MB / 500MB). 사용 기록의 '자세히'에서 무엇이 큰지 보세요`, "#/log", "앱");
+  await toDeveloper(env, `DB 1(계정·글·사진) 저장 공간이 ${level}%를 넘었어요 (${mb}MB / 500MB). 사용 기록의 '자세히'에서 무엇이 큰지 보세요`);
+}
+
+/** 앱개발자에게 알림 (DB 크기) */
+async function toDeveloper(env: Env, text: string): Promise<void> {
+  const { results } = await env.DB.prepare("SELECT id FROM users WHERE role = 'developer' AND main_id IS NULL").all<{ id: string }>();
+  await notify(env, results.map((r) => r.id), "account", text, "#/log", "앱");
 }
 
 /** 바꾸는 글의 이름 (지우기 전에 본다): 중개인 물건, 골드 글, 의뢰 */

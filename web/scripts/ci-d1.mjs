@@ -1,6 +1,7 @@
 // 자동 배포(.github/workflows/deploy-web.yml)에서 계정 DB(D1)를 준비한다.
 //  1. sapphire-accounts DB 가 없으면 아시아(apac)에 만들고, 그 database_id 를 wrangler.toml 에 넣는다
 //     (배포하는 서버의 작업 폴더에서만 바꾸고 커밋하지 않는다)
+//     사용 기록 DB 2~10(sapphire-log-2 ~ 10)도 없으면 만들고 차례가 돌아온 가장 오래된 것은 비운다 (아래 '사용 기록 DB 2~10')
 //  2. schema.sql 을 넣는다 (CREATE TABLE IF NOT EXISTS 라 몇 번을 해도 된다). 이미 있는 표에 나중에 더한 칸은 ALTER TABLE 로 넣는다
 //  3. 계정이 하나도 없을 때만 앱개발자 계정(퓨앙)을 저장소 비밀값 DEV_PASSWORD 로 만든다.
 //  4. 저장소 비밀값 FIRST_PASSWORD 가 있으면 시작 계정(길드마스터, 오피서)을 한 번만 만든다 (제작자 요청).
@@ -58,8 +59,18 @@ function insertUser(id, role, password, now) {
   return "INSERT OR IGNORE INTO users (id, role, pw_hash, pw_salt, pw_iter, must_change, created_at, created_by) VALUES (" + values.join(", ") + ");";
 }
 
-function findDb() {
-  return parseJson(wrangler("d1", "list", "--json")).find((d) => d.name === DB)?.uuid;
+const dbList = () => parseJson(wrangler("d1", "list", "--json"));
+function findDb(name = DB) {
+  return dbList().find((d) => d.name === name)?.uuid;
+}
+
+/** wrangler.toml 에서 그 바인딩의 database_id 를 바꾼다 (배포하는 서버의 작업 폴더에서만, 커밋하지 않는다) */
+let toml = readFileSync("wrangler.toml", "utf8");
+function setDbId(binding, uuid) {
+  const next = toml.replace(new RegExp(`(binding = "${binding}"\\n(?:[^\\n]*\\n)*?database_id = )"[^"]*"`), `$1"${uuid}"`);
+  if (next === toml && !toml.includes(`"${uuid}"`)) throw new Error(`wrangler.toml 에 ${binding} 바인딩이 없어요`);
+  toml = next;
+  writeFileSync("wrangler.toml", toml);
 }
 
 let id = findDb();
@@ -69,8 +80,7 @@ if (!id) {
   console.log("계정 DB를 새로 만들었어요");
 }
 if (!id) throw new Error("계정 DB를 찾지 못했어요: " + DB);
-const toml = readFileSync("wrangler.toml", "utf8");
-writeFileSync("wrangler.toml", toml.replace(/^database_id = ".*"$/m, `database_id = "${id}"`));
+setDbId("DB", id);
 
 wrangler("d1", "execute", DB, "--remote", "--yes", "--file=schema.sql");
 
@@ -104,6 +114,58 @@ for (const [table, column, type] of ADDED_COLUMNS) {
     console.log(`${table} 표에 ${column} 칸을 더했어요`);
   }
 }
+// 사용 기록 DB 2~10 (server/logdb.ts, 제작자 요청 2026-11-02: 'DB 10개를 미리 해 놔', '1부터 채우고 2 3 4 진행하고 10까지 차면 1을 비우고').
+// 무료 요금제는 DB 10개(합쳐 5GB)까지: DB 1(sapphire-accounts)은 계정·글·사진이라 비우지 않고, 사용 기록만 sapphire-log-2 ~ 10 을 차례로 쓴다.
+//  1. 없는 DB 는 아시아(apac)에 만들고 표(schema-log.sql)를 넣는다. wrangler.toml 의 LOG2 ~ LOG10 에 그 id 를 넣는다
+//  2. 지금 쓰는 DB 가 절반을 넘었는데 다음 차례 DB 에 예전 기록이 남아 있으면(DB 10 다음 DB 2 처럼 한 바퀴 돈 때) 그 DB 를 지웠다 새로 만들어 비운다.
+//     행을 지우면 무료 쓰기 한도(하루 10만 줄)를 다 써서 DB 째 새로 만든다. 새 id 는 이번 배포에 들어간다
+{
+  const LOG_NUMS = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const LOG_FULL = 450 * 1024 * 1024; // server/logdb.ts 와 같게
+  const logName = (n) => `sapphire-log-${n}`;
+  const makeLog = (n) => {
+    wrangler("d1", "create", logName(n), "--location=apac", "--update-config=false");
+    const uuid = findDb(logName(n));
+    if (!uuid) throw new Error("사용 기록 DB를 만들지 못했어요: " + logName(n));
+    wrangler("d1", "execute", logName(n), "--remote", "--yes", "--file=schema-log.sql");
+    return uuid;
+  };
+  const list = dbList();
+  const ids = new Map();
+  for (const n of LOG_NUMS) {
+    let uuid = list.find((d) => d.name === logName(n))?.uuid;
+    if (!uuid) {
+      try {
+        uuid = makeLog(n);
+        console.log(`사용 기록 DB ${n}을 만들었어요`);
+      } catch {
+        // 계정에 다른 DB 가 있어 무료 10개를 넘는 등: 그 DB 없이 배포한다 (server/logdb.ts 는 없는 DB 를 건너뛴다)
+        console.log(`::warning::사용 기록 DB ${n}을 만들지 못해서 빼고 배포해요 (Cloudflare 무료 요금제는 DB 10개까지)`);
+        toml = toml.replace(new RegExp(`\\[\\[d1_databases\\]\\]\\nbinding = "LOG${n}"\\n[^\\n]*\\n[^\\n]*\\n\\n?`), "");
+        writeFileSync("wrangler.toml", toml);
+        continue;
+      }
+    }
+    ids.set(n, uuid);
+  }
+  const ring = parseJson(
+    wrangler("d1", "execute", DB, "--remote", "--json", "--command", "SELECT n, started_at FROM log_ring WHERE started_at IS NOT NULL ORDER BY started_at DESC"),
+  )[0]?.results ?? [];
+  if (ring.length) {
+    const cur = Number(ring[0].n);
+    const next = LOG_NUMS[(LOG_NUMS.indexOf(cur) + 1) % LOG_NUMS.length];
+    const size = Number(parseJson(wrangler("d1", "execute", logName(cur), "--remote", "--json", "--command", "SELECT 1 AS one"))[0]?.meta?.size_after ?? 0);
+    console.log(`사용 기록은 DB ${cur}에 쓰는 중 (${Math.round(size / 1024 / 1024)}MB / ${LOG_FULL / 1024 / 1024}MB)`);
+    if (ids.has(next) && ring.some((r) => Number(r.n) === next) && size > LOG_FULL / 2) {
+      wrangler("d1", "delete", logName(next), "-y");
+      ids.set(next, makeLog(next));
+      wrangler("d1", "execute", DB, "--remote", "--yes", "--command", `UPDATE log_ring SET started_at = NULL, base = NULL, cleared_at = ${Date.now()} WHERE n = ${next}`);
+      console.log(`다음 차례 DB ${next}의 가장 오래된 사용 기록을 비웠어요`);
+    }
+  }
+  for (const [n, uuid] of ids) setDbId(`LOG${n}`, uuid);
+}
+
 // 더한 칸의 색인 (schema.sql 은 칸이 생기기 전에 돌아서 여기서 만든다)
 wrangler("d1", "execute", DB, "--remote", "--yes", "--command", "CREATE INDEX IF NOT EXISTS official_news_added ON official_news (added_at)");
 

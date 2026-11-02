@@ -187,6 +187,16 @@ CREATE TABLE IF NOT EXISTS activity (
 CREATE INDEX IF NOT EXISTS activity_at ON activity (at);
 CREATE INDEX IF NOT EXISTS activity_user_at ON activity (user_id, at);
 
+-- 사용 기록 DB 2~10 (server/logdb.ts, 제작자 요청 2026-11-02: '1부터 채우고 2 3 4 진행하고 10까지 차면 1을 비우고').
+-- 위 activity 는 이 기능 전의 기록만 남고, 새 기록은 sapphire-log-2 부터 차례로 쓴다. 쓰기 시작한 때와 그 DB 의 첫 기록 번호(base 보다 크다).
+-- 자동 배포가 가장 오래된 DB 를 비우면 started_at, base 를 비우고 cleared_at 을 적는다
+CREATE TABLE IF NOT EXISTS log_ring (
+  n INTEGER PRIMARY KEY,                  -- DB 번호 2~10 (wrangler.toml LOG2 ~ LOG10)
+  started_at INTEGER,
+  base INTEGER,
+  cleared_at INTEGER
+);
+
 -- 알림 (server/alerts.ts, 30일 보관): 나와 관련된 일 (살래요, 입찰, 의뢰 수락 ...). read_at 이 없으면 안 읽음
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -9,3 +9,50 @@ compatibility_date = "2026-10-01"
 binding = "DB"
 database_name = "sapphire-accounts"
 database_id = "00000000-0000-0000-0000-000000000000"
+
+# 사용 기록 DB 2~10 (server/logdb.ts, 제작자 요청 2026-11-02: 무료 DB 10개를 미리 만들고 차례로 채운다).
+# 자동 배포(scripts/ci-d1.mjs)가 없으면 만들고 아래 database_id 를 그 DB 것으로 바꾼다 (끝자리가 DB 번호인 자리 표시).
+[[d1_databases]]
+binding = "LOG2"
+database_name = "sapphire-log-2"
+database_id = "00000000-0000-0000-0000-000000000002"
+
+[[d1_databases]]
+binding = "LOG3"
+database_name = "sapphire-log-3"
+database_id = "00000000-0000-0000-0000-000000000003"
+
+[[d1_databases]]
+binding = "LOG4"
+database_name = "sapphire-log-4"
+database_id = "00000000-0000-0000-0000-000000000004"
+
+[[d1_databases]]
+binding = "LOG5"
+database_name = "sapphire-log-5"
+database_id = "00000000-0000-0000-0000-000000000005"
+
+[[d1_databases]]
+binding = "LOG6"
+database_name = "sapphire-log-6"
+database_id = "00000000-0000-0000-0000-000000000006"
+
+[[d1_databases]]
+binding = "LOG7"
+database_name = "sapphire-log-7"
+database_id = "00000000-0000-0000-0000-000000000007"
+
+[[d1_databases]]
+binding = "LOG8"
+database_name = "sapphire-log-8"
+database_id = "00000000-0000-0000-0000-000000000008"
+
+[[d1_databases]]
+binding = "LOG9"
+database_name = "sapphire-log-9"
+database_id = "00000000-0000-0000-0000-000000000009"
+
+[[d1_databases]]
+binding = "LOG10"
+database_name = "sapphire-log-10"
+database_id = "00000000-0000-0000-0000-000000000010"

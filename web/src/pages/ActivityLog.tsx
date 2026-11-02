@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { errorText } from "../auth";
 import { KIND_NAME, VIA_NAME, actionText, fetchActivity, fetchUsage, pageName, sectionOf } from "../activity";
-import type { ActivityRow, DeviceInfo, Kind, Person } from "../activity";
+import type { ActivityRow, DeviceInfo, Kind, LogDbInfo, Person, Storage } from "../activity";
 import { ago } from "../market";
 import type { Wiki } from "../types";
 import { Loading, TopBar } from "../ui";
@@ -75,7 +75,7 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
   const [query, setQuery] = useState("");
   const [allPeople, setAllPeople] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [storage, setStorage] = useState<{ rows: number; bytes: number | null } | null>(null);
+  const [storage, setStorage] = useState<Storage | null>(null);
   /** '자세히': DB 를 무엇이 얼마나 쓰는지 */
   const [usage, setUsage] = useState<{ total: number | null; parts: { name: string; bytes: number }[] } | "loading" | null>(null);
   /** 펼친 묶음 (그 묶음 맨 위 기록 번호) */
@@ -126,14 +126,19 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
       {/* 기록은 지우지 않고 쌓는다. 한도는 DB 크기뿐이라 얼마나 찼는지 (제작자 2026-11-02 '사용 기록 무제한으로 못 쌓아?') */}
       {storage && (
         <div className="log-storage">
-          <span>
-            기록 {storage.rows.toLocaleString()}건{storage.bytes !== null && ` · 저장 ${mbText(storage.bytes)} / ${mbText(DB_LIMIT)}`}
-          </span>
+          <span>기록 {storage.rows.toLocaleString()}건</span>
           {storage.bytes !== null && (
-            <span className="log-storage-bar">
-              <i style={{ width: `${Math.min(100, (storage.bytes / DB_LIMIT) * 100)}%` }} />
-            </span>
+            <>
+              <span className="log-storage-line">
+                <b>DB 1 계정·글·사진</b> {mbText(storage.bytes)} / {mbText(DB_LIMIT)}
+              </span>
+              <span className="log-storage-bar">
+                <i style={{ width: `${Math.min(100, (storage.bytes / DB_LIMIT) * 100)}%` }} />
+              </span>
+            </>
           )}
+          {/* 사용 기록 DB 2~10 (제작자 요청 2026-11-02: 차례로 채우고 10까지 차면 가장 오래된 것을 비운다, server/logdb.ts) */}
+          {storage.logs && storage.logFull && <LogRing logs={storage.logs} full={storage.logFull} />}
           {usage === null ? (
             <button
               type="button"
@@ -330,6 +335,27 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
           </button>
         </div>
       )}
+    </>
+  );
+}
+
+/** 사용 기록 DB 2~10: 칸마다 찬 만큼, 지금 쓰는 칸은 금색 테두리 */
+function LogRing({ logs, full }: { logs: LogDbInfo[]; full: number }) {
+  const cur = logs.find((l) => l.cur);
+  return (
+    <>
+      <span className="log-storage-line">
+        <b>사용 기록 DB 2~10</b>
+        {cur && cur.bytes !== null && ` 지금 DB ${cur.n} ${mbText(cur.bytes)} / ${mbText(full)}`}
+      </span>
+      <span className="log-ring" role="img" aria-label={`사용 기록 DB ${cur ? cur.n : 2}에 쓰는 중`}>
+        {logs.map((l) => (
+          <span key={l.n} className={"log-ring-cell" + (l.cur ? " log-ring-cur" : "") + (l.since === null ? " log-ring-empty" : "")}>
+            <i style={{ height: `${l.since === null || l.bytes === null ? 0 : Math.min(100, Math.max(4, (l.bytes / full) * 100))}%` }} />
+            <small>{l.n}</small>
+          </span>
+        ))}
+      </span>
     </>
   );
 }

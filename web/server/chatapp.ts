@@ -12,6 +12,7 @@
 // - To do 는 개발 중이라 미리 보는 사람(운영진, 앱개발자, 테스트 계정)에게만, 장비대여는 2026-11-02 열었다
 // 칸마다 글자 수를 정해 두어 질문이 너무 길어지지 않게 한다.
 import { RANK, TEST_IDS } from "./auth";
+import { covering, fromLogs, logDbs, newestLogs } from "./logdb";
 import type { Env, Guild, Job, Role, User } from "./auth";
 import { CAT_NAME } from "./board";
 import type { Cat } from "./board";
@@ -497,26 +498,60 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
 async function activityParts(env: Env, mentioned: string[], now: number, today: number): Promise<string[]> {
   const since = now - 7 * DAY;
   const people = mentioned.slice(0, 2);
-  const [sumR, lastR, recentR, ...personR] = await env.DB.batch([
-    env.DB.prepare(
-      "SELECT user_id, SUM(kind = 'visit') AS visits, SUM(kind = 'view') AS views, SUM(kind = 'act') AS acts, " +
-        "SUM(kind = 'visit' AND at >= ?2) AS today_visits, MAX(at) AS last FROM activity WHERE at > ?1 GROUP BY user_id ORDER BY last DESC LIMIT 100",
-    ).bind(since, today),
-    env.DB.prepare(
-      "SELECT a.user_id AS user_id, a.via AS via, a.place AS place, a.device AS device FROM activity a " +
-        "JOIN (SELECT user_id, MAX(at) AS at FROM activity WHERE at > ? GROUP BY user_id) m ON m.user_id = a.user_id AND m.at = a.at",
-    ).bind(since),
-    env.DB.prepare("SELECT user_id, kind, what, detail, via, at FROM activity WHERE kind != 'view' ORDER BY at DESC LIMIT 50"),
+  // 사용 기록은 DB 2~10 을 차례로 쓴다 (server/logdb.ts): 7일 안의 것이 있는 DB 마다 묻고 합친다
+  const dbs = await logDbs(env);
+  const week = covering(dbs, since);
+  type Sum = { user_id: string; visits: number; views: number; acts: number; today_visits: number; last: number };
+  type Last = { user_id: string; via: string | null; place: string | null; device: string | null; at: number };
+  type Recent = { user_id: string; kind: string; what: string; detail: string | null; via: string | null; at: number };
+  type Person = { kind: string; what: string; detail: string | null; via: string | null; place: string | null; ip: string | null; device: string | null; at: number };
+  const [sums, lasts, recentRows, ...personRows] = await Promise.all([
+    fromLogs<Sum>(week, (db) =>
+      db
+        .prepare(
+          "SELECT user_id, SUM(kind = 'visit') AS visits, SUM(kind = 'view') AS views, SUM(kind = 'act') AS acts, " +
+            "SUM(kind = 'visit' AND at >= ?2) AS today_visits, MAX(at) AS last FROM activity WHERE at > ?1 GROUP BY user_id",
+        )
+        .bind(since, today),
+    ),
+    fromLogs<Last>(week, (db) =>
+      db
+        .prepare(
+          "SELECT a.user_id AS user_id, a.via AS via, a.place AS place, a.device AS device, a.at AS at FROM activity a " +
+            "JOIN (SELECT user_id, MAX(at) AS at FROM activity WHERE at > ? GROUP BY user_id) m ON m.user_id = a.user_id AND m.at = a.at",
+        )
+        .bind(since),
+    ),
+    newestLogs<Recent>(dbs, 50, (db, left) => db.prepare(`SELECT user_id, kind, what, detail, via, at FROM activity WHERE kind != 'view' ORDER BY id DESC LIMIT ${left}`)),
     ...people.map((id) =>
-      env.DB.prepare("SELECT kind, what, detail, via, place, ip, device, at FROM activity WHERE user_id = ? ORDER BY at DESC LIMIT 40").bind(id),
+      newestLogs<Person>(dbs, 40, (db, left) =>
+        db.prepare(`SELECT kind, what, detail, via, place, ip, device, at FROM activity WHERE user_id = ? ORDER BY id DESC LIMIT ${left}`).bind(id),
+      ),
     ),
   ]);
-  const last = new Map<string, { via: string | null; place: string | null; device: string | null }>();
-  for (const r of lastR.results as { user_id: string; via: string | null; place: string | null; device: string | null }[]) last.set(r.user_id, r);
-  const sum = (sumR.results as { user_id: string; visits: number; views: number; acts: number; today_visits: number; last: number }[]).map((r) => {
-    const l = last.get(r.user_id);
-    return `${r.user_id} · 접속 ${r.visits}번 (오늘 ${r.today_visits}) · 화면 ${r.views} · 한 일 ${r.acts} · 마지막 ${when(r.last)}${l?.via ? ` ${VIA[l.via] ?? l.via}` : ""}${l?.place ? ` ${l.place}` : ""}${l?.device ? ` (${l.device})` : ""}`;
-  });
+  const last = new Map<string, Last>();
+  for (const r of lasts) if (!last.has(r.user_id) || last.get(r.user_id)!.at < r.at) last.set(r.user_id, r);
+  const total = new Map<string, Sum>();
+  for (const r of sums) {
+    const o = total.get(r.user_id);
+    if (!o) total.set(r.user_id, { ...r });
+    else {
+      o.visits += r.visits;
+      o.views += r.views;
+      o.acts += r.acts;
+      o.today_visits += r.today_visits;
+      o.last = Math.max(o.last, r.last);
+    }
+  }
+  const sum = [...total.values()]
+    .sort((a, b) => b.last - a.last)
+    .slice(0, 100)
+    .map((r) => {
+      const l = last.get(r.user_id);
+      return `${r.user_id} · 접속 ${r.visits}번 (오늘 ${r.today_visits}) · 화면 ${r.views} · 한 일 ${r.acts} · 마지막 ${when(r.last)}${l?.via ? ` ${VIA[l.via] ?? l.via}` : ""}${l?.place ? ` ${l.place}` : ""}${l?.device ? ` (${l.device})` : ""}`;
+    });
+  const recentR = { results: recentRows };
+  const personR = personRows.map((results) => ({ results }));
   const row = (r: { kind: string; what: string; detail: string | null; via: string | null; at: number }) =>
     `${when(r.at)} ${r.kind === "visit" ? "접속" : r.kind === "view" ? "화면" : "한 일"} ${r.what}${r.detail ? ` ${oneLine(r.detail).slice(0, 100)}` : ""}${r.via ? ` [${VIA[r.via] ?? r.via}]` : ""}`;
   const out = [

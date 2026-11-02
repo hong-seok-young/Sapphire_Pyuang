@@ -833,6 +833,15 @@ button { font: inherit; color: inherit; }
 .log-storage { display: grid; gap: 4px; margin: 0 0 10px; font-size: 11px; color: var(--muted); }
 .log-storage-bar { height: 4px; overflow: hidden; background: var(--night); border: 1px solid var(--edge); }
 .log-storage-bar i { display: block; height: 100%; background: var(--sapphire); }
+.log-storage-line b { font-weight: 400; color: var(--text); }
+/* 사용 기록 DB 2~10 (server/logdb.ts): 칸마다 찬 만큼, 지금 쓰는 칸은 금색 테두리 */
+.log-ring { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 3px; }
+.log-ring-cell { position: relative; display: flex; flex-direction: column; justify-content: flex-end; height: 26px; background: var(--night); border: 1px solid var(--edge); }
+.log-ring-cell i { display: block; width: 100%; background: var(--sapphire); }
+.log-ring-cell small { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; text-shadow: 1px 1px 0 var(--edge); }
+.log-ring-cur { border-color: var(--gold); }
+.log-ring-cur i { background: var(--gold); }
+.log-ring-empty small { color: var(--muted); }
 .log-usage-btn { justify-self: start; padding: 0; font: inherit; font-size: 11px; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; box-shadow: none; cursor: pointer; }
 .log-usage { list-style: none; margin: 2px 0 0; padding: 6px 8px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; background: var(--night-2); }
 .log-usage li { display: flex; justify-content: space-between; gap: 8px; }
