@@ -49,7 +49,7 @@ export function skyIcon(sky: Sky, day = true): string {
   return { clear: day ? "☀️" : "🌙", cloud: "☁️", fog: "🌫️", drizzle: "🌦️", rain: "🌧️", heavy: "🌧️", snow: "🌨️", blizzard: "❄️", storm: "⛈️" }[sky];
 }
 /** 앱개발자 미리 보기 순서 (날씨 표를 누를 때마다 다음 것, 마지막 다음은 실제 날씨) */
-export const PREVIEW: Sky[] = ["drizzle", "rain", "heavy", "storm", "snow", "blizzard", "fog"];
+export const PREVIEW: Sky[] = ["drizzle", "rain", "heavy", "storm", "snow", "blizzard"];
 
 const PREF = "sapphire.wx"; // '1' 켬, '0' 끔(나중에·거절)
 const CACHE = "sapphire.wx.cache";

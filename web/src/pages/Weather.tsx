@@ -20,6 +20,9 @@ const SNOW: Partial<Record<Sky, { n: number; v: [number, number]; wind: number }
   blizzard: { n: 200, v: [1, 2.2], wind: 1.4 },
 };
 
+/** 효과가 있는 날씨 (맑음·흐림·안개는 그리지 않는다. 안개는 제작자 요청 2026-11-02 '안개 있으면 빼'로 뺐다) */
+const hasFx = (sky: Sky) => !!(RAIN[sky] || SNOW[sky]);
+
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 /** 도트 한 칸 (px) */
 const P = 2;
@@ -85,8 +88,6 @@ export function WeatherFx({ sky }: { sky: Sky }) {
         if (Math.random() < 0.35) x += (Math.random() < 0.5 ? -4 : 4);
       }
     };
-    // 안개: 천천히 흐르는 옅은 띠
-    const bands = sky === "fog" ? [0.22, 0.48, 0.74].map((y) => ({ y, x: rnd(-1, 0), v: rnd(0.0003, 0.0007), a: rnd(0.12, 0.18) })) : [];
 
     let last = performance.now();
     let raf = 0;
@@ -128,22 +129,6 @@ export function WeatherFx({ sky }: { sky: Sky }) {
             ctx.fillRect(x, y - P, P, P * 3);
           } else ctx.fillRect(x, y, P * f.s, P * f.s);
         }
-      }
-      for (const b of bands) {
-        b.x += b.v * k;
-        if (b.x > 1) b.x = -1;
-        // 가로로 긴 타원 (가장자리까지 옅어져 테두리가 안 보이게)
-        const cx = b.x * w * 1.6 + w / 2;
-        ctx.save();
-        ctx.translate(cx, b.y * h);
-        ctx.scale(1, 0.32);
-        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 0.95);
-        g.addColorStop(0, `rgba(205, 210, 235, ${b.a})`);
-        g.addColorStop(0.6, `rgba(205, 210, 235, ${b.a * 0.45})`);
-        g.addColorStop(1, "rgba(205, 210, 235, 0)");
-        ctx.fillStyle = g;
-        ctx.fillRect(-w, -w, w * 2, w * 2);
-        ctx.restore();
       }
       if (sky === "storm") {
         if (now > nextFlash) {
@@ -199,7 +184,7 @@ export function HomeWeather({ me }: { me: Me }) {
   const next = () => (failed ? wx.retry() : setPreview((p) => (p + 1 >= PREVIEW.length ? -1 : p + 1)));
   return (
     <>
-      {sky && <WeatherFx key={sky} sky={sky} />}
+      {sky && hasFx(sky) && <WeatherFx key={sky} sky={sky} />}
       {wx.state.status === "ask" && (
         <div className="panel wx-ask">
           <span>🌦️ 화면에 우리 동네 날씨를 반영하는 기능이 생겼어요</span>
