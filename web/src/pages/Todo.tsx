@@ -1,6 +1,6 @@
 // To do (#/todo, 제작자 요청 2026-11-01): 이벤트를 안 읽어도 본인 직업·레벨에 맞는 할 일을 명사형으로 딱.
 // 오늘(한국 시간 0시 초기화) · 이번 주(목요일 오전 10시 초기화) · 이벤트(기간 안에 한 번) 칸에 체크 칸과 함께 보인다.
-// 줄을 누르면 체크, 오른쪽 '›' 는 그 인던의 위키 화면이나 이벤트 공식 글. 늘 하는 일과 이벤트 할 일은 src/todo.ts
+// 줄을 누르면 체크, 오른쪽 '›' 는 인던·길드던전의 위키 화면이나 이벤트 공식 글. 늘 하는 일과 이벤트 할 일은 src/todo.ts
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Me } from "../auth";
 import { GUILD_NAME, JOB_NAME, errorText } from "../auth";

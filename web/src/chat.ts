@@ -270,15 +270,17 @@ export function wikiContext(
 
   // 레벨을 물으면: 그 레벨 근처 사냥터(몬스터, 장비 드랍)와 직업 장비 (제작자 요청: 답을 더 알차게)
   if (level !== null) {
+    // 끝이 없는 레벨('Lv.30 이상', 길드던전)은 시작 레벨에서 10 위까지만 맞는 곳으로 친다
+    const top = (p: Place) => p.level![1] ?? p.level![0] + 10;
     const around = Object.values(wiki.places)
-      .filter((p) => p.level && p.level[0] - 3 <= level && level <= p.level[1] + 3)
-      .map((p) => ({ p, gap: p.level![0] <= level && level <= p.level![1] ? 0 : Math.min(Math.abs(p.level![0] - level), Math.abs(p.level![1] - level)) }));
+      .filter((p) => p.level && p.level[0] - 3 <= level && level <= top(p) + 3)
+      .map((p) => ({ p, gap: p.level![0] <= level && level <= top(p) ? 0 : Math.min(Math.abs(p.level![0] - level), Math.abs(top(p) - level)) }));
     // 막 들어갈 만한 곳(시작 레벨이 지금 레벨에 가까운 곳)부터
     const fromStart = (x: { p: Place }) => Math.abs(level - x.p.level![0]);
     const near = [...around].sort((a, b) => a.gap - b.gap || fromStart(a) - fromStart(b)).slice(0, 8);
     // 레벨이 딱 맞는 곳 4곳은 몬스터 드랍과 가는 길까지: 시작 레벨이 가깝고 레벨 폭이 좁은(그 레벨에 맞춘) 곳부터
     // (챗봇 개선 2026-11-01: 시작 레벨이 낮은 2곳만 골라 Lv.35 에 30~36 사막이 들고 34~40 죽늪이 빠졌다)
-    const width = (x: { p: Place }) => x.p.level![1] - x.p.level![0];
+    const width = (x: { p: Place }) => top(x.p) - x.p.level![0];
     const exact = around
       .filter((x) => x.gap === 0)
       .sort((a, b) => fromStart(a) - fromStart(b) || width(a) - width(b))

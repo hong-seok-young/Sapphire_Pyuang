@@ -323,8 +323,9 @@ export function NotFound({ what }: { what: string }) {
   );
 }
 
-export function levelText(level: [number, number] | null | undefined): string {
-  return level ? `Lv.${level[0]}~${level[1]}` : "";
+export function levelText(level: [number, number | null] | null | undefined): string {
+  if (!level) return "";
+  return level[1] === null ? `Lv.${level[0]} 이상` : `Lv.${level[0]}~${level[1]}`;
 }
 
 export function num(n: number | null | undefined): string {

@@ -1,5 +1,5 @@
 // To do (제작자 요청 2026-11-01): 이벤트를 안 읽어도 본인 직업·레벨에 맞는 할 일을 명사형으로 딱.
-// - 늘 하는 일은 여기서 만든다: 매일 길드 출석, 매주(목요일 오전 10시 초기화) 길드 임무, 들어갈 수 있는 인스턴스 던전 중 위쪽 2곳(위키 '인스턴스 던전' 지역,
+// - 늘 하는 일은 여기서 만든다: 매일 길드 출석, 매주(목요일 오전 10시 초기화) 길드 임무, 들어갈 수 있는 인스턴스 던전 한 줄(위키 '인스턴스 던전' 지역,
 //   이름의 숫자가 들어가는 레벨), 길드던전, 헌팅 그라운드 이용 시간.
 // - 이벤트 할 일은 서버가 공식 글에서 Claude 로 뽑아 둔 것 중 지금 이 캐릭터의 레벨·직업에 맞는 것 (/api/todo, server/todo.ts).
 // - 체크는 계정(캐릭터)마다 서버에 두고, 그 주기 안에서만 남는다 (오늘은 한국 시간 0시, 이번 주는 목요일 오전 10시에 비워진다).
@@ -51,10 +51,10 @@ export interface TodoItem {
 }
 
 /**
- * 길드던전과 헌팅 그라운드를 보이는 레벨. 공식 글과 위키에 입장 레벨이 없어서 몬스터 레벨로 정했다
- * (길드던전 첫 부위 Lv.35, 헌팅 그라운드 Easy 몬스터 Lv.33). 게임과 다르면 여기만 고친다
+ * 길드던전과 헌팅 그라운드를 보이는 레벨. 길드던전은 Lv.30 이상 (제작자 2026-11-02, 위키 사냥터 레벨 [30, null] 이 있으면 그 값),
+ * 헌팅 그라운드는 공식 글과 위키에 입장 레벨이 없어서 몬스터 레벨로 정했다 (Easy 몬스터 Lv.33). 게임과 다르면 여기만 고친다
  */
-const GUILD_DUNGEON_LV = 35;
+const GUILD_DUNGEON_LV = 30;
 const HUNTING_LV = 30;
 
 /** 늘 하는 일: 오늘(매일)과 이번 주(매주) */
@@ -63,20 +63,30 @@ export function routineItems(wiki: Wiki, level: number | null): { today: TodoIte
   const today: TodoItem[] = [{ key: "d:guild-attend", text: "길드 출석" }];
   const week: TodoItem[] = [{ key: "w:guild-mission", text: "길드 임무" }];
   const region = wiki.regions.find((r) => r.name.includes("인스턴스 던전"));
-  const dungeons: { lv: number; item: TodoItem }[] = [];
+  const dungeons: number[] = [];
+  let guildDungeon: TodoItem | null = null;
   for (const id of region?.places ?? []) {
     const p = wiki.places[id];
     if (!p) continue;
-    // '인던20 ： 버려진 유령선(Ghost Ship)' -> 버려진 유령선
-    const name = (p.title.split(/[：:]/)[1] ?? p.name).replace(/\(.*$/, "").trim() || p.name;
     const n = /^인던\s*(\d+)/.exec(p.name);
-    if (n && lv >= Number(n[1])) dungeons.push({ lv: Number(n[1]), item: { key: `w:dungeon:${id}`, text: name, note: `인던 ${n[1]}`, to: `#/place/${id}` } });
-    else if (!n && /길드\s*던전|길던/.test(p.name + p.title) && lv >= GUILD_DUNGEON_LV) {
-      week.push({ key: "w:guild-dungeon", text: "길드던전", note: name, to: `#/place/${id}` });
+    if (n) {
+      if (lv >= Number(n[1])) dungeons.push(Number(n[1]));
+    } else if (/길드\s*던전|길던/.test(p.name + p.title) && lv >= (p.level && p.level[1] === null ? p.level[0] : GUILD_DUNGEON_LV)) {
+      // '길드던전 ： 전지의관 리에티' -> 전지의관 리에티
+      const name = (p.title.split(/[：:]/)[1] ?? p.name).replace(/\(.*$/, "").trim() || p.name;
+      guildDungeon = { key: "w:guild-dungeon", text: "길드던전", note: name, to: `#/place/${id}` };
     }
   }
-  // 들어갈 수 있는 인던 중 지금 레벨에 맞는 위쪽 2곳만 (제작자 요청 2026-11-02: 할 일이 너무 많다. 낮은 인던은 빼고)
-  week.push(...dungeons.sort((a, b) => b.lv - a.lv).slice(0, 2).map((d) => d.item));
+  // 인던은 파티로 들어갈 수 있는 곳을 한 번에 다 돈다: 한 줄, 체크 하나 (제작자 요청 2026-11-02: '20 25 30 35 이런 식으로 통으로 가')
+  if (dungeons.length && region) {
+    week.push({
+      key: "w:dungeons",
+      text: "인던",
+      note: dungeons.sort((a, b) => a - b).join(" · "),
+      to: "#/places?r=" + encodeURIComponent(region.name),
+    });
+  }
+  if (guildDungeon) week.push(guildDungeon);
   if (lv >= HUNTING_LV) {
     const hunting = Object.values(wiki.places).find((p) => /헌팅\s*그라운드/.test(p.name));
     week.push({ key: "w:hunting", text: "헌팅 그라운드", note: "주간 이용 시간", to: hunting ? `#/place/${hunting.id}` : null });

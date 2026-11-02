@@ -45,7 +45,8 @@ export interface Place {
   name: string;
   title: string;
   region: string;
-  level: [number, number] | null;
+  /** [30, null] = 'Lv.30 이상' (길드던전처럼 입장 레벨만 있는 곳, 자료 지도_목록.json 의 레벨) */
+  level: [number, number | null] | null;
   desc: string | null;
   banner: Pic | null;
   monsters: string[];
