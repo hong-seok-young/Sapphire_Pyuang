@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { KakaoField } from "../kakao";
-import type { FormEvent } from "react";
+import { KakaoButton, KakaoField, useKakao } from "../kakao";
+import type { FormEvent, ReactNode } from "react";
 import {
   EXP_MAX, GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, MAX_LEVEL, ROLE_NAME, avatarUrl, deleteMyAvatar, errorText, expText,
   TEST_IDS, fetchMe, logout, positionOf, renameAccount, requestCharacter, saveMyProfile, setMainCharacter, switchAccount,
@@ -196,85 +196,87 @@ export function ProfileSetupPage({
   );
 }
 
-/** 내 캐릭터 사진: 성장 랭킹에 나온다 (1등이면 크게). 스샷에서 직접 잘라 올린다 (AvatarMaker) */
-function AvatarPanel({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
-  const [making, setMaking] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+type MenuKey = "photo" | "kakao" | "rename" | "test";
+
+/** 설정 목록의 한 줄: 누르면 그 아래로 펼친다 (한 번에 하나) */
+function MeRow({
+  icon,
+  label,
+  value,
+  open,
+  onToggle,
+  children,
+}: {
+  icon: string;
+  label: string;
+  value?: ReactNode;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
   return (
-    <section className="panel profile-panel">
-      <h2 className="panel-title">내 캐릭터 사진</h2>
-      {making ? (
-        <AvatarMaker
-          onSaved={(avatar) => {
-            onMe({ avatar });
-            setMaking(false);
-          }}
-          onCancel={() => setMaking(false)}
-        />
-      ) : (
-        <>
-          {me.avatar && (
-            <div className="avatar-current">
-              <img className="growth-face" src={avatarUrl(me.id, me.avatar)} alt="내 캐릭터" />
-            </div>
-          )}
-          {error && <p className="form-error">{error}</p>}
-          <div className="avatar-actions">
-            <button type="button" className="btn" onClick={() => setMaking(true)}>
-              {me.avatar ? "사진 변경" : "📷 캐릭터 등록"}
-            </button>
-            {me.avatar && (
-              <button
-                type="button"
-                className="btn btn-ghost"
-                disabled={busy}
-                onClick={async () => {
-                  setBusy(true);
-                  setError("");
-                  try {
-                    await deleteMyAvatar();
-                    onMe({ avatar: null });
-                  } catch (x) {
-                    setError(errorText(x));
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-              >
-                사진 삭제
-              </button>
-            )}
-          </div>
-        </>
-      )}
-    </section>
+    <>
+      <button type="button" className="me-row" aria-expanded={open} onClick={onToggle}>
+        <span className="me-row-icon" aria-hidden>
+          {icon}
+        </span>
+        <span className="me-row-label">{label}</span>
+        {value && <span className="me-row-value">{value}</span>}
+        <span className="me-row-arrow" aria-hidden>
+          ›
+        </span>
+      </button>
+      {open && <div className="me-row-body">{children}</div>}
+    </>
   );
 }
 
-/** 내 정보: 직업, 레벨, 경험치 바꾸기 (레벨업하면 여기서), 캐릭터 사진, 비밀번호, 로그아웃 */
+/**
+ * 내 정보 (제작자 요청 2026-11-02 '고도화, 길드 랭킹은 왜 여기 있어 빼, 버튼 정돈'):
+ * 맨 위 내 카드(사진이나 직업 엠블럼, 길드·직책, 직업·레벨, 경험치 막대), 캐릭터 정보(길드·직업·레벨·경험치: 레벨업하면 여기서),
+ * 내 캐릭터(묶은 캐릭터, 오른쪽 위 '추가'), 설정 목록(캐릭터 사진, 카톡 오픈프로필, 닉네임 변경, 비밀번호 변경, 테스트 계정, 로그아웃: 한 줄씩, 누르면 그 아래로)
+ */
 export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; onLogout: () => void }) {
   const [saved, setSaved] = useState(false);
+  const [open, setOpen] = useState<MenuKey | null>(null);
+  const { links } = useKakao();
+  const toggle = (k: MenuKey) => () => setOpen((o) => (o === k ? null : k));
   // 직책은 지금 캐릭터의 것 (me.role 은 묶은 캐릭터 중 가장 높은 권한)
   const myRole = me.characters?.find((c) => c.id === me.id)?.role ?? me.role;
   return (
     <>
       <TopBar title="내 정보" />
       <section className="panel me-card">
-        {me.job && me.level && <JobEmblem job={me.job} level={me.level} size={64} />}
-        <div>
+        <div className="me-face">
+          {me.avatar ? (
+            <img className="growth-face" src={avatarUrl(me.id, me.avatar)} alt="내 캐릭터" />
+          ) : (
+            me.job && me.level && <JobEmblem job={me.job} level={me.level} size={64} />
+          )}
+        </div>
+        <div className="me-main">
           <div className="me-name">{me.id}</div>
-          <div className="muted">
+          <div className="me-sub">
             {me.guild && `${GUILD_TIER[me.guild]} ${GUILD_NAME[me.guild]} · `}
             {ROLE_NAME[positionOf(myRole)]}
-            {me.job && ` · ${JOB_NAME[me.job]}`}
-            {me.level && ` · Lv.${me.level}`}
-            {me.exp !== null && ` · ${expText(me.exp)}`}
+          </div>
+          {me.job && (
+            <div className="me-sub me-job">
+              <JobGlyph job={me.job} size={14} />
+              {JOB_NAME[me.job]}
+              {me.level && <b>Lv.{me.level}</b>}
+            </div>
+          )}
+          <div className="me-exp">
+            <span className="me-exp-track">
+              <i style={{ width: `${Math.min(100, (me.exp ?? 0) / 1000)}%` }} />
+            </span>
+            <small>{me.exp !== null ? expText(me.exp) : "경험치 미입력"}</small>
           </div>
         </div>
       </section>
       <section className="panel profile-panel">
-        <h2 className="panel-title">정보 수정</h2>
+        <h2 className="panel-title">캐릭터 정보</h2>
         <ProfileForm
           key={`${me.guild}-${me.job}-${me.level}-${me.exp}`}
           guild={me.guild}
@@ -292,57 +294,126 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
         />
         {saved && <p className="form-note">저장했어요.</p>}
       </section>
-      <AvatarPanel me={me} onMe={onMe} />
-      {/* 카톡 오픈프로필 링크 (제작자 요청 2026-11-02): 장비대여·중개인·의뢰소에서 이름 옆 '카톡' 단추로 바로 열린다 */}
-      <section className="panel profile-panel">
-        <h2 className="panel-title">카톡 오픈프로필</h2>
-        <KakaoField name={me.id} />
-      </section>
-      <RenamePanel me={me} onMe={onMe} />
-      {/* 앱개발자만: 테스트 계정으로 바꿔서 상대방 쪽 화면과 알림을 혼자 시험한다 (제작자 요청) */}
-      {me.role === "developer" && (
-        <section className="panel profile-panel">
-          <h2 className="panel-title">테스트 계정</h2>
-          <div className="mk-chips">
-            {TEST_IDS.map((id) => (
-              <button
-                key={id}
-                className="pill"
-                onClick={async () => {
-                  await switchAccount(id);
-                  location.hash = "#/";
-                  location.reload();
-                }}
-              >
-                🧪 {id}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-      <div className="links">
-        <a className="btn btn-ghost" href="#/ranking">🏆 길드 랭킹</a>
-        <a className="btn btn-ghost" href="#/password">비밀번호 변경</a>
-      </div>
       <CharactersPanel me={me} />
-      <div className="links">
+      <section className="panel me-menu">
+        <MeRow icon="📷" label="캐릭터 사진" value={me.avatar ? "등록됨" : "없음"} open={open === "photo"} onToggle={toggle("photo")}>
+          <AvatarBody me={me} onMe={onMe} />
+        </MeRow>
+        {/* 카톡 오픈프로필 링크 (제작자 요청 2026-11-02): 장비대여·중개인·의뢰소에서 이름 옆 '카톡' 단추로 열린다 */}
+        <MeRow icon="💬" label="카톡 오픈프로필" value={links[me.id] ? "등록됨" : "없음"} open={open === "kakao"} onToggle={toggle("kakao")}>
+          <KakaoField name={me.id} />
+          <p className="me-hint">
+            중개인·의뢰소·장비대여에서 내 이름 옆에 보여요{" "}
+            <span className="me-kakao-demo">
+              {me.id} {links[me.id] ? <KakaoButton name={me.id} /> : <span className="kakao-btn">카톡</span>}
+            </span>
+          </p>
+        </MeRow>
+        <MeRow icon="✏️" label="닉네임 변경" open={open === "rename"} onToggle={toggle("rename")}>
+          <RenameBody me={me} onMe={onMe} />
+        </MeRow>
+        <a className="me-row" href="#/password">
+          <span className="me-row-icon" aria-hidden>
+            🔒
+          </span>
+          <span className="me-row-label">비밀번호 변경</span>
+          <span className="me-row-arrow" aria-hidden>
+            ›
+          </span>
+        </a>
+        {/* 앱개발자만: 테스트 계정으로 바꿔서 상대방 쪽 화면과 알림을 혼자 시험한다 (제작자 요청) */}
+        {me.role === "developer" && (
+          <MeRow icon="🧪" label="테스트 계정" open={open === "test"} onToggle={toggle("test")}>
+            <div className="pill-row me-pills">
+              {TEST_IDS.map((id) => (
+                <button
+                  key={id}
+                  className="pill"
+                  onClick={async () => {
+                    await switchAccount(id);
+                    location.hash = "#/";
+                    location.reload();
+                  }}
+                >
+                  {id}
+                </button>
+              ))}
+            </div>
+          </MeRow>
+        )}
         <button
           type="button"
-          className="btn btn-ghost"
+          className="me-row me-row-out"
           onClick={async () => {
             await logout().catch(() => undefined);
             onLogout();
           }}
         >
-          로그아웃
+          <span className="me-row-icon" aria-hidden>
+            🚪
+          </span>
+          <span className="me-row-label">로그아웃</span>
         </button>
+      </section>
+    </>
+  );
+}
+
+/** 내 캐릭터 사진: 성장 랭킹에 나온다 (1등이면 크게). 스샷에서 직접 잘라 올린다 (AvatarMaker) */
+function AvatarBody({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
+  const [making, setMaking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  if (making)
+    return (
+      <AvatarMaker
+        onSaved={(avatar) => {
+          onMe({ avatar });
+          setMaking(false);
+        }}
+        onCancel={() => setMaking(false)}
+      />
+    );
+  return (
+    <>
+      {me.avatar && (
+        <div className="avatar-current">
+          <img className="growth-face" src={avatarUrl(me.id, me.avatar)} alt="내 캐릭터" />
+        </div>
+      )}
+      {error && <p className="form-error">{error}</p>}
+      <div className="me-acts">
+        <button type="button" className="btn" onClick={() => setMaking(true)}>
+          {me.avatar ? "사진 변경" : "사진 등록"}
+        </button>
+        {me.avatar && (
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setError("");
+              try {
+                await deleteMyAvatar();
+                onMe({ avatar: null });
+              } catch (x) {
+                setError(errorText(x));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            사진 삭제
+          </button>
+        )}
       </div>
     </>
   );
 }
 
 /**
- * 내 캐릭터 (부캐 묶기, 제작자 요청 2026-11-01): 묶은 캐릭터 목록(눌러서 바꾸기, 부캐 옆 '본캐 지정')과 '캐릭터 추가' 요청.
+ * 내 캐릭터 (부캐 묶기, 제작자 요청 2026-11-01): 묶은 캐릭터 목록(눌러서 바꾸기, 부캐 옆 '본캐 지정')과 오른쪽 위 '추가'(캐릭터 추가 요청).
  * 추가한 캐릭터는 길드마스터·오피서가 '길드원 관리'에서 승낙해야 생긴다. 로그인은 본캐 아이디와 비밀번호로
  */
 function CharactersPanel({ me }: { me: Me }) {
@@ -367,8 +438,15 @@ function CharactersPanel({ me }: { me: Me }) {
 
   return (
     <section className="panel profile-panel">
-      <h2 className="panel-title">내 캐릭터</h2>
-      {list.length > 1 && (
+      <div className="me-title-row">
+        <h2 className="panel-title">내 캐릭터{list.length > 1 && <small> {list.length}</small>}</h2>
+        {!adding && (
+          <button className="pill" onClick={() => setAdding(true)}>
+            ＋ 추가
+          </button>
+        )}
+      </div>
+      {list.length > 0 && (
         <div className="char-list">
           {list.map((c) => (
             <div key={c.id} className="char-row">
@@ -407,39 +485,36 @@ function CharactersPanel({ me }: { me: Me }) {
         </div>
       )}
       {pending.length > 0 && <p className="form-note">승낙 대기: {pending.join(", ")}</p>}
-      {adding ? (
-        <div className="mk-actions">
+      {adding && (
+        <div className="me-add">
           <input
             className="mk-input"
             value={name}
             onChange={(e) => setName(e.target.value.slice(0, 20))}
-            placeholder="캐릭터 닉네임"
+            placeholder="추가할 캐릭터 닉네임"
             aria-label="캐릭터 닉네임"
             autoCapitalize="off"
+            autoFocus
           />
-          <button
-            className="pill pill-on"
-            disabled={busy || !name.trim()}
-            onClick={() =>
-              run(async () => {
-                const r = await requestCharacter(name.trim());
-                setPending((p) => [...p, r.id]);
-                setName("");
-                setAdding(false);
-              })
-            }
-          >
-            요청
-          </button>
-          <button className="pill" disabled={busy} onClick={() => setAdding(false)}>
-            취소
-          </button>
-        </div>
-      ) : (
-        <div className="links">
-          <button className="btn btn-ghost" onClick={() => setAdding(true)}>
-            ＋ 캐릭터 추가
-          </button>
+          <div className="me-acts">
+            <button
+              className="btn"
+              disabled={busy || !name.trim()}
+              onClick={() =>
+                run(async () => {
+                  const r = await requestCharacter(name.trim());
+                  setPending((p) => [...p, r.id]);
+                  setName("");
+                  setAdding(false);
+                })
+              }
+            >
+              추가 요청
+            </button>
+            <button className="btn btn-ghost" disabled={busy} onClick={() => setAdding(false)}>
+              취소
+            </button>
+          </div>
         </div>
       )}
       {error && <p className="form-error">{error}</p>}
@@ -449,9 +524,9 @@ function CharactersPanel({ me }: { me: Me }) {
 
 /**
  * 닉네임 바꾸기 (제작자 요청: 키우는 캐릭터를 바꾸거나 캐릭터를 사는 일이 있어서). 다음 로그인부터 새 닉네임으로 들어온다.
- * '다른 캐릭터로 바꿨어요'를 고르면 새 캐릭터의 직업, 레벨도 같이 적고 성장 랭킹을 그 레벨부터 새로 센다
+ * '캐릭터 변경'을 고르면 새 캐릭터의 직업, 레벨도 같이 적고 성장 랭킹을 그 레벨부터 새로 센다
  */
-function RenamePanel({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
+function RenameBody({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
   const [newId, setNewId] = useState("");
   const [switched, setSwitched] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -478,13 +553,16 @@ function RenamePanel({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
   }
 
   return (
-    <section className="panel profile-panel">
-      <h2 className="panel-title">닉네임 변경</h2>
-      <label className="rename-field">
-        새 닉네임
-        <input value={newId} onChange={(e) => setNewId(e.target.value.slice(0, 20))} autoCapitalize="off" placeholder={me.id} />
-      </label>
-      <div className="mk-chips">
+    <>
+      <input
+        className="mk-input me-input"
+        value={newId}
+        onChange={(e) => setNewId(e.target.value.slice(0, 20))}
+        autoCapitalize="off"
+        placeholder="새 닉네임"
+        aria-label="새 닉네임"
+      />
+      <div className="pill-row me-pills">
         <button type="button" className={"pill" + (!switched ? " pill-on" : "")} onClick={() => setSwitched(false)}>
           닉네임만
         </button>
@@ -493,26 +571,24 @@ function RenamePanel({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
         </button>
       </div>
       {switched ? (
-        <>
-          <ProfileForm
-            guild={me.guild}
-            job={me.job}
-            level={null}
-            withExp
-            submitLabel={busy ? "바꾸는 중…" : "변경"}
-            onSave={async (job, level, exp, guild) => {
-              if (!name) throw new Error("새 닉네임을 적어 주세요");
-              await rename({ job, level, exp, guild });
-            }}
-          />
-        </>
+        <ProfileForm
+          guild={me.guild}
+          job={me.job}
+          level={null}
+          withExp
+          submitLabel={busy ? "바꾸는 중…" : "변경"}
+          onSave={async (job, level, exp, guild) => {
+            if (!name) throw new Error("새 닉네임을 적어 주세요");
+            await rename({ job, level, exp, guild });
+          }}
+        />
       ) : (
-        <button className="btn" disabled={busy || !name} onClick={() => rename()}>
+        <button className="btn me-wide" disabled={busy || !name} onClick={() => rename()}>
           {busy ? "바꾸는 중…" : "닉네임 변경"}
         </button>
       )}
       {error && <p className="form-error">{error}</p>}
       {done && <p className="form-note">{done}</p>}
-    </section>
+    </>
   );
 }
