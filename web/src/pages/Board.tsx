@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { ApiError, RANK, errorText } from "../auth";
 import type { Me } from "../auth";
 import {
-  CATS, CAT_ICON, CAT_NAME, URL_RE, addComment, createPost, deleteComment, deleteFile, deletePost, fetchPost, fetchPosts,
+  CATS, CAT_NAME, URL_RE, addComment, createPost, deleteComment, deleteFile, deletePost, fetchPost, fetchPosts,
   fileUrl, linkPreview, setLike, shrinkPhoto, sizeText, updatePost, uploadFile, youtubeId,
 } from "../board";
 import type { BoardComment, BoardFile, Cat, LinkPreview, PostDetail, PostSummary } from "../board";
@@ -47,13 +47,13 @@ const CAT_SHORT: Record<Cat, string> = { notice: "공지", event: "길드 이벤
 
 /**
  * 게시판 칸 줄: 전체, 공지, 길드 이벤트, 자유, 건의, 아이모 소식을 한 줄 탭으로 (제작자 요청 2026-11-02: 맨 위 단추를 한 줄로,
- * 아이모 소식 안의 전체·공지사항·점검·이벤트와 위아래가 구분되게). 아래 칸 줄은 Official.tsx 의 .sub-tabs
+ * 아이모 소식 안의 전체·공지사항·점검·이벤트와 위아래가 구분되게. 이모지 없이 글자만, 칸 폭은 모두 같게). 아래 칸 줄은 Official.tsx 의 .sub-tabs
  */
 function BoardCats({ cat }: { cat: Cat | "imo" | null }) {
-  const tabs: { key: Cat | "imo" | null; icon: string; name: string; to: string }[] = [
-    { key: null, icon: "📋", name: "전체", to: "#/board" },
-    ...CATS.map((c) => ({ key: c, icon: CAT_ICON[c], name: CAT_SHORT[c], to: `#/board?cat=${c}` })),
-    { key: "imo", icon: "🎮", name: "아이모 소식", to: "#/board?cat=imo" },
+  const tabs: { key: Cat | "imo" | null; name: string; to: string }[] = [
+    { key: null, name: "전체", to: "#/board" },
+    ...CATS.map((c) => ({ key: c, name: CAT_SHORT[c], to: `#/board?cat=${c}` })),
+    { key: "imo", name: "아이모 소식", to: "#/board?cat=imo" },
   ];
   return (
     <nav className="main-tabs">
@@ -64,9 +64,6 @@ function BoardCats({ cat }: { cat: Cat | "imo" | null }) {
           aria-pressed={cat === t.key}
           onClick={() => go(t.to, true)}
         >
-          <span className="main-tab-icon" aria-hidden>
-            {t.icon}
-          </span>
           <FitLine className="main-tab-name" text={t.name} wrap={false} />
         </button>
       ))}
@@ -565,10 +562,10 @@ function Write({ me, cat: startCat, editId }: { me: Me; cat?: Cat; editId?: numb
       <TopBar title={editId ? "글 수정" : "글쓰기"} />
       <section className="panel form bd-write-form">
         {!editId && (
-          <div className="filter">
+          <div className="sub-tabs bd-write-cats">
             {CATS.filter((c) => canWrite(me, c)).map((c) => (
-              <button key={c} type="button" className={"pill" + (cat === c ? " pill-on" : "")} onClick={() => setCat(c)}>
-                {CAT_ICON[c]} {CAT_NAME[c]}
+              <button key={c} type="button" className={"sub-tab" + (cat === c ? " sub-tab-on" : "")} aria-pressed={cat === c} onClick={() => setCat(c)}>
+                {CAT_NAME[c]}
               </button>
             ))}
           </div>
