@@ -83,9 +83,11 @@ export function WeatherFx({ sky }: { sky: Sky }) {
     let cols = 0;
     let pile: number[] = [];
     let water: number[] = [];
+    // 바닥은 아래 탭 위의 밝은 선(.tabbar 의 box-shadow, --px 두께) 위 (2026-11-02 제작자 폰: 바닥 한 줄이 그 선에 가려 빗물이 하나도 안 보였다)
+    const line = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--px")) || 2;
     const measure = () => {
       const bar = document.querySelector(".tabbar");
-      ground = bar ? Math.round(bar.getBoundingClientRect().top) : h;
+      ground = bar ? Math.round(bar.getBoundingClientRect().top - line()) : h;
     };
     const size = () => {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
