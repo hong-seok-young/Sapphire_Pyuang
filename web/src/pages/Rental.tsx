@@ -5,7 +5,7 @@
 //   확인을 묻는 동안에는 그 단추만, 대화창은 '대화'를 눌러 연다.
 // - 신청: 줄 왼쪽 칸으로 여러 개 골라 한 번에 신청서로. 무기마다 선착순으로 줄을 서고, 신청 전에 '앞사람이 받은 날 + 기한 뒤' 받을 수 있는 날을 보인다.
 //   줄이 없으면 기한이 지나도 계속 쓰고, 줄이 생기면 기한이 끝나는 날 담당자에게 돌려준다. 신청서마다 신청한 사람과 운영진의 대화창.
-// - 운영진: 신청서마다 무기별 수락·거절, 차례가 오면 '건네줌'(마일리지에서 쓴 💎), 반납, 직접 대여, 물건 더하기·고치기·내리기, 카톡 목록 붙여넣기, 마일리지.
+// - 운영진: 신청서마다 무기별 수락·거절, 차례가 오면 '대여 완료'(보증금: 마일리지와 골드), 반납, 대여 등록, 물건 더하기·고치기·내리기, 카톡 목록 붙여넣기, 마일리지.
 // - 화면은 세 칸 (제작자 요청 2026-11-02 '신청함은 따로, 운영에서도 신청 관리 단추 따로, 위에 뜨게 하니까 복잡함'): 목록(#/rent, 무기 목록부터),
 //   신청함(#/rent?v=apps: 내 마일리지와 장부, 쓰는 무기, 내 신청서), 운영(#/rent?v=staff: 신청 · 물건 추가 · 붙여넣기 · 마일리지).
 // - 단추에 이모지를 넣지 않고 같은 줄 단추는 폭을 같게 (.pill-row). 💎 는 값의 단위로만 쓴다.
@@ -33,18 +33,22 @@ import {
   importRent,
   lendRent,
   levelOf,
+  manGold,
   md,
+  optionFull,
   optionParts,
+  optionShort,
   removeRent,
   returnRent,
   talkRent,
   weaponOf,
 } from "../rental";
 import type { AppRequest, ImportSummary, LedgerLine, RentApp, RentData, RentFields, RentItem, RentTerm } from "../rental";
+import { MARKET_PIC, itemFacts, jobsFor, rollHint } from "../market";
 
-const REASON: Record<LedgerLine["reason"], string> = { donate: "기부", rent: "대여", adjust: "고침" };
-/** 한 번에 고를 수 있는 무기 수 (서버 MAX_APP_ITEMS 와 같다) */
-const MAX_PICK = 5;
+const REASON: Record<LedgerLine["reason"], string> = { donate: "기부", rent: "대여 보증금", adjust: "고침", return: "반납 · 보증금 돌려받음" };
+/** 한 번에 고를 수 있는 무기 수 (서버 MAX_APP_ITEMS 와 같다. 제작자 요청 2026-11-02: 5개 한도를 두지 말고, 여러 개면 안내만) */
+const MAX_PICK = 30;
 
 /** '11/2 14:05' */
 function when(ms: number): string {
@@ -52,13 +56,6 @@ function when(ms: number): string {
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
 }
 
-/** 새로 신청하면 언제 받는지: 지금 / 11/19부터 (앞사람이 받은 날 + 2주) / 앞사람이 반납하면 ('바로'라는 말은 쓰지 않는다, 제작자 요청 2026-11-02) */
-function nextText(i: RentItem, now: number): string {
-  if (!i.renter && !i.queue) return "지금 받을 수 있어요";
-  if (i.next === null) return "앞사람이 반납하면 받아요 (기한 없음)";
-  if (i.next <= now + 60_000) return "앞사람이 돌려주면 받아요";
-  return `${md(i.next)}부터 받아요 (앞사람이 받은 날 + ${TERM_NAME[i.term]})`;
-}
 
 export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: string }) {
   const [data, setData] = useState<RentData | null>(null);
@@ -140,6 +137,12 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
             <p key={i.id} className="rent-me-line">
               <span>
                 {i.weapon} +{i.enhance} <small className="rent-muted">대여 중</small>
+                {i.deposit && (i.deposit.dia > 0 || i.deposit.gold > 0) && (
+                  <small className="rent-muted">
+                    {" "}
+                    · 보증금 {[i.deposit.dia ? `💎${i.deposit.dia}` : "", i.deposit.gold ? `골드 ${manGold(i.deposit.gold)}` : ""].filter(Boolean).join(" + ")}
+                  </small>
+                )}
               </span>
               {!i.dueAt ? (
                 <span className="rent-muted">기한 없음</span>
@@ -161,14 +164,17 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
 
       {/* 운영: 신청 관리, 물건 추가, 카톡 목록 붙여넣기, 마일리지 */}
       {tab === "staff" && (
+        // 아래 단계 단추는 위 단추 바로 아래 어두운 띠의 작은 글자 단추로 (제작자 요청 2026-11-02: 맨 위 단추와 하위 단추가 구분되게)
+        <nav className="sub-tabs rent-sub">
+          {(["apps", "add", "paste", "mileage"] as const).map((p) => (
+            <button key={p} className={"sub-tab" + (panel === p ? " sub-tab-on" : "")} aria-pressed={panel === p} onClick={() => setPanel(p)}>
+              {p === "apps" ? `신청 ${openApps.length}` : p === "add" ? "물건 추가" : p === "paste" ? "붙여넣기" : "마일리지"}
+            </button>
+          ))}
+        </nav>
+      )}
+      {tab === "staff" && (
         <section className="panel rent-admin">
-          <div className="pill-row">
-            {(["apps", "add", "paste", "mileage"] as const).map((p) => (
-              <button key={p} className={"pill" + (panel === p ? " pill-on" : "")} aria-pressed={panel === p} onClick={() => setPanel(p)}>
-                {p === "apps" ? `신청 ${openApps.length}` : p === "add" ? "물건 추가" : p === "paste" ? "붙여넣기" : "마일리지"}
-              </button>
-            ))}
-          </div>
           {panel === "apps" &&
             (openApps.length ? (
               openApps.map((a) => <AppCard key={a.id} app={a} data={data} byId={byId} manage onDone={() => void load()} />)
@@ -184,13 +190,13 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
       {tab === "list" && (
         <>
       {/* 직업 */}
-      <div className="pill-row rent-jobs">
+      <nav className="sub-tabs rent-sub">
         {JOBS.map((j) => (
-          <button key={j} className={"pill" + (job === j ? " pill-on" : "")} onClick={() => setJob(j)}>
+          <button key={j} className={"sub-tab" + (job === j ? " sub-tab-on" : "")} aria-pressed={job === j} onClick={() => setJob(j)}>
             {JOB_NAME[j]}
           </button>
         ))}
-      </div>
+      </nav>
 
       {levels.map((lv) => (
         <section key={lv} className="rent-lv">
@@ -200,7 +206,7 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
               .filter((i) => levelOf(wiki, i) === lv)
               .sort((a, b) => a.weapon.localeCompare(b.weapon) || a.enhance - b.enhance || TERMS.indexOf(a.term) - TERMS.indexOf(b.term) || a.price - b.price)
               .map((i) => (
-                <li key={i.id} className={"rent-li" + (open === i.id ? " rent-open" : "") + (i.renter ? " rent-held" : "")}>
+                <li key={i.id} className={"rent-li" + (i.renter ? " rent-held" : "")}>
                   <div className="rent-row">
                     {/* 고르기: 신청할 수 있는 무기만 (내가 쓰거나 이미 신청한 것은 빼고) */}
                     {i.mine || (i.renter && mine.has(i.renter)) ? (
@@ -210,7 +216,7 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
                     ) : (
                       <button className={"rent-pick" + (picked.includes(i.id) ? " rent-pick-on" : "")} onClick={() => toggle(i.id)} aria-label="고르기" aria-pressed={picked.includes(i.id)} />
                     )}
-                    <button className="rent-main" onClick={() => setOpen(open === i.id ? null : i.id)}>
+                    <button className="rent-main" onClick={() => setOpen(i.id)}>
                       <Slot wiki={wiki} item={i} />
                       <span className="rent-nm">
                         {i.weapon}
@@ -223,20 +229,31 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
                       <RowStatus item={i} />
                     </button>
                   </div>
-                  {open === i.id && <Detail wiki={wiki} item={i} data={data} now={now} onDone={() => void load()} />}
                 </li>
               ))}
           </ul>
         </section>
       ))}
       {!ofJob.length && <div className="empty">대여 무기가 없어요</div>}
+      {open !== null && byId.get(open) && (
+        <ItemPopup
+          wiki={wiki}
+          item={byId.get(open)!}
+          data={data}
+          picked={picked.includes(open)}
+          onPick={() => toggle(open)}
+          onClose={() => setOpen(null)}
+          onDone={() => void load()}
+        />
+      )}
         </>
       )}
 
       {tab === "list" && picked.length > 0 && (
         <Cart
           picked={picked.map((id) => byId.get(id)).filter((i): i is RentItem => !!i)}
-          now={now}
+          mileage={data.mileage}
+          rate={data.rate}
           onClear={() => setPicked([])}
           onDone={() => (setPicked([]), void load(), go("#/rent?v=apps", true))}
         />
@@ -256,55 +273,112 @@ function RowStatus({ item }: { item: RentItem }) {
   return item.renter ? <span className="rent-st">대여 중</span> : null;
 }
 
-/** 펼친 칸: 위키 정보, 쓰는 사람과 줄, 내 신청, 운영진 일 */
-function Detail({ wiki, item, data, now, onDone }: { wiki: Wiki; item: RentItem; data: RentData; now: number; onDone: () => void }) {
-  const info = weaponOf(wiki, item.weapon)?.equip?.[0]?.info;
+/** 차례를 기다리면 받는 때: '11/19부터' / '앞사람 반납 뒤' (지금 받을 수 있으면 빈 글) */
+function waitText(i: RentItem): string {
+  if (!i.renter && !i.queue) return "";
+  return i.next === null ? "앞사람 반납 뒤" : i.next <= Date.now() + 60_000 ? "" : `${md(i.next)}부터`;
+}
+
+/**
+ * 무기 정보창 (제작자 요청 2026-11-02: 목록에서 무기를 누르면 게임처럼 정보창이 잠깐 뜨고, 다른 곳을 누르면 닫힌다. 줄 아래 설명은 뺐다).
+ * 위키 정보(요구 레벨, 공격·속도, 이 무기의 옵션 값, 직업), 기한과 보증금, 대여 중이면 누가 언제까지, 대기, 내 신청 또는 담기, 운영진 일
+ */
+function ItemPopup({ wiki, item, data, picked, onPick, onClose, onDone }: {
+  wiki: Wiki;
+  item: RentItem;
+  data: RentData;
+  picked: boolean;
+  onPick: () => void;
+  onClose: () => void;
+  onDone: () => void;
+}) {
   const [editing, setEditing] = useState(false);
+  const it = weaponOf(wiki, item.weapon);
+  const facts = itemFacts(it);
+  const values = optionFull(item.options);
+  const holding = !!item.renter && data.mine.includes(item.renter);
   return (
-    <div className="rent-detail">
-      <p className="mk-meta">
-        {[
-          `Lv.${levelOf(wiki, item)}`,
-          info?.["공격"] && `공격 ${info["공격"]}`,
-          info?.["속도"] && `속도 ${info["속도"]}`,
-          info?.["옵션"] && `옵션 범위 ${info["옵션"]}`,
-          item.donor && `기부 ${item.donor}`,
-          `💎${item.price} = ${diaGold(item.price, data.rate)} 골드`,
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-      </p>
-      {item.note && <p className="mk-note">{item.note}</p>}
-      <p className="rent-line">
-        {item.renter ? (
-          <>
-            {item.renter} 대여 중{item.rentedAt ? ` · ${md(item.rentedAt)}부터` : ""}
-            {item.dueAt ? ` · 기한 ${md(item.dueAt)}` : " · 기한 없음"}
-            {item.dueAt && !item.queue ? " · 대기 없으면 계속" : ""}
-          </>
+    <>
+      <div className="rent-pop-back" onClick={onClose} />
+      <div className="rent-pop" role="dialog" aria-label={`${item.weapon} +${item.enhance}`}>
+        <div className="mk-tip">
+          <b className="mk-tip-name rent-pop-name">
+            {it?.icon && <PicImg pic={it.icon} fit={22} />}
+            <span>
+              {item.weapon} <em>+{item.enhance}</em>
+            </span>
+          </b>
+          <p className="mk-tip-lv">요구 레벨 {levelOf(wiki, item)}</p>
+          {facts.stats.map((s) => (
+            <p key={s}>{s}</p>
+          ))}
+          {values.map(([n, v]) => (
+            <p key={n}>
+              {n} {v}
+            </p>
+          ))}
+          {!values.length && item.options && <p>{item.options}</p>}
+          {facts.options.fixed.map((f) => (
+            <p key={f}>{f}</p>
+          ))}
+          {facts.options.sets.map((s) => (
+            <p key={s} className="mk-tip-dim">
+              {s}
+            </p>
+          ))}
+          {facts.job && (
+            <div className="mk-tip-jobs" aria-label={`직업 ${facts.job}`}>
+              {jobsFor(facts.job).map((j) => (
+                <img key={j} src={`${MARKET_PIC}job_${j}.png`} alt={JOB_NAME[j]} title={JOB_NAME[j]} />
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="rent-pop-info">
+          <p>
+            {item.term === "none" ? "기한 없음" : `기한 ${TERM_NAME[item.term]}`} · 보증금 💎{item.price} <small>(골드 {diaGold(item.price, data.rate)})</small>
+          </p>
+          {item.donor && <p className="rent-muted">기부 {item.donor}</p>}
+          {item.renter && (
+            <p>
+              <b className="rent-st">대여 중</b> {item.renter}
+              {item.dueAt ? ` · ${md(item.dueAt)}까지` : " · 기한 없음"}
+              {item.deposit && (
+                <small className="rent-muted">
+                  {" "}
+                  · 보증금 {[item.deposit.dia ? `💎${item.deposit.dia}` : "", item.deposit.gold ? `골드 ${manGold(item.deposit.gold)}` : ""].filter(Boolean).join(" + ") || "없음"}
+                </small>
+              )}
+            </p>
+          )}
+          {/* 줄: 길드원은 수, 운영진은 명단 */}
+          {item.queue > 0 && (
+            <p>
+              대기 {item.queue}명{waitText(item) && ` · 새 신청은 ${waitText(item)}`}
+              {item.line && <small className="rent-muted"> · {item.line.map((q) => `${q.pos}. ${q.user}(${STATUS_NAME[q.status]})`).join(", ")}</small>}
+            </p>
+          )}
+          {item.note && <p className="mk-note">{item.note}</p>}
+        </div>
+        {item.mine ? (
+          <MyRequest item={item} onDone={onDone} />
         ) : (
-          "담당자에게 있어요"
+          !holding && (
+            <div className="pill-row">
+              <button className={"pill" + (picked ? " pill-on" : "")} onClick={onPick}>
+                {picked ? "담기 취소" : "신청 담기"}
+              </button>
+            </div>
+          )
         )}
-      </p>
-      {/* 줄: 길드원은 수와 내 차례, 운영진은 명단 */}
-      {item.queue > 0 && (
-        <p className="rent-line">
-          대기 {item.queue}명
-          {item.line && ` · ${item.line.map((q) => `${q.pos}. ${q.user}(${STATUS_NAME[q.status]}${q.at ? ` ${md(q.at)}~` : ""})`).join(", ")}`}
-        </p>
-      )}
-      {item.mine ? (
-        <MyRequest item={item} onDone={onDone} />
-      ) : (
-        !(item.renter && data.mine.includes(item.renter)) && <p className="rent-next">새로 신청하면 {nextText(item, now)}</p>
-      )}
-      {data.manager &&
-        (editing ? (
-          <ItemForm wiki={wiki} data={data} start={item} onDone={() => (setEditing(false), onDone())} />
-        ) : (
-          <ManagerBox item={item} data={data} onEdit={() => setEditing(true)} onDone={onDone} />
-        ))}
-    </div>
+        {data.manager &&
+          (editing ? (
+            <ItemForm wiki={wiki} data={data} start={item} onDone={() => (setEditing(false), onDone())} />
+          ) : (
+            <ManagerBox item={item} data={data} onEdit={() => setEditing(true)} onDone={onDone} />
+          ))}
+      </div>
+    </>
   );
 }
 
@@ -341,8 +415,11 @@ function MyRequest({ item, onDone }: { item: RentItem; onDone: () => void }) {
   );
 }
 
-/** 고른 무기 칸 (화면 아래): 무기마다 받을 수 있는 날을 보이고 한마디와 함께 신청서로 */
-function Cart({ picked, now, onClear, onDone }: { picked: RentItem[]; now: number; onClear: () => void; onDone: () => void }) {
+/**
+ * 고른 무기 칸 (화면 아래): 무기마다 보증금(💎, 골드)과 기다리면 받는 때, 합계와 '마일리지를 다 쓰면 골드를 얼마 더' (제작자 요청 2026-11-02:
+ * 마일리지 1 = 10만 골드, 보증금이라 반납하면 돌려받는다). 여러 개면 1인 1개가 원칙이라는 안내. 한마디와 함께 신청서로
+ */
+function Cart({ picked, mileage, rate, onClear, onDone }: { picked: RentItem[]; mileage: number; rate: number; onClear: () => void; onDone: () => void }) {
   const [openForm, setOpenForm] = useState(false);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -356,10 +433,30 @@ function Cart({ picked, now, onClear, onDone }: { picked: RentItem[]; now: numbe
               <b>
                 {i.weapon} +{i.enhance}
               </b>{" "}
-              <span>{i.term === "none" ? "무기한" : TERM_NAME[i.term]} · 💎{i.price}</span>
-              <small>{nextText(i, now)}</small>
+              <span>
+                {i.term === "none" ? "무기한" : TERM_NAME[i.term]} · 💎{i.price} <small>골드 {diaGold(i.price, rate)}</small>
+              </span>
+              {waitText(i) && <small>{waitText(i)}</small>}
             </p>
           ))}
+          {(() => {
+            const total = picked.reduce((n, i) => n + i.price, 0);
+            const use = Math.min(mileage, total);
+            return (
+              <div className="rent-cart-sum">
+                <p>
+                  보증금 <b>💎{total}</b> <small>= 골드 {diaGold(total, rate)}</small>
+                </p>
+                {/* 마일리지를 다 쓰면 골드로 얼마 더 (제작자 요청 2026-11-02) */}
+                <p>
+                  내 마일리지 💎{mileage}
+                  {use >= total ? ` · 마일리지로 모두 내요 (남는 💎${mileage - total})` : use > 0 ? ` 다 쓰고 골드 ${diaGold(total - use, rate)} 더` : ` · 골드 ${diaGold(total, rate)}`}
+                </p>
+                <small className="rent-muted">보증금이라 반납하면 마일리지와 골드를 돌려받아요</small>
+              </div>
+            );
+          })()}
+          {picked.length > 1 && <p className="rent-cart-warn">1인 1개 대여가 원칙이에요. 여러 개 신청하면 담당자가 거절할 수 있어요.</p>}
           <input className="mk-input" placeholder="한마디 (마일리지 쓸 양, 받을 시간 등)" maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} />
           {error && <p className="form-error">{error}</p>}
         </div>
@@ -367,7 +464,6 @@ function Cart({ picked, now, onClear, onDone }: { picked: RentItem[]; now: numbe
       <div className="rent-cart-bar">
         <span>
           고른 무기 <b>{picked.length}</b>
-          <small>/{MAX_PICK}</small>
         </span>
         <button className="pill" onClick={onClear}>
           비우기
@@ -404,7 +500,7 @@ function Cart({ picked, now, onClear, onDone }: { picked: RentItem[]; now: numbe
   );
 }
 
-/** 신청서: 무기마다 상태와 차례, 운영진의 수락·거절·건네줌, 신청한 사람의 취소, 대화창 */
+/** 신청서: 무기마다 상태와 차례, 운영진의 수락·거절·대여 완료, 신청한 사람의 취소, 대화창 */
 function AppCard({ app, data, byId, manage = false, onDone }: { app: RentApp; data: RentData; byId: Map<number, RentItem>; manage?: boolean; onDone: () => void }) {
   // 대화창은 접어 두고 '대화'로 연다. 상대가 마지막으로 썼으면 '대화'를 금색으로 (운영진에게는 신청한 사람의 글, 신청한 사람에게는 운영진의 글)
   const [talkOpen, setTalkOpen] = useState(false);
@@ -441,12 +537,11 @@ function ReqLine({ r, item, app, manage, rate, onDone }: { r: AppRequest; item?:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [handing, setHanding] = useState(false);
-  const [use, setUse] = useState(0);
-  const act = async (action: "accept" | "reject" | "cancel" | "hand") => {
+  const act = async (action: "accept" | "reject" | "cancel" | "hand", use = 0, gold?: number) => {
     setBusy(true);
     setError("");
     try {
-      await actRequest(r.rid, action, action === "hand" ? use : 0);
+      await actRequest(r.rid, action, use, gold);
       setHanding(false);
       onDone();
     } catch (e) {
@@ -456,7 +551,7 @@ function ReqLine({ r, item, app, manage, rate, onDone }: { r: AppRequest; item?:
     }
   };
   const queued = r.status === "wait" || r.status === "ok";
-  // 건넬 수 있는 때: 무기가 담당자에게 있고 줄의 첫 사람 (그 밖에도 담당자 판단으로 건넬 수 있게 '건네줌'은 늘 둔다)
+  // 대여 완료할 수 있는 때: 무기가 담당자에게 있을 때 (줄의 첫 사람이 아니어도 담당자 판단으로)
   const free = item && !item.renter;
   // 아직 다른 사람이 쓰고 있으면 운영진에게는 누구에게 돌려받아야 하는지 ('춘천다크갈비 반납 뒤')
   const after = manage && !free && item?.renter ? `${item.renter} 반납 뒤` : "앞사람 반납 뒤";
@@ -465,7 +560,7 @@ function ReqLine({ r, item, app, manage, rate, onDone }: { r: AppRequest; item?:
     : queued
       ? `${STATUS_NAME[r.status]} · ${r.pos}번째${r.at ? (r.at <= Date.now() + 60_000 ? "" : ` · ${md(r.at)}부터`) : free && r.pos === 1 ? "" : ` · ${after}`}`
       : r.status === "done"
-        ? `건네받음${r.returnedAt ? ` · ${md(r.returnedAt)} 반납` : ""}`
+        ? `대여 완료${r.returnedAt ? ` · ${md(r.returnedAt)} 반납` : ""}`
         : STATUS_NAME[r.status];
   return (
     <li className="rent-req">
@@ -490,7 +585,7 @@ function ReqLine({ r, item, app, manage, rate, onDone }: { r: AppRequest; item?:
                 </button>
               )}
               <button className={"pill" + (handing ? " pill-on" : "")} disabled={busy || !free} onClick={() => setHanding((v) => !v)}>
-                건네줌
+                대여 완료
               </button>
               <button className="pill" disabled={busy} onClick={() => void act("reject")}>
                 거절
@@ -505,10 +600,7 @@ function ReqLine({ r, item, app, manage, rate, onDone }: { r: AppRequest; item?:
       )}
       {handing && item && (
         <div className="rent-hand rent-full">
-          <DiaStep use={use} max={Math.min(item.price, app.mileage ?? 0)} price={item.price} rate={rate} onChange={setUse} />
-          <button className="pill pill-on" disabled={busy} onClick={() => void act("hand")}>
-            완료
-          </button>
+          <DepositForm price={item.price} mileage={app.mileage ?? 0} rate={rate} busy={busy} label="대여 완료" onSave={(use, gold) => void act("hand", use, gold)} />
         </div>
       )}
       {error && <p className="form-error rent-full">{error}</p>}
@@ -516,20 +608,53 @@ function ReqLine({ r, item, app, manage, rate, onDone }: { r: AppRequest; item?:
   );
 }
 
-/** 마일리지에서 쓸 💎: 마일리지 − 💎2 + 골드 80만 (나머지는 골드) */
-function DiaStep({ use, max, price, rate, onChange }: { use: number; max: number; price: number; rate: number; onChange: (v: number) => void }) {
+/**
+ * 보증금 받기 (대여 완료, 대여 등록): 마일리지에서 쓸 💎 (− +) 와 받은 골드(만). 골드는 처음에 '가격에서 마일리지를 뺀 나머지'로 채우고
+ * 고칠 수 있다 (제작자 요청 2026-11-02: 마일리지만 뜨고 골드를 입력 못 했다. 마일리지 1 = 10만 골드, 보증금이라 반납하면 돌려준다)
+ */
+function DepositForm({ price, mileage, rate, busy, label, onSave }: {
+  price: number;
+  mileage: number;
+  rate: number;
+  busy: boolean;
+  label: string;
+  onSave: (useDia: number, gold: number) => void;
+}) {
+  const max = Math.min(price, mileage);
+  const [use, setUse] = useState(0);
+  // 골드는 만 단위로 적는다. 손대기 전에는 나머지를 따라간다
+  const rest = ((price - use) * rate) / 10_000;
+  const [man, setMan] = useState<string | null>(null);
+  const goldMan = man === null ? rest : Number(man) || 0;
   return (
-    <span className="rent-step">
-      <span className="rent-muted">마일리지</span>
-      <button type="button" className="pill" disabled={use <= 0} onClick={() => onChange(Math.max(0, use - 1))} aria-label="마일리지 빼기">
-        −
-      </button>
-      <b className="rent-use">💎{use}</b>
-      <button type="button" className="pill" disabled={use >= max} onClick={() => onChange(Math.min(max, use + 1))} aria-label="마일리지 더하기">
-        +
-      </button>
-      <span className="rent-muted">골드 {diaGold(price - use, rate)}</span>
-    </span>
+    <div className="rent-deposit">
+      <p className="rent-muted">
+        보증금 💎{price} <small>= 골드 {diaGold(price, rate)}</small>
+        {mileage > 0 && <small> · 마일리지 💎{mileage}</small>}
+      </p>
+      <div className="rent-deposit-row">
+        <span className="rent-step">
+          <span className="rent-muted">마일리지</span>
+          <button type="button" className="pill" disabled={use <= 0} onClick={() => setUse(Math.max(0, use - 1))} aria-label="마일리지 빼기">
+            −
+          </button>
+          <b className="rent-use">💎{use}</b>
+          <button type="button" className="pill" disabled={use >= max} onClick={() => setUse(Math.min(max, use + 1))} aria-label="마일리지 더하기">
+            +
+          </button>
+        </span>
+        <label className="rent-gold">
+          <span className="rent-muted">골드</span>
+          <input className="mk-input" inputMode="numeric" value={man ?? String(rest)} onChange={(e) => setMan(e.target.value.replace(/\D/g, "").slice(0, 7))} aria-label="받은 골드 (만)" />
+          <span className="rent-muted">만</span>
+        </label>
+      </div>
+      <div className="pill-row">
+        <button className="pill pill-on" disabled={busy} onClick={() => onSave(use, goldMan * 10_000)}>
+          {label}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -596,7 +721,7 @@ function Talk({ app, onDone }: { app: RentApp; onDone: () => void }) {
   );
 }
 
-/** 운영진: 직접 대여, 반납, 고치기, 내리기 (신청서의 수락·건네줌은 '운영 > 신청') */
+/** 운영진: 대여 등록, 반납, 고치기, 내리기 (신청서의 수락·대여 완료은 '운영 > 신청') */
 function ManagerBox({ item, data, onEdit, onDone }: { item: RentItem; data: RentData; onEdit: () => void; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -620,17 +745,28 @@ function ManagerBox({ item, data, onEdit, onDone }: { item: RentItem; data: Rent
     <div className="rent-manage">
       {/* 한 줄: 반납·내리기는 한 번 더 묻는 동안 그 단추와 취소만 */}
       {sure === "return" ? (
-        <div className="rent-btns">
-          <span className="rent-muted">게임 안에서 돌려받았어요?</span>
-          <button className="pill pill-on" disabled={busy} onClick={() => run(() => returnRent(item.id))}>
-            반납
-          </button>
-          <button className="pill" onClick={() => setSure("")}>
-            취소
-          </button>
+        // 반납: 받은 보증금을 돌려준다 (마일리지는 장부로 저절로, 골드는 게임 안에서)
+        <div className="rent-return">
+          <p className="rent-muted">
+            게임 안에서 돌려받았어요?
+            {item.deposit && (item.deposit.dia > 0 || item.deposit.gold > 0) && (
+              <>
+                {" "}
+                보증금 돌려주기: {[item.deposit.dia ? `마일리지 💎${item.deposit.dia} (저절로)` : "", item.deposit.gold ? `골드 ${manGold(item.deposit.gold)} (게임 안에서)` : ""].filter(Boolean).join(" · ")}
+              </>
+            )}
+          </p>
+          <div className="pill-row">
+            <button className="pill pill-on" disabled={busy} onClick={() => run(() => returnRent(item.id))}>
+              반납
+            </button>
+            <button className="pill" onClick={() => setSure("")}>
+              취소
+            </button>
+          </div>
         </div>
       ) : sure === "remove" ? (
-        <div className="rent-btns">
+        <div className="pill-row">
           <button className="pill pill-danger" disabled={busy} onClick={() => run(() => removeRent(item.id))}>
             내리기
           </button>
@@ -639,14 +775,15 @@ function ManagerBox({ item, data, onEdit, onDone }: { item: RentItem; data: Rent
           </button>
         </div>
       ) : (
-        <div className="rent-btns">
+        <div className="pill-row">
           {item.renter ? (
             <button className="pill" onClick={() => (setLending(false), setSure("return"))}>
               반납
             </button>
           ) : (
+            // 대여 등록: 카톡 등 앱 밖에서 받은 신청을 운영진이 적는다 (예전 이름 '직접 대여', 제작자: '직접 대여는 뭔 말임')
             <button className={"pill" + (lending ? " pill-on" : "")} onClick={() => setLending((v) => !v)}>
-              직접 대여
+              대여 등록
             </button>
           )}
           <button className="pill" onClick={onEdit}>
@@ -665,25 +802,32 @@ function ManagerBox({ item, data, onEdit, onDone }: { item: RentItem; data: Rent
   );
 }
 
-/** 직접 대여: 카톡 등으로 따로 받은 것을 닉네임으로 적는다 (마일리지를 쓰면 그 사람 장부에서 뺀다, 날짜를 고르면 그날 빌려 간 것으로) */
-function LendForm({ item, data, busy, onLend }: { item: RentItem; data: RentData; busy: boolean; onLend: (b: { renter: string; useDia: number; date?: string }) => void }) {
+/** 대여 등록: 카톡 등 앱 밖 신청을 닉네임으로 적는다 (보증금 마일리지와 골드, 빌려 간 날을 고르면 그날 빌려 간 것으로) */
+function LendForm({ item, data, busy, onLend }: {
+  item: RentItem;
+  data: RentData;
+  busy: boolean;
+  onLend: (b: { renter: string; useDia: number; gold: number; date?: string }) => void;
+}) {
   const [renter, setRenter] = useState("");
-  const [use, setUse] = useState(0);
   const [date, setDate] = useState("");
+  const who = (data.balances ?? []).find((b) => b.person === renter.trim());
   return (
     <div className="rent-ask">
       <NameInput value={renter} onChange={setRenter} members={data.members ?? []} placeholder="빌려 갈 사람 닉네임" />
-      <DiaStep use={use} max={item.price} price={item.price} rate={data.rate} onChange={setUse} />
-      {/* 빌려 간 날과 처리 단추를 한 줄에 */}
-      <div className="rent-lend">
-        <label className="mk-field">
-          <span>빌려 간 날 (비우면 오늘)</span>
-          <input className="mk-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </label>
-        <button className="pill pill-on" disabled={busy || !renter.trim()} onClick={() => onLend({ renter: renter.trim(), useDia: use, ...(date ? { date } : {}) })}>
-          대여 처리
-        </button>
-      </div>
+      <label className="mk-field">
+        <span>빌려 간 날 (비우면 오늘)</span>
+        <input className="mk-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+      </label>
+      <DepositForm
+        key={renter.trim()}
+        price={item.price}
+        mileage={who?.dia ?? 0}
+        rate={data.rate}
+        busy={busy || !renter.trim()}
+        label="대여 등록"
+        onSave={(useDia, gold) => onLend({ renter: renter.trim(), useDia, gold, ...(date ? { date } : {}) })}
+      />
     </div>
   );
 }
@@ -737,6 +881,16 @@ function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; s
   );
   const q = f.weapon.trim().replace(/\s+/g, "");
   const hits = q ? weapons.filter((w) => w.name.replace(/\s+/g, "").includes(q) && w.name !== f.weapon).slice(0, 6) : [];
+  // 위키 무기면 그 무기에 뜰 수 있는 옵션(명중 0~6, 크리티컬 0~5 …)을 칸으로 보이고 값만 적게 한다 (제작자 요청 2026-11-02: 아이템 자료 연동, 옵션 자동완성)
+  const rolls = itemFacts(weaponOf(wiki, f.weapon)).options.rolls;
+  const values = new Map(optionFull(f.options));
+  const setRoll = (name: string, v: number) =>
+    set(
+      "options",
+      optionShort(rolls.map((r) => [r.name, r.name === name ? v : (values.get(r.name) ?? 0)] as [string, number])),
+    );
+  /** 위키에서 무기를 고르면 레벨을 채우고 옵션은 그 무기 것으로 비운다 */
+  const pickWeapon = (name: string, level: number) => setF((cur) => ({ ...cur, weapon: name, level, options: "" }));
   const save = async () => {
     setBusy(true);
     setError("");
@@ -774,7 +928,17 @@ function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; s
       </div>
       <label className="mk-field">
         <span>무기</span>
-        <input className="mk-input" maxLength={30} value={f.weapon} onChange={(e) => set("weapon", e.target.value)} />
+        <input
+          className="mk-input"
+          maxLength={30}
+          value={f.weapon}
+          onChange={(e) => {
+            // 위키 무기 이름을 다 적으면 고른 것과 같게 레벨을 채운다
+            const exact = weapons.find((w) => w.name === e.target.value.trim());
+            if (exact) pickWeapon(exact.name, exact.level);
+            else set("weapon", e.target.value);
+          }}
+        />
       </label>
       {hits.length > 0 && (
         <div className="mk-chips">
@@ -783,7 +947,7 @@ function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; s
               key={w.name}
               type="button"
               className="pill"
-              onClick={() => setF((cur) => ({ ...cur, weapon: w.name, level: w.level }))}
+              onClick={() => pickWeapon(w.name, w.level)}
             >
               {w.name} <small>Lv.{w.level}</small>
             </button>
@@ -795,10 +959,30 @@ function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; s
         <Num label="+강" value={f.enhance} min={0} max={20} onChange={(v) => set("enhance", v)} />
         <Num label="가격 💎" value={f.price} min={0} max={9999} onChange={(v) => set("price", v)} />
       </div>
-      <label className="mk-field">
-        <span>옵션 (명6크3, 지4마11마재1)</span>
-        <input className="mk-input" maxLength={30} value={f.options} onChange={(e) => set("options", e.target.value)} />
-      </label>
+      {rolls.length > 0 ? (
+        // 위키 무기: 옵션마다 값 칸 (범위는 이름 옆에, 0 이면 없음)
+        <div className="rent-rolls">
+          {rolls.map((r) => (
+            <Num
+              key={r.name}
+              label={
+                <>
+                  {r.name} <small>{rollHint(r)}</small>
+                </>
+              }
+              value={values.get(r.name) ?? 0}
+              min={0}
+              max={999}
+              onChange={(v) => setRoll(r.name, v)}
+            />
+          ))}
+        </div>
+      ) : (
+        <label className="mk-field">
+          <span>옵션 (명6크3, 지4마11마재1)</span>
+          <input className="mk-input" maxLength={30} value={f.options} onChange={(e) => set("options", e.target.value)} />
+        </label>
+      )}
       {/* 기부한 사람과 그 사람에게 적립할 마일리지 */}
       <div className="rent-donor">
         <label className="mk-field">

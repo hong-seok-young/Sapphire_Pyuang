@@ -541,7 +541,8 @@ CREATE TABLE IF NOT EXISTS rental_requests (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   item_id INTEGER NOT NULL,
   user_id TEXT NOT NULL,                  -- 빌리는 사람 (닉네임)
-  use_dia INTEGER NOT NULL DEFAULT 0,     -- 건넬 때 마일리지에서 쓴 💎 (나머지는 골드)
+  use_dia INTEGER NOT NULL DEFAULT 0,     -- 대여 완료 때 보증금으로 쓴 마일리지 💎 (반납하면 돌려준다)
+  gold INTEGER,                           -- 대여 완료 때 보증금으로 받은 골드 (반납하면 게임 안에서 돌려준다, 제작자 요청 2026-11-02 '보증금 개념')
   note TEXT,
   status TEXT NOT NULL DEFAULT 'wait',    -- wait 신청(확인 전) | ok 수락(차례 기다림) | done 건네받음 | no 거절 | cancel 취소
   created_at INTEGER NOT NULL,

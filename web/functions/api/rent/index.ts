@@ -33,11 +33,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const manager = isManager(me);
   const owner = me.owner ?? me.id;
   const now = Date.now();
-  const [itemsR, queueR, charsR, ledgerR, myAppsR] = await env.DB.batch([
+  const [itemsR, queueR, depositR, charsR, ledgerR, myAppsR] = await env.DB.batch([
     env.DB.prepare(
       "SELECT id, job, level, weapon, options, enhance, term, price, donor, renter, rented_at, due_at, note FROM rental_items WHERE status = 'open' ORDER BY job, level, weapon, enhance, id",
     ),
     env.DB.prepare("SELECT id, item_id, user_id, status, created_at, app_id FROM rental_requests WHERE status IN ('wait', 'ok') ORDER BY created_at, id"),
+    // 지금 대여 중인 무기마다 받은 보증금 (가장 최근의 반납 전 대여)
+    env.DB.prepare(
+      "SELECT r.item_id, r.use_dia, r.gold FROM rental_requests r JOIN rental_items i ON i.id = r.item_id AND i.renter IS NOT NULL " +
+        "WHERE r.status = 'done' AND r.returned_at IS NULL ORDER BY r.done_at",
+    ),
     env.DB.prepare("SELECT id FROM users WHERE id = ?1 OR main_id = ?1").bind(owner),
     env.DB.prepare(
       "SELECT who, delta, gold, reason, note, created_at AS at FROM rental_mileage WHERE who IN (SELECT id FROM users WHERE id = ?1 OR main_id = ?1) " +
@@ -46,6 +51,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     env.DB.prepare("SELECT id, user_id, note, created_at, updated_at FROM rental_apps WHERE user_id IN (SELECT id FROM users WHERE id = ?1 OR main_id = ?1) ORDER BY created_at DESC LIMIT 10").bind(owner),
   ]);
   const mine = new Set((charsR.results as { id: string }[]).map((r) => r.id));
+  const deposits = new Map<number, { dia: number; gold: number | null }>();
+  for (const d of depositR.results as { item_id: number; use_dia: number; gold: number | null }[]) deposits.set(d.item_id, { dia: d.use_dia, gold: d.gold });
   const rows = itemsR.results as RentalRow[];
   const byId = new Map(rows.map((r) => [r.id, r]));
   // 무기마다 줄 (신청한 순서)과 차례마다 받을 수 있는 때
@@ -86,6 +93,13 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       next: when.get(it.id)?.[line.length] ?? null,
       mine: my ? { rid: my.id, status: my.status, ...placeOf(my)! } : null,
       ...(manager ? { donorDia: it.donor ? (donated.get(it.id)?.get(it.donor) ?? 0) : 0 } : {}),
+      // 받은 보증금: 운영진과 빌린 사람에게만 (예전 기록에 골드가 없으면 가격에서 마일리지를 뺀 나머지)
+      ...(it.renter && (manager || mine.has(it.renter))
+        ? (() => {
+            const d = deposits.get(it.id) ?? { dia: 0, gold: null };
+            return { deposit: { dia: d.dia, gold: d.gold ?? (it.price - d.dia) * DIA_GOLD } };
+          })()
+        : {}),
       // 누가 줄을 섰는지는 운영진만 (길드원은 수와 내 차례만)
       ...(manager ? { line: line.map((q) => ({ rid: q.id, user: q.user_id, status: q.status, appId: q.app_id, ...placeOf(q)! })) } : {}),
     };

@@ -9,7 +9,7 @@ export const TERMS: RentTerm[] = ["none", "4w", "2w"];
 export const TERM_NAME: Record<RentTerm, string> = { none: "기한 없음", "4w": "4주", "2w": "2주" };
 
 export type ReqStatus = "wait" | "ok" | "done" | "no" | "cancel";
-export const STATUS_NAME: Record<ReqStatus, string> = { wait: "확인 전", ok: "수락", done: "건네받음", no: "거절", cancel: "취소" };
+export const STATUS_NAME: Record<ReqStatus, string> = { wait: "확인 전", ok: "수락", done: "대여 완료", no: "거절", cancel: "취소" };
 
 export interface RentItem {
   id: number;
@@ -37,6 +37,8 @@ export interface RentItem {
   mine: { rid: number; status: ReqStatus; pos: number; at: number | null } | null;
   /** 운영진만: 이 물건으로 기부자에게 적립한 💎 */
   donorDia?: number;
+  /** 대여 중일 때 받은 보증금 (운영진과 빌린 사람에게만): 마일리지 💎, 골드 */
+  deposit?: { dia: number; gold: number };
   /** 운영진만: 줄 명단 */
   line?: { rid: number; user: string; status: ReqStatus; appId: number | null; pos: number; at: number | null }[];
 }
@@ -78,7 +80,7 @@ export interface LedgerLine {
   who: string;
   delta: number;
   gold: number | null;
-  reason: "donate" | "rent" | "adjust";
+  reason: "donate" | "rent" | "adjust" | "return";
   note: string | null;
   at: number;
   by?: string;
@@ -103,14 +105,14 @@ export interface RentData {
 export const fetchRent = () => api<RentData>("/api/rent");
 /** 신청서: 무기 여러 개를 한 번에 (무기마다 선착순으로 줄을 선다) */
 export const applyRent = (items: number[], note: string) => api<{ appId: number }>("/api/rent/apply", "POST", { items, note });
-/** 신청 하나: accept 수락 / reject 거절 / hand 건네줌(마일리지 💎) — 운영진, cancel 취소 — 신청한 사람 */
-export const actRequest = (rid: number, action: "accept" | "reject" | "cancel" | "hand", useDia = 0) =>
-  api<{ ok: boolean }>(`/api/rent/requests/${rid}`, "POST", { action, useDia });
+/** 신청 하나: accept 수락 / reject 거절 / hand 대여 완료(보증금: 마일리지 💎 와 골드) — 운영진, cancel 취소 — 신청한 사람 */
+export const actRequest = (rid: number, action: "accept" | "reject" | "cancel" | "hand", useDia = 0, gold?: number) =>
+  api<{ ok: boolean }>(`/api/rent/requests/${rid}`, "POST", { action, useDia, gold });
 export const talkRent = (aid: number, text: string) => api<{ id: number; at: number }>(`/api/rent/apps/${aid}/talk`, "POST", { text });
-/** 직접 대여 (카톡 등 앱 밖 신청) */
-export const lendRent = (id: number, body: { renter: string; useDia: number; date?: string }) =>
+/** 대여 등록 (카톡 등 앱 밖 신청) */
+export const lendRent = (id: number, body: { renter: string; useDia: number; gold?: number; date?: string }) =>
   api<{ ok: boolean; dueAt: number | null }>(`/api/rent/${id}/lend`, "POST", body);
-export const returnRent = (id: number) => api<{ ok: boolean }>(`/api/rent/${id}/return`, "POST");
+export const returnRent = (id: number) => api<{ ok: boolean; refund: { dia: number; gold: number } }>(`/api/rent/${id}/return`, "POST");
 export interface RentFields {
   job: Job;
   level: number;
@@ -143,12 +145,29 @@ export const addMileage = (who: string, delta: number, reason: "donate" | "adjus
   api<{ ok: boolean; mileage: number }>("/api/rent/mileage", "POST", { who, delta, reason, note });
 
 /** 옵션 줄임말 -> [짧은 이름, 값] ('명6크3' -> 명중 6, 크리 3). 한 줄에 들어가게 짧게 (제작자 요청 2026-11-02). 마재(마나재생)를 마(마나)보다 먼저 */
-const OPTION_NAME: Record<string, string> = { 마재: "마재", 명: "명중", 크: "크리", 힘: "힘", 민: "민첩", 지: "지능", 마: "마나" };
+const OPTION_NAME: Record<string, string> = { 마재: "마재", 명: "명중", 크: "크리", 힘: "힘", 민: "민첩", 지: "지능", 마: "마나", 체: "체력", 이속: "이속", 속저: "속저" };
+/** 줄임말 -> 위키 옵션 이름 (정보창), 위키 옵션 이름 -> 줄임말 (물건 추가의 옵션 칸) */
+const OPTION_FULL: Record<string, string> = {
+  마재: "마나재생", 명: "명중", 크: "크리티컬", 힘: "힘", 민: "민첩", 지: "지능", 마: "마나", 체: "체력", 이속: "이동속도", 속저: "속성저항",
+};
+export const OPTION_SHORT: Record<string, string> = Object.fromEntries(Object.entries(OPTION_FULL).map(([k, v]) => [v, k]));
+const OPTION_RE = /(마재|이속|속저|명|크|힘|민|지|마|체)\s*(\d{1,3})/g;
 export function optionParts(options: string): [string, number][] {
   const out: [string, number][] = [];
-  const re = /(마재|명|크|힘|민|지|마)\s*(\d{1,3})/g;
-  for (let m = re.exec(options); m; m = re.exec(options)) out.push([OPTION_NAME[m[1]], Number(m[2])]);
+  for (let m = OPTION_RE.exec(options); m; m = OPTION_RE.exec(options)) out.push([OPTION_NAME[m[1]], Number(m[2])]);
+  OPTION_RE.lastIndex = 0;
   return out;
+}
+/** 옵션 줄임말 -> 위키 이름과 값 ('명6크3' -> [['명중', 6], ['크리티컬', 3]]) */
+export function optionFull(options: string): [string, number][] {
+  const out: [string, number][] = [];
+  for (let m = OPTION_RE.exec(options); m; m = OPTION_RE.exec(options)) out.push([OPTION_FULL[m[1]], Number(m[2])]);
+  OPTION_RE.lastIndex = 0;
+  return out;
+}
+/** 위키 이름과 값 -> 줄임말 (0 은 빼고): [['명중', 6], ['크리티컬', 3]] -> '명6크3' */
+export function optionShort(values: [string, number][]): string {
+  return values.filter(([, v]) => v > 0).map(([n, v]) => `${OPTION_SHORT[n] ?? n}${v}`).join("");
 }
 
 /** 위키의 그 무기 (띄어쓰기는 보지 않는다: '폭풍채찍' = '폭풍 채찍') */
@@ -163,6 +182,11 @@ export function levelOf(wiki: Wiki, r: { weapon: string; level: number }): numbe
   return Number.isInteger(lv) && lv > 0 ? lv : r.level;
 }
 
+/** 골드 -> '80만' */
+export function manGold(gold: number): string {
+  if (!gold) return "0";
+  return gold >= 100_000_000 ? `${(gold / 100_000_000).toLocaleString()}억` : `${Math.round(gold / 10_000).toLocaleString()}만`;
+}
 /** 💎 -> '120만' 골드 */
 export function diaGold(dia: number, rate = 100_000): string {
   if (!dia) return "0";
