@@ -1,8 +1,9 @@
 // 메뉴 튜토리얼 (제작자 요청 2026-11-02, 글은 src/guides.ts).
-// - 위 줄 제목(배너)이나 홈의 'Sapphire' 글씨를 누르면 openGuide(제목) -> GuideHost(App 이 한 번 그린다)가 바로 튜토리얼을 시작한다.
+// - 위 줄 제목(배너)이나 홈의 길드마크를 누르면 openGuide(제목) -> GuideHost(App 이 한 번 그린다)가 바로 튜토리얼을 시작한다.
 //   처음엔 설명 칸(단추별 기능·흐름 글)을 먼저 올리고 '튜토리얼 시작'을 누르게 했는데, 제작자가 '설명서 필요 없고 바로 튜토리얼 시작' 이라고 해서 뺐다 (2026-11-02).
 // - Tutorial: 화면을 어둡게 하고 그 단계의 자리만 밝게 비추며(spotlight) 글 상자로 안내. 'n/N', 그만 · 이전 · 다음.
 //   '눌러 보기' 단계(tap)는 그 자리를 직접 누르면 다음으로 (칸 열기, 탭 바꾸기처럼 바꾸지 않는 것만). 다음을 눌러 넘어가도 된다. go 가 있으면 먼저 그 주소로 간다.
+//   날씨 샘플 단계(fx)는 어두운 막 없이 그 날씨 효과(WeatherFx)를 그리고 글 상자는 위에 (제작자 요청: 비·눈·함박눈·빈 곳 누르기 샘플). tap 이면 빈 곳을 누르면 다음으로.
 //   자리를 못 찾으면(그 권한에 없거나 자료가 없어서) 그 단계는 건너뛴다. 어두운 막은 누르는 데 걸리지 않아 화면을 그대로 쓸 수 있다.
 //   비추는 네모는 화면 안으로 맞춘다 (가장자리의 배치 편집을 비출 때 잘렸다, 제작자 2026-11-02). 설명이 있는 다른 메뉴로 가면 끝난다.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -11,6 +12,7 @@ import { createPortal } from "react-dom";
 import type { Me } from "./auth";
 import { GUIDES, canSee, guideByTitle } from "./guides";
 import type { Guide, GuideStep } from "./guides";
+import { WeatherFx } from "./pages/Weather";
 
 // ---------- 열기 (작은 바깥 저장소: TopBar 는 me 를 모른다) ----------
 let openKey: string | null = null;
@@ -86,6 +88,8 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
   const step: GuideStep | undefined = steps[i];
   const dir = useRef(1);
   const going = useRef(false);
+  /** 이 단계에서 눌러 이미 넘어가는 중 (두 번 눌러 두 단계 건너뛰지 않게) */
+  const fired = useRef(false);
 
   // 단계가 바뀌면: 이동(go) -> 자리 찾기(1.5초까지) -> 보이게 스크롤. 못 찾으면 건너뛴다
   useEffect(() => {
@@ -94,6 +98,7 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
       return;
     }
     let alive = true;
+    fired.current = false;
     setReady(false);
     (async () => {
       if (step.go && location.hash !== step.go) {
@@ -151,7 +156,7 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
     };
   }, []);
 
-  // 설명이 있는 다른 메뉴로 가면(아래 탭 등) 끝낸다. go 로 스스로 옮기는 것과 글·사냥터처럼 설명이 없는 안쪽 화면은 그대로
+  // 설명이 있는 다른 메뉴로 가면(아래 탭 등) 끝낸다. go 로 스스로 옮기는 것과 글·사냥터·패치 내역처럼 설명이 없는 안쪽 화면은 그대로
   useEffect(() => {
     const onHash = () => {
       if (going.current) return;
@@ -162,15 +167,29 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
     return () => window.removeEventListener("hashchange", onHash);
   }, [guide.key, onEnd]);
 
-  // 눌러 보기 단계: 그 자리를 누르면 다음으로
+  // 눌러 보기 단계: 그 자리를 누르면 다음으로. 날씨 샘플이면 글 상자 밖 아무 곳이나 (터지는 것을 보고 넘어간다)
   useEffect(() => {
     if (!step?.tap) return;
+    const advance = (after: number) => {
+      if (fired.current) return;
+      fired.current = true;
+      dir.current = 1;
+      window.setTimeout(() => setI((n) => n + 1), after);
+    };
+    if (step.fx) {
+      const onDown = (e: Event) => {
+        const t = e.target as Element | null;
+        if (t && t.closest(".tut-box")) return;
+        advance(1800);
+      };
+      document.addEventListener("pointerdown", onDown, true);
+      return () => document.removeEventListener("pointerdown", onDown, true);
+    }
     const onTap = (e: Event) => {
       const el = elRef.current;
       const t = e.target as Node | null;
       if (!el || !t || !el.contains(t)) return;
-      dir.current = 1;
-      window.setTimeout(() => setI((n) => n + 1), 450);
+      advance(450);
     };
     document.addEventListener("click", onTap, true);
     return () => document.removeEventListener("click", onTap, true);
@@ -209,56 +228,61 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
   const sy = r ? Math.max(2, r.top - pad) : 0;
   const ex = r ? Math.min(W - 2, r.right + pad) : 0;
   const ey = r ? Math.min(H - 2, r.bottom + pad) : 0;
-  // 글 상자: 비춘 자리 아래, 자리가 아래쪽이면 위, 자리가 크면 아래쪽에
+  // 글 상자: 비춘 자리 아래, 자리가 아래쪽이면 위, 자리가 크면 아래쪽에. 날씨 샘플은 위에 (아래에 쌓이는 것을 보게)
   const tall = !!r && r.height > H * 0.45;
   const below = !!r && !tall && r.bottom + 160 < H;
-  const boxStyle: CSSProperties = !r || tall
-    ? { bottom: 80 }
-    : below
-      ? { top: Math.max(8, Math.min(H - 170, ey + 10)) }
-      : { bottom: Math.max(8, Math.min(H - 170, H - sy + 10)) };
+  const boxStyle: CSSProperties = step.fx
+    ? { top: 12 }
+    : !r || tall
+      ? { bottom: 80 }
+      : below
+        ? { top: Math.max(8, Math.min(H - 170, ey + 10)) }
+        : { bottom: Math.max(8, Math.min(H - 170, H - sy + 10)) };
   return createPortal(
-    <div className="tut" aria-live="polite">
-      {r && !missing ? (
-        <div className={"tut-spot" + (step.tap ? " tut-spot-tap" : "")} style={{ left: sx, top: sy, width: Math.max(0, ex - sx), height: Math.max(0, ey - sy) }} />
-      ) : (
-        <div className="tut-dim" />
-      )}
-      <div className="tut-box" style={boxStyle}>
-        <small>
-          {guide.title} 튜토리얼 {i + 1}/{steps.length}
-        </small>
-        <p>
-          {step.tap && <span className="tut-tap">눌러 보기</span>}
-          {step.text}
-        </p>
-        <div className="tut-acts">
-          <button className="bd-mini" onClick={onEnd}>
-            그만
-          </button>
-          {i > 0 && (
+    <>
+      {step.fx && <WeatherFx key={step.fx} sky={step.fx} />}
+      <div className="tut" aria-live="polite">
+        {step.fx ? null : r && !missing ? (
+          <div className={"tut-spot" + (step.tap ? " tut-spot-tap" : "")} style={{ left: sx, top: sy, width: Math.max(0, ex - sx), height: Math.max(0, ey - sy) }} />
+        ) : (
+          <div className="tut-dim" />
+        )}
+        <div className="tut-box" style={boxStyle}>
+          <small>
+            {guide.title} 튜토리얼 {i + 1}/{steps.length}
+          </small>
+          <p>
+            {step.tap && <span className="tut-tap">눌러 보기</span>}
+            {step.text}
+          </p>
+          <div className="tut-acts">
+            <button className="bd-mini" onClick={onEnd}>
+              그만
+            </button>
+            {i > 0 && (
+              <button
+                className="pill"
+                onClick={() => {
+                  dir.current = -1;
+                  setI(i - 1);
+                }}
+              >
+                이전
+              </button>
+            )}
             <button
-              className="pill"
+              className={"pill" + (step.tap ? "" : " pill-on")}
               onClick={() => {
-                dir.current = -1;
-                setI(i - 1);
+                dir.current = 1;
+                setI(i + 1);
               }}
             >
-              이전
+              {i + 1 >= steps.length ? "끝" : "다음"}
             </button>
-          )}
-          <button
-            className={"pill" + (step.tap ? "" : " pill-on")}
-            onClick={() => {
-              dir.current = 1;
-              setI(i + 1);
-            }}
-          >
-            {i + 1 >= steps.length ? "끝" : "다음"}
-          </button>
+          </div>
         </div>
       </div>
-    </div>,
+    </>,
     document.body,
   );
 }

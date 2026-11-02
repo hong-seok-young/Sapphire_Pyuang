@@ -2507,7 +2507,7 @@ button.gd-member-row { cursor: pointer; }
 
 /* 메뉴 튜토리얼 (src/tutorial.tsx, 제작자 요청 2026-11-02: 제목을 누르면 바로 그 메뉴 튜토리얼) */
 .tb-guide { cursor: pointer; }
-.hero-title-btn { padding: 0; margin: 0; text-align: left; color: inherit; font: inherit; background: none; border: 0; cursor: pointer; }
+.hero-mark-btn { flex: none; padding: 0; margin: 0; line-height: 0; background: none; border: 0; cursor: pointer; }
 .tut { position: fixed; inset: 0; z-index: 70; pointer-events: none; }
 .tut-dim { position: absolute; inset: 0; background: rgba(5, 5, 14, 0.55); }
 .tut-spot {

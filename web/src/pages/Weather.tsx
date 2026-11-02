@@ -137,7 +137,7 @@ export function WeatherFx({ sky }: { sky: Sky }) {
     const sparks: Spark[] = [];
     const flashes: { x: number; y: number; life: number }[] = [];
     /** 누르는 곳: 칸·단추·링크·입력·아래 탭 위는 그 일을 하게 두고 빈 곳만 */
-    const BUSY = "a, button, input, textarea, select, label, [role=button], [role=link], .tile, .tabbar, .home-corner, .home-weather, .wx-ask, .topbar";
+    const BUSY = "a, button, input, textarea, select, label, [role=button], [role=link], .tile, .tabbar, .home-corner, .home-weather, .wx-ask, .topbar, .tut-box";
     const onTap = (e: PointerEvent) => {
       const t = e.target as Element | null;
       if (!t || t.closest(BUSY) || e.clientY >= ground) return;
