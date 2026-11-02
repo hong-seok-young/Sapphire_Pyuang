@@ -249,7 +249,11 @@ function MeGroup({ title, children }: { title: string; children: ReactNode }) {
  */
 export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; onLogout: () => void }) {
   const [saved, setSaved] = useState(false);
-  const [open, setOpen] = useState<MenuKey | null>(null);
+  // '#/me?open=kakao' 처럼 줄을 펼친 채로 연다 (내 글의 흐린 '카톡'을 누르면 카톡 오픈프로필로)
+  const [open, setOpen] = useState<MenuKey | null>(() => {
+    const k = new URLSearchParams(location.hash.split("?")[1] ?? "").get("open");
+    return k === "kakao" || k === "photo" || k === "info" || k === "weather" ? k : null;
+  });
   const { links } = useKakao();
   const [wxOn, setWxOn] = useState(weatherOn);
   const row = (k: MenuKey) => ({ open: open === k, onToggle: () => setOpen((o) => (o === k ? null : k)) });

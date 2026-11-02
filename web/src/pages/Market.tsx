@@ -158,7 +158,7 @@ function Detail({ wiki, me, l, rate, onChanged }: {
       </div>
       {l.note && <p className="mk-note">“{l.note}”</p>}
       <p className="mk-meta">
-        {l.seller} {!mine && <KakaoButton name={l.seller} />} · {ago(l.createdAt)} 올림{l.qty > 1 && ` · ${l.qty}개 한꺼번에`}
+        {l.seller} <KakaoButton name={l.seller} mine={mine} /> · {ago(l.createdAt)} 올림{l.qty > 1 && ` · ${l.qty}개 한꺼번에`}
         {l.status === "sold" && " · 거래 완료"}
       </p>
       {auction ? (

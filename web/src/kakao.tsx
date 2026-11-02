@@ -39,11 +39,22 @@ export function useKakao(): Links {
 /** 내 링크 적기 (user 를 주면 그 사람 것: 운영진) */
 export const saveKakao = (link: string, user?: string) => api<{ ok: boolean; link: string | null }>("/api/kakao", "PUT", { link, user });
 
-/** 이름 옆 작은 '카톡' 단추 (그 사람이 링크를 적어 뒀을 때만). label 을 주면 그 글자로 */
-export function KakaoButton({ name, label = "카톡" }: { name: string | null | undefined; label?: string }) {
+/**
+ * 이름 옆 작은 '카톡' 단추 (그 사람이 링크를 적어 뒀을 때만). label 을 주면 그 글자로.
+ * mine 이면 내 글의 내 이름 옆에도 보인다 (제작자 요청 2026-11-02: 내 판매의 '퓨앙 · 방금 올림'에도): 적어 두었으면 눌러서 내 링크를 확인하고,
+ * 안 적었으면 흐린 '카톡'을 눌러 내 정보의 카톡 오픈프로필로 간다
+ */
+export function KakaoButton({ name, label = "카톡", mine = false }: { name: string | null | undefined; label?: string; mine?: boolean }) {
   const { links } = useKakao();
   const link = name ? links[name] : undefined;
-  if (!link) return null;
+  if (!link) {
+    if (!mine) return null;
+    return (
+      <a className="kakao-btn kakao-btn-off" href="#/me?open=kakao" onClick={(e) => e.stopPropagation()} aria-label="카톡 오픈프로필 적기">
+        {label}
+      </a>
+    );
+  }
   return (
     <a
       className="kakao-btn"
