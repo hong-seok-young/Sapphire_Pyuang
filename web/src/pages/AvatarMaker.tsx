@@ -5,8 +5,9 @@ import { errorText, uploadAvatar } from "../auth";
 /**
  * 캐릭터 사진 만들기 ('내 정보'). 길드원이 갤러리에서 직접 고른 자기 캐릭터 스샷에서
  *  1. 끌고 벌려서(확대) 캐릭터를 네모 안에 넣고 자른다
- *  2. AI 가 배경을 지우고(서버의 Cloudflare 배경 지우기, 제작자 요청), 남은 배경은 눌러서 지운다 (잘못 지운 곳은 '복원').
- *     AI 가 안 되면 가장자리에 이어진 배경을 저절로 지운다
+ *  2. 'AI 보정' 하나로 끝 (제작자 요청 2026-11-02: '색 범위 이딴 거 필요없음, AI 보정 하나 누르면 싹 배경 따고 캐릭 센터로 딱 맞춰주고 끝'):
+ *     서버의 Cloudflare 배경 지우기로 배경을 따고, 떨어진 조각(이름표, 펫)을 지우고, 캐릭터에 꼭 맞게 잘라 가운데에 둔다.
+ *     AI 를 못 쓰면(로컬 시험, 하루 한도) 가장자리에 이어진 배경을 저절로 지우고 그 까닭과 '다시 AI 보정'을 보인다. 손으로 지우는 도구는 없다
  *  3. 성장 랭킹 1등 카드에 넣어 보고 올린다
  * 자르기는 폰 안에서 하고, 자른 그림만 서버에 간다 (AI 지우기, 올리기). 앱은 화면을 찍지 않고 게임에 아무것도 보내지 않는다
  * (CLAUDE.md 게임 안전 규칙: 사용자가 고른 스샷만 쓰는 챗봇과 같은 조건).
@@ -21,13 +22,15 @@ const OUT_H = 240;
 /** 서버 한도(300KB)보다 조금 작게 */
 const OUT_MAX_BYTES = 280_000;
 
-type Step = "pick" | "crop" | "erase" | "check";
+type Step = "pick" | "crop" | "check";
 
 export function AvatarMaker({ onSaved, onCancel }: { onSaved: (avatar: number) => void; onCancel: () => void }) {
   const [step, setStep] = useState<Step>("pick");
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [work, setWork] = useState<ImageData | null>(null);
   const [png, setPng] = useState<{ blob: Blob; url: string } | null>(null);
+  /** AI 를 못 써서 가장자리 배경만 지웠으면 그 까닭 */
+  const [fallback, setFallback] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -52,6 +55,23 @@ export function AvatarMaker({ onSaved, onCancel }: { onSaved: (avatar: number) =
     im.src = url;
   }
 
+  /** AI 보정: 배경 따기 -> 떨어진 조각 지우기 -> 캐릭터에 꼭 맞게 가운데로 -> 미리 보기 */
+  async function correct(pixels: ImageData) {
+    setWork(pixels);
+    setBusy(true);
+    setError("");
+    try {
+      const r = await autoCut(pixels);
+      setPng({ blob: r.blob, url: URL.createObjectURL(r.blob) });
+      setFallback(r.fallback);
+      setStep("check");
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function upload() {
     if (!png) return;
     setBusy(true);
@@ -69,35 +89,18 @@ export function AvatarMaker({ onSaved, onCancel }: { onSaved: (avatar: number) =
     <div className="avatar-maker">
       {step === "pick" && (
         <>
-          <p className="form-note">
-            게임에서 내 캐릭터가 잘 보이게 찍어 둔 스샷을 골라요. 뒤가 한 가지 색인 화면(장비창 등)이면 더 깔끔하게 따져요.
-            자른 캐릭터만 올라가요.
-          </p>
+          <p className="form-note">게임에서 내 캐릭터가 잘 보이게 찍어 둔 스샷을 골라요. 자른 캐릭터만 올라가요.</p>
           <label className="btn avatar-file">
             스샷 고르기
             <input type="file" accept="image/*" onChange={(e) => pick(e.target.files?.[0])} />
           </label>
         </>
       )}
-      {step === "crop" && img && (
-        <CropStep
-          img={img}
-          onBack={() => setStep("pick")}
-          onCrop={(pixels) => {
-            setWork(pixels);
-            setStep("erase");
-          }}
-        />
-      )}
-      {step === "erase" && work && (
-        <EraseStep
-          source={work}
-          onBack={() => setStep("crop")}
-          onDone={(blob) => {
-            setPng({ blob, url: URL.createObjectURL(blob) });
-            setStep("check");
-          }}
-        />
+      {/* 미리 보기에서 '다시 자르기'로 돌아오면 맞춰 둔 자리 그대로 (화면에서 숨겨 둔다) */}
+      {img && step !== "pick" && (
+        <div className="avatar-maker" hidden={step !== "crop"}>
+          <CropStep img={img} busy={busy} onBack={() => setStep("pick")} onCrop={(pixels) => void correct(pixels)} />
+        </div>
       )}
       {step === "check" && png && (
         <>
@@ -107,9 +110,17 @@ export function AvatarMaker({ onSaved, onCancel }: { onSaved: (avatar: number) =
               <img className="growth-face" src={png.url} alt="내 캐릭터" style={{ maxWidth: 96, maxHeight: 96 }} />
             </span>
           </div>
+          {fallback && (
+            <p className="form-note avatar-fallback">
+              AI 보정을 못 해서 가장자리 배경만 지웠어요 ({fallback}).
+              <button type="button" className="pill" disabled={busy || !work} onClick={() => work && void correct(work)}>
+                {busy ? "보정하는 중…" : "다시 AI 보정"}
+              </button>
+            </p>
+          )}
           <div className="avatar-actions">
-            <button type="button" className="btn btn-ghost" onClick={() => setStep("erase")} disabled={busy}>
-              ◀ 다시 편집
+            <button type="button" className="btn btn-ghost" onClick={() => setStep("crop")} disabled={busy}>
+              ◀ 다시 자르기
             </button>
             <button type="button" className="btn" onClick={upload} disabled={busy}>
               {busy ? "올리는 중…" : "등록"}
@@ -133,7 +144,7 @@ interface View {
 type Point = { x: number; y: number };
 
 /** 1단계: 끌어서 옮기고, 두 손가락으로 벌리거나 막대로 확대해서 캐릭터를 네모 안에 넣는다 */
-function CropStep({ img, onBack, onCrop }: { img: HTMLImageElement; onBack: () => void; onCrop: (pixels: ImageData) => void }) {
+function CropStep({ img, busy, onBack, onCrop }: { img: HTMLImageElement; busy: boolean; onBack: () => void; onCrop: (pixels: ImageData) => void }) {
   const iw = img.naturalWidth;
   const ih = img.naturalHeight;
   const minS = VIEW / Math.min(iw, ih);
@@ -175,6 +186,7 @@ function CropStep({ img, onBack, onCrop }: { img: HTMLImageElement; onBack: () =
   };
 
   function down(e: ReactPointerEvent<HTMLCanvasElement>) {
+    if (busy) return;
     try {
       e.currentTarget.setPointerCapture(e.pointerId); // 손가락이 네모 밖으로 나가도 계속 끌리게
     } catch {
@@ -228,10 +240,10 @@ function CropStep({ img, onBack, onCrop }: { img: HTMLImageElement; onBack: () =
 
   return (
     <>
-      <p className="form-note">끌어서 옮기고, 두 손가락으로 벌려서 키워요. 내 캐릭터가 네모에 꽉 차게 맞춰 주세요.</p>
+      <p className="form-note">{busy ? "AI 가 배경을 따고 캐릭터를 가운데로 맞추는 중…" : "끌어서 옮기고, 두 손가락으로 벌려서 키워요. 내 캐릭터가 네모에 꽉 차게 맞춰 주세요."}</p>
       <canvas
         ref={canvas}
-        className="avatar-crop"
+        className={"avatar-crop" + (busy ? " avatar-ai" : "")}
         onPointerDown={down}
         onPointerMove={move}
         onPointerUp={up}
@@ -252,11 +264,11 @@ function CropStep({ img, onBack, onCrop }: { img: HTMLImageElement; onBack: () =
         />
       </label>
       <div className="avatar-actions">
-        <button type="button" className="btn btn-ghost" onClick={onBack}>
+        <button type="button" className="btn btn-ghost" onClick={onBack} disabled={busy}>
           ◀ 다른 스샷
         </button>
-        <button type="button" className="btn" onClick={crop}>
-          자르기
+        <button type="button" className="btn" onClick={crop} disabled={busy}>
+          {busy ? "보정하는 중…" : "AI 보정"}
         </button>
       </div>
     </>
@@ -341,7 +353,7 @@ async function aiAlpha(src: ImageData): Promise<Uint8Array> {
 
 /**
  * AI 는 이름표, 펫처럼 떨어져 있는 것도 남긴다 (제작자가 본 결과). 가장 큰 덩어리(캐릭터)와 거기 붙은 것만 남기고
- * 떨어진 조각은 지운다. 남은 조각은 지우개로 누르면 된다
+ * 떨어진 조각은 지운다
  */
 function keepBiggest(a: Uint8Array, w: number, h: number): Uint8Array {
   const label = new Int32Array(a.length);
@@ -383,131 +395,21 @@ function keepBiggest(a: Uint8Array, w: number, h: number): Uint8Array {
   return out;
 }
 
-/** 2단계: 배경 지우기. 처음에 AI 가 지우고 (안 되면 가장자리 배경), 남은 곳은 눌러서 지우거나 되살린다 */
-function EraseStep({ source, onBack, onDone }: { source: ImageData; onBack: () => void; onDone: (png: Blob) => void }) {
-  const [tol, setTol] = useState(40);
-  const [alpha, setAlpha] = useState(() => clearEdges(source, 40, new Uint8Array(source.width * source.height).fill(255)));
-  const [undo, setUndo] = useState<Uint8Array[]>([]);
-  const [mode, setMode] = useState<"erase" | "keep">("erase");
-  const [error, setError] = useState("");
-  const [ai, setAi] = useState(false);
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const started = useRef(false);
-  /** AI 가 끝났을 때의 지금 그림 (되돌리기에 넣는다) */
-  const alphaNow = useRef(alpha);
-  alphaNow.current = alpha;
-
-  async function runAi() {
-    setAi(true);
-    setError("");
-    try {
-      const next = await aiAlpha(source);
-      setUndo((u) => [...u.slice(-19), alphaNow.current]);
-      setAlpha(next);
-    } catch (x) {
-      setError(errorText(x));
-    } finally {
-      setAi(false);
-    }
+/**
+ * AI 보정: AI 로 배경을 따고(aiAlpha, 떨어진 조각은 keepBiggest 가 지운다) 캐릭터에 꼭 맞게 잘라 가운데에 둔 PNG (exportPng).
+ * AI 를 못 쓰면 가장자리에 이어진 배경을 지운 것으로 대신하고 그 까닭을 돌려준다
+ */
+async function autoCut(src: ImageData): Promise<{ blob: Blob; fallback: string }> {
+  try {
+    return { blob: await exportPng(src, await aiAlpha(src)), fallback: "" };
+  } catch (e) {
+    const edges = keepBiggest(clearEdges(src, 40, new Uint8Array(src.width * src.height).fill(255)), src.width, src.height);
+    if (!edges.some((v) => v)) throw e;
+    return { blob: await exportPng(src, edges), fallback: errorText(e) };
   }
-  // 이 단계에 들어오면 AI 가 먼저 지운다
-  useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    runAi();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const c = canvas.current;
-    const g = c?.getContext("2d");
-    if (!c || !g) return;
-    c.width = source.width;
-    c.height = source.height;
-    const shown = new ImageData(new Uint8ClampedArray(source.data), source.width, source.height);
-    for (let i = 0; i < alpha.length; i++) shown.data[i * 4 + 3] = alpha[i];
-    g.putImageData(shown, 0, 0);
-  }, [source, alpha]);
-
-  function change(next: Uint8Array) {
-    setUndo((u) => [...u.slice(-19), alpha]);
-    setAlpha(next);
-  }
-
-  function tap(e: ReactPointerEvent<HTMLCanvasElement>) {
-    const r = e.currentTarget.getBoundingClientRect();
-    const x = Math.floor(((e.clientX - r.left) * source.width) / r.width);
-    const y = Math.floor(((e.clientY - r.top) * source.height) / r.height);
-    if (x < 0 || y < 0 || x >= source.width || y >= source.height) return;
-    const next = alpha.slice();
-    for (const i of region(source, x, y, tol)) next[i] = mode === "erase" ? 0 : 255;
-    change(next);
-  }
-
-  async function done() {
-    setError("");
-    try {
-      onDone(await exportPng(source, alpha));
-    } catch (x) {
-      setError(errorText(x));
-    }
-  }
-
-  return (
-    <>
-      <p className="form-note">
-        {ai ? "AI 가 배경을 지우는 중…" : mode === "erase" ? "남은 배경을 눌러서 지워요." : "잘못 지운 곳을 눌러서 되살려요."}
-        {!ai && " 비슷한 색까지 한 번에 바뀌어요."}
-      </p>
-      <canvas ref={canvas} className={"avatar-erase" + (ai ? " avatar-ai" : "")} onPointerDown={ai ? undefined : tap} />
-      <div className="avatar-modes">
-        <button type="button" className={"pill" + (mode === "erase" ? " pill-on" : "")} onClick={() => setMode("erase")}>
-          지우개
-        </button>
-        <button type="button" className={"pill" + (mode === "keep" ? " pill-on" : "")} onClick={() => setMode("keep")}>
-          복원
-        </button>
-        <button
-          type="button"
-          className="pill"
-          disabled={!undo.length}
-          onClick={() => {
-            setAlpha(undo[undo.length - 1]);
-            setUndo((u) => u.slice(0, -1));
-          }}
-        >
-          하나 전
-        </button>
-      </div>
-      <label className="avatar-slider">
-        <span>색 범위</span>
-        <input type="range" min={5} max={120} value={tol} onChange={(e) => setTol(Number(e.target.value))} />
-      </label>
-      <div className="avatar-modes">
-        <button type="button" className="pill" disabled={ai} onClick={runAi}>
-          AI 지우기
-        </button>
-        <button type="button" className="pill" onClick={() => change(clearEdges(source, tol, alpha))}>
-          가장자리 정리
-        </button>
-        <button type="button" className="pill" onClick={() => change(new Uint8Array(alpha.length).fill(255))}>
-          처음 그림으로
-        </button>
-      </div>
-      {error && <p className="form-error">{error}</p>}
-      <div className="avatar-actions">
-        <button type="button" className="btn btn-ghost" onClick={onBack}>
-          ◀ 이전
-        </button>
-        <button type="button" className="btn" disabled={ai} onClick={done}>
-          완료
-        </button>
-      </div>
-    </>
-  );
 }
 
-/** 남은 캐릭터만 꼭 맞게 잘라 높이를 맞춘 PNG */
+/** 남은 캐릭터만 꼭 맞게 잘라(위아래 양옆 빈 곳 없이 가운데로) 높이를 맞춘 PNG */
 async function exportPng(src: ImageData, alpha: Uint8Array): Promise<Blob> {
   const { width: w, height: h } = src;
   let [x0, y0, x1, y1] = [w, h, -1, -1];
@@ -520,7 +422,7 @@ async function exportPng(src: ImageData, alpha: Uint8Array): Promise<Blob> {
     y0 = Math.min(y0, y);
     y1 = Math.max(y1, y);
   }
-  if (x1 < 0) throw new Error("다 지워졌어요. '처음 그림으로'를 눌러 다시 해 주세요");
+  if (x1 < 0) throw new Error("캐릭터를 찾지 못했어요. 캐릭터가 네모에 꽉 차게 다시 잘라 주세요");
   const cw = x1 - x0 + 1;
   const ch = y1 - y0 + 1;
   const cut = document.createElement("canvas");

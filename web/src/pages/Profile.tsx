@@ -103,10 +103,10 @@ export function ProfileForm({
           </button>
         ))}
       </div>
-      {/* 레벨과 경험치는 한 줄 (자리가 모자라면 다음 줄로) */}
+      {/* 레벨과 경험치는 늘 한 줄 (제작자 요청 2026-11-02) */}
       <div className="level-line">
       <div className="level-row">
-        <span className="level-label">레벨</span>
+        <span className="level-label">Lv</span>
         <button type="button" className="pill level-step" onClick={() => step(-1)} aria-label="레벨 내리기">
           −
         </button>
@@ -123,8 +123,8 @@ export function ProfileForm({
         </button>
       </div>
       {withExp && (
-          <div className="level-row">
-            <span className="level-label">경험치</span>
+          <div className="level-row level-row-exp">
+            <span className="level-label">EXP</span>
             <input
               className="level-input exp-input"
               inputMode="decimal"
