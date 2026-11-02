@@ -241,41 +241,41 @@ function LevelRanking({ me, data, guild, onGuild, onMe }: {
 
   return (
     <>
-      <GuildCards items={data} selected={guild} onSelect={onGuild} />
-      <div className="rank-stats">
-        <span>
-          최고 <b>Lv.{inGuild[0]?.level ?? "-"}</b>
-        </span>
-        {ups > 0 && (
+      {/* 아래 단계(길드, 직업)는 어두운 띠 안의 납작한 단추: 위 단계(레벨·성장)와 상하위가 구분되게 (제작자 요청 2026-11-02) */}
+      <div className="rank-filters">
+        <GuildCards items={data} selected={guild} onSelect={onGuild} />
+        {/* 직업마다 사람 수와 평균 레벨 (제작자 요청 2026-11-01, 고른 길드 안에서) */}
+        <div className="job-filter" role="tablist" aria-label="직업">
+          <button role="tab" aria-selected={filter === "all"} className={"job-chip" + (filter === "all" ? " job-chip-on" : "")} onClick={() => setFilter("all")}>
+            <span className="job-chip-all">ALL</span>
+            <small>{inGuild.length}</small>
+            <small className="job-chip-avg">{avgText(inGuild)}</small>
+          </button>
+          {JOBS.map((j) => (
+            <button
+              key={j}
+              role="tab"
+              aria-selected={filter === j}
+              className={"job-chip" + (filter === j ? " job-chip-on" : "")}
+              onClick={() => setFilter(j)}
+            >
+              <JobGlyph job={j} size={22} />
+              <small>
+                {JOB_NAME[j]} {inGuild.filter((r) => r.job === j).length}
+              </small>
+              <small className="job-chip-avg">{avgText(inGuild.filter((r) => r.job === j))}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+      {/* '최고 Lv.' 줄은 뺐다 (제작자 요청 2026-11-02) */}
+      {ups > 0 && (
+        <div className="rank-stats">
           <span>
             🔥 이번 주 레벨업 <b>{ups}</b>명
           </span>
-        )}
-      </div>
-
-      {/* 직업마다 사람 수와 평균 레벨 (제작자 요청 2026-11-01, 고른 길드 안에서) */}
-      <div className="job-filter" role="tablist" aria-label="직업">
-        <button role="tab" aria-selected={filter === "all"} className={"job-chip" + (filter === "all" ? " job-chip-on" : "")} onClick={() => setFilter("all")}>
-          <span className="job-chip-all">ALL</span>
-          <small>{inGuild.length}</small>
-          <small className="job-chip-avg">{avgText(inGuild)}</small>
-        </button>
-        {JOBS.map((j) => (
-          <button
-            key={j}
-            role="tab"
-            aria-selected={filter === j}
-            className={"job-chip" + (filter === j ? " job-chip-on" : "")}
-            onClick={() => setFilter(j)}
-          >
-            <JobGlyph job={j} size={22} />
-            <small>
-              {JOB_NAME[j]} {inGuild.filter((r) => r.job === j).length}
-            </small>
-            <small className="job-chip-avg">{avgText(inGuild.filter((r) => r.job === j))}</small>
-          </button>
-        ))}
-      </div>
+        </div>
+      )}
 
       {list.length === 0 ? (
         <div className="empty">
@@ -346,7 +346,9 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
   const mine = entries.findIndex((e) => e.id === me.id);
   return (
     <>
-      <GuildCards items={data.entries} selected={guild} onSelect={onGuild} withAverage={false} />
+      <div className="rank-filters">
+        <GuildCards items={data.entries} selected={guild} onSelect={onGuild} withAverage={false} />
+      </div>
       <p className="growth-note">
         {/* 주간은 목요일 오전 10시부터 (제작자 요청, week.ts) */}
         {period === "day" ? "오늘 0시" : `${dayText(data.start)} ${period === "week" ? "오전 10시" : "0시"}`}부터 지금까지 오른 만큼이에요.

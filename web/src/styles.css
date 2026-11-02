@@ -2162,3 +2162,12 @@ input, textarea { min-width: 0; max-width: 100%; }
   .rank-row .emblem img, .rank-mine-bar .emblem img { width: 40px; height: 40px; }
   .rank-up-slot { width: 34px; }
 }
+/* 랭킹 단추의 상하위 (제작자 요청 2026-11-02: '위 버튼 아래 버튼 상하위 개념 나누자'): 위(레벨·성장)는 테두리 단추,
+   아래(길드·직업)는 어두운 띠 안의 납작한 단추 (장비대여의 .sub-tabs 와 같은 구분) */
+.rank-view { padding: 9px 2px; font-size: 13px; }
+.rank-filters { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; margin: 0 0 10px; padding: 5px; background: rgba(11, 10, 26, 0.5); }
+.rank-filters .guild-stats, .rank-filters .job-filter { margin: 0; gap: 4px; }
+.rank-filters .guild-stat, .rank-filters .job-chip { padding: 4px 2px; background: none; border: 1px solid rgba(255, 255, 255, 0.07); box-shadow: none; }
+.rank-filters .guild-stat b { font-size: 13px; }
+.rank-filters .job-chip { min-height: 46px; }
+.rank-filters .guild-stat-on, .rank-filters .job-chip-on { background: var(--sunset); border-color: transparent; box-shadow: none; }
