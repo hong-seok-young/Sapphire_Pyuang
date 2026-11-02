@@ -524,7 +524,7 @@ function WeatherBody({ on, onChange }: { on: boolean; onChange: (on: boolean) =>
   return (
     <>
       {/* 천둥번개 효과는 없앴다 (비로 그린다). 눈은 쌓이고 비는 빗물이 점점 차오른다 (제작자 요청 2026-11-02) */}
-      <p className="me-hint me-hint-top">위치를 허용하면 우리 동네 날씨가 홈 화면에 반영돼요. 눈이 오면 아래에 눈이 쌓이고, 비가 오면 빗물이 점점 차올라요.</p>
+      <p className="me-hint me-hint-top">위치를 허용하면 우리 동네 날씨가 홈 화면에 반영돼요. 눈이 오면 아래에 눈이 쌓이고, 비가 오면 빗물이 점점 차올라요. 홈 화면의 빈 곳을 누르면 그 자리에서 눈이나 비가 터져 나와요.</p>
       {/* 미리 보기: 이 화면 위에 바로 (다시 누르면 멈춤, 화면을 나가면 멈춤) */}
       <div className="pill-row me-wx-preview">
         {PREVIEW.map((sky) => (
