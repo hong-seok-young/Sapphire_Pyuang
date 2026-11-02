@@ -445,7 +445,8 @@ CREATE TABLE IF NOT EXISTS official_news (
   body TEXT NOT NULL,                     -- 본문 글자만 (그림, 꾸밈은 뺐다. 3만 자까지)
   fetched_at INTEGER NOT NULL,            -- 받거나 바뀐 때
   html TEXT,                              -- 간단히 한 본문 HTML (문단, 굵게, 표, 목록, 그림, 링크만. 게시판 '아이모 소식'에서 읽는다, 58KB 넘으면 비움)
-  src TEXT                                -- 원문(제목+본문)의 해시와 바꾼 방법의 판 (server/officialText.ts): 같으면 다시 쓰지 않는다
+  src TEXT,                               -- 원문(제목+본문)의 해시와 바꾼 방법의 판 (server/officialText.ts): 같으면 다시 쓰지 않는다
+  added_at INTEGER                        -- 우리 표에 처음 들어온 때 (새 글 숫자 배지는 이것으로 센다. 고쳐 받아도 그대로, 예전 글은 NULL)
 );
 -- 아이모 소식 글의 핵심 요약과 패치노트 직업별 변경점 (제작자 요청 2026-11-02, server/officialSummary.ts). 글을 처음 열 때 만들고 원문(src)이 바뀌면 다시
 CREATE TABLE IF NOT EXISTS official_summary (
@@ -459,6 +460,7 @@ CREATE TABLE IF NOT EXISTS official_summary (
 CREATE INDEX IF NOT EXISTS official_news_kind ON official_news (kind, id);
 CREATE INDEX IF NOT EXISTS official_news_type ON official_news (type, id);          -- 점검 전광판 (2분마다 최근 점검 글 3개)
 CREATE INDEX IF NOT EXISTS official_news_date ON official_news (kind, start_date);  -- To do 로 정리할 최근 글
+-- 새 글 숫자 배지(/api/news, 2분마다)의 색인 official_news_added (added_at) 는 칸을 더한 뒤에 scripts/ci-d1.mjs 가 만든다 (이미 있는 표에서는 여기서 못 만든다)
 
 -- To do 의 이벤트 할 일 (제작자 요청 2026-11-01: 이벤트를 안 읽어도 본인 직업·레벨에 맞는 할 일). 공식 글 하나를 Claude 가 읽고 뽑은 것
 -- (server/todoDigest.ts, 주로 GitHub Actions 의 scripts/digest-official.mjs, 새 글은 서버 /api/todo/digest). 원문(src)이 바뀌면 다시 정리한다. 지우지 않는다

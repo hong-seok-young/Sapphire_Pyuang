@@ -91,7 +91,7 @@ const ADDED_COLUMNS = [
   ["users", "main_id", "TEXT"], ["signup_requests", "owner", "TEXT"],
   ["users", "kakao", "TEXT"],
   ["plat_orders", "voided_at", "INTEGER"], ["plat_orders", "voided_by", "TEXT"], ["plat_orders", "gold_paid", "INTEGER"],
-  ["official_news", "html", "TEXT"], ["official_news", "src", "TEXT"],
+  ["official_news", "html", "TEXT"], ["official_news", "src", "TEXT"], ["official_news", "added_at", "INTEGER"],
   ["rental_requests", "app_id", "INTEGER"],
   ["rental_requests", "gold", "INTEGER"],
   ["rental_items", "return_req_at", "INTEGER"], ["rental_items", "return_app_id", "INTEGER"],
@@ -103,6 +103,8 @@ for (const [table, column, type] of ADDED_COLUMNS) {
     console.log(`${table} 표에 ${column} 칸을 더했어요`);
   }
 }
+// 더한 칸의 색인 (schema.sql 은 칸이 생기기 전에 돌아서 여기서 만든다)
+wrangler("d1", "execute", DB, "--remote", "--yes", "--command", "CREATE INDEX IF NOT EXISTS official_news_added ON official_news (added_at)");
 
 const count = Number(queryFirst("SELECT COUNT(*) AS n FROM users")?.n ?? 0);
 if (count > 0) {

@@ -2,7 +2,7 @@
 // 2026-11-02 제작자 요청 '큰 버튼 -> 들어가면 어느 버튼에서 신규인지도 그 안에서도 뜨게 (장비대여에 뱃지 -> 안에서 신청함에 뱃지)':
 // 칸 안의 단추마다 따로 센다 (KEYS: 'board.notice', 'market.gold', 'rent.apps' …). 홈 칸과 아래 탭은 그 칸 안의 수를 더한다 (GROUPS).
 // 단추마다 마지막으로 본 때를 이 기기에 계정별로 적어 두고 그 뒤로 다른 사람이 올린 수를 서버에 묻는다 (/api/news).
-// 아이모 소식(imo.*)은 때 대신 마지막으로 본 공식 글 번호를 적는다 (공식 글은 받은 때가 올린 때가 아니라서).
+// 아이모 소식(imo.*)은 공식 글이 우리 앱에 처음 들어온 때로 센다 (2026-11-02: 글 번호로 세다가 번호가 먼저 매겨진 예약 글을 놓쳤다).
 // 처음 쓰는 기기는 지금부터 센다. 그 단추의 화면을 열면 0 이 된다 (useNewsSeen). 홈으로 올 때, 앱으로 돌아올 때, 2분마다 다시 묻는다.
 import { useEffect, useSyncExternalStore } from "react";
 import { api } from "./auth";
@@ -23,8 +23,6 @@ export const KEYS = [
   "rent.staff",
 ] as const;
 export type NewsKey = (typeof KEYS)[number];
-/** 공식 글 번호로 세는 것 */
-const ID_KEYS: NewsKey[] = ["imo.notice", "imo.maint", "imo.event"];
 /** 홈 칸(launcher.ts 의 key)마다 더하는 단추들 */
 const GROUPS: Record<string, string[]> = { board: ["board.", "imo."], market: ["market."], requests: ["requests"], rent: ["rent."] };
 const POLL_MS = 120_000;
@@ -32,8 +30,6 @@ const POLL_MS = 120_000;
 type Counts = Record<NewsKey, number>;
 const zero = (): Counts => Object.fromEntries(KEYS.map((k) => [k, 0])) as Counts;
 let counts: Counts = zero();
-/** 공식 글 종류마다 가장 새 글 번호 (본 것으로 적을 때 쓴다) */
-let tops: Partial<Record<NewsKey, number>> = {};
 
 /** 아이모 점검 하나 (홈 점검 전광판, 제작자 요청 2026-11-01. 서버 server/maint.ts 가 공식 점검 글에서 읽은 것) */
 export interface Maint {
@@ -73,11 +69,11 @@ function seenAll(): Record<NewsKey, number> {
     // 못 읽으면 지금부터 센다
   }
   const now = Date.now();
+  // 때가 아닌 값(예전에 아이모 소식에 적던 공식 글 번호)은 없는 것으로
+  const at = (v: number | undefined) => (typeof v === "number" && v > 1e12 ? v : undefined);
   // 예전에 적은 칸 하나짜리 때('board', 'market')는 그 안의 단추들이 이어받는다
-  const out = Object.fromEntries(
-    KEYS.map((k) => [k, seen[k] ?? (ID_KEYS.includes(k) ? 0 : (seen[k.split(".")[0]] ?? now))]),
-  ) as Record<NewsKey, number>;
-  if (KEYS.some((k) => seen[k] === undefined && !ID_KEYS.includes(k))) save(out);
+  const out = Object.fromEntries(KEYS.map((k) => [k, at(seen[k]) ?? at(seen[k.split(".")[0]]) ?? now])) as Record<NewsKey, number>;
+  if (KEYS.some((k) => at(seen[k]) === undefined)) save(out);
   return out;
 }
 function save(seen: Record<NewsKey, number>) {
@@ -96,15 +92,11 @@ export function refreshNews(): Promise<void> {
   const seen = seenAll();
   const q = KEYS.map((k) => `${k}=${seen[k]}`).join("&");
   if (inflight?.q === q) return inflight.p;
-  const p = api<{ counts?: Partial<Counts>; tops?: Partial<Record<NewsKey, number>>; maint?: Maint[] }>(`/api/news?${q}`)
+  const p = api<{ counts?: Partial<Counts>; maint?: Maint[] }>(`/api/news?${q}`)
     .catch(() => null)
     .then((r) => {
       if (r && user) {
         counts = Object.fromEntries(KEYS.map((k) => [k, r.counts?.[k] ?? 0])) as Counts;
-        tops = r.tops ?? {};
-        // 처음 쓰는 기기의 공식 글은 지금 가장 새 글부터 센다
-        const fresh = ID_KEYS.filter((k) => !seen[k] && tops[k]);
-        if (fresh.length) save({ ...seenAll(), ...Object.fromEntries(fresh.map((k) => [k, tops[k]])) });
         // 점검은 바뀌었을 때만 새로 (전광판이 흐르다가 처음부터 다시 흐르지 않게)
         if (Array.isArray(r.maint) && JSON.stringify(r.maint) !== JSON.stringify(maint)) maint = r.maint;
         emit();
@@ -122,7 +114,6 @@ export function startNews(id: string) {
   if (user === id) return;
   user = id;
   counts = zero();
-  tops = {};
   maint = [];
   emit();
   void refreshNews();
@@ -139,11 +130,7 @@ export function startNews(id: string) {
 export function markNewsSeen(...keys: NewsKey[]) {
   if (!user || !keys.length) return;
   const seen = seenAll();
-  for (const k of keys) {
-    if (ID_KEYS.includes(k)) {
-      if (tops[k]) seen[k] = tops[k]!;
-    } else seen[k] = Date.now();
-  }
+  for (const k of keys) seen[k] = Date.now();
   save(seen);
   if (keys.some((k) => counts[k])) {
     counts = { ...counts, ...Object.fromEntries(keys.map((k) => [k, 0])) };

@@ -29,7 +29,7 @@ const where = local ? "--local" : "--remote";
 
 const CREATE = `CREATE TABLE IF NOT EXISTS official_news (
   id INTEGER PRIMARY KEY, kind TEXT NOT NULL, type TEXT NOT NULL, title TEXT NOT NULL, start_date TEXT, end_date TEXT,
-  image TEXT, body TEXT NOT NULL, fetched_at INTEGER NOT NULL, html TEXT, src TEXT
+  image TEXT, body TEXT NOT NULL, fetched_at INTEGER NOT NULL, html TEXT, src TEXT, added_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS official_news_kind ON official_news (kind, id);`;
 

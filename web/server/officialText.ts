@@ -203,8 +203,8 @@ export function rowOf(item: HiveItem, kind: "notice" | "event"): OfficialRow {
  * 그 뒤에 새로 받아 고친 글(연장된 점검 등)이 예전 내용으로 돌아가지 않는다. 원문이 바뀌면 To do 정리(official_todo)는 src 를 보고 다시 한다
  */
 export const UPSERT_SQL =
-  "INSERT INTO official_news (id, kind, type, title, start_date, end_date, image, body, fetched_at, html, src) " +
-  "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11) " +
+  "INSERT INTO official_news (id, kind, type, title, start_date, end_date, image, body, fetched_at, html, src, added_at) " +
+  "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?9) " +
   "ON CONFLICT (id) DO UPDATE SET kind = excluded.kind, type = excluded.type, title = excluded.title, start_date = excluded.start_date, " +
   "end_date = excluded.end_date, image = excluded.image, body = excluded.body, fetched_at = excluded.fetched_at, html = excluded.html, src = excluded.src " +
   "WHERE excluded.src IS NOT NULL AND official_news.fetched_at <= excluded.fetched_at AND (official_news.src IS NULL OR " +
