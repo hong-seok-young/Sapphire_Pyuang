@@ -1,12 +1,23 @@
-// 장비대여 (제작자 요청 2026-11-01, 서버 server/rental.ts, functions/api/rent): 길드가 기부받은 무기를 기한(없음, 4주, 2주)마다 💎 가격으로 빌려준다.
+// 장비대여 (제작자 요청 2026-11-01, 서버 server/rental.ts, functions/api/rent): 길드가 기부받은 무기를 기한(없음, 1~52주)마다 💎 가격으로 빌려준다.
 // 💎 1개 = 10만 골드. 장비를 기부하면 운영진이 옵션 시세로 마일리지 💎 를 적립하고, 빌릴 때 골드 대신 쓴다. 실제 주고받기는 게임 안에서.
 import { api } from "./auth";
 import type { Job } from "./auth";
 import type { Item, Wiki } from "./types";
 
-export type RentTerm = "none" | "4w" | "2w";
-export const TERMS: RentTerm[] = ["none", "4w", "2w"];
-export const TERM_NAME: Record<RentTerm, string> = { none: "기한 없음", "4w": "4주", "2w": "2주" };
+/** 대여 기한: 'none' 기한 없음, '3w' 3주 (1~52주. 제작자 요청 2026-11-02: 2주·4주로 고정하지 말고. 서버 server/rentalParse.ts 와 같은 값) */
+export type RentTerm = "none" | `${number}w`;
+export const MAX_WEEKS = 52;
+/** 기한의 주 수 (기한 없음이면 null) */
+export function termWeeks(t: RentTerm | string | null | undefined): number | null {
+  const m = typeof t === "string" ? /^(\d{1,2})w$/.exec(t) : null;
+  const n = m ? Number(m[1]) : 0;
+  return n >= 1 && n <= MAX_WEEKS ? n : null;
+}
+/** '4주', '기한 없음' */
+export const termName = (t: RentTerm) => {
+  const w = termWeeks(t);
+  return w === null ? "기한 없음" : `${w}주`;
+};
 
 export type ReqStatus = "wait" | "ok" | "done" | "no" | "cancel";
 export const STATUS_NAME: Record<ReqStatus, string> = { wait: "확인 전", ok: "수락", done: "대여 완료", no: "거절", cancel: "취소" };

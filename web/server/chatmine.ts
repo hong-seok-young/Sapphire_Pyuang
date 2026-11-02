@@ -9,13 +9,12 @@ import type { Env, Job, User } from "./auth";
 import { activeMaint } from "./maint";
 import { TYPE_NAME, officialUrl } from "./official";
 import { effective, loadCatalog, loadRules, loadSettings, wallet } from "./platshop";
-import { DIA_GOLD, TERM_DAYS, canEnter, isManager, manText, mileageOf } from "./rental";
+import { DIA_GOLD, termDays, termName, canEnter, isManager, manText, mileageOf } from "./rental";
 import type { RentTerm } from "./rentalParse";
 
 const KST = 9 * 3_600_000;
 const DAY = 86_400_000;
 const JOB: Record<Job, string> = { warrior: "전사", ranger: "레인저", mage: "마법사", monk: "무도가" };
-const TERM: Record<RentTerm, string> = { none: "기한 없음", "4w": "4주", "2w": "2주" };
 const REQ_STATUS: Record<string, string> = { wait: "확인 전", ok: "수락", done: "대여 완료", no: "거절", cancel: "취소" };
 const LEDGER: Record<string, string> = { donate: "기부 적립", rent: "대여 보증금", adjust: "고침", return: "반납 · 보증금 돌려받음" };
 
@@ -174,7 +173,7 @@ export async function mineExtras(
         (held.length
           ? ` · 대여 중 ${held
               .map((h) => {
-                const days = TERM_DAYS[h.term];
+                const days = termDays(h.term);
                 const due = h.rented_at && days ? h.rented_at + days * DAY : null;
                 const dia = h.use_dia ?? 0;
                 const gold = h.gold ?? (h.price - dia) * DIA_GOLD;
@@ -224,11 +223,11 @@ async function rentalSection(env: Env, me: User, manager: boolean, mentioned: st
   for (const r of queueR.results as { item_id: number; user_id: string; status: string }[]) line.set(r.item_id, [...(line.get(r.item_id) ?? []), r]);
   const items = itemsR.results as { id: number; job: Job; level: number; weapon: string; options: string; enhance: number; term: RentTerm; price: number; donor: string | null; renter: string | null; rented_at: number | null; note: string | null }[];
   const lines = items.map((i) => {
-    const days = TERM_DAYS[i.term];
+    const days = termDays(i.term);
     const due = i.renter && i.rented_at && days ? i.rented_at + days * DAY : null;
     const q = line.get(i.id) ?? [];
     return (
-      `#${i.id} ${JOB[i.job]} Lv.${i.level} ${i.weapon} +${i.enhance}${i.options ? ` ${i.options}` : ""} · ${TERM[i.term]} · 보증금 💎${i.price}(${manText(i.price * DIA_GOLD)} 골드)` +
+      `#${i.id} ${JOB[i.job]} Lv.${i.level} ${i.weapon} +${i.enhance}${i.options ? ` ${i.options}` : ""} · ${termName(i.term)} · 보증금 💎${i.price}(${manText(i.price * DIA_GOLD)} 골드)` +
       `${i.renter ? ` · 대여 중 ${i.renter}${due ? ` ${md(due)}까지` : ""}` : ""}${q.length ? ` · 대기 ${q.length}명${manager ? ` (${q.map((x) => `${x.user_id} ${REQ_STATUS[x.status]}`).join(", ")})` : ""}` : ""}` +
       `${i.donor ? ` · 기부 ${i.donor}` : ""}${i.note ? ` · "${oneLine(i.note)}"` : ""}`
     );

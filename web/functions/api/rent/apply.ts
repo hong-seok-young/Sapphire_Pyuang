@@ -4,7 +4,7 @@
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { notify } from "../../../server/alerts";
-import { MAX_APP_ITEMS, MAX_WAIT, TERM_DAYS, canEnter, itemLabel, notifyManagers } from "../../../server/rental";
+import { MAX_APP_ITEMS, MAX_WAIT, termDays, canEnter, itemLabel, notifyManagers } from "../../../server/rental";
 import type { RentalRow } from "../../../server/rental";
 
 const md = (ms: number) => {
@@ -56,7 +56,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   // 대여하고 있는 사람에게도 언제까지 반납해야 한다고 알림). 기한 없는 무기는 정해진 날이 없어서 다 쓰면 '반납 신청'을 눌러 달라고
   for (const i of items) {
     if (!i.renter || i.renter === me.id) continue;
-    const days = TERM_DAYS[i.term];
+    const days = termDays(i.term);
     const waiting = (queued.get(i.id) ?? 0) + 1;
     const due = i.rented_at && days ? i.rented_at + days * 86_400_000 : null;
     const when = due === null ? "기한 없는 무기라 다 쓰면 '반납 신청'을 눌러 주세요" : due > now ? `${md(due)}까지 반납해 주세요` : "기한이 지났어요. 지금 반납해 주세요";

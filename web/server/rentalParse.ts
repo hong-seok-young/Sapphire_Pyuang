@@ -8,7 +8,29 @@
 // Node 가 타입을 지우고 읽으므로 상대 경로 import 는 두지 않는다.
 
 export type RentJob = "warrior" | "ranger" | "mage" | "monk";
-export type RentTerm = "none" | "4w" | "2w";
+/**
+ * 대여 기한: 'none' 기한 없음, '3w' 3주 (1~52주). 제작자 요청 2026-11-02: '3주 할 수도 있고 5주 할 수도 있잖아, 뭐 저렇게 고정을 함'
+ * (처음엔 기한 없음·4주·2주 셋뿐이었다. 예전 값 '4w', '2w' 도 그대로 맞다)
+ */
+export type RentTerm = "none" | `${number}w`;
+export const MAX_WEEKS = 52;
+/** 기한의 주 수 (기한 없음이나 맞지 않는 값이면 null) */
+export function termWeeks(t: unknown): number | null {
+  const m = typeof t === "string" ? /^(\d{1,2})w$/.exec(t) : null;
+  const n = m ? Number(m[1]) : 0;
+  return n >= 1 && n <= MAX_WEEKS ? n : null;
+}
+export const isTerm = (t: unknown): t is RentTerm => t === "none" || termWeeks(t) !== null;
+/** 기한의 날 수 (기한 없음이면 null) */
+export const termDays = (t: RentTerm): number | null => {
+  const w = termWeeks(t);
+  return w === null ? null : w * 7;
+};
+/** '4주', '기한 없음' */
+export const termName = (t: RentTerm) => {
+  const w = termWeeks(t);
+  return w === null ? "기한 없음" : `${w}주`;
+};
 
 /** 목록에서 읽은 물건 하나 */
 export interface ParsedRental {
@@ -81,7 +103,8 @@ export function parseRentalList(text: string, now = Date.now()): ParseResult {
     }
     // 기한 칸: '‼️기한 제한없음‼️', '‼️기한 4주‼️'
     if (/기한/.test(line) && /ㅡ|‼|!/.test(line)) {
-      term = /2\s*주/.test(line) ? "2w" : /4\s*주/.test(line) ? "4w" : "none";
+      const w = /(\d+)\s*주/.exec(line);
+      term = w && termWeeks(`${Number(w[1])}w`) ? (`${Number(w[1])}w` as RentTerm) : "none";
       weapon = null;
       continue;
     }

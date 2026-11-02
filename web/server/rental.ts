@@ -1,5 +1,5 @@
 // 장비대여 (제작자 요청 2026-11-01, 대여 담당 성민 님의 카카오톡 목록과 마일리지 방식 그대로):
-// 길드가 기부받은 무기를 기한(없음, 4주, 2주)마다 💎 가격으로 빌려준다 (💎 1개 = 10만 골드). 길드원은 무기 여러 개를 한 번에 신청하고(신청서),
+// 길드가 기부받은 무기를 기한(없음, 1~52주)마다 💎 가격으로 빌려준다 (💎 1개 = 10만 골드). 길드원은 무기 여러 개를 한 번에 신청하고(신청서),
 // 운영진이 무기마다 수락·거절한 뒤 게임 안에서 건네면 '대여 완료', 돌려받으면 '반납'. 신청서마다 대화창이 있다 (2026-11-02 제작자 요청).
 // 가격은 보증금이다 (제작자 요청 2026-11-02): 대여 완료 때 마일리지와 골드로 받고, 반납하면 마일리지는 장부로 저절로, 골드는 게임 안에서 돌려준다.
 // 무기마다 선착순으로 줄을 선다: 앞사람이 받은 날 + 기한 뒤에 받는다. 줄이 없으면 기한이 지나도 계속 쓰고, 줄이 생기면 기한이 끝나는 날 담당자에게 돌려준다.
@@ -9,7 +9,9 @@
 import { RANK, TEST_IDS } from "./auth";
 import type { Env, User } from "./auth";
 import { notify } from "./alerts";
+import { isTerm, termDays } from "./rentalParse";
 import type { RentJob, RentTerm } from "./rentalParse";
+export { termDays, termName } from "./rentalParse";
 
 /** 길드원에게 열었는지 (2026-11-02 열었다). false 면 미리 보는 사람만 쓰고, 운영진 알림도 앱개발자에게만 간다 */
 export const RENT_OPEN = true;
@@ -23,10 +25,7 @@ export function goldOf(v: unknown, price: number, useDia: number): number | null
 }
 /** 골드 -> '80만' */
 export const manText = (gold: number) => (gold >= 100_000_000 ? `${(gold / 100_000_000).toLocaleString()}억` : `${Math.round(gold / 10_000).toLocaleString()}만`);
-/** 기한마다 대여 날 수 */
-export const TERM_DAYS: Record<RentTerm, number | null> = { none: null, "4w": 28, "2w": 14 };
 export const JOBS: RentJob[] = ["warrior", "ranger", "mage", "monk"];
-export const TERMS: RentTerm[] = ["none", "4w", "2w"];
 /** 신청서 하나에 담는 무기 수, 한 사람(묶은 캐릭터 모두)이 동시에 줄 서는 무기 수 */
 export const MAX_APP_ITEMS = 30;
 export const MAX_WAIT = 30;
@@ -47,7 +46,7 @@ export interface QueueRow {
  * 그 뒤 차례는 앞사람이 받을 때 + 기한. 기한 없는 무기는 앞사람이 반납해야 받으므로 null. count: 몇 번째 차례까지
  */
 export function expectedTimes(item: { term: RentTerm; renter: string | null; rented_at: number | null }, count: number, now = Date.now()): (number | null)[] {
-  const days = TERM_DAYS[item.term];
+  const days = termDays(item.term);
   const t = days ? days * DAY : null;
   let at: number | null = item.renter ? (t !== null && item.rented_at !== null ? Math.max(now, item.rented_at + t) : null) : now;
   const out: (number | null)[] = [];
@@ -126,7 +125,10 @@ export async function notifyManagers(env: Env, text: string, from: string): Prom
 }
 
 /** 돌려줄 때 (기한 없음이면 null) */
-export const dueOf = (term: RentTerm, from: number) => (TERM_DAYS[term] ? from + TERM_DAYS[term]! * 86_400_000 : null);
+export const dueOf = (term: RentTerm, from: number) => {
+  const days = termDays(term);
+  return days ? from + days * 86_400_000 : null;
+};
 
 /** 물건 고치기·더하기 값 검사. 맞지 않으면 오류 글 */
 export function checkItem(b: Record<string, unknown>): { error: string } | { item: Omit<RentalRow, "id" | "renter" | "rented_at" | "due_at" | "status"> } {
@@ -140,7 +142,7 @@ export function checkItem(b: Record<string, unknown>): { error: string } | { ite
   const donor = typeof b.donor === "string" ? b.donor.trim() : "";
   const note = typeof b.note === "string" ? b.note.trim() : "";
   if (!JOBS.includes(job)) return { error: "직업을 골라 주세요" };
-  if (!TERMS.includes(term)) return { error: "기한을 골라 주세요" };
+  if (!isTerm(term)) return { error: "기한을 골라 주세요 (기한 없음이나 1~52주)" };
   if (!weapon || weapon.length > 30) return { error: "무기 이름을 적어 주세요" };
   if (!Number.isInteger(level) || level < 1 || level > 200) return { error: "레벨이 맞지 않아요" };
   if (!Number.isInteger(enhance) || enhance < 0 || enhance > 20) return { error: "강화는 0~20 이에요" };

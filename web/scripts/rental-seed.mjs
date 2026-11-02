@@ -11,7 +11,7 @@ import { parseRentalList } from "../server/rentalParse.ts";
 const DB = "sapphire-accounts";
 const DIR = "../자료/길드/장비대여";
 const where = process.argv.includes("--local") ? "--local" : "--remote";
-const TERM_DAYS = { none: null, "4w": 28, "2w": 14 };
+const termDays = (t) => (/^\d+w$/.test(t) ? parseInt(t, 10) * 7 : null);
 
 if (!existsSync(DIR)) {
   console.log("장비대여 목록 파일이 없어서 건너뛰어요");
@@ -37,7 +37,7 @@ const now = Date.now();
 const sql = [];
 for (const p of items) {
   const at = p.renter ? p.rentedAt ?? now : null;
-  const due = at !== null && TERM_DAYS[p.term] ? at + TERM_DAYS[p.term] * 86_400_000 : null;
+  const due = at !== null && termDays(p.term) ? at + termDays(p.term) * 86_400_000 : null;
   sql.push(
     "INSERT INTO rental_items (job, level, weapon, options, enhance, term, price, donor, renter, rented_at, due_at, status, created_at, updated_at, updated_by) VALUES (" +
       [q(p.job), p.level, q(p.weapon), q(p.options), p.enhance, q(p.term), p.price, q(p.donor), q(p.renter), q(at), q(due), "'open'", now, now, "'처음 목록'"].join(", ") +

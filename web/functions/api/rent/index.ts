@@ -4,7 +4,7 @@
 // 제작자 요청 2026-11-01, 신청서·줄·대화창 2026-11-02. 2026-11-02 길드원에게 열었다 (server/rental.ts RENT_OPEN)
 import { FORBIDDEN, NEED_LOGIN, TEST_IDS, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { DIA_GOLD, TERM_DAYS, canEnter, checkItem, donations, donorDiaOf, expectedTimes, isManager, mileageOf, setDonation } from "../../../server/rental";
+import { DIA_GOLD, termDays, canEnter, checkItem, donations, donorDiaOf, expectedTimes, isManager, mileageOf, setDonation } from "../../../server/rental";
 import type { QueueRow, RentalRow } from "../../../server/rental";
 
 interface ReqRow {
@@ -72,7 +72,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const items = rows.map((it) => {
     const line = lines.get(it.id) ?? [];
     const my = line.find((q) => mine.has(q.user_id));
-    const days = TERM_DAYS[it.term];
+    const days = termDays(it.term);
     return {
       id: it.id,
       job: it.job,

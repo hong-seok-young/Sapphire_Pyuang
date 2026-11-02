@@ -21,8 +21,9 @@ import { FitLine, Loading, NewsDot, PicImg, TopBar } from "../ui";
 import { useNews, useNewsSeen } from "../news";
 import {
   STATUS_NAME,
-  TERMS,
-  TERM_NAME,
+  MAX_WEEKS,
+  termName,
+  termWeeks,
   actRequest,
   addMileage,
   addRent,
@@ -227,7 +228,7 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
           <ul className="rent-list">
             {ofJob
               .filter((i) => levelOf(wiki, i) === lv)
-              .sort((a, b) => a.weapon.localeCompare(b.weapon) || a.enhance - b.enhance || TERMS.indexOf(a.term) - TERMS.indexOf(b.term) || a.price - b.price)
+              .sort((a, b) => a.weapon.localeCompare(b.weapon) || a.enhance - b.enhance || (termWeeks(b.term) ?? 999) - (termWeeks(a.term) ?? 999) || a.price - b.price)
               .map((i) => (
                 <li key={i.id} className={"rent-li" + (i.renter ? " rent-held" : "")}>
                   <div className="rent-row">
@@ -246,8 +247,8 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
                         <em>+{i.enhance}</em>
                       </span>
                       <span className="rent-op">{optionParts(i.options).map(([n, v]) => `${n}${v}`).join(" ") || i.options}</span>
-                      {/* 기한 없는 것은 표시 없이, 2주·4주만 */}
-                      {i.term !== "none" && <span className={"rent-tg rent-tg-" + i.term}>{TERM_NAME[i.term]}</span>}
+                      {/* 기한 없는 것은 표시 없이, 기한이 있으면 '3주' (2주 이하는 붉게) */}
+                      {i.term !== "none" && <span className={"rent-tg" + ((termWeeks(i.term) ?? 99) <= 2 ? " rent-tg-short" : " rent-tg-long")}>{termName(i.term)}</span>}
                       <span className="rent-pr">💎{i.price}</span>
                       <RowStatus item={i} />
                     </button>
@@ -359,7 +360,7 @@ function ItemPopup({ wiki, item, data, picked, onPick, onClose, onDone }: {
         </div>
         <div className="rent-pop-info">
           <p>
-            {item.term === "none" ? "기한 없음" : `기한 ${TERM_NAME[item.term]}`} · 보증금 💎{item.price} <small>(골드 {diaGold(item.price, data.rate)})</small>
+            {item.term === "none" ? "기한 없음" : `기한 ${termName(item.term)}`} · 보증금 💎{item.price} <small>(골드 {diaGold(item.price, data.rate)})</small>
           </p>
           {item.donor && <p className="rent-muted">기부 {item.donor}</p>}
           {item.renter && (
@@ -457,7 +458,7 @@ function Cart({ picked, mileage, rate, onClear, onDone }: { picked: RentItem[]; 
                 {i.weapon} +{i.enhance}
               </b>{" "}
               <span>
-                {i.term === "none" ? "무기한" : TERM_NAME[i.term]} · 💎{i.price} <small>골드 {diaGold(i.price, rate)}</small>
+                {i.term === "none" ? "무기한" : termName(i.term)} · 💎{i.price} <small>골드 {diaGold(i.price, rate)}</small>
               </span>
               {waitText(i) && <small>{waitText(i)}</small>}
             </p>
@@ -593,7 +594,7 @@ function ReqLine({ r, item, app, manage, rate, onDone }: { r: AppRequest; item?:
         <span className="rent-req-name">
           {r.weapon ?? "내려간 무기"} {r.enhance !== null ? `+${r.enhance}` : ""}
           <small>
-            {r.term ? (r.term === "none" ? " 무기한" : ` ${TERM_NAME[r.term]}`) : ""} {r.price !== null ? `💎${r.price}` : ""}
+            {r.term ? (r.term === "none" ? " 무기한" : ` ${termName(r.term)}`) : ""} {r.price !== null ? `💎${r.price}` : ""}
           </small>
         </span>
         <span className={"rent-req-st rent-req-" + (r.holding ? "hold" : r.status)}>{state}</span>
@@ -901,7 +902,15 @@ function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; s
   const DAY = 86_400_000;
   const setTerm = (t: RentTerm) => {
     set("term", t);
-    if (rentedAt !== null) setDue(t === "none" ? null : rentedAt + (t === "2w" ? 14 : 28) * DAY);
+    const w = termWeeks(t);
+    if (rentedAt !== null) setDue(w === null ? null : rentedAt + w * 7 * DAY);
+  };
+  // 기한은 '기한 없음' 또는 1~52주 (제작자 요청 2026-11-02: '3주 할 수도 있고 5주 할 수도 있잖아, 뭐 저렇게 고정을 함'). 기한 없음일 때 −/+ 를 누르면 그 주로 돌아온다
+  const [weeks, setWeeks] = useState(termWeeks(start.term) ?? 4);
+  const stepWeeks = (d: number) => {
+    const w = termWeeks(f.term) === null ? weeks : Math.min(MAX_WEEKS, Math.max(1, weeks + d));
+    setWeeks(w);
+    setTerm(`${w}w`);
   };
   const moveDue = (days: number) => setDue((d) => (d === null ? null : Math.max((rentedAt ?? 0) + DAY, d + days * DAY)));
   /**
@@ -984,12 +993,21 @@ function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; s
       {/* 기한 (제작자 요청 2026-11-02: 무엇을 고르는 단추인지 이름을 붙였다) */}
       <div className="mk-field">
         <span className="rent-field-head">대여 기한</span>
-        <div className="pill-row">
-          {TERMS.map((t) => (
-            <button key={t} type="button" className={"pill" + (f.term === t ? " pill-on" : "")} onClick={() => setTerm(t as RentTerm)}>
-              {TERM_NAME[t]}
+        <div className="rent-term">
+          <button type="button" className={"pill" + (f.term === "none" ? " pill-on" : "")} onClick={() => setTerm("none")}>
+            기한 없음
+          </button>
+          <div className="rent-weeks">
+            <button type="button" className="pill" onClick={() => stepWeeks(-1)} disabled={f.term !== "none" && weeks <= 1} aria-label="1주 줄이기">
+              −
             </button>
-          ))}
+            <button type="button" className={"pill" + (f.term !== "none" ? " pill-on" : "")} onClick={() => setTerm(`${weeks}w`)}>
+              {weeks}주
+            </button>
+            <button type="button" className="pill" onClick={() => stepWeeks(1)} disabled={f.term !== "none" && weeks >= MAX_WEEKS} aria-label="1주 늘리기">
+              +
+            </button>
+          </div>
         </div>
       </div>
       {rentedAt !== null && (

@@ -540,7 +540,7 @@ CREATE TABLE IF NOT EXISTS rental_items (
   weapon TEXT NOT NULL,                   -- 무기 이름 (위키 아이템 이름과 같으면 그림과 옵션 범위가 붙는다)
   options TEXT NOT NULL,                  -- 옵션 줄임말 그대로 ('명6크3', '지4마11마재1'), 화면이 명중 6 · 크리티컬 3 으로
   enhance INTEGER NOT NULL,               -- +강
-  term TEXT NOT NULL,                     -- none 기한 없음 | 4w 4주 | 2w 2주
+  term TEXT NOT NULL,                     -- none 기한 없음 | <N>w N주 (1~52주, 예 3w)
   price INTEGER NOT NULL,                 -- 💎
   donor TEXT,                             -- 기부한 사람 (닉네임 글자, 앱 계정이 아닐 수도 있다)
   renter TEXT,                            -- 지금 빌려 간 사람 (닉네임 글자). 비면 대여 가능

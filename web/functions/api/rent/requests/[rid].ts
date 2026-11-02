@@ -5,7 +5,7 @@
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
 import { notify } from "../../../../server/alerts";
-import { TERM_DAYS, canEnter, dueOf, expectedTimes, goldOf, isManager, itemLabel, manText, mileageOfName } from "../../../../server/rental";
+import { termDays, canEnter, dueOf, expectedTimes, goldOf, isManager, itemLabel, manText, mileageOfName } from "../../../../server/rental";
 import type { RentalRow } from "../../../../server/rental";
 
 const md = (ms: number) => {
@@ -81,7 +81,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
         : []),
     ]);
     const next = await env.DB.prepare("SELECT COUNT(*) AS n FROM rental_requests WHERE item_id = ? AND status IN ('wait', 'ok')").bind(item.id).first<{ n: number }>();
-    const days = TERM_DAYS[item.term];
+    const days = termDays(item.term);
     const tail = !days || !due ? "기한 없음" : next?.n ? `다음 신청이 있어서 ${md(due)}에 대여 담당자에게 돌려주세요` : `기한 ${md(due)} · 다음 신청이 없으면 계속 써요`;
     const deposit = [useDia ? `마일리지 💎${useDia}` : "", gold ? `골드 ${manText(gold)}` : ""].filter(Boolean).join(" + ") || "없음";
     await notify(env, [req.user_id], "rent", `${itemLabel(item)} 대여 완료 · 보증금 ${deposit} (반납하면 돌려받아요) · ${tail}`, "#/rent?v=apps", me.id);
