@@ -261,8 +261,10 @@ export function WeatherFx({ sky }: { sky: Sky }) {
       }
     };
     /**
-     * 옆 칸보다 두 칸 넘게 높으면 차이의 절반이 낮은 쪽으로 굴러 내린다 (뾰족하지 않은 둔덕, 눈의 안식각).
-     * 매번 방향을 바꿔 한쪽으로 쏠리지 않게. 빨리 쌓일 때도 따라가게 한 번에 여러 번 훑는다
+     * 눈의 안식각: 쌓인 자리는 그대로 두고, 옆 칸보다 세 칸 넘게 높아 가파른 곳에서만 한 톨씩 낮은 쪽으로 흘러내린다 (두 칸 높으면 가끔).
+     * 평평한 곳은 흐르지 않는다 (제작자 2026-11-02: '옆으로 막 흘러서 채워지는 모습이 너무 각지고 부자연스러워. 눈도 어느 정도 쌓여 안식각을 넘어 가파르게 되면
+     * 그때 조금씩 흘러내리는 거지, 평평한데도 흘러내리지 않아'. 전에는 차이의 절반을 한 번에 옮기고, 평균보다 높은 곳의 눈을 멀리 낮은 곳으로 옮기는 level 도 해서
+     * 평평한 선반과 절벽이 생겼다). 매번 방향을 바꿔 한쪽으로 쏠리지 않게. 빨리 쌓일 때도 따라가게 한 번에 여러 번 훑는다
      */
     let sweep = 1;
     const settle = () => {
@@ -275,10 +277,9 @@ export function WeatherFx({ sky }: { sky: Sky }) {
           const low = l < r ? c - 1 : l > r ? c + 1 : Math.random() < 0.5 ? c - 1 : c + 1;
           if (low < 0 || low >= cols) continue;
           const diff = pile[c] - pile[low];
-          if (diff >= 2) {
-            const move = Math.max(1, Math.floor(diff / 2));
-            pile[c] -= move;
-            pile[low] += move;
+          if (diff >= 3 || (diff === 2 && Math.random() < 0.15)) {
+            pile[c]--;
+            pile[low]++;
           }
         }
       }
@@ -388,9 +389,8 @@ export function WeatherFx({ sky }: { sky: Sky }) {
             ctx.fillRect(x, y - P, P, P * 3);
           } else ctx.fillRect(x, y, P * f.s, P * f.s);
         }
+        // 눈은 안식각을 넘은 가파른 곳만 흘러내린다. 물처럼 평평하게 고르는 level 은 눈에는 쓰지 않는다 (선반과 절벽이 생겨 각졌다, 제작자 2026-11-02)
         settle();
-        // 눈은 둔덕은 두되 전체가 한쪽으로 기울지 않게 (평균보다 8칸 넘게 높은 곳의 눈을 4칸 넘게 낮은 곳으로 조금씩. 2026-11-02 제작자 폰: 비스듬히 쌓였다)
-        level(pile, 8, 4, 12);
         // 쌓인 눈: 칸마다 도트로 (맨 위 한 칸은 더 밝게, 맨 아래는 살짝 푸르게)
         for (let c = 0; c < cols; c++) {
           const ph = pile[c] * P;

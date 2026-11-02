@@ -2521,7 +2521,8 @@ button.gd-member-row { cursor: pointer; }
   background: var(--panel); border: var(--px) solid var(--gold); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
 }
 .tut-box small { font-size: 11px; color: var(--muted); }
-.tut-box p { margin: 4px 0 8px; font-size: 14px; line-height: 1.5; color: #fff; }
+.tut-head { display: block; margin-top: 4px; font-size: 15px; color: var(--gold); }
+.tut-box p { margin: 4px 0 8px; font-size: 14px; line-height: 1.5; color: #fff; white-space: pre-line; }
 .tut-tap { display: inline-block; margin-right: 6px; padding: 0 6px; font-size: 11px; line-height: 18px; color: var(--edge); background: var(--gold); vertical-align: 2px; }
 .tut-acts { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .tut-acts .bd-mini { margin-right: auto; }
