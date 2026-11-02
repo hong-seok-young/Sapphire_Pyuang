@@ -4,7 +4,7 @@ import { api } from "./auth";
 
 export type AlertKind =
   | "market_want" | "market_bid" | "market_outbid" | "market_auction" | "market_new" | "gold_want" | "request" | "request_new" | "talk" | "account" | "shop"
-  | "board" | "board_notice" | "imo_news" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo";
+  | "board" | "board_notice" | "imo_news" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo" | "gdungeon";
 
 export interface Alert {
   id: number;
@@ -41,6 +41,8 @@ export const ALERT_GROUPS: { menu: string; kinds: { kind: AlertKind; name: strin
   { menu: "장비대여", kinds: [{ kind: "rent", name: "대여·마일리지" }] },
   // To do 함께 하는 할 일 (개발 중이라 미리 보는 사람만: 운영진, 앱개발자. 열면 preview 를 뺀다, server/todo.ts TODO_OPEN)
   { menu: "To do", kinds: [{ kind: "todo", name: "함께", preview: true }] },
+  // 길드 던전 (1군 전용, 제작자 요청 2026-11-02): 파티 들어옴, 가능한 때가 다 모임, 확정, 불참
+  { menu: "길드 던전", kinds: [{ kind: "gdungeon", name: "파티·시간" }] },
 ];
 
 export const fetchAlerts = () =>

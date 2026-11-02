@@ -72,6 +72,14 @@ export async function deleteAccountData(env: Env, user: { id: string; main_id: s
       "UPDATE requests SET status = 'open', accepter = NULL, accepted_at = NULL WHERE accepter = ? AND status = 'accepted'",
     ).bind(user.id),
     env.DB.prepare("DELETE FROM delete_requests WHERE user_id = ?").bind(user.id),
+    // 길드 던전: 파티에서 빼고, 파티장이었으면 먼저 들어온 사람에게 넘긴다 (아무도 없으면 파티를 지운다)
+    env.DB.prepare("DELETE FROM gd_members WHERE user_id = ?").bind(user.id),
+    env.DB.prepare(
+      "UPDATE gd_parties SET leader = COALESCE((SELECT m.user_id FROM gd_members m WHERE m.party_id = gd_parties.id ORDER BY m.joined_at LIMIT 1), leader) WHERE leader = ?",
+    ).bind(user.id),
+    env.DB.prepare("DELETE FROM gd_parties WHERE id NOT IN (SELECT party_id FROM gd_members)"),
+    env.DB.prepare("DELETE FROM gd_avail WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM gd_answers WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM users WHERE id = ?").bind(user.id),
   ]);
   // 사용 기록 DB 2~10 의 그 사람 기록 (server/logdb.ts)

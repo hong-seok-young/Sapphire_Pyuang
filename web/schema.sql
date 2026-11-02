@@ -640,3 +640,35 @@ CREATE INDEX IF NOT EXISTS board_comments_user ON board_comments (user_id, creat
 CREATE INDEX IF NOT EXISTS listing_talk_user ON listing_talk (user_id, created_at);
 CREATE INDEX IF NOT EXISTS listing_wants_user ON listing_wants (user_id);
 CREATE INDEX IF NOT EXISTS listing_bids_user ON listing_bids (user_id);
+
+-- 길드 던전 (server/gdungeon.ts, 제작자 요청 2026-11-02, 1군 전용): 4인 파티와 이번 주(목 10시부터) 가능한 때, 후보마다 확정·불참. 지우지 않는다
+CREATE TABLE IF NOT EXISTS gd_parties (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  leader TEXT NOT NULL,                   -- 파티장 (만든 사람. 나가면 먼저 들어온 사람)
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS gd_members (
+  user_id TEXT PRIMARY KEY,               -- 한 캐릭터는 파티 하나에만
+  party_id INTEGER NOT NULL,
+  joined_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS gd_members_party ON gd_members (party_id);
+CREATE TABLE IF NOT EXISTS gd_avail (
+  user_id TEXT NOT NULL,
+  week INTEGER NOT NULL,                  -- 그 주가 시작한 때 (목 10시, server/week.ts weekStart)
+  slots TEXT NOT NULL,                    -- 30분 칸마다 '0'/'1' 336자 (목 10:00 부터, 하루 09:00 ~ 02:00 만 쓴다)
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, week)
+);
+CREATE INDEX IF NOT EXISTS gd_avail_week ON gd_avail (week);
+CREATE TABLE IF NOT EXISTS gd_answers (
+  party_id INTEGER NOT NULL,
+  week INTEGER NOT NULL,
+  slot INTEGER NOT NULL,                  -- 후보 칸 번호 (gd_avail.slots 의 자리)
+  user_id TEXT NOT NULL,
+  answer TEXT NOT NULL,                   -- yes 확정 | no 불참 (불참이 하나라도 있으면 그 후보는 무산)
+  at INTEGER NOT NULL,
+  PRIMARY KEY (party_id, week, slot, user_id)
+);
+CREATE INDEX IF NOT EXISTS gd_answers_week ON gd_answers (week);

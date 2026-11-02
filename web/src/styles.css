@@ -2379,3 +2379,87 @@ input, textarea { min-width: 0; max-width: 100%; }
 .log-dev b { font-weight: 400; font-size: 13px; color: var(--text); }
 .log-dev small { font-size: 11px; color: var(--muted); }
 .log-dev-old { opacity: 0.6; }
+
+/* 길드 던전 (pages/GuildDungeon.tsx, 제작자 요청 2026-11-02, 1군 전용): 파티, 지금 후보와 확정·불참, 시간표 */
+.gd-week { margin-bottom: 8px; }
+.gd-party-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-bottom: 6px; }
+.gd-party-head > b { font-size: 15px; color: var(--gold); }
+.gd-party-head > small { flex: 1; min-width: 0; font-size: 11px; color: var(--muted); }
+.gd-members { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.gd-members li { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; min-width: 0; padding: 4px 6px; background: rgba(11, 10, 26, 0.45); border: 1px solid var(--edge); }
+.gd-member-name { min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.gd-members small { width: 100%; font-size: 10px; color: #7ee0a8; }
+.gd-member-wait small { color: var(--muted); }
+.gd-state { margin: 4px 0; font-size: 13px; }
+.gd-state small { color: var(--muted); }
+.gd-cand, .gd-confirm { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 2px; margin: 6px 0; padding: 10px 8px; text-align: center; border: 1px solid var(--edge); background: rgba(11, 10, 26, 0.5); }
+.gd-cand > small, .gd-confirm > small { font-size: 11px; color: var(--muted); }
+.gd-cand > b { font-size: 20px; color: #fff; }
+.gd-confirm { background: linear-gradient(180deg, rgba(255, 195, 92, 0.22), rgba(255, 195, 92, 0.06)); border-color: var(--gold); }
+.gd-confirm > b { font-size: 22px; color: var(--gold); text-shadow: 1px 1px 0 var(--edge); }
+.gd-btns { width: 100%; margin: 6px 0 0; }
+.gd-confirm .gd-btns { display: flex; justify-content: center; }
+.gd-btns .pill { padding-top: 7px; padding-bottom: 7px; }
+.gd-yes:not(.pill-on) { color: #0d2a1a; background: #7ee0a8; }
+.gd-no { color: #ffd2c8; }
+.gd-sure { color: #fff; background: #d6452b; }
+.gd-sure-text { color: #ff8a73 !important; }
+.gd-next { margin: 4px 0 0; font-size: 11px; color: var(--muted); }
+.gd-rejected { list-style: none; margin: 4px 0; padding: 0; font-size: 11px; color: var(--muted); }
+.gd-rejected li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.gd-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.gd-manage { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 8px 0; padding: 8px; background: rgba(11, 10, 26, 0.35); border: 1px dashed var(--edge); }
+.gd-row { display: flex; gap: 6px; }
+.gd-row .mk-input { flex: 1; min-width: 0; }
+.gd-row .pill { flex: none; }
+.gd-manage-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.gd-manage-list li { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px; font-size: 13px; }
+.gd-manage-list small { font-size: 11px; color: var(--gold); }
+.gd-manage-acts { display: flex; gap: 6px; margin-left: auto; }
+.gd-delete { justify-self: end; }
+.gd-picker { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.gd-picked { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
+.gd-picked .pill { padding: 3px 8px; }
+.gd-people { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; max-height: 210px; overflow-y: auto; }
+.gd-people button { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 5px 7px; text-align: left; color: var(--text); background: var(--night-2); border: 1px solid var(--edge); cursor: pointer; }
+.gd-people button b { font-weight: 400; font-size: 13px; overflow-wrap: anywhere; }
+.gd-people button small { font-size: 10px; color: var(--muted); }
+.gd-people-none { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+.gd-make { justify-self: stretch; text-align: center; }
+.gd-tabs { margin-top: 2px; }
+.gd-times-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin-bottom: 4px; }
+.gd-times-head b { font-size: 14px; color: var(--gold); font-weight: 400; }
+.gd-times-head small { font-size: 11px; color: var(--muted); }
+.gd-tools { display: flex; flex-wrap: wrap; gap: 8px; min-height: 4px; margin-bottom: 4px; }
+/* 시간표: 왼쪽 시간 줄 + 7일. 칸 높이는 손가락으로 칠하기 좋게 */
+.gd-grid { display: grid; grid-template-columns: 26px repeat(7, minmax(0, 1fr)); gap: 1px; user-select: none; -webkit-user-select: none; }
+.gd-corner { display: block; }
+.gd-head { display: flex; flex-direction: column; align-items: center; padding-bottom: 2px; line-height: 1.15; }
+.gd-head b { font-size: 12px; font-weight: 400; }
+.gd-head small { font-size: 9px; color: var(--muted); }
+.gd-weekend b { color: #ffb38a; }
+.gd-time { position: relative; font-size: 9px; line-height: 1; color: var(--muted); touch-action: pan-y; }
+.gd-hour { transform: translateY(-4px); }
+.gd-cell { display: block; height: 18px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.04); }
+.gd-grid-edit .gd-cell { touch-action: none; cursor: pointer; }
+.gd-cell.gd-off { background: rgba(0, 0, 0, 0.35); border-color: transparent; cursor: default; }
+.gd-cell.gd-on { background: var(--sapphire); border-color: #8fc2ff; }
+.gd-cell.gd-h1 { background: rgba(111, 182, 255, 0.22); }
+.gd-cell.gd-h2 { background: rgba(111, 182, 255, 0.45); }
+.gd-cell.gd-h3 { background: rgba(111, 182, 255, 0.7); }
+.gd-cell.gd-all { background: var(--gold); border-color: #fff3b0; }
+.gd-cell.gd-is-current { outline: 2px solid #7ee0a8; outline-offset: -2px; }
+.gd-cell.gd-is-confirmed { outline: 2px solid #fff; outline-offset: -2px; box-shadow: 0 0 6px var(--gold); }
+.gd-cell.gd-is-rejected { background-image: linear-gradient(135deg, transparent 45%, rgba(214, 69, 43, 0.9) 45%, rgba(214, 69, 43, 0.9) 55%, transparent 55%); }
+.gd-cell.gd-picked { outline: 2px dashed #fff; outline-offset: -2px; }
+.gd-who { margin: 6px 0 0; font-size: 12px; }
+.gd-who b { font-weight: 400; color: var(--gold); }
+.gd-who-no { color: var(--muted); }
+.gd-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 6px 0 0; font-size: 10px; color: var(--muted); }
+.gd-legend .gd-cell { display: inline-block; width: 12px; height: 10px; }
+.gd-all-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.gd-all-list li { padding: 6px 8px; background: rgba(11, 10, 26, 0.45); border: 1px solid var(--edge); }
+.gd-all-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px; }
+.gd-all-head b { font-weight: 400; font-size: 13px; }
+.gd-all-head small { font-size: 11px; color: var(--gold); }
+.gd-all-members { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 4px 0 0; font-size: 12px; color: var(--muted); }

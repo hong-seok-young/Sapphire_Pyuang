@@ -10,6 +10,7 @@ import { activeMaint } from "./maint";
 import { TYPE_NAME, officialUrl } from "./official";
 import { effective, loadCatalog, loadRules, loadSettings, wallet } from "./platshop";
 import { DIA_GOLD, termDays, termName, canEnter, isManager, manText, mileageOf } from "./rental";
+import { allParties, canUseGd, candidateNo, slotText, weeks } from "./gdungeon";
 import type { RentTerm } from "./rentalParse";
 
 const KST = 9 * 3_600_000;
@@ -34,6 +35,8 @@ export const ASK_MORE = {
   favorites: /즐겨 ?찾기|즐찾|찜/,
   news: /소식|뉴스|점검|이벤트|공지|패치|업데이트|쿠폰/,
   shop: /플티|플래티넘|상점|지갑|할인|패키지/,
+  /** 길드 던전 (1군 전용, server/gdungeon.ts) */
+  gdungeon: /길던|길드 ?던전|파티|후보|불참|언제 ?(가|해|하)/,
 };
 
 const two = (n: number) => String(n).padStart(2, "0");
@@ -150,6 +153,31 @@ export async function mineExtras(
         1500,
       ),
     );
+  }
+
+  // ---------- 길드 던전 (1군 전용, 2026-11-02 열었다): 내 파티와 이번 주 정한 때·지금 후보, 다른 파티는 이름·파티원·정한 때만 ----------
+  if ((ASK_MORE.gdungeon.test(q) || ASK_MORE.doNow.test(q)) && (await canUseGd(env, me))) {
+    const { week } = weeks(now);
+    const parties = await allParties(env, week, now);
+    const mine = parties.find((p) => p.members.some((m) => m.id === me.id));
+    const lines: string[] = [`이번 주: ${slotText(week, 0)} ~ ${slotText(week, 336)} (목 10시에 새 주)`];
+    if (mine) {
+      const waiting = mine.members.filter((m) => !m.filled).map((m) => m.id);
+      lines.push(
+        `내 파티 ${mine.name} (파티장 ${mine.leader}): ${mine.members.map((m) => m.id).join(", ")}`,
+        waiting.length
+          ? `가능한 때를 아직 안 칠한 사람: ${waiting.join(", ")}`
+          : mine.confirmed !== null
+            ? `이번 주 길드 던전 확정: ${slotText(week, mine.confirmed)} (모두 확정)`
+            : mine.current !== null
+              ? `지금 ${candidateNo(mine, mine.current)}번 후보 ${slotText(week, mine.current)} · 확정한 사람 ${mine.yes.join(", ") || "없음"} · 대답 전 ${mine.members.map((m) => m.id).filter((id) => !mine.yes.includes(id)).join(", ")}`
+              : "모두 되는 때가 없음 (가능한 때를 더 칠해야 한다)",
+      );
+      if (mine.rejected.length) lines.push(`무산된 후보: ${mine.rejected.map((r) => `${slotText(week, r.slot)}(${r.by.join(", ")} 불참)`).join(", ")}`);
+    } else lines.push(`${me.id}은 아직 파티가 없음 (길드 던전 화면에서 파티 만들기)`);
+    const others = parties.filter((p) => p !== mine);
+    if (others.length) lines.push(`다른 파티: ${others.map((p) => `${p.name}(${p.members.map((m) => m.id).join(", ")}${p.confirmed !== null ? ` · ${slotText(week, p.confirmed)} 확정` : ""})`).join(" / ")}`);
+    parts.push(section("길드 던전 (1군 전용, 4인 파티가 이번 주 가능한 때를 칠하고 모두 되는 때를 빠른 순 후보로 확정·불참)", lines, 1500));
   }
 
   // ---------- 장비대여 (2026-11-02 열었다, canEnter) ----------

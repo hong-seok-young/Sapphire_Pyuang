@@ -61,8 +61,9 @@ export const ITEMS: LaunchItem[] = [
   { key: "requests", title: "길드원 의뢰소", short: "의뢰소", to: "#/requests", icon: "📋", match: ["requests"] },
   // 장비대여 (2026-11-02 제작자 요청으로 열었다), 길드던전과 인던 같이 갈 사람 찾기 (칸만 먼저 두고 개발 중으로 막는다)
   { key: "rent", title: "장비대여", to: "#/rent", icon: "🤝", match: ["rent"] },
-  // 길드 던전 (제작자 요청 2026-11-02: '길던 인던 매칭을 길드 던전으로 바꾸고 1군 전용'). 칸 이름(key match, 주소 #/match)은 그대로라 저장된 배치가 이어진다
-  { key: "match", title: "길드 던전", short: "길드던전", to: "#/match", icon: "⚔️", ribbon: "1군 전용", ring: "gold", soon: true, badge: "개발 중", locked: true, match: ["match"] },
+  // 길드 던전 (제작자 요청 2026-11-02: '길던 인던 매칭을 길드 던전으로 바꾸고 1군 전용', 같은 날 오픈). 4인 파티가 이번 주에 갈 때를 정한다 (pages/GuildDungeon.tsx).
+  // 칸 이름(key match, 주소 #/match)은 그대로라 저장된 배치가 이어진다
+  { key: "match", title: "길드 던전", short: "길드던전", to: "#/match", icon: "⚔️", ribbon: "1군 전용", ring: "gold", match: ["match"] },
   // 시계와 보스 타이머는 안드로이드 앱에만 있다. 앱은 검토 후 오픈 (제작자 요청 2026-10-31: 지금은 웹만)
   { key: "app", title: "안드로이드 앱 받기", short: "앱 받기", to: "#/app", icon: "📲", androidOnly: true, soon: !APP_OPEN, badge: "검토 후 오픈", match: [] },
   { key: "admin", title: "길드원 관리", short: "관리", to: "#/admin", icon: "👥", managers: true, ribbon: "운영진", ring: "blue", match: ["admin"] },
