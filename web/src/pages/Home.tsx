@@ -155,7 +155,7 @@ export function Home({ me }: { me: Me }) {
       {soon.length > 0 && !L.editing && (
         <>
           <button className="soon-fold" onClick={() => setShowSoon((v) => !v)} aria-expanded={showSoon}>
-            🚧 개발 중 {soon.length} {showSoon ? "▴" : "▾"}
+            개발 중 {soon.length} {showSoon ? "▴" : "▾"}
           </button>
           {showSoon && <Tiles me={me} tiles={soon} />}
         </>
