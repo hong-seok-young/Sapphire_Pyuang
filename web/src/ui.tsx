@@ -256,7 +256,13 @@ export function FitLine({ text, shrink = 1, wrap = true, className }: {
       const base = parseFloat(getComputedStyle(el).fontSize);
       el.dataset.fit = "tight";
       if (!wrap) {
-        el.style.fontSize = Math.max(9, Math.floor(((base * el.clientWidth) / el.scrollWidth) * 2) / 2) + "px";
+        // 글자 폭이 크기에 꼭 비례하지 않아서(픽셀 글꼴) 맞을 때까지 0.5px 씩 더 줄인다 (2026-11-02: 320px 폭에서 3~5px 잘렸다)
+        let px = Math.max(9, Math.floor(((base * el.clientWidth) / el.scrollWidth) * 2) / 2);
+        el.style.fontSize = px + "px";
+        while (!fits() && px > 8) {
+          px -= 0.5;
+          el.style.fontSize = px + "px";
+        }
         return;
       }
       for (let px = base; px >= base - shrink; px--) {

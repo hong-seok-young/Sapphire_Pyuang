@@ -99,7 +99,7 @@ for (let i = 0; i < pending.length; i += PARALLEL) {
   }
   const ids = pending.slice(i, i + PARALLEL).map((p) => p.id);
   // 본문은 맡을 때 읽는다 (한꺼번에 읽으면 너무 크다)
-  const posts = select(`SELECT id, kind, type, title, start_date, src, substr(body, 1, 20000) AS body FROM official_news WHERE id IN (${ids.join(", ")})`);
+  const posts = select(`SELECT id, kind, type, title, start_date, src, substr(body, 1, 20000) AS body, html FROM official_news WHERE id IN (${ids.join(", ")})`);
   const results = await Promise.all(
     posts.map(async (p) => {
       try {

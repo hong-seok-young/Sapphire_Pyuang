@@ -21,7 +21,8 @@ export interface TodoTaskOut {
   post: { id: number; title: string };
   /** 펼치면 보이는 요약: 게임 안에서 할 것, 기간을 몰라 손해 보는 것 (server/todoDigest.ts) */
   steps?: string[];
-  warns?: string[];
+  warns?: string[];  /** 게임 밖에서 여는 곳 (응모하는 디스코드·카페·설문, 쿠폰 입력 페이지) */
+  link?: string | null;
 }
 
 /** 내 할 일 (직접 더한 것) */
@@ -101,6 +102,8 @@ export interface TodoItem {
   /** 이름을 누르면 펼쳐지는 요약 (제작자 요청 2026-11-02): 할 것, 기간을 몰라 손해 보는 것 */
   steps?: string[];
   warns?: string[];
+  /** 펼친 칸의 '참여하러 가기 ↗' (응모하는 곳, 쿠폰 입력 페이지. 제작자 요청 2026-11-02: 원글을 다시 안 봐도 되게) */
+  link?: string | null;
   /** 이벤트 칸에서 이름 앞 작은 표 (일간, 주간) */
   tag?: string | null;
   /** 내 할 일이면 그 번호 */
@@ -198,6 +201,7 @@ export function eventItems(tasks: TodoTaskOut[], dayEnd: number): TodoItem[] {
       to: `#/official/${t.post.id}`,
       steps: t.steps ?? [],
       warns: t.warns ?? [],
+      link: t.link ?? null,
       tag: t.cycle === "d" ? "일간" : t.cycle === "w" ? "주간" : null,
     };
     if (t.until !== null && t.until <= dayEnd && !t.at) item.right = "오늘까지";

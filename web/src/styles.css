@@ -2171,3 +2171,7 @@ input, textarea { min-width: 0; max-width: 100%; }
 .rank-filters .guild-stat b { font-size: 13px; }
 .rank-filters .job-chip { min-height: 46px; }
 .rank-filters .guild-stat-on, .rank-filters .job-chip-on { background: var(--sunset); border-color: transparent; box-shadow: none; }
+/* To do 펼친 칸의 '디스코드에서 참여 ↗' (게임 밖 응모·쿠폰 입력 페이지, 제작자 요청 2026-11-02) */
+.todo-link { justify-self: start; margin-top: 2px; padding: 3px 10px; font-size: 13px; color: var(--edge); background: var(--gold); border: var(--px) solid var(--edge); overflow-wrap: anywhere; }
+/* 홈 제목: 오른쪽 위 '내 정보' 단추(.hero-me) 자리는 비우고, 좁은 폰에서는 글자를 조금 줄여 'web' 까지 보이게 (화면 폭 대원칙, 320px 에서 가려졌다) */
+.hero-title { padding-right: 44px; font-size: clamp(20px, 7vw, 30px); }

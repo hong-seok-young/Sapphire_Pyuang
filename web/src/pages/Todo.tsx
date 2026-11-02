@@ -181,6 +181,23 @@ function Section({ title, reset, items, ctx, empty }: { title: string; reset?: s
 }
 
 /** 할 일 한 줄: 체크 칸, 이름(누르면 펼침), 함께 하는 사람, '›'. 펼치면 요약과 수정·함께·숨김 */
+/** 링크 단추 글자: 어디로 가는지 (디스코드, 카페, 설문 …) */
+function linkName(url: string): string {
+  const host = (() => {
+    try {
+      return new URL(url).hostname.replace(/^www\./, "");
+    } catch {
+      return "";
+    }
+  })();
+  if (/discord\.(gg|com)/.test(host)) return "디스코드에서 참여";
+  if (/cafe\.naver\.com/.test(host)) return "카페에서 참여";
+  if (/forms\.gle|docs\.google\.com|naver\.me|form/.test(host + url)) return "설문·응모 열기";
+  if (/coupon/i.test(url)) return "쿠폰 입력하러 가기";
+  if (/instagram|youtube|youtu\.be|x\.com|twitter|facebook|kakao/.test(host)) return "참여 페이지 열기";
+  return "참여하러 가기";
+}
+
 function Row({ item: i, ctx }: { item: TodoItem; ctx: RowCtx }) {
   const [opened, setOpened] = useState(false);
   const [mode, setMode] = useState<"" | "edit" | "share">("");
@@ -240,6 +257,12 @@ function Row({ item: i, ctx }: { item: TodoItem; ctx: RowCtx }) {
               ⚠️ {w}
             </p>
           ))}
+          {/* 게임 밖에서 하는 응모·쿠폰: 그곳으로 바로 (제작자 요청 2026-11-02: 원글을 무조건 봐야 하면 요약한 의미가 없다) */}
+          {i.link && (
+            <a className="todo-link" href={i.link} target="_blank" rel="noopener noreferrer">
+              {linkName(i.link)} ↗
+            </a>
+          )}
           {mode === "edit" && <EditForm item={i} act={ctx.act} onDone={() => setMode("")} />}
           {mode === "share" && <ShareForm item={i} ctx={ctx} onDone={() => setMode("")} />}
           {!mode && (

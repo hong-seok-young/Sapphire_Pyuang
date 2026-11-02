@@ -7,7 +7,7 @@ import Anthropic from "@anthropic-ai/sdk";
 
 export const DIGEST_MODEL = "claude-opus-5-5";
 /** 정리한 모델과 지시문의 판 (official_todo.model). 지시문을 고치면 판을 올린다: 예전 판으로 정리한 글은 모두 다시 정리된다 */
-export const DIGEST_TAG = `${DIGEST_MODEL}#5`;
+export const DIGEST_TAG = `${DIGEST_MODEL}#6`;
 
 const JOBS_KO = ["전사", "레인저", "마법사", "무도가"] as const;
 const JOB_KEY: Record<string, string> = { 전사: "warrior", 레인저: "ranger", 마법사: "mage", 무도가: "monk" };
@@ -21,7 +21,7 @@ const SYSTEM = `너는 모바일 MMORPG 아이모(IMO: The World Of Magic)의 �
 - 출석 보상 수령, 이벤트 퀘스트, 이벤트 아이템 모으기와 NPC 교환, 이벤트 제작, 이벤트 던전·보스, 쿠폰 입력, 이벤트 상점, 우편 보상 수령
 - 시즌제 일정: 길드 점령전, 이노티아 워 경기처럼 정해진 요일·시각에 열리는 것 (한국어 서버, 한국 시간 기준)
 - 참여 보상이 있는 게임 밖 응모 (제작자 요청 2026-11-02 '넣어야지'): 스크린샷·영상 응모, SNS 인증, 설문, 퀴즈, 카카오톡 채널 추가.
-  text 는 무엇을 올리는지 (예: "버프 세팅 스샷 응모"), note 는 어디에 올리는지 (예: "공식 카페"), 응모 마감을 end 로
+  text 는 무엇을 올리는지 (예: "버프 세팅 스샷 응모"), note 는 어디에 올리는지 (예: "공식 디스코드"), 응모 마감을 end 로
 
 넣지 않는 것
 - 유료 결제, 패키지·상품·상자 판매와 뽑기, 원스토어 결제 프로모션과 포인트백, 결제 인증
@@ -50,7 +50,10 @@ const SYSTEM = `너는 모바일 MMORPG 아이모(IMO: The World Of Magic)의 �
   보상 목록, 교환 목록, 확률, 재료 개수표, 이벤트 소개·인사말은 쓰지 않는다. text 를 그대로 되풀이하지 않는다
 - warns: 기간을 몰라서 손해 보는 것만 0~2줄, 날짜·시각과 함께 (한국 시간, '11/19 10:00' 처럼 짧게).
   예: 주차마다 재료가 바뀌면 "2주차 재료(밀가루·고기)는 3주차 시작 11/19 10:00 전에 다 쓰기", 아이템이 사라지면 "이벤트 재료는 11/26 점검 때 사라짐",
-  교환 마감이 이벤트 끝보다 빠르면 "교환은 11/30 23:59까지". 그냥 끝나는 날만 되풀이하는 줄(end 와 같은 말)은 쓰지 않는다. 없으면 []`;
+  교환 마감이 이벤트 끝보다 빠르면 "교환은 11/30 23:59까지". 그냥 끝나는 날만 되풀이하는 줄(end 와 같은 말)은 쓰지 않는다. 없으면 []
+- link: 게임 밖에서 여는 곳이 있으면 그 주소 (응모하는 디스코드 채널·카페 글·설문 폼, 쿠폰 입력 페이지). 글 끝의 '글 속 링크' 에 있는 주소 중 하나를 글자 그대로.
+  (제작자 요청 2026-11-02: 원글을 다시 안 봐도 바로 가서 하게). 게임 안에서 하는 일이거나 맞는 링크가 없으면 null.
+  steps 에는 올릴 것과 올리는 방법(채널 이름, 필요한 해시태그·양식)을 적는다`;
 
 /** 답 모양 (API 가 이 모양을 지키게 한다) */
 const TASKS_SCHEMA = {
@@ -73,8 +76,9 @@ const TASKS_SCHEMA = {
           jobs: { type: "array", items: { type: "string", enum: [...JOBS_KO] } },
           steps: { type: "array", items: { type: "string" } },
           warns: { type: "array", items: { type: "string" } },
+          link: { anyOf: [{ type: "string" }, { type: "null" }] },
         },
-        required: ["text", "note", "cycle", "days", "time", "start", "end", "minLevel", "maxLevel", "jobs", "steps", "warns"],
+        required: ["text", "note", "cycle", "days", "time", "start", "end", "minLevel", "maxLevel", "jobs", "steps", "warns", "link"],
         additionalProperties: false,
       },
     },
@@ -107,6 +111,8 @@ export interface TodoTask {
   w?: string[];
   /** 모은 할 일(mergeTasks)만: 이 일을 안내한 공식 글 번호들 (새 글 먼저) */
   p?: number[];
+  /** 게임 밖에서 여는 곳 (응모하는 디스코드·카페·설문, 쿠폰 입력 페이지). 글 속 링크 중 하나 (#6 부터) */
+  l?: string;
 }
 
 /** 정리할 글 */
@@ -117,6 +123,23 @@ export interface DigestPost {
   title: string;
   start_date: string | null;
   body: string;
+  /** 간단한 HTML (글 속 링크를 읽는다, 58KB 넘는 글은 없다) */
+  html?: string | null;
+}
+
+/** 글 속 링크 (글자와 주소). 간단한 HTML 의 <a href> 와 본문에 그대로 적힌 주소. 컴투스 공식 글끼리의 링크는 뺀다 */
+export function postLinks(post: { body: string; html?: string | null }): { text: string; url: string }[] {
+  const out = new Map<string, string>();
+  for (const m of String(post.html ?? "").matchAll(/<a href="([^"]+)">([\s\S]*?)<\/a>/g)) {
+    const url = m[1].replace(/&amp;/g, "&");
+    const text = m[2].replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim().slice(0, 40);
+    if (!out.has(url) || !out.get(url)) out.set(url, text);
+  }
+  for (const m of String(post.body ?? "").matchAll(/https?:\/\/[^\s<>"'）)\]]+/g)) if (!out.has(m[0])) out.set(m[0], "");
+  return [...out]
+    .filter(([url]) => /^https?:\/\//.test(url) && !/withhive\.com\/(?:help\/)?notice|hive-fn\.qpyou\.cn|com2us\.com\/?$/.test(url))
+    .slice(0, 20)
+    .map(([url, text]) => ({ url, text }));
 }
 
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
@@ -149,7 +172,7 @@ function lines(v: unknown, max: number, len: number): string[] {
 }
 
 /** 모델 답 -> 할 일 목록 (맞지 않는 줄은 버린다). posts: 모은 할 일이면 그 줄이 가리킬 수 있는 글 번호, max: 줄 수 */
-export function normalizeTasks(raw: unknown, posts?: Set<number>, max = 6): TodoTask[] {
+export function normalizeTasks(raw: unknown, posts?: Set<number>, max = 6, links?: Set<string>): TodoTask[] {
   const list = raw && typeof raw === "object" && Array.isArray((raw as { tasks?: unknown }).tasks) ? (raw as { tasks: unknown[] }).tasks : [];
   const out: TodoTask[] = [];
   for (const x of list) {
@@ -179,6 +202,8 @@ export function normalizeTasks(raw: unknown, posts?: Set<number>, max = 6): Todo
       d: lines(r.steps, 3, 40),
       w: lines(r.warns, 2, 60),
       ...(p ? { p } : {}),
+      // 링크는 글에 있던 주소만 (지어낸 주소를 막는다)
+      ...(typeof r.link === "string" && links?.has(r.link.trim()) ? { l: r.link.trim() } : {}),
     });
     if (out.length >= max) break;
   }
@@ -232,7 +257,7 @@ async function askJson(client: Anthropic, system: string, user: string, schema: 
   return JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1));
 }
 
-const SHAPE = `{"tasks": [{"text", "note", "cycle", "days", "time", "start", "end", "minLevel", "maxLevel", "jobs", "steps", "warns"}]}`;
+const SHAPE = `{"tasks": [{"text", "note", "cycle", "days", "time", "start", "end", "minLevel", "maxLevel", "jobs", "steps", "warns", "link"}]}`;
 
 /** 글 하나를 Claude 에 맡겨 할 일을 뽑는다. 거절당하면 빈 목록, API 오류는 던진다 (나중에 다시) */
 export async function digestPost(client: Anthropic, post: DigestPost): Promise<TodoTask[]> {
@@ -240,8 +265,11 @@ export async function digestPost(client: Anthropic, post: DigestPost): Promise<T
   const dow = /^\d{4}-\d{2}-\d{2}$/.test(posted) ? DOW[new Date(posted + "T00:00:00Z").getUTCDay()] : "";
   const user =
     `글 올린 날: ${posted}${dow ? ` (${dow})` : ""}\n종류: ${post.kind === "event" ? "이벤트" : "공지사항"}\n제목: ${post.title}\n\n본문:\n` + post.body.slice(0, 20_000);
-  const raw = await askJson(client, SYSTEM, user, TASKS_SCHEMA, SHAPE);
-  return raw ? normalizeTasks(raw) : [];
+  // 글 속 링크 (응모하는 곳, 쿠폰 입력 페이지를 link 로 고르게)
+  const links = postLinks(post);
+  const linkText = links.length ? "\n\n글 속 링크:\n" + links.map((l) => `- ${l.text ? l.text + ": " : ""}${l.url}`).join("\n") : "";
+  const raw = await askJson(client, SYSTEM, user + linkText, TASKS_SCHEMA, SHAPE);
+  return raw ? normalizeTasks(raw, undefined, 6, new Set(links.map((l) => l.url))) : [];
 }
 
 // ---------- 모으기: 여러 글이 같은 이벤트를 다시 안내해서 겹친 할 일을 하나로 ----------
@@ -257,6 +285,7 @@ const MERGE_SYSTEM = `너는 길드 앱 'To do' 의 이벤트 할 일을 마지�
 - 끝난 일(end 가 지금보다 앞)은 뺀다. 없던 일을 새로 만들지 않는다. 회차마다 기간이 다른 줄(1회차, 2회차)은 합치지 않고,
   같은 이벤트를 전체 기간 한 줄로도 적은 줄이 있으면 그 줄은 빼고 회차 줄만 남긴다 (기간이 겹쳐 두 번 보이지 않게).
 - text 는 6~14자 명사형, note 는 어디서 하는지 하나만 12자 안팎. 나머지 칸(cycle, days, time, start, end, minLevel, maxLevel, jobs)은 받은 값의 뜻을 그대로 둔다.
+- link(게임 밖에서 여는 곳의 주소)는 합친 줄 중 하나의 값을 글자 그대로 둔다 (새로 만들지 않는다, 없으면 null).
 - steps(게임 안에서 할 것 1~3줄)와 warns(기간을 몰라서 손해 보는 것 0~2줄, 날짜와 함께)는 합친 줄들의 것을 모아 겹친 말을 빼고 남긴다.
   묶은 줄이면 이벤트마다 무엇을 하는지 짧게 (예: ["11월 출석판 매일 출석", "또봉이 출석판 매일 출석"]). 보상·교환 목록은 쓰지 않는다. 받은 줄에 없던 내용을 새로 만들지 않는다.`;
 
@@ -287,7 +316,7 @@ export interface DigestOfPost {
 }
 
 /** 모으는 지시문의 판: 고치면 올린다 (글마다 다시 정리하지 않고 모으기만 다시 한다) */
-const MERGE_VERSION = 5;
+const MERGE_VERSION = 6;
 
 /** 모은 목록이 어느 정리들로 만든 것인지 (모으기 판, 글 번호와 정리한 때). 같으면 다시 모으지 않는다 */
 export function mergeSignature(digests: DigestOfPost[], now = Date.now()): string {
@@ -320,7 +349,7 @@ export async function mergeTasks(client: Anthropic, digests: DigestOfPost[], now
           JSON.stringify({
             text: t.t, note: t.n, cycle: t.c === "d" ? "daily" : t.c === "w" ? "weekly" : "once", days: t.days, time: t.at,
             start: kstText(t.s), end: kstText(t.e), minLevel: t.lv[0], maxLevel: t.lv[1], jobs: t.jobs.map((j) => JOB_KO_OF[j] ?? j),
-            steps: t.d ?? [], warns: t.w ?? [],
+            steps: t.d ?? [], warns: t.w ?? [], link: t.l ?? null,
           }),
         )
         .join("\n"),
@@ -330,9 +359,10 @@ export async function mergeTasks(client: Anthropic, digests: DigestOfPost[], now
     MERGE_SYSTEM,
     `지금: ${kstText(now)} (한국 시간)\n\n${blocks.join("\n\n")}`,
     MERGE_SCHEMA,
-    SHAPE.replace('"jobs"}', '"jobs", "posts"}'),
+    SHAPE.replace('"link"}', '"link", "posts"}'),
   );
-  return raw ? normalizeTasks(raw, new Set(live.map((d) => d.id)), 10) : null;
+  const links = new Set(live.flatMap((d) => d.tasks.flatMap((t) => (t.l ? [t.l] : []))));
+  return raw ? normalizeTasks(raw, new Set(live.map((d) => d.id)), 10, links) : null;
 }
 
 /** 정리할 글인지 (제목만 봐도 할 일이 없는 글은 모델에 보내지 않는다) */

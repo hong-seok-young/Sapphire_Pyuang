@@ -53,6 +53,8 @@ export interface TodoItemOut {
   /** 펼치면 보이는 요약: 게임 안에서 할 것, 기간을 몰라 손해 보는 것 (todoDigest.ts) */
   steps: string[];
   warns: string[];
+  /** 게임 밖에서 여는 곳 (응모하는 디스코드·카페·설문, 쿠폰 입력 페이지) */
+  link: string | null;
 }
 
 /** 지금 할 수 있는 할 일이 남은 글의 정리 (표 official_todo, 글 번호 0 은 모은 목록이라 official_news 와 이어지지 않아 빠진다) */
@@ -82,7 +84,7 @@ async function liveDigests(env: Env, now: number): Promise<{ digests: DigestOfPo
 }
 
 /** 할 일 하나의 보이는 칸 */
-const shown = (t: TodoTask) => ({ text: t.t, note: t.n, cycle: t.c, at: t.at, until: t.e, steps: t.d ?? [], warns: t.w ?? [] });
+const shown = (t: TodoTask) => ({ text: t.t, note: t.n, cycle: t.c, at: t.at, until: t.e, steps: t.d ?? [], warns: t.w ?? [], link: t.l ?? null });
 
 /**
  * 지금 이 사람에게 보일 이벤트 할 일: 시작했고 안 끝난 것, 정해진 요일이면 오늘인 것, 레벨·직업이 맞는 것.
@@ -128,7 +130,7 @@ export async function mergeIfStale(env: Env, client: Anthropic, now = Date.now()
 
 /** 정리할 글 (서버 몫: 최근 30일). 원문이 바뀌었거나 아직 안 했고, 다른 곳이 맡은 지 10분이 안 된 것은 뺀다 */
 export function pendingSql(withBody: boolean) {
-  const cols = withBody ? "n.id, n.kind, n.type, n.title, n.start_date, n.src, substr(n.body, 1, 20000) AS body" : "n.id, n.title, t.claimed_at";
+  const cols = withBody ? "n.id, n.kind, n.type, n.title, n.start_date, n.src, substr(n.body, 1, 20000) AS body, n.html" : "n.id, n.title, t.claimed_at";
   // 아직 안 했거나, 맡기만 했거나, 원문이 바뀌었거나, 예전 지시문으로 정리한 글
   const stale = `(t.id IS NULL OR t.made_at = 0 OR substr(t.src, 3) IS NOT substr(n.src, 3) OR t.model IS NOT '${DIGEST_TAG}')`;
   return (
