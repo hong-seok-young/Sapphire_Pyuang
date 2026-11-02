@@ -414,8 +414,8 @@ function MyTimes({ data, onSaved, onError }: { data: GdData; onSaved: (p: PartyS
   bitsRef.current = bits;
   const drag = useRef<{ val: boolean; changed: boolean } | null>(null);
   const grid = useRef<HTMLDivElement>(null);
-  const now = data.now;
-  const locked = (i: number) => !validSlot(i) || data.week + i * SLOT_MS + SLOT_MS <= now;
+  // 지난 칸도 칠할 수 있다: 매주 같은 루틴을 그대로 적어 두려고 (제작자 요청 2026-11-02 '시간 지났다고 비활성화하지 마'). 후보는 앞으로 올 때만 (서버)
+  const locked = (i: number) => !validSlot(i);
 
   async function save(next: string) {
     setState("saving");
@@ -458,7 +458,7 @@ function MyTimes({ data, onSaved, onError }: { data: GdData; onSaved: (p: PartyS
     drag.current = null;
     if (d?.changed) void save(bitsRef.current);
   };
-  /** 지난주와 같게: 칸 자리가 요일·시각마다 같아서 그대로 옮긴다 (지난 칸은 그대로) */
+  /** 전주 복사: 칸 자리가 요일·시각마다 같아서 지난주 시간표를 그대로 옮긴다 (목 10시에 새 주가 되면 시간표는 빈다) */
   const fill = (from: string) => {
     let b = "";
     for (let i = 0; i < from.length; i++) b += locked(i) ? bitsRef.current[i] : from[i] === "1" && validSlot(i) ? "1" : "0";
@@ -476,7 +476,7 @@ function MyTimes({ data, onSaved, onError }: { data: GdData; onSaved: (p: PartyS
       <div className="gd-tools">
         {data.prev && data.prev !== bits && (
           <button className="bd-mini" onClick={() => fill(data.prev!)}>
-            지난주와 같게
+            전주 복사
           </button>
         )}
         {count > 0 && (
@@ -513,7 +513,7 @@ function HeatTimes({ data, party: p }: { data: GdData; party: PartyState }) {
   const ids = p.members.map((m) => m.id);
   const total = ids.length;
   const countAt = (i: number) => ids.filter((id) => p.avail[id]?.[i] === "1").length;
-  const off = (i: number) => !validSlot(i) || data.week + i * SLOT_MS + SLOT_MS <= data.now;
+  const off = (i: number) => !validSlot(i);
   const rejected = new Set(p.rejected.map((r) => r.slot));
   return (
     <section className="panel gd-times">

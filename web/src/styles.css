@@ -2458,13 +2458,13 @@ button.gd-member-row { cursor: pointer; }
 /* 시간표: 왼쪽 시간 줄 + 7일. 칸 높이는 손가락으로 칠하기 좋게 */
 .gd-grid { display: grid; grid-template-columns: 26px repeat(7, minmax(0, 1fr)); gap: 1px; user-select: none; -webkit-user-select: none; }
 .gd-corner { display: block; }
-.gd-head { display: flex; flex-direction: column; align-items: center; padding-bottom: 2px; line-height: 1.15; }
+.gd-head { display: flex; flex-direction: column; align-items: center; padding-bottom: 2px; line-height: 1.1; }
 .gd-head b { font-size: 12px; font-weight: 400; }
 .gd-head small { font-size: 9px; color: var(--muted); }
 .gd-weekend b { color: #ffb38a; }
 .gd-time { position: relative; font-size: 9px; line-height: 1; color: var(--muted); touch-action: pan-y; }
-.gd-hour { transform: translateY(-4px); }
-.gd-cell { display: block; height: 18px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.04); }
+.gd-hour { transform: translateY(-5px); }
+.gd-cell { display: block; height: 13px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.04); }
 .gd-grid-edit .gd-cell { touch-action: none; cursor: pointer; }
 .gd-cell.gd-off { background: rgba(0, 0, 0, 0.35); border-color: transparent; cursor: default; }
 .gd-cell.gd-on { background: var(--sapphire); border-color: #8fc2ff; }
