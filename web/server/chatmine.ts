@@ -1,7 +1,7 @@
 // 챗봇의 길드 앱 자료 더하기 (제작자 요청 2026-11-02: '내가 지금 할 것' 치면 내 레벨, 직업 등 내 데이터를 다 읽고 대답,
 // 이 웹에서 볼 수 있는 모든 정보(아이모 소식, 장비대여 포함)를 챗봇이 읽게. 대신 권한: 오피서나 개발자만 보는 메뉴를 다 대답하면 안 된다).
 // server/chatapp.ts 의 appContext 가 부른다. 규칙은 같다: 묻는 사람이 앱에서 볼 수 있는 것만 넣는다.
-// - 장비대여, To do: 개발 중이라 미리 보는 사람(운영진, 앱개발자, 테스트 계정)에게만 (rental.ts canEnter). 줄 명단, 남의 보증금, 마일리지 표는 운영진만
+// - 장비대여: 2026-11-02 열었다 (rental.ts canEnter). To do 는 개발 중이라 미리 보는 사람만. 장비대여의 줄 명단, 남의 보증금, 마일리지 표는 운영진만
 // - 아이디 생성·캐릭터 추가 요청: 길드원 관리를 하는 오피서 이상만
 // - 알림, 즐겨찾기, 내 신청: 본인(묶은 캐릭터 모두) 것만
 import { RANK } from "./auth";
@@ -148,7 +148,7 @@ export async function mineExtras(
     );
   }
 
-  // ---------- 장비대여 (개발 중: 미리 보는 사람만) ----------
+  // ---------- 장비대여 (2026-11-02 열었다, canEnter) ----------
   if (canEnter(me)) {
     const manager = isManager(me);
     const full = ASK_MORE.rental.test(q);
@@ -170,7 +170,7 @@ export async function mineExtras(
     const held = heldR.results as { id: number; weapon: string; enhance: number; term: RentTerm; renter: string; rented_at: number | null; queue: number; use_dia: number | null; gold: number | null; price: number }[];
     const myReqs = myReqR.results as { item_id: number; user_id: string; status: string; created_at: number; weapon: string; enhance: number }[];
     meLines.push(
-      `장비대여 (홈 '개발 중' 안): 마일리지 💎${mileage} (💎1 = 10만 골드)` +
+      `장비대여: 마일리지 💎${mileage} (💎1 = 10만 골드)` +
         (held.length
           ? ` · 대여 중 ${held
               .map((h) => {

@@ -37,8 +37,8 @@ export const ALERT_GROUPS: { menu: string; kinds: { kind: AlertKind; name: strin
     kinds: [{ kind: "chat_done", name: "답변 완료" }, { kind: "chat_fixed", name: "개선됨" }, { kind: "chat_gap", name: "모르는 질문", developer: true }],
   },
   { menu: "계정", kinds: [{ kind: "account", name: "역할" }] },
-  // 장비대여: 신청, 대여, 마일리지 (개발 중이라 앱개발자만 보인다. 열면 developer 를 뺀다, server/rental.ts RENT_OPEN)
-  { menu: "장비대여", kinds: [{ kind: "rent", name: "대여·마일리지", developer: true }] },
+  // 장비대여: 신청, 대여, 마일리지 (2026-11-02 열었다, server/rental.ts RENT_OPEN)
+  { menu: "장비대여", kinds: [{ kind: "rent", name: "대여·마일리지" }] },
   // To do 함께 하는 할 일 (개발 중이라 미리 보는 사람만: 운영진, 앱개발자. 열면 preview 를 뺀다, server/todo.ts TODO_OPEN)
   { menu: "To do", kinds: [{ kind: "todo", name: "함께", preview: true }] },
 ];

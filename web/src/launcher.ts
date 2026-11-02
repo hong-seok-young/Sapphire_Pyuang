@@ -59,8 +59,8 @@ export const ITEMS: LaunchItem[] = [
   { key: "ranking", title: "길드 랭킹", short: "랭킹", to: "#/ranking", icon: "🏆", match: ["ranking"] },
   { key: "market", title: "사파이어 중개인", short: "중개인", to: "#/market", icon: "💰", match: ["market"] },
   { key: "requests", title: "길드원 의뢰소", short: "의뢰소", to: "#/requests", icon: "📋", match: ["requests"] },
-  // 길드원끼리 장비 빌려주기, 길드던전과 인던 같이 갈 사람 찾기 (제작자 요청: 칸만 먼저 두고 개발 중으로 막는다)
-  { key: "rent", title: "장비대여", to: "#/rent", icon: "🤝", soon: true, badge: "개발 중", locked: true, match: ["rent"] },
+  // 장비대여 (2026-11-02 제작자 요청으로 열었다), 길드던전과 인던 같이 갈 사람 찾기 (칸만 먼저 두고 개발 중으로 막는다)
+  { key: "rent", title: "장비대여", to: "#/rent", icon: "🤝", match: ["rent"] },
   { key: "match", title: "길던&인던 매칭", short: "매칭", to: "#/match", icon: "⚔️", soon: true, badge: "개발 중", locked: true, match: ["match"] },
   // 시계와 보스 타이머는 안드로이드 앱에만 있다. 앱은 검토 후 오픈 (제작자 요청 2026-10-31: 지금은 웹만)
   { key: "app", title: "안드로이드 앱 받기", short: "앱 받기", to: "#/app", icon: "📲", androidOnly: true, soon: !APP_OPEN, badge: "검토 후 오픈", match: [] },

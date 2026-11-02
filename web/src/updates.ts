@@ -3,7 +3,10 @@
 // 들어간 때는 그 기기에 계정별로 적어 둔다 (localStorage, 못 쓰면 표만 계속 보인다).
 // 메뉴를 고쳐서 올릴 때마다 여기 그 메뉴의 시각을 바꾼다 (홈 칸의 주소 그대로, 한국 시간).
 // 2026-11-01 정식 오픈 v1.0 때 모두 비웠다 (제작자 요청: 오픈하면 업데이트 표시는 다 지우기). 그 뒤 고친 메뉴만 다시 넣는다.
-export const MENU_UPDATES: Record<string, string> = {};
+export const MENU_UPDATES: Record<string, string> = {
+  // 장비대여 오픈 (제작자 요청 2026-11-02)
+  "#/rent": "2026-11-02T20:23+09:00",
+};
 
 const DAY = 86_400_000;
 const SHOW_DAYS = 7;

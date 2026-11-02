@@ -5,14 +5,14 @@
 // 무기마다 선착순으로 줄을 선다: 앞사람이 받은 날 + 기한 뒤에 받는다. 줄이 없으면 기한이 지나도 계속 쓰고, 줄이 생기면 기한이 끝나는 날 담당자에게 돌려준다.
 // 장비를 기부하면 운영진이 옵션 시세로 마일리지 💎 를 적립하고, 빌릴 때(건넬 때) 골드 대신 쓴다 (D1 rental_mileage).
 // 실제 주고받기는 게임 안에서 하고 앱은 목록과 장부만 둔다 (게임을 읽거나 게임에 무엇을 보내지 않는다, CLAUDE.md 게임 안전 규칙).
-// 지금은 개발 중이라 앱개발자만 들어간다 (RENT_OPEN, 화면 src/launcher.ts 의 locked 와 같이 바꾼다).
+// 2026-11-02 제작자 요청으로 길드원에게 열었다 (RENT_OPEN, 화면 src/launcher.ts 의 rent 칸과 같이).
 import { RANK, TEST_IDS } from "./auth";
 import type { Env, User } from "./auth";
 import { notify } from "./alerts";
 import type { RentJob, RentTerm } from "./rentalParse";
 
-/** 길드원에게 열었는지. false 면 앱개발자만 쓰고, 운영진 알림도 앱개발자에게만 간다 */
-export const RENT_OPEN = false;
+/** 길드원에게 열었는지 (2026-11-02 열었다). false 면 미리 보는 사람만 쓰고, 운영진 알림도 앱개발자에게만 간다 */
+export const RENT_OPEN = true;
 /** 💎 1개의 골드 (마일리지 1 = 10만 골드) */
 export const DIA_GOLD = 100_000;
 /** 보증금으로 받은 골드 칸 값 (0 ~ 💎 가격만큼의 골드, 맞지 않으면 null). 비우면 가격에서 마일리지를 뺀 나머지 */

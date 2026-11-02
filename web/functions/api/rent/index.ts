@@ -1,7 +1,7 @@
 // GET /api/rent -> 장비대여 목록(무기마다 쓰는 사람, 줄, 새로 신청하면 받을 수 있는 때), 신청서(대화 포함), 내 마일리지와 장부
 //   길드원: 내 신청서 최근 10개. 운영진: 줄 서는 신청이 있는 신청서 모두와 무기마다 줄 명단, 사람마다 마일리지, 닉네임 목록
 // POST /api/rent { job, level, weapon, options, enhance, term, price, donor, donorDia, note } -> 물건 더하기 (운영진). donorDia: 기부자에게 적립할 💎 (server/rental.ts setDonation)
-// 제작자 요청 2026-11-01, 신청서·줄·대화창 2026-11-02. 지금은 개발 중이라 앱개발자만 (server/rental.ts RENT_OPEN)
+// 제작자 요청 2026-11-01, 신청서·줄·대화창 2026-11-02. 2026-11-02 길드원에게 열었다 (server/rental.ts RENT_OPEN)
 import { FORBIDDEN, NEED_LOGIN, TEST_IDS, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { DIA_GOLD, TERM_DAYS, canEnter, checkItem, donations, donorDiaOf, expectedTimes, isManager, mileageOf, setDonation } from "../../../server/rental";
