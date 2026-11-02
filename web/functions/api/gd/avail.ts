@@ -25,8 +25,8 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   if (after && !before.members.every((m) => m.filled) && after.members.every((m) => m.filled)) {
     const text =
       after.current !== null
-        ? `가능한 때가 다 모였어요 · 1번 후보 ${slotText(week, after.current)} · 확정이나 불참을 눌러 주세요`
-        : "가능한 때가 다 모였는데 모두 되는 때가 없어요 · 가능한 때를 더 칠해 주세요";
+        ? `시간표가 다 모였어요 · 1번 후보 ${slotText(week, after.current)} · 확정이나 불참을 눌러 주세요`
+        : "시간표가 다 모였는데 교집합이 없어요 · 시간표를 더 칠해 주세요";
     await tellParty(env, after, `[${after.name}] ${text}`, me.id);
   }
   return json({ ok: true, party: after });

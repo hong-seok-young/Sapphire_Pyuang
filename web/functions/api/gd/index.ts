@@ -59,6 +59,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     await env.DB.batch([env.DB.prepare("DELETE FROM gd_members WHERE party_id = ?").bind(id), env.DB.prepare("DELETE FROM gd_parties WHERE id = ?").bind(id)]);
     return json({ error: "그 사이 다른 파티에 들어간 사람이 있어요. 다시 골라 주세요" }, 409);
   }
-  await notify(env, others, "gdungeon", `${name}에 들어왔어요 (파티장 ${me.id}) · 이번 주 가능한 때를 칠해 주세요`, "#/match", me.id);
+  await notify(env, others, "gdungeon", `${name}에 들어왔어요 (파티장 ${me.id}) · 이번 주 시간표를 칠해 주세요`, "#/match", me.id);
   return json({ id });
 };

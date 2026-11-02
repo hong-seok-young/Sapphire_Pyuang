@@ -166,12 +166,12 @@ export async function mineExtras(
       lines.push(
         `내 파티 ${mine.name} (파티장 ${mine.leader}): ${mine.members.map((m) => m.id).join(", ")}`,
         waiting.length
-          ? `가능한 때를 아직 안 칠한 사람: ${waiting.join(", ")}`
+          ? `시간표를 아직 안 칠한 사람: ${waiting.join(", ")}`
           : mine.confirmed !== null
             ? `이번 주 길드 던전 확정: ${slotText(week, mine.confirmed)} (모두 확정)`
             : mine.current !== null
               ? `지금 ${candidateNo(mine, mine.current)}번 후보 ${slotText(week, mine.current)} · 확정한 사람 ${mine.yes.join(", ") || "없음"} · 대답 전 ${mine.members.map((m) => m.id).filter((id) => !mine.yes.includes(id)).join(", ")}`
-              : "모두 되는 때가 없음 (가능한 때를 더 칠해야 한다)",
+              : "교집합이 없음 (시간표를 더 칠해야 한다)",
       );
       if (mine.rejected.length) lines.push(`무산된 후보: ${mine.rejected.map((r) => `${slotText(week, r.slot)}(${r.by.join(", ")} 불참)`).join(", ")}`);
     } else lines.push(`${me.id}은 아직 파티가 없음 (길드 던전 화면에서 파티 만들기)`);

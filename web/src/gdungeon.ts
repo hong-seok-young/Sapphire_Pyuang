@@ -62,7 +62,7 @@ export const saveAvail = (slots: string) => api<{ ok: boolean; party?: PartyStat
 export const answerGd = (slot: number, answer: "yes" | "no") => api<{ ok: boolean; party?: PartyState | null }>("/api/gd/answer", "POST", { slot, answer });
 export const undoAnswer = (slot: number) => api<{ ok: boolean; party?: PartyState | null }>(`/api/gd/answer?slot=${slot}`, "DELETE");
 export const resetGd = () => api<{ ok: boolean; party?: PartyState | null }>("/api/gd/answer", "POST", { reset: true });
-export const editParty = (id: number, change: { add?: string[]; remove?: string[] }) =>
+export const editParty = (id: number, change: { add?: string[]; remove?: string[]; leader?: string }) =>
   api<{ ok: boolean; party?: PartyState | null }>(`/api/gd/party/${id}`, "PUT", change);
 export const leaveParty = (id: number) => api<{ ok: boolean }>(`/api/gd/party/${id}`, "PUT", { leave: true });
 export const deleteParty = (id: number) => api<{ ok: boolean }>(`/api/gd/party/${id}`, "DELETE");

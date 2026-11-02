@@ -45,7 +45,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (answer === "yes" && after.confirmed === slot) {
     await tellParty(env, after, `[${p.name}] 이번 주 길드 던전은 ${when} 확정!`, me.id);
   } else if (answer === "no") {
-    const next = after.current !== null ? `다음은 ${candidateNo(after, after.current)}번 후보 ${slotText(week, after.current)}` : "남은 후보가 없어요 · 가능한 때를 더 칠해 주세요";
+    const next = after.current !== null ? `다음은 ${candidateNo(after, after.current)}번 후보 ${slotText(week, after.current)}` : "남은 후보가 없어요 · 시간표를 더 칠해 주세요";
     await tellParty(env, after, `[${p.name}] ${me.id} 님이 ${wasConfirmed ? `정해진 ${when}에 못 가요` : `${when} 불참`} · ${next}`, me.id);
   }
   return json({ ok: true, party: after });

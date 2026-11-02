@@ -1,12 +1,12 @@
 // 길드 던전 화면 #/match (제작자 요청 2026-11-02, 1군 전용, src/gdungeon.ts, 서버 server/gdungeon.ts)
-// 위에서부터: 이번 주(목 10시 ~ 다음 주 목 10시), 내 파티와 지금 후보(확정·불참), 내 가능한 때 / 겹치는 때 시간표, 모든 파티.
+// 위에서부터: 이번 주(목 10시 ~ 다음 주 목 10시), 내 파티와 지금 후보(확정·불참), 내 시간표 / 교집합, 모든 파티.
 // 시간표는 칸을 누르고 끌어서 칠한다 (왼쪽 시간 줄을 끌면 화면이 내려간다).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { JOB_NAME, errorText } from "../auth";
 import type { Job, Me } from "../auth";
 import {
-  COLS, EMPTY, MAX_MEMBERS, ROWS, SLOT_MS, answerGd, candidateNo, colHead, createParty, deleteParty, editParty, fetchGd, leaveParty, resetGd, rowLabel,
+  COLS, EMPTY, MAX_MEMBERS, ROWS, SLOT_MS, answerGd, candidateNo, colHead, createParty, deleteParty, editParty, fetchGd, leaveParty, rowLabel,
   saveAvail, slotOf, slotShort, slotText, undoAnswer, validSlot, weekText,
 } from "../gdungeon";
 import type { GdData, GdPerson, PartyState } from "../gdungeon";
@@ -62,10 +62,10 @@ export function GuildDungeonPage({ me }: { me: Me }) {
       {party && (
         <nav className="pill-row gd-tabs">
           <button className={"pill" + (tab === "mine" ? " pill-on" : "")} onClick={() => setTab("mine")}>
-            내 가능한 때
+            내 시간표
           </button>
           <button className={"pill" + (tab === "heat" ? " pill-on" : "")} onClick={() => setTab("heat")}>
-            겹치는 때
+            교집합
           </button>
         </nav>
       )}
@@ -79,19 +79,20 @@ export function GuildDungeonPage({ me }: { me: Me }) {
   );
 }
 
-/** 내 파티: 파티원, 지금 후보와 확정·불참, 다음 후보, 무산된 후보, 관리 */
+/** 내 파티: 파티원 카드, 지금 후보와 확정·불참, 다음 후보, 무산된 후보 */
 function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
   me: Me; data: GdData; party: PartyState; onParty: (p: PartyState | null | undefined) => void; onReload: () => void; onError: (e: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [sure, setSure] = useState<string | null>(null);
-  const [manage, setManage] = useState(false);
+  const [open, setOpen] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const week = data.week;
   const leader = p.leader === me.id;
   const canManage = leader || data.staff;
   const all = p.members.every((m) => m.filled);
   const waiting = p.members.filter((m) => !m.filled).map((m) => m.id);
-  // 두 번 눌러야 하는 단추 (불참, 다시 정하기): 3초 안에 한 번 더
+  // 두 번 눌러야 하는 단추 (불참, 빼기, 파티 지우기, 나가기): 3초 안에 한 번 더
   useEffect(() => {
     if (!sure) return;
     const t = window.setTimeout(() => setSure(null), 3000);
@@ -112,6 +113,22 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
     }
   }
   const twice = (key: string, fn: () => void) => (sure === key ? fn() : setSure(key));
+  /** 파티원 넣고 빼기, 파티장 지정, 파티 지우기: 끝나면 다시 받는다 */
+  async function act(fn: () => Promise<unknown>) {
+    setBusy(true);
+    onError("");
+    try {
+      await fn();
+      setOpen(null);
+      setAdding(false);
+      onReload();
+    } catch (e) {
+      onError(errorText(e));
+    } finally {
+      setBusy(false);
+      setSure(null);
+    }
+  }
   const myNo = (slot: number) => p.rejected.some((r) => r.slot === slot && r.by.includes(me.id));
   const next = p.current !== null ? p.candidates.filter((s) => s > p.current! && !p.rejected.some((r) => r.slot === s)).slice(0, 4) : [];
   const past = p.confirmed !== null && week + p.confirmed * SLOT_MS + SLOT_MS <= data.now;
@@ -120,32 +137,77 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
     <section className="panel gd-party">
       <div className="gd-party-head">
         <b>{p.name}</b>
-        {canManage && (
-          <button className="bd-mini" onClick={() => setManage((v) => !v)}>
-            {manage ? "닫기" : "관리"}
-          </button>
-        )}
       </div>
+      {/* 파티원 카드: 한 줄에 닉네임 · 카톡 · 파티장 · 상태. 파티장·운영진은 카드를 누르면 아래에 파티장 지정 · 빼기 (파티장 카드는 파티 지우기)
+          (제작자 요청 2026-11-02: 아래에 닉네임을 늘어놓은 관리 칸 대신 카드를 눌러서) */}
       <ul className="gd-members">
         {p.members.map((m) => {
           const said = p.current !== null && p.yes.includes(m.id);
-          return (
-            <li key={m.id} className={m.filled ? "" : "gd-member-wait"}>
+          const row = (
+            <>
               <span className="gd-member-name">{m.id}</span>
-              <KakaoButton name={m.id} />
-              <small>
-                {m.id === p.leader && <i className="gd-leader">파티장</i>}
-                {!m.filled ? "칠하기 전" : p.confirmed !== null ? "확정" : said ? "확정 ✓" : all && p.current !== null ? "대답 전" : "칠함"}
-              </small>
+              <KakaoButton name={m.id} nested={canManage} />
+              {m.id === p.leader && <i className="gd-leader">파티장</i>}
+              <small>{!m.filled ? "칠하기 전" : p.confirmed !== null ? "확정" : said ? "확정 ✓" : all && p.current !== null ? "대답 전" : "칠함"}</small>
+            </>
+          );
+          return (
+            <li key={m.id} className={(m.filled ? "" : "gd-member-wait") + (open === m.id ? " gd-member-open" : "")}>
+              {canManage ? (
+                <button className="gd-member-row" onClick={() => setOpen(open === m.id ? null : m.id)} aria-expanded={open === m.id}>
+                  {row}
+                </button>
+              ) : (
+                <div className="gd-member-row">{row}</div>
+              )}
+              {open === m.id && canManage && (
+                <div className="pill-row gd-member-acts">
+                  {m.id !== p.leader ? (
+                    <>
+                      <button className="pill" disabled={busy} onClick={() => void act(() => editParty(p.id, { leader: m.id }))}>
+                        파티장 지정
+                      </button>
+                      <button
+                        className={"pill" + (sure === "rm" + m.id ? " gd-sure" : "")}
+                        disabled={busy}
+                        onClick={() => twice("rm" + m.id, () => void act(() => editParty(p.id, { remove: [m.id] })))}
+                      >
+                        {sure === "rm" + m.id ? "정말 빼기" : "빼기"}
+                      </button>
+                    </>
+                  ) : (
+                    <button className={"pill" + (sure === "del" ? " gd-sure" : "")} disabled={busy} onClick={() => twice("del", () => void act(() => deleteParty(p.id)))}>
+                      {sure === "del" ? "정말 파티 지우기" : "파티 지우기"}
+                    </button>
+                  )}
+                </div>
+              )}
             </li>
           );
         })}
+        {canManage && p.members.length < MAX_MEMBERS && (
+          <li className="gd-member-add">
+            <button className="gd-member-row" onClick={() => setAdding((v) => !v)} aria-expanded={adding}>
+              + 파티원 넣기
+            </button>
+            {adding && (
+              <PeoplePicker
+                people={data.people.filter((x) => x.party === null)}
+                exclude={p.members.map((m) => m.id)}
+                max={MAX_MEMBERS - p.members.length}
+                busy={busy}
+                action="넣기"
+                onPick={(ids) => void act(() => editParty(p.id, { add: ids }))}
+              />
+            )}
+          </li>
+        )}
       </ul>
 
       {/* 지금 상태 */}
       {!all ? (
         <p className="gd-state">
-          가능한 때 {p.members.length - waiting.length}/{p.members.length}
+          시간표 {p.members.length - waiting.length}/{p.members.length}
           <small> · {waiting.join(", ")} 기다리는 중</small>
         </p>
       ) : p.confirmed !== null ? (
@@ -185,8 +247,8 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
         </div>
       ) : (
         <p className="gd-state">
-          모두 되는 때가 없어요
-          <small> · 가능한 때를 더 칠해 주세요</small>
+          교집합이 없어요
+          <small> · 시간표를 더 칠해 주세요</small>
         </p>
       )}
 
@@ -209,14 +271,7 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
         </ul>
       )}
 
-      {manage && canManage && <PartyManage me={me} data={data} party={p} onDone={() => (setManage(false), onReload())} onError={onError} />}
-
       <div className="gd-foot">
-        {canManage && all && (p.rejected.length > 0 || p.yes.length > 0 || p.confirmed !== null) && (
-          <button className={"bd-mini" + (sure === "reset" ? " gd-sure-text" : "")} disabled={busy} onClick={() => twice("reset", () => void run(resetGd))}>
-            {sure === "reset" ? "정말 처음부터" : "처음부터 다시 정하기"}
-          </button>
-        )}
         <button
           className={"bd-mini" + (sure === "leave" ? " gd-sure-text" : "")}
           disabled={busy}
@@ -238,58 +293,6 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
         </button>
       </div>
     </section>
-  );
-}
-
-/** 파티 관리 (파티장, 운영진): 파티원 넣고 빼기, 파티 지우기 (파티장 지정은 두지 않는다, 제작자 요청 2026-11-02) */
-function PartyManage({ me, data, party: p, onDone, onError }: { me: Me; data: GdData; party: PartyState; onDone: () => void; onError: (e: string) => void }) {
-  const [busy, setBusy] = useState(false);
-  const [sure, setSure] = useState(false);
-  async function run(fn: () => Promise<unknown>) {
-    setBusy(true);
-    onError("");
-    try {
-      await fn();
-      onDone();
-    } catch (e) {
-      onError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-  const room = MAX_MEMBERS - p.members.length;
-  return (
-    <div className="gd-manage">
-      <ul className="gd-manage-list">
-        {p.members.map((m) => (
-          <li key={m.id}>
-            <span className="gd-member-name">{m.id}</span>
-            {m.id === p.leader ? (
-              <small>파티장</small>
-            ) : (
-              m.id !== me.id && (
-                <button className="bd-mini" disabled={busy} onClick={() => void run(() => editParty(p.id, { remove: [m.id] }))}>
-                  빼기
-                </button>
-              )
-            )}
-          </li>
-        ))}
-      </ul>
-      {room > 0 && (
-        <PeoplePicker
-          people={data.people.filter((x) => x.party === null)}
-          exclude={p.members.map((m) => m.id)}
-          max={room}
-          busy={busy}
-          action="넣기"
-          onPick={(ids) => void run(() => editParty(p.id, { add: ids }))}
-        />
-      )}
-      <button className={"bd-mini gd-delete" + (sure ? " gd-sure-text" : "")} disabled={busy} onClick={() => (sure ? void run(() => deleteParty(p.id)) : setSure(true))}>
-        {sure ? "정말 파티 지우기" : "파티 지우기"}
-      </button>
-    </div>
   );
 }
 
@@ -396,7 +399,7 @@ function Head({ week }: { week: number }) {
   );
 }
 
-/** 내 가능한 때: 칸을 누르고 끌어서 칠한다. 손을 떼면 저장 */
+/** 내 시간표: 칸을 누르고 끌어서 칠한다. 손을 떼면 저장 */
 function MyTimes({ data, onSaved, onError }: { data: GdData; onSaved: (p: PartyState | null | undefined) => void; onError: (e: string) => void }) {
   const [bits, setBits] = useState(data.mine ?? EMPTY);
   const [state, setState] = useState<"" | "saving" | "saved">("");
@@ -460,7 +463,7 @@ function MyTimes({ data, onSaved, onError }: { data: GdData; onSaved: (p: PartyS
   return (
     <section className="panel gd-times">
       <div className="gd-times-head">
-        <b>내 가능한 때</b>
+        <b>내 시간표</b>
         <small>{count ? `${count / 2}시간` : "칠한 때 없음"}{state === "saving" ? " · 저장 중" : state === "saved" ? " · 저장됨" : ""}</small>
       </div>
       <div className="gd-tools">
@@ -497,7 +500,7 @@ function Row({ row, children }: { row: number; children: (i: number) => JSX.Elem
   );
 }
 
-/** 겹치는 때: 칸마다 되는 사람 수 (모두 되면 금색), 후보는 테두리. 칸을 누르면 누가 되는지 */
+/** 교집합: 칸마다 되는 사람 수 (모두 되면 금색), 후보는 테두리. 칸을 누르면 누가 되는지 */
 function HeatTimes({ data, party: p }: { data: GdData; party: PartyState }) {
   const [pick, setPick] = useState<number | null>(null);
   const ids = p.members.map((m) => m.id);
@@ -508,7 +511,7 @@ function HeatTimes({ data, party: p }: { data: GdData; party: PartyState }) {
   return (
     <section className="panel gd-times">
       <div className="gd-times-head">
-        <b>겹치는 때</b>
+        <b>교집합</b>
         <small>
           {p.members.filter((m) => m.filled).length}/{total}명 칠함
         </small>
