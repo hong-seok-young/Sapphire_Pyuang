@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { KakaoField } from "../kakao";
 import type { FormEvent } from "react";
 import {
   EXP_MAX, GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, MAX_LEVEL, ROLE_NAME, avatarUrl, deleteMyAvatar, errorText, expText,
@@ -292,6 +293,11 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
         {saved && <p className="form-note">저장했어요.</p>}
       </section>
       <AvatarPanel me={me} onMe={onMe} />
+      {/* 카톡 오픈프로필 링크 (제작자 요청 2026-11-02): 장비대여·중개인·의뢰소에서 이름 옆 '카톡' 단추로 바로 열린다 */}
+      <section className="panel profile-panel">
+        <h2 className="panel-title">카톡 오픈프로필</h2>
+        <KakaoField name={me.id} />
+      </section>
       <RenamePanel me={me} onMe={onMe} />
       {/* 앱개발자만: 테스트 계정으로 바꿔서 상대방 쪽 화면과 알림을 혼자 시험한다 (제작자 요청) */}
       {me.role === "developer" && (

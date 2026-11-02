@@ -89,6 +89,7 @@ const ADDED_COLUMNS = [
   ["listings", "auto_auction", "INTEGER"],
   ["plat_settings", "week_plat", "INTEGER NOT NULL DEFAULT 300"], ["plat_settings", "high_week_plat", "INTEGER NOT NULL DEFAULT 300"],
   ["users", "main_id", "TEXT"], ["signup_requests", "owner", "TEXT"],
+  ["users", "kakao", "TEXT"],
   ["plat_orders", "voided_at", "INTEGER"], ["plat_orders", "voided_by", "TEXT"], ["plat_orders", "gold_paid", "INTEGER"],
   ["official_news", "html", "TEXT"], ["official_news", "src", "TEXT"],
   ["rental_requests", "app_id", "INTEGER"],

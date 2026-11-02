@@ -47,6 +47,7 @@ import {
 import type { AppRequest, LedgerLine, RentApp, RentData, RentFields, RentItem, RentTerm } from "../rental";
 import { MARKET_PIC, itemFacts, jobsFor, rollHint } from "../market";
 import { readShot, shrinkShot } from "../shot";
+import { KakaoButton, useKakao } from "../kakao";
 
 const REASON: Record<LedgerLine["reason"], string> = { donate: "기부", rent: "대여 보증금", adjust: "고침", return: "반납 · 보증금 돌려받음" };
 /** 한 번에 고를 수 있는 무기 수 (서버 MAX_APP_ITEMS 와 같다. 제작자 요청 2026-11-02: 5개 한도를 두지 말고, 여러 개면 안내만) */
@@ -149,6 +150,7 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
               장부
             </button>
           </div>
+          <StaffKakao />
           {showLedger && <Ledger lines={data.ledger} rate={data.rate} />}
           {/* 쓰는 무기: 줄이 있으면 기한이 끝나는 날 담당자에게 반납, 없으면 계속 쓴다 */}
           {myHeld.map((i) => (
@@ -521,6 +523,7 @@ function AppCard({ app, data, byId, manage = false, onDone }: { app: RentApp; da
     <div className="rent-app">
       <div className="rent-app-head">
         <b>{manage ? app.user : "내 신청"}</b>
+        {manage && <KakaoButton name={app.user} />}
         <small>{when(app.createdAt)}</small>
         {manage && app.mileage !== undefined && <small className="rent-dia-sm">💎{app.mileage}</small>}
         <button
@@ -1101,6 +1104,20 @@ function Num({ label, value, min, max, onChange }: { label: ReactNode; value: nu
   );
 }
 
+/** 신청함 맨 위: 링크를 적어 둔 운영진에게 바로 카톡 (제작자 요청 2026-11-02, 앱 안 대화와 같이) */
+function StaffKakao() {
+  const { staff } = useKakao();
+  if (!staff.length) return null;
+  return (
+    <p className="rent-kakao">
+      <small className="rent-muted">담당자 카톡</small>
+      {staff.map((s) => (
+        <KakaoButton key={s} name={s} label={s} />
+      ))}
+    </p>
+  );
+}
+
 /**
  * 신청함의 내가 쓰는 무기 한 줄: 기한, 보증금, 그리고 '반납 신청' (제작자 요청 2026-11-02: 장비 반납도 신청하게).
  * 신청하면 운영진에게 알림이 가고 '운영 > 장비반납' 맨 위에 보인다. 게임 안에서 돌려준 뒤 담당자가 '반납'을 누르면 끝난다
@@ -1222,6 +1239,7 @@ function ReturnRow({ wiki, item, apps, onDone }: { wiki: Wiki; item: RentItem; a
           <em>+{item.enhance}</em>
         </span>
         <b className="rent-back-who">{item.renter}</b>
+        <KakaoButton name={item.renter} />
         {/* 폰 폭에서 넘치지 않게 단추는 한 묶음으로 (자리가 모자라면 다음 줄로) */}
         {!sure && (
           <span className="rent-back-acts">

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useEntryState } from "../router";
+import { KakaoButton } from "../kakao";
 import type { FormEvent } from "react";
 import { ApiError, RANK, errorText } from "../auth";
 import type { Me } from "../auth";
@@ -145,8 +146,14 @@ function RequestDetail({ me, r, onChanged, onStale }: { me: Me; r: GuildRequest;
     <div className="mk-detail">
       {r.detail && <p className="mk-note rq-detail-text">{r.detail}</p>}
       <p className="mk-meta">
-        {r.owner} · {ago(r.createdAt)} 의뢰
-        {r.status === "accepted" && r.accepter && r.dueAt && ` · ${r.accepter} 수락 (${timeLeft(r.dueAt)} 남음)`}
+        {r.owner} {!mine && <KakaoButton name={r.owner} />} · {ago(r.createdAt)} 의뢰
+        {r.status === "accepted" && r.accepter && r.dueAt && (
+          <>
+            {` · ${r.accepter} `}
+            {!accepter && <KakaoButton name={r.accepter} />}
+            {` 수락 (${timeLeft(r.dueAt)} 남음)`}
+          </>
+        )}
         {r.status === "done" && r.accepter && ` · ${r.accepter} 님이 해냈어요`}
       </p>
       <div className="mk-actions">

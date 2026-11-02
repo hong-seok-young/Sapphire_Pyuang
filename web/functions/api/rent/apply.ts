@@ -52,12 +52,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   const names = items.map(itemLabel);
   await notifyManagers(env, `대여 신청: ${me.id} · ${names[0]}${names.length > 1 ? ` 외 ${names.length - 1}개` : ""}${note ? ` · ${note}` : ""}`, me.id);
-  // 지금 쓰는 사람에게: 첫 줄이 생겼으면 기한이 끝나는 날 돌려달라고 (기한 없는 무기는 반납할 때까지 쓴다)
+  // 지금 쓰는 사람에게: 새 신청이 들어올 때마다 언제까지 반납해야 하는지와 기다리는 사람 수 (제작자 요청 2026-11-02: 다른 대여 신청이 들어오면
+  // 대여하고 있는 사람에게도 언제까지 반납해야 한다고 알림). 기한 없는 무기는 정해진 날이 없어서 다 쓰면 '반납 신청'을 눌러 달라고
   for (const i of items) {
+    if (!i.renter || i.renter === me.id) continue;
     const days = TERM_DAYS[i.term];
-    if (!i.renter || !i.rented_at || !days || queued.get(i.id)) continue;
-    const due = i.rented_at + days * 86_400_000;
-    await notify(env, [i.renter], "rent", `${itemLabel(i)} 다음 신청이 있어요 · ${due > now ? `${md(due)}에` : "지금"} 대여 담당자에게 돌려주세요`, "#/rent?v=apps", me.id);
+    const waiting = (queued.get(i.id) ?? 0) + 1;
+    const due = i.rented_at && days ? i.rented_at + days * 86_400_000 : null;
+    const when = due === null ? "기한 없는 무기라 다 쓰면 '반납 신청'을 눌러 주세요" : due > now ? `${md(due)}까지 반납해 주세요` : "기한이 지났어요. 지금 반납해 주세요";
+    await notify(env, [i.renter], "rent", `${itemLabel(i)} 대여 신청이 들어왔어요 (대기 ${waiting}명) · ${when}`, "#/rent?v=apps", me.id);
   }
   return json({ appId });
 };

@@ -11,6 +11,7 @@ import {
   updateListing, wantListing, wikiItem, WANTS_FOR_AUCTION, toAuction, shotUrl,
 } from "../market";
 import { readShot, shrinkShot } from "../shot";
+import { KakaoButton } from "../kakao";
 import type { Shot } from "../shot";
 import type { Category, Enchant, Listing, ListingOption, TalkLine } from "../market";
 import type { Wiki } from "../types";
@@ -157,7 +158,7 @@ function Detail({ wiki, me, l, rate, onChanged }: {
       </div>
       {l.note && <p className="mk-note">“{l.note}”</p>}
       <p className="mk-meta">
-        {l.seller} · {ago(l.createdAt)} 올림{l.qty > 1 && ` · ${l.qty}개 한꺼번에`}
+        {l.seller} {!mine && <KakaoButton name={l.seller} />} · {ago(l.createdAt)} 올림{l.qty > 1 && ` · ${l.qty}개 한꺼번에`}
         {l.status === "sold" && " · 거래 완료"}
       </p>
       {auction ? (

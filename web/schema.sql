@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS users (
   high_spec INTEGER NOT NULL DEFAULT 0,   -- 고스펙 길드원 (길드마스터, 오피서가 표시. 플래티넘 상점에서 더 할인)
   push_perm TEXT,                         -- 폰 알림 허용 상태 (functions/api/alerts/device.ts): on / app_off / denied / ask / none
   push_at INTEGER,                        -- 그 상태를 마지막으로 확인한 때
-  main_id TEXT                            -- 부캐면 본캐 아이디 (부캐 묶기, 본캐 아이디와 비밀번호로 로그인). 본캐와 혼자인 계정은 비어 있다
+  main_id TEXT,                           -- 부캐면 본캐 아이디 (부캐 묶기, 본캐 아이디와 비밀번호로 로그인). 본캐와 혼자인 계정은 비어 있다
+  kakao TEXT                              -- 카톡 오픈프로필·1:1 오픈채팅 링크 (https://open.kakao.com/..., 본인이 내 정보에서, 운영진이 길드원 관리에서. 2026-11-02)
 );
 
 CREATE TABLE IF NOT EXISTS sessions (

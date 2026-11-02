@@ -12,6 +12,7 @@ import type { LevelLogEntry } from "../auth";
 import { JobEmblem } from "../emblems";
 import { refreshMe } from "../characters";
 import { ProfileForm } from "./Profile";
+import { KakaoField } from "../kakao";
 import { Loading, Panel, TopBar } from "../ui";
 
 /** 새 계정과 비밀번호 초기화의 처음 비밀번호 (제작자 요청: 칸 없이 늘 123123). 다음 로그인 때 바꾸게 한다 */
@@ -458,6 +459,8 @@ function AccountRow({
               }}
             />
           )}
+          {/* 그 사람의 카톡 오픈프로필 링크 (운영진이 대신 적어 줄 수 있다, 제작자 요청 2026-11-02) */}
+          {editing && <KakaoField user={account.id} name={account.id} />}
         </div>
       )}
     </li>
