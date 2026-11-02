@@ -833,6 +833,11 @@ button { font: inherit; color: inherit; }
 .log-storage { display: grid; gap: 4px; margin: 0 0 10px; font-size: 11px; color: var(--muted); }
 .log-storage-bar { height: 4px; overflow: hidden; background: var(--night); border: 1px solid var(--edge); }
 .log-storage-bar i { display: block; height: 100%; background: var(--sapphire); }
+.log-usage-btn { justify-self: start; padding: 0; font: inherit; font-size: 11px; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; box-shadow: none; cursor: pointer; }
+.log-usage { list-style: none; margin: 2px 0 0; padding: 6px 8px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; background: var(--night-2); }
+.log-usage li { display: flex; justify-content: space-between; gap: 8px; }
+.log-usage b { flex: none; font-weight: 400; color: var(--text); }
+.log-usage-etc { opacity: 0.7; }
 .log-day { margin: 12px 0 4px; font-size: 13px; color: var(--gold); }
 .log-row { display: flex; gap: 10px; padding: 6px 2px; font-size: 13px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
 .log-row time { flex: none; width: 40px; color: var(--muted); font-size: 12px; }

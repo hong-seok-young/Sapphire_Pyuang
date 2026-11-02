@@ -61,6 +61,35 @@ async function viewTitle(env: Env, path: string): Promise<string | null> {
   }
 }
 
+/**
+ * DB 를 무엇이 얼마나 쓰는지 (사용 기록 화면의 '자세히', 앱개발자만. 무료 500MB 안에서 쓰려고, 제작자 2026-11-02 '무조건 무료로').
+ * 사진·첨부, 공식 소식, 챗봇 대화는 실제 바이트를 더하고, 사용 기록은 건수 x 최근 2000건의 평균 크기(색인 몫 더해서)로 어림한다
+ */
+async function usage(env: Env) {
+  const r = await env.DB.prepare(
+    "SELECT " +
+      "(SELECT COALESCE(SUM(length(data)), 0) FROM board_files) AS files, " +
+      "(SELECT COALESCE(SUM(length(data)), 0) FROM listing_shots) AS shots, " +
+      "(SELECT COALESCE(SUM(length(png)), 0) FROM avatars) AS avatars, " +
+      "(SELECT COALESCE(SUM(length(CAST(body AS BLOB)) + COALESCE(length(CAST(html AS BLOB)), 0)), 0) FROM official_news) AS official, " +
+      "(SELECT COALESCE(SUM(length(CAST(text AS BLOB)) + COALESCE(length(CAST(thinking AS BLOB)), 0)), 0) FROM chat_msgs) AS chat, " +
+      "(SELECT COALESCE(MAX(id), 0) FROM activity) AS actRows, " +
+      "(SELECT AVG(length(CAST(what AS BLOB)) + COALESCE(length(CAST(detail AS BLOB)), 0) + COALESCE(length(ip), 0) + COALESCE(length(CAST(place AS BLOB)), 0) + " +
+      "COALESCE(length(device), 0) + COALESCE(length(dev), 0) + length(CAST(user_id AS BLOB)) * 2 + 60) FROM (SELECT * FROM activity ORDER BY id DESC LIMIT 2000)) AS actAvg",
+  ).all<{ files: number; shots: number; avatars: number; official: number; chat: number; actRows: number; actAvg: number | null }>();
+  const u = r.results[0];
+  const total = (r.meta as { size_after?: number } | undefined)?.size_after ?? null;
+  const parts = [
+    { name: "게시판 사진·첨부", bytes: u.files },
+    { name: "사용 기록", bytes: Math.round(u.actRows * (u.actAvg ?? 0)) },
+    { name: "공식 소식 본문", bytes: u.official },
+    { name: "챗봇 대화", bytes: u.chat },
+    { name: "중개인 스샷", bytes: u.shots },
+    { name: "캐릭터 사진", bytes: u.avatars },
+  ];
+  return { total, limit: 500 * 1024 * 1024, parts };
+}
+
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
@@ -79,6 +108,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (!me) return NEED_LOGIN();
   if (me.role !== "developer") return FORBIDDEN();
   const q = new URL(request.url).searchParams;
+  if (q.get("usage")) return json(await usage(env));
   const where: string[] = [];
   const binds: (string | number)[] = [];
   const user = q.get("user");

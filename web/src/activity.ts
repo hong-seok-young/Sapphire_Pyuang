@@ -66,6 +66,9 @@ export const VIA_NAME: Record<Via, string> = {
 
 export const KIND_NAME: Record<Kind, string> = { visit: "접속", view: "화면", act: "한 일" };
 
+/** DB 를 무엇이 얼마나 쓰는지 (사용 기록의 '자세히', 앱개발자만) */
+export const fetchUsage = () => api<{ total: number | null; limit: number; parts: { name: string; bytes: number }[] }>("/api/activity?usage=1");
+
 export function fetchActivity(q: { user?: string | null; kind?: Kind | null; before?: number }) {
   const p = new URLSearchParams();
   if (q.user) p.set("user", q.user);

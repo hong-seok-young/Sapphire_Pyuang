@@ -3,6 +3,7 @@
 // 제작자 요청으로 비밀번호만 빼고 모두 남긴다: 보낸 내용(한마디, 흥정 가격, 입찰 금액, 경험치, 챗봇 질문, 토론방 글 ...),
 // IP, 대략의 위치(Cloudflare 가 아는 도시), 기기. 사진은 그림 대신 장 수와 크기만 적는다.
 import type { Env } from "./auth";
+import { notify } from "./alerts";
 
 /** 남기지 않는 칸: 비밀번호 (로그인, 계정 만들기, 초기화의 password, 비밀번호 바꾸기의 current, next) */
 const SECRET = /pass|^current$|^next$/i;
@@ -111,9 +112,27 @@ export function whereOf(request: Request): Where {
 /** 기록 하나. 접속은 화면이 열릴 때 따로 보낸다 (POST /api/activity { open: true }) */
 export async function record(env: Env, userId: string, kind: Kind, what: string, detail: string | null, where: Where): Promise<void> {
   const { via, ip, place, device, dev } = where;
-  await env.DB.prepare("INSERT INTO activity (user_id, kind, what, detail, via, ip, place, device, dev, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+  const res = await env.DB.prepare("INSERT INTO activity (user_id, kind, what, detail, via, ip, place, device, dev, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
     .bind(userId, kind, what.slice(0, 200), detail, via, ip, place, device, dev, Date.now())
     .run();
+  const size = (res.meta as { size_after?: number } | undefined)?.size_after;
+  if (size && size > DB_LIMIT * 0.7) await sizeAlarm(env, size);
+}
+
+/** Cloudflare 무료 요금제의 DB 하나 크기 한도 (D1 Free 500MB). 무료로만 쓴다 (제작자 2026-11-02 '무조건 무료로') */
+export const DB_LIMIT = 500 * 1024 * 1024;
+
+/**
+ * DB 가 70%, 90% 를 넘으면 앱개발자에게 한 번씩 알린다 (setup 에 적어 두어 한 번만). 그때 사용 기록의 '자세히'로 무엇이 큰지 보고
+ * 큰 것을 무료로 따로 쓸 수 있는 다른 D1 DB(무료 10개, 합쳐 5GB)로 옮긴다. 기록은 지우지 않는다
+ */
+async function sizeAlarm(env: Env, size: number): Promise<void> {
+  const level = size > DB_LIMIT * 0.9 ? 90 : 70;
+  const res = await env.DB.prepare("INSERT OR IGNORE INTO setup (key, done_at) VALUES (?, ?)").bind(`db_size_${level}`, Date.now()).run();
+  if (!res.meta.changes) return;
+  const { results } = await env.DB.prepare("SELECT id FROM users WHERE role = 'developer' AND main_id IS NULL").all<{ id: string }>();
+  const mb = Math.round(size / 1024 / 1024);
+  await notify(env, results.map((r) => r.id), "account", `DB 저장 공간이 ${level}%를 넘었어요 (${mb}MB / 500MB). 사용 기록의 '자세히'에서 무엇이 큰지 보세요`, "#/log", "앱");
 }
 
 /** 바꾸는 글의 이름 (지우기 전에 본다): 중개인 물건, 골드 글, 의뢰 */

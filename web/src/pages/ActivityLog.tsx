@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { errorText } from "../auth";
-import { KIND_NAME, VIA_NAME, actionText, fetchActivity, pageName, sectionOf } from "../activity";
+import { KIND_NAME, VIA_NAME, actionText, fetchActivity, fetchUsage, pageName, sectionOf } from "../activity";
 import type { ActivityRow, DeviceInfo, Kind, Person } from "../activity";
 import { ago } from "../market";
 import type { Wiki } from "../types";
@@ -25,7 +25,7 @@ const mdText = (t: number) => `${new Date(t).getMonth() + 1}/${new Date(t).getDa
 const squash = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 /** 무료 요금제의 DB 하나 크기 한도 (Cloudflare D1 Free 500MB, Workers Paid 10GB) */
 const DB_LIMIT = 500 * 1024 * 1024;
-const mbText = (b: number) => `${(b / 1024 / 1024).toFixed(b < 10 * 1024 * 1024 ? 1 : 0)}MB`;
+const mbText = (b: number) => (b < 1024 * 1024 ? `${Math.round(b / 1024)}KB` : `${(b / 1024 / 1024).toFixed(b < 10 * 1024 * 1024 ? 1 : 0)}MB`);
 
 /**
  * 같은 사람이 같은 메뉴(게시판, 중개인 …)에서 잇달아 한 기록은 한 묶음으로 (제작자 요청 2026-11-02: '게시판 안에서 뭐 했는지 기록을 묶어서').
@@ -76,6 +76,8 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
   const [allPeople, setAllPeople] = useState(false);
   const [busy, setBusy] = useState(false);
   const [storage, setStorage] = useState<{ rows: number; bytes: number | null } | null>(null);
+  /** '자세히': DB 를 무엇이 얼마나 쓰는지 */
+  const [usage, setUsage] = useState<{ total: number | null; parts: { name: string; bytes: number }[] } | "loading" | null>(null);
   /** 펼친 묶음 (그 묶음 맨 위 기록 번호) */
   const [opened, setOpened] = useState<Set<number>>(new Set());
 
@@ -131,6 +133,37 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
             <span className="log-storage-bar">
               <i style={{ width: `${Math.min(100, (storage.bytes / DB_LIMIT) * 100)}%` }} />
             </span>
+          )}
+          {usage === null ? (
+            <button
+              type="button"
+              className="log-usage-btn"
+              onClick={() => {
+                setUsage("loading");
+                fetchUsage().then(setUsage, (x) => (setError(errorText(x)), setUsage(null)));
+              }}
+            >
+              자세히
+            </button>
+          ) : usage === "loading" ? (
+            <span>재는 중…</span>
+          ) : (
+            <ul className="log-usage">
+              {[...usage.parts]
+                .sort((a, b) => b.bytes - a.bytes)
+                .map((p) => (
+                  <li key={p.name}>
+                    <span>{p.name}</span>
+                    <b>{mbText(p.bytes)}</b>
+                  </li>
+                ))}
+              {usage.total !== null && (
+                <li className="log-usage-etc">
+                  <span>계정·글·알림·색인 등</span>
+                  <b>{mbText(Math.max(0, usage.total - usage.parts.reduce((n, p) => n + p.bytes, 0)))}</b>
+                </li>
+              )}
+            </ul>
           )}
         </div>
       )}
