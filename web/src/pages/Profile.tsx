@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { KakaoButton, KakaoField, useKakao } from "../kakao";
 import type { FormEvent, ReactNode } from "react";
 import {
@@ -11,8 +12,9 @@ import { JobEmblem, JobGlyph } from "../emblems";
 import { ChangeAsk, HeroTitle, TopBar } from "../ui";
 import { AvatarMaker } from "./AvatarMaker";
 import { useBackToLogin } from "./Login";
-import { canUseWeather } from "./Weather";
-import { SKY_NAME, WxError, disableWeather, enableWeather, isDenied, loadWeather, permission, weatherOn } from "../weather";
+import { WeatherFx, canUseWeather } from "./Weather";
+import { PREVIEW, SKY_NAME, WxError, disableWeather, enableWeather, isDenied, loadWeather, permission, weatherOn } from "../weather";
+import type { Sky } from "../weather";
 import type { Weather } from "../weather";
 import { goCharacter, refreshMe } from "../characters";
 
@@ -491,6 +493,7 @@ function KakaoWhere({ me, link }: { me: Me; link: boolean }) {
 
 /** 날씨 반영 켜기·끄기: 켜면 폰이 위치 허락을 묻고, 우리 동네 날씨가 홈 화면에 반영된다 (pages/Weather.tsx, src/weather.ts) */
 function WeatherBody({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  const [preview, setPreview] = useState<Sky | null>(null);
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState<Weather | null>(null);
   const [note, setNote] = useState("");
@@ -520,7 +523,18 @@ function WeatherBody({ on, onChange }: { on: boolean; onChange: (on: boolean) =>
   }
   return (
     <>
-      <p className="me-hint me-hint-top">위치를 허용하면 우리 동네 날씨(비·눈·천둥)가 홈 화면에 반영돼요.</p>
+      {/* 천둥번개 효과는 없앴다 (비로 그린다). 눈은 쌓이고 비는 빗물이 점점 차오른다 (제작자 요청 2026-11-02) */}
+      <p className="me-hint me-hint-top">위치를 허용하면 우리 동네 날씨가 홈 화면에 반영돼요. 눈이 오면 아래에 눈이 쌓이고, 비가 오면 빗물이 점점 차올라요.</p>
+      {/* 미리 보기: 이 화면 위에 바로 (다시 누르면 멈춤, 화면을 나가면 멈춤) */}
+      <div className="pill-row me-wx-preview">
+        {PREVIEW.map((sky) => (
+          <button key={sky} className={"pill" + (preview === sky ? " pill-on" : "")} onClick={() => setPreview(preview === sky ? null : sky)}>
+            {SKY_NAME[sky]}
+          </button>
+        ))}
+      </div>
+      {/* 화면이 떠오르는 효과(.page 의 transform) 안에서는 화면에 고정되지 않아서 body 에 그린다 */}
+      {preview && createPortal(<WeatherFx key={preview} sky={preview} />, document.body)}
       {on && now && (
         <p className="me-wx-now">
           지금 <b>{SKY_NAME[now.sky]}</b>

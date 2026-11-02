@@ -110,9 +110,10 @@ export interface Layout {
   grid: string[];
 }
 export const DOCK_MAX = 5;
+/** 처음 배치 (제작자 요청 2026-11-02: 제작자 폰의 배치 그대로 '이걸 기본 배치로') */
 export const DEFAULT_LAYOUT: Layout = {
-  dock: ["home", "board", "search", "info", "chat"],
-  grid: ["todo", "shop", "ranking", "market", "requests", "rent", "match", "app", "admin", "log", "gaps"],
+  dock: ["home", "board", "info", "search", "chat"],
+  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "app"],
 };
 
 /** 저장된 배치를 맞춘다: 모르는 칸과 겹친 칸은 빼고, 홈은 아래 탭 맨 앞, 아래 탭은 5칸까지, 새로 생긴 칸은 홈 칸 끝에 */

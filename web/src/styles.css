@@ -2498,3 +2498,5 @@ button.gd-member-row { cursor: pointer; }
 .gd-all-head b { font-weight: 400; font-size: 13px; }
 .gd-all-head small { font-size: 11px; color: var(--gold); }
 .gd-all-members { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+/* 내 정보 날씨 반영: 비 · 눈 · 함박눈 미리 보기 단추 */
+.me-wx-preview { margin: 6px 0 8px; }

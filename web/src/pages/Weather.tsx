@@ -34,7 +34,8 @@ const SNOW: Partial<Record<Sky, { n: number; v: [number, number]; wind: number; 
  * 홈에서 몇 초 안에 차오르게 (제작자 요청 2026-11-02 '좀 더 빨리 팍팍, 절반 남기지 말고 다 남겨, 누가 홈 화면에서 1분이나 멍때리냐')
  */
 const KEEP = 1;
-const WATER_MAX = 5;
+/** 눈처럼 40px 까지 점점 차오른다 (제작자 요청 2026-11-02 '비는 점점 화면 위로 차오른다') */
+const WATER_MAX = 20;
 /** 아래 탭 위 선에 쌓이는 눈의 가장 높은 곳 (도트 칸 수, 한 칸 2px). 그 위로는 더 안 쌓인다 */
 const PILE_MAX = 20;
 /**
