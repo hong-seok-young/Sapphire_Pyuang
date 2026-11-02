@@ -69,7 +69,7 @@ export function GuildDungeonPage({ me }: { me: Me }) {
         </nav>
       )}
       {!party || tab === "mine" ? (
-        <MyTimes key={data.week} data={data} onSaved={setParty} onError={setError} />
+        <MyTimes key={data.week} me={me.id} data={data} onSaved={setParty} onError={setError} />
       ) : (
         <HeatTimes data={data} party={party} />
       )}
@@ -405,7 +405,7 @@ function Head({ week }: { week: number }) {
 }
 
 /** 내 시간표: 칸을 누르고 끌어서 칠한다. 손을 떼면 저장 */
-function MyTimes({ data, onSaved, onError }: { data: GdData; onSaved: (p: PartyState | null | undefined) => void; onError: (e: string) => void }) {
+function MyTimes({ me, data, onSaved, onError }: { me: string; data: GdData; onSaved: (p: PartyState | null | undefined) => void; onError: (e: string) => void }) {
   const [bits, setBits] = useState(data.mine ?? EMPTY);
   const [state, setState] = useState<"" | "saving" | "saved">("");
   const bitsRef = useRef(bits);
@@ -464,6 +464,11 @@ function MyTimes({ data, onSaved, onError }: { data: GdData; onSaved: (p: PartyS
     void save(b);
   };
   const count = useMemo(() => [...bits].filter((c, i) => c === "1" && validSlot(i)).length, [bits]);
+  // 파티원이 모두 되는 칸 (내 칸은 지금 칠한 대로, 다른 사람은 받은 시간표로. 모두 칠했을 때만)
+  const party = data.party;
+  const others = party ? party.members.filter((m) => m.id !== me) : [];
+  const ready = !!party && party.members.every((m) => m.filled || m.id === me);
+  const allAt = (i: number) => ready && bits[i] === "1" && others.every((m) => party!.avail[m.id]?.[i] === "1");
 
   return (
     <section className="panel gd-times">
@@ -487,11 +492,46 @@ function MyTimes({ data, onSaved, onError }: { data: GdData; onSaved: (p: PartyS
         <Head week={data.week} />
         {Array.from({ length: ROWS }, (_, r) => (
           <Row key={r} row={r}>
-            {(i) => <span key={i} data-slot={i} className={"gd-cell" + hourLine(i) + (locked(i) ? " gd-off" : bits[i] === "1" ? " gd-on" : "")} />}
+            {(i) => {
+              const m = candMark(party, i);
+              const cls = "gd-cell" + hourLine(i) + (locked(i) ? " gd-off" : allAt(i) ? " gd-all" : bits[i] === "1" ? " gd-on" : "") + m.cls;
+              return (
+                <span key={i} data-slot={i} className={cls}>
+                  {m.no > 0 && <b>{m.no}</b>}
+                </span>
+              );
+            }}
           </Row>
         ))}
       </div>
+      {party && <Legend mine />}
     </section>
+  );
+}
+
+/**
+ * 후보 칸 표시 (내 시간표와 교집합에 똑같이, 제작자 요청 2026-11-02): 지금 후보는 초록 테두리, 확정은 흰 테두리와 빛, 무산은 붉은 빗금,
+ * 그리고 칸 안에 후보 번호 (빠른 순 1부터)
+ */
+function candMark(p: PartyState | null, i: number): { cls: string; no: number } {
+  if (!p) return { cls: "", no: 0 };
+  const no = p.candidates.indexOf(i) + 1;
+  const cls = i === p.confirmed ? " gd-is-confirmed" : i === p.current ? " gd-is-current" : p.rejected.some((r) => r.slot === i) ? " gd-is-rejected" : "";
+  return { cls, no };
+}
+
+/** 시간표 아래 뜻 (내 시간표는 '내 시간'도) */
+function Legend({ mine = false }: { mine?: boolean }) {
+  return (
+    <p className="gd-legend">
+      {mine && (
+        <>
+          <i className="gd-cell gd-on" /> 내 시간{" "}
+        </>
+      )}
+      <i className="gd-cell gd-all" /> 모두 됨 <i className="gd-cell gd-is-current" /> 지금 후보 <i className="gd-cell gd-is-confirmed" /> 확정{" "}
+      <i className="gd-cell gd-is-rejected" /> 무산 <span className="gd-legend-no">1</span> 후보 번호
+    </p>
   );
 }
 
@@ -518,7 +558,6 @@ function HeatTimes({ data, party: p }: { data: GdData; party: PartyState }) {
   const total = ids.length;
   const countAt = (i: number) => ids.filter((id) => p.avail[id]?.[i] === "1").length;
   const off = (i: number) => !validSlot(i);
-  const rejected = new Set(p.rejected.map((r) => r.slot));
   return (
     <section className="panel gd-times">
       <div className="gd-times-head">
@@ -533,13 +572,18 @@ function HeatTimes({ data, party: p }: { data: GdData; party: PartyState }) {
           <Row key={r} row={r}>
             {(i) => {
               const n = off(i) ? 0 : countAt(i);
+              const m = candMark(p, i);
               const cls =
                 "gd-cell" +
                 hourLine(i) +
                 (off(i) ? " gd-off" : n === total && total > 0 ? " gd-all" : n > 0 ? ` gd-h${Math.min(3, Math.ceil((n / total) * 3))}` : "") +
-                (i === p.confirmed ? " gd-is-confirmed" : i === p.current ? " gd-is-current" : rejected.has(i) ? " gd-is-rejected" : "") +
+                m.cls +
                 (pick === i ? " gd-picked" : "");
-              return <span key={i} data-slot={i} className={cls} onClick={() => !off(i) && setPick(pick === i ? null : i)} />;
+              return (
+                <span key={i} data-slot={i} className={cls} onClick={() => !off(i) && setPick(pick === i ? null : i)}>
+                  {m.no > 0 && <b>{m.no}</b>}
+                </span>
+              );
             }}
           </Row>
         ))}
@@ -551,9 +595,7 @@ function HeatTimes({ data, party: p }: { data: GdData; party: PartyState }) {
           {ids.some((id) => p.avail[id]?.[pick] !== "1") && <span className="gd-who-no"> · 안 됨 {ids.filter((id) => p.avail[id]?.[pick] !== "1").join(", ")}</span>}
         </p>
       )}
-      <p className="gd-legend">
-        <i className="gd-cell gd-all" /> 모두 됨 <i className="gd-cell gd-is-current" /> 지금 후보 <i className="gd-cell gd-is-confirmed" /> 확정
-      </p>
+      <Legend />
     </section>
   );
 }

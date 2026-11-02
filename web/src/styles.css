@@ -2464,7 +2464,7 @@ button.gd-member-row { cursor: pointer; }
 .gd-weekend b { color: #ffb38a; }
 .gd-time { position: relative; font-size: 9px; line-height: 1; color: var(--muted); touch-action: pan-y; }
 .gd-hour { transform: translateY(-5px); }
-.gd-cell { display: block; height: 13px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.04); }
+.gd-cell { position: relative; display: block; height: 13px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.04); }
 .gd-grid-edit .gd-cell { touch-action: none; cursor: pointer; }
 /* 정각마다 가로 구분선 (위 칸과의 틈에 밝은 선) */
 .gd-cell.gd-hourline { box-shadow: 0 -1px 0 rgba(200, 210, 255, 0.45); }
@@ -2483,6 +2483,10 @@ button.gd-member-row { cursor: pointer; }
 .gd-who-no { color: var(--muted); }
 .gd-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 6px 0 0; font-size: 10px; color: var(--muted); }
 .gd-legend .gd-cell { display: inline-block; width: 12px; height: 10px; }
+/* 후보 번호 (칸 안 가운데, 칠하기에 걸리지 않게) */
+.gd-cell > b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 400; line-height: 1; color: #1a1430; pointer-events: none; }
+.gd-cell.gd-is-rejected > b { color: #fff; }
+.gd-legend-no { display: inline-flex; align-items: center; justify-content: center; width: 12px; height: 10px; font-size: 8px; color: #1a1430; background: var(--gold); }
 .gd-all-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .gd-all-list li { padding: 6px 8px; background: rgba(11, 10, 26, 0.45); border: 1px solid var(--edge); }
 .gd-all-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px; }
