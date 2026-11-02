@@ -1,6 +1,6 @@
 // 내 지역 날씨로 홈 화면에 비·눈 (제작자 요청 2026-11-02 초안: '위치정보 허용하면 사는 지역 그날 날씨에 따라 화면에 눈 오게 비 오게').
-// - 위치: 폰이 허락했을 때만 브라우저에서 받는다 (navigator.geolocation, 정확도 낮게). 소수 둘째 자리(1km 쯤)로 줄여 이 기기에만 30분 둔다.
-//   우리 서버에는 보내거나 저장하지 않는다.
+// - 위치: 폰이 허락했을 때만 브라우저에서 받는다 (navigator.geolocation, 정확도 낮게 -> 안 되면 GPS). 소수 둘째 자리(1km 쯤)로 줄여
+//   날씨는 이 기기에 30분, 마지막 위치는 위치를 못 받을 때 쓰려고 이 기기에만 30일 둔다. 우리 서버에는 보내거나 저장하지 않는다.
 // - 날씨: Open-Meteo (무료, 키 없음, 기상청 자료 포함)에 브라우저가 바로 묻는다. 'current' 의 WMO 날씨 코드로 맑음·비·눈·천둥 …
 // - 게임과 상관없는 화면 꾸밈이라 게임 안전 규칙에 맞는다. 게임 위 위키 창(inFloat)에서는 쓰지 않는다.
 // 지금은 초안이라 앱개발자(와 테스트 계정)에게만 보인다 (WEATHER_OPEN). 앱개발자는 아래 날씨 표를 눌러 효과를 하나씩 미리 본다.
@@ -70,30 +70,98 @@ function write(key: string, v: string) {
   }
 }
 
-/** 이 기기의 위치 (허락을 묻는 창은 처음 한 번 폰이 띄운다) */
-function position(): Promise<{ lat: number; lon: number }> {
+/** 날씨를 못 받은 까닭: 위치(폰이 위치를 못 줌) / 날씨 서버(인터넷, Open-Meteo) */
+export class WxError extends Error {
+  constructor(
+    public kind: "loc" | "net",
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+/** 위치 거절 (폰이 묻는 창에서 '차단' 또는 브라우저 설정에서 막힘) */
+const isDenied = (e: unknown) => typeof e === "object" && e !== null && !(e instanceof WxError) && (e as GeolocationPositionError).code === 1;
+
+type Pos = { lat: number; lon: number };
+const round = (v: number) => Math.round(v * 100) / 100;
+
+/** 위치 한 번 묻기 (허락을 묻는 창은 처음 한 번 폰이 띄운다) */
+function locate(high: boolean, timeout: number): Promise<Pos> {
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) return reject(new Error("위치를 쓸 수 없는 브라우저예요"));
+    if (!navigator.geolocation) return reject(new WxError("loc", "위치를 쓸 수 없는 브라우저"));
     navigator.geolocation.getCurrentPosition(
-      (p) => resolve({ lat: Math.round(p.coords.latitude * 100) / 100, lon: Math.round(p.coords.longitude * 100) / 100 }),
+      (p) => resolve({ lat: round(p.coords.latitude), lon: round(p.coords.longitude) }),
       (e) => reject(e),
-      { enableHighAccuracy: false, maximumAge: FRESH, timeout: 15_000 },
+      { enableHighAccuracy: high, maximumAge: 60 * 60_000, timeout },
     );
   });
 }
 
-async function fetchWeather(lat: number, lon: number): Promise<Weather> {
+/** 마지막으로 받은 위치 (1km 쯤으로 줄인 것, 이 기기에만): 위치를 못 받을 때 쓴다 */
+const POS = "sapphire.wx.pos";
+const POS_KEEP = 30 * 24 * 60 * 60_000;
+function savedPos(): Pos | null {
+  try {
+    const p = JSON.parse(read(POS) ?? "null") as (Pos & { at: number }) | null;
+    if (p && typeof p.lat === "number" && typeof p.lon === "number" && Date.now() - p.at < POS_KEEP) return { lat: p.lat, lon: p.lon };
+  } catch {
+    // 없음
+  }
+  return null;
+}
+
+/**
+ * 이 기기의 위치 (2026-11-02: 홈에 '날씨를 못 받았어요'. 정확도 낮게만 물으면 안드로이드에서 'Google 위치 정확도'가 꺼져 있거나
+ * 실내라 망 위치가 없을 때 15초를 기다리다 끝났다): 정확도 낮게 10초 -> 안 되면 GPS 로 20초 -> 그래도 안 되면 이 기기의 마지막 위치.
+ * 거절은 그대로 넘긴다 (다시 묻지 않게)
+ */
+async function position(): Promise<Pos> {
+  let last: unknown;
+  for (const [high, timeout] of [
+    [false, 10_000],
+    [true, 20_000],
+  ] as const) {
+    try {
+      const p = await locate(high, timeout);
+      write(POS, JSON.stringify({ ...p, at: Date.now() }));
+      return p;
+    } catch (e) {
+      if (isDenied(e) || e instanceof WxError) throw e;
+      last = e;
+    }
+  }
+  const saved = savedPos();
+  if (saved) return saved;
+  const code = (last as GeolocationPositionError | undefined)?.code;
+  throw new WxError("loc", code === 3 ? "위치 시간 초과" : "위치를 찾지 못함");
+}
+
+async function fetchOnce(lat: number, lon: number): Promise<Weather> {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code,temperature_2m,is_day&timezone=Asia%2FSeoul`;
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 12_000);
   try {
     const res = await fetch(url, { signal: ctl.signal });
-    if (!res.ok) throw new Error(`날씨 ${res.status}`);
+    if (!res.ok) throw new WxError("net", `날씨 서버 ${res.status}`);
     const j = (await res.json()) as { current?: { weather_code?: number; temperature_2m?: number; is_day?: number } };
-    const c = j.current ?? {};
-    return { sky: skyOf(Number(c.weather_code ?? 0)), temp: typeof c.temperature_2m === "number" ? Math.round(c.temperature_2m) : null, day: c.is_day !== 0, at: Date.now() };
+    const c = j.current;
+    if (!c || typeof c.weather_code !== "number") throw new WxError("net", "날씨 자료가 비었음");
+    return { sky: skyOf(c.weather_code), temp: typeof c.temperature_2m === "number" ? Math.round(c.temperature_2m) : null, day: c.is_day !== 0, at: Date.now() };
+  } catch (e) {
+    throw e instanceof WxError ? e : new WxError("net", "날씨 서버 연결 안 됨");
   } finally {
     clearTimeout(t);
+  }
+}
+
+/** 날씨 받기 (인터넷이 잠깐 끊긴 것이면 한 번 더) */
+async function fetchWeather(lat: number, lon: number): Promise<Weather> {
+  try {
+    return await fetchOnce(lat, lon);
+  } catch {
+    await new Promise((r) => setTimeout(r, 1500));
+    return fetchOnce(lat, lon);
   }
 }
 
@@ -123,7 +191,12 @@ async function permission(): Promise<PermissionState | null> {
   }
 }
 
-export type WxState = { status: "off" } | { status: "ask" } | { status: "loading" } | { status: "on"; weather: Weather } | { status: "error"; reason: string };
+export type WxState =
+  | { status: "off" }
+  | { status: "ask" }
+  | { status: "loading" }
+  | { status: "on"; weather: Weather }
+  | { status: "error"; kind: "loc" | "net"; reason: string };
 
 /**
  * 홈의 날씨: 켜 두었으면 받아 오고, 아직 안 정했으면 'ask'(홈에 켜기 카드). 'enable' 은 카드의 '켜기' (여기서 폰이 허락을 묻는다)
@@ -135,9 +208,12 @@ export function useWeather(allowed: boolean) {
     loadWeather(force)
       .then((weather) => setState({ status: "on", weather }))
       .catch((e: unknown) => {
-        const denied = typeof e === "object" && e !== null && (e as GeolocationPositionError).code === 1;
-        if (denied) write(PREF, "0");
-        setState(denied ? { status: "off" } : { status: "error", reason: e instanceof Error ? e.message : "위치를 못 받았어요" });
+        if (isDenied(e)) {
+          write(PREF, "0");
+          return setState({ status: "off" });
+        }
+        const err = e instanceof WxError ? e : new WxError("loc", "위치를 못 받음");
+        setState({ status: "error", kind: err.kind, reason: err.message });
       });
   };
   useEffect(() => {
@@ -165,6 +241,8 @@ export function useWeather(allowed: boolean) {
   }, [allowed]);
   return {
     state,
+    /** '날씨를 못 받았어요' 를 누르면 다시 */
+    retry: () => start(true),
     enable: () => {
       write(PREF, "1");
       start(true);
