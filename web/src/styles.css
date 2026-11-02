@@ -1707,21 +1707,27 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 .off-body td, .off-body th { border: 1px solid var(--hi); padding: 4px 6px; }
 .off-text { white-space: pre-line; }
 
-/* 아이모 점검 띠 (Home.tsx MaintBanner, 제작자 요청 2026-11-02): 테두리 없이 좌우를 꽉 채운 연한 노란 띠, 두 줄 (윗줄 때와 점검, 아랫줄 점검 내용) */
-.maint-wrap { margin: -4px -12px 12px; display: grid; grid-template-columns: minmax(0, 1fr); }
-.maint { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; padding: 6px 12px 5px; background: #ffe58f; color: #3a2a00; }
-.maint + .maint { border-top: 1px solid rgba(58, 42, 0, 0.18); }
-.maint-on { background: #ffd166; }
-.maint-top { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 700; }
-.maint-top .fit-line { flex: 1; min-width: 0; }
-.maint-now { flex: none; padding: 0 5px; font-size: 11px; line-height: 16px; font-weight: 400; color: #fff; background: #d6452b; }
-.maint-sub { display: block; min-height: 17px; overflow: hidden; white-space: nowrap; font-size: 12px; line-height: 17px; color: #6b5200; }
+/* 아이모 점검 띠 (Home.tsx MaintBanner, 제작자 요청 2026-11-02: 위아래로 아주 얇게, 반투명, 테두리 없는 띠, 작은 글씨로 인상만):
+   좌우를 꽉 채운 얇은 공사 띠(옅은 사선 줄무늬) 한 줄, 글씨가 길면 오른쪽에서 왼쪽으로 흐른다. 점검 중이면 붉은 띠와 깜박이는 점 */
+.maint-wrap { margin: -6px -12px 10px; display: grid; grid-template-columns: minmax(0, 1fr); }
+.maint {
+  display: flex; align-items: center; gap: 6px; height: 18px; padding: 0 12px; overflow: hidden;
+  font-size: 10px; line-height: 18px; color: rgba(255, 214, 130, 0.9); letter-spacing: 0.2px;
+  background: repeating-linear-gradient(-45deg, rgba(255, 186, 60, 0.15) 0 7px, rgba(255, 186, 60, 0.05) 7px 14px);
+}
+.maint + .maint { margin-top: 1px; }
+.maint-on { color: rgba(255, 170, 140, 0.95); background: repeating-linear-gradient(-45deg, rgba(255, 96, 60, 0.2) 0 7px, rgba(255, 96, 60, 0.07) 7px 14px); }
+.maint-dot { flex: none; width: 5px; height: 5px; background: currentColor; box-shadow: 0 0 4px currentColor; }
+.maint-on .maint-dot { animation: maint-blink 1s steps(1) infinite; }
+@keyframes maint-blink { 50% { opacity: 0.2; } }
+.maint-sub { flex: 1; min-width: 0; display: block; overflow: hidden; white-space: nowrap; }
 .maint-run { display: inline-flex; }
 .maint-flow .maint-run { animation: maint-scroll linear infinite; will-change: transform; }
 .maint-flow .maint-run > span { padding-right: 48px; }
 @keyframes maint-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @media (prefers-reduced-motion: reduce) {
-  .maint-flow .maint-run { animation: none; }
+  .maint-flow .maint-run, .maint-on .maint-dot { animation: none; }
+  .maint { height: auto; }
   .maint-sub { white-space: normal; }
   .maint-run > span[aria-hidden] { display: none; }
 }
@@ -2171,19 +2177,28 @@ input, textarea { min-width: 0; max-width: 100%; }
 .todo-link { justify-self: start; margin-top: 2px; padding: 3px 10px; font-size: 13px; color: var(--edge); background: var(--gold); border: var(--px) solid var(--edge); overflow-wrap: anywhere; }
 /* 홈 제목: 오른쪽 위 '내 정보' 단추(.hero-me) 자리는 비우고, 좁은 폰에서는 글자를 조금 줄여 'web' 까지 보이게 (화면 폭 대원칙, 320px 에서 가려졌다) */
 .hero-title { padding-right: 44px; font-size: clamp(20px, 7vw, 30px); }
-/* 장비대여 운영 '기록' (제작자 요청 2026-11-02): 줄마다 무기·빌린 사람, 그 아래 대여 → 반납, 반납한 줄은 '삭제' */
-.rent-log { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
-.rent-log li { padding: 5px 7px; background: var(--night-2); border: 1px solid var(--edge); }
-.rent-log li.rent-log-now { border-color: var(--sunset); }
-.rent-log-top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
-.rent-log-top .rent-nm { flex: 1 1 auto; min-width: 0; white-space: normal; }
-.rent-log-info { margin: 3px 0 0 30px; font-size: 11px; color: var(--muted); }
-.rent-log-on { color: var(--sunset); }
-.rent-log-acts { display: flex; justify-content: flex-end; gap: 4px; margin-top: 3px; }
-.rent-log-acts .pill, .rent-ledger-del { padding: 2px 10px; font-size: 12px; }
-/* 기부 현황의 장부 줄 '삭제' */
+/* 장비대여 운영 '기록' (제작자 요청 2026-11-02: 줄 두께가 같게, 글로 늘어놓지 말고): 한 줄에 한 건, 칸이 맞는 표 */
+.rent-log { display: grid; grid-template-columns: minmax(0, 1fr); }
+.rent-log-row {
+  display: grid; grid-template-columns: 22px minmax(0, 1.1fr) minmax(0, 0.9fr) 36px 42px 36px; align-items: center; gap: 5px;
+  height: 32px; padding: 0 4px; font-size: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.rent-log-row > span:nth-child(4), .rent-log-row > span:nth-child(5) { text-align: center; color: var(--muted); white-space: nowrap; }
+.rent-log-head { height: 22px; font-size: 10px; color: var(--muted); border-bottom-color: rgba(255, 255, 255, 0.14); }
+.rent-log-head > span:nth-child(4), .rent-log-head > span:nth-child(5) { text-align: center; }
+.rent-log-who { color: #ffd166; }
+.rent-log-now { background: rgba(255, 149, 64, 0.08); }
+.rent-log-row > .rent-log-on { color: var(--sunset); }
+/* 줄 끝의 작은 ✕ (한 번 더 누르면 지운다): 기록, 기부 현황 장부 */
+.rent-x { justify-self: end; flex: none; min-width: 24px; height: 22px; padding: 0 4px; font-size: 11px; white-space: nowrap; color: var(--muted); background: none; border: 1px solid transparent; cursor: pointer; }
+/* 좁은 폰에서는 무기 그림 칸을 빼고 이름 자리를 넓힌다 (화면 폭 대원칙) */
+@media (max-width: 359px) {
+  .rent-log-row { grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr) 34px 38px 32px; gap: 4px; font-size: 11px; }
+  .rent-log-row > span:nth-child(4), .rent-log-row > span:nth-child(5) { font-size: 10px; letter-spacing: -0.3px; }
+  .rent-log-row > :first-child { display: none; }
+}
+.rent-x-sure { color: #fff; background: #d6452b; }
 .rent-ledger-edit li { align-items: center; }
-.rent-ledger-del { flex: none; }
 /* 정보 수정의 반납 기한 (대여 중인 물건) */
 .rent-due { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
 .rent-due b { min-width: 52px; font-size: 15px; color: var(--gold); }

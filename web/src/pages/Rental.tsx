@@ -17,7 +17,7 @@ import { go, useEntryState } from "../router";
 import { JOBS, JOB_NAME, errorText } from "../auth";
 import type { Job, Me } from "../auth";
 import type { Wiki } from "../types";
-import { Loading, NewsDot, PicImg, TopBar } from "../ui";
+import { FitLine, Loading, NewsDot, PicImg, TopBar } from "../ui";
 import { useNews, useNewsSeen } from "../news";
 import {
   STATUS_NAME,
@@ -1575,7 +1575,8 @@ function Ledger({ lines, rate, onDelete }: { lines: LedgerLine[]; rate: number; 
           <small>{md(l.at)}</small>
           {onDelete && l.id !== undefined && (
             <button
-              className={"pill rent-ledger-del" + (sure === l.id ? " pill-on" : "")}
+              className={"rent-x" + (sure === l.id ? " rent-x-sure" : "")}
+              aria-label={sure === l.id ? "기록 삭제" : "삭제"}
               disabled={busy}
               onClick={async () => {
                 if (sure !== l.id) return setSure(l.id!);
@@ -1588,7 +1589,7 @@ function Ledger({ lines, rate, onDelete }: { lines: LedgerLine[]; rate: number; 
                 }
               }}
             >
-              {sure === l.id ? "기록 삭제" : "삭제"}
+              {sure === l.id ? "삭제" : "✕"}
             </button>
           )}
         </li>
@@ -1615,10 +1616,6 @@ function RentLog({ wiki }: { wiki: Wiki }) {
   useEffect(load, [load]);
   if (!rows) return <Loading error={error || undefined} />;
   if (!rows.length) return <p className="rent-muted">아직 기록이 없어요</p>;
-  const when = (t: number) => {
-    const d = new Date(t + 9 * 3_600_000);
-    return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
-  };
   const remove = async (id: number) => {
     setError("");
     try {
@@ -1629,48 +1626,41 @@ function RentLog({ wiki }: { wiki: Wiki }) {
       setError(errorText(e));
     }
   };
+  const day = (t: number | null) => (t ? md(t) : "");
   return (
     <>
       {error && <p className="form-error">{error}</p>}
-      <ul className="rent-log">
+      {/* 한 줄에 한 건, 모든 줄이 같은 높이 (제작자 요청 2026-11-02: 줄 두께가 다르고 아래에 글로 늘어놓은 게 별로) */}
+      <div className="rent-log" role="table">
+        <div className="rent-log-row rent-log-head" role="row">
+          <span />
+          <span>무기</span>
+          <span>빌린 사람</span>
+          <span>대여</span>
+          <span>반납</span>
+          <span />
+        </div>
         {rows.map((r) => (
-          <li key={r.id} className={r.returnedAt ? "" : "rent-log-now"}>
-            <div className="rent-log-top">
-              {r.weapon && <Slot wiki={wiki} item={{ weapon: r.weapon }} />}
-              <span className="rent-nm">
-                {r.weapon ?? "지운 물건"}
-                {r.enhance !== null && <em>+{r.enhance}</em>}
-              </span>
-              <b className="rent-back-who">{r.user}</b>
-            </div>
-            <p className="rent-log-info">
-              {r.rentedAt ? `${when(r.rentedAt)} 대여` : "대여"}
-              {" → "}
-              {r.returnedAt ? `${when(r.returnedAt)} 반납` : <span className="rent-log-on">대여 중</span>}
-              {(r.useDia > 0 || !!r.gold) && ` · 보증금 ${[r.useDia > 0 ? `💎${r.useDia}` : "", r.gold ? `골드 ${manGold(r.gold)}` : ""].filter(Boolean).join(" + ")}`}
-              {r.by && ` · ${r.by}`}
-            </p>
-            {r.returnedAt && (
-              <div className="rent-log-acts">
-                {sure === r.id ? (
-                  <>
-                    <button className="pill pill-on" onClick={() => void remove(r.id)}>
-                      기록 삭제
-                    </button>
-                    <button className="pill" onClick={() => setSure(null)}>
-                      취소
-                    </button>
-                  </>
-                ) : (
-                  <button className="pill" onClick={() => setSure(r.id)}>
-                    삭제
-                  </button>
-                )}
-              </div>
+          <div key={r.id} className={"rent-log-row" + (r.returnedAt ? "" : " rent-log-now")} role="row" title={r.by ? `건넨 사람 ${r.by}` : undefined}>
+            <span>{r.weapon && <Slot wiki={wiki} item={{ weapon: r.weapon }} />}</span>
+            <FitLine text={`${r.weapon ?? "지운 물건"}${r.enhance !== null ? ` +${r.enhance}` : ""}`} wrap={false} />
+            <FitLine className="rent-log-who" text={r.user} wrap={false} />
+            <span>{day(r.rentedAt)}</span>
+            <span className={r.returnedAt ? "" : "rent-log-on"}>{r.returnedAt ? day(r.returnedAt) : "대여 중"}</span>
+            {r.returnedAt ? (
+              <button
+                className={"rent-x" + (sure === r.id ? " rent-x-sure" : "")}
+                aria-label={sure === r.id ? "기록 삭제" : "삭제"}
+                onClick={() => (sure === r.id ? void remove(r.id) : setSure(r.id))}
+              >
+                {sure === r.id ? "삭제" : "✕"}
+              </button>
+            ) : (
+              <span />
             )}
-          </li>
+          </div>
         ))}
-      </ul>
+      </div>
     </>
   );
 }

@@ -269,9 +269,10 @@ function FlowLine({ text }: { text: string }) {
 }
 
 /**
- * 아이모 점검 띠 (제작자 요청 2026-11-01, 2026-11-02 고침: 상자 말고 테두리 없이 좌우를 꽉 채운 노란 띠, 두 줄):
- * 윗줄은 언제부터 언제 무슨 점검, 아랫줄은 점검 내용 (공식 글의 '■ 점검내용', 없으면 비움, 길면 흐른다).
- * 서버가 공식 점검 글을 2분마다 새로 받아 읽는다 (연장 공지도, server/maint.ts). 끝나는 시각이 지나면 바로 사라진다. 누르면 그 공식 글
+ * 아이모 점검 띠 (제작자 요청 2026-11-01, 2026-11-02 고침: '위아래 폭은 엄청 얇게, 반투명, 테두리 없는 띠, 글씨는 작게,
+ * 점검이 이때부터 이때 있구나 하는 인상만'): 좌우를 꽉 채운 얇은 공사 띠 한 줄에 '정기 점검 11/5(목) 10:30 ~ 15:00 · 점검 내용'이 흐른다.
+ * 공식 점검 글이 올라온 때부터 점검이 끝날 때까지만 (눌러 봐도 없어지지 않는다). 서버가 점검 글을 2분마다 새로 받는다 (연장 공지도, server/maint.ts).
+ * 누르면 그 공식 글
  */
 function MaintBanner() {
   const list = useMaint();
@@ -287,12 +288,9 @@ function MaintBanner() {
       {shown.map((m) => {
         const on = now >= m.start;
         return (
-          <a key={m.id} className={"maint" + (on ? " maint-on" : "")} href={`#/official/${m.id}`}>
-            <span className="maint-top">
-              {on && <b className="maint-now">점검 중</b>}
-              <FitLine text={maintTop(m)} wrap={false} />
-            </span>
-            {m.content ? <FlowLine text={m.content} /> : <span className="maint-sub" />}
+          <a key={m.id} className={"maint" + (on ? " maint-on" : "")} href={`#/official/${m.id}`} aria-label={maintTop(m)}>
+            <span className="maint-dot" aria-hidden />
+            <FlowLine text={(on ? "점검 중 · " : "") + maintTop(m) + (m.content ? "  ·  " + m.content : "")} />
           </a>
         );
       })}
