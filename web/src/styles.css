@@ -1822,6 +1822,20 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
   position: absolute; top: -8px; right: -6px; min-width: 16px; padding: 0 3px; font-size: 10px; line-height: 14px; text-align: center;
   color: #fff; background: var(--red); border: 1px solid var(--edge);
 }
+/* 빨간 숫자 표를 도트 모양으로 (제작자 요청 2026-11-02 '알림 뱃지도 도트 쪽으로 디자인 맞추면'): 🔔 의 안 읽은 수, 홈 칸·아래 탭의 새 글 수,
+   장비대여 운영의 확인 전 수. 둥근 공 대신 네모 칸에 모서리를 한 칸씩 깎은 검은 테두리(바깥 그림자 넷), 왼쪽 위 밝은 줄과 오른쪽 아래 어두운 줄, 도트 글씨 */
+.bell-dot, .news-badge, .rent-new {
+  min-width: 16px; height: 14px; padding: 0 3px; border: 0; border-radius: 0;
+  font-family: Galmuri11, sans-serif; font-style: normal; font-size: 10px; font-weight: 400; line-height: 14px; text-align: center; color: #fff;
+  background: #e63946; text-shadow: 1px 1px 0 #7a0f14;
+  box-shadow: 0 -2px 0 #0b0a1a, 0 2px 0 #0b0a1a, -2px 0 0 #0b0a1a, 2px 0 0 #0b0a1a, inset 1px 1px 0 #ff9aa2, inset -1px -1px 0 #a4161a;
+}
+.bell-dot { top: -4px; right: -4px; }
+.tile-news { top: -5px; right: -5px; }
+/* 빛이 도는 칸(1군 전용, 운영진, 개발자)은 칸 밖이 잘려서 안쪽 모서리에 */
+.tile-ring > .tile-news { top: 4px; right: 4px; }
+/* 홈 닉네임 앞 작은 🔔 는 표가 종을 덮지 않게 오른쪽 위로 */
+.hero-bell .bell-dot { top: -11px; right: -13px; }
 .rent-jobs { margin-bottom: 4px; gap: 5px; }
 .rent-jobs .pill { padding: 4px 4px; }
 .rent-lv { margin-bottom: 4px; }
