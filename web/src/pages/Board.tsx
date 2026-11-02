@@ -4,14 +4,14 @@ import type { ReactNode } from "react";
 import { ApiError, RANK, errorText } from "../auth";
 import type { Me } from "../auth";
 import {
-  CATS, CAT_NAME, URL_RE, addComment, createPost, deleteComment, deleteFile, deletePost, fetchPost, fetchPosts,
+  CATS, CAT_ICON, CAT_NAME, URL_RE, addComment, createPost, deleteComment, deleteFile, deletePost, fetchPost, fetchPosts,
   fileUrl, linkPreview, setLike, shrinkPhoto, sizeText, updatePost, uploadFile, youtubeId,
 } from "../board";
 import type { BoardComment, BoardFile, Cat, LinkPreview, PostDetail, PostSummary } from "../board";
 import { RoleBadge } from "../emblems";
 import { ago } from "../market";
 import { go, useEntryState } from "../router";
-import { FitLine, Loading, TopBar } from "../ui";
+import { Loading, TopBar } from "../ui";
 import { OfficialList } from "./Official";
 import { isOfficialTab } from "../official";
 
@@ -47,13 +47,14 @@ const CAT_SHORT: Record<Cat, string> = { notice: "공지", event: "길드 이벤
 
 /**
  * 게시판 칸 줄: 전체, 공지, 길드 이벤트, 자유, 건의, 아이모 소식을 한 줄 탭으로 (제작자 요청 2026-11-02: 맨 위 단추를 한 줄로,
- * 아이모 소식 안의 전체·공지사항·점검·이벤트와 위아래가 구분되게. 이모지 없이 글자만, 칸 폭은 모두 같게). 아래 칸 줄은 Official.tsx 의 .sub-tabs
+ * 아이모 소식 안의 전체·공지사항·점검·이벤트와 위아래가 구분되게). 이모지는 이름 위에, 이름 글자 크기는 모두 같게(줄이지 않고 칸 좌우 여백을 줄인다).
+ * 아래 칸 줄은 Official.tsx 의 .pill-row
  */
 function BoardCats({ cat }: { cat: Cat | "imo" | null }) {
-  const tabs: { key: Cat | "imo" | null; name: string; to: string }[] = [
-    { key: null, name: "전체", to: "#/board" },
-    ...CATS.map((c) => ({ key: c, name: CAT_SHORT[c], to: `#/board?cat=${c}` })),
-    { key: "imo", name: "아이모 소식", to: "#/board?cat=imo" },
+  const tabs: { key: Cat | "imo" | null; icon: string; name: string; to: string }[] = [
+    { key: null, icon: "📋", name: "전체", to: "#/board" },
+    ...CATS.map((c) => ({ key: c, icon: CAT_ICON[c], name: CAT_SHORT[c], to: `#/board?cat=${c}` })),
+    { key: "imo", icon: "🎮", name: "아이모 소식", to: "#/board?cat=imo" },
   ];
   return (
     <nav className="main-tabs">
@@ -64,7 +65,10 @@ function BoardCats({ cat }: { cat: Cat | "imo" | null }) {
           aria-pressed={cat === t.key}
           onClick={() => go(t.to, true)}
         >
-          <FitLine className="main-tab-name" text={t.name} wrap={false} />
+          <span className="main-tab-icon" aria-hidden>
+            {t.icon}
+          </span>
+          <span className="main-tab-name">{t.name}</span>
         </button>
       ))}
     </nav>
