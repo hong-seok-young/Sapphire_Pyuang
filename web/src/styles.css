@@ -2079,3 +2079,13 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .bd-suggest-body { margin: 0; max-height: 260px; overflow: auto; font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
 /* 읽는 중처럼 잠깐 못 누르는 단추 */
 .pill-off { opacity: 0.6; pointer-events: none; }
+/* 반납 신청 (제작자 요청 2026-11-02): 신청함의 쓰는 무기 줄 오른쪽 단추, 운영 장비반납의 표 */
+.rent-me .rent-me-line { align-items: center; padding: 4px 0; }
+.rent-me-line > .pill { flex: none; padding: 4px 10px; font-size: 12px; }
+.rent-me-line .rent-btns { display: inline-flex; align-items: center; gap: 6px; }
+.rent-me-line .rent-btns .pill { padding: 4px 10px; font-size: 12px; }
+.rent-back-asked { flex: none; padding: 0 5px; font-size: 11px; line-height: 16px; color: #0b0a1a; background: #ffb454; border: 1px solid var(--edge); }
+.rent-back-ask { border-color: #ffb454; }
+.sub-tab { position: relative; }
+/* 어두운 띠 단추의 숫자 표는 글자를 가리지 않게 칸 오른쪽 위 밖으로 */
+.sub-tab .in-news { top: -7px; right: -3px; }

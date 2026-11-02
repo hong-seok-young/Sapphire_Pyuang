@@ -543,6 +543,7 @@ CREATE TABLE IF NOT EXISTS rental_items (
   renter TEXT,                            -- 지금 빌려 간 사람 (닉네임 글자). 비면 대여 가능
   rented_at INTEGER,
   due_at INTEGER,                         -- 돌려줄 때 (기한 없음이면 NULL)
+  return_req_at INTEGER,                  -- 빌린 사람이 '반납 신청'을 누른 때 (제작자 요청 2026-11-02). 반납하면 비운다
   note TEXT,
   status TEXT NOT NULL DEFAULT 'open',    -- open | gone (내림)
   created_at INTEGER NOT NULL,

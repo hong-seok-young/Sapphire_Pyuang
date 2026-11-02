@@ -35,7 +35,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const now = Date.now();
   const [itemsR, queueR, depositR, charsR, ledgerR, myAppsR] = await env.DB.batch([
     env.DB.prepare(
-      "SELECT id, job, level, weapon, options, enhance, term, price, donor, renter, rented_at, due_at, note FROM rental_items WHERE status = 'open' ORDER BY job, level, weapon, enhance, id",
+      "SELECT id, job, level, weapon, options, enhance, term, price, donor, renter, rented_at, due_at, note, return_req_at FROM rental_items WHERE status = 'open' ORDER BY job, level, weapon, enhance, id",
     ),
     env.DB.prepare("SELECT id, item_id, user_id, status, created_at, app_id FROM rental_requests WHERE status IN ('wait', 'ok') ORDER BY created_at, id"),
     // 지금 대여 중인 무기마다 받은 보증금 (가장 최근의 반납 전 대여)
@@ -86,6 +86,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       note: it.note,
       renter: it.renter,
       rentedAt: it.rented_at,
+      // 빌린 사람이 반납 신청한 때 (운영진과 빌린 사람에게만)
+      ...(it.renter && (manager || mine.has(it.renter)) ? { returnReqAt: it.return_req_at ?? null } : {}),
       // 기한이 끝나는 날 (줄이 있으면 이날 담당자에게 돌려준다)
       dueAt: it.renter && it.rented_at && days ? it.rented_at + days * 86_400_000 : null,
       queue: line.length,

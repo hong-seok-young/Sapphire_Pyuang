@@ -27,6 +27,8 @@ export interface RentItem {
   /** 지금 쓰는 사람 */
   renter: string | null;
   rentedAt: number | null;
+  /** 빌린 사람이 반납 신청한 때 (운영진과 빌린 사람에게만) */
+  returnReqAt?: number | null;
   /** 기한이 끝나는 날 (줄이 있으면 이날 담당자에게 돌려준다) */
   dueAt: number | null;
   /** 줄 선 사람 수 */
@@ -114,6 +116,8 @@ export const talkRent = (aid: number, text: string) => api<{ id: number; at: num
 export const lendRent = (id: number, body: { renter: string; useDia: number; gold?: number; date?: string }) =>
   api<{ ok: boolean; dueAt: number | null }>(`/api/rent/${id}/lend`, "POST", body);
 export const returnRent = (id: number) => api<{ ok: boolean; refund: { dia: number; gold: number } }>(`/api/rent/${id}/return`, "POST");
+/** 빌린 사람의 반납 신청과 취소 (제작자 요청 2026-11-02) */
+export const requestReturn = (id: number, cancel = false) => api<{ ok: boolean; returnReqAt: number | null }>(`/api/rent/${id}/return-request`, "POST", { cancel });
 export interface RentFields {
   job: Job;
   level: number;

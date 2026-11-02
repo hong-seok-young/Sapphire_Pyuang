@@ -17,7 +17,7 @@ import { go, useEntryState } from "../router";
 import { JOBS, JOB_NAME, errorText } from "../auth";
 import type { Job, Me } from "../auth";
 import type { Wiki } from "../types";
-import { Loading, PicImg, TopBar } from "../ui";
+import { Loading, NewsDot, PicImg, TopBar } from "../ui";
 import { useNews, useNewsSeen } from "../news";
 import {
   STATUS_NAME,
@@ -39,6 +39,7 @@ import {
   optionParts,
   optionShort,
   removeRent,
+  requestReturn,
   returnRent,
   talkRent,
   weaponOf,
@@ -100,7 +101,11 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
   const myApps = data.apps.filter((a) => a.mine && a.requests.some((r) => r.status === "wait" || r.status === "ok" || r.holding));
   const openApps = data.manager ? data.apps.filter((a) => a.requests.some((r) => r.status === "wait" || r.status === "ok")) : [];
   // 빌려 간 무기 (장비반납 칸): 기한이 먼저 끝나는 것부터, 기한 없는 것은 뒤로
-  const lent = data.items.filter((i) => i.renter).sort((a, b) => (a.dueAt ?? Infinity) - (b.dueAt ?? Infinity) || (a.rentedAt ?? 0) - (b.rentedAt ?? 0));
+  // 반납 신청한 것이 맨 위 (제작자 요청 2026-11-02: 장비 반납도 신청하게)
+  const lent = data.items
+    .filter((i) => i.renter)
+    .sort((a, b) => Number(!a.returnReqAt) - Number(!b.returnReqAt) || (a.dueAt ?? Infinity) - (b.dueAt ?? Infinity) || (a.rentedAt ?? 0) - (b.rentedAt ?? 0));
+  const backAsked = lent.filter((i) => i.returnReqAt).length;
   const waitCount = openApps.reduce((n, a) => n + a.requests.filter((r) => r.status === "wait").length, 0);
   const ofJob = data.items.filter((i) => i.job === job);
   // 레벨별로 쭉 (같은 레벨 안에서는 무기, 강화, 기한 순서)
@@ -147,26 +152,7 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
           {showLedger && <Ledger lines={data.ledger} rate={data.rate} />}
           {/* 쓰는 무기: 줄이 있으면 기한이 끝나는 날 담당자에게 반납, 없으면 계속 쓴다 */}
           {myHeld.map((i) => (
-            <p key={i.id} className="rent-me-line">
-              <span>
-                {i.weapon} +{i.enhance} <small className="rent-muted">대여 중</small>
-                {i.deposit && (i.deposit.dia > 0 || i.deposit.gold > 0) && (
-                  <small className="rent-muted">
-                    {" "}
-                    · 보증금 {[i.deposit.dia ? `💎${i.deposit.dia}` : "", i.deposit.gold ? `골드 ${manGold(i.deposit.gold)}` : ""].filter(Boolean).join(" + ")}
-                  </small>
-                )}
-              </span>
-              {!i.dueAt ? (
-                <span className="rent-muted">기한 없음</span>
-              ) : i.queue ? (
-                <b className={i.dueAt < now ? "rent-late" : "rent-warn"}>
-                  {md(i.dueAt)} 반납 · 대기 {i.queue}
-                </b>
-              ) : (
-                <span className="rent-muted">기한 {md(i.dueAt)} · 대기 없음</span>
-              )}
-            </p>
+            <HeldLine key={i.id} item={i} now={now} onDone={() => void load()} />
           ))}
           {myApps.map((a) => (
             <AppCard key={a.id} app={a} data={data} byId={byId} onDone={() => void load()} />
@@ -184,6 +170,7 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
           {PANELS.map((p) => (
             <button key={p} className={"sub-tab" + (panel === p ? " sub-tab-on" : "")} aria-pressed={panel === p} onClick={() => setPanel(p)}>
               {p === "apps" ? `장비대여 ${openApps.length}` : p === "back" ? `장비반납 ${lent.length}` : p === "add" ? "물건 추가" : "기부 현황"}
+              {p === "back" && <NewsDot n={backAsked} />}
             </button>
           ))}
         </nav>
@@ -1089,20 +1076,85 @@ function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; s
   );
 }
 
+/**
+ * 숫자 칸. 고치는 동안은 적은 글자 그대로 두어 지우고 새로 적을 수 있다 (2026-11-02: 차감 💎 의 1 이 안 지워졌다. 비우면 바로 최소값으로 돌아갔다).
+ * 칸을 벗어나면 범위에 맞춘 값을 보인다. 누르면 전체가 골라져 바로 새로 적는다
+ */
 function Num({ label, value, min, max, onChange }: { label: ReactNode; value: number; min: number; max: number; onChange: (v: number) => void }) {
+  const [text, setText] = useState<string | null>(null);
   return (
     <label className="mk-field">
       <span>{label}</span>
       <input
         className="mk-input"
         inputMode="numeric"
-        value={String(value)}
+        value={text ?? String(value)}
+        onFocus={(e) => e.target.select()}
         onChange={(e) => {
-          const n = Number(e.target.value.replace(/\D/g, ""));
-          onChange(Math.min(max, Math.max(min, Number.isFinite(n) ? n : min)));
+          const t = e.target.value.replace(/\D/g, "").slice(0, String(max).length);
+          setText(t);
+          if (t !== "") onChange(Math.min(max, Math.max(min, Number(t))));
         }}
+        onBlur={() => setText(null)}
       />
     </label>
+  );
+}
+
+/**
+ * 신청함의 내가 쓰는 무기 한 줄: 기한, 보증금, 그리고 '반납 신청' (제작자 요청 2026-11-02: 장비 반납도 신청하게).
+ * 신청하면 운영진에게 알림이 가고 '운영 > 장비반납' 맨 위에 보인다. 게임 안에서 돌려준 뒤 담당자가 '반납'을 누르면 끝난다
+ */
+function HeldLine({ item: i, now, onDone }: { item: RentItem; now: number; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const ask = async (cancel: boolean) => {
+    setBusy(true);
+    setError("");
+    try {
+      await requestReturn(i.id, cancel);
+      onDone();
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="rent-me-line">
+      <span>
+        {i.weapon} +{i.enhance} <small className="rent-muted">대여 중</small>
+        {i.deposit && (i.deposit.dia > 0 || i.deposit.gold > 0) && (
+          <small className="rent-muted">
+            {" "}
+            · 보증금 {[i.deposit.dia ? `💎${i.deposit.dia}` : "", i.deposit.gold ? `골드 ${manGold(i.deposit.gold)}` : ""].filter(Boolean).join(" + ")}
+          </small>
+        )}
+        <br />
+        {!i.dueAt ? (
+          <small className="rent-muted">기한 없음</small>
+        ) : i.queue ? (
+          <small className={i.dueAt < now ? "rent-late" : "rent-warn"}>
+            {md(i.dueAt)} 반납 · 대기 {i.queue}
+          </small>
+        ) : (
+          <small className="rent-muted">기한 {md(i.dueAt)} · 대기 없음</small>
+        )}
+      </span>
+      {i.returnReqAt ? (
+        <span className="rent-btns">
+          <small className="rent-back-asked">반납 신청함</small>
+          <button className="pill" disabled={busy} onClick={() => void ask(true)}>
+            취소
+          </button>
+        </span>
+      ) : (
+        <button className="pill" disabled={busy} onClick={() => void ask(false)}>
+          반납 신청
+        </button>
+      )}
+      {error && <p className="form-error">{error}</p>}
+    </div>
   );
 }
 
@@ -1130,7 +1182,7 @@ function ReturnRow({ wiki, item, onDone }: { wiki: Wiki; item: RentItem; onDone:
     }
   };
   return (
-    <li className={"rent-back" + (late ? " rent-back-late" : "")}>
+    <li className={"rent-back" + (late ? " rent-back-late" : "") + (item.returnReqAt ? " rent-back-ask" : "")}>
       <div className="rent-back-top">
         <Slot wiki={wiki} item={item} />
         <span className="rent-nm">
@@ -1138,6 +1190,7 @@ function ReturnRow({ wiki, item, onDone }: { wiki: Wiki; item: RentItem; onDone:
           <em>+{item.enhance}</em>
         </span>
         <b className="rent-back-who">{item.renter}</b>
+        {item.returnReqAt && <small className="rent-back-asked">반납 신청</small>}
         {!sure && (
           <button className="pill" onClick={() => setSure(true)}>
             반납

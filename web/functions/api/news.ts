@@ -2,7 +2,7 @@
 // 그때(아이모 소식은 그 글 번호) 뒤로 다른 사람이 새로 올린 것의 수. 2026-11-02 제작자 요청으로 칸 안의 단추마다 따로 센다 (src/news.ts KEYS).
 //   board.<칸>: 게시판 칸마다 새 글 / imo.notice·maint·event: 아이모 소식 새 공식 글 (공지·안내·오류, 점검, 이벤트) / market.items: 중개인 새 물건(판매 중)
 //   market.gold: 새 골드 글 / requests: 의뢰소 새 의뢰(끝나지 않은 것) / rent.list: 장비대여 새 무기 / rent.apps: 내 신청에 생긴 일(수락, 대여 완료, 반납, 대화 …,
-//   신청함으로 가는 알림) / rent.staff: 운영진에게 새 신청과 신청한 사람의 대화. 장비대여는 들어갈 수 있는 사람(rental.ts canEnter)만, rent.staff 는 운영진만.
+//   신청함으로 가는 알림) / rent.staff: 운영진에게 새 신청, 신청한 사람의 대화, 반납 신청. 장비대여는 들어갈 수 있는 사람(rental.ts canEnter)만, rent.staff 는 운영진만.
 //   tops: 아이모 소식 종류마다 가장 새 글 번호 (처음 쓰는 기기는 여기서부터 센다)
 // 예전 화면(?board=&market=&requests=)에는 board, market, requests 도 같이 준다.
 //   maint: 아이모 점검 (홈 점검 전광판, 제작자 요청 2026-11-01, server/maint.ts). 점검 글은 2분에 한 번 뒤에서 새로 받는다 (server/official.ts refreshMaint)
@@ -64,7 +64,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
       ? [
           q(
             `SELECT (SELECT COUNT(*) FROM rental_requests WHERE created_at > ?1 AND app_id IS NOT NULL AND user_id NOT IN ${MINE}) + ` +
-              `(SELECT COUNT(*) FROM rental_talk t JOIN rental_apps a ON a.id = t.app_id WHERE t.created_at > ?1 AND t.user_id = a.user_id AND a.user_id NOT IN ${MINE}) AS n`,
+              `(SELECT COUNT(*) FROM rental_talk t JOIN rental_apps a ON a.id = t.app_id WHERE t.created_at > ?1 AND t.user_id = a.user_id AND a.user_id NOT IN ${MINE}) + ` +
+              `(SELECT COUNT(*) FROM rental_items WHERE return_req_at > ?1 AND renter NOT IN ${MINE}) AS n`,
             since("rent.staff"),
           ),
         ]

@@ -80,6 +80,8 @@ export interface RentalRow {
   due_at: number | null;
   note: string | null;
   status: string;
+  /** 빌린 사람이 '반납 신청'을 누른 때 */
+  return_req_at?: number | null;
 }
 
 /** 알림에 쓰는 이름: '카타나 +7' */
