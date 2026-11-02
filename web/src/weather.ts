@@ -1,6 +1,7 @@
 // 내 지역 날씨로 홈 화면에 비·눈 (제작자 요청 2026-11-02 초안: '위치정보 허용하면 사는 지역 그날 날씨에 따라 화면에 눈 오게 비 오게').
 // - 위치: 폰이 허락했을 때만 브라우저에서 받는다 (navigator.geolocation, 정확도 낮게 -> 안 되면 GPS). 소수 둘째 자리(1km 쯤)로 줄여
-//   날씨는 이 기기에 30분, 마지막 위치는 위치를 못 받을 때 쓰려고 이 기기에만 30일 둔다. 우리 서버에는 보내거나 저장하지 않는다.
+//   날씨는 이 기기에 30분(5km 넘게 움직이면 바로 새로), 마지막 위치는 위치를 못 받을 때 쓰려고 이 기기에만 30일 둔다. 우리 서버에는 보내거나 저장하지 않는다.
+//   위치는 홈에 올 때, 앱으로 돌아올 때, 홈을 켜 둔 동안 10분마다 다시 본다 (폰이 1분 안에 잡은 위치까지 쓴다).
 // - 날씨: Open-Meteo (무료, 키 없음, 기상청 자료 포함)에 브라우저가 바로 묻는다. 'current' 의 WMO 날씨 코드로 맑음·비·눈·천둥 …
 // - 게임과 상관없는 화면 꾸밈이라 게임 안전 규칙에 맞는다. 게임 위 위키 창(inFloat)에서는 쓰지 않는다.
 // 지금은 초안이라 앱개발자(와 테스트 계정)에게만 보인다 (WEATHER_OPEN). 앱개발자는 아래 날씨 표를 눌러 효과를 하나씩 미리 본다.
@@ -53,7 +54,12 @@ export const PREVIEW: Sky[] = ["drizzle", "rain", "heavy", "storm", "snow", "bli
 
 const PREF = "sapphire.wx"; // '1' 켬, '0' 끔(나중에·거절)
 const CACHE = "sapphire.wx.cache";
+/** 같은 곳이면 날씨를 이만큼 두고 쓴다 */
 const FRESH = 30 * 60_000;
+/** 위치를 다시 보는 간격 (홈을 켜 둔 동안. 앱으로 돌아오거나 홈에 올 때도 본다) */
+const RECHECK = 10 * 60_000;
+/** 이만큼(소수 둘째 자리로 5칸, 5km 쯤) 움직였으면 30분이 안 됐어도 날씨를 새로 받는다 */
+const MOVED = 0.05;
 
 function read(key: string): string | null {
   try {
@@ -93,7 +99,8 @@ function locate(high: boolean, timeout: number): Promise<Pos> {
     navigator.geolocation.getCurrentPosition(
       (p) => resolve({ lat: round(p.coords.latitude), lon: round(p.coords.longitude) }),
       (e) => reject(e),
-      { enableHighAccuracy: high, maximumAge: 60 * 60_000, timeout },
+      // 폰이 들고 있는 위치는 1분까지만 쓴다 (움직이면 따라가게, 제작자 2026-11-02 '실시간으로 이동되는 것까지')
+      { enableHighAccuracy: high, maximumAge: 60_000, timeout },
     );
   });
 }
@@ -165,19 +172,31 @@ async function fetchWeather(lat: number, lon: number): Promise<Weather> {
   }
 }
 
-/** 지금 날씨 (30분 안에 받은 것이 있으면 그것) */
-export async function loadWeather(force = false): Promise<Weather> {
-  if (!force) {
-    try {
-      const c = JSON.parse(read(CACHE) ?? "null") as Weather | null;
-      if (c && Date.now() - c.at < FRESH) return c;
-    } catch {
-      // 다시 받는다
-    }
+type Cached = Weather & { lat?: number; lon?: number };
+function readCache(): Cached | null {
+  try {
+    return JSON.parse(read(CACHE) ?? "null") as Cached | null;
+  } catch {
+    return null;
   }
+}
+/** 화면을 열자마자 보일 지난 날씨 (3시간 안에 받은 것, 그 뒤 loadWeather 가 새로 맞춘다) */
+export function cachedWeather(): Weather | null {
+  const c = readCache();
+  return c && Date.now() - c.at < 3 * 60 * 60_000 ? c : null;
+}
+
+/**
+ * 지금 있는 곳의 날씨: 위치는 매번 다시 보고(폰이 1분 안에 잡은 위치까지), 같은 곳(5km 안)에서 30분 안에 받은 날씨면 그것을 쓴다.
+ * 그보다 멀리 움직였거나 30분이 지났으면 새로 받는다
+ */
+export async function loadWeather(force = false): Promise<Weather> {
   const { lat, lon } = await position();
+  const c = readCache();
+  const near = c?.lat !== undefined && c.lon !== undefined && Math.abs(c.lat - lat) < MOVED && Math.abs(c.lon - lon) < MOVED;
+  if (!force && c && near && Date.now() - c.at < FRESH) return c;
   const w = await fetchWeather(lat, lon);
-  write(CACHE, JSON.stringify(w));
+  write(CACHE, JSON.stringify({ ...w, lat, lon }));
   return w;
 }
 
@@ -218,7 +237,9 @@ export type WxState =
 export function useWeather(allowed: boolean) {
   const [state, setState] = useState<WxState>({ status: "off" });
   const start = (force = false) => {
-    setState((s) => (s.status === "on" ? s : { status: "loading" }));
+    // 지난 날씨가 있으면 그것부터 보이고 뒤에서 새로 맞춘다
+    const last = cachedWeather();
+    setState((s) => (s.status === "on" ? s : last ? { status: "on", weather: last } : { status: "loading" }));
     loadWeather(force)
       .then((weather) => setState({ status: "on", weather }))
       .catch((e: unknown) => {
@@ -243,13 +264,16 @@ export function useWeather(allowed: boolean) {
           start();
         } else if (p !== "denied") setState({ status: "ask" });
       });
-    // 30분마다 다시 (홈을 오래 켜 둘 때)
-    const t = window.setInterval(() => {
-      if (read(PREF) === "1" && document.visibilityState === "visible") start();
-    }, FRESH);
+    // 움직이면 따라간다: 홈을 켜 둔 동안 10분마다, 다른 앱에 갔다가 돌아올 때마다 위치를 다시 본다 (날씨는 5km 넘게 움직였거나 30분이 지났을 때만 새로)
+    const again = () => {
+      if (!gone && read(PREF) === "1" && document.visibilityState === "visible") start();
+    };
+    const t = window.setInterval(again, RECHECK);
+    document.addEventListener("visibilitychange", again);
     return () => {
       gone = true;
       window.clearInterval(t);
+      document.removeEventListener("visibilitychange", again);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allowed]);

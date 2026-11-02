@@ -14,10 +14,13 @@ const RAIN: Partial<Record<Sky, { n: number; v: [number, number]; len: [number, 
   heavy: { n: 260, v: [12, 16], len: [12, 20], wind: -2.2, a: 0.65 },
   storm: { n: 240, v: [12, 16], len: [12, 20], wind: -2.8, a: 0.65 },
 };
-/** 눈: 송이 수, 내려오는 빠르기, 바람 */
-const SNOW: Partial<Record<Sky, { n: number; v: [number, number]; wind: number }>> = {
-  snow: { n: 80, v: [0.5, 1.2], wind: 0.15 },
-  blizzard: { n: 200, v: [1, 2.2], wind: 1.4 },
+/**
+ * 눈: 송이 수, 내려오는 빠르기, 바람, 큰 송이 비율.
+ * 함박눈은 바람에 날리는 눈보라가 아니라 큰 송이가 화면 가득 천천히 내리는 것 (제작자 2026-11-02: 오른쪽으로 쏠려 머리카락처럼 꺾였다, 화면 전체가 채워져야지)
+ */
+const SNOW: Partial<Record<Sky, { n: number; v: [number, number]; wind: number; big: number }>> = {
+  snow: { n: 90, v: [0.5, 1.2], wind: 0.1, big: 0.12 },
+  blizzard: { n: 170, v: [0.7, 1.6], wind: 0.2, big: 0.4 },
 };
 
 /** 효과가 있는 날씨 (맑음·흐림·안개는 그리지 않는다. 안개는 제작자 요청 2026-11-02 '안개 있으면 빼'로 뺐다) */
@@ -57,19 +60,23 @@ export function WeatherFx({ sky }: { sky: Sky }) {
     const drops: Drop[] = [];
     const flakes: Flake[] = [];
     const newDrop = (top: boolean): Drop => ({
-      x: rnd(0, w + 60),
+      x: rnd(0, w),
       y: top ? rnd(-h * 0.3, -10) : rnd(-20, h),
       v: rnd(...rain!.v),
       len: rnd(...rain!.len),
     });
-    const newFlake = (top: boolean): Flake => ({
-      x: rnd(-20, w + 20),
-      y: top ? rnd(-40, -4) : rnd(-20, h),
-      v: rnd(...snow!.v),
-      s: Math.random() < 0.18 ? 3 : Math.random() < 0.5 ? 2 : 1, // 1·2: 네모, 3: 십자 송이
-      ph: rnd(0, Math.PI * 2),
-      f: rnd(0.01, 0.03),
-    });
+    const newFlake = (top: boolean): Flake => {
+      // 1·2: 작은 네모, 3: 십자 송이, 4: 큰 송이 (가운데 네모와 팔). 큰 송이일수록 천천히
+      const s = Math.random() < snow!.big ? (Math.random() < 0.5 ? 4 : 3) : Math.random() < 0.5 ? 2 : 1;
+      return {
+        x: rnd(0, w),
+        y: top ? rnd(-40, -4) : rnd(-20, h),
+        v: rnd(...snow!.v) * (s === 4 ? 0.75 : 1),
+        s,
+        ph: rnd(0, Math.PI * 2),
+        f: rnd(0.01, 0.03),
+      };
+    };
     if (rain) for (let i = 0; i < rain.n * area(); i++) drops.push(newDrop(false));
     if (snow) for (let i = 0; i < snow.n * area(); i++) flakes.push(newFlake(false));
 
@@ -106,7 +113,9 @@ export function WeatherFx({ sky }: { sky: Sky }) {
         for (const d of drops) {
           d.y += d.v * k;
           d.x += rain.wind * k;
-          if (d.y > h || d.x < -20) Object.assign(d, newDrop(true));
+          // 바람에 왼쪽으로 나가면 오른쪽에서 이어서 (한쪽이 비지 않게 화면 전체에 고르게)
+          if (d.x < -20) d.x += w + 40;
+          if (d.y > h) Object.assign(d, newDrop(true));
           // 도트 빗줄기: 위 반은 바람 쪽으로 한 칸 옮겨 비스듬히
           const x = snap(d.x);
           const y = snap(d.y);
@@ -119,12 +128,19 @@ export function WeatherFx({ sky }: { sky: Sky }) {
         for (const f of flakes) {
           f.ph += f.f * k;
           f.y += f.v * k;
-          f.x += (snow.wind + Math.sin(f.ph) * 0.6) * k;
-          if (f.y > h + 6 || f.x > w + 24 || f.x < -24) Object.assign(f, newFlake(true));
+          f.x += (snow.wind + Math.sin(f.ph) * 0.5) * k;
+          // 옆으로 나가면 반대편에서 같은 높이로 이어서 (예전에는 위에서 다시 떨어져 한쪽으로 쏠렸다)
+          if (f.x > w + 24) f.x -= w + 48;
+          else if (f.x < -24) f.x += w + 48;
+          if (f.y > h + 8) Object.assign(f, newFlake(true));
           const x = snap(f.x);
           const y = snap(f.y);
-          ctx.fillStyle = f.s === 3 ? "rgba(255, 255, 255, 0.9)" : f.s === 2 ? "rgba(240, 246, 255, 0.8)" : "rgba(230, 238, 255, 0.6)";
-          if (f.s === 3) {
+          ctx.fillStyle = f.s >= 3 ? "rgba(255, 255, 255, 0.92)" : f.s === 2 ? "rgba(240, 246, 255, 0.8)" : "rgba(230, 238, 255, 0.6)";
+          if (f.s === 4) {
+            ctx.fillRect(x - P, y - P, P * 3, P * 3);
+            ctx.fillRect(x - P * 2, y, P * 5, P);
+            ctx.fillRect(x, y - P * 2, P, P * 5);
+          } else if (f.s === 3) {
             ctx.fillRect(x - P, y, P * 3, P);
             ctx.fillRect(x, y - P, P, P * 3);
           } else ctx.fillRect(x, y, P * f.s, P * f.s);
