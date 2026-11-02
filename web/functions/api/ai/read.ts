@@ -4,13 +4,14 @@
 //           데이터로 만들지 않고, 스샷 그림을 정보창처럼 보여 준다)
 //   rental: { name, enhance, job, level, options: [{ name, value }] }
 // 길드원이 갤러리에서 직접 고른 스샷만 받고 앱은 화면을 캡처하지 않는다. 읽은 값은 칸에 채울 뿐, 사람이 확인하고 저장한다
-// (CLAUDE.md '해도 되는 것', 챗봇 사진 읽기(chat/peek.ts)와 같은 모델과 방법). 한 사람 하루 kind 마다 30번 (D1 ai_usage).
+// (CLAUDE.md '해도 되는 것', 챗봇 사진 읽기(chat/peek.ts)와 같은 방법, 가장 좋은 모델). 한 사람 하루 kind 마다 30번 (D1 ai_usage).
 import Anthropic from "@anthropic-ai/sdk";
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { canEnter, isManager } from "../../../server/rental";
 
-const READ_MODEL = "claude-haiku-5-5";
+/** 제작자 요청 2026-11-02 '비용 신경 쓰지 말고 무조건 퀄리티': 가장 좋은 모델로 읽는다 */
+const READ_MODEL = "claude-opus-5-5";
 const MAX_IMAGE_B64 = 1_500_000;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 const DAILY = 30;
@@ -98,9 +99,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try {
     const res = await client.messages.create({
       model: READ_MODEL,
-      max_tokens: 1000,
-      thinking: { type: "disabled" },
-      output_config: { format: { type: "json_schema", schema: SCHEMA[kind] } },
+      max_tokens: 8000,
+      output_config: { effort: "high", format: { type: "json_schema", schema: SCHEMA[kind] } },
       messages: [
         {
           role: "user",

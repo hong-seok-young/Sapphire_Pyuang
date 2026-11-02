@@ -73,10 +73,11 @@ export async function makeSummary(
   try {
     const res = await client.beta.messages.create({
       model: SUMMARY_MODEL,
-      max_tokens: 4000,
+      max_tokens: 16000,
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
-      output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA } },
+      // 제작자 요청 2026-11-02 '무조건 퀄리티': 높은 effort (생각도 max_tokens 에 든다)
+      output_config: { effort: "high", format: { type: "json_schema", schema: SCHEMA } },
       system: SYSTEM,
       messages: [
         {

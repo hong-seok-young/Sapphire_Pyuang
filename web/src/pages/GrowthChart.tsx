@@ -40,7 +40,15 @@ export function GrowthChart({ id }: { id: string }) {
   }
 
   const now = Date.now();
-  const pts: LevelLogEntry[] = data.points.slice();
+  const all: LevelLogEntry[] = data.points.slice();
+  // 진짜 시작점부터 (제작자 요청 2026-11-02: 처음 레벨에서 나중에 더 낮은 경험치를 적었으면 그 앞의 높은 값은 잘못 적은 것. server/growth.ts realStart 와 같다)
+  let from = 0;
+  for (let i = 1; i < all.length && all[i].level === all[0].level; i++) {
+    const e = all[i].exp;
+    const s = all[from].exp;
+    if (e !== null && s !== null && e < s) from = i;
+  }
+  const pts: LevelLogEntry[] = all.slice(from);
   const last = pts[pts.length - 1];
   if (!last || last.level !== data.profile.level || last.exp !== data.profile.exp) {
     pts.push({ at: Math.max(now, last?.at ?? 0), level: data.profile.level, exp: data.profile.exp });

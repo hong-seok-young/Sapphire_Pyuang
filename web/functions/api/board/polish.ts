@@ -48,10 +48,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try {
     const res = await client.beta.messages.create({
       model: POLISH_MODEL,
-      max_tokens: 8000,
+      max_tokens: 16000,
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
-      output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA } },
+      // 제작자 요청 2026-11-02 '무조건 퀄리티': 높은 effort
+      output_config: { effort: "high", format: { type: "json_schema", schema: SCHEMA } },
       system: SYSTEM,
       messages: [{ role: "user", content: `[${b.cat === "notice" ? "공지사항" : "길드 이벤트"}]\n제목: ${title || "(없음)"}\n\n${body}` }],
     } as Anthropic.Beta.MessageCreateParamsNonStreaming);

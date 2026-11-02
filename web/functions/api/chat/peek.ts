@@ -3,12 +3,13 @@
 // 물은 사람이 적어 둔 레벨(Lv.50)로 골랐고, 사진 속 캐릭터는 Lv.34 마법사라 맞는 장비, 공략, 스킬이 빠졌다.
 // 화면이 이 값으로 자료를 고른 뒤 같은 사진으로 /api/chat 에 묻는다. 길드원이 갤러리에서 직접 고른 사진만 받고
 // (CLAUDE.md '해도 되는 것': 챗봇에 고른 스샷 올리기), 앱은 화면을 캡처하지 않는다. 읽은 값은 자료를 고르는 데만 쓰고 저장하지 않는다.
-// 빠르고 싼 모델로 읽는다. 못 읽으면 빈 값을 주고, 화면은 물은 사람의 값으로 그대로 묻는다.
+// 가장 좋은 모델로 읽는다 (2026-11-02 제작자 '무조건 퀄리티'). 못 읽으면 빈 값을 주고, 화면은 물은 사람의 값으로 그대로 묻는다.
 import Anthropic from "@anthropic-ai/sdk";
 import { NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 
-const PEEK_MODEL = "claude-haiku-5-5";
+/** 제작자 요청 2026-11-02 '무조건 퀄리티': 가장 좋은 모델 (예전에는 빠르고 싼 모델) */
+const PEEK_MODEL = "claude-opus-5-5";
 const MAX_IMAGES = 4;
 const MAX_IMAGE_B64 = 1_500_000;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
@@ -90,10 +91,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const read = (schema: boolean) =>
     client.messages.create({
       model: PEEK_MODEL,
-      // 400 이면 답이 이름 목록 중간에서 잘려 빈 값이 됐다. 생각은 끄고 넉넉히
-      max_tokens: 1500,
-      thinking: { type: "disabled" },
-      ...(schema ? { output_config: { format: { type: "json_schema" as const, schema: SEEN_SCHEMA } } } : {}),
+      // 400 이면 답이 이름 목록 중간에서 잘려 빈 값이 됐다. 생각도 여기에 들어서 넉넉히
+      max_tokens: 8000,
+      output_config: { effort: "high" as const, ...(schema ? { format: { type: "json_schema" as const, schema: SEEN_SCHEMA } } : {}) },
       messages: [
         {
           role: "user",

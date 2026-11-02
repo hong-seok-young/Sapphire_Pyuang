@@ -45,17 +45,47 @@ export interface GrowthEntry {
   highSpec: boolean;
 }
 
-/** 기간 시작 때의 레벨·경험치 (사람마다): 시작 전 마지막 기록, 없으면 기간 안 첫 기록 */
-export async function startPoints(env: Env, start: number): Promise<Map<string, Point>> {
+/**
+ * 진짜 시작점 (제작자 요청 2026-11-02: '34 레벨 80%대에서 한 걸로 잡혔는데, 중간에 0% 로 적은 때가 진짜 시작 지점'):
+ * 시작 기록 뒤로 레벨이 바뀌기 전까지 같은 레벨에서 경험치가 더 낮게 적힌 기록이 있으면 그 가장 낮은 기록부터 센다
+ * (앞의 높은 값은 잘못 적은 것으로 본다). list 는 기간 안 기록 (오래된 것부터)
+ */
+export function realStart<T extends { level: number; exp: number | null }>(base: T | undefined, list: T[]): T | undefined {
+  let s = base ?? list[0];
+  if (!s) return undefined;
+  for (const p of list) {
+    if (p.level !== s.level) break;
+    if (p.exp !== null && s.exp !== null && p.exp < s.exp) s = p;
+  }
+  return s;
+}
+
+/** 기간 시작 전 마지막 기록과 기간 안 기록들 (사람마다, 오래된 것부터) */
+export async function periodPoints(env: Env, start: number): Promise<{ base: Map<string, Point>; during: Map<string, Point[]> }> {
   const [before, during] = await env.DB.batch([
-    // SQLite: MAX/MIN 과 같이 고른 칸은 그 줄의 값이다
+    // SQLite: MAX 와 같이 고른 칸은 그 줄의 값이다
     env.DB.prepare("SELECT user_id, level, exp, MAX(at) AS at FROM level_log WHERE at <= ? GROUP BY user_id").bind(start),
-    env.DB.prepare("SELECT user_id, level, exp, MIN(at) AS at FROM level_log WHERE at > ? GROUP BY user_id").bind(start),
+    env.DB.prepare("SELECT user_id, level, exp, at FROM level_log WHERE at > ? ORDER BY user_id, at").bind(start),
   ]);
   const base = new Map<string, Point>();
-  for (const p of during.results as Point[]) base.set(p.user_id, p);
-  for (const p of before.results as Point[]) base.set(p.user_id, p); // 기간 전 기록이 있으면 그것부터
-  return base;
+  for (const p of before.results as Point[]) base.set(p.user_id, p);
+  const lists = new Map<string, Point[]>();
+  for (const p of during.results as Point[]) {
+    if (!lists.has(p.user_id)) lists.set(p.user_id, []);
+    lists.get(p.user_id)!.push(p);
+  }
+  return { base, during: lists };
+}
+
+/** 기간 시작 때의 레벨·경험치 (사람마다): 시작 전 마지막 기록(없으면 기간 안 첫 기록)에서 진짜 시작점(realStart) */
+export async function startPoints(env: Env, start: number): Promise<Map<string, Point>> {
+  const { base, during } = await periodPoints(env, start);
+  const out = new Map<string, Point>();
+  for (const id of new Set([...base.keys(), ...during.keys()])) {
+    const s = realStart(base.get(id), during.get(id) ?? []);
+    if (s) out.set(id, s);
+  }
+  return out;
 }
 
 /** 오른 사람만 많이 오른 순 (같으면 먼저 적은 사람이 위). 테스트 계정은 뺀다 */

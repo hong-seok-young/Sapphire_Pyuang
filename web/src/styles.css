@@ -2175,3 +2175,10 @@ input, textarea { min-width: 0; max-width: 100%; }
 .todo-link { justify-self: start; margin-top: 2px; padding: 3px 10px; font-size: 13px; color: var(--edge); background: var(--gold); border: var(--px) solid var(--edge); overflow-wrap: anywhere; }
 /* 홈 제목: 오른쪽 위 '내 정보' 단추(.hero-me) 자리는 비우고, 좁은 폰에서는 글자를 조금 줄여 'web' 까지 보이게 (화면 폭 대원칙, 320px 에서 가려졌다) */
 .hero-title { padding-right: 44px; font-size: clamp(20px, 7vw, 30px); }
+/* 예산 검토의 실제 결제 상자: 금액 바로 옆에 무슨 돈인지, 아래에 어떻게 셈했는지 (제작자 요청 2026-11-02) */
+.ps-pay { display: grid; gap: 3px; margin: 6px 0 12px; padding: 8px 10px; background: rgba(11, 10, 26, 0.45); border-left: 3px solid var(--gold); }
+.ps-pay-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; }
+.ps-pay-head span { font-size: 13px; color: var(--text); }
+.ps-pay-head b { font-size: 20px; color: var(--gold); white-space: nowrap; }
+.ps-pay small { font-size: 11px; color: var(--muted); }
+.ps-pay small img { width: 12px; height: 12px; margin-right: 2px; vertical-align: -1px; image-rendering: pixelated; }

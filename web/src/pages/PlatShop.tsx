@@ -140,13 +140,7 @@ export function PlatShopPage() {
   return (
     <>
       <TopBar title="플래티넘 할인 상점" />
-      {!data.open && <p className="ps-closed">오픈 전 · 오피서 이상만 보여요</p>}
-      <p className="ps-rate">
-        <img src={SHOP_PIC + "plat.png"} alt="플래티넘" /> 100 = <s>{s.market}만</s> <span className={high ? "ps-dim" : "ps-strong"}>1군 {s.ratio}만</span>{" "}
-        <span className={high ? "ps-strong" : "ps-dim"}>고스펙 {s.highRatio}만</span>
-      </p>
-      {/* 내 플래티넘 지갑 (제작자 요청: 1군에게 매주 300씩 가상 플래티넘을 지급하고 쌓인다. 고스펙은 따로) */}
-      {data.wallet && <WalletBox wallet={data.wallet} high={high} onDue={load} />}
+      {/* 칸 고르는 단추가 맨 위 (제작자 요청 2026-11-02) */}
       <div className="filter ps-tabs">
         {tabs.map((t) => (
           <button key={t.key} className={"pill" + (tab === t.key ? " pill-on" : "")} onClick={() => setTab(t.key)}>
@@ -154,11 +148,19 @@ export function PlatShopPage() {
           </button>
         ))}
       </div>
+      {!data.open && <p className="ps-closed">오픈 전 · 오피서 이상만 보여요</p>}
       {error && <p className="form-error">{error}</p>}
       {notice && <p className="form-note">{notice}</p>}
 
       {tab === "shop" && (
         <>
+          {/* 비율과 내 이용한도는 상점 칸에서만 (제작자 요청 2026-11-02) */}
+          <p className="ps-rate">
+            <img src={SHOP_PIC + "plat.png"} alt="플래티넘" /> 100 = <s>{s.market}만</s> <span className={high ? "ps-dim" : "ps-strong"}>1군 {s.ratio}만</span>{" "}
+            <span className={high ? "ps-strong" : "ps-dim"}>고스펙 {s.highRatio}만</span>
+          </p>
+          {/* 내 플래티넘 지갑 (제작자 요청: 1군에게 매주 300씩 가상 플래티넘을 지급하고 쌓인다. 고스펙은 따로) */}
+          {data.wallet && <WalletBox wallet={data.wallet} high={high} onDue={load} />}
           <ul className="ps-grid">
             {/* 판매 중지한 물건은 상점에 안 나온다 (설정의 '판매 중지된 물건'에서 다시 판매) */}
             {items.filter((it) => it.enabled).map((it) => (
@@ -794,6 +796,29 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
   /** 1군, 고스펙 따로: 쓴 돈을 산 플래티넘 중 그쪽이 사 간 만큼으로 나눠 친다 */
   const share = (plat: number) => (buy.plat > 0 ? (paid * plat) / buy.plat : 0);
   const gem = <img src={SHOP_PIC + "plat.png"} alt="" />;
+  /**
+   * 실제로 결제할 돈과 그 돈이 무엇인지 (제작자 요청 2026-11-02: 금액만 덩그러니 있어서 무슨 돈인지 바로 안 와닿았다,
+   * 좁은 폰에서는 금액과 설명이 다른 줄로 흩어졌다): 금액 바로 옆에 이름, 아래에 어떻게 셈했는지
+   */
+  const payBox = (
+    <div className="ps-pay">
+      <div className="ps-pay-head">
+        <span>원스토어 실제 결제</span>
+        <b>{won(paid)}</b>
+      </div>
+      <small>
+        {gem}
+        {buy.plat.toLocaleString("ko-KR")}개 · 게임 상점 정가 {won(buy.won)}에서 원스토어 {rate}% 할인
+      </small>
+      {mode === "won" && want === 0 && (
+        <small>
+          충전 칸을 비워서 1군 {int(n)}명·고스펙 {int(h)}명이 {w}주 동안 다 사 갈 만큼({gem}
+          {b.plat.toLocaleString("ko-KR")}개)으로 셈했어요
+        </small>
+      )}
+      {mode === "won" && want > 0 && <small>{won(want)} 안에서 플래티넘이 가장 많은 상품 조합{want > buy.won && ` · 남는 돈 ${won(want - buy.won)}`}</small>}
+    </div>
+  );
   return (
     <>
       <section className="panel ps-settings">
@@ -816,16 +841,11 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
                 inputMode="numeric"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value.replace(/\D/g, "").slice(0, 9))}
-                placeholder="110000"
+                placeholder="비우면 자동"
               />{" "}
-              원어치
-              {/* 바로 오른쪽에 원스토어 할인 뒤 실제로 내는 돈 (제작자 요청) */}
-              <b className="ps-charge-paid">→ {won(paid)}</b>
+              원어치 (정가)
             </label>
-            <small className="ps-charge-sum">
-              {want > 0 ? `원스토어 ${rate}% 할인 뒤 결제액` : "비우면 길드원이 사 갈 만큼"}
-              {want > buy.won && ` · 남는 돈 ${won(want - buy.won)}`}
-            </small>
+            {payBox}
           </>
         ) : (
           <>
@@ -850,11 +870,7 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
                 </li>
               ))}
             </ul>
-            <p className="ps-charge">
-              {gem}
-              {buy.plat.toLocaleString("ko-KR")} · 정가 {won(buy.won)}
-              <b className="ps-charge-paid">→ {won(paid)}</b>
-            </p>
+            {payBox}
           </>
         )}
         <label>

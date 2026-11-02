@@ -213,12 +213,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
     client.beta.messages
       .create({
         model: MODEL,
-        max_tokens: 20000, // 생각(요약)과 웹 찾기도 여기에 든다
+        max_tokens: 32000, // 생각(요약)과 웹 찾기도 여기에 든다 (effort high 라 넉넉히)
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default", // 안전 필터가 거절하면 서버가 알맞은 다른 모델로 이어서 답한다
         // 생각하는 동안 무엇을 하는지 화면에 보인다 (제작자 요청: 클로드처럼). 요약만 오고 답에는 섞이지 않는다
         thinking: { type: "adaptive", display: "summarized" },
-        output_config: { effort: "medium" }, // 제작자 요청: 답을 더 알차게 (API 월 300달러 한도라 비용보다 품질)
+        output_config: { effort: "high" }, // 제작자 요청 2026-11-02 '비용 신경 쓰지 말고 무조건 퀄리티' (전에는 medium)
         system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
         ...(web ? { tools: WEB_TOOLS as unknown as Anthropic.Beta.BetaToolUnion[] } : {}),
         messages: toMessages(turns, context, app, official),

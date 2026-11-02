@@ -116,12 +116,10 @@ function Row({ r, me, now, open, onToggle, onMe }: { r: Ranked; me: Me; now: num
       </span>
       {/* 레벨업 표시 자리는 늘 비워 두어서 표시가 떠도 닉네임이 밀리지 않는다 */}
       <span className="rank-up-slot">
-        {up > 0 ? (
-          <span className="rank-up">▲{up}</span>
-        ) : (
-          // 경험치만 올랐으면 '+2%' (제작자 요청, 실제 성장으로 저장한 것만)
-          !!r.expUp && <span className="rank-up rank-exp-up">+{expUpText(r.expUp)}%</span>
-        )}
+        {up > 0 && <span className="rank-up">▲{up}</span>}
+        {/* 이번 주 오른 경험치 '+2%' (제작자 요청, 실제 성장으로 저장한 것만). 레벨업했으면 그 레벨에 올라온 뒤 오른 만큼을 ▲ 아래에
+            (2026-11-02 제작자: '1업 한 사람은 경험치를 더 올려도 1업했다고만 뜬다') */}
+        {!!r.expUp && <span className="rank-up rank-exp-up">+{expUpText(r.expUp)}%</span>}
       </span>
       <RoleBadge role={r.role} />
     </li>
