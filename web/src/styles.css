@@ -2233,3 +2233,16 @@ input, textarea { min-width: 0; max-width: 100%; }
 .ps-budget ~ .ps-review-groups li { flex-direction: row; justify-content: space-between; gap: 8px; padding: 6px 10px; text-align: left; }
 .ps-budget ~ .ps-review-groups li > span { display: grid; min-width: 0; }
 .ps-budget ~ .ps-review-groups li .ps-review-gain { flex: none; font-size: 12px; }
+
+/* 내 지역 날씨로 홈에 비·눈 (제작자 요청 2026-11-02 초안, pages/Weather.tsx). 효과는 누르는 데 걸리지 않고 아래 탭 밑에 깔린다 */
+.wx-fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9; }
+.home-weather {
+  position: fixed; z-index: 10; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 3px); left: 50%; transform: translateX(-50%);
+  max-width: 46%; padding: 0; white-space: nowrap; overflow: hidden; font-size: 10px; color: var(--muted); opacity: 0.85;
+  background: none; border: 0; cursor: pointer;
+}
+.wx-ask {
+  position: fixed; z-index: 11; left: 12px; right: 12px; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 20px);
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+}
+.wx-ask span { flex: 1; min-width: 0; font-size: 13px; }

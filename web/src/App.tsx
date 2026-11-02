@@ -6,6 +6,7 @@ import { goCharacter, justSwitched, onRefreshMe, personOf, setMyCharacters } fro
 import { resetFavorites } from "./favorites";
 import { DevSoon, FitLine, PixelIcon, Loading, NotFound } from "./ui";
 import { Home, HomeCorner, InfoPage, TileIcon } from "./pages/Home";
+import { HomeWeather } from "./pages/Weather";
 import { canPreview, canSee, clickItem, isLocked, isUpdated, itemOf, loadLayout, pressItem, setEditing, useLauncher } from "./launcher";
 import type { LaunchItem } from "./launcher";
 import { markNewsSeen, newsFor, refreshNews, startNews, useNews } from "./news";
@@ -292,6 +293,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
         {body}
       </main>
       {body.type === Home && <HomeCorner />}
+      {/* 내 지역 날씨로 비·눈 (초안, 앱개발자만. pages/Weather.tsx) */}
+      {body.type === Home && <HomeWeather me={me} />}
       <nav className={"tabbar" + (launcher.editing && editable ? " launch-editing" : "")} data-zone="dock">
         {tabs.map((t) => {
           // 아래 탭도 고친 메뉴면 'UPDATE' (제작자 요청 2026-11-01, 홈 칸과 같은 updates.ts)
