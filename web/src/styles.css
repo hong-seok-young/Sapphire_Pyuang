@@ -2008,3 +2008,50 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .main-tab, .mk-tab, .rent-views .pill, .pill-row .pill, .soon-fold { position: relative; }
 .in-news { position: absolute; z-index: 3; top: 2px; right: 2px; pointer-events: none; }
 .soon-fold .in-news { position: static; display: inline-block; margin-left: 6px; vertical-align: 1px; }
+
+/* 플래티넘 상점 정산 (제작자 요청 2026-11-02: 누가 무슨 템을 사고 누가 전달했는지 글줄 말고 보기 좋게, PlatShop.tsx Settlement) */
+.st-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.st-card { margin: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 10px; text-align: left; color: var(--text); cursor: pointer; opacity: 0.7; }
+.st-card-on { opacity: 1; border-color: var(--gold); box-shadow: inset 0 0 0 1px rgba(255, 209, 102, 0.35); }
+.st-card-label { font-size: 11px; color: var(--muted); }
+.st-card-gold { font-size: 18px; font-weight: 400; color: var(--gold); text-shadow: 1px 1px 0 var(--edge); }
+.st-card-gold small { font-size: 11px; color: var(--muted); text-shadow: none; }
+.st-card > small { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); }
+.st-card img, .st-row-more img, .st-plat img { width: 12px; height: 12px; }
+.st-views { margin-bottom: 8px; }
+.st-day { margin-bottom: 8px; }
+.st-day-head { margin: 6px 2px 4px; font-size: 12px; font-weight: 400; color: #6fb6ff; text-shadow: 1px 1px 0 var(--edge); }
+.st-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.st-row { background: var(--night-2); border: 1px solid var(--edge); }
+.st-open { border-color: #6fb6ff; }
+.st-row-main { width: 100%; display: flex; align-items: center; gap: 8px; padding: 6px 8px; text-align: left; color: var(--text); background: none; border: 0; cursor: pointer; }
+.st-tile { flex: none; display: block; image-rendering: pixelated; object-fit: contain; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--edge); }
+.st-tile-none { display: inline-block; }
+.st-who {
+  flex: none; width: 34px; height: 34px; display: grid; place-items: center; font-size: 15px; color: #0b0a1a;
+  background: linear-gradient(#ffe08a, #e0a63a); border: 2px solid var(--edge);
+}
+.st-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.st-item { font-weight: 400; font-size: 13px; }
+.st-flow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 4px; font-size: 12px; }
+.st-flow small { font-size: 10px; color: var(--muted); margin-right: 4px; }
+.st-buyer { color: #ffd166; }
+.st-giver { color: #8ff0b0; }
+.st-row-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.st-gold { font-weight: 400; font-size: 14px; color: var(--gold); }
+.st-row-side small { font-size: 10px; color: var(--muted); }
+.st-chip { padding: 0 4px; font-size: 10px; line-height: 14px; border: 1px solid currentColor; }
+.st-chip-done { color: #8ff0b0 !important; }
+.st-chip-cancelled, .st-chip-voided { color: var(--muted); }
+.st-cancelled .st-row-main, .st-voided .st-row-main { opacity: 0.55; }
+.st-voided .st-item { text-decoration: line-through; }
+.st-row-more { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; padding: 0 8px 7px 50px; }
+.st-row-more small { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); }
+.st-acts { display: flex; gap: 4px; }
+.st-acts .pill { font-size: 12px; padding: 4px 8px; }
+.st-bar { display: block; height: 5px; background: rgba(0, 0, 0, 0.3); }
+.st-bar span { display: block; height: 100%; background: linear-gradient(90deg, #e0a63a, #ffd166); }
+.st-things { justify-content: flex-start; padding-left: 8px; }
+.st-thing { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px 2px 2px; font-size: 12px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--edge); }
+.st-thing em { font-style: normal; color: var(--gold); }
+.st-plat { margin-left: auto; }

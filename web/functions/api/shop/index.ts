@@ -36,8 +36,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         "SELECT id, user_id AS user, item_name AS itemName, plat, gold, ratio, created_at AS at FROM plat_orders WHERE status = 'requested' ORDER BY id",
       ),
       env.DB.prepare(
-        "SELECT id, user_id AS user, item_name AS itemName, plat, gold, gold_paid AS goldPaid, status, created_at AS at, done_at AS doneAt, " +
-          "done_by AS doneBy, voided_at IS NOT NULL AS voided, voided_by AS voidedBy FROM plat_orders WHERE status != 'requested' ORDER BY id DESC LIMIT 60",
+        // 정산 화면이 사람별·물건별·전달한 사람별로 묶어 보므로 넉넉히 (제작자 요청 2026-11-02: 정산 고도화)
+        "SELECT id, user_id AS user, item_id AS itemId, item_name AS itemName, plat, gold, gold_paid AS goldPaid, status, created_at AS at, done_at AS doneAt, " +
+          "done_by AS doneBy, voided_at IS NOT NULL AS voided, voided_by AS voidedBy FROM plat_orders WHERE status != 'requested' ORDER BY id DESC LIMIT 500",
       ),
       // 정산: 거래 완료한 것 중 지우지 않은 것, 받은 골드는 직접 적은 값이 있으면 그 값
       env.DB.prepare(

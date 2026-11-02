@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useEntryState } from "../router";
 import type { ChangeEvent, ReactNode } from "react";
 import { errorText } from "../auth";
@@ -257,27 +257,7 @@ export function PlatShopPage() {
         />
       )}
 
-      {tab === "ledger" && data.manage && (
-        <>
-          <div className="ps-ledger">
-            {[
-              { label: "이번 달", v: data.manage.month },
-              { label: "전체", v: data.manage.total },
-            ].map((x) => (
-              <div key={x.label} className="panel">
-                <b>{x.label}</b>
-                <span>거래 {x.v.n}건</span>
-                <span>
-                  <img src={SHOP_PIC + "plat.png"} alt="" /> {x.v.plat.toLocaleString("ko-KR")}
-                </span>
-                <span className="ps-gold">{goldText(x.v.gold)} 골드</span>
-              </div>
-            ))}
-          </div>
-          {/* 정산에서 지우기·복구, 받은 골드 적기 (제작자 요청 2026-11-01: 시험 거래나 공짜로 준 것, 49,500 대신 5만을 받은 것) */}
-          <OrderList orders={data.manage.recent} empty="아직 기록이 없어요." action={(o) => <LedgerActions o={o} busy={busy} run={run} />} />
-        </>
-      )}
+      {tab === "ledger" && data.manage && <Settlement manage={data.manage} items={items} busy={busy} run={run} />}
 
       {tab === "settings" && data.manage && (
         <ShopSettingsPanel settings={s} items={items} busy={busy} run={run} />
@@ -315,6 +295,203 @@ function OrderList({ orders, empty, action }: { orders: ShopOrder[]; empty: stri
         );
       })}
     </ul>
+  );
+}
+
+type SettleView = "log" | "buyer" | "item" | "giver";
+const SETTLE_VIEWS: { key: SettleView; label: string }[] = [
+  { key: "log", label: "기록" },
+  { key: "buyer", label: "사람별" },
+  { key: "item", label: "물건별" },
+  { key: "giver", label: "전달한 사람" },
+];
+
+/**
+ * 정산 (제작자 요청 2026-11-02: '어떤 템 누가 사고 누가 템 전달하고 이런 걸 텍스트로만 나열하지 말고 가독성 좋게').
+ * 위: 이번 달·전체 칸 (받은 골드를 크게, 거래 수와 플래티넘). 아래 칸 줄: 기록(날짜마다 물건 그림, 산 사람 → 전달한 사람, 받은 골드) ·
+ * 사람별(산 사람마다 건수·골드와 산 물건) · 물건별(물건마다 팔린 수·골드) · 전달한 사람(오피서마다 전달 건수·받은 골드).
+ * 묶음은 지우지 않은 거래 완료만 센다. 기록 줄을 누르면 삭제·복구·골드 수정
+ */
+function Settlement({ manage, items, busy, run }: {
+  manage: NonNullable<ShopData["manage"]>;
+  items: ShopItem[];
+  busy: boolean;
+  run: (fn: () => Promise<unknown>, done?: string) => void;
+}) {
+  const [view, setView] = useEntryState<SettleView>("settle", "log");
+  const [month, setMonth] = useEntryState("settleMonth", true);
+  const [open, setOpen] = useState<number | string | null>(null);
+  const tileOf = useMemo(() => {
+    const byId = new Map(items.map((it) => [it.id, it.tile]));
+    const byName = new Map(items.map((it) => [it.name, it.tile]));
+    return (o: ShopOrder) => (o.itemId && byId.get(o.itemId)) || byName.get(o.itemName) || null;
+  }, [items]);
+  const kst = new Date(Date.now() + 9 * 3_600_000);
+  const monthStart = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), 1) - 9 * 3_600_000;
+  const done = manage.recent.filter((o) => o.status === "done" && !o.voided && (!month || (o.doneAt ?? o.at) >= monthStart));
+  const paid = (o: ShopOrder) => o.goldPaid ?? o.gold;
+  // 골드는 읽기 쉽게 '495만', '1억 2000만'
+  const gw = (n: number) => goldWords(n) || "0";
+  const group = (key: (o: ShopOrder) => string) => {
+    const m = new Map<string, ShopOrder[]>();
+    for (const o of done) m.set(key(o), [...(m.get(key(o)) ?? []), o]);
+    return [...m.entries()]
+      .map(([k, list]) => ({ k, list, gold: list.reduce((n, o) => n + paid(o), 0), plat: list.reduce((n, o) => n + o.plat, 0) }))
+      .sort((a, b) => b.gold - a.gold || b.list.length - a.list.length);
+  };
+  const Tile = ({ o, size = 34 }: { o: ShopOrder; size?: number }) => {
+    const t = tileOf(o);
+    return t ? <img className="st-tile" src={SHOP_PIC + t} alt="" width={size} height={size} loading="lazy" /> : <span className="st-tile st-tile-none" style={{ width: size, height: size }} />;
+  };
+  // 기록: 날짜마다 (한국 시간)
+  const day = (ms: number) => {
+    const d = new Date(ms + 9 * 3_600_000);
+    return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일 (${"일월화수목금토"[d.getUTCDay()]})`;
+  };
+  const log = manage.recent.filter((o) => !month || (o.doneAt ?? o.at) >= monthStart);
+  const days: { d: string; list: ShopOrder[] }[] = [];
+  for (const o of log) {
+    const d = day(o.doneAt ?? o.at);
+    const last = days[days.length - 1];
+    if (last?.d === d) last.list.push(o);
+    else days.push({ d, list: [o] });
+  }
+  return (
+    <>
+      <div className="st-cards">
+        {[
+          { label: "이번 달", v: manage.month, on: month },
+          { label: "전체", v: manage.total, on: !month },
+        ].map((x) => (
+          <button key={x.label} className={"panel st-card" + (x.on ? " st-card-on" : "")} onClick={() => setMonth(x.label === "이번 달")} aria-pressed={x.on}>
+            <span className="st-card-label">{x.label}</span>
+            <b className="st-card-gold">
+              {gw(x.v.gold)} <small>골드</small>
+            </b>
+            <small>
+              거래 {x.v.n}건 · <img src={SHOP_PIC + "plat.png"} alt="플래티넘" /> {x.v.plat.toLocaleString("ko-KR")}
+            </small>
+          </button>
+        ))}
+      </div>
+      <nav className="sub-tabs st-views">
+        {SETTLE_VIEWS.map((v) => (
+          <button key={v.key} className={"sub-tab" + (view === v.key ? " sub-tab-on" : "")} aria-pressed={view === v.key} onClick={() => (setView(v.key), setOpen(null))}>
+            {v.label}
+          </button>
+        ))}
+      </nav>
+
+      {view === "log" &&
+        (days.length ? (
+          days.map((g) => (
+            <section key={g.d} className="st-day">
+              <h3 className="st-day-head">{g.d}</h3>
+              <ul className="st-list">
+                {g.list.map((o) => (
+                  <li key={o.id} className={"st-row st-" + o.status + (o.voided ? " st-voided" : "") + (open === o.id ? " st-open" : "")}>
+                    <button className="st-row-main" onClick={() => setOpen(open === o.id ? null : o.id)} aria-expanded={open === o.id}>
+                      <Tile o={o} />
+                      <span className="st-row-text">
+                        <b className="st-item">{o.itemName}</b>
+                        {/* 누가 샀고 누가 게임 안에서 건넸는지 */}
+                        <span className="st-flow">
+                          <span className="st-buyer">{o.user}</span>
+                          <small>구매</small>
+                          {o.status === "done" && o.doneBy && (
+                            <>
+                              <span className="st-giver">{o.doneBy}</span>
+                              <small>전달</small>
+                            </>
+                          )}
+                        </span>
+                      </span>
+                      <span className="st-row-side">
+                        <b className="st-gold">{o.status === "done" ? gw(paid(o)) : "-"}</b>
+                        <small className={"st-chip st-chip-" + (o.voided ? "voided" : o.status)}>{o.voided ? "삭제됨" : STATUS[o.status]}</small>
+                      </span>
+                    </button>
+                    {open === o.id && (
+                      <div className="st-row-more">
+                        <small>
+                          신청 {ago(o.at)}
+                          {o.doneAt ? ` · 거래 ${ago(o.doneAt)}` : ""} · <img src={SHOP_PIC + "plat.png"} alt="플래티넘" /> {o.plat.toLocaleString("ko-KR")}
+                          {o.goldPaid != null && o.goldPaid !== o.gold && ` · 신청 때 ${gw(o.gold)}`}
+                          {o.voided && o.voidedBy && ` · ${o.voidedBy} 삭제`}
+                        </small>
+                        <span className="st-acts">
+                          <LedgerActions o={o} busy={busy} run={run} />
+                        </span>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))
+        ) : (
+          <div className="empty">{month ? "이번 달 기록이 없어요." : "아직 기록이 없어요."}</div>
+        ))}
+
+      {view !== "log" &&
+        (() => {
+          const groups = group((o) => (view === "buyer" ? (o.user ?? "?") : view === "item" ? o.itemName : (o.doneBy ?? "?")));
+          if (!groups.length) return <div className="empty">{month ? "이번 달 거래가 없어요." : "아직 거래가 없어요."}</div>;
+          const top = groups[0].gold || 1;
+          return (
+            <ul className="st-list">
+              {groups.map((g) => {
+                // 사람별·전달한 사람: 그 사람이 사거나 전달한 물건을 그림과 개수로
+                const things = new Map<string, { o: ShopOrder; n: number }>();
+                for (const o of g.list) things.set(o.itemName, { o, n: (things.get(o.itemName)?.n ?? 0) + 1 });
+                const people = new Map<string, number>();
+                if (view === "item") for (const o of g.list) people.set(o.user ?? "?", (people.get(o.user ?? "?") ?? 0) + 1);
+                return (
+                  <li key={g.k} className={"st-row" + (open === g.k ? " st-open" : "")}>
+                    <button className="st-row-main" onClick={() => setOpen(open === g.k ? null : g.k)} aria-expanded={open === g.k}>
+                      {view === "item" ? <Tile o={g.list[0]} /> : <span className="st-who">{g.k.slice(0, 1)}</span>}
+                      <span className="st-row-text">
+                        <b className="st-item">{g.k}</b>
+                        <span className="st-bar">
+                          <span style={{ width: `${Math.max(4, Math.round((g.gold / top) * 100))}%` }} />
+                        </span>
+                      </span>
+                      <span className="st-row-side">
+                        <b className="st-gold">{gw(g.gold)}</b>
+                        <small>
+                          {view === "giver" ? "전달" : view === "item" ? "팔림" : "구매"} {g.list.length}건
+                        </small>
+                      </span>
+                    </button>
+                    {open === g.k && (
+                      <div className="st-row-more st-things">
+                        {view === "item"
+                          ? [...people.entries()].map(([who, n]) => (
+                              <span key={who} className="st-thing">
+                                {who}
+                                {n > 1 && <em>×{n}</em>}
+                              </span>
+                            ))
+                          : [...things.values()].map(({ o, n }) => (
+                              <span key={o.itemName} className="st-thing">
+                                <Tile o={o} size={24} />
+                                {o.itemName}
+                                {n > 1 && <em>×{n}</em>}
+                              </span>
+                            ))}
+                        <small className="st-plat">
+                          <img src={SHOP_PIC + "plat.png"} alt="플래티넘" /> {g.plat.toLocaleString("ko-KR")}
+                        </small>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          );
+        })()}
+      {manage.recent.length >= 500 && <p className="ps-note">최근 500건까지 보여요</p>}
+    </>
   );
 }
 
