@@ -1,5 +1,5 @@
 // 길드 던전 화면 #/match (제작자 요청 2026-11-02, 1군 전용, src/gdungeon.ts, 서버 server/gdungeon.ts)
-// 위에서부터: 이번 주(목 10시 ~ 다음 주 목 10시), 내 파티와 지금 후보(확정·불참), 내 시간표 / 교집합, 모든 파티.
+// 위에서부터 (이번 주 날짜 줄은 뺐다, 제작자 요청 2026-11-02 '다 알아'): 내 파티와 지금 후보(확정·불참), 내 시간표 / 교집합, 모든 파티.
 // 시간표는 칸을 누르고 끌어서 칠한다 (왼쪽 시간 줄을 끌면 화면이 내려간다).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
@@ -7,7 +7,7 @@ import { JOB_NAME, errorText } from "../auth";
 import type { Job, Me } from "../auth";
 import {
   COLS, EMPTY, MAX_MEMBERS, ROWS, SLOT_MS, answerGd, candidateNo, colHead, createParty, deleteParty, editParty, fetchGd, leaveParty, rowLabel,
-  saveAvail, slotOf, slotShort, slotText, undoAnswer, validSlot, weekText,
+  saveAvail, slotOf, slotShort, slotText, undoAnswer, validSlot,
 } from "../gdungeon";
 import type { GdData, GdPerson, PartyState } from "../gdungeon";
 import { KakaoButton, Nick, useKakao } from "../kakao";
@@ -52,7 +52,6 @@ export function GuildDungeonPage({ me }: { me: Me }) {
   return (
     <>
       <TopBar title="길드 던전" />
-      <p className="growth-note gd-week">{weekText(data.week, data.end)}</p>
       {error && <p className="form-error">{error}</p>}
       {party ? (
         <PartyPanel me={me} data={data} party={party} onParty={setParty} onReload={load} onError={setError} />
@@ -149,14 +148,15 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
           const row = (
             <>
               <FitLine className="gd-member-name" text={m.id} wrap={false} hs={high.includes(m.id)} />
-              <KakaoButton name={m.id} nested={canManage} />
+              <KakaoButton name={m.id} nested={canManage || m.id === me.id} />
               {m.id === p.leader && <i className="gd-leader">파티장</i>}
               <small className={state === "확정" ? "gd-st-yes" : undefined}>{state}</small>
             </>
           );
           return (
             <li key={m.id} className={(m.filled ? "" : "gd-member-wait") + (open === m.id ? " gd-member-open" : "")}>
-              {canManage ? (
+              {/* 내 카드는 누구나 (파티 나가기), 남의 카드는 파티장·운영진만 (파티장 지정 · 빼기) */}
+              {canManage || m.id === me.id ? (
                 <button className="gd-member-row" onClick={() => (setOpen(open === m.id ? null : m.id), setAdding(false))} aria-expanded={open === m.id}>
                   {row}
                 </button>
@@ -174,8 +174,9 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
               </button>
             </li>,
           );
-        // 누른 카드: 그 카드 줄 바로 아래 가로 꽉 차게 '파티장 지정 · 빼기' (파티장 카드는 '파티 지우기') (제작자 요청 2026-11-02 '카드 누르면 파티장 주게')
-        const at = open !== null && canManage ? p.members.findIndex((m) => m.id === open) : -1;
+        // 누른 카드: 그 카드 줄 바로 아래 가로 꽉 차게. 남의 카드는 '파티장 지정 · 빼기', 내 카드는 '파티 나가기'(파티장은 '파티 지우기'도)
+        // (제작자 요청 2026-11-02 '카드 누르면 파티장 주게', '파티 나가기도 본인 카드 누르면')
+        const at = open !== null && (canManage || open === me.id) ? p.members.findIndex((m) => m.id === open) : -1;
         if (at >= 0)
           cells.splice(
             Math.min(cells.length, at - (at % 2) + 2),
@@ -183,7 +184,18 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
             <li key="+acts" className="gd-member-acts">
               <b>{open}</b>
               <div className="pill-row">
-                {open !== p.leader ? (
+                {open === me.id ? (
+                  <>
+                    <button className={"pill" + (sure === "leave" ? " gd-sure" : "")} disabled={busy} onClick={() => twice("leave", () => void act(() => leaveParty(p.id)))}>
+                      {sure === "leave" ? "정말 나가기" : "파티 나가기"}
+                    </button>
+                    {canManage && open === p.leader && (
+                      <button className={"pill" + (sure === "del" ? " gd-sure" : "")} disabled={busy} onClick={() => twice("del", () => void act(() => deleteParty(p.id)))}>
+                        {sure === "del" ? "정말 파티 지우기" : "파티 지우기"}
+                      </button>
+                    )}
+                  </>
+                ) : open !== p.leader ? (
                   <>
                     <button className="pill" disabled={busy} onClick={() => void act(() => editParty(p.id, { leader: open! }))}>
                       파티장 지정
@@ -193,6 +205,7 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
                     </button>
                   </>
                 ) : (
+                  // 운영진이 남의 파티장 카드를 누른 때
                   <button className={"pill" + (sure === "del" ? " gd-sure" : "")} disabled={busy} onClick={() => twice("del", () => void act(() => deleteParty(p.id)))}>
                     {sure === "del" ? "정말 파티 지우기" : "파티 지우기"}
                   </button>
@@ -282,27 +295,6 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
         </ul>
       )}
 
-      <div className="gd-foot">
-        <button
-          className={"bd-mini" + (sure === "leave" ? " gd-sure-text" : "")}
-          disabled={busy}
-          onClick={() =>
-            twice("leave", async () => {
-              setBusy(true);
-              try {
-                await leaveParty(p.id);
-                onReload();
-              } catch (e) {
-                onError(errorText(e));
-              } finally {
-                setBusy(false);
-              }
-            })
-          }
-        >
-          {sure === "leave" ? "정말 나가기" : "파티 나가기"}
-        </button>
-      </div>
     </section>
   );
 }
