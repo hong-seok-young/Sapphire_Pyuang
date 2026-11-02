@@ -196,18 +196,19 @@ export function ProfileSetupPage({
   );
 }
 
-type MenuKey = "photo" | "kakao" | "rename" | "test";
+type MenuKey = "info" | "photo" | "chars" | "rename" | "kakao" | "test";
+
+/** 펼치는 줄의 오른쪽 꺾쇠 (이모지·글자 대신 선으로 그린다, 펼치면 아래로) */
+const Chevron = () => <span className="me-chev" aria-hidden />;
 
 /** 설정 목록의 한 줄: 누르면 그 아래로 펼친다 (한 번에 하나) */
 function MeRow({
-  icon,
   label,
   value,
   open,
   onToggle,
   children,
 }: {
-  icon: string;
   label: string;
   value?: ReactNode;
   open: boolean;
@@ -215,92 +216,119 @@ function MeRow({
   children: ReactNode;
 }) {
   return (
-    <>
+    <div className={"me-item" + (open ? " me-item-open" : "")}>
       <button type="button" className="me-row" aria-expanded={open} onClick={onToggle}>
-        <span className="me-row-icon" aria-hidden>
-          {icon}
-        </span>
         <span className="me-row-label">{label}</span>
         {value && <span className="me-row-value">{value}</span>}
-        <span className="me-row-arrow" aria-hidden>
-          ›
-        </span>
+        <Chevron />
       </button>
       {open && <div className="me-row-body">{children}</div>}
-    </>
+    </div>
+  );
+}
+
+/** 묶음: 작은 제목과 그 아래 줄들 */
+function MeGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="me-group">
+      <h2 className="me-group-title">{title}</h2>
+      <div className="panel me-menu">{children}</div>
+    </section>
   );
 }
 
 /**
- * 내 정보 (제작자 요청 2026-11-02 '고도화, 길드 랭킹은 왜 여기 있어 빼, 버튼 정돈'):
- * 맨 위 내 카드(사진이나 직업 엠블럼, 길드·직책, 직업·레벨, 경험치 막대), 캐릭터 정보(길드·직업·레벨·경험치: 레벨업하면 여기서),
- * 내 캐릭터(묶은 캐릭터, 오른쪽 위 '추가'), 설정 목록(캐릭터 사진, 카톡 오픈프로필, 닉네임 변경, 비밀번호 변경, 테스트 계정, 로그아웃: 한 줄씩, 누르면 그 아래로)
+ * 내 정보 (제작자 요청 2026-11-02 '고도화, 길드 랭킹은 왜 여기 있어 빼, 버튼 정돈' -> '카테고리화하고 누르면 열리게, 이모지 다 빼고'):
+ * 맨 위 내 카드(사진이나 직업 엠블럼, 길드·직책 표, 직업·레벨, 경험치 막대)는 늘 보이고, 나머지는 묶음마다 한 줄씩 접혀 있다가 누르면 그 아래로 펼친다 (한 번에 하나).
+ * 캐릭터: 캐릭터 정보(길드·직업·레벨·경험치) · 캐릭터 사진 · 내 캐릭터(묶은 캐릭터와 추가 요청)
+ * 계정: 닉네임 변경 · 비밀번호 변경 · 카톡 오픈프로필 / 개발자(앱개발자만): 테스트 계정 / 맨 아래 로그아웃
  */
 export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; onLogout: () => void }) {
   const [saved, setSaved] = useState(false);
   const [open, setOpen] = useState<MenuKey | null>(null);
   const { links } = useKakao();
-  const toggle = (k: MenuKey) => () => setOpen((o) => (o === k ? null : k));
+  const row = (k: MenuKey) => ({ open: open === k, onToggle: () => setOpen((o) => (o === k ? null : k)) });
   // 직책은 지금 캐릭터의 것 (me.role 은 묶은 캐릭터 중 가장 높은 권한)
   const myRole = me.characters?.find((c) => c.id === me.id)?.role ?? me.role;
+  const chars = me.characters?.length ?? 0;
+  const pending = me.pendingCharacters?.length ?? 0;
   return (
     <>
       <TopBar title="내 정보" />
-      <section className="panel me-card">
-        <div className="me-face">
-          {me.avatar ? (
-            <img className="growth-face" src={avatarUrl(me.id, me.avatar)} alt="내 캐릭터" />
-          ) : (
-            me.job && me.level && <JobEmblem job={me.job} level={me.level} size={64} />
-          )}
-        </div>
-        <div className="me-main">
-          <div className="me-name">{me.id}</div>
-          <div className="me-sub">
-            {me.guild && `${GUILD_TIER[me.guild]} ${GUILD_NAME[me.guild]} · `}
-            {ROLE_NAME[positionOf(myRole)]}
+      <section className="panel me-hero">
+        <div className="me-hero-top">
+          <div className="me-face">
+            {me.avatar ? (
+              <img className="growth-face" src={avatarUrl(me.id, me.avatar)} alt="내 캐릭터" />
+            ) : (
+              me.job && me.level && <JobEmblem job={me.job} level={me.level} size={64} />
+            )}
           </div>
-          {me.job && (
-            <div className="me-sub me-job">
-              <JobGlyph job={me.job} size={14} />
-              {JOB_NAME[me.job]}
-              {me.level && <b>Lv.{me.level}</b>}
+          <div className="me-main">
+            <div className="me-name">{me.id}</div>
+            <div className="me-tags">
+              {me.guild && (
+                <span className={"me-tag me-tag-" + me.guild}>
+                  {GUILD_TIER[me.guild]} {GUILD_NAME[me.guild]}
+                </span>
+              )}
+              <span className="me-tag">{ROLE_NAME[positionOf(myRole)]}</span>
             </div>
-          )}
-          <div className="me-exp">
-            <span className="me-exp-track">
-              <i style={{ width: `${Math.min(100, (me.exp ?? 0) / 1000)}%` }} />
-            </span>
-            <small>{me.exp !== null ? expText(me.exp) : "경험치 미입력"}</small>
+            {me.job && (
+              <div className="me-job">
+                <JobGlyph job={me.job} size={14} />
+                {JOB_NAME[me.job]}
+                {me.level && <b>Lv.{me.level}</b>}
+              </div>
+            )}
           </div>
         </div>
+        <div className="me-exp">
+          <span className="me-exp-label">EXP</span>
+          <span className="me-exp-track">
+            <i style={{ width: `${Math.min(100, (me.exp ?? 0) / 1000)}%` }} />
+          </span>
+          <small>{me.exp !== null ? expText(me.exp) : "미입력"}</small>
+        </div>
       </section>
-      <section className="panel profile-panel">
-        <h2 className="panel-title">캐릭터 정보</h2>
-        <ProfileForm
-          key={`${me.guild}-${me.job}-${me.level}-${me.exp}`}
-          guild={me.guild}
-          job={me.job}
-          level={me.level}
-          exp={me.exp}
-          withExp
-          askChange
-          submitLabel="저장"
-          onSave={async (job, level, exp, guild, change) => {
-            await saveMyProfile(job, level, exp, guild, change);
-            onMe({ job, level, exp, guild });
-            setSaved(true);
-          }}
-        />
-        {saved && <p className="form-note">저장했어요.</p>}
-      </section>
-      <CharactersPanel me={me} />
-      <section className="panel me-menu">
-        <MeRow icon="📷" label="캐릭터 사진" value={me.avatar ? "등록됨" : "없음"} open={open === "photo"} onToggle={toggle("photo")}>
+
+      <MeGroup title="캐릭터">
+        <MeRow label="캐릭터 정보" value={me.level ? `Lv.${me.level}` : "미정"} {...row("info")}>
+          <ProfileForm
+            key={`${me.guild}-${me.job}-${me.level}-${me.exp}`}
+            guild={me.guild}
+            job={me.job}
+            level={me.level}
+            exp={me.exp}
+            withExp
+            askChange
+            submitLabel="저장"
+            onSave={async (job, level, exp, guild, change) => {
+              await saveMyProfile(job, level, exp, guild, change);
+              onMe({ job, level, exp, guild });
+              setSaved(true);
+            }}
+          />
+          {saved && <p className="form-note">저장했어요.</p>}
+        </MeRow>
+        <MeRow label="캐릭터 사진" value={me.avatar ? "등록됨" : "없음"} {...row("photo")}>
           <AvatarBody me={me} onMe={onMe} />
         </MeRow>
+        <MeRow label="내 캐릭터" value={pending ? `승낙 대기 ${pending}` : chars > 1 ? `${chars}개` : undefined} {...row("chars")}>
+          <CharactersBody me={me} />
+        </MeRow>
+      </MeGroup>
+
+      <MeGroup title="계정">
+        <MeRow label="닉네임 변경" {...row("rename")}>
+          <RenameBody me={me} onMe={onMe} />
+        </MeRow>
+        <a className="me-item me-row" href="#/password">
+          <span className="me-row-label">비밀번호 변경</span>
+          <Chevron />
+        </a>
         {/* 카톡 오픈프로필 링크 (제작자 요청 2026-11-02): 장비대여·중개인·의뢰소에서 이름 옆 '카톡' 단추로 열린다 */}
-        <MeRow icon="💬" label="카톡 오픈프로필" value={links[me.id] ? "등록됨" : "없음"} open={open === "kakao"} onToggle={toggle("kakao")}>
+        <MeRow label="카톡 오픈프로필" value={links[me.id] ? "등록됨" : "없음"} {...row("kakao")}>
           <KakaoField name={me.id} />
           <p className="me-hint">
             중개인·의뢰소·장비대여에서 내 이름 옆에 보여요{" "}
@@ -309,21 +337,12 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
             </span>
           </p>
         </MeRow>
-        <MeRow icon="✏️" label="닉네임 변경" open={open === "rename"} onToggle={toggle("rename")}>
-          <RenameBody me={me} onMe={onMe} />
-        </MeRow>
-        <a className="me-row" href="#/password">
-          <span className="me-row-icon" aria-hidden>
-            🔒
-          </span>
-          <span className="me-row-label">비밀번호 변경</span>
-          <span className="me-row-arrow" aria-hidden>
-            ›
-          </span>
-        </a>
-        {/* 앱개발자만: 테스트 계정으로 바꿔서 상대방 쪽 화면과 알림을 혼자 시험한다 (제작자 요청) */}
-        {me.role === "developer" && (
-          <MeRow icon="🧪" label="테스트 계정" open={open === "test"} onToggle={toggle("test")}>
+      </MeGroup>
+
+      {/* 앱개발자만: 테스트 계정으로 바꿔서 상대방 쪽 화면과 알림을 혼자 시험한다 (제작자 요청) */}
+      {me.role === "developer" && (
+        <MeGroup title="개발자">
+          <MeRow label="테스트 계정" {...row("test")}>
             <div className="pill-row me-pills">
               {TEST_IDS.map((id) => (
                 <button
@@ -340,21 +359,19 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
               ))}
             </div>
           </MeRow>
-        )}
-        <button
-          type="button"
-          className="me-row me-row-out"
-          onClick={async () => {
-            await logout().catch(() => undefined);
-            onLogout();
-          }}
-        >
-          <span className="me-row-icon" aria-hidden>
-            🚪
-          </span>
-          <span className="me-row-label">로그아웃</span>
-        </button>
-      </section>
+        </MeGroup>
+      )}
+
+      <button
+        type="button"
+        className="btn btn-ghost me-logout"
+        onClick={async () => {
+          await logout().catch(() => undefined);
+          onLogout();
+        }}
+      >
+        로그아웃
+      </button>
     </>
   );
 }
@@ -413,10 +430,10 @@ function AvatarBody({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
 }
 
 /**
- * 내 캐릭터 (부캐 묶기, 제작자 요청 2026-11-01): 묶은 캐릭터 목록(눌러서 바꾸기, 부캐 옆 '본캐 지정')과 오른쪽 위 '추가'(캐릭터 추가 요청).
+ * 내 캐릭터 (부캐 묶기, 제작자 요청 2026-11-01): 묶은 캐릭터 목록(눌러서 바꾸기, 부캐 옆 '본캐 지정')과 '캐릭터 추가' 요청.
  * 추가한 캐릭터는 길드마스터·오피서가 '길드원 관리'에서 승낙해야 생긴다. 로그인은 본캐 아이디와 비밀번호로
  */
-function CharactersPanel({ me }: { me: Me }) {
+function CharactersBody({ me }: { me: Me }) {
   const list = me.characters ?? [];
   const [pending, setPending] = useState(me.pendingCharacters ?? []);
   const [adding, setAdding] = useState(false);
@@ -437,15 +454,7 @@ function CharactersPanel({ me }: { me: Me }) {
   }
 
   return (
-    <section className="panel profile-panel">
-      <div className="me-title-row">
-        <h2 className="panel-title">내 캐릭터{list.length > 1 && <small> {list.length}</small>}</h2>
-        {!adding && (
-          <button className="pill" onClick={() => setAdding(true)}>
-            ＋ 추가
-          </button>
-        )}
-      </div>
+    <>
       {list.length > 0 && (
         <div className="char-list">
           {list.map((c) => (
@@ -463,7 +472,7 @@ function CharactersPanel({ me }: { me: Me }) {
                     {c.job ? ` ${JOB_NAME[c.job]}` : ""}
                   </small>
                 </span>
-                <span className="char-mark">{c.id === me.id ? "✓" : ""}</span>
+                {c.id === me.id && <span className="char-now">지금</span>}
               </button>
               {/* 주력 캐릭터가 바뀌면 본캐를 바꾼다 (제작자 요청): 비밀번호는 그대로, 로그인 아이디만 이 캐릭터로 */}
               {!c.main && (
@@ -485,7 +494,7 @@ function CharactersPanel({ me }: { me: Me }) {
         </div>
       )}
       {pending.length > 0 && <p className="form-note">승낙 대기: {pending.join(", ")}</p>}
-      {adding && (
+      {adding ? (
         <div className="me-add">
           <input
             className="mk-input"
@@ -516,9 +525,13 @@ function CharactersPanel({ me }: { me: Me }) {
             </button>
           </div>
         </div>
+      ) : (
+        <button className="btn btn-ghost me-wide" onClick={() => setAdding(true)}>
+          캐릭터 추가
+        </button>
       )}
       {error && <p className="form-error">{error}</p>}
-    </section>
+    </>
   );
 }
 

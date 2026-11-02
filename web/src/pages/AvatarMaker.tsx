@@ -74,7 +74,7 @@ export function AvatarMaker({ onSaved, onCancel }: { onSaved: (avatar: number) =
             자른 캐릭터만 올라가요.
           </p>
           <label className="btn avatar-file">
-            📷 스샷 고르기
+            스샷 고르기
             <input type="file" accept="image/*" onChange={(e) => pick(e.target.files?.[0])} />
           </label>
         </>
@@ -102,7 +102,7 @@ export function AvatarMaker({ onSaved, onCancel }: { onSaved: (avatar: number) =
       {step === "check" && png && (
         <>
           <div className="growth-hero avatar-preview">
-            <span className="growth-crown">👑 이번 주의 성장왕</span>
+            <span className="growth-crown">이번 주의 성장왕</span>
             <span className="growth-hero-face">
               <img className="growth-face" src={png.url} alt="내 캐릭터" style={{ maxWidth: 96, maxHeight: 96 }} />
             </span>
@@ -456,16 +456,16 @@ function EraseStep({ source, onBack, onDone }: { source: ImageData; onBack: () =
   return (
     <>
       <p className="form-note">
-        {ai ? "✨ AI 가 배경을 지우는 중…" : mode === "erase" ? "남은 배경을 눌러서 지워요." : "잘못 지운 곳을 눌러서 되살려요."}
+        {ai ? "AI 가 배경을 지우는 중…" : mode === "erase" ? "남은 배경을 눌러서 지워요." : "잘못 지운 곳을 눌러서 되살려요."}
         {!ai && " 비슷한 색까지 한 번에 바뀌어요."}
       </p>
       <canvas ref={canvas} className={"avatar-erase" + (ai ? " avatar-ai" : "")} onPointerDown={ai ? undefined : tap} />
       <div className="avatar-modes">
         <button type="button" className={"pill" + (mode === "erase" ? " pill-on" : "")} onClick={() => setMode("erase")}>
-          🧽 지우개
+          지우개
         </button>
         <button type="button" className={"pill" + (mode === "keep" ? " pill-on" : "")} onClick={() => setMode("keep")}>
-          ✏️ 복원
+          복원
         </button>
         <button
           type="button"
@@ -476,7 +476,7 @@ function EraseStep({ source, onBack, onDone }: { source: ImageData; onBack: () =
             setUndo((u) => u.slice(0, -1));
           }}
         >
-          ↩ 하나 전
+          하나 전
         </button>
       </div>
       <label className="avatar-slider">
@@ -485,7 +485,7 @@ function EraseStep({ source, onBack, onDone }: { source: ImageData; onBack: () =
       </label>
       <div className="avatar-modes">
         <button type="button" className="pill" disabled={ai} onClick={runAi}>
-          ✨ AI 지우기
+          AI 지우기
         </button>
         <button type="button" className="pill" onClick={() => change(clearEdges(source, tol, alpha))}>
           가장자리 정리

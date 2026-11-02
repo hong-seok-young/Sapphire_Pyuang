@@ -499,10 +499,10 @@ export function ChangeAsk({ onPick, onCancel, busy, compact }: {
     <span className={"change-ask" + (compact ? " change-ask-compact" : "")}>
       {!compact && <span className="change-ask-q">레벨이나 경험치가 바뀌었어요. 어떤 변경이에요?</span>}
       <button type="button" className="pill" disabled={busy} onClick={() => onPick("grow")}>
-        📈 실제 성장
+        실제 성장
       </button>
       <button type="button" className="pill" disabled={busy} onClick={() => onPick("fix")}>
-        ✏️ 오타 수정
+        오타 수정
       </button>
       <button type="button" className="pill" disabled={busy} onClick={onCancel}>
         취소
