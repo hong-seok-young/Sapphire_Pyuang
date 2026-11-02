@@ -1,9 +1,10 @@
-// 메뉴 설명 칸과 튜토리얼 (제작자 요청 2026-11-02, 글은 src/guides.ts).
-// - 위 줄 제목(배너)이나 홈의 'Sapphire' 글씨를 누르면 openGuide(제목) -> GuideHost(App 이 한 번 그린다)가 아래에서 설명 칸(GuideSheet)을 올린다:
-//   한 줄 소개, 단추, 흐름 (그 사람 권한에 보이는 것만), '튜토리얼 시작'.
-// - 튜토리얼(Tutorial): 화면을 어둡게 하고 그 단계의 자리만 밝게 비추며(spotlight) 글 상자로 안내. 'n/N · 이전 · 다음 · 그만'.
-//   👆 단계(tap)는 그 자리를 직접 누르면 다음으로 (칸 열기, 탭 바꾸기처럼 바꾸지 않는 것만). go 가 있으면 먼저 그 주소로 간다.
+// 메뉴 튜토리얼 (제작자 요청 2026-11-02, 글은 src/guides.ts).
+// - 위 줄 제목(배너)이나 홈의 'Sapphire' 글씨를 누르면 openGuide(제목) -> GuideHost(App 이 한 번 그린다)가 바로 튜토리얼을 시작한다.
+//   처음엔 설명 칸(단추별 기능·흐름 글)을 먼저 올리고 '튜토리얼 시작'을 누르게 했는데, 제작자가 '설명서 필요 없고 바로 튜토리얼 시작' 이라고 해서 뺐다 (2026-11-02).
+// - Tutorial: 화면을 어둡게 하고 그 단계의 자리만 밝게 비추며(spotlight) 글 상자로 안내. 'n/N', 그만 · 이전 · 다음.
+//   '눌러 보기' 단계(tap)는 그 자리를 직접 누르면 다음으로 (칸 열기, 탭 바꾸기처럼 바꾸지 않는 것만). 다음을 눌러 넘어가도 된다. go 가 있으면 먼저 그 주소로 간다.
 //   자리를 못 찾으면(그 권한에 없거나 자료가 없어서) 그 단계는 건너뛴다. 어두운 막은 누르는 데 걸리지 않아 화면을 그대로 쓸 수 있다.
+//   비추는 네모는 화면 안으로 맞춘다 (가장자리의 배치 편집을 비출 때 잘렸다, 제작자 2026-11-02). 설명이 있는 다른 메뉴로 가면 끝난다.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
@@ -13,23 +14,25 @@ import type { Guide, GuideStep } from "./guides";
 
 // ---------- 열기 (작은 바깥 저장소: TopBar 는 me 를 모른다) ----------
 let openKey: string | null = null;
+let openSeq = 0;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
-/** 제목으로 설명 칸 열기 (설명이 없는 제목이면 아무 일도 없다) */
+/** 제목으로 튜토리얼 시작 (설명이 없는 제목이면 아무 일도 없다. 도는 중에 다시 누르면 처음부터) */
 export function openGuide(title: string) {
   const g = guideByTitle(title);
   if (!g) return;
   openKey = g.key;
+  openSeq++;
   emit();
 }
 export const hasGuide = (title: string) => !!guideByTitle(title);
-function useOpenKey() {
+function useOpen() {
   return useSyncExternalStore(
     (l) => {
       listeners.add(l);
       return () => listeners.delete(l);
     },
-    () => openKey,
+    () => (openKey === null ? "" : `${openSeq}:${openKey}`),
   );
 }
 const close = () => {
@@ -37,89 +40,13 @@ const close = () => {
   emit();
 };
 
-/** App 이 한 번 그린다: 열린 설명 칸과 진행 중인 튜토리얼 */
+/** App 이 한 번 그린다: 진행 중인 튜토리얼 */
 export function GuideHost({ me }: { me: Me }) {
-  const key = useOpenKey();
-  const [running, setRunning] = useState<Guide | null>(null);
-  const guide = key === null ? null : GUIDES.find((g) => g.key === key) ?? null;
-  // 다른 화면으로 가면 설명 칸은 닫는다 (튜토리얼은 go 로 스스로 옮기므로 그대로)
-  useEffect(() => {
-    const onHash = () => {
-      if (openKey !== null) close();
-    };
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
-  }, []);
-  return (
-    <>
-      {guide && !running && (
-        <GuideSheet
-          guide={guide}
-          me={me}
-          onClose={close}
-          onStart={() => {
-            close();
-            setRunning(guide);
-          }}
-        />
-      )}
-      {running && <Tutorial guide={running} me={me} onEnd={() => setRunning(null)} />}
-    </>
-  );
-}
-
-// ---------- 설명 칸 ----------
-function GuideSheet({ guide, me, onClose, onStart }: { guide: Guide; me: Me; onClose: () => void; onStart: () => void }) {
-  const buttons = guide.buttons.filter((b) => canSee(b.who, me));
-  const flows = guide.flows.filter((f) => canSee(f.who, me));
-  const steps = guide.tutorial.filter((s) => canSee(s.who, me));
-  // 폰 뒤로 가기로 닫히게
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  return createPortal(
-    <div className="guide-back" onClick={onClose}>
-      <section className="guide-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`${guide.title} 설명`}>
-        <header className="guide-head">
-          <b>{guide.title}</b>
-          <button className="bd-mini" onClick={onClose}>
-            닫기
-          </button>
-        </header>
-        <p className="guide-intro">{guide.intro}</p>
-        <div className="guide-body">
-          <h3>단추</h3>
-          <ul className="guide-buttons">
-            {buttons.map((b) => (
-              <li key={b.name}>
-                <b>{b.name}</b>
-                {b.what && <span>{b.what}</span>}
-              </li>
-            ))}
-          </ul>
-          <h3>흐름</h3>
-          {flows.map((f) => (
-            <div key={f.title} className="guide-flow">
-              <b>{f.title}</b>
-              <ol>
-                {f.steps.map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ol>
-            </div>
-          ))}
-        </div>
-        {steps.length > 0 && (
-          <button className="pill pill-on guide-start" onClick={onStart}>
-            튜토리얼 시작 ({steps.length}단계)
-          </button>
-        )}
-      </section>
-    </div>,
-    document.body,
-  );
+  const open = useOpen();
+  if (!open) return null;
+  const key = open.slice(open.indexOf(":") + 1);
+  const guide = GUIDES.find((g) => g.key === key);
+  return guide ? <Tutorial key={open} guide={guide} me={me} onEnd={close} /> : null;
 }
 
 // ---------- 튜토리얼 ----------
@@ -127,7 +54,7 @@ function GuideSheet({ guide, me, onClose, onStart }: { guide: Guide; me: Me; onC
 function find(sel: string): HTMLElement | null {
   for (const part of sel.split(/,(?![^(]*\))/).map((s) => s.trim())) {
     const m = part.match(/^(.*?):has-text\('([^']*)'\)$/);
-    const base = m ? m[1] || "*" : part;
+    const base = m ? m[1].trim() || "*" : part;
     let list: HTMLElement[] = [];
     try {
       list = [...document.querySelectorAll<HTMLElement>(base)];
@@ -144,6 +71,8 @@ function find(sel: string): HTMLElement | null {
   return null;
 }
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** 주소의 첫 칸 ('#/rent?v=apps' -> 'rent', '#/' -> '') */
+const hashKey = () => location.hash.replace(/^#\/?/, "").split(/[/?]/)[0];
 
 function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => void }) {
   const steps = guide.tutorial.filter((s) => canSee(s.who, me));
@@ -156,6 +85,7 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
   const elRef = useRef<HTMLElement | null>(null);
   const step: GuideStep | undefined = steps[i];
   const dir = useRef(1);
+  const going = useRef(false);
 
   // 단계가 바뀌면: 이동(go) -> 자리 찾기(1.5초까지) -> 보이게 스크롤. 못 찾으면 건너뛴다
   useEffect(() => {
@@ -167,8 +97,10 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
     setReady(false);
     (async () => {
       if (step.go && location.hash !== step.go) {
+        going.current = true;
         location.hash = step.go;
         await wait(350);
+        going.current = false;
       }
       let el: HTMLElement | null = null;
       if (step.sel) {
@@ -219,7 +151,18 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
     };
   }, []);
 
-  // 👆 단계: 그 자리를 누르면 다음으로
+  // 설명이 있는 다른 메뉴로 가면(아래 탭 등) 끝낸다. go 로 스스로 옮기는 것과 글·사냥터처럼 설명이 없는 안쪽 화면은 그대로
+  useEffect(() => {
+    const onHash = () => {
+      if (going.current) return;
+      const k = hashKey();
+      if (k !== guide.key && GUIDES.some((g) => g.key === k)) onEnd();
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, [guide.key, onEnd]);
+
+  // 눌러 보기 단계: 그 자리를 누르면 다음으로
   useEffect(() => {
     if (!step?.tap) return;
     const onTap = (e: Event) => {
@@ -238,7 +181,7 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
       <div className="tut">
         <div className="tut-box" style={{ bottom: 80 }}>
           <small>{guide.title} 튜토리얼</small>
-          <p>지금 이 화면에는 보여 줄 게 없어요. 자료가 생기면(글, 신청, 파티 등) 다시 눌러 보세요.</p>
+          <p>지금 이 화면에는 보여 줄 게 없어요. 글이나 신청, 파티가 생기면 다시 눌러 보세요.</p>
           <div className="tut-acts">
             <button className="pill pill-on" onClick={onEnd}>
               닫기
@@ -248,34 +191,45 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
       </div>,
       document.body,
     );
-  if (!step || !ready) return null;
+  if (!step) return null;
+  // 다음 자리를 찾는 동안(건너뛰는 단계가 있으면 1~2초)은 어두운 막만 두어 화면이 깜박이지 않게
+  if (!ready)
+    return createPortal(
+      <div className="tut">
+        <div className="tut-dim" />
+      </div>,
+      document.body,
+    );
   const pad = 6;
   const r = rect;
-  // 글 상자: 비춘 자리 아래, 자리가 아래쪽이면 위
+  const W = window.innerWidth;
   const H = window.innerHeight;
+  // 비추는 네모는 화면 안으로 (가장자리 단추는 잘렸다)
+  const sx = r ? Math.max(2, r.left - pad) : 0;
+  const sy = r ? Math.max(2, r.top - pad) : 0;
+  const ex = r ? Math.min(W - 2, r.right + pad) : 0;
+  const ey = r ? Math.min(H - 2, r.bottom + pad) : 0;
+  // 글 상자: 비춘 자리 아래, 자리가 아래쪽이면 위, 자리가 크면 아래쪽에
   const tall = !!r && r.height > H * 0.45;
   const below = !!r && !tall && r.bottom + 160 < H;
   const boxStyle: CSSProperties = !r || tall
     ? { bottom: 80 }
     : below
-      ? { top: Math.max(8, Math.min(H - 170, r.bottom + pad + 10)) }
-      : { bottom: Math.max(8, Math.min(H - 170, H - r.top + pad + 10)) };
+      ? { top: Math.max(8, Math.min(H - 170, ey + 10)) }
+      : { bottom: Math.max(8, Math.min(H - 170, H - sy + 10)) };
   return createPortal(
     <div className="tut" aria-live="polite">
       {r && !missing ? (
-        <div
-          className={"tut-spot" + (step.tap ? " tut-spot-tap" : "")}
-          style={{ left: r.left - pad, top: r.top - pad, width: r.width + pad * 2, height: r.height + pad * 2 }}
-        />
+        <div className={"tut-spot" + (step.tap ? " tut-spot-tap" : "")} style={{ left: sx, top: sy, width: Math.max(0, ex - sx), height: Math.max(0, ey - sy) }} />
       ) : (
         <div className="tut-dim" />
       )}
       <div className="tut-box" style={boxStyle}>
         <small>
-          {guide.title} 튜토리얼 · {i + 1}/{steps.length}
+          {guide.title} 튜토리얼 {i + 1}/{steps.length}
         </small>
         <p>
-          {step.tap && <span className="tut-tap">👆 </span>}
+          {step.tap && <span className="tut-tap">눌러 보기</span>}
           {step.text}
         </p>
         <div className="tut-acts">
@@ -300,7 +254,7 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
               setI(i + 1);
             }}
           >
-            {i + 1 >= steps.length ? "끝" : step.tap ? "건너뛰기" : "다음"}
+            {i + 1 >= steps.length ? "끝" : "다음"}
           </button>
         </div>
       </div>
