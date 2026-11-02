@@ -1,9 +1,9 @@
 // 길드 던전 (server/gdungeon.ts, 제작자 요청 2026-11-02, 1군 전용)
 // GET  /api/gd -> { week, end, now, party(내 파티 상태), mine(내 이번 주 가능한 때), prev(지난주 것), parties(모든 파티 요약), people(넣을 수 있는 1군), staff }
-// POST /api/gd { name, members } -> 파티 만들기 (만든 사람이 파티장, 나 빼고 3명까지)
+// POST /api/gd { members } -> 파티 만들기 (만든 사람이 파티장, 나 빼고 3명까지. 이름은 파티장 닉네임으로 'OO 팀')
 import { FORBIDDEN, NEED_LOGIN, RANK, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { MAX_MEMBERS, allParties, canUseGd, gdPeople, memberProblem, partyIdOf, weeks } from "../../../server/gdungeon";
+import { MAX_MEMBERS, allParties, canUseGd, gdPeople, memberProblem, partyIdOf, teamName, weeks } from "../../../server/gdungeon";
 import { notify } from "../../../server/alerts";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
@@ -42,8 +42,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!(await canUseGd(env, me))) return FORBIDDEN();
-  const b = await readJson<{ name: unknown; members: unknown }>(request);
-  const name = typeof b.name === "string" && b.name.trim() ? b.name.trim().slice(0, 20) : `${me.id} 파티`;
+  const b = await readJson<{ members: unknown }>(request);
+  const name = teamName(me.id);
   const others = Array.isArray(b.members) ? [...new Set(b.members.filter((x): x is string => typeof x === "string" && x !== me.id))] : [];
   if (others.length > MAX_MEMBERS - 1) return json({ error: `파티는 ${MAX_MEMBERS}명까지예요` }, 400);
   if (await partyIdOf(env, me.id)) return json({ error: "이미 파티에 있어요" }, 409);

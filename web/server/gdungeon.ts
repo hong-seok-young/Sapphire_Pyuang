@@ -45,6 +45,9 @@ export async function canUseGd(env: Env, me: User): Promise<boolean> {
   return p?.guild === "main";
 }
 
+/** 파티 이름은 파티장 닉네임으로 'OO 팀' (제작자 요청 2026-11-02: '파티장 이름으로, 팀 이름 유어아너 팀'). 파티장이 바뀌면 같이 바뀐다 */
+export const teamName = (leader: string) => `${leader} 팀`;
+
 /** 파티를 다룰 수 있는지: 파티장 또는 운영진(오피서 이상) */
 export const canManageParty = (me: User, leader: string) => me.id === leader || RANK[me.role] >= 1;
 
@@ -110,7 +113,7 @@ export function partyState(
   }
   return {
     id: p.id,
-    name: p.name,
+    name: teamName(p.leader),
     leader: p.leader,
     members,
     avail,

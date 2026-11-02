@@ -120,7 +120,6 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
     <section className="panel gd-party">
       <div className="gd-party-head">
         <b>{p.name}</b>
-        <small>파티장 {p.leader}</small>
         {canManage && (
           <button className="bd-mini" onClick={() => setManage((v) => !v)}>
             {manage ? "닫기" : "관리"}
@@ -134,7 +133,10 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
             <li key={m.id} className={m.filled ? "" : "gd-member-wait"}>
               <span className="gd-member-name">{m.id}</span>
               <KakaoButton name={m.id} />
-              <small>{!m.filled ? "칠하기 전" : p.confirmed !== null ? "확정" : said ? "확정 ✓" : all && p.current !== null ? "대답 전" : "칠함"}</small>
+              <small>
+                {m.id === p.leader && <i className="gd-leader">파티장</i>}
+                {!m.filled ? "칠하기 전" : p.confirmed !== null ? "확정" : said ? "확정 ✓" : all && p.current !== null ? "대답 전" : "칠함"}
+              </small>
             </li>
           );
         })}
@@ -239,9 +241,8 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
   );
 }
 
-/** 파티 관리 (파티장, 운영진): 이름, 파티원 넣고 빼기, 파티장 넘기기, 파티 지우기 */
+/** 파티 관리 (파티장, 운영진): 파티원 넣고 빼기, 파티 지우기 (파티장 지정은 두지 않는다, 제작자 요청 2026-11-02) */
 function PartyManage({ me, data, party: p, onDone, onError }: { me: Me; data: GdData; party: PartyState; onDone: () => void; onError: (e: string) => void }) {
-  const [name, setName] = useState(p.name);
   const [busy, setBusy] = useState(false);
   const [sure, setSure] = useState(false);
   async function run(fn: () => Promise<unknown>) {
@@ -259,12 +260,6 @@ function PartyManage({ me, data, party: p, onDone, onError }: { me: Me; data: Gd
   const room = MAX_MEMBERS - p.members.length;
   return (
     <div className="gd-manage">
-      <div className="gd-row">
-        <input className="mk-input" value={name} maxLength={20} onChange={(e) => setName(e.target.value)} aria-label="파티 이름" />
-        <button className="pill" disabled={busy || !name.trim() || name.trim() === p.name} onClick={() => void run(() => editParty(p.id, { name: name.trim() }))}>
-          이름 변경
-        </button>
-      </div>
       <ul className="gd-manage-list">
         {p.members.map((m) => (
           <li key={m.id}>
@@ -272,16 +267,11 @@ function PartyManage({ me, data, party: p, onDone, onError }: { me: Me; data: Gd
             {m.id === p.leader ? (
               <small>파티장</small>
             ) : (
-              <span className="gd-manage-acts">
-                <button className="bd-mini" disabled={busy} onClick={() => void run(() => editParty(p.id, { leader: m.id }))}>
-                  파티장 지정
+              m.id !== me.id && (
+                <button className="bd-mini" disabled={busy} onClick={() => void run(() => editParty(p.id, { remove: [m.id] }))}>
+                  빼기
                 </button>
-                {m.id !== me.id && (
-                  <button className="bd-mini" disabled={busy} onClick={() => void run(() => editParty(p.id, { remove: [m.id] }))}>
-                    빼기
-                  </button>
-                )}
-              </span>
+              )
             )}
           </li>
         ))}
@@ -303,10 +293,9 @@ function PartyManage({ me, data, party: p, onDone, onError }: { me: Me; data: Gd
   );
 }
 
-/** 파티가 없을 때: 파티 만들기 (만든 사람이 파티장, 나 빼고 3명까지) */
+/** 파티가 없을 때: 파티 만들기 (만든 사람이 파티장, 나 빼고 3명까지, 이름은 'OO 팀') */
 function NewParty({ me, data, onDone, onError }: { me: Me; data: GdData; onDone: () => void; onError: (e: string) => void }) {
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   return (
     <section className="panel gd-party">
@@ -317,7 +306,7 @@ function NewParty({ me, data, onDone, onError }: { me: Me; data: GdData; onDone:
         </button>
       ) : (
         <div className="gd-manage">
-          <input className="mk-input" value={name} maxLength={20} placeholder={`${me.id} 파티`} onChange={(e) => setName(e.target.value)} aria-label="파티 이름" />
+          <p className="gd-new-name">{me.id} 팀</p>
           <PeoplePicker
             people={data.people.filter((x) => x.party === null)}
             exclude={[me.id]}
@@ -329,7 +318,7 @@ function NewParty({ me, data, onDone, onError }: { me: Me; data: GdData; onDone:
               setBusy(true);
               onError("");
               try {
-                await createParty(name.trim(), ids);
+                await createParty(ids);
                 onDone();
               } catch (e) {
                 onError(errorText(e));

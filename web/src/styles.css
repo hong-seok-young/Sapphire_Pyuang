@@ -2384,11 +2384,14 @@ input, textarea { min-width: 0; max-width: 100%; }
 .gd-week { margin-bottom: 8px; }
 .gd-party-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-bottom: 6px; }
 .gd-party-head > b { font-size: 15px; color: var(--gold); }
+.gd-party-head > .bd-mini { margin-left: auto; }
 .gd-party-head > small { flex: 1; min-width: 0; font-size: 11px; color: var(--muted); }
 .gd-members { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
 .gd-members li { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; min-width: 0; padding: 4px 6px; background: rgba(11, 10, 26, 0.45); border: 1px solid var(--edge); }
 .gd-member-name { min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
 .gd-members small { width: 100%; font-size: 10px; color: #7ee0a8; }
+.gd-leader { margin-right: 4px; padding: 0 3px; font-style: normal; color: var(--edge); background: var(--gold); }
+.gd-new-name { margin: 0; font-size: 14px; color: var(--gold); }
 .gd-member-wait small { color: var(--muted); }
 .gd-state { margin: 4px 0; font-size: 13px; }
 .gd-state small { color: var(--muted); }
@@ -2409,13 +2412,9 @@ input, textarea { min-width: 0; max-width: 100%; }
 .gd-rejected li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .gd-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 6px; }
 .gd-manage { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 8px 0; padding: 8px; background: rgba(11, 10, 26, 0.35); border: 1px dashed var(--edge); }
-.gd-row { display: flex; gap: 6px; }
-.gd-row .mk-input { flex: 1; min-width: 0; }
-.gd-row .pill { flex: none; }
 .gd-manage-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .gd-manage-list li { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px; font-size: 13px; }
 .gd-manage-list small { font-size: 11px; color: var(--gold); }
-.gd-manage-acts { display: flex; gap: 6px; margin-left: auto; }
 .gd-delete { justify-self: end; }
 .gd-picker { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .gd-picked { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
