@@ -1,5 +1,8 @@
 // 장비대여 (#/rent, 제작자 요청 2026-11-01, 2026-11-02 고침): 대여 담당 성민 님의 카카오톡 대여무기 목록을 옮겼다.
-// - 목록: 직업마다 레벨별로 쭉 (레벨 머리줄 아래 얇은 줄): 위키 그림과 +강, 짧은 옵션(명중9 크리4), 기한, 💎 가격, 바로 가능 / 사용 중 / 대기 수.
+// - 목록: 직업마다 레벨별로 쭉 (레벨 머리줄 아래 얇은 줄): 위키 그림과 +강, 짧은 옵션(명중9 크리4), 기한, 💎 가격, 빌려 간 무기만 '대여 중'
+//   (2026-11-02 제작자 요청: '바로' 표시와 '바로 가능' 거르기는 뺐다. 줄과 내 차례는 펼친 칸과 신청서에서).
+// - 폰 화면이 작아서 단추는 한 줄에 (2026-11-02 제작자 요청 '두 줄씩 있는 거 보기 안 좋아, 콤팩트하게'): 신청서의 무기 줄은 단추를 오른쪽에,
+//   확인을 묻는 동안에는 그 단추만, 대화창은 💬 를 눌러 연다.
 // - 신청: 줄 왼쪽 칸으로 여러 개 골라 한 번에 신청서로. 무기마다 선착순으로 줄을 서고, 신청 전에 '앞사람이 받은 날 + 기한 뒤' 받을 수 있는 날을 보인다.
 //   줄이 없으면 기한이 지나도 계속 쓰고, 줄이 생기면 기한이 끝나는 날 담당자에게 돌려준다. 신청서마다 신청한 사람과 운영진의 대화창.
 // - 운영진: 신청서마다 무기별 수락·거절, 차례가 오면 '건네줌'(마일리지에서 쓴 💎), 반납, 직접 대여, 물건 더하기·고치기·내리기, 카톡 목록 붙여넣기, 마일리지.
@@ -57,7 +60,6 @@ export function RentalPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const [data, setData] = useState<RentData | null>(null);
   const [error, setError] = useState("");
   const [job, setJob] = useEntryState<Job>("job", me.job ?? "warrior");
-  const [onlyFree, setOnlyFree] = useEntryState("free", false);
   const [open, setOpen] = useState<number | null>(null);
   const [picked, setPicked] = useState<number[]>([]);
   const [panel, setPanel] = useState<"" | "apps" | "add" | "paste" | "mileage">("apps");
@@ -87,7 +89,7 @@ export function RentalPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const myApps = data.apps.filter((a) => a.mine && a.requests.some((r) => r.status === "wait" || r.status === "ok" || r.holding));
   const openApps = data.manager ? data.apps.filter((a) => a.requests.some((r) => r.status === "wait" || r.status === "ok")) : [];
   const waitCount = openApps.reduce((n, a) => n + a.requests.filter((r) => r.status === "wait").length, 0);
-  const ofJob = data.items.filter((i) => i.job === job && (!onlyFree || (!i.renter && !i.queue)));
+  const ofJob = data.items.filter((i) => i.job === job);
   // 레벨별로 쭉 (같은 레벨 안에서는 무기, 강화, 기한 순서)
   const levels = [...new Set(ofJob.map((i) => levelOf(wiki, i)))].sort((a, b) => a - b);
   const toggle = (id: number) =>
@@ -108,15 +110,20 @@ export function RentalPage({ wiki, me }: { wiki: Wiki; me: Me }) {
           </button>
         </div>
         {showLedger && <Ledger lines={data.ledger} rate={data.rate} />}
+        {/* 쓰는 무기: 줄이 있으면 기한이 끝나는 날 담당자에게 반납, 없으면 계속 쓴다 */}
         {myHeld.map((i) => (
           <p key={i.id} className="rent-me-line">
-            🤝 {i.weapon} +{i.enhance} ·{" "}
+            <span>
+              🤝 {i.weapon} +{i.enhance}
+            </span>
             {!i.dueAt ? (
-              "기한 없음"
+              <span className="rent-muted">기한 없음</span>
             ) : i.queue ? (
-              <b className={i.dueAt < now ? "rent-late" : "rent-warn"}>다음 사람 있음 · {md(i.dueAt)}에 담당자에게 돌려주세요</b>
+              <b className={i.dueAt < now ? "rent-late" : "rent-warn"}>
+                {md(i.dueAt)} 반납 · 대기 {i.queue}
+              </b>
             ) : (
-              <span className="rent-muted">기한 {md(i.dueAt)} · 다음 신청이 없으면 계속 써요</span>
+              <span className="rent-muted">기한 {md(i.dueAt)} · 대기 없음</span>
             )}
           </p>
         ))}
@@ -128,11 +135,17 @@ export function RentalPage({ wiki, me }: { wiki: Wiki; me: Me }) {
       {/* 운영진: 신청서, 물건 더하기, 카톡 목록 붙여넣기, 마일리지 */}
       {data.manager && (
         <section className="panel rent-admin">
-          <div className="mk-chips">
+          {/* 한 줄에: 확인 전 신청 수는 '신청' 단추 모서리의 빨간 숫자 */}
+          <div className="rent-tabs">
             <b className="rent-admin-title">운영</b>
             {(["apps", "add", "paste", "mileage"] as const).map((p) => (
               <button key={p} className={"pill" + (panel === p ? " pill-on" : "")} onClick={() => setPanel(panel === p ? "" : p)}>
-                {p === "apps" ? `신청 ${openApps.length}${waitCount ? ` (새 ${waitCount})` : ""}` : p === "add" ? "+ 물건" : p === "paste" ? "목록 붙여넣기" : "마일리지"}
+                {p === "apps" ? `신청 ${openApps.length}` : p === "add" ? "+ 물건" : p === "paste" ? "붙여넣기" : "마일리지"}
+                {p === "apps" && waitCount > 0 && (
+                  <span className="rent-new" aria-label={`확인 전 ${waitCount}`}>
+                    {waitCount}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -148,16 +161,13 @@ export function RentalPage({ wiki, me }: { wiki: Wiki; me: Me }) {
         </section>
       )}
 
-      {/* 직업, 바로 받을 수 있는 것만 */}
+      {/* 직업 */}
       <div className="mk-chips rent-jobs">
         {JOBS.map((j) => (
           <button key={j} className={"pill" + (job === j ? " pill-on" : "")} onClick={() => setJob(j)}>
             {JOB_NAME[j]}
           </button>
         ))}
-        <button className={"pill" + (onlyFree ? " pill-on" : "")} onClick={() => setOnlyFree((v) => !v)}>
-          바로 가능
-        </button>
       </div>
 
       {levels.map((lv) => (
@@ -197,7 +207,7 @@ export function RentalPage({ wiki, me }: { wiki: Wiki; me: Me }) {
           </ul>
         </section>
       ))}
-      {!ofJob.length && <div className="empty">{onlyFree ? "지금 바로 받을 수 있는 무기가 없어요" : "대여 무기가 없어요"}</div>}
+      {!ofJob.length && <div className="empty">대여 무기가 없어요</div>}
 
       {picked.length > 0 && <Cart picked={picked.map((id) => byId.get(id)).filter((i): i is RentItem => !!i)} now={now} onClear={() => setPicked([])} onDone={() => (setPicked([]), void load())} />}
     </>
@@ -207,14 +217,12 @@ export function RentalPage({ wiki, me }: { wiki: Wiki; me: Me }) {
 /** 무기 그림 칸 (+강 표) */
 function Slot({ wiki, item }: { wiki: Wiki; item: RentItem }) {
   const it = weaponOf(wiki, item.weapon);
-  return <span className="rent-slot">{it?.icon ? <PicImg pic={it.icon} fit={22} /> : "?"}</span>;
+  return <span className="rent-slot">{it?.icon ? <PicImg pic={it.icon} fit={20} /> : "?"}</span>;
 }
 
-/** 줄 오른쪽 끝: 바로 / 대기 2 / 사용 중 */
+/** 줄 오른쪽 끝: 빌려 간 무기만 '대여 중' (대기와 내 차례는 펼친 칸에서, 내 신청은 왼쪽 ⏳) */
 function RowStatus({ item }: { item: RentItem }) {
-  if (item.mine) return <span className="rent-st rent-st-me">{item.mine.pos}번째</span>;
-  if (!item.renter && !item.queue) return <span className="rent-st rent-st-free">바로</span>;
-  return <span className="rent-st">{item.queue ? `대기 ${item.queue}` : "사용 중"}</span>;
+  return item.renter ? <span className="rent-st">대여 중</span> : null;
 }
 
 /** 펼친 칸: 위키 정보, 쓰는 사람과 줄, 내 신청, 운영진 일 */
@@ -239,9 +247,9 @@ function Detail({ wiki, item, data, now, onDone }: { wiki: Wiki; item: RentItem;
       <p className="rent-line">
         {item.renter ? (
           <>
-            🤝 {item.renter} 사용 중{item.rentedAt ? ` · ${md(item.rentedAt)}부터` : ""}
+            🤝 {item.renter} 대여 중{item.rentedAt ? ` · ${md(item.rentedAt)}부터` : ""}
             {item.dueAt ? ` · 기한 ${md(item.dueAt)}` : " · 기한 없음"}
-            {item.dueAt && !item.queue ? " (다음 신청이 없으면 계속 써요)" : ""}
+            {item.dueAt && !item.queue ? " · 대기 없으면 계속" : ""}
           </>
         ) : (
           "담당자에게 있어요"
@@ -275,10 +283,10 @@ function MyRequest({ item, onDone }: { item: RentItem; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   return (
-    <div className="mk-actions">
+    <div className="rent-bar">
       <span className="rent-next">
         내 신청 · {STATUS_NAME[m.status]} · {m.pos}번째
-        {m.at ? (m.at <= Date.now() + 60_000 ? " · 바로" : ` · ${md(m.at)}부터`) : m.pos === 1 && !item.renter ? " · 바로" : " · 앞사람이 반납하면"}
+        {m.at ? (m.at <= Date.now() + 60_000 ? " · 바로" : ` · ${md(m.at)}부터`) : m.pos === 1 && !item.renter ? " · 바로" : " · 앞사람 반납 뒤"}
       </span>
       <button
         className="pill"
@@ -297,7 +305,7 @@ function MyRequest({ item, onDone }: { item: RentItem; onDone: () => void }) {
       >
         신청 취소
       </button>
-      {error && <p className="form-error">{error}</p>}
+      {error && <p className="form-error rent-full">{error}</p>}
     </div>
   );
 }
@@ -327,7 +335,8 @@ function Cart({ picked, now, onClear, onDone }: { picked: RentItem[]; now: numbe
       )}
       <div className="rent-cart-bar">
         <span>
-          {picked.length}개 골랐어요 <small>(한 번에 {MAX_PICK}개까지)</small>
+          고른 무기 <b>{picked.length}</b>
+          <small>/{MAX_PICK}</small>
         </span>
         <button className="pill" onClick={onClear}>
           비우기
@@ -366,14 +375,22 @@ function Cart({ picked, now, onClear, onDone }: { picked: RentItem[]; now: numbe
 
 /** 신청서: 무기마다 상태와 차례, 운영진의 수락·거절·건네줌, 신청한 사람의 취소, 대화창 */
 function AppCard({ app, data, byId, manage = false, onDone }: { app: RentApp; data: RentData; byId: Map<number, RentItem>; manage?: boolean; onDone: () => void }) {
-  const [talkOpen, setTalkOpen] = useState(manage || app.talk.length > 0);
+  // 대화창은 접어 두고 💬 로 연다. 상대가 마지막으로 썼으면 💬 를 금색으로 (운영진에게는 신청한 사람의 글, 신청한 사람에게는 운영진의 글)
+  const [talkOpen, setTalkOpen] = useState(false);
+  const last = app.talk[app.talk.length - 1];
+  const fresh = !!last && (manage ? last.user === app.user : !data.mine.includes(last.user));
   return (
     <div className="rent-app">
       <div className="rent-app-head">
         <b>{manage ? app.user : "내 신청"}</b>
         <small>{when(app.createdAt)}</small>
         {manage && app.mileage !== undefined && <small className="rent-dia-sm">💎{app.mileage}</small>}
-        <button className="pill rent-talk-btn" onClick={() => setTalkOpen((v) => !v)}>
+        <button
+          className={"pill rent-talk-btn" + (talkOpen ? " pill-on" : fresh ? " rent-talk-fresh" : "")}
+          onClick={() => setTalkOpen((v) => !v)}
+          aria-label="대화"
+          aria-expanded={talkOpen}
+        >
           💬 {app.talk.length || ""}
         </button>
       </div>
@@ -410,16 +427,19 @@ function ReqLine({ r, item, app, manage, rate, onDone }: { r: AppRequest; item?:
   const queued = r.status === "wait" || r.status === "ok";
   // 건넬 수 있는 때: 무기가 담당자에게 있고 줄의 첫 사람 (그 밖에도 담당자 판단으로 건넬 수 있게 '건네줌'은 늘 둔다)
   const free = item && !item.renter;
+  // 아직 다른 사람이 쓰고 있으면 운영진에게는 누구에게 돌려받아야 하는지 ('춘천다크갈비 반납 뒤')
+  const after = manage && !free && item?.renter ? `${item.renter} 반납 뒤` : "앞사람 반납 뒤";
   const state = r.holding
-    ? `사용 중${item?.dueAt ? ` · 기한 ${md(item.dueAt)}` : ""}`
+    ? `대여 중${item?.dueAt ? ` · 기한 ${md(item.dueAt)}` : ""}`
     : queued
-      ? `${STATUS_NAME[r.status]} · ${r.pos}번째${r.at ? (r.at <= Date.now() + 60_000 ? " · 바로" : ` · ${md(r.at)}부터`) : free && r.pos === 1 ? " · 바로" : " · 앞사람 반납 뒤"}`
+      ? `${STATUS_NAME[r.status]} · ${r.pos}번째 · ${r.at ? (r.at <= Date.now() + 60_000 ? "바로" : `${md(r.at)}부터`) : free && r.pos === 1 ? "바로" : after}`
       : r.status === "done"
         ? `건네받음${r.returnedAt ? ` · ${md(r.returnedAt)} 반납` : ""}`
         : STATUS_NAME[r.status];
   return (
     <li className="rent-req">
-      <div className="rent-req-top">
+      {/* 왼쪽: 무기와 상태 두 줄, 오른쪽: 단추 한 줄 */}
+      <div className="rent-req-info">
         <span className="rent-req-name">
           {r.weapon ?? "내려간 무기"} {r.enhance !== null ? `+${r.enhance}` : ""}
           <small>
@@ -428,8 +448,8 @@ function ReqLine({ r, item, app, manage, rate, onDone }: { r: AppRequest; item?:
         </span>
         <span className={"rent-req-st rent-req-" + (r.holding ? "hold" : r.status)}>{state}</span>
       </div>
-      {queued && (
-        <div className="mk-actions">
+      {queued && (manage || app.mine) && (
+        <div className="rent-btns">
           {manage ? (
             <>
               {r.status === "wait" && (
@@ -443,35 +463,41 @@ function ReqLine({ r, item, app, manage, rate, onDone }: { r: AppRequest; item?:
               <button className="pill" disabled={busy} onClick={() => void act("reject")}>
                 거절
               </button>
-              {!free && item?.renter && <small className="rent-muted">{item.renter} 님에게 돌려받은 뒤 건네요</small>}
             </>
           ) : (
-            app.mine && (
-              <button className="pill" disabled={busy} onClick={() => void act("cancel")}>
-                취소
-              </button>
-            )
+            <button className="pill" disabled={busy} onClick={() => void act("cancel")}>
+              취소
+            </button>
           )}
         </div>
       )}
       {handing && item && (
-        <div className="mk-actions rent-hand">
-          <span className="rent-muted">마일리지</span>
-          <button className="pill" disabled={use <= 0} onClick={() => setUse((v) => Math.max(0, v - 1))}>
-            −
-          </button>
-          <b className="rent-use">💎{use}</b>
-          <button className="pill" disabled={use >= Math.min(item.price, app.mileage ?? 0)} onClick={() => setUse((v) => v + 1)}>
-            +
-          </button>
-          <span className="rent-muted">골드 {diaGold(item.price - use, rate)}</span>
+        <div className="rent-hand rent-full">
+          <DiaStep use={use} max={Math.min(item.price, app.mileage ?? 0)} price={item.price} rate={rate} onChange={setUse} />
           <button className="pill pill-on" disabled={busy} onClick={() => void act("hand")}>
-            건넸어요
+            완료
           </button>
         </div>
       )}
-      {error && <p className="form-error">{error}</p>}
+      {error && <p className="form-error rent-full">{error}</p>}
     </li>
+  );
+}
+
+/** 마일리지에서 쓸 💎: 마일리지 − 💎2 + 골드 80만 (나머지는 골드) */
+function DiaStep({ use, max, price, rate, onChange }: { use: number; max: number; price: number; rate: number; onChange: (v: number) => void }) {
+  return (
+    <span className="rent-step">
+      <span className="rent-muted">마일리지</span>
+      <button type="button" className="pill" disabled={use <= 0} onClick={() => onChange(Math.max(0, use - 1))} aria-label="마일리지 빼기">
+        −
+      </button>
+      <b className="rent-use">💎{use}</b>
+      <button type="button" className="pill" disabled={use >= max} onClick={() => onChange(Math.min(max, use + 1))} aria-label="마일리지 더하기">
+        +
+      </button>
+      <span className="rent-muted">골드 {diaGold(price - use, rate)}</span>
+    </span>
   );
 }
 
@@ -480,8 +506,17 @@ function Talk({ app, onDone }: { app: RentApp; onDone: () => void }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const list = useRef<HTMLUListElement>(null);
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => end.current?.scrollIntoView({ block: "nearest" }), [app.talk.length]);
+  // 열면 입력 칸이 보이게 (대화창은 💬 를 눌러야 열려서 화면을 열 때 저절로 내려가지 않는다)
+  // scrollIntoView 는 요즘 크롬에서 Promise 를 돌려준다: 화살표 함수로 그대로 돌려주면 React 가 정리 함수로 불러 화면이 멈췄다 (운영 칸 바꾸기, 💬 닫기)
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "nearest" });
+  }, []);
+  // 새 글은 대화 목록 안에서만 맨 아래로
+  useEffect(() => {
+    if (list.current) list.current.scrollTop = list.current.scrollHeight;
+  }, [app.talk.length]);
   const send = async () => {
     const t = text.trim();
     if (!t) return;
@@ -500,7 +535,7 @@ function Talk({ app, onDone }: { app: RentApp; onDone: () => void }) {
   return (
     <div className="rent-talk">
       {app.talk.length > 0 && (
-        <ul className="rent-talk-list">
+        <ul ref={list} className="rent-talk-list">
           {app.talk.map((t) => (
             <li key={t.id} className={t.user === app.user ? "rent-talk-them" : "rent-talk-staff"}>
               <b>{t.user}</b> <small>{when(t.at)}</small>
@@ -551,47 +586,47 @@ function ManagerBox({ item, data, onEdit, onDone }: { item: RentItem; data: Rent
   };
   return (
     <div className="rent-manage">
-      <div className="mk-actions">
-        {item.renter ? (
-          sure === "return" ? (
-            <>
-              <span className="rent-muted">게임 안에서 돌려받았어요?</span>
-              <button className="pill pill-on" disabled={busy} onClick={() => run(() => returnRent(item.id))}>
-                반납
-              </button>
-              <button className="pill" onClick={() => setSure("")}>
-                취소
-              </button>
-            </>
-          ) : (
-            <button className="pill" onClick={() => setSure("return")}>
+      {/* 한 줄: 반납·내리기는 한 번 더 묻는 동안 그 단추와 취소만 */}
+      {sure === "return" ? (
+        <div className="rent-btns">
+          <span className="rent-muted">게임 안에서 돌려받았어요?</span>
+          <button className="pill pill-on" disabled={busy} onClick={() => run(() => returnRent(item.id))}>
+            반납
+          </button>
+          <button className="pill" onClick={() => setSure("")}>
+            취소
+          </button>
+        </div>
+      ) : sure === "remove" ? (
+        <div className="rent-btns">
+          <button className="pill pill-danger" disabled={busy} onClick={() => run(() => removeRent(item.id))}>
+            내리기
+          </button>
+          <button className="pill" onClick={() => setSure("")}>
+            취소
+          </button>
+        </div>
+      ) : (
+        <div className="rent-btns">
+          {item.renter ? (
+            <button className="pill" onClick={() => (setLending(false), setSure("return"))}>
               반납
             </button>
-          )
-        ) : (
-          <button className={"pill" + (lending ? " pill-on" : "")} onClick={() => setLending((v) => !v)}>
-            직접 대여
-          </button>
-        )}
-        <button className="pill" onClick={onEdit}>
-          정보 수정
-        </button>
-        {!item.renter &&
-          (sure === "remove" ? (
-            <>
-              <button className="pill pill-danger" disabled={busy} onClick={() => run(() => removeRent(item.id))}>
-                내리기
-              </button>
-              <button className="pill" onClick={() => setSure("")}>
-                취소
-              </button>
-            </>
           ) : (
-            <button className="pill" onClick={() => setSure("remove")}>
+            <button className={"pill" + (lending ? " pill-on" : "")} onClick={() => setLending((v) => !v)}>
+              직접 대여
+            </button>
+          )}
+          <button className="pill" onClick={onEdit}>
+            정보 수정
+          </button>
+          {!item.renter && (
+            <button className="pill" onClick={() => (setLending(false), setSure("remove"))}>
               내리기
             </button>
-          ))}
-      </div>
+          )}
+        </div>
+      )}
       {lending && <LendForm item={item} data={data} busy={busy} onLend={(body) => run(() => lendRent(item.id, body))} />}
       {error && <p className="form-error">{error}</p>}
     </div>
@@ -606,24 +641,17 @@ function LendForm({ item, data, busy, onLend }: { item: RentItem; data: RentData
   return (
     <div className="rent-ask">
       <NameInput value={renter} onChange={setRenter} members={data.members ?? []} placeholder="빌려 갈 사람 닉네임" />
-      <div className="mk-actions">
-        <span className="rent-muted">마일리지</span>
-        <button className="pill" disabled={use <= 0} onClick={() => setUse((v) => Math.max(0, v - 1))}>
-          −
+      <DiaStep use={use} max={item.price} price={item.price} rate={data.rate} onChange={setUse} />
+      {/* 빌려 간 날과 처리 단추를 한 줄에 */}
+      <div className="rent-lend">
+        <label className="mk-field">
+          <span>빌려 간 날 (비우면 오늘)</span>
+          <input className="mk-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </label>
+        <button className="pill pill-on" disabled={busy || !renter.trim()} onClick={() => onLend({ renter: renter.trim(), useDia: use, ...(date ? { date } : {}) })}>
+          대여 처리
         </button>
-        <b className="rent-use">💎{use}</b>
-        <button className="pill" disabled={use >= item.price} onClick={() => setUse((v) => Math.min(item.price, v + 1))}>
-          +
-        </button>
-        <span className="rent-muted">골드 {diaGold(item.price - use, data.rate)}</span>
       </div>
-      <label className="mk-field">
-        <span>빌려 간 날 (비우면 오늘)</span>
-        <input className="mk-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-      </label>
-      <button className="btn" disabled={busy || !renter.trim()} onClick={() => onLend({ renter: renter.trim(), useDia: use, ...(date ? { date } : {}) })}>
-        대여 처리
-      </button>
     </div>
   );
 }
@@ -865,10 +893,14 @@ function MileagePanel({ data, onDone }: { data: RentData; onDone: () => void }) 
           − 차감
         </button>
       </div>
-      <div className="rent-grid">
+      {/* 💎 와 메모를 한 줄에 */}
+      <div className="rent-mile">
         <Num label="💎" value={amount} min={1} max={9999} onChange={setAmount} />
+        <label className="mk-field">
+          <span>메모</span>
+          <input className="mk-input" placeholder={reason === "donate" ? "기부한 장비 (+8 글라디우스)" : "까닭"} maxLength={100} value={note} onChange={(e) => setNote(e.target.value)} />
+        </label>
       </div>
-      <input className="mk-input" placeholder={reason === "donate" ? "기부한 장비 (+8 글라디우스)" : "까닭"} maxLength={100} value={note} onChange={(e) => setNote(e.target.value)} />
       <button className="btn" disabled={busy || !who.trim()} onClick={() => void save()}>
         {minus ? `💎${amount} 빼기` : `💎${amount} 더하기`}
       </button>
