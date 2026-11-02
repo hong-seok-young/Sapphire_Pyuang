@@ -24,9 +24,9 @@ export interface OfficialPost extends OfficialItem {
 /** 게시판 '아이모 소식' 안의 칸 */
 export const OFFICIAL_TABS: { key: OfficialTab; label: string }[] = [
   { key: "all", label: "전체" },
-  { key: "notice", label: "📢 공지사항" },
-  { key: "maint", label: "🔧 점검" },
-  { key: "event", label: "🎉 이벤트" },
+  { key: "notice", label: "공지사항" },
+  { key: "maint", label: "점검" },
+  { key: "event", label: "이벤트" },
 ];
 
 export const TYPE_NAME: Record<string, string> = { N: "공지", C: "점검", I: "안내", D: "오류", E: "이벤트" };
