@@ -4,7 +4,7 @@ import { VERSION } from "../patchnotes";
 import { useEffect, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { enablePush, markPushAsked, shouldAskPush } from "../push";
-import { INFO_TILES, canSee, clickItem, isLocked, isUpdated, itemOf, pressItem, resetLayout, setEditing, useLauncher } from "../launcher";
+import { INFO_TILES, canPreview, canSee, clickItem, isLocked, isUpdated, itemOf, pressItem, resetLayout, setEditing, useLauncher } from "../launcher";
 import type { LaunchItem } from "../launcher";
 import { newsFor, useMaint, useNews } from "../news";
 import type { Maint } from "../news";
@@ -157,14 +157,15 @@ export function Home({ me }: { me: Me }) {
           <button className="soon-fold" onClick={() => setShowSoon((v) => !v)} aria-expanded={showSoon}>
             개발 중 {soon.length} {showSoon ? "▴" : "▾"}
           </button>
-          {showSoon && <Tiles me={me} tiles={soon} />}
+          {/* 안의 칸은 운영진(길드마스터, 오피서)과 앱개발자만 (제작자 요청 2026-11-02). 길드원은 단추만 */}
+          {showSoon && (canPreview(me) ? <Tiles me={me} tiles={soon} /> : <p className="soon-closed">운영진에게만 보여요</p>)}
         </>
       )}
 
       {/* 배치 편집: 아래 탭 왼쪽 끝 바로 위에 작게 (제작자 요청 2026-11-01: 꾹 누르기와 함께, 버전 글씨의 반대편) */}
       {!L.editing && (
         <button className="home-edit" onClick={() => setEditing(true)}>
-          ✏️ 배치 편집
+          ⚙️ 배치 편집
         </button>
       )}
 

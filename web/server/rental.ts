@@ -50,7 +50,8 @@ export function expectedTimes(item: { term: RentTerm; renter: string | null; ren
 }
 
 /** 들어올 수 있는 사람 (개발 중에는 앱개발자만) */
-export const canEnter = (me: User) => RENT_OPEN || me.role === "developer";
+/** 들어갈 수 있는지: 열기 전에는 운영진(길드마스터, 오피서)과 앱개발자만 미리 본다 (제작자 요청 2026-11-02, 화면 src/launcher.ts canPreview) */
+export const canEnter = (me: User) => RENT_OPEN || RANK[me.role] >= 1;
 /** 목록, 신청, 마일리지를 다루는 사람: 길드마스터·오피서·앱개발자 */
 export const isManager = (me: User) => RANK[me.role] >= 1;
 

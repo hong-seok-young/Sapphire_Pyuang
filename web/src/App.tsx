@@ -6,7 +6,7 @@ import { goCharacter, justSwitched, onRefreshMe, personOf, setMyCharacters } fro
 import { resetFavorites } from "./favorites";
 import { DevSoon, FitLine, PixelIcon, Loading, NotFound } from "./ui";
 import { Home, InfoPage, TileIcon } from "./pages/Home";
-import { canSee, clickItem, isLocked, isUpdated, itemOf, loadLayout, pressItem, setEditing, useLauncher } from "./launcher";
+import { canPreview, canSee, clickItem, isLocked, isUpdated, itemOf, loadLayout, pressItem, setEditing, useLauncher } from "./launcher";
 import type { LaunchItem } from "./launcher";
 import { markNewsSeen, newsFor, refreshNews, startNews, useNews } from "./news";
 import { Search } from "./pages/Search";
@@ -232,7 +232,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "as") body = <SwitchTo me={me} who={arg} to={route.query.get("to") ?? ""} />;
   else if (page === "ranking") body = <RankingPage me={me} onMe={onMe} />;
   else if (page === "requests") body = <RequestsPage me={me} />;
-  else if (page === "alerts") body = <AlertsPage developer={me.role === "developer"} />;
+  else if (page === "alerts") body = <AlertsPage developer={me.role === "developer"} preview={canPreview(me)} />;
   else if (page === "shop") body = <PlatShopPage />;
   else if (page === "patch") body = <PatchNotesPage />;
   // 아이모 소식 글 읽기 (#/official/번호). 예전 목록 주소(#/official)는 게시판 '아이모 소식'으로
@@ -244,8 +244,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
   else if (page === "app" || page === "timer") body = <AppPage />;
   else if (page === "gaps") body = me.role === "developer" ? <ChatGapsPage /> : <NotFound what="페이지" />;
-  // 개발 중인 칸 (장비대여, 매칭, To do): 길드원에게는 '개발 중' 화면. 앱개발자는 만든 화면이 있으면 그 화면 (제작자 요청 2026-11-01)
-  else if (page === "match" || ((page === "rent" || page === "todo") && me.role !== "developer")) body = <DevSoon title={itemOf(page)?.title ?? ""} />;
+  // 개발 중인 칸 (장비대여, 매칭, To do): 길드원에게는 '개발 중' 화면. 운영진과 앱개발자는 만든 화면이 있으면 그 화면 (제작자 요청 2026-11-02, canPreview)
+  else if (page === "match" || ((page === "rent" || page === "todo") && !canPreview(me))) body = <DevSoon title={itemOf(page)?.title ?? ""} />;
   else if (!wiki) body = <Loading error={loggedOut ? undefined : error} onRetry={() => setWikiTry((n) => n + 1)} />;
   else if (page === "search") body = <Search wiki={wiki} q={route.query.get("q") ?? ""} />;
   else if (page === "places") body = <Places wiki={wiki} region={route.query.get("r") ?? ""} />;

@@ -2,6 +2,7 @@
 // 체크한 것(todo_checks)을 준다. 길드 출석·길드 임무·인던 같은 늘 하는 일은 화면이 위키 자료로 만든다 (src/todo.ts).
 // 체크는 그 주기 안에서만 남는다: 매일(d)은 한국 시간 0시, 매주(w)는 목요일 오전 10시(server/week.ts), 한 번(o)은 계속.
 // 사용자가 직접 누르는 체크일 뿐 게임은 읽지 않는다 (CLAUDE.md 게임 안전 규칙).
+import { TEST_IDS } from "./auth";
 import type { Env } from "./auth";
 import { weekStart } from "./week";
 import { DIGEST_TAG, NO_TODO_TITLE, digestClient, digestPost, mergeSignature, mergeTasks, signatureSources, tasksUntil } from "./todoDigest";
@@ -219,4 +220,101 @@ export async function doneKeys(env: Env, userId: string, now = Date.now()): Prom
     .bind(userId, "d" + kstDate(now), "w" + kstDate(weekStart(now)))
     .all<{ item: string }>();
   return results.map((r) => r.item);
+}
+
+// ---------- 사람마다 고친 To do: 내 할 일, 숨기기·이름 고치기, 함께 하는 할 일 (제작자 요청 2026-11-02) ----------
+
+/** 길드원에게 열었는지. 지금은 개발 중이라 운영진, 앱개발자, 테스트 계정만 쓴다: 함께 할 사람도 그 안에서만 고른다 (알림이 길드원에게 가지 않게) */
+export const TODO_OPEN = false;
+/** 할 일 키: 주기(d 매일, w 매주, o 한 번):무엇 */
+export const TODO_KEY = /^[dwo]:[\p{L}\p{N}:_-]{1,80}$/u;
+/** 내 할 일의 키 */
+export const customKey = (cycle: string, id: number) => `${cycle}:c:${id}`;
+export const isCustomKey = (key: string) => /^[dwo]:c:\d+$/.test(key);
+export const MAX_CUSTOM = 30;
+export const MAX_SHARE_MEMBERS = 20;
+export const MAX_SHARES = 30;
+
+/** 글자 칸: 공백을 하나로, max 자까지 (빈 글은 null) */
+export function cleanText(v: unknown, max: number): string | null {
+  if (typeof v !== "string") return null;
+  const s = v.replace(/\s+/g, " ").trim().slice(0, max);
+  return s || null;
+}
+
+export interface TodoCustomOut {
+  id: number;
+  key: string;
+  cycle: "d" | "w" | "o";
+  text: string;
+  note: string | null;
+}
+export interface TodoEditOut {
+  key: string;
+  hidden: boolean;
+  text: string | null;
+  note: string | null;
+}
+export interface TodoShareOut {
+  id: number;
+  owner: string;
+  key: string;
+  text: string;
+  note: string | null;
+  at: string | null;
+  /** 함께 하는 사람 (만든 사람 먼저)과 지금 주기에 체크했는지 */
+  members: { id: string; done: boolean }[];
+}
+
+/** 이 캐릭터의 내 할 일, 고친 것, 함께 하는 할 일 (함께 하는 사람들의 체크까지) */
+export async function todoExtras(env: Env, userId: string, now = Date.now()): Promise<{ custom: TodoCustomOut[]; edits: TodoEditOut[]; shares: TodoShareOut[] }> {
+  const mine = "SELECT share_id FROM todo_share_members WHERE user_id = ?1";
+  const [customR, editsR, sharesR, membersR, checksR] = await env.DB.batch([
+    env.DB.prepare("SELECT id, cycle, text, note FROM todo_custom WHERE user_id = ?1 ORDER BY id").bind(userId),
+    env.DB.prepare("SELECT item, hidden, text, note FROM todo_edits WHERE user_id = ?1").bind(userId),
+    env.DB.prepare(`SELECT id, owner, item, text, note, at_text FROM todo_shares WHERE id IN (${mine}) ORDER BY id`).bind(userId),
+    env.DB.prepare(`SELECT share_id, user_id FROM todo_share_members WHERE share_id IN (${mine}) ORDER BY added_at, user_id`).bind(userId),
+    env.DB.prepare(
+      "SELECT m.share_id, c.user_id FROM todo_share_members m JOIN todo_shares s ON s.id = m.share_id " +
+        `JOIN todo_checks c ON c.user_id = m.user_id AND c.item = s.item WHERE m.share_id IN (${mine}) AND c.period IN (?2, ?3, 'o')`,
+    ).bind(userId, "d" + kstDate(now), "w" + kstDate(weekStart(now))),
+  ]);
+  const custom = (customR.results as { id: number; cycle: "d" | "w" | "o"; text: string; note: string | null }[]).map((r) => ({
+    ...r,
+    key: customKey(r.cycle, r.id),
+  }));
+  const edits = (editsR.results as { item: string; hidden: number; text: string | null; note: string | null }[]).map((r) => ({
+    key: r.item,
+    hidden: !!r.hidden,
+    text: r.text,
+    note: r.note,
+  }));
+  const done = new Set((checksR.results as { share_id: number; user_id: string }[]).map((r) => `${r.share_id}\n${r.user_id}`));
+  const members = new Map<number, string[]>();
+  for (const r of membersR.results as { share_id: number; user_id: string }[]) members.set(r.share_id, [...(members.get(r.share_id) ?? []), r.user_id]);
+  const shares = (sharesR.results as { id: number; owner: string; item: string; text: string; note: string | null; at_text: string | null }[]).map((s) => {
+    const ids = members.get(s.id) ?? [];
+    const ordered = [s.owner, ...ids.filter((id) => id !== s.owner)];
+    return {
+      id: s.id,
+      owner: s.owner,
+      key: s.item,
+      text: s.text,
+      note: s.note,
+      at: s.at_text,
+      members: ordered.map((id) => ({ id, done: done.has(`${s.id}\n${id}`) })),
+    };
+  });
+  return { custom, edits, shares };
+}
+
+/** 함께 할 수 있는 사람인지 (열기 전에는 미리 보는 사람만: 운영진, 앱개발자, 테스트 계정. 화면 src/launcher.ts canPreview) */
+export async function shareablePeople(env: Env, exclude: string): Promise<{ id: string; job: string | null; level: number | null; guild: string | null }[]> {
+  const only = TODO_OPEN ? "" : ` AND (u.role IN ('developer', 'master', 'officer') OR u.id IN (${TEST_IDS.map((id) => `'${id}'`).join(", ")}))`;
+  const { results } = await env.DB.prepare(
+    "SELECT u.id, p.job, p.level, p.guild FROM users u LEFT JOIN profiles p ON p.user_id = u.id WHERE u.id != ?" + only + " ORDER BY p.level DESC, u.id LIMIT 500",
+  )
+    .bind(exclude)
+    .all<{ id: string; job: string | null; level: number | null; guild: string | null }>();
+  return results;
 }

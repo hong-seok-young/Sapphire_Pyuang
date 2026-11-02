@@ -16,10 +16,9 @@ import { growthEntries } from "./growth";
 import type { Period } from "./growth";
 import { ACCEPT_MS } from "./requests";
 import { weekStart } from "./week";
-import { doneKeys, eventTasks } from "./todo";
+import { TODO_OPEN, doneKeys, eventTasks, todoExtras } from "./todo";
 
 /** To do 를 길드원에게 열었는지 (지금은 개발 중이라 앱개발자만, 제작자 요청 2026-11-01. 열 때 true 와 챗봇 안내 줄, src/launcher.ts) */
-const TODO_OPEN = false;
 
 /** 길드 앱 자료 전체 글자 수 */
 export const MAX_APP = 24000;
@@ -321,11 +320,19 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
   }
 
   // ---------- To do (홈 'To do' 화면과 같은 값: 이 사람의 레벨·직업에 맞는 할 일과 이번 주기에 체크한 것) ----------
-  if (ASK.todo.test(q) && (TODO_OPEN || dev)) {
+  if (ASK.todo.test(q) && (TODO_OPEN || officer || TEST_IDS.includes(me.id))) {
     const mine = people.find((p) => p.id === me.id);
-    const [tasks, done] = await Promise.all([eventTasks(env, { job: mine?.job ?? null, level: mine?.level ?? null }, now), doneKeys(env, me.id, now)]);
+    const [all, done, extras] = await Promise.all([
+      eventTasks(env, { job: mine?.job ?? null, level: mine?.level ?? null }, now),
+      doneKeys(env, me.id, now),
+      todoExtras(env, me.id, now),
+    ]);
     const checked = new Set(done);
     const mark = (key: string) => (checked.has(key) ? " (체크함)" : "");
+    // 그 사람이 숨긴 일은 빼고, 고친 이름은 그 이름으로 (화면과 같게)
+    const edit = new Map(extras.edits.map((e) => [e.key, e]));
+    const tasks = all.filter((t) => !edit.get(t.key)?.hidden).map((t) => ({ ...t, text: edit.get(t.key)?.text ?? t.text }));
+    const cycleName = (c: string) => (c === "d" ? "매일" : c === "w" ? "매주" : "한 번");
     const lines = [
       `늘 하는 일: 매일(한국 시간 0시 초기화) 길드 출석${mark("d:guild-attend")} · 매주(목요일 오전 10시 초기화) 길드 임무${mark("w:guild-mission")}, ` +
         `들어갈 수 있는 인스턴스 던전 한 줄(파티로 한 번에 다 돈다. 위키 '인스턴스 던전' 지역, 이름의 숫자가 입장 레벨: 인던20 ~ 인던44)${mark("w:dungeons")}, ` +
@@ -338,6 +345,13 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
       ),
     ];
     if (!tasks.length) lines.push("이벤트 할 일: 지금 이 사람에게 맞는 것 없음");
+    const hidden = extras.edits.filter((e) => e.hidden).map((e) => e.text ?? e.key);
+    if (hidden.length) lines.push(`숨긴 할 일 (이 사람이 To do 에서 뺀 것): ${hidden.join(", ")}`);
+    for (const c of extras.custom) lines.push(`내 할 일 (직접 더함): ${c.text}${c.note ? ` (${c.note})` : ""} · ${cycleName(c.cycle)}${mark(c.key)}`);
+    for (const s of extras.shares)
+      lines.push(
+        `함께 하는 할 일: ${s.text}${s.at ? ` · 언제 ${s.at}` : ""} · 만든 사람 ${s.owner} · 함께: ` + s.members.map((m) => m.id + (m.done ? "(했음)" : "")).join(", "),
+      );
     parts.push(section(`To do: ${me.id}의 레벨·직업에 맞는 할 일 (홈 'To do' 화면, 공식 글에서 뽑은 이벤트 할 일 포함)`, lines, 2500));
   }
 

@@ -43,6 +43,11 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
     env.DB.prepare("DELETE FROM cutout_log WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM favorites WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM todo_checks WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM todo_custom WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM todo_edits WHERE user_id = ?").bind(user.id),
+    // 함께 하는 할 일: 그 사람이 만든 것은 끄고, 다른 사람 것에서는 빠진다
+    env.DB.prepare("DELETE FROM todo_share_members WHERE user_id = ? OR share_id IN (SELECT id FROM todo_shares WHERE owner = ?)").bind(user.id, user.id),
+    env.DB.prepare("DELETE FROM todo_shares WHERE owner = ?").bind(user.id),
     // 장비대여: 기다리는 신청과 대화창의 그 사람 글만 지운다 (대여 기록과 마일리지 장부는 길드 장부라 남긴다, 같은 닉네임으로 다시 오면 이어진다)
     env.DB.prepare("DELETE FROM rental_requests WHERE user_id = ? AND status IN ('wait', 'ok')").bind(user.id),
     env.DB.prepare("DELETE FROM rental_talk WHERE user_id = ?").bind(user.id),

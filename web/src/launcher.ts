@@ -8,7 +8,7 @@ import { useSyncExternalStore } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { api } from "./auth";
 import type { Me } from "./auth";
-import { RANK } from "./auth";
+import { RANK, TEST_IDS } from "./auth";
 import { APP_OPEN, inApp, isAndroid } from "./platform";
 import { showUpdate } from "./updates";
 
@@ -33,7 +33,7 @@ export interface LaunchItem {
   soon?: boolean;
   /** soon 일 때 오른쪽 위 표 (없으면 '준비 중') */
   badge?: string;
-  /** 아직 못 들어가는 칸 (개발 중): 길드원은 눌러도 열리지 않는다. 앱개발자는 들어간다 (제작자 요청 2026-11-01, isLocked) */
+  /** 아직 못 들어가는 칸 (개발 중): 길드원은 눌러도 열리지 않는다. 운영진과 앱개발자는 들어간다 (제작자 요청 2026-11-02, canPreview) */
   locked?: boolean;
   /** 안드로이드 폰 브라우저에서만 보인다 (앱 안, 아이폰에서는 숨김) */
   androidOnly?: boolean;
@@ -87,8 +87,13 @@ export const INFO_TILES: LaunchItem[] = [
   { key: "odds", title: "공식 확률", to: "#/odds", icon: "🎲", match: [] },
 ];
 
-/** 눌러도 안 열리는 칸인지: 개발 중인 칸은 길드원에게만 막고, 앱개발자는 다 들어간다 (제작자 요청 2026-11-01) */
-export const isLocked = (item: LaunchItem, me: Me) => !!item.locked && me.role !== "developer";
+/**
+ * 개발 중인 것을 미리 보는 사람: 길드마스터, 오피서, 앱개발자 (제작자 요청 2026-11-02: '개발 중' 묶음 안은 운영진과 개발자만).
+ * 테스트 계정도 (앱개발자가 To do '함께' 같은 상대방 쪽을 시험하려고). 서버는 server/rental.ts canEnter, server/todo.ts shareablePeople
+ */
+export const canPreview = (me: Me) => RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
+/** 눌러도 안 열리는 칸인지: 개발 중인 칸은 길드원에게만 막는다 */
+export const isLocked = (item: LaunchItem, me: Me) => !!item.locked && !canPreview(me);
 
 /** 이 사람에게 보이는 칸인지 */
 export const canSee = (item: LaunchItem, me: Me) =>

@@ -114,6 +114,7 @@ button { font: inherit; color: inherit; }
 .tile-title { font-size: 13px; line-height: 17px; }
 .tile-count { font-size: 11px; color: var(--muted); }
 .tile-soon { opacity: 0.6; }
+.soon-closed { margin: 0 2px 8px; font-size: 12px; color: var(--muted); }
 /* 홈 아래 접힌 '개발 중' 묶음 (제작자 요청 2026-11-02): 개발 중·검토 후 오픈 칸, 평소에는 접힘 */
 .soon-fold {
   display: block; width: 100%; margin: 12px 0 8px; padding: 6px 2px; text-align: left; font-size: 12px;
@@ -1688,6 +1689,29 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 .todo-step::before { content: "· "; color: var(--muted); }
 .todo-warn { margin: 0; font-size: 13px; color: var(--sunset); }
 .todo-done .todo-detail { opacity: 0.6; }
+/* 이벤트 칸의 매일·매주 할 일 표 (제작자 요청 2026-11-02: 이벤트 할 일은 이벤트 칸에) */
+.todo-tag { display: inline-block; margin-right: 5px; padding: 0 4px; font-size: 10px; line-height: 15px; vertical-align: 2px; color: var(--edge); background: var(--muted); text-decoration: none; }
+/* 함께 하는 사람 (체크한 사람은 금색 ✓) 과 언제 */
+.todo-with { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 0 6px; font-size: 11px; color: var(--muted); }
+.todo-with::before { content: "함께"; color: var(--hi); }
+.todo-with-done { color: var(--gold); }
+.todo-with b { font-weight: 400; color: #8ccaff; }
+.todo-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.todo-acts .pill { padding: 4px 10px; font-size: 12px; }
+.todo-form { display: grid; gap: 6px; margin-top: 4px; }
+.todo-input {
+  width: 100%; min-width: 0; padding: 6px 8px; font: inherit; font-size: 13px; color: var(--text);
+  background: var(--lo); border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 #0b0a1a;
+}
+.todo-people { display: flex; flex-wrap: wrap; gap: 4px; }
+.todo-people .pill { padding: 3px 8px; font-size: 12px; }
+.todo-people small { color: var(--muted); }
+.todo-add { display: block; width: 100%; margin: 0 0 10px; padding: 10px; font-size: 13px; color: var(--muted); background: none; border: 1px dashed var(--hi); cursor: pointer; }
+section.todo-form { padding: 10px; margin-bottom: 10px; }
+.todo-hidden-fold { margin-top: 0; }
+.todo-hidden-row { display: flex; align-items: center; gap: 8px; padding: 4px 2px; }
+.todo-hidden-row .todo-name { color: var(--muted); }
+.todo-hidden-row .pill { padding: 3px 8px; font-size: 12px; }
 .todo-box {
   flex: none; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1;
   background: var(--lo); border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 #0b0a1a; color: var(--edge);

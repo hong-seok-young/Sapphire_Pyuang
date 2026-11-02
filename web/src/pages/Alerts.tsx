@@ -8,7 +8,7 @@ import { ago } from "../market";
 import { Loading, TopBar } from "../ui";
 
 /** 알림함 (제작자 요청): 나와 관련된 일 목록. 열면 모두 읽음이 된다. 아래에서 메뉴별로 켜고 끈다 */
-export function AlertsPage({ developer = false }: { developer?: boolean }) {
+export function AlertsPage({ developer = false, preview = false }: { developer?: boolean; preview?: boolean }) {
   const [alerts, setAlerts] = useState<Alert[] | null>(null);
   const [prefs, setPrefs] = useState<Record<AlertKind, boolean> | null>(null);
   const [pushPrefs, setPushPrefs] = useState<Partial<Record<AlertKind, boolean>>>({});
@@ -77,12 +77,12 @@ export function AlertsPage({ developer = false }: { developer?: boolean }) {
         <section className="panel alert-prefs">
           <h2 className="panel-title">알림 설정</h2>
           <PhonePush />
-          {ALERT_GROUPS.filter((g) => g.kinds.some((k) => !k.developer || developer)).map((g) => (
+          {ALERT_GROUPS.filter((g) => g.kinds.some((k) => (!k.developer || developer) && (!k.preview || preview))).map((g) => (
             <div key={g.menu} className="alert-pref-row">
               <span>{g.menu}</span>
               <div className="mk-chips">
                 {/* 앞은 앱 알림함, 옆 📱 는 폰 알림(팝업) (제작자 요청: 폰 팝업은 따로) */}
-                {g.kinds.filter((k) => !k.developer || developer).map((k) => (
+                {g.kinds.filter((k) => (!k.developer || developer) && (!k.preview || preview)).map((k) => (
                   <span key={k.kind} className="pref-pair">
                     <button className={"pill" + (prefs[k.kind] ? " pill-on" : "")} onClick={() => toggle(k.kind)}>
                       {k.name}

@@ -457,6 +457,51 @@ CREATE TABLE IF NOT EXISTS todo_checks (
   PRIMARY KEY (user_id, item, period)
 );
 
+-- To do 내 할 일 (제작자 요청 2026-11-02: 할 일을 직접 더하고 고치고 지우기). 캐릭터마다, 30개까지. 할 일 키는 '<cycle>:c:<id>'.
+-- 본인이 지우는 것만 지운다. 닉네임 바꾸기와 계정 삭제에 따라간다
+CREATE TABLE IF NOT EXISTS todo_custom (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  cycle TEXT NOT NULL,                    -- d 매일 | w 매주 | o 한 번
+  text TEXT NOT NULL,
+  note TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS todo_custom_user ON todo_custom (user_id);
+
+-- 늘 하는 일·이벤트 할 일을 그 사람만 숨기거나 이름·어디서를 고친 것 (item 은 할 일 키). '원래대로'를 누르면 지운다
+CREATE TABLE IF NOT EXISTS todo_edits (
+  user_id TEXT NOT NULL,
+  item TEXT NOT NULL,
+  hidden INTEGER NOT NULL DEFAULT 0,
+  text TEXT,
+  note TEXT,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, item)
+);
+
+-- 함께 하는 할 일 (제작자 요청 2026-11-02: 길드던전 고정 멤버처럼 같이 하는 사람과 공유하고 언제 하자고 적는다).
+-- 할 일 하나(item 키)에 사람들을 묶는다. 만든 사람(owner)도 todo_share_members 에 있다. 체크는 각자 todo_checks 에 하고 서로의 체크가 보인다.
+-- 만든 사람이 끄거나 계정을 지우면 지운다
+CREATE TABLE IF NOT EXISTS todo_shares (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  owner TEXT NOT NULL,
+  item TEXT NOT NULL,                     -- 할 일 키 ('w:guild-dungeon', 내 할 일이면 'w:c:12')
+  text TEXT NOT NULL,                     -- 그 할 일이 없는 사람에게 보일 이름 (내 할 일, 레벨이 안 맞는 이벤트)
+  note TEXT,
+  at_text TEXT,                           -- 언제 ('토 21:00'), 함께 하는 사람 누구나 고친다
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS todo_shares_owner ON todo_shares (owner, item);
+CREATE TABLE IF NOT EXISTS todo_share_members (
+  share_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  added_at INTEGER NOT NULL,
+  PRIMARY KEY (share_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS todo_share_members_user ON todo_share_members (user_id);
+
 -- 장비대여 (제작자 요청 2026-11-01): 길드가 기부받은 무기를 길드원에게 빌려준다. 실제로 주고받는 것은 게임 안에서 하고 앱은 목록과 장부만.
 -- 가격은 💎 (1개 = 10만 골드). 장비를 기부하면 대여 담당이 옵션 시세를 보고 마일리지 💎 를 적립하고, 빌릴 때 골드 대신 쓴다.
 -- 처음 목록은 카카오톡 목록 글(비공개 자료 길드/장비대여)로 채운다 (scripts/rental-seed.mjs). 지우지 않고 내린 물건은 status 'gone'

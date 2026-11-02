@@ -23,6 +23,7 @@ export const ALERT_KINDS = {
   chat_gap: true,
   chat_done: true,
   rent: true,
+  todo: true,
 } as const;
 export type AlertKind = keyof typeof ALERT_KINDS;
 export const isAlertKind = (k: unknown): k is AlertKind => typeof k === "string" && k in ALERT_KINDS;
