@@ -8,8 +8,10 @@ import {
   AUCTION_HOURS, CATEGORIES, ENCHANTS, ENCHANT_CATEGORIES, ENHANCE_CATEGORIES, MARKET_PIC, OTHER_CATEGORIES, auctionOver, bidListing,
   cashText, currentPrice, deleteTalk, fetchTalk, nextBid, postTalk, MAX_ENHANCE, MAX_NOTE, MAX_PRICE, MAX_QTY, ago, categoryOf, categoryPic, createListing,
   deleteListing, enchantText, fetchMarket, goldText, goldWords, inRoll, itemFacts, jobsFor, listingName, rollHint, unwantListing,
-  updateListing, wantListing, wikiItem, WANTS_FOR_AUCTION, toAuction,
+  updateListing, wantListing, wikiItem, WANTS_FOR_AUCTION, toAuction, shotUrl,
 } from "../market";
+import { readShot, shrinkShot } from "../shot";
+import type { Shot } from "../shot";
 import type { Category, Enchant, Listing, ListingOption, TalkLine } from "../market";
 import type { Wiki } from "../types";
 import { Loading, NewsDot, PicImg, TopBar } from "../ui";
@@ -34,11 +36,18 @@ function MaskIcon({ src, size }: { src: string; size: number }) {
 const Coin = () => <img className="mk-coin" src={MARKET_PIC + "coin.png"} alt="골드" />;
 
 /** 아이템 칸: 위키 그림, 오른쪽 위 +강화, 오른쪽 아래 수량 (게임 거래소처럼) */
-function Slot({ wiki, l, size = 36 }: { wiki: Wiki; l: { item: string; enhance: number; qty: number }; size?: number }) {
+function Slot({ wiki, l, size = 36 }: { wiki: Wiki; l: { id?: number; item: string; enhance: number; qty: number; shot?: boolean }; size?: number }) {
   const it = wikiItem(wiki, l.item);
   return (
     <span className="mk-slot" style={{ width: size + 10, height: size + 10 }}>
-      {it?.icon ? <PicImg pic={it.icon} fit={size} /> : <span className="mk-slot-none">?</span>}
+      {it?.icon ? (
+        <PicImg pic={it.icon} fit={size} />
+      ) : l.shot && l.id ? (
+        // 위키에 없는 물건: 판 사람이 붙인 스샷 (제작자 요청 2026-11-02)
+        <img className="mk-slot-shot" src={shotUrl(l.id)} alt="" loading="lazy" />
+      ) : (
+        <span className="mk-slot-none">?</span>
+      )}
       {l.enhance > 0 && <b className="mk-plus">+{l.enhance}</b>}
       {l.qty > 1 && <b className="mk-qty">{l.qty}</b>}
     </span>
@@ -142,7 +151,9 @@ function Detail({ wiki, me, l, rate, onChanged }: {
             ))}
           </div>
         )}
-        {!facts.level && !facts.stats.length && !l.options?.length && <p className="mk-tip-dim">{l.category}</p>}
+        {/* 위키에 없는 물건: 판 사람이 붙인 스샷을 게임 정보창처럼 (옵션은 데이터로 만들지 않는다, 제작자 요청 2026-11-02) */}
+        {l.shot && !wikiItem(wiki, l.item) && <img className="mk-shot" src={shotUrl(l.id)} alt={`${l.item} 정보창`} />}
+        {!facts.level && !facts.stats.length && !l.options?.length && !l.shot && <p className="mk-tip-dim">{l.category}</p>}
       </div>
       {l.note && <p className="mk-note">“{l.note}”</p>}
       <p className="mk-meta">
@@ -594,6 +605,9 @@ function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: ()
   const [optionText, setOptionText] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  /** 위키에 없는 물건의 스샷 (제작자 요청 2026-11-02): 읽은 값으로 이름·종류·강화·속성부여를 채우고, 그림은 정보창처럼 보인다 */
+  const [shot, setShot] = useState<Shot | null>(null);
+  const [reading, setReading] = useState(false);
 
   const name = item.trim();
   const known = name ? wikiItem(wiki, name) : undefined;
@@ -634,6 +648,34 @@ function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: ()
     ? rolls.map((r) => ({ name: r.name, value: Number(optionText[r.name]), unit: r.unit }))
     : null;
 
+  async function pickShot(file: File | undefined) {
+    if (!file) return;
+    setError("");
+    setReading(true);
+    try {
+      const next = await shrinkShot(file);
+      setShot(next);
+      const r = await readShot("market", next);
+      if (r.name) {
+        setItem(r.name);
+        setTyping(false);
+        setOptionText({});
+      }
+      if (r.category) setCategory(r.category as Category);
+      if (r.enhance !== null) setEnhance(r.enhance);
+      const ench = ENCHANTS.find((x) => x.name === r.enchant);
+      if (ench && r.enchantValue !== null) {
+        setEnchant(ench.key);
+        setEnchantValue(r.enchantValue);
+      }
+    } catch (x) {
+      // 읽지 못해도 그림은 붙인 채로 두고 직접 적게 한다
+      setError(errorText(x));
+    } finally {
+      setReading(false);
+    }
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!ok || cat === null) return;
@@ -644,6 +686,8 @@ function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: ()
         item: name, category: cat, enhance: enhanceOk ? enhance : 0, enchant: enchantOk ? enchant : null,
         enchantValue: enchantOk && enchant ? enchantValue : null, qty: qtyN, price: priceN, note: note.trim() || null, options,
         mode, hours: mode === "auction" ? hours : null, autoAuction: mode === "sale" ? autoHours : null,
+        // 스샷은 위키에 없는 물건일 때만 (위키 물건은 위키 정보창으로 보인다)
+        shot: shot && !known ? { type: shot.type, data: shot.data } : null,
       });
       onDone();
     } catch (x) {
@@ -698,8 +742,23 @@ function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: ()
           ))}
         </ul>
       )}
+      {/* 위키에 없는 물건: 한 줄에 스샷 단추만 (제작자 요청 2026-11-02: UI 덕지덕지 없이). 고르면 읽어서 칸을 채운다 */}
       {name && !known && !(typing && suggestions.length > 0) && (
-        <p className="mk-meta">위키에 없는 아이템이에요. 적은 이름 그대로 올라가고, 종류는 직접 골라 주세요. 위키 자료에 넣으면 그림이 붙어요.</p>
+        <div className="mk-shot-row">
+          {shot && (
+            <span className="mk-shot-thumb">
+              <img src={shot.preview} alt="" />
+              <button type="button" aria-label="스샷 빼기" onClick={() => setShot(null)}>
+                ✕
+              </button>
+            </span>
+          )}
+          <small>{reading ? "스샷 읽는 중…" : shot ? "스샷이 정보창으로 보여요" : "위키에 없는 아이템이에요"}</small>
+          <label className={"pill" + (reading ? " pill-off" : "")}>
+            {shot ? "스샷 바꾸기" : "스샷 올리기"}
+            <input type="file" accept="image/*" hidden disabled={reading} onChange={(e) => (void pickShot(e.target.files?.[0]), (e.target.value = ""))} />
+          </label>
+        </div>
       )}
       {known && (
         <div className="mk-picked">

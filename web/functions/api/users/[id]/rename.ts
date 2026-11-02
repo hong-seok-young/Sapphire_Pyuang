@@ -7,7 +7,7 @@ import type { Env, Role } from "../../../../server/auth";
 
 /** 닉네임이 들어 있는 칸 (표, 칸) */
 const ID_COLUMNS: [string, string][] = [
-  ["users", "created_by"], ["sessions", "user_id"], ["chat_usage", "user_id"], ["profiles", "user_id"], ["profiles", "updated_by"],
+  ["users", "created_by"], ["sessions", "user_id"], ["chat_usage", "user_id"], ["ai_usage", "user_id"], ["profiles", "user_id"], ["profiles", "updated_by"],
   ["level_log", "user_id"], ["level_log_archive", "user_id"], ["avatars", "user_id"], ["avatars", "updated_by"], ["listings", "seller"], ["listing_wants", "user_id"],
   ["listing_bids", "user_id"], ["gold_offers", "owner"], ["gold_wants", "user_id"], ["requests", "owner"], ["requests", "accepter"],
   ["activity", "user_id"], ["alerts", "user_id"], ["alert_prefs", "user_id"], ["listing_talk", "user_id"], ["plat_orders", "user_id"],

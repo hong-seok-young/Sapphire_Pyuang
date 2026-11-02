@@ -31,6 +31,15 @@ CREATE TABLE IF NOT EXISTS chat_usage (
   PRIMARY KEY (user_id, day)
 );
 
+-- AI 기능을 하루에 몇 번 썼는지 (2026-11-02: 스샷 읽기 read_market / read_rental, 공지 다듬기 polish, functions/api/ai/read.ts, board/polish.ts)
+CREATE TABLE IF NOT EXISTS ai_usage (
+  user_id TEXT NOT NULL,
+  day TEXT NOT NULL,                      -- 한국 시간 'YYYY-MM-DD'
+  kind TEXT NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, day, kind)
+);
+
 -- 배포 때 한 번만 하는 일 기록 (web/scripts/ci-d1.mjs). starting_accounts: 시작 계정을 만들었다
 CREATE TABLE IF NOT EXISTS setup (
   key TEXT PRIMARY KEY,
@@ -207,6 +216,13 @@ CREATE TABLE IF NOT EXISTS listing_talk (
   parent_id INTEGER                       -- 답글이면 원래 글 (한 단계만)
 );
 CREATE INDEX IF NOT EXISTS listing_talk_listing ON listing_talk (listing_id, id);
+-- 위키에 없는 물건의 스샷 (제작자 요청 2026-11-02: 옵션은 데이터로 만들지 않고 그림을 게임 정보창처럼 보여 준다). 판 사람이 갤러리에서 고른 그림
+CREATE TABLE IF NOT EXISTS listing_shots (
+  listing_id INTEGER PRIMARY KEY,
+  type TEXT NOT NULL,                     -- image/jpeg
+  data BLOB NOT NULL,
+  created_at INTEGER NOT NULL
+);
 
 -- 1군 전용 플래티넘 할인 상점 (server/platshop.ts). 통 설정 한 줄: 비율은 '플래티넘 100당 몇 만 골드'
 CREATE TABLE IF NOT EXISTS plat_settings (
@@ -429,6 +445,15 @@ CREATE TABLE IF NOT EXISTS official_news (
   fetched_at INTEGER NOT NULL,            -- 받거나 바뀐 때
   html TEXT,                              -- 간단히 한 본문 HTML (문단, 굵게, 표, 목록, 그림, 링크만. 게시판 '아이모 소식'에서 읽는다, 58KB 넘으면 비움)
   src TEXT                                -- 원문(제목+본문)의 해시와 바꾼 방법의 판 (server/officialText.ts): 같으면 다시 쓰지 않는다
+);
+-- 아이모 소식 글의 핵심 요약과 패치노트 직업별 변경점 (제작자 요청 2026-11-02, server/officialSummary.ts). 글을 처음 열 때 만들고 원문(src)이 바뀌면 다시
+CREATE TABLE IF NOT EXISTS official_summary (
+  id INTEGER PRIMARY KEY,                 -- official_news.id
+  src TEXT,                               -- 요약할 때의 official_news.src
+  lines TEXT,                             -- JSON ["…", "…", "…"] (만드는 중이면 NULL)
+  jobs TEXT,                              -- JSON { "전사": ["…"], … } (패치노트가 아니면 비어 있다)
+  claimed_at INTEGER,                     -- 만들기 시작한 때 (여럿이 같이 열어도 한 번만)
+  created_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS official_news_kind ON official_news (kind, id);
 CREATE INDEX IF NOT EXISTS official_news_type ON official_news (type, id);          -- 점검 전광판 (2분마다 최근 점검 글 3개)

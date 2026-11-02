@@ -1,8 +1,8 @@
 import { Fragment, createElement, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { errorText } from "../auth";
-import { OFFICIAL_TABS, TYPE_NAME, fetchOfficial, fetchOfficialPost, officialLink, officialUrl } from "../official";
-import type { OfficialItem, OfficialPost, OfficialTab } from "../official";
+import { OFFICIAL_TABS, TYPE_NAME, fetchOfficial, fetchOfficialPost, fetchOfficialSummary, officialLink, officialUrl } from "../official";
+import type { OfficialItem, OfficialPost, OfficialSummary, OfficialTab } from "../official";
 import { go } from "../router";
 import { Loading, NewsDot, TopBar } from "../ui";
 import { markNewsSeen, newsSum, useNews, useNewsSeen } from "../news";
@@ -157,10 +157,72 @@ function renderNode(node: Node, key: number): ReactNode {
   return createElement(tag, { key }, kids);
 }
 
+/**
+ * 핵심 요약 (제작자 요청 2026-11-02: 공식 글이 너무 길다): 서버가 처음 연 사람 때 만들어 둔다 (server/officialSummary.ts).
+ * 만드는 중이면 4초 뒤에 다시 묻고(5번까지), 못 만들었으면 칸을 그리지 않는다
+ */
+function useSummary(id: number): OfficialSummary | null {
+  const [summary, setSummary] = useState<OfficialSummary | null>(null);
+  useEffect(() => {
+    let alive = true;
+    let timer: number | undefined;
+    setSummary(null);
+    const ask = (tries: number) => {
+      fetchOfficialSummary(id).then(
+        (s) => {
+          if (!alive) return;
+          if (s.pending && tries < 5) {
+            setSummary(s);
+            timer = window.setTimeout(() => ask(tries + 1), 4000);
+          } else setSummary(s.pending ? { none: true } : s);
+        },
+        () => alive && setSummary({ none: true }),
+      );
+    };
+    ask(0);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [id]);
+  return summary;
+}
+
+/** 글 제목 아래 '핵심 요약' 칸과, 패치노트면 내 직업 변경점 */
+function SummaryBox({ summary, job }: { summary: OfficialSummary | null; job: string | null }) {
+  if (summary?.none || (summary && !summary.pending && !summary.lines?.length)) return null;
+  const mine = job ? (summary?.jobs?.[job] ?? []) : [];
+  return (
+    <div className="off-sum">
+      <b className="off-sum-head">핵심 요약</b>
+      {!summary || summary.pending ? (
+        <p className="off-sum-wait">요약하는 중…</p>
+      ) : (
+        <ul>
+          {summary.lines!.map((l) => (
+            <li key={l}>{l}</li>
+          ))}
+        </ul>
+      )}
+      {mine.length > 0 && (
+        <>
+          <b className="off-sum-head">{job} 변경점</b>
+          <ul>
+            {mine.map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
 /** 공식 글 하나를 앱 안에서 읽는다 (그림 포함, 맨 위에 원문 링크) */
-export function OfficialPostPage({ id }: { id: number }) {
+export function OfficialPostPage({ id, job }: { id: number; job: string | null }) {
   const [post, setPost] = useState<OfficialPost | null>(null);
   const [error, setError] = useState("");
+  const summary = useSummary(id);
   useEffect(() => {
     let alive = true;
     setPost(null);
@@ -213,6 +275,7 @@ export function OfficialPostPage({ id }: { id: number }) {
           <small>{dates(post, today)}</small>
         </div>
         <h2 className="off-post-title">{post.title}</h2>
+        <SummaryBox summary={summary} job={job} />
         <div className="off-body">{body ?? <p className="off-text">{post.body}</p>}</div>
       </article>
     </>

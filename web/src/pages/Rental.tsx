@@ -45,6 +45,7 @@ import {
 } from "../rental";
 import type { AppRequest, LedgerLine, RentApp, RentData, RentFields, RentItem, RentTerm } from "../rental";
 import { MARKET_PIC, itemFacts, jobsFor, rollHint } from "../market";
+import { readShot, shrinkShot } from "../shot";
 
 const REASON: Record<LedgerLine["reason"], string> = { donate: "기부", rent: "대여 보증금", adjust: "고침", return: "반납 · 보증금 돌려받음" };
 /** 한 번에 고를 수 있는 무기 수 (서버 MAX_APP_ITEMS 와 같다. 제작자 요청 2026-11-02: 5개 한도를 두지 말고, 여러 개면 안내만) */
@@ -892,7 +893,36 @@ function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; s
   const [warning, setWarning] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [reading, setReading] = useState(false);
   const set = <K extends keyof RentFields>(k: K, v: RentFields[K]) => setF((cur) => ({ ...cur, [k]: v }));
+  /**
+   * 무기 스샷으로 칸 채우기 (제작자 요청 2026-11-02: 데이터에 없는 장비를 넣을 때). 운영진이 갤러리에서 고른 스샷을 읽어 직업, 무기, 레벨, +강, 옵션을 채운다.
+   * 위키 무기면 레벨과 직업은 위키 값으로. 채운 뒤 사람이 보고 고친다
+   */
+  async function pickShot(file: File | undefined) {
+    if (!file) return;
+    setReading(true);
+    setError("");
+    try {
+      const r = await readShot("rental", await shrinkShot(file));
+      const it = r.name ? weaponOf(wiki, r.name) : undefined;
+      const slotJob = JOBS.find((j) => it?.equip?.some((e) => e.slot === `${JOB_NAME[j]} 무기`));
+      const readJob = JOBS.find((j) => JOB_NAME[j] === r.job);
+      const wikiLv = Number(it?.equip?.[0]?.info["레벨제한"]) || null;
+      setF((cur) => ({
+        ...cur,
+        job: slotJob ?? readJob ?? cur.job,
+        weapon: it?.name ?? r.name ?? cur.weapon,
+        level: wikiLv ?? r.level ?? cur.level,
+        enhance: r.enhance ?? cur.enhance,
+        options: r.options.length ? optionShort(r.options.map((o) => [o.name, o.value] as [string, number])) : cur.options,
+      }));
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setReading(false);
+    }
+  }
   // 그 직업의 위키 무기 (이름을 누르면 레벨도 위키 값으로)
   const weapons = useMemo(
     () =>
@@ -949,11 +979,19 @@ function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; s
           </button>
         ))}
       </div>
-      <label className="mk-field">
-        <span>무기</span>
+      {/* 무기 칸 머리 오른쪽에 작은 '스샷' (데이터에 없는 장비를 넣을 때 칸을 채운다) */}
+      <div className="mk-field">
+        <span className="rent-field-head">
+          무기
+          <label className={"pill rent-shot" + (reading ? " pill-off" : "")}>
+            {reading ? "읽는 중…" : "스샷"}
+            <input type="file" accept="image/*" hidden disabled={reading} onChange={(e) => (void pickShot(e.target.files?.[0]), (e.target.value = ""))} />
+          </label>
+        </span>
         <input
           className="mk-input"
           maxLength={30}
+          aria-label="무기"
           value={f.weapon}
           onChange={(e) => {
             // 위키 무기 이름을 다 적으면 고른 것과 같게 레벨을 채운다
@@ -962,7 +1000,7 @@ function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; s
             else set("weapon", e.target.value);
           }}
         />
-      </label>
+      </div>
       {hits.length > 0 && (
         <div className="mk-chips">
           {hits.map((w) => (

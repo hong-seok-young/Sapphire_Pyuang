@@ -46,3 +46,11 @@ export const fetchOfficial = (tab: OfficialTab, before?: number) =>
   api<{ items: OfficialItem[]; more: boolean; checkedAt: number | null }>(`/api/official?tab=${tab}${before ? `&before=${before}` : ""}`);
 
 export const fetchOfficialPost = (id: number) => api<OfficialPost>(`/api/official/${id}`);
+/** 글의 핵심 요약과 패치노트 직업별 변경점 (처음 연 사람이면 서버가 만든다, 만드는 중이면 pending) */
+export interface OfficialSummary {
+  lines?: string[];
+  jobs?: Record<string, string[]>;
+  pending?: boolean;
+  none?: boolean;
+}
+export const fetchOfficialSummary = (id: number) => api<OfficialSummary>(`/api/official/${id}/summary`);

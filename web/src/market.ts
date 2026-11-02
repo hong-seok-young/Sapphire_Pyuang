@@ -101,6 +101,8 @@ export interface Listing {
   bidCount: number;
   /** 종목 토론방 글 수 */
   talkCount: number;
+  /** 위키에 없는 물건이면 판 사람이 붙인 스샷이 있는지 (shotUrl) */
+  shot?: boolean;
   highestBid: number | null;
   /** 내 가장 높은 입찰 */
   myBid: number | null;
@@ -127,7 +129,9 @@ export interface ListingInput {
 
 /** 글 전부와 골드 시세(1만 원에 몇 만 골드, 현금 환산용) */
 export const fetchMarket = () => api<{ listings: Listing[]; goldRate: number }>("/api/market");
-export const createListing = (input: ListingInput) => api<Listing>("/api/market", "POST", input);
+export const createListing = (input: ListingInput & { shot?: { type: string; data: string } | null }) => api<Listing>("/api/market", "POST", input);
+/** 위키에 없는 물건의 스샷 그림 주소 */
+export const shotUrl = (id: number) => `/api/market/${id}/shot`;
 export const updateListing = (id: number, change: { status?: "selling" | "sold"; price?: number; note?: string | null }) =>
   api<Omit<Listing, "wants" | "wanted" | "wanters">>(`/api/market/${id}`, "PATCH", change);
 export const deleteListing = (id: number) => api<{ ok: boolean }>(`/api/market/${id}`, "DELETE");

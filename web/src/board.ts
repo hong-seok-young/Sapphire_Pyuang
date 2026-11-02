@@ -70,6 +70,8 @@ export const fetchPost = (id: number) => api<PostDetail>(`/api/board/${id}`);
 export const createPost = (cat: Cat, title: string, body: string) => api<{ id: number }>("/api/board", "POST", { cat, title, body });
 export const updatePost = (id: number, p: { title?: string; body?: string; pinned?: boolean }) => api<{ ok: boolean }>(`/api/board/${id}`, "PATCH", p);
 export const deletePost = (id: number) => api<{ ok: boolean }>(`/api/board/${id}`, "DELETE");
+/** 공지·길드 이벤트 글을 AI 로 다듬기 (운영진, 제작자 요청 2026-11-02) */
+export const polishPost = (cat: Cat, title: string, body: string) => api<{ title: string; body: string }>("/api/board/polish", "POST", { cat, title, body });
 export const deleteFile = (id: number) => api<{ ok: boolean }>(`/api/board/files/${id}`, "DELETE");
 export const addComment = (id: number, text: string, parent: number | null) =>
   api<BoardComment>(`/api/board/${id}/comments`, "POST", { text, parent });

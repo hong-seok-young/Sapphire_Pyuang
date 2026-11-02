@@ -5,7 +5,7 @@ import { ApiError, RANK, errorText } from "../auth";
 import type { Me } from "../auth";
 import {
   CATS, CAT_ICON, CAT_NAME, URL_RE, addComment, createPost, deleteComment, deleteFile, deletePost, fetchPost, fetchPosts,
-  fileUrl, linkPreview, setLike, shrinkPhoto, sizeText, updatePost, uploadFile, youtubeId,
+  fileUrl, linkPreview, polishPost, setLike, shrinkPhoto, sizeText, updatePost, uploadFile, youtubeId,
 } from "../board";
 import type { BoardComment, BoardFile, Cat, LinkPreview, PostDetail, PostSummary } from "../board";
 import { RoleBadge } from "../emblems";
@@ -484,6 +484,23 @@ function Write({ me, cat: startCat, editId }: { me: Me; cat?: Cat; editId?: numb
   const [added, setAdded] = useState<NewFile[]>([]);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  // AI 로 다듬기 (운영진, 공지사항·길드 이벤트만, 제작자 요청 2026-11-02). 쓴 글을 바로 바꾸지 않고 아래에 미리 보여 주고 '적용'·'닫기'
+  // (제작자 요청: 원치 않게 되면 다 지워야 해서 번거롭다). 적용한 뒤에도 손대기 전까지 '되돌리기'
+  const [suggestion, setSuggestion] = useState<{ title: string; body: string } | null>(null);
+  const [before, setBefore] = useState<{ title: string; body: string } | null>(null);
+  const [polishing, setPolishing] = useState(false);
+  const canPolish = staff(me) && (cat === "notice" || cat === "event");
+  async function polish() {
+    setPolishing(true);
+    setError("");
+    try {
+      setSuggestion(await polishPost(cat, title, body));
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setPolishing(false);
+    }
+  }
   const [loaded, setLoaded] = useState(!editId);
   // 이미 만든 글 번호: 사진 올리기가 중간에 실패해도 다시 누르면 글을 또 만들지 않고 이어서 올린다
   const created = useRef<number | null>(null);
@@ -590,12 +607,12 @@ function Write({ me, cat: startCat, editId }: { me: Me; cat?: Cat; editId?: numb
             ))}
           </div>
         )}
-        <input className="mk-input" value={title} maxLength={80} onChange={(e) => setTitle(e.target.value)} placeholder="제목" aria-label="제목" />
+        <input className="mk-input" value={title} maxLength={80} onChange={(e) => (setTitle(e.target.value), setBefore(null))} placeholder="제목" aria-label="제목" />
         <textarea
           className="mk-input bd-textarea"
           value={body}
           maxLength={10000}
-          onChange={(e) => setBody(e.target.value)}
+          onChange={(e) => (setBody(e.target.value), setBefore(null))}
           placeholder="내용 (링크를 넣으면 미리보기가 붙어요. 유튜브는 글 안에서 재생돼요)"
           aria-label="내용"
         />
@@ -609,7 +626,36 @@ function Write({ me, cat: startCat, editId }: { me: Me; cat?: Cat; editId?: numb
             <input type="file" multiple hidden onChange={(e) => (pick(e.target.files, false), (e.target.value = ""))} />
           </label>
           <small>{count}/10</small>
+          {canPolish &&
+            (before ? (
+              <button type="button" className="pill bd-polish" onClick={() => (setTitle(before.title), setBody(before.body), setBefore(null))}>
+                되돌리기
+              </button>
+            ) : (
+              <button type="button" className="pill bd-polish" disabled={polishing || !!suggestion || body.trim().length < 10} onClick={() => void polish()}>
+                {polishing ? "다듬는 중…" : "AI로 다듬기"}
+              </button>
+            ))}
         </div>
+        {suggestion && (
+          <div className="bd-suggest">
+            <b className="bd-suggest-head">AI가 다듬은 글</b>
+            <p className="bd-suggest-title">{suggestion.title}</p>
+            <p className="bd-suggest-body">{suggestion.body}</p>
+            <div className="pill-row">
+              <button
+                type="button"
+                className="pill pill-on"
+                onClick={() => (setBefore({ title, body }), setTitle(suggestion.title), setBody(suggestion.body), setSuggestion(null))}
+              >
+                적용
+              </button>
+              <button type="button" className="pill" onClick={() => setSuggestion(null)}>
+                닫기
+              </button>
+            </div>
+          </div>
+        )}
         {(old.length > 0 || added.length > 0) && (
           <ul className="bd-attach">
             {old.filter((f) => !removed.includes(f.id)).map((f) => (

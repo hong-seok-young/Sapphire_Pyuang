@@ -1126,6 +1126,8 @@ button { font: inherit; color: inherit; }
 .bd-pickers { display: flex; align-items: center; gap: 6px; }
 .bd-pickers .pill { cursor: pointer; }
 .bd-pickers small { color: var(--muted); }
+/* AI 로 다듬기 (운영진, 공지·이벤트): 같은 줄 오른쪽 끝 */
+.bd-pickers .bd-polish { margin-left: auto; }
 .bd-attach { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .bd-attach li { position: relative; min-height: 64px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: var(--night-2); border: var(--px) solid var(--edge); font-size: 11px; word-break: break-all; padding: 2px; }
 .bd-attach img { width: 100%; height: 64px; object-fit: cover; }
@@ -1686,6 +1688,12 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 .off-post .off-head { margin-bottom: 6px; }
 .off-post .off-head small { font-size: 11px; color: var(--muted); }
 .off-post-title { margin: 0 0 10px; font-size: 16px; line-height: 1.4; }
+/* 아이모 소식 핵심 요약 (제작자 요청 2026-11-02, Official.tsx SummaryBox): 제목 아래 작은 칸 */
+.off-sum { margin: 0 0 12px; padding: 8px 10px; background: rgba(111, 182, 255, 0.08); border-left: 3px solid #6fb6ff; }
+.off-sum-head { display: block; margin: 0 0 3px; font-size: 11px; font-weight: 400; color: #6fb6ff; }
+.off-sum ul { margin: 0 0 4px; padding-left: 16px; font-size: 13px; line-height: 1.5; }
+.off-sum ul:last-child { margin-bottom: 0; }
+.off-sum-wait { margin: 0; font-size: 12px; color: var(--muted); }
 .off-body { font-size: 14px; line-height: 1.6; word-break: keep-all; overflow-wrap: anywhere; }
 .off-body p { margin: 0; min-height: 0.6em; }
 .off-body img { display: block; max-width: 100%; height: auto; margin: 6px 0; }
@@ -2027,10 +2035,6 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .st-row-main { width: 100%; display: flex; align-items: center; gap: 8px; padding: 6px 8px; text-align: left; color: var(--text); background: none; border: 0; cursor: pointer; }
 .st-tile { flex: none; display: block; image-rendering: pixelated; object-fit: contain; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--edge); }
 .st-tile-none { display: inline-block; }
-.st-who {
-  flex: none; width: 34px; height: 34px; display: grid; place-items: center; font-size: 15px; color: #0b0a1a;
-  background: linear-gradient(#ffe08a, #e0a63a); border: 2px solid var(--edge);
-}
 .st-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .st-item { font-weight: 400; font-size: 13px; }
 .st-flow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 4px; font-size: 12px; }
@@ -2055,3 +2059,23 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .st-thing { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px 2px 2px; font-size: 12px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--edge); }
 .st-thing em { font-style: normal; color: var(--gold); }
 .st-plat { margin-left: auto; }
+
+/* 중개인 위키에 없는 물건의 스샷 (제작자 요청 2026-11-02): 팔기 칸의 한 줄, 목록 칸 그림, 정보창 */
+.mk-shot-row { display: flex; align-items: center; gap: 8px; }
+.mk-shot-row small { flex: 1; min-width: 0; font-size: 12px; color: var(--muted); }
+.mk-shot-row .pill { flex: none; cursor: pointer; }
+.mk-shot-thumb { position: relative; flex: none; width: 44px; height: 44px; border: 1px solid var(--edge); background: #000; }
+.mk-shot-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mk-shot-thumb button { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; padding: 0; font-size: 10px; line-height: 16px; color: #fff; background: var(--night-2); border: 1px solid var(--edge); cursor: pointer; }
+.mk-slot-shot { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mk-shot { display: block; width: 100%; max-height: 420px; object-fit: contain; margin: 6px 0; background: #000; border: 1px solid var(--edge); }
+/* 장비대여 물건 추가의 무기 칸 머리: 오른쪽 끝 작은 '스샷' (제작자 요청 2026-11-02) */
+.rent-field-head { display: flex; align-items: center; justify-content: space-between; }
+.rent-field-head .rent-shot { padding: 2px 10px; font-size: 12px; cursor: pointer; }
+/* AI 로 다듬은 글 미리 보기 (게시판 글쓰기, 운영진): 쓴 글은 그대로 두고 아래에 보여 준다 */
+.bd-suggest { padding: 8px 10px; background: rgba(111, 182, 255, 0.08); border-left: 3px solid #6fb6ff; display: grid; gap: 6px; }
+.bd-suggest-head { font-size: 11px; font-weight: 400; color: #6fb6ff; }
+.bd-suggest-title { margin: 0; font-size: 14px; }
+.bd-suggest-body { margin: 0; max-height: 260px; overflow: auto; font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
+/* 읽는 중처럼 잠깐 못 누르는 단추 */
+.pill-off { opacity: 0.6; pointer-events: none; }
