@@ -428,9 +428,9 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
     parts.push(section(`To do: ${me.id}의 레벨·직업에 맞는 할 일 (홈 'To do' 화면, 공식 글에서 뽑은 이벤트 할 일 포함)`, lines, 2500));
   }
 
-  // ---------- 앱개발자만: 사용 기록, 챗봇 개선 ----------
-  if (dev && (ASK.logs.test(q) || mentioned.length)) parts.push(...(await activityParts(env, mentioned, now, today)));
-  if (dev && ASK.gaps.test(q)) {
+  // ---------- 길드마스터와 앱개발자만: 사용 기록, 챗봇 개선 (2026-11-02 길드마스터에게도 열었다) ----------
+  if (RANK[me.role] >= 2 && (ASK.logs.test(q) || mentioned.length)) parts.push(...(await activityParts(env, mentioned, now, today)));
+  if (RANK[me.role] >= 2 && ASK.gaps.test(q)) {
     const day = new Date(now + KST).toISOString().slice(0, 10);
     const [gapsR, usageR] = await env.DB.batch([
       env.DB.prepare("SELECT id, user_id, question, reason, kind, created_at FROM chat_gaps WHERE status = 'open' ORDER BY id DESC LIMIT 15"),

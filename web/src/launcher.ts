@@ -41,6 +41,8 @@ export interface LaunchItem {
   managers?: boolean;
   /** 앱개발자에게만 보인다 */
   developer?: boolean;
+  /** 길드마스터와 앱개발자만 (사용 기록, 챗봇 개선: 제작자 요청 2026-11-02 '길드마스터도 보이게') */
+  masters?: boolean;
 }
 
 export const ITEMS: LaunchItem[] = [
@@ -67,9 +69,10 @@ export const ITEMS: LaunchItem[] = [
   // 시계와 보스 타이머는 안드로이드 앱에만 있다. 앱은 검토 후 오픈 (제작자 요청 2026-10-31: 지금은 웹만)
   { key: "app", title: "안드로이드 앱 받기", short: "앱 받기", to: "#/app", icon: "📲", androidOnly: true, soon: !APP_OPEN, badge: "검토 후 오픈", match: [] },
   { key: "admin", title: "길드원 관리", short: "관리", to: "#/admin", icon: "👥", managers: true, ribbon: "운영진", ring: "blue", match: ["admin"] },
-  { key: "log", title: "사용 기록", to: "#/log", icon: "📊", developer: true, ribbon: "개발자", ring: "purple", match: ["log"] },
+  { key: "log", title: "사용 기록", to: "#/log", icon: "📊", masters: true, ribbon: "길마", ring: "purple", match: ["log"] },
   // 챗봇이 모르는 질문 (제작자 요청: 보고 고친 뒤 물은 사람에게 알린다)
-  { key: "gaps", title: "챗봇 개선", to: "#/gaps", icon: "🧙", developer: true, ribbon: "개발자", ring: "purple", match: ["gaps"] },
+  // 아이콘은 고치는 연장 (제작자 요청 2026-11-02 '챗봇 개선 아이콘은 좀 바꾸자', 예전 🧙)
+  { key: "gaps", title: "챗봇 개선", to: "#/gaps", icon: "🛠️", masters: true, ribbon: "길마", ring: "purple", match: ["gaps"] },
 ];
 const BY_KEY = new Map(ITEMS.map((i) => [i.key, i]));
 export const itemOf = (key: string) => BY_KEY.get(key);
@@ -99,7 +102,7 @@ export const isLocked = (item: LaunchItem, me: Me) => !!item.locked && !canPrevi
 
 /** 이 사람에게 보이는 칸인지 */
 export const canSee = (item: LaunchItem, me: Me) =>
-  (!item.androidOnly || (isAndroid && !inApp)) && (!item.managers || RANK[me.role] >= 1) && (!item.developer || me.role === "developer");
+  (!item.androidOnly || (isAndroid && !inApp)) && (!item.managers || RANK[me.role] >= 1) && (!item.developer || me.role === "developer") && (!item.masters || RANK[me.role] >= 2);
 
 /** 'UPDATE' 를 달지 (updates.ts). '정보'는 안의 칸이 고쳐졌을 때도 */
 export const isUpdated = (user: string, item: LaunchItem) =>

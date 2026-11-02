@@ -62,9 +62,9 @@ function groupRows(rows: ActivityRow[]): Item[] {
 export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
   /** 묶음 요약에 쓰는 짧은 이름 ('게시판: 자유' -> '자유', '게시판 글: 제목' -> '제목') */
   const itemText = (r: ActivityRow) =>
-    r.kind === "view" ? pageName(r.what, wiki, r.detail).replace(/^(게시판|게시판 글|아이모 소식 글|글|사냥터|몬스터|아이템|메뉴|장비|검색): /, "") : actionText(r.what, r.detail);
+    r.kind === "view" ? pageName(r.what, wiki, r.detail).replace(/^(게시판|게시판 글|아이모 소식 글|글|사냥터|몬스터|아이템|메뉴|장비|검색): /, "") : actionText(r.what, r.detail, r.at);
   const lineText = (r: ActivityRow) =>
-    r.kind === "visit" ? "🟢 접속" : r.kind === "view" ? `📖 ${pageName(r.what, wiki, r.detail)}` : `✏️ ${actionText(r.what, r.detail)}`;
+    r.kind === "visit" ? "🟢 접속" : r.kind === "view" ? `📖 ${pageName(r.what, wiki, r.detail)}` : `✏️ ${actionText(r.what, r.detail, r.at)}`;
   const [user, setUser] = useState<string | null>(null);
   const [kind, setKind] = useState<Kind | null>(null);
   const [rows, setRows] = useState<ActivityRow[] | null>(null);

@@ -7,7 +7,7 @@
 //      사람마다 7일 동안 쓴 기기 수(devices7), 7일 안에 처음 나온 기기(newDev, 전에 쓰던 다른 기기가 있을 때만),
 //      같은 때(10분 안) 다른 기기가 다른 도시에서 쓴 번 수(together). user 로 고르면 그 사람의 기기 목록(devices, 60일).
 //      기기는 화면이 보내는 기기 표(activity.dev)로 가린다. 기기 표가 없던 예전 기록은 기기 글(device)로 묶어 목록에만 보인다
-import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../server/auth";
+import { FORBIDDEN, NEED_LOGIN, RANK, currentUser, json, readJson } from "../../server/auth";
 import type { Env } from "../../server/auth";
 import { record, whereOf } from "../../server/activity";
 import { LOG_FULL, LOG_NUMS, covering, fromLogs, logBinding, logDbs, newestLogs } from "../../server/logdb";
@@ -130,7 +130,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  if (me.role !== "developer") return FORBIDDEN();
+  // 길드마스터와 앱개발자 (제작자 요청 2026-11-02 '사용 기록하고 챗봇 개선은 길드마스터도')
+  if (RANK[me.role] < 2) return FORBIDDEN();
   const q = new URL(request.url).searchParams;
   if (q.get("usage")) return json(await usage(env));
   const where: string[] = [];

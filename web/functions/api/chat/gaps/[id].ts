@@ -1,12 +1,12 @@
-// PATCH /api/chat/gaps/:id { note? } -> 개선 완료 (앱개발자만). 물은 사람에게 '챗봇이 개선됐어요' 알림, 누르면 그 대화에서 새 답을 받는다
-import { FORBIDDEN, NEED_LOGIN, currentUser, json, paramId, readJson } from "../../../../server/auth";
+// PATCH /api/chat/gaps/:id { note? } -> 개선 완료 (길드마스터와 앱개발자). 물은 사람에게 '챗봇이 개선됐어요' 알림, 누르면 그 대화에서 새 답을 받는다
+import { FORBIDDEN, NEED_LOGIN, RANK, currentUser, json, paramId, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
 import { notify } from "../../../../server/alerts";
 
 export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  if (me.role !== "developer") return FORBIDDEN();
+  if (RANK[me.role] < 2) return FORBIDDEN();
   const gap = await env.DB.prepare("SELECT id, user_id, thread_id, question, status FROM chat_gaps WHERE id = ?")
     .bind(Number(paramId(params)))
     .first<{ id: number; user_id: string; thread_id: number; question: string; status: string }>();

@@ -246,7 +246,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "info") body = <InfoPage me={me} />;
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
   else if (page === "app" || page === "timer") body = <AppPage />;
-  else if (page === "gaps") body = me.role === "developer" ? <ChatGapsPage /> : <NotFound what="페이지" />;
+  // 사용 기록, 챗봇 개선: 길드마스터와 앱개발자 (제작자 요청 2026-11-02)
+  else if (page === "gaps") body = RANK[me.role] >= 2 ? <ChatGapsPage /> : <NotFound what="페이지" />;
   // 길드 던전은 1군 전용 (제작자 요청 2026-11-02): 2군은 들어와도 안내만 (앱개발자는 길드와 상관없이 본다)
   else if (page === "match") body = me.guild !== "main" && me.role !== "developer" ? <DevSoon title="길드 던전" text="1군 전용이에요" /> : <GuildDungeonPage me={me} />;
   else if (!wiki) body = <Loading error={loggedOut ? undefined : error} onRetry={() => setWikiTry((n) => n + 1)} />;
@@ -264,7 +265,7 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   else if (page === "todo") body = <TodoPage wiki={wiki} me={me} />;
   // 장비대여: 대여 무기 목록, 신청, 마일리지 (제작자 요청 2026-11-01, 개발 중이라 앱개발자만). 무기 그림과 레벨이 위키 자료라서 위키를 기다린다
   else if (page === "rent") body = <RentalPage wiki={wiki} me={me} view={route.query.get("v") ?? ""} />;
-  else if (page === "log") body = me.role === "developer" ? <ActivityLogPage wiki={wiki} /> : <NotFound what="페이지" />;
+  else if (page === "log") body = RANK[me.role] >= 2 ? <ActivityLogPage wiki={wiki} /> : <NotFound what="페이지" />;
   else body = <Home me={me} />;
 
   return (
