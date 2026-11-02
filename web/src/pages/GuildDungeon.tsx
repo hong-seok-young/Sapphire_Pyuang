@@ -487,13 +487,19 @@ function MyTimes({ data, onSaved, onError }: { data: GdData; onSaved: (p: PartyS
         <Head week={data.week} />
         {Array.from({ length: ROWS }, (_, r) => (
           <Row key={r} row={r}>
-            {(i) => <span key={i} data-slot={i} className={"gd-cell" + (locked(i) ? " gd-off" : bits[i] === "1" ? " gd-on" : "")} />}
+            {(i) => <span key={i} data-slot={i} className={"gd-cell" + hourLine(i) + (locked(i) ? " gd-off" : bits[i] === "1" ? " gd-on" : "")} />}
           </Row>
         ))}
       </div>
     </section>
   );
 }
+
+/** 정각(09:00, 10:00 …)에 시작하는 칸: 위에 가로 구분선 (제작자 요청 2026-11-02 '정각마다 가로 구분선, 헷갈림') */
+const hourLine = (i: number) => {
+  const row = (((i + 2) % 48) + 48) % 48;
+  return row > 0 && row % 2 === 0 ? " gd-hourline" : "";
+};
 
 /** 한 줄: 왼쪽 시간 이름과 7칸 */
 function Row({ row, children }: { row: number; children: (i: number) => JSX.Element }) {
@@ -529,6 +535,7 @@ function HeatTimes({ data, party: p }: { data: GdData; party: PartyState }) {
               const n = off(i) ? 0 : countAt(i);
               const cls =
                 "gd-cell" +
+                hourLine(i) +
                 (off(i) ? " gd-off" : n === total && total > 0 ? " gd-all" : n > 0 ? ` gd-h${Math.min(3, Math.ceil((n / total) * 3))}` : "") +
                 (i === p.confirmed ? " gd-is-confirmed" : i === p.current ? " gd-is-current" : rejected.has(i) ? " gd-is-rejected" : "") +
                 (pick === i ? " gd-picked" : "");

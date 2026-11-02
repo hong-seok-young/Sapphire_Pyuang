@@ -2466,6 +2466,8 @@ button.gd-member-row { cursor: pointer; }
 .gd-hour { transform: translateY(-5px); }
 .gd-cell { display: block; height: 13px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.04); }
 .gd-grid-edit .gd-cell { touch-action: none; cursor: pointer; }
+/* 정각마다 가로 구분선 (위 칸과의 틈에 밝은 선) */
+.gd-cell.gd-hourline { box-shadow: 0 -1px 0 rgba(200, 210, 255, 0.45); }
 .gd-cell.gd-off { background: rgba(0, 0, 0, 0.35); border-color: transparent; cursor: default; }
 .gd-cell.gd-on { background: var(--sapphire); border-color: #8fc2ff; }
 .gd-cell.gd-h1 { background: rgba(111, 182, 255, 0.22); }

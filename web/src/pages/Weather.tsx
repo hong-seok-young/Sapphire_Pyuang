@@ -1,4 +1,4 @@
-// 홈 화면의 날씨 효과 (제작자 요청 2026-11-02 초안, src/weather.ts): 내 지역이 비면 가는 비(아래 탭 위 선에 닿으면 퐁당 튄다),
+// 홈 화면의 날씨 효과 (제작자 요청 2026-11-02 초안, src/weather.ts): 내 지역이 비면 가는 비(아래 탭 위 선에 닿으면 작게 퐁당 튀고 그 선에 빗물이 고인다),
 // 눈이면 눈(그 선 위에 소복이 쌓인다). 폭우·천둥번개도 가는 비로 (화면을 가려서 뺐다).
 // 앱의 도트 그림과 맞게 네모 픽셀로 그린다. 화면을 누르는 데는 걸리지 않고(pointer-events: none), 다른 앱에 가 있으면 멈추고,
 // 움직임 줄이기면 그리지 않는다. App.tsx 가 홈일 때 <main> 밖에 그린다 (.page 의 transform 안이면 위에서 내려온다)
@@ -23,10 +23,17 @@ const RAIN: Partial<Record<Sky, typeof LIGHT_RAIN>> = {
  * 눈: 송이 수, 내려오는 빠르기, 바람, 큰 송이 비율, 쌓이는 빠르기(송이 하나가 쌓는 높이 px).
  * 함박눈은 바람에 날리는 눈보라가 아니라 큰 송이가 화면 가득 천천히 내리는 것 (제작자 2026-11-02: 오른쪽으로 쏠려 머리카락처럼 꺾였다, 화면 전체가 채워져야지)
  */
-const SNOW: Partial<Record<Sky, { n: number; v: [number, number]; wind: number; big: number }>> = {
-  snow: { n: 90, v: [0.5, 1.2], wind: 0.1, big: 0.12 },
-  blizzard: { n: 170, v: [0.7, 1.6], wind: 0.2, big: 0.4 },
+const SNOW: Partial<Record<Sky, { n: number; v: [number, number]; wind: number; big: number; grow: number }>> = {
+  // 그냥 눈도 함박눈처럼 쌓이게 송이 하나가 쌓는 양을 3배로 (제작자 요청 2026-11-02 '그냥 눈은 왜 안 쌓임 함박눈처럼 해')
+  snow: { n: 90, v: [0.5, 1.2], wind: 0.1, big: 0.12, grow: 3 },
+  blizzard: { n: 170, v: [0.7, 1.6], wind: 0.2, big: 0.4, grow: 1 },
 };
+/**
+ * 아래 탭 위 선에 고이는 빗물 (제작자 요청 2026-11-02: '그 선에 물이 받아지는 느낌, 함박눈처럼'): 빗방울 하나가 이만큼(px) 물을 더하고,
+ * 물은 옆으로 퍼져 수평이 되며 WATER_MAX(px)까지 천천히 차오른다
+ */
+const DROP_WATER = 2;
+const WATER_MAX = 10;
 /** 아래 탭 위 선에 쌓이는 눈의 가장 높은 곳 (도트 칸 수, 한 칸 2px). 그 위로는 더 안 쌓인다 */
 const PILE_MAX = 20;
 /**
@@ -53,6 +60,8 @@ const snap = (v: number) => Math.round(v / P) * P;
  * 눈이 아닌 날씨가 되면 지운다
  */
 let pileMemo: { w: number; h: number[] } | null = null;
+/** 고인 빗물 (도트 한 칸 폭마다 높이 px). 쌓인 눈처럼 이번에 연 동안은 이어지고 비가 아니게 되면 지운다 */
+let waterMemo: { w: number; h: number[] } | null = null;
 
 export function WeatherFx({ sky }: { sky: Sky }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -64,12 +73,14 @@ export function WeatherFx({ sky }: { sky: Sky }) {
     const rain = RAIN[sky];
     const snow = SNOW[sky];
     if (!snow) pileMemo = null;
+    if (!rain) waterMemo = null;
     let w = 0;
     let h = 0;
     /** 아래 탭 위 선 (빗방울이 튀고 눈이 쌓이는 곳). 탭이 없으면 화면 맨 아래 */
     let ground = 0;
     let cols = 0;
     let pile: number[] = [];
+    let water: number[] = [];
     const measure = () => {
       const bar = document.querySelector(".tabbar");
       ground = bar ? Math.round(bar.getBoundingClientRect().top) : h;
@@ -89,6 +100,10 @@ export function WeatherFx({ sky }: { sky: Sky }) {
         pile = pileMemo && pileMemo.w === cols ? pileMemo.h : new Array(cols).fill(0);
         pileMemo = { w: cols, h: pile };
       }
+      if (rain) {
+        water = waterMemo && waterMemo.w === cols ? waterMemo.h : new Array(cols).fill(0);
+        waterMemo = { w: cols, h: water };
+      }
     };
     size();
     window.addEventListener("resize", size);
@@ -98,10 +113,10 @@ export function WeatherFx({ sky }: { sky: Sky }) {
 
     type Drop = { x: number; y: number; v: number; len: number };
     type Flake = { x: number; y: number; v: number; s: number; ph: number; f: number };
-    /** 빗방울이 선에 닿아 튀는 물방울 */
-    type Bit = { x: number; y: number; vx: number; vy: number; life: number; big: boolean };
-    /** 닿은 자리의 짧은 물결 */
-    type Ring = { x: number; life: number };
+    /** 빗방울이 선에 닿아 튀는 작은 물방울 */
+    type Bit = { x: number; y: number; vx: number; vy: number; life: number };
+    /** 닿은 자리(물 위)의 짧은 잔물결 */
+    type Ring = { x: number; y: number; life: number };
     const drops: Drop[] = [];
     const flakes: Flake[] = [];
     const bits: Bit[] = [];
@@ -127,21 +142,36 @@ export function WeatherFx({ sky }: { sky: Sky }) {
     if (rain) for (let i = 0; i < rain.n * area(); i++) drops.push(newDrop(false));
     if (snow) for (let i = 0; i < snow.n * area(); i++) flakes.push(newFlake(false));
 
-    /** 빗방울이 선에 닿으면 퐁당: 양옆 위로 크게 튀는 물방울 서넛과 양옆으로 퍼지는 물결 (폰에서도 잘 보이게) */
-    const splash = (x: number) => {
-      if (bits.length > 200) return;
-      const n = Math.random() < 0.5 ? 3 : 4;
-      for (let i = 0; i < n; i++) {
-        bits.push({ x, y: ground - P, vx: rnd(0.6, 2.2) * (i % 2 ? 1 : -1), vy: rnd(-3.8, -2.2), life: 1, big: i < 2 });
+    /** 빗방울이 물(선)에 닿으면 작게 퐁당: 양옆 위로 튀는 물방울 둘과 짧은 잔물결 (제작자 2026-11-02: 크게 튀는 것은 너무 두꺼워 되돌렸다) */
+    const splash = (x: number, y: number) => {
+      if (bits.length > 120) return;
+      for (let i = 0; i < 2; i++) bits.push({ x, y: y - P, vx: rnd(0.4, 1.2) * (i ? 1 : -1), vy: rnd(-2.6, -1.6), life: 1 });
+      rings.push({ x, y, life: 1 });
+    };
+    /** 빗물 더하기 (닿은 칸에) */
+    const pour = (x: number) => {
+      const c = Math.floor(x / P);
+      if (c >= 0 && c < cols && water[c] < WATER_MAX) water[c] = Math.min(WATER_MAX + 2, water[c] + DROP_WATER);
+    };
+    /** 물은 옆으로 퍼져 수평이 된다 (양옆과의 높이 차를 조금씩 나눈다. 전체 물의 양은 그대로) */
+    const flow = () => {
+      for (let pass = 0; pass < 3; pass++) {
+        let prev = water[0];
+        for (let c = 0; c < cols; c++) {
+          const cur = water[c];
+          const l = c > 0 ? prev : cur;
+          const r = c < cols - 1 ? water[c + 1] : cur;
+          prev = cur;
+          water[c] = cur + 0.24 * (l + r - 2 * cur);
+        }
       }
-      rings.push({ x, life: 1 });
     };
     /** 눈송이가 닿으면 그 자리에 그 송이만큼 도트를 바로 얹는다 (한 톨 한 톨 보이게) */
     const land = (x: number, size: number) => {
       const c0 = Math.floor(x / P);
       for (const [dx, n] of FLAKE_CELLS[size]) {
         const c = c0 + dx;
-        if (c >= 0 && c < cols) pile[c] = Math.min(PILE_MAX, pile[c] + n);
+        if (c >= 0 && c < cols) pile[c] = Math.min(PILE_MAX, pile[c] + n * snow!.grow);
       }
     };
     /** 옆 칸보다 두 칸 넘게 높으면 맨 위 한 톨이 낮은 쪽으로 굴러 내린다 (뾰족하지 않은 둔덕). 매번 방향을 바꿔 한쪽으로 쏠리지 않게 */
@@ -174,8 +204,11 @@ export function WeatherFx({ sky }: { sky: Sky }) {
           d.x += rain.wind * k;
           // 바람에 왼쪽으로 나가면 오른쪽에서 이어서 (한쪽이 비지 않게 화면 전체에 고르게)
           if (d.x < -20) d.x += w + 40;
-          if (d.y + d.len >= ground) {
-            splash(snap(d.x));
+          const wc = Math.max(0, Math.min(cols - 1, Math.floor(d.x / P)));
+          const surface = ground - snap(water[wc] ?? 0);
+          if (d.y + d.len >= surface) {
+            splash(snap(d.x), surface);
+            pour(d.x);
             Object.assign(d, newDrop(true));
             continue;
           }
@@ -185,35 +218,46 @@ export function WeatherFx({ sky }: { sky: Sky }) {
           ctx.fillRect(x, y, P, half);
           ctx.fillRect(x, y + half, P, half);
         }
-        // 튀는 물방울: 위로 튀었다가 떨어지며 흐려진다
+        // 고인 빗물: 옆으로 퍼져 수평이 되고 조금씩 차오른다. 수면 한 줄은 밝게, 천천히 반짝인다
+        flow();
+        const t = now / 600;
+        for (let c = 0; c < cols; c++) {
+          // 조금이라도 고이면 한 줄은 보이게
+          if (water[c] < 0.5) continue;
+          const wh = Math.max(P, snap(water[c]));
+          const x = c * P;
+          ctx.fillStyle = "rgba(110, 165, 235, 0.42)";
+          ctx.fillRect(x, ground - wh, P, wh);
+          ctx.fillStyle = `rgba(200, 228, 255, ${0.55 + 0.35 * Math.sin(t + c * 0.35)})`;
+          ctx.fillRect(x, ground - wh, P, P);
+        }
+        // 튀는 물방울: 조금 튀었다가 떨어지며 흐려진다
         ctx.fillStyle = "rgba(210, 232, 255, 1)";
         for (let i = bits.length - 1; i >= 0; i--) {
           const b = bits[i];
           b.x += b.vx * k;
           b.y += b.vy * k;
           b.vy += 0.3 * k;
-          b.life -= 0.03 * k;
+          b.life -= 0.05 * k;
           if (b.life <= 0 || b.y > ground) {
             bits.splice(i, 1);
             continue;
           }
           ctx.globalAlpha = Math.min(1, b.life * 1.3);
-          const sz = b.big ? P * 2 : P;
-          ctx.fillRect(snap(b.x), snap(b.y), sz, sz);
+          ctx.fillRect(snap(b.x), snap(b.y), P, P);
         }
-        // 물결: 닿은 자리에서 양옆으로 퍼지는 짧은 선 (처음엔 가운데가 반짝)
+        // 잔물결: 닿은 자리 수면에서 양옆으로 짧게
         for (let i = rings.length - 1; i >= 0; i--) {
           const r = rings[i];
-          r.life -= 0.045 * k;
+          r.life -= 0.06 * k;
           if (r.life <= 0) {
             rings.splice(i, 1);
             continue;
           }
-          const spread = snap((1 - r.life) * 14) + P;
-          ctx.globalAlpha = Math.min(1, r.life * 1.1);
-          if (r.life > 0.75) ctx.fillRect(r.x - P, ground - P * 2, P * 3, P);
-          ctx.fillRect(r.x - spread - P * 2, ground - P, P * 3, P);
-          ctx.fillRect(r.x + spread, ground - P, P * 3, P);
+          const spread = snap((1 - r.life) * 6) + P;
+          ctx.globalAlpha = Math.min(1, r.life);
+          ctx.fillRect(r.x - spread - P, r.y - P, P * 2, P);
+          ctx.fillRect(r.x + spread, r.y - P, P * 2, P);
         }
         ctx.globalAlpha = 1;
       }
