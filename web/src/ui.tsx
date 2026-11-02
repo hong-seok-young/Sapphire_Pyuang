@@ -81,8 +81,6 @@ export const TITLE_EN: Record<string, string> = {
   "퀘스트 · 지도": "QUESTS · MAPS",
   "길던&인던 매칭": "PARTY MATCHING",
 };
-/** 제목 배너 모양: 제작자가 고른 시안 (A 보라 육각, B 금테 리본, C 사파이어 보석 판, D 양피지, E 금빛 글자와 보석 장식) */
-const TITLE_STYLE: "A" | "B" | "C" | "D" | "E" = "B";
 
 export function TopBar({ title, back = true, right, star }: { title: ReactNode; back?: boolean; right?: ReactNode; star?: ReactNode }) {
   const en = typeof title === "string" ? TITLE_EN[title] : undefined;
@@ -98,7 +96,8 @@ export function TopBar({ title, back = true, right, star }: { title: ReactNode; 
       )}
       {en ? (
         <h1 className="topbar-title topbar-title-banner">
-          <span className={"tb-banner tb-" + TITLE_STYLE}>
+          {/* 제작자가 고른 E: 판 없이 금빛 글자, 양옆 보석 장식과 밑줄, 잔잔한 움직임 (2026-11-02, styles.css .tb-banner) */}
+          <span className="tb-banner">
             <span className="tb-b">
               <span className="tb-i">
                 <span className="tb-en">{en}</span>

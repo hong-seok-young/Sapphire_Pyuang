@@ -103,27 +103,36 @@ button { font: inherit; color: inherit; }
 .tb-b, .tb-i { display: flex; flex-direction: column; align-items: center; min-width: 0; max-width: 100%; }
 .tb-en { font-size: 8px; line-height: 1.2; letter-spacing: 2px; font-weight: 400; text-shadow: none; white-space: nowrap; }
 .tb-ko { display: block; max-width: 100%; font-size: 15px; line-height: 1.2; text-align: center; }
-/* A 보라 육각 */
-.tb-A .tb-b { padding: 3px 22px 4px; background: linear-gradient(#4d4f9a, #34357a); clip-path: polygon(7% 0, 93% 0, 100% 50%, 93% 100%, 7% 100%, 0 50%); }
-.tb-A .tb-en { color: #b9c2ff; } .tb-A .tb-ko { color: #fff; }
-/* B 금테 리본 */
-.tb-B .tb-b { padding: 2px; background: #e8b04a; clip-path: polygon(0 0, 100% 0, 95% 50%, 100% 100%, 0 100%, 5% 50%); }
-.tb-B .tb-i { padding: 3px 24px 4px; background: linear-gradient(#2c2558, #191433); clip-path: polygon(0 0, 100% 0, 95% 50%, 100% 100%, 0 100%, 5% 50%); }
-.tb-B .tb-en { color: #e8c77a; } .tb-B .tb-ko { color: #ffd166; text-shadow: 1px 1px 0 #000; }
-/* C 사파이어 보석 판 */
-.tb-C .tb-b { padding: 2px; background: #a8e4ff; clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px); }
-.tb-C .tb-i { padding: 3px 20px 4px; background: linear-gradient(#4a8cf0 0%, #2a5bc8 55%, #1d3f96 100%); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.45);
-  clip-path: polygon(5px 0, calc(100% - 5px) 0, 100% 5px, 100% calc(100% - 5px), calc(100% - 5px) 100%, 5px 100%, 0 calc(100% - 5px), 0 5px); }
-.tb-C .tb-en { color: #d6f1ff; } .tb-C .tb-ko { color: #fff; text-shadow: 1px 1px 0 #0d2260; }
-/* D 양피지 두루마리 */
-.tb-D .tb-b { padding: 2px; background: #5b3a1e; }
-.tb-D .tb-i { padding: 3px 22px 4px; background: linear-gradient(#f6e7bf, #d8bd84);
-  box-shadow: inset 7px 0 0 #c4a265, inset -7px 0 0 #c4a265, inset 9px 0 0 #8a6634, inset -9px 0 0 #8a6634; }
-.tb-D .tb-en { color: #7a5a32; } .tb-D .tb-ko { color: #3b2410; text-shadow: none; }
-/* E 판 없이 금빛 글자와 보석 장식, 밑줄 */
-.tb-E .tb-b { padding: 0 4px 3px; background: linear-gradient(90deg, transparent, #6fa8ff, transparent) bottom / 100% 2px no-repeat; }
-.tb-E .tb-en { color: #8fd3ff; } .tb-E .tb-ko { color: #ffd166; text-shadow: 0 0 6px rgba(255, 209, 102, 0.55), 1px 1px 0 #000; }
-.tb-E .tb-ko::before, .tb-E .tb-ko::after { content: "◆"; font-size: 9px; color: #6fa8ff; vertical-align: 3px; margin: 0 6px; text-shadow: none; }
+/* 제작자가 고른 E (2026-11-02): 판 없이 금빛 글자, 양옆 사파이어 보석 장식과 밑줄. 움직임은 잔잔하게 (제작자 요청 '애니메이션을 잔잔하게'):
+   글자 빛이 천천히 밝아졌다 어두워지고, 보석이 번갈아 반짝이고, 밑줄 위로 빛이 몇 초에 한 번 지나간다. 움직임 줄이기면 멈춘다 */
+.tb-b { position: relative; padding: 0 4px 3px; background: linear-gradient(90deg, transparent, #6fa8ff, transparent) bottom / 100% 2px no-repeat; }
+.tb-b::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.9), transparent) no-repeat; background-size: 30% 100%;
+  animation: tb-sweep 5s ease-in-out infinite;
+}
+.tb-en { color: #8fd3ff; }
+.tb-ko { color: #ffd166; text-shadow: 0 0 5px rgba(255, 209, 102, 0.45), 1px 1px 0 #000; animation: tb-glow 3.6s ease-in-out infinite; }
+.tb-ko::before, .tb-ko::after {
+  content: "◆"; display: inline-block; font-size: 9px; color: #6fa8ff; vertical-align: 3px; margin: 0 6px; text-shadow: 0 0 4px rgba(111, 168, 255, 0.6);
+  animation: tb-twinkle 2.8s ease-in-out infinite;
+}
+.tb-ko::after { animation-delay: 1.4s; }
+@keyframes tb-glow {
+  0%, 100% { text-shadow: 0 0 3px rgba(255, 209, 102, 0.3), 1px 1px 0 #000; }
+  50% { text-shadow: 0 0 9px rgba(255, 209, 102, 0.75), 1px 1px 0 #000; }
+}
+@keyframes tb-twinkle {
+  0%, 100% { opacity: 0.55; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+@keyframes tb-sweep {
+  0% { background-position: -40% 0; }
+  55%, 100% { background-position: 140% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tb-ko, .tb-ko::before, .tb-ko::after, .tb-b::after { animation: none; }
+}
 
 /* home */
 .hero { display: flex; align-items: center; gap: 14px; padding: calc(20px + env(safe-area-inset-top)) 4px 14px; }
