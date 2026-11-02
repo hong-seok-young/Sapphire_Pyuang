@@ -59,7 +59,9 @@ const detect = () => {
       const inner = pr.right - parseFloat(pcs.borderRightWidth || "0");
       // 줄 끝의 빈칸(pre-wrap)은 보이지 않으니 글자 조각이 몇 px 나간 것은 넘침이 아니다
       const hang = cs.display === "inline" && r.right - inner < 8;
-      if (pcs.overflowX === "visible" && r.right > inner + 2 && pcs.display !== "inline" && !hang) why = `부모 밖 +${Math.round(r.right - inner)}px`;
+      // 좌우를 꽉 채우려고 음수 여백으로 화면 끝까지 늘인 띠(점검 띠 등)는 화면 안이면 괜찮다
+      const bleed = parseFloat(cs.marginRight) < 0 && r.right <= vw + 1;
+      if (pcs.overflowX === "visible" && r.right > inner + 2 && pcs.display !== "inline" && !hang && !bleed) why = `부모 밖 +${Math.round(r.right - inner)}px`;
     }
     // 한 줄에 맞추려고 글자를 가장 작게 줄였는데도 잘린 이름 (FitLine, overflow hidden)
     if (!why && el.classList.contains("fit-line") && el.scrollWidth > el.clientWidth + 1) why = `글자 잘림 +${el.scrollWidth - el.clientWidth}px`;
