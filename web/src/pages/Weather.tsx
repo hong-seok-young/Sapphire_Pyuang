@@ -30,14 +30,18 @@ const SNOW: Partial<Record<Sky, { n: number; v: [number, number]; wind: number; 
 };
 /**
  * 아래 탭 위 선에 고이는 빗물 (제작자 요청 2026-11-02: '퐁당거리는 그 도트가 땅에 남아서 점점 좌우로 퍼지면 되잖아, 물처럼'):
- * 빗방울 자리에 한 칸, 튄 물방울 도트도 떨어지면 다 그 자리에 남고, 옆으로 흘러 퍼져 한 줄씩 차오른다. 도트 칸 수로 WATER_MAX 까지 (한 칸 2px).
+ * 빗방울 자리에 한 칸, 튄 물방울 도트도 떨어지면 다 그 자리에 남고, 옆으로 흘러 퍼져 한 줄씩 차오른다 (한 칸 2px).
  * 홈에서 몇 초 안에 차오르게 (제작자 요청 2026-11-02 '좀 더 빨리 팍팍, 절반 남기지 말고 다 남겨, 누가 홈 화면에서 1분이나 멍때리냐')
  */
 const KEEP = 1;
-/** 눈처럼 40px 까지 점점 차오른다 (제작자 요청 2026-11-02 '비는 점점 화면 위로 차오른다') */
-const WATER_MAX = 20;
-/** 아래 탭 위 선에 쌓이는 눈의 가장 높은 곳 (도트 칸 수, 한 칸 2px). 그 위로는 더 안 쌓인다 */
-const PILE_MAX = 20;
+/**
+ * 눈과 빗물은 화면 맨 위까지 계속 쌓이고 차오른다 (제작자 요청 2026-11-02 '비와 눈은 화면 맨 위까지 꽉 차게 해, 잠수 타면').
+ * 화면을 IDLE_MS 넘게 안 만지면(잠수) IDLE_BOOST 배로 빨리 쌓인다. 효과는 누르는 데 걸리지 않아서 꽉 차도 홈 칸은 그대로 눌린다
+ */
+/** 평소에도 이만큼 한 번에 쌓고, 화면을 IDLE_MS 넘게 안 만지면 IDLE_BOOST 배 더 (제작자 요청 2026-11-02 '좀 더 차는 속도 빠르게, 한국인 성격 급함') */
+const BASE = 2;
+const IDLE_MS = 8_000;
+const IDLE_BOOST = 5;
 /**
  * 눈송이 크기마다 쌓이는 도트 (가운데 칸을 0 으로 옆 칸까지): 닿는 그 순간 그 자리에 한 톨씩 보이게 쌓인다
  * (제작자 요청 2026-11-02: '1분 말고 실시간으로 눈 한 톨 한 톨 점점 쌓이게')
@@ -148,6 +152,17 @@ export function WeatherFx({ sky }: { sky: Sky }) {
       flashes.push({ x: e.clientX, y: e.clientY, life: 1 });
     };
     window.addEventListener("pointerdown", onTap);
+    /** 마지막으로 만진 때 (잠수인지) */
+    let active = performance.now();
+    const touch = () => {
+      active = performance.now();
+    };
+    const ACTIVE_EVENTS = ["pointerdown", "keydown", "wheel", "touchmove", "scroll"] as const;
+    for (const ev of ACTIVE_EVENTS) window.addEventListener(ev, touch, { passive: true, capture: true });
+    /** 이만큼 한 번에 쌓는다 (잠수면 더) */
+    const boost = () => BASE * (performance.now() - active > IDLE_MS ? IDLE_BOOST : 1);
+    /** 화면 맨 위까지 (도트 칸 수) */
+    const topCells = () => Math.max(20, Math.floor(ground / P));
     const newDrop = (top: boolean): Drop => ({
       x: rnd(0, w),
       y: top ? rnd(-ground * 0.3, -10) : rnd(-20, ground),
@@ -178,7 +193,7 @@ export function WeatherFx({ sky }: { sky: Sky }) {
     /** 떨어진 물방울 도트 하나가 그 자리에 남는다 */
     const drip = (x: number) => {
       const c = Math.floor(x / P);
-      if (c >= 0 && c < cols && water[c] < WATER_MAX) water[c]++;
+      if (c >= 0 && c < cols) water[c] = Math.min(topCells(), water[c] + boost());
     };
     /**
      * 물은 옆으로 흐른다: 옆 칸보다 두 칸 높으면 바로, 한 칸 높으면 가끔 맨 위 도트가 옆으로 (그래서 고인 물이 좌우로 조금씩 번져 나간다).
@@ -201,12 +216,36 @@ export function WeatherFx({ sky }: { sky: Sky }) {
         }
       }
     };
+    /**
+     * 물은 수면이 평평하다: 바람 때문에 한쪽에 더 떨어져도, 평균보다 두 칸 넘게 높은 칸의 물을 평균보다 낮은 칸으로 조금씩 옮긴다
+     * (옆으로만 흘리면 화면 끝에서 끝까지 펴지는 데 너무 오래 걸려 비스듬했다)
+     */
+    const level = () => {
+      let total = 0;
+      for (let c = 0; c < cols; c++) total += water[c];
+      const mean = total / cols;
+      if (mean < 1) return;
+      const lo = Math.floor(Math.random() * cols);
+      for (let moved = 0, tries = 0; moved < 40 && tries < cols; tries++) {
+        const c = (lo + tries * 7) % cols;
+        if (water[c] < mean + 2) continue;
+        // 가까운 낮은 칸부터
+        for (let d = 1; d < cols * 2; d++) {
+          const t = c + (d % 2 ? (d + 1) / 2 : -d / 2);
+          if (t < 0 || t >= cols || water[t] > mean - 1) continue;
+          water[c]--;
+          water[t]++;
+          moved++;
+          break;
+        }
+      }
+    };
     /** 눈송이가 닿으면 그 자리에 그 송이만큼 도트를 바로 얹는다 (한 톨 한 톨 보이게) */
     const land = (x: number, size: number) => {
       const c0 = Math.floor(x / P);
       for (const [dx, n] of FLAKE_CELLS[size]) {
         const c = c0 + dx;
-        if (c >= 0 && c < cols) pile[c] = Math.min(PILE_MAX, pile[c] + n * snow!.grow);
+        if (c >= 0 && c < cols) pile[c] = Math.min(topCells(), pile[c] + n * snow!.grow * boost());
       }
     };
     /** 옆 칸보다 두 칸 넘게 높으면 맨 위 한 톨이 낮은 쪽으로 굴러 내린다 (뾰족하지 않은 둔덕). 매번 방향을 바꿔 한쪽으로 쏠리지 않게 */
@@ -253,8 +292,9 @@ export function WeatherFx({ sky }: { sky: Sky }) {
           ctx.fillRect(x, y, P, half);
           ctx.fillRect(x, y + half, P, half);
         }
-        // 고인 빗물: 도트가 칸마다 쌓여 옆으로 흐른다. 맨 위 도트는 밝게, 천천히 반짝인다
-        flow();
+        // 고인 빗물: 도트가 칸마다 쌓여 옆으로 흐른다 (높이 찰수록 여러 번 흘려 수면이 평평하게). 맨 위 도트는 밝게, 천천히 반짝인다
+        for (let pass = 0; pass < 2; pass++) flow();
+        level();
         const t = now / 600;
         for (let c = 0; c < cols; c++) {
           const n = water[c];
@@ -416,6 +456,7 @@ export function WeatherFx({ sky }: { sky: Sky }) {
       window.removeEventListener("resize", size);
       document.removeEventListener("visibilitychange", vis);
       window.removeEventListener("pointerdown", onTap);
+      for (const ev of ACTIVE_EVENTS) window.removeEventListener(ev, touch, { capture: true });
     };
   }, [sky]);
   return <canvas className="wx-fx" ref={ref} aria-hidden />;
