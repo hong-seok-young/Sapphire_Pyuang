@@ -298,18 +298,18 @@ function OrderList({ orders, empty, action }: { orders: ShopOrder[]; empty: stri
   );
 }
 
-type SettleView = "log" | "buyer" | "item" | "giver";
+type SettleView = "log" | "buyer" | "item";
+/** 정산 아래 칸 (제작자 요청 2026-11-02: '사람별'은 '구매자', '물건별'은 '아이템', '전달한 사람'은 굳이 없어도 된다) */
 const SETTLE_VIEWS: { key: SettleView; label: string }[] = [
   { key: "log", label: "기록" },
-  { key: "buyer", label: "사람별" },
-  { key: "item", label: "물건별" },
-  { key: "giver", label: "전달한 사람" },
+  { key: "buyer", label: "구매자" },
+  { key: "item", label: "아이템" },
 ];
 
 /**
  * 정산 (제작자 요청 2026-11-02: '어떤 템 누가 사고 누가 템 전달하고 이런 걸 텍스트로만 나열하지 말고 가독성 좋게').
- * 위: 이번 달·전체 칸 (받은 골드를 크게, 거래 수와 플래티넘). 아래 칸 줄: 기록(날짜마다 물건 그림, 산 사람 → 전달한 사람, 받은 골드) ·
- * 사람별(산 사람마다 건수·골드와 산 물건) · 물건별(물건마다 팔린 수·골드) · 전달한 사람(오피서마다 전달 건수·받은 골드).
+ * 위: 이번 달·전체 칸 (받은 골드를 크게, 거래 수와 플래티넘). 아래 칸 줄: 기록(날짜마다 물건 그림, '산 사람 구매 · 판 사람 판매', 받은 골드) ·
+ * 구매자(산 사람마다 건수·골드와 산 물건) · 아이템(물건마다 팔린 수·골드와 산 사람). 맨 앞 그림은 기록에서만.
  * 묶음은 지우지 않은 거래 완료만 센다. 기록 줄을 누르면 삭제·복구·골드 수정
  */
 function Settlement({ manage, items, busy, run }: {
@@ -318,7 +318,9 @@ function Settlement({ manage, items, busy, run }: {
   busy: boolean;
   run: (fn: () => Promise<unknown>, done?: string) => void;
 }) {
-  const [view, setView] = useEntryState<SettleView>("settle", "log");
+  const [viewRaw, setView] = useEntryState<SettleView>("settle", "log");
+  // 예전에 고른 칸('giver')이 남아 있으면 기록으로
+  const view: SettleView = SETTLE_VIEWS.some((v) => v.key === viewRaw) ? viewRaw : "log";
   const [month, setMonth] = useEntryState("settleMonth", true);
   const [open, setOpen] = useState<number | string | null>(null);
   const tileOf = useMemo(() => {
@@ -394,14 +396,14 @@ function Settlement({ manage, items, busy, run }: {
                       <Tile o={o} />
                       <span className="st-row-text">
                         <b className="st-item">{o.itemName}</b>
-                        {/* 누가 샀고 누가 게임 안에서 건넸는지 */}
+                        {/* 누가 샀고 누가 게임 안에서 팔았는지 ('구매 · 판매', 제작자 요청 2026-11-02) */}
                         <span className="st-flow">
                           <span className="st-buyer">{o.user}</span>
                           <small>구매</small>
                           {o.status === "done" && o.doneBy && (
                             <>
                               <span className="st-giver">{o.doneBy}</span>
-                              <small>전달</small>
+                              <small>판매</small>
                             </>
                           )}
                         </span>
@@ -435,13 +437,13 @@ function Settlement({ manage, items, busy, run }: {
 
       {view !== "log" &&
         (() => {
-          const groups = group((o) => (view === "buyer" ? (o.user ?? "?") : view === "item" ? o.itemName : (o.doneBy ?? "?")));
+          const groups = group((o) => (view === "buyer" ? (o.user ?? "?") : o.itemName));
           if (!groups.length) return <div className="empty">{month ? "이번 달 거래가 없어요." : "아직 거래가 없어요."}</div>;
           const top = groups[0].gold || 1;
           return (
             <ul className="st-list">
               {groups.map((g) => {
-                // 사람별·전달한 사람: 그 사람이 사거나 전달한 물건을 그림과 개수로
+                // 구매자: 그 사람이 산 물건을 그림과 개수로, 아이템: 산 사람과 개수
                 const things = new Map<string, { o: ShopOrder; n: number }>();
                 for (const o of g.list) things.set(o.itemName, { o, n: (things.get(o.itemName)?.n ?? 0) + 1 });
                 const people = new Map<string, number>();
@@ -449,7 +451,7 @@ function Settlement({ manage, items, busy, run }: {
                 return (
                   <li key={g.k} className={"st-row" + (open === g.k ? " st-open" : "")}>
                     <button className="st-row-main" onClick={() => setOpen(open === g.k ? null : g.k)} aria-expanded={open === g.k}>
-                      {view === "item" ? <Tile o={g.list[0]} /> : <span className="st-who">{g.k.slice(0, 1)}</span>}
+                      {/* 맨 앞 그림은 기록에서만 (제작자 요청 2026-11-02: 이름 앞 글자 아이콘은 의미가 없다) */}
                       <span className="st-row-text">
                         <b className="st-item">{g.k}</b>
                         <span className="st-bar">
@@ -459,7 +461,7 @@ function Settlement({ manage, items, busy, run }: {
                       <span className="st-row-side">
                         <b className="st-gold">{gw(g.gold)}</b>
                         <small>
-                          {view === "giver" ? "전달" : view === "item" ? "팔림" : "구매"} {g.list.length}건
+                          {view === "item" ? "팔림" : "구매"} {g.list.length}건
                         </small>
                       </span>
                     </button>
