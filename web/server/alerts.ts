@@ -19,6 +19,7 @@ export const ALERT_KINDS = {
   shop: true,
   board: true,
   board_notice: true,
+  imo_news: true,
   chat_fixed: true,
   chat_gap: true,
   chat_done: true,

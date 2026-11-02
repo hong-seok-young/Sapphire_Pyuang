@@ -11,6 +11,8 @@ import { NEED_LOGIN, currentUser, json } from "../../server/auth";
 import type { Env } from "../../server/auth";
 import { activeMaint } from "../../server/maint";
 import { EVENT_EVERY, MAINT_EVERY, refreshEvents, refreshMaint } from "../../server/official";
+import { NEW_OFFICIAL_SQL, announceOfficial } from "../../server/officialAlert";
+import type { NewOfficial } from "../../server/officialAlert";
 import { canEnter, isManager } from "../../server/rental";
 
 const IMO: Record<string, string> = { "imo.notice": "type IN ('N', 'I', 'D')", "imo.maint": "type = 'C'", "imo.event": "type = 'E'" };
@@ -85,6 +87,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
     // 점검 글 최근 3개 (색인 official_news_type, 본문은 점검 시간·서버·인던 제한이 있는 앞부분만)
     env.DB.prepare("SELECT id, title, start_date, substr(body, 1, 3000) AS body FROM official_news WHERE type = 'C' ORDER BY id DESC LIMIT 3"),
     env.DB.prepare("SELECT key, done_at FROM setup WHERE key IN ('official_maint_checked', 'official_event_checked')"),
+    // 아직 알리지 않은 새 공식 글 (server/officialAlert.ts, 색인 official_news_added)
+    env.DB.prepare(NEW_OFFICIAL_SQL).bind(imoFrom),
   ]);
   const n = (r: D1Result | undefined) => Number((r?.results[0] as { n: number | null } | undefined)?.n ?? 0);
   let i = 0;
@@ -107,6 +111,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
   if (manager) counts["rent.staff"] = n(results[i++]);
   const maint = results[i++];
   const checked = results[i++];
+  const fresh = results[i++].results as unknown as NewOfficial[];
+  // 새 공식 글은 모두에게 알림 (여럿이 같이 와도 한 곳만)
+  if (fresh.length) waitUntil(announceOfficial(env, fresh).catch((e) => console.error("official alert", e instanceof Error ? e.message : e)));
   // 뒤에서 공식 글 새로 받기: 점검 글(2분마다)을 먼저, 아니면 새 이벤트 글(15분마다). 한 번에 하나만 (CPU 한도)
   const last = new Map((checked.results as { key: string; done_at: number }[]).map((r) => [r.key, r.done_at]));
   const maintAt = last.get("official_maint_checked") ?? null;

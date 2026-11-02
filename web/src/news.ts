@@ -26,6 +26,11 @@ export type NewsKey = (typeof KEYS)[number];
 /** 홈 칸(launcher.ts 의 key)마다 더하는 단추들 */
 const GROUPS: Record<string, string[]> = { board: ["board.", "imo."], market: ["market."], requests: ["requests"], rent: ["rent."] };
 const POLL_MS = 120_000;
+/**
+ * 아이모 소식을 글 번호로 세던 기기(예전 값이 글 번호)는 이때부터 센다 (2026-11-02 11/2 17:00 KST): 번호로 세다 놓친 새 글을 다시 보이게
+ * (제작자 요청 '아까 안 떴으니 게시판 배지 다시 띄워 줘', 배포가 그 글을 지금 들어온 것으로 적는다, scripts/ci-d1.mjs)
+ */
+const IMO_FROM = 1793606400000;
 
 type Counts = Record<NewsKey, number>;
 const zero = (): Counts => Object.fromEntries(KEYS.map((k) => [k, 0])) as Counts;
@@ -72,7 +77,8 @@ function seenAll(): Record<NewsKey, number> {
   // 때가 아닌 값(예전에 아이모 소식에 적던 공식 글 번호)은 없는 것으로
   const at = (v: number | undefined) => (typeof v === "number" && v > 1e12 ? v : undefined);
   // 예전에 적은 칸 하나짜리 때('board', 'market')는 그 안의 단추들이 이어받는다
-  const out = Object.fromEntries(KEYS.map((k) => [k, at(seen[k]) ?? at(seen[k.split(".")[0]]) ?? now])) as Record<NewsKey, number>;
+  const oldId = (k: string) => (k.startsWith("imo.") && typeof seen[k] === "number" && seen[k] > 0 && seen[k] < 1e12 ? IMO_FROM : undefined);
+  const out = Object.fromEntries(KEYS.map((k) => [k, at(seen[k]) ?? oldId(k) ?? at(seen[k.split(".")[0]]) ?? now])) as Record<NewsKey, number>;
   if (KEYS.some((k) => at(seen[k]) === undefined)) save(out);
   return out;
 }

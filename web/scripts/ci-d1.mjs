@@ -10,7 +10,7 @@
 // 공개 저장소라 실행 기록을 누구나 볼 수 있으므로 비밀번호, 해시, SQL 은 화면에 찍지 않는다.
 import { execFileSync } from "node:child_process";
 import { pbkdf2Sync, randomBytes } from "node:crypto";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 const DB = "sapphire-accounts";
 const DEVELOPER = "퓨앙";
@@ -105,6 +105,27 @@ for (const [table, column, type] of ADDED_COLUMNS) {
 }
 // 더한 칸의 색인 (schema.sql 은 칸이 생기기 전에 돌아서 여기서 만든다)
 wrangler("d1", "execute", DB, "--remote", "--yes", "--command", "CREATE INDEX IF NOT EXISTS official_news_added ON official_news (added_at)");
+
+// 아이모 소식 새 글 배지·알림 (제작자 요청 2026-11-02: '새 이벤트 수집했으니 게시판 배지 다시 띄워 줘, 웹 알림도'): added_at 칸이 생기기 전에 들어온 글 중
+// 한국 PC 파일(자료/공식/소식.json)에 없는 글은 그 파일을 저장한 뒤에 새로 올라온 글이다. 한 번만 지금 들어온 것으로 적어 배지가 뜨게 하고,
+// 알림은 그 파일을 저장한 때 뒤에 들어온 글부터 보낸다 (setup 'official_announced', server/officialAlert.ts)
+if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'official_added_backfill'")) {
+  const file = "../자료/공식/소식.json";
+  const now = Date.now();
+  let saved = now;
+  let ids = [];
+  if (existsSync(file)) {
+    const snap = JSON.parse(readFileSync(file, "utf8"));
+    saved = Date.parse(snap.savedAt) || now;
+    ids = (snap.rows ?? []).map((r) => Number(r.id)).filter(Number.isInteger);
+  }
+  runSql([
+    `UPDATE official_news SET added_at = ${now} WHERE added_at IS NULL AND ${ids.length ? `id NOT IN (${ids.join(",")})` : "0"};`,
+    `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('official_announced', ${saved});`,
+    `INSERT OR REPLACE INTO setup (key, done_at) VALUES ('official_added_backfill', ${now});`,
+  ]);
+  console.log("아이모 소식 새 글 표시를 맞췄어요");
+}
 
 const count = Number(queryFirst("SELECT COUNT(*) AS n FROM users")?.n ?? 0);
 if (count > 0) {

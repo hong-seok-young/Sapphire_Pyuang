@@ -4,7 +4,7 @@ import { api } from "./auth";
 
 export type AlertKind =
   | "market_want" | "market_bid" | "market_outbid" | "market_auction" | "market_new" | "gold_want" | "request" | "request_new" | "talk" | "account" | "shop"
-  | "board" | "board_notice" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo";
+  | "board" | "board_notice" | "imo_news" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo";
 
 export interface Alert {
   id: number;
@@ -30,7 +30,7 @@ export const ALERT_GROUPS: { menu: string; kinds: { kind: AlertKind; name: strin
   { menu: "골드", kinds: [{ kind: "gold_want", name: "거래 신청" }] },
   { menu: "의뢰소", kinds: [{ kind: "request", name: "내 의뢰" }, { kind: "request_new", name: "새 의뢰" }] },
   { menu: "토론방", kinds: [{ kind: "talk", name: "새 글" }] },
-  { menu: "게시판", kinds: [{ kind: "board", name: "내 글 댓글" }, { kind: "board_notice", name: "새 공지·이벤트" }] },
+  { menu: "게시판", kinds: [{ kind: "board", name: "내 글 댓글" }, { kind: "board_notice", name: "새 공지·이벤트" }, { kind: "imo_news", name: "아이모 소식" }] },
   { menu: "상점", kinds: [{ kind: "shop", name: "플래티넘 구매" }] },
   {
     menu: "챗봇",

@@ -16,6 +16,7 @@ const KIND_TITLE = {
   talk: "💬 토론방",
   board: "📋 게시판 · 댓글",
   board_notice: "📢 게시판",
+  imo_news: "🎮 아이모 소식",
   shop: "💎 플래티넘 상점",
   account: "👤 내 계정",
   chat_fixed: "🧙 챗봇 · 개선됨",
