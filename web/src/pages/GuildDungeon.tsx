@@ -141,8 +141,8 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
       </div>
       {/* 파티원 카드: 한 줄에 닉네임 · 카톡 · 파티장 · 상태. 파티장·운영진은 카드를 누르면 아래에 파티장 지정 · 빼기 (파티장 카드는 파티 지우기)
           (제작자 요청 2026-11-02: 아래에 닉네임을 늘어놓은 관리 칸 대신 카드를 눌러서) */}
-      <ul className="gd-members">
-        {p.members.map((m) => {
+      {(() => {
+        const cells = p.members.map((m) => {
           const said = p.current !== null && p.yes.includes(m.id);
           // 상태는 짧게 (한 칸에 닉네임 · 카톡 · 파티장 · 상태가 한 줄로 들어가게, 제작자 요청 2026-11-02)
           const state = !m.filled ? "미입력" : p.confirmed !== null || said ? "확정" : all && p.current !== null ? "대기" : "입력";
@@ -165,37 +165,43 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
               )}
             </li>
           );
-        })}
-        {canManage && p.members.length < MAX_MEMBERS && (
-          <li className="gd-member-add">
-            <button className="gd-member-row" onClick={() => (setAdding((v) => !v), setOpen(null))} aria-expanded={adding}>
-              + 파티원 넣기
-            </button>
-          </li>
-        )}
-      </ul>
-      {/* 누른 카드: 파티장 지정 · 빼기 (파티장 카드는 파티 지우기) */}
-      {open !== null && canManage && p.members.some((m) => m.id === open) && (
-        <div className="gd-member-acts">
-          <b>{open}</b>
-          <div className="pill-row">
-            {open !== p.leader ? (
-              <>
-                <button className="pill" disabled={busy} onClick={() => void act(() => editParty(p.id, { leader: open }))}>
-                  파티장 지정
-                </button>
-                <button className={"pill" + (sure === "rm" + open ? " gd-sure" : "")} disabled={busy} onClick={() => twice("rm" + open, () => void act(() => editParty(p.id, { remove: [open] })))}>
-                  {sure === "rm" + open ? "정말 빼기" : "빼기"}
-                </button>
-              </>
-            ) : (
-              <button className={"pill" + (sure === "del" ? " gd-sure" : "")} disabled={busy} onClick={() => twice("del", () => void act(() => deleteParty(p.id)))}>
-                {sure === "del" ? "정말 파티 지우기" : "파티 지우기"}
+        });
+        if (canManage && p.members.length < MAX_MEMBERS)
+          cells.push(
+            <li key="+add" className="gd-member-add">
+              <button className="gd-member-row" onClick={() => (setAdding((v) => !v), setOpen(null))} aria-expanded={adding}>
+                + 파티원 넣기
               </button>
-            )}
-          </div>
-        </div>
-      )}
+            </li>,
+          );
+        // 누른 카드: 그 카드 줄 바로 아래 가로 꽉 차게 '파티장 지정 · 빼기' (파티장 카드는 '파티 지우기') (제작자 요청 2026-11-02 '카드 누르면 파티장 주게')
+        const at = open !== null && canManage ? p.members.findIndex((m) => m.id === open) : -1;
+        if (at >= 0)
+          cells.splice(
+            Math.min(cells.length, at - (at % 2) + 2),
+            0,
+            <li key="+acts" className="gd-member-acts">
+              <b>{open}</b>
+              <div className="pill-row">
+                {open !== p.leader ? (
+                  <>
+                    <button className="pill" disabled={busy} onClick={() => void act(() => editParty(p.id, { leader: open! }))}>
+                      파티장 지정
+                    </button>
+                    <button className={"pill" + (sure === "rm" + open ? " gd-sure" : "")} disabled={busy} onClick={() => twice("rm" + open, () => void act(() => editParty(p.id, { remove: [open!] })))}>
+                      {sure === "rm" + open ? "정말 빼기" : "빼기"}
+                    </button>
+                  </>
+                ) : (
+                  <button className={"pill" + (sure === "del" ? " gd-sure" : "")} disabled={busy} onClick={() => twice("del", () => void act(() => deleteParty(p.id)))}>
+                    {sure === "del" ? "정말 파티 지우기" : "파티 지우기"}
+                  </button>
+                )}
+              </div>
+            </li>,
+          );
+        return <ul className="gd-members">{cells}</ul>;
+      })()}
       {adding && canManage && (
         <div className="gd-member-acts">
           <PeoplePicker

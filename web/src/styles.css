@@ -2407,7 +2407,7 @@ input, textarea { min-width: 0; max-width: 100%; }
 .gd-member-row { display: flex; align-items: center; gap: 3px; width: 100%; min-width: 0; padding: 0; color: inherit; font: inherit; text-align: left; background: none; border: 0; }
 button.gd-member-row { cursor: pointer; }
 .gd-member-open { border-color: var(--gold) !important; }
-.gd-member-acts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: -2px 0 8px; padding: 8px; background: rgba(11, 10, 26, 0.45); border: 1px solid var(--gold); }
+.gd-members > li.gd-member-acts, .gd-member-acts { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 0 0 4px; padding: 8px; background: rgba(11, 10, 26, 0.45); border: 1px solid var(--gold); }
 .gd-member-acts > b { font-weight: 400; font-size: 13px; color: var(--gold); }
 .gd-member-acts .pill-row { margin: 0; }
 .gd-member-add { border-style: dashed !important; }
