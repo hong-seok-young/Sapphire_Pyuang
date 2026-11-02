@@ -543,8 +543,9 @@ function LedgerActions({ o, busy, run }: { o: ShopOrder; busy: boolean; run: (fn
           골드 수정
         </button>
       )}
+      {/* '삭제'보다 무엇을 지우는지 분명하게 (제작자 요청 2026-11-02) */}
       <button className="pill" disabled={busy} onClick={() => run(() => actOrder(o.id, "void"), "정산에서 뺐어요. 복구할 수 있어요.")}>
-        삭제
+        기록 삭제
       </button>
     </>
   );
