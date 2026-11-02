@@ -87,7 +87,8 @@ const TITLE_STYLE: "A" | "B" | "C" | "D" | "E" = "B";
 export function TopBar({ title, back = true, right, star }: { title: ReactNode; back?: boolean; right?: ReactNode; star?: ReactNode }) {
   const en = typeof title === "string" ? TITLE_EN[title] : undefined;
   return (
-    <header className="topbar">
+    // 위 줄 (제작자 요청 2026-11-02): 왼쪽 ◀, 가운데 제목(메뉴 화면은 작은 배너, 화면 가운데), 오른쪽 🔔 과 👤. 단추는 상자 없이 작게
+    <header className={"topbar" + (right ? "" : " topbar-std")}>
       {back ? (
         <button className="topbar-back" onClick={goBack} aria-label="뒤로">
           ◀
@@ -112,42 +113,25 @@ export function TopBar({ title, back = true, right, star }: { title: ReactNode; 
       {right ?? (
         <span className="topbar-right">
           {star}
-          {!location.hash.startsWith("#/alerts") && <Bell className="topbar-me" />}
-          {!location.hash.startsWith("#/me") && <MeButton className="topbar-me" size={24} />}
+          {!location.hash.startsWith("#/alerts") && <Bell className="topbar-me" size={18} />}
+          {!location.hash.startsWith("#/me") && <MeButton className="topbar-me" size={18} />}
         </span>
       )}
     </header>
   );
 }
 
-/** '내 정보' 단추 (👤): 누르면 늘 내 정보 (제작자 요청 2026-11-01. 캐릭터 바꾸기는 홈의 초록 점과 닉네임) */
-export function MeButton({ className, size }: { className: string; size: number }) {
-  return (
-    <a className={className} href="#/me" aria-label="내 정보" title="내 정보">
-      <PixelIcon name="me" size={size} />
-    </a>
-  );
-}
-
 /**
- * 홈의 초록 점과 닉네임. 캐릭터를 묶은 사람(부캐 묶기)은 누르면 캐릭터 목록이 뜨고, 고르면 그 캐릭터로 바꿔 지금 화면을 다시 연다
- * (제작자 요청 2026-11-01: 캐릭터 바꾸기만). 캐릭터가 하나면 그냥 글자
+ * 캐릭터 목록 (부캐 묶기): 고르면 그 캐릭터로 바꿔 지금 화면을 다시 연다. me 를 주면 맨 아래에 '내 정보' 줄
+ * (제작자 요청 2026-11-02: 위 줄 프로필 단추를 누르면 아이디 목록과 내 정보)
  */
-export function CharacterSwitch() {
+function CharacterMenu({ top, me, onClose }: { top: number; me?: boolean; onClose: () => void }) {
   const { current, list } = useMyCharacters();
-  const [at, setAt] = useState<number | null>(null);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const label = (
-    <>
-      <i className="online-dot" aria-label="로그인 중" />
-      {current}
-    </>
-  );
-  if (list.length < 2) return label;
   async function pick(id: string) {
     if (id === current) {
-      setAt(null);
+      onClose();
       return;
     }
     setBusy(id);
@@ -162,6 +146,79 @@ export function CharacterSwitch() {
   }
   return (
     <>
+      <div className="char-menu-back" onClick={onClose} />
+      <div className="char-menu" role="menu" style={{ top }}>
+        {list.map((c) => (
+          <button key={c.id} className={"char-item" + (c.id === current ? " char-on" : "")} disabled={!!busy} onClick={() => pick(c.id)} role="menuitem">
+            <span className="char-name">
+              <b>{c.id}</b>
+              <small>
+                {c.main ? "본캐" : "부캐"}
+                {c.level ? ` · Lv.${c.level}` : ""}
+                {c.job ? ` ${JOB_NAME[c.job]}` : ""}
+              </small>
+            </span>
+            <span className="char-mark">{busy === c.id ? "…" : c.id === current ? "✓" : ""}</span>
+          </button>
+        ))}
+        {me && (
+          <a className="char-item char-me" href="#/me" onClick={onClose} role="menuitem">
+            <span className="char-name">
+              <b>내 정보</b>
+            </span>
+            <span className="char-mark">›</span>
+          </a>
+        )}
+        {error && <small className="form-error">{error}</small>}
+      </div>
+    </>
+  );
+}
+
+/**
+ * 프로필 단추 (👤): 캐릭터가 하나면 누르면 바로 내 정보, 묶은 캐릭터가 있으면 아이디 목록과 '내 정보'가 뜨고 고르면 그 캐릭터로 바꾼다
+ * (제작자 요청 2026-11-02: '알림 + 프로필 모양으로 두고 한 번 누르면 아이디 목록 + 내 정보, 부캐 없으면 바로 내 정보')
+ */
+export function MeButton({ className, size }: { className: string; size: number }) {
+  const { list } = useMyCharacters();
+  const [at, setAt] = useState<number | null>(null);
+  if (list.length < 2)
+    return (
+      <a className={className} href="#/me" aria-label="내 정보" title="내 정보">
+        <PixelIcon name="me" size={size} />
+      </a>
+    );
+  return (
+    <>
+      <button
+        className={className}
+        onClick={(e) => setAt(at === null ? e.currentTarget.getBoundingClientRect().bottom + 6 : null)}
+        aria-label="캐릭터 · 내 정보"
+        aria-expanded={at !== null}
+      >
+        <PixelIcon name="me" size={size} />
+      </button>
+      {at !== null && <CharacterMenu top={at} me onClose={() => setAt(null)} />}
+    </>
+  );
+}
+
+/**
+ * 홈의 초록 점과 닉네임. 캐릭터를 묶은 사람(부캐 묶기)은 누르면 캐릭터 목록이 뜨고, 고르면 그 캐릭터로 바꿔 지금 화면을 다시 연다
+ * (제작자 요청 2026-11-01: 캐릭터 바꾸기만). 캐릭터가 하나면 그냥 글자
+ */
+export function CharacterSwitch() {
+  const { current, list } = useMyCharacters();
+  const [at, setAt] = useState<number | null>(null);
+  const label = (
+    <>
+      <i className="online-dot" aria-label="로그인 중" />
+      {current}
+    </>
+  );
+  if (list.length < 2) return label;
+  return (
+    <>
       <button
         className="char-switch"
         onClick={(e) => setAt(at === null ? e.currentTarget.getBoundingClientRect().bottom + 6 : null)}
@@ -171,27 +228,7 @@ export function CharacterSwitch() {
         {label}
         <span className="char-switch-arrow" aria-hidden="true">▾</span>
       </button>
-      {at !== null && (
-        <>
-          <div className="char-menu-back" onClick={() => setAt(null)} />
-          <div className="char-menu" role="menu" style={{ top: at }}>
-            {list.map((c) => (
-              <button key={c.id} className={"char-item" + (c.id === current ? " char-on" : "")} disabled={!!busy} onClick={() => pick(c.id)} role="menuitem">
-                <span className="char-name">
-                  <b>{c.id}</b>
-                  <small>
-                    {c.main ? "본캐" : "부캐"}
-                    {c.level ? ` · Lv.${c.level}` : ""}
-                    {c.job ? ` ${JOB_NAME[c.job]}` : ""}
-                  </small>
-                </span>
-                <span className="char-mark">{busy === c.id ? "…" : c.id === current ? "✓" : ""}</span>
-              </button>
-            ))}
-            {error && <small className="form-error">{error}</small>}
-          </div>
-        </>
-      )}
+      {at !== null && <CharacterMenu top={at} onClose={() => setAt(null)} />}
     </>
   );
 }
