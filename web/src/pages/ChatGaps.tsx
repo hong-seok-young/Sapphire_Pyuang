@@ -3,14 +3,14 @@ import { errorText } from "../auth";
 import { fixGap, listGaps } from "../chat";
 import type { ChatGap } from "../chat";
 import { ago } from "../market";
-import { Loading, TopBar } from "../ui";
+import { Loading, MasterNote, TopBar } from "../ui";
 
 /**
  * 챗봇 개선 (앱개발자만, 제작자 요청): 길잡이가 짐작하거나 자료가 없다고 한 답, 길드원이 '👎 별로'를 누른 답.
  * '목록 복사'로 Claude 에게 넘겨 위키 자료나 프롬프트를 고치고 배포한 뒤 '개선 완료'를 누르면,
  * 물은 사람에게 '챗봇이 개선됐어요' 알림이 가고 누르면 그 대화에서 새 답을 받는다
  */
-export function ChatGapsPage() {
+export function ChatGapsPage({ role }: { role: string }) {
   const [tab, setTab] = useState<"open" | "fixed">("open");
   const [gaps, setGaps] = useState<ChatGap[] | null>(null);
   const [error, setError] = useState("");
@@ -54,6 +54,10 @@ export function ChatGapsPage() {
   return (
     <>
       <TopBar title="챗봇 개선" />
+      <MasterNote role={role}>
+        챗봇이 몰라서 짐작한 답과 길드원이 '별로'를 누른 답이 모여요. 개발자가 보고 자료를 채워 챗봇을 고치는 메뉴예요. 고치고 '개선 완료'를 누르면 물어본
+        길드원에게 알림이 가요.
+      </MasterNote>
       <div className="gap-top">
         <button className={"pill" + (tab === "open" ? " pill-on" : "")} onClick={() => setTab("open")}>
           대기

@@ -4,7 +4,7 @@ import { KIND_NAME, VIA_NAME, actionText, fetchActivity, fetchUsage, pageName, s
 import type { ActivityRow, DeviceInfo, Kind, LogDbInfo, Person, Storage } from "../activity";
 import { ago } from "../market";
 import type { Wiki } from "../types";
-import { Loading, TopBar } from "../ui";
+import { Loading, MasterNote, TopBar } from "../ui";
 
 const KINDS: (Kind | null)[] = [null, "visit", "view", "act"];
 const SHOWN_PEOPLE = 12;
@@ -59,7 +59,7 @@ function groupRows(rows: ActivityRow[]): Item[] {
  * 줄마다 붙던 기기·도시·IP 는 뺐다 (제작자 요청 2026-11-02: '주소 뜨는 거 불필요'. IP 는 데이터·와이파이만 바꿔도 바뀌어 다른 사람인지 알 수 없다).
  * 대신 사람마다 기기 표로 센 기기 수, '새 기기', '같은 때 다른 곳'(10분 안에 다른 기기가 다른 도시에서)을 보인다. 기록에는 그대로 남긴다
  */
-export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
+export function ActivityLogPage({ wiki, role }: { wiki: Wiki; role: string }) {
   /** 묶음 요약에 쓰는 짧은 이름 ('게시판: 자유' -> '자유', '게시판 글: 제목' -> '제목') */
   const itemText = (r: ActivityRow) =>
     r.kind === "view" ? pageName(r.what, wiki, r.detail).replace(/^(게시판|게시판 글|아이모 소식 글|글|사냥터|몬스터|아이템|메뉴|장비|검색): /, "") : actionText(r.what, r.detail, r.at);
@@ -123,6 +123,10 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
   return (
     <>
       <TopBar title="사용 기록" />
+      <MasterNote role={role}>
+        길드원이 언제 접속해서 어떤 화면을 보고 무엇을 했는지 남아요. 앱을 더 낫게 고치고, 오류나 사고가 났을 때 무슨 일이 있었는지 원인을 찾으려고
+        쓰는 메뉴예요. 길드원에게는 보이지 않아요.
+      </MasterNote>
       {/* 기록은 지우지 않고 쌓는다. 한도는 DB 크기뿐이라 얼마나 찼는지 (제작자 2026-11-02 '사용 기록 무제한으로 못 쌓아?') */}
       {storage && (
         <div className="log-storage">

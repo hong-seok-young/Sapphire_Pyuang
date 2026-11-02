@@ -2500,3 +2500,7 @@ button.gd-member-row { cursor: pointer; }
 .gd-all-members { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 4px 0 0; font-size: 12px; color: var(--muted); }
 /* 내 정보 날씨 반영: 비 · 눈 · 함박눈 미리 보기 단추 */
 .me-wx-preview { margin: 6px 0 8px; }
+/* 길드마스터에게만 보이는 메뉴 설명 (ui.tsx MasterNote) */
+.master-note { border-color: #b98cff; }
+.master-note b { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 400; color: #d9c2ff; }
+.master-note p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }

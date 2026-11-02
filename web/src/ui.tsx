@@ -524,3 +524,17 @@ export function ChangeAsk({ onPick, onCancel, busy, compact }: {
 export function NewsDot({ n }: { n: number }) {
   return n > 0 ? <span className="news-badge in-news">{n > 99 ? "99+" : n}</span> : null;
 }
+
+/**
+ * 길드마스터에게만 보이는 메뉴 설명 (사용 기록, 챗봇 개선. 제작자 요청 2026-11-02: '길드마스터한테만 설명이 뜨게,
+ * 길드마스터와 개발자에게만 보이는 메뉴, 앱을 개선하기 위한, 디버깅과 사고 원인을 찾기 위한 메뉴'). 앱개발자에게는 안 보인다
+ */
+export function MasterNote({ role, children }: { role: string; children: ReactNode }) {
+  if (role !== "master") return null;
+  return (
+    <div className="panel master-note">
+      <b>길드마스터와 개발자에게만 보이는 메뉴예요</b>
+      <p>{children}</p>
+    </div>
+  );
+}
