@@ -237,8 +237,10 @@ export function CharacterSwitch() {
  * 그래도 넘치면 낱말 사이(띄어쓰기와 · 뒤)에서만 줄을 바꾼다. 낱말 가운데에서는 자르지 않는다 (제작자 요청).
  * wrap={false} (닉네임처럼 줄을 바꿀 자리가 없는 글)는 들어갈 만큼 글자를 줄인다
  */
-export function FitLine({ text, shrink = 1, wrap = true, className }: {
+export function FitLine({ text, shrink = 1, wrap = true, className, hs = false }: {
   text: string; shrink?: number; wrap?: boolean; className?: string;
+  /** 고스펙 닉네임: 글자 위로 금빛 반짝임 (styles.css .hs, src/kakao.tsx Nick 과 같다) */
+  hs?: boolean;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {
@@ -291,7 +293,7 @@ export function FitLine({ text, shrink = 1, wrap = true, className }: {
   }, [text, shrink, wrap]);
 
   return (
-    <span ref={ref} className={"fit-line" + (className ? " " + className : "")}>
+    <span ref={ref} className={"fit-line" + (className ? " " + className : "") + (hs ? " hs" : "")} data-hs={hs ? text : undefined}>
       {/* · 뒤와 ( 앞의 폭 없는 공백이 줄을 바꿀 자리다 (<wbr> 은 크롬에서 한 줄로 둘 때도 줄을 바꿔서 쓰지 않는다) */}
       {text.split(" · ").map((part, i) => (
         <Fragment key={i}>

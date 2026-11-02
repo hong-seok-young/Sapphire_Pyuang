@@ -11,7 +11,7 @@ import {
   updateListing, wantListing, wikiItem, WANTS_FOR_AUCTION, toAuction, shotUrl,
 } from "../market";
 import { readShot, shrinkShot } from "../shot";
-import { KakaoButton } from "../kakao";
+import { KakaoButton, Nick } from "../kakao";
 import type { Shot } from "../shot";
 import type { Category, Enchant, Listing, ListingOption, TalkLine } from "../market";
 import type { Wiki } from "../types";
@@ -185,7 +185,10 @@ function Detail({ wiki, me, l, rate, onChanged }: {
                 {l.bids!.map((b, i) => (
                   <li key={b.id + b.at}>
                     {i === 0 ? (over ? "🏆 낙찰 " : "🔨 최고 ") : "· "}
-                    <b>{b.id}</b> <KakaoButton name={b.id} /> <Coin /> {goldText(b.amount)} <small>{ago(b.at)}</small>
+                    <b>
+                      <Nick name={b.id} />
+                    </b>{" "}
+                    <KakaoButton name={b.id} /> <Coin /> {goldText(b.amount)} <small>{ago(b.at)}</small>
                   </li>
                 ))}
               </ul>
@@ -196,7 +199,11 @@ function Detail({ wiki, me, l, rate, onChanged }: {
             <ul className="mk-wanters">
               {l.wanters!.map((w) => (
                 <li key={w.id}>
-                  ♥ <b>{w.id}</b> <KakaoButton name={w.id} /> <small>{ago(w.at)}</small>
+                  ♥{" "}
+                  <b>
+                    <Nick name={w.id} />
+                  </b>{" "}
+                  <KakaoButton name={w.id} /> <small>{ago(w.at)}</small>
                   {w.offer ? (
                     <span className="mk-offer">
                       {" "}
@@ -463,7 +470,9 @@ function Talk({ l, me, onCount }: { l: Listing; me: Me; onCount: (n: number) => 
     return (
       <li key={t.id} className={(reply ? "mk-talk-reply" : "") + (t.user === l.seller ? " mk-talk-seller" : "")}>
         {reply && <span className="mk-talk-arrow">↳</span>}
-        <b>{t.user}</b>
+        <b>
+          <Nick name={t.user} />
+        </b>
         <KakaoButton name={t.user} />
         {t.user === l.seller && <span className="mk-talk-tag">판매자</span>}
         {position !== "member" && <span className="mk-talk-tag mk-talk-staff">{ROLE_NAME[position]}</span>}
@@ -568,7 +577,7 @@ function Rows({ wiki, me, list, rate, onChanged, empty }: {
               </span>
               <span className="mk-price">
                 <small>
-                  {l.seller} <KakaoButton name={l.seller} nested />
+                  <Nick name={l.seller} /> <KakaoButton name={l.seller} nested />
                 </small>
                 <b key={shownPrice} className={changed ? "mk-flash" : undefined}>
                   <Coin /> {goldText(shownPrice)}

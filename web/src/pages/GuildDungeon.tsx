@@ -10,9 +10,9 @@ import {
   saveAvail, slotOf, slotShort, slotText, undoAnswer, validSlot, weekText,
 } from "../gdungeon";
 import type { GdData, GdPerson, PartyState } from "../gdungeon";
-import { KakaoButton } from "../kakao";
+import { KakaoButton, Nick, useKakao } from "../kakao";
 import { useEntryState } from "../router";
-import { Loading, TopBar } from "../ui";
+import { FitLine, Loading, TopBar } from "../ui";
 
 export function GuildDungeonPage({ me }: { me: Me }) {
   const [data, setData] = useState<GdData | null>(null);
@@ -87,6 +87,7 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
   const [sure, setSure] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const { high } = useKakao();
   const week = data.week;
   const leader = p.leader === me.id;
   const canManage = leader || data.staff;
@@ -143,66 +144,70 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
       <ul className="gd-members">
         {p.members.map((m) => {
           const said = p.current !== null && p.yes.includes(m.id);
+          // 상태는 짧게 (한 칸에 닉네임 · 카톡 · 파티장 · 상태가 한 줄로 들어가게, 제작자 요청 2026-11-02)
+          const state = !m.filled ? "미입력" : p.confirmed !== null || said ? "확정" : all && p.current !== null ? "대기" : "입력";
           const row = (
             <>
-              <span className="gd-member-name">{m.id}</span>
+              <FitLine className="gd-member-name" text={m.id} wrap={false} hs={high.includes(m.id)} />
               <KakaoButton name={m.id} nested={canManage} />
               {m.id === p.leader && <i className="gd-leader">파티장</i>}
-              <small>{!m.filled ? "칠하기 전" : p.confirmed !== null ? "확정" : said ? "확정 ✓" : all && p.current !== null ? "대답 전" : "칠함"}</small>
+              <small className={state === "확정" ? "gd-st-yes" : undefined}>{state}</small>
             </>
           );
           return (
             <li key={m.id} className={(m.filled ? "" : "gd-member-wait") + (open === m.id ? " gd-member-open" : "")}>
               {canManage ? (
-                <button className="gd-member-row" onClick={() => setOpen(open === m.id ? null : m.id)} aria-expanded={open === m.id}>
+                <button className="gd-member-row" onClick={() => (setOpen(open === m.id ? null : m.id), setAdding(false))} aria-expanded={open === m.id}>
                   {row}
                 </button>
               ) : (
                 <div className="gd-member-row">{row}</div>
-              )}
-              {open === m.id && canManage && (
-                <div className="pill-row gd-member-acts">
-                  {m.id !== p.leader ? (
-                    <>
-                      <button className="pill" disabled={busy} onClick={() => void act(() => editParty(p.id, { leader: m.id }))}>
-                        파티장 지정
-                      </button>
-                      <button
-                        className={"pill" + (sure === "rm" + m.id ? " gd-sure" : "")}
-                        disabled={busy}
-                        onClick={() => twice("rm" + m.id, () => void act(() => editParty(p.id, { remove: [m.id] })))}
-                      >
-                        {sure === "rm" + m.id ? "정말 빼기" : "빼기"}
-                      </button>
-                    </>
-                  ) : (
-                    <button className={"pill" + (sure === "del" ? " gd-sure" : "")} disabled={busy} onClick={() => twice("del", () => void act(() => deleteParty(p.id)))}>
-                      {sure === "del" ? "정말 파티 지우기" : "파티 지우기"}
-                    </button>
-                  )}
-                </div>
               )}
             </li>
           );
         })}
         {canManage && p.members.length < MAX_MEMBERS && (
           <li className="gd-member-add">
-            <button className="gd-member-row" onClick={() => setAdding((v) => !v)} aria-expanded={adding}>
+            <button className="gd-member-row" onClick={() => (setAdding((v) => !v), setOpen(null))} aria-expanded={adding}>
               + 파티원 넣기
             </button>
-            {adding && (
-              <PeoplePicker
-                people={data.people.filter((x) => x.party === null)}
-                exclude={p.members.map((m) => m.id)}
-                max={MAX_MEMBERS - p.members.length}
-                busy={busy}
-                action="넣기"
-                onPick={(ids) => void act(() => editParty(p.id, { add: ids }))}
-              />
-            )}
           </li>
         )}
       </ul>
+      {/* 누른 카드: 파티장 지정 · 빼기 (파티장 카드는 파티 지우기) */}
+      {open !== null && canManage && p.members.some((m) => m.id === open) && (
+        <div className="gd-member-acts">
+          <b>{open}</b>
+          <div className="pill-row">
+            {open !== p.leader ? (
+              <>
+                <button className="pill" disabled={busy} onClick={() => void act(() => editParty(p.id, { leader: open }))}>
+                  파티장 지정
+                </button>
+                <button className={"pill" + (sure === "rm" + open ? " gd-sure" : "")} disabled={busy} onClick={() => twice("rm" + open, () => void act(() => editParty(p.id, { remove: [open] })))}>
+                  {sure === "rm" + open ? "정말 빼기" : "빼기"}
+                </button>
+              </>
+            ) : (
+              <button className={"pill" + (sure === "del" ? " gd-sure" : "")} disabled={busy} onClick={() => twice("del", () => void act(() => deleteParty(p.id)))}>
+                {sure === "del" ? "정말 파티 지우기" : "파티 지우기"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {adding && canManage && (
+        <div className="gd-member-acts">
+          <PeoplePicker
+            people={data.people.filter((x) => x.party === null)}
+            exclude={p.members.map((m) => m.id)}
+            max={MAX_MEMBERS - p.members.length}
+            busy={busy}
+            action="넣기"
+            onPick={(ids) => void act(() => editParty(p.id, { add: ids }))}
+          />
+        </div>
+      )}
 
       {/* 지금 상태 */}
       {!all ? (
@@ -364,7 +369,9 @@ function PeoplePicker({ people, exclude, max, busy, action, allowEmpty = false, 
             {list.map((x) => (
               <li key={x.id}>
                 <button onClick={() => (setPicked([...picked, x.id]), setQ(""))}>
-                  <b>{x.id}</b>
+                  <b>
+                    <Nick name={x.id} />
+                  </b>
                   {x.level !== null && <small>Lv.{x.level}{x.job ? ` ${JOB_NAME[x.job as Job] ?? ""}` : ""}</small>}
                 </button>
               </li>
@@ -563,7 +570,7 @@ function AllParties({ data }: { data: GdData }) {
             <p className="gd-all-members">
               {p.members.map((id) => (
                 <span key={id}>
-                  {id} <KakaoButton name={id} />
+                  <Nick name={id} /> <KakaoButton name={id} />
                 </span>
               ))}
             </p>

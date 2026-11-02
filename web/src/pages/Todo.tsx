@@ -8,7 +8,7 @@ import type { Me } from "../auth";
 import { errorText } from "../auth";
 import type { Wiki } from "../types";
 import { Loading, TopBar } from "../ui";
-import { KakaoButton } from "../kakao";
+import { KakaoButton, Nick } from "../kakao";
 import {
   addCustom, buildLists, deleteCustom, digestTodo, editCustom, editTodo, eventItems, fetchPeople, fetchTodo, leaveShare, leftText, routineItems,
   setTodoDone, shareTodo, updateShare,
@@ -224,7 +224,7 @@ function Row({ item: i, ctx }: { item: TodoItem; ctx: RowCtx }) {
               <span className="todo-with">
                 {s.members.map((m) => (
                   <span key={m.id} className={m.done ? "todo-with-done" : ""}>
-                    {m.id}
+                    <Nick name={m.id} />
                     {m.done ? " ✓" : ""}
                     {m.id !== ctx.me.id && (
                       <>

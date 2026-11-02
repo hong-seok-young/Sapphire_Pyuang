@@ -54,7 +54,7 @@ import {
 import type { AppRequest, LedgerLine, RentApp, RentData, RentFields, RentItem, RentLogRow, RentTerm } from "../rental";
 import { MARKET_PIC, itemFacts, rollHint } from "../market";
 import { readShot, shrinkShot } from "../shot";
-import { KakaoButton, useKakao } from "../kakao";
+import { KakaoButton, useKakao, Nick } from "../kakao";
 
 const REASON: Record<LedgerLine["reason"], string> = { donate: "기부", rent: "대여 보증금", adjust: "고침", return: "반납 · 보증금 돌려받음" };
 /** 한 번에 고를 수 있는 무기 수 (서버 MAX_APP_ITEMS 와 같다. 제작자 요청 2026-11-02: 5개 한도를 두지 말고, 여러 개면 안내만) */
@@ -367,10 +367,14 @@ function ItemPopup({ wiki, item, data, picked, onPick, onClose, onDone }: {
           <p>
             {item.term === "none" ? "기한 없음" : `기한 ${termName(item.term)}`} · 보증금 💎{item.price} <small>(골드 {diaGold(item.price, data.rate)})</small>
           </p>
-          {item.donor && <p className="rent-muted">기부 {item.donor}</p>}
+          {item.donor && (
+            <p className="rent-muted">
+              기부 <Nick name={item.donor} />
+            </p>
+          )}
           {item.renter && (
             <p>
-              <b className="rent-st">대여 중</b> {item.renter} <KakaoButton name={item.renter} />
+              <b className="rent-st">대여 중</b> <Nick name={item.renter} /> <KakaoButton name={item.renter} />
               {item.dueAt ? ` · ${md(item.dueAt)}까지` : " · 기한 없음"}
               {item.deposit && (
                 <small className="rent-muted">
@@ -389,7 +393,9 @@ function ItemPopup({ wiki, item, data, picked, onPick, onClose, onDone }: {
                   {item.line.map((q, i) => (
                     <Fragment key={q.pos + q.user}>
                       {i === 0 ? " · " : ", "}
-                      {`${q.pos}. ${q.user}(${STATUS_NAME[q.status]})`} <KakaoButton name={q.user} />
+                      {`${q.pos}. `}
+                      <Nick name={q.user} />
+                      {`(${STATUS_NAME[q.status]})`} <KakaoButton name={q.user} />
                     </Fragment>
                   ))}
                 </small>
@@ -547,7 +553,7 @@ function AppCard({ app, data, byId, manage = false, onDone }: { app: RentApp; da
   return (
     <div className="rent-app">
       <div className="rent-app-head">
-        <b>{manage ? app.user : "내 신청"}</b>
+        <b>{manage ? <Nick name={app.user} /> : "내 신청"}</b>
         {manage && <KakaoButton name={app.user} />}
         <small>{when(app.createdAt)}</small>
         {manage && app.mileage !== undefined && <small className="rent-dia-sm">💎{app.mileage}</small>}
@@ -734,7 +740,10 @@ function Talk({ app, onDone }: { app: RentApp; onDone: () => void }) {
         <ul ref={list} className="rent-talk-list">
           {app.talk.map((t) => (
             <li key={t.id} className={t.user === app.user ? "rent-talk-them" : "rent-talk-staff"}>
-              <b>{t.user}</b> <KakaoButton name={t.user} /> <small>{when(t.at)}</small>
+              <b>
+                <Nick name={t.user} />
+              </b>{" "}
+              <KakaoButton name={t.user} /> <small>{when(t.at)}</small>
               <p>{t.text}</p>
             </li>
           ))}
@@ -1337,7 +1346,9 @@ function ReturnRow({ wiki, item, apps, onDone }: { wiki: Wiki; item: RentItem; a
         </span>
         {/* 빌린 사람과 단추는 한 묶음: 폰 폭에서 자리가 모자라면 묶음째 다음 줄 오른쪽으로 (제작자 2026-11-02: 화면 폭을 넘었다) */}
         <span className="rent-back-side">
-          <b className="rent-back-who">{item.renter}</b>
+          <b className="rent-back-who">
+            <Nick name={item.renter} />
+          </b>
           <KakaoButton name={item.renter} />
           {!sure && (
             <span className="rent-back-acts">
@@ -1430,7 +1441,7 @@ function DonationPanel({ wiki, data, onDone }: { wiki: Wiki; data: RentData; onD
             <li key={b.person} className={open === b.person ? "rent-don-open" : ""}>
               <button className="rent-don-row" onClick={() => toggle(b.person)} aria-expanded={open === b.person}>
                 <span className="rent-don-name">
-                  {b.person} <KakaoButton name={b.person} nested />
+                  <Nick name={b.person} /> <KakaoButton name={b.person} nested />
                 </span>
                 <small>
                   기부 {b.count ?? 0}건 · 적립 💎{Math.max(0, b.donated ?? 0)}
@@ -1654,6 +1665,7 @@ function Ledger({ lines, rate, onDelete }: { lines: LedgerLine[]; rate: number; 
  * 건넨 줄마다 무기, 빌린 사람, 대여한 날, 반납한 날(대여 중이면 '대여 중'), 보증금. 반납한 줄은 '삭제'(한 번 더 눌러 확인)로 지운다
  */
 function RentLog({ wiki }: { wiki: Wiki }) {
+  const { high } = useKakao();
   const [rows, setRows] = useState<RentLogRow[] | null>(null);
   const [error, setError] = useState("");
   const [sure, setSure] = useState<number | null>(null);
@@ -1695,7 +1707,7 @@ function RentLog({ wiki }: { wiki: Wiki }) {
             <span>{r.weapon && <Slot wiki={wiki} item={{ weapon: r.weapon }} />}</span>
             <FitLine text={`${r.weapon ?? "지운 물건"}${r.enhance !== null ? ` +${r.enhance}` : ""}`} wrap={false} />
             <span className="rent-log-whoc">
-              <FitLine className="rent-log-who" text={r.user} wrap={false} />
+              <FitLine className="rent-log-who" text={r.user} wrap={false} hs={high.includes(r.user)} />
               <KakaoButton name={r.user} />
             </span>
             <span>{day(r.rentedAt)}</span>

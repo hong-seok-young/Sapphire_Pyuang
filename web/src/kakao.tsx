@@ -8,8 +8,10 @@ interface Links {
   links: Record<string, string>;
   /** 링크가 있는 운영진 (장비대여 '담당자 카톡') */
   staff: string[];
+  /** 고스펙 닉네임 (닉네임이 뜨는 곳마다 반짝임, Nick) */
+  high: string[];
 }
-let data: Links = { links: {}, staff: [] };
+let data: Links = { links: {}, staff: [], high: [] };
 let loading: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 const subscribe = (l: () => void) => {
@@ -21,7 +23,7 @@ const subscribe = (l: () => void) => {
 export function refreshKakao(): Promise<void> {
   loading = api<Links>("/api/kakao")
     .then((r) => {
-      data = { links: r.links ?? {}, staff: r.staff ?? [] };
+      data = { links: r.links ?? {}, staff: r.staff ?? [], high: r.high ?? [] };
       listeners.forEach((l) => l());
     })
     .catch(() => undefined);
@@ -34,6 +36,21 @@ export function useKakao(): Links {
     if (!loading) void refreshKakao();
   }, []);
   return d;
+}
+
+/**
+ * 닉네임: 고스펙이면 금빛 반짝임이 글자 위로 흐른다 (제작자 요청 2026-11-02 '고스펙 닉네임 애니메이션은 어디서든, 폰트 크기나 글씨체는 바꾸지 말고 딱 애니메이션만').
+ * 글자는 그 자리의 색·크기·글꼴 그대로 두고, 같은 글자를 위에 겹쳐 반짝임 띠만 그린다 (styles.css .hs). 랭킹·길드원 관리는 예전 .hs-text 그대로
+ */
+export function Nick({ name }: { name: string | null | undefined }) {
+  const { high } = useKakao();
+  if (!name) return null;
+  if (!high.includes(name)) return <>{name}</>;
+  return (
+    <span className="hs" data-hs={name}>
+      {name}
+    </span>
+  );
 }
 
 /** 내 링크 적기 (user 를 주면 그 사람 것: 운영진) */

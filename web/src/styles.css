@@ -1115,6 +1115,21 @@ button { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .hs-text { animation: none; }
 }
+/* 닉네임이 뜨는 곳마다 고스펙 반짝임 (src/kakao.tsx Nick, 제작자 요청 2026-11-02 '어디서든, 폰트 크기나 글씨체는 바꾸지 말고 딱 애니메이션만'):
+   글자는 그 자리 색 그대로, 같은 글자를 위에 겹쳐(::after) 금빛 띠만 흐르고 은은히 빛난다 (.hs-text 와 같은 띠·빛) */
+.hs {
+  --hs-deep: #c8901e; --hs-hi: #ffd34d; --hs-core: #fffbe6; --hs-glow: rgba(255, 196, 50, 0.9);
+  position: relative; white-space: nowrap; animation: hs-glow 1.2s ease-in-out infinite alternate;
+}
+.hs::after {
+  content: attr(data-hs); position: absolute; left: 0; top: 0; color: transparent; pointer-events: none; white-space: nowrap;
+  background: linear-gradient(100deg, transparent 0 30%, var(--hs-deep) 38%, var(--hs-hi) 45%, var(--hs-core) 50%, var(--hs-hi) 55%, var(--hs-deep) 62%, transparent 70% 100%);
+  background-size: 150% 100%; -webkit-background-clip: text; background-clip: text; animation: hs-run 1.8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hs { animation: none; }
+  .hs::after { display: none; }
+}
 
 /* updated menu on home (updates.ts, 제작자 요청): a mint border and an 'UPDATE' tag at the top right for a day after the first visit */
 .tile-new { border-color: #3fe0a0; box-shadow: inset var(--px) var(--px) 0 rgba(63, 224, 160, 0.45), inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--lo), 0 0 6px rgba(63, 224, 160, 0.55); }
@@ -2386,20 +2401,23 @@ input, textarea { min-width: 0; max-width: 100%; }
 .gd-party-head > b { font-size: 15px; color: var(--gold); }
 .gd-party-head > .bd-mini { margin-left: auto; }
 .gd-party-head > small { flex: 1; min-width: 0; font-size: 11px; color: var(--muted); }
-.gd-members { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; }
-.gd-members > li { min-width: 0; padding: 4px 8px; background: rgba(11, 10, 26, 0.45); border: 1px solid var(--edge); }
-.gd-member-name { min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
-.gd-member-row { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; padding: 0; color: inherit; font: inherit; text-align: left; background: none; border: 0; }
+.gd-members { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.gd-members > li { min-width: 0; padding: 5px 6px; background: rgba(11, 10, 26, 0.45); border: 1px solid var(--edge); }
+.gd-member-name { flex: 0 1 auto; min-width: 0; font-size: 13px; }
+.gd-member-row { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 0; padding: 0; color: inherit; font: inherit; text-align: left; background: none; border: 0; }
 button.gd-member-row { cursor: pointer; }
 .gd-member-open { border-color: var(--gold) !important; }
-.gd-member-acts { margin: 6px 0 2px; }
+.gd-member-acts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: -2px 0 8px; padding: 8px; background: rgba(11, 10, 26, 0.45); border: 1px solid var(--gold); }
+.gd-member-acts > b { font-weight: 400; font-size: 13px; color: var(--gold); }
+.gd-member-acts .pill-row { margin: 0; }
 .gd-member-add { border-style: dashed !important; }
 .gd-member-add > .gd-member-row { justify-content: center; min-height: 20px; font-size: 12px; color: var(--muted); }
-.gd-member-add .gd-picker { margin-top: 6px; }
-.gd-member-row > small { margin-left: auto; flex: none; font-size: 11px; color: #7ee0a8; }
-.gd-leader { flex: none; padding: 0 3px; font-size: 10px; font-style: normal; line-height: 15px; color: var(--edge); background: var(--gold); }
+
+.gd-member-row > small { margin-left: auto; flex: none; font-size: 10px; color: var(--muted); }
+.gd-member-row > small.gd-st-yes { color: #7ee0a8; }
+.gd-member-row > .kakao-btn { flex: none; padding: 0 3px; font-size: 10px; line-height: 15px; }
+.gd-leader { flex: none; padding: 0 2px; font-size: 9px; font-style: normal; line-height: 14px; color: var(--edge); background: var(--gold); }
 .gd-new-name { margin: 0; font-size: 14px; color: var(--gold); }
-.gd-member-wait .gd-member-row > small { color: var(--muted); }
 .gd-state { margin: 4px 0; font-size: 13px; }
 .gd-state small { color: var(--muted); }
 .gd-cand, .gd-confirm { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 2px; margin: 6px 0; padding: 10px 8px; text-align: center; border: 1px solid var(--edge); background: rgba(11, 10, 26, 0.5); }

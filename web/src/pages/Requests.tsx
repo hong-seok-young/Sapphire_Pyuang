@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useEntryState } from "../router";
-import { KakaoButton } from "../kakao";
+import { KakaoButton, Nick } from "../kakao";
 import type { FormEvent } from "react";
 import { ApiError, RANK, errorText } from "../auth";
 import type { Me } from "../auth";
@@ -150,12 +150,18 @@ function RequestDetail({ me, r, onChanged, onStale }: { me: Me; r: GuildRequest;
         {ago(r.createdAt)} 의뢰
         {r.status === "accepted" && r.accepter && r.dueAt && (
           <>
-            {` · ${r.accepter} `}
+            {" · "}
+            <Nick name={r.accepter} />{" "}
             <KakaoButton name={r.accepter} mine={accepter} />
             {` 수락 (${timeLeft(r.dueAt)} 남음)`}
           </>
         )}
-        {r.status === "done" && r.accepter && ` · ${r.accepter} 님이 해냈어요`}
+        {r.status === "done" && r.accepter && (
+          <>
+            {" · "}
+            <Nick name={r.accepter} /> 님이 해냈어요
+          </>
+        )}
       </p>
       <div className="mk-actions">
         {!mine && r.status === "open" && (
@@ -271,14 +277,14 @@ export function RequestsPage({ me }: { me: Me }) {
                     <Reward r={r} />
                     {r.status === "accepted" && r.accepter && (
                       <span>
-                        ✋ {r.accepter} <KakaoButton name={r.accepter} nested />
+                        ✋ <Nick name={r.accepter} /> <KakaoButton name={r.accepter} nested />
                       </span>
                     )}
                   </small>
                 </span>
                 <span className="mk-price">
                   <small>
-                    {r.owner} <KakaoButton name={r.owner} nested />
+                    <Nick name={r.owner} /> <KakaoButton name={r.owner} nested />
                   </small>
                   <small>{ago(r.createdAt)}</small>
                 </span>

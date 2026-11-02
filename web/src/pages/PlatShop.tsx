@@ -6,7 +6,7 @@ import { ago, goldText, goldWords } from "../market";
 import { PLAT_PACKS, SHOP_PIC, actOrder, budget, discount, fetchShop, goldOf, orderItem, packsOf, packsWithin, saveShopItem, saveShopSettings, setOrderGold } from "../platshop";
 import type { ShopData, ShopItem, ShopOrder, ShopSettings, Wallet } from "../platshop";
 import { FitLine, Loading, TopBar } from "../ui";
-import { KakaoButton } from "../kakao";
+import { KakaoButton, Nick } from "../kakao";
 import { WEEK } from "../week";
 
 type Tab = "shop" | "mine" | "pending" | "ledger" | "settings" | "budget";
@@ -284,7 +284,7 @@ function OrderList({ orders, empty, action }: { orders: ShopOrder[]; empty: stri
               <small>
                 {o.user && (
                   <>
-                    {o.user} <KakaoButton name={o.user} /> ·{" "}
+                    <Nick name={o.user} /> <KakaoButton name={o.user} /> ·{" "}
                   </>
                 )}
                 {goldText(paid)} 골드
@@ -405,12 +405,16 @@ function Settlement({ manage, items, busy, run }: {
                         <b className="st-item">{o.itemName}</b>
                         {/* 누가 샀고 누가 게임 안에서 팔았는지 ('구매 · 판매', 제작자 요청 2026-11-02) */}
                         <span className="st-flow">
-                          <span className="st-buyer">{o.user}</span>
+                          <span className="st-buyer">
+                            <Nick name={o.user} />
+                          </span>
                           <KakaoButton name={o.user} nested />
                           <small>구매</small>
                           {o.status === "done" && o.doneBy && (
                             <>
-                              <span className="st-giver">{o.doneBy}</span>
+                              <span className="st-giver">
+                                <Nick name={o.doneBy} />
+                              </span>
                               <small>판매</small>
                             </>
                           )}
