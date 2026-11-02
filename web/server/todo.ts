@@ -226,8 +226,8 @@ export async function doneKeys(env: Env, userId: string, now = Date.now()): Prom
 
 // ---------- 사람마다 고친 To do: 내 할 일, 숨기기·이름 고치기, 함께 하는 할 일 (제작자 요청 2026-11-02) ----------
 
-/** 길드원에게 열었는지. 지금은 개발 중이라 운영진, 앱개발자, 테스트 계정만 쓴다: 함께 할 사람도 그 안에서만 고른다 (알림이 길드원에게 가지 않게) */
-export const TODO_OPEN = false;
+/** 길드원에게 열었는지 (2026-11-02 열었다, 제작자 요청 '투두도 오픈'). 열기 전에는 운영진, 앱개발자, 테스트 계정만 쓰고 함께 할 사람도 그 안에서만 골랐다 */
+export const TODO_OPEN = true;
 /** 할 일 키: 주기(d 매일, w 매주, o 한 번):무엇 */
 export const TODO_KEY = /^[dwo]:[\p{L}\p{N}:_-]{1,80}$/u;
 /** 내 할 일의 키 */

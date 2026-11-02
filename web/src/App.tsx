@@ -247,10 +247,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
   else if (page === "app" || page === "timer") body = <AppPage />;
   else if (page === "gaps") body = me.role === "developer" ? <ChatGapsPage /> : <NotFound what="페이지" />;
-  // 개발 중인 칸 (장비대여, 매칭, To do): 길드원에게는 '개발 중' 화면. 운영진과 앱개발자는 만든 화면이 있으면 그 화면 (제작자 요청 2026-11-02, canPreview)
   // 길드 던전은 1군 전용 (제작자 요청 2026-11-02): 2군은 들어와도 안내만 (앱개발자는 길드와 상관없이 본다)
   else if (page === "match") body = me.guild !== "main" && me.role !== "developer" ? <DevSoon title="길드 던전" text="1군 전용이에요" /> : <GuildDungeonPage me={me} />;
-  else if (page === "todo" && !canPreview(me)) body = <DevSoon title={itemOf(page)?.title ?? ""} />;
   else if (!wiki) body = <Loading error={loggedOut ? undefined : error} onRetry={() => setWikiTry((n) => n + 1)} />;
   else if (page === "search") body = <Search wiki={wiki} q={route.query.get("q") ?? ""} />;
   else if (page === "places") body = <Places wiki={wiki} region={route.query.get("r") ?? ""} />;

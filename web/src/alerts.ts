@@ -39,8 +39,8 @@ export const ALERT_GROUPS: { menu: string; kinds: { kind: AlertKind; name: strin
   { menu: "계정", kinds: [{ kind: "account", name: "역할" }] },
   // 장비대여: 신청, 대여, 마일리지 (2026-11-02 열었다, server/rental.ts RENT_OPEN)
   { menu: "장비대여", kinds: [{ kind: "rent", name: "대여·마일리지" }] },
-  // To do 함께 하는 할 일 (개발 중이라 미리 보는 사람만: 운영진, 앱개발자. 열면 preview 를 뺀다, server/todo.ts TODO_OPEN)
-  { menu: "To do", kinds: [{ kind: "todo", name: "함께", preview: true }] },
+  // To do 함께 하는 할 일 (2026-11-02 열었다, server/todo.ts TODO_OPEN)
+  { menu: "To do", kinds: [{ kind: "todo", name: "함께" }] },
   // 길드 던전 (1군 전용, 제작자 요청 2026-11-02): 파티 들어옴, 가능한 때가 다 모임, 확정, 불참
   { menu: "길드 던전", kinds: [{ kind: "gdungeon", name: "파티·시간" }] },
 ];

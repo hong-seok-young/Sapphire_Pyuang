@@ -9,7 +9,7 @@
 //   사용 기록은 앱개발자만 보는 기능이라 (CLAUDE.md '사용 기록') 다른 사람의 질문에는 붙이지 않는다
 // - 내 정보 (늘, 2026-11-02 제작자 요청: '내가 지금 할 것' 치면 내 레벨, 직업 등 내 데이터를 다 읽고): 캐릭터, 묶은 캐릭터, 순위, 알림 수,
 //   중개인·골드·의뢰소·상점에서 내가 한 것, 장비대여 내 것 (server/chatmine.ts). 아이모 소식(진행 중 이벤트, 점검)도 늘 짧게
-// - To do 는 개발 중이라 미리 보는 사람(운영진, 앱개발자, 테스트 계정)에게만, 장비대여는 2026-11-02 열었다
+// - To do 와 장비대여는 2026-11-02 열었다 (To do 는 server/todo.ts TODO_OPEN)
 // 칸마다 글자 수를 정해 두어 질문이 너무 길어지지 않게 한다.
 import { RANK, TEST_IDS } from "./auth";
 import { covering, fromLogs, logDbs, newestLogs } from "./logdb";
@@ -23,7 +23,6 @@ import { weekStart } from "./week";
 import { TODO_OPEN, doneKeys, eventTasks, todoExtras } from "./todo";
 import { ASK_MORE, mineExtras, newsNow, shopCatalog } from "./chatmine";
 
-/** To do 를 길드원에게 열었는지 (지금은 개발 중이라 앱개발자만, 제작자 요청 2026-11-01. 열 때 true 와 챗봇 안내 줄, src/launcher.ts) */
 
 /** 길드 앱 자료 전체 글자 수 (내 정보, 아이모 소식, 장비대여를 더해 늘렸다. 2026-11-02) */
 export const MAX_APP = 36000;

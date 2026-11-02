@@ -54,8 +54,8 @@ export const ITEMS: LaunchItem[] = [
   // 1군 전용 플래티넘 할인 상점 (제작자 요청). 아이콘은 게임 첫 화면의 상점 그림. '1군 전용'은 왼쪽 위 띠로
   { key: "shop", title: "플래티넘 할인 상점", short: "상점", to: "#/shop", icon: "🏪", iconPic: "/data/shop/shop_icon.png", ribbon: "1군 전용", ring: "gold", match: ["shop"] },
   // To do: 이벤트를 안 읽어도 내 직업·레벨에 맞는 오늘·이번 주 할 일 (제작자 요청 2026-11-01, pages/Todo.tsx)
-  // 지금은 개발 중 (제작자 요청 2026-11-01): 길드원은 못 들어가고 앱개발자만. 열 때는 soon, badge, locked 를 빼고 CLAUDE.md 'To do' 의 순서대로
-  { key: "todo", title: "To do", to: "#/todo", icon: "✅", soon: true, badge: "개발 중", locked: true, match: ["todo"] },
+  // To do: 2026-11-02 열었다 (제작자 요청 '투두도 오픈')
+  { key: "todo", title: "To do", to: "#/todo", icon: "✅", match: ["todo"] },
   { key: "ranking", title: "길드 랭킹", short: "랭킹", to: "#/ranking", icon: "🏆", match: ["ranking"] },
   { key: "market", title: "사파이어 중개인", short: "중개인", to: "#/market", icon: "💰", match: ["market"] },
   { key: "requests", title: "길드원 의뢰소", short: "의뢰소", to: "#/requests", icon: "📋", match: ["requests"] },
