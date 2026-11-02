@@ -1,6 +1,6 @@
 // 사용 기록 (앱개발자만 보는 '사용 기록' 화면 #/log, 서버 functions/api/activity.ts, server/activity.ts).
 // 화면이 지금 보는 주소를 알아서 보낸다. 한 일은 서버가 API 요청에서 남긴다.
-import { api } from "./auth";
+import { api, apiHeaders } from "./auth";
 import type { Role } from "./auth";
 import type { Wiki } from "./types";
 
@@ -31,6 +31,27 @@ export interface Person {
   lastVia: Via | null;
   /** 같은 사람의 부캐 (부캐 묶기: 기록을 본캐 한 줄로 합친다) */
   alts?: string[];
+  /** 7일 동안 쓴 기기 수 (기기 표로 센다, 2026-11-02 부터) */
+  devices7: number;
+  /** 7일 안에 처음 나온 기기 (전에 쓰던 다른 기기가 있을 때만) */
+  newDev: boolean;
+  /** 7일 동안 같은 때(10분 안) 다른 기기가 다른 도시에서 쓴 번 수 */
+  together: number;
+}
+
+/** 고른 사람의 기기 하나 (최근 60일, 같은 기기는 캐릭터를 합쳐서) */
+export interface DeviceInfo {
+  /** 기기와 브라우저 ('안드로이드 14 SM-S928N · 삼성 인터넷'. 크롬은 폰 모델을 가린다) */
+  name: string | null;
+  /** 기기 표가 생기기 전 기록 (기기 글로만 묶음) */
+  legacy: boolean;
+  first: number;
+  last: number;
+  visits: number;
+  n: number;
+  cities: string[];
+  chars: string[];
+  isNew: boolean;
 }
 
 export const VIA_NAME: Record<Via, string> = {
@@ -48,7 +69,7 @@ export function fetchActivity(q: { user?: string | null; kind?: Kind | null; bef
   if (q.user) p.set("user", q.user);
   if (q.kind) p.set("kind", q.kind);
   if (q.before) p.set("before", String(q.before));
-  return api<{ rows: ActivityRow[]; more: boolean; people?: Person[] }>(`/api/activity?${p}`);
+  return api<{ rows: ActivityRow[]; more: boolean; people?: Person[]; devices?: DeviceInfo[] }>(`/api/activity?${p}`);
 }
 
 let lastSent = "";
@@ -64,7 +85,7 @@ export function reportView(hash: string) {
     fetch("/api/activity", {
       method: "POST",
       credentials: "same-origin",
-      headers: { "content-type": "application/json" },
+      headers: apiHeaders(true),
       body: JSON.stringify({ path: path.slice(0, 200) }),
       keepalive: true,
     }).catch(() => {});
@@ -91,7 +112,7 @@ export function reportOpen(userId: string) {
   fetch("/api/activity", {
     method: "POST",
     credentials: "same-origin",
-    headers: { "content-type": "application/json" },
+    headers: apiHeaders(true),
     body: JSON.stringify({ open: true }),
     keepalive: true,
   }).catch(() => {});

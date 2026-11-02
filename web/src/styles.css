@@ -2246,3 +2246,13 @@ input, textarea { min-width: 0; max-width: 100%; }
   display: flex; align-items: center; gap: 8px; padding: 8px 10px;
 }
 .wx-ask span { flex: 1; min-width: 0; font-size: 13px; }
+
+/* 사용 기록: 기기 표시 (제작자 요청 2026-11-02, pages/ActivityLog.tsx) */
+.log-flag { display: inline-block; margin-left: 6px; padding: 0 4px; font-style: normal; font-size: 10px; line-height: 1.5; border: 1px solid; }
+.log-flag-new { color: var(--gold); border-color: #8a6a2e; }
+.log-flag-warn { color: #ff8fa3; border-color: #8a3a52; }
+.log-devs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.log-dev { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 6px 8px; background: var(--night-2); }
+.log-dev b { font-weight: 400; font-size: 13px; color: var(--text); }
+.log-dev small { font-size: 11px; color: var(--muted); }
+.log-dev-old { opacity: 0.6; }

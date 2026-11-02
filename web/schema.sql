@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS avatars (
   png BLOB NOT NULL                       -- 맨 끝 칸 (랭킹은 updated_at 만 읽는다)
 );
 
--- 사용 기록 (앱개발자만 본다, 60일 보관, server/activity.ts): 접속, 화면, 한 일.
+-- 사용 기록 (앱개발자만 본다, 지우지 않음, server/activity.ts): 접속, 화면, 한 일.
 -- 제작자 요청으로 비밀번호만 빼고 보낸 내용, IP, 대략의 위치, 기기를 모두 남긴다
 CREATE TABLE IF NOT EXISTS activity (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -181,6 +181,7 @@ CREATE TABLE IF NOT EXISTS activity (
   ip TEXT,
   place TEXT,           -- Cloudflare 가 아는 도시, 지역, 나라
   device TEXT,          -- User-Agent 에서 읽은 기기와 브라우저
+  dev TEXT,             -- 기기 표 (브라우저마다 무작위 글, 같은 기기인지 알려고. 2026-11-02 부터)
   at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS activity_at ON activity (at);

@@ -128,6 +128,33 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * 이 기기 표: 브라우저마다 한 번 만든 무작위 글. 사용 기록에서 같은 기기인지 알려고 모든 API 요청에 헤더로 보낸다
+ * (제작자 요청 2026-11-02, server/activity.ts whereOf). 사람이나 폰을 알아내는 값이 아니고, 브라우저 자료를 지우면 새로 만든다
+ */
+let devId = "";
+export function deviceId(): string {
+  if (devId) return devId;
+  try {
+    let d = localStorage.getItem("sapphire.dev") ?? "";
+    if (!/^[a-z0-9]{8,16}$/.test(d)) {
+      d = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => (b % 36).toString(36)).join("") + Date.now().toString(36).slice(-4);
+      localStorage.setItem("sapphire.dev", d);
+    }
+    devId = d;
+  } catch {
+    devId = "";
+  }
+  return devId;
+}
+/** API 요청 헤더 (JSON 이면 content-type, 그리고 기기 표) */
+export function apiHeaders(json: boolean): Record<string, string> {
+  const h: Record<string, string> = json ? { "content-type": "application/json" } : {};
+  const d = deviceId();
+  if (d) h["x-sapphire-dev"] = d;
+  return h;
+}
+
 /** 서버 API (JSON). 실패하면 서버가 준 이유로 ApiError */
 export async function api<T>(path: string, method = "GET", body?: unknown): Promise<T> {
   let res: Response;
@@ -135,7 +162,7 @@ export async function api<T>(path: string, method = "GET", body?: unknown): Prom
     res = await fetch(path, {
       method,
       credentials: "same-origin",
-      headers: body === undefined ? undefined : { "content-type": "application/json" },
+      headers: apiHeaders(body !== undefined),
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {

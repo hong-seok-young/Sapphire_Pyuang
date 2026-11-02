@@ -84,6 +84,7 @@ const ADDED_COLUMNS = [
   ["activity", "ip", "TEXT"],
   ["activity", "place", "TEXT"],
   ["activity", "device", "TEXT"],
+  ["activity", "dev", "TEXT"],
   ["alert_prefs", "push", "INTEGER"],
   ["users", "push_perm", "TEXT"], ["users", "push_at", "INTEGER"],
   ["listings", "auto_auction", "INTEGER"],

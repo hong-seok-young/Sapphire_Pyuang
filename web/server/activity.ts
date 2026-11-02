@@ -64,6 +64,11 @@ export interface Where {
   ip: string | null;
   place: string | null;
   device: string | null;
+  /**
+   * 기기 표: 브라우저마다 한 번 만든 무작위 글 (화면이 헤더 x-sapphire-dev 로 보낸다, src/auth.ts deviceId).
+   * 같은 기기인지 알려고 (제작자 요청 2026-11-02: IP 는 데이터·와이파이만 바꿔도 바뀌어서 다른 사람인지 알 수 없다). 크롬은 폰 모델을 가려 기기 글만으로는 못 가린다
+   */
+  dev: string | null;
 }
 
 function deviceOf(ua: string): string | null {
@@ -99,14 +104,15 @@ export function whereOf(request: Request): Where {
     ip: request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for"),
     place: place || null,
     device: deviceOf(request.headers.get("user-agent") ?? ""),
+    dev: /^[a-z0-9]{8,16}$/.test(request.headers.get("x-sapphire-dev") ?? "") ? request.headers.get("x-sapphire-dev") : null,
   };
 }
 
 /** 기록 하나. 접속은 화면이 열릴 때 따로 보낸다 (POST /api/activity { open: true }) */
 export async function record(env: Env, userId: string, kind: Kind, what: string, detail: string | null, where: Where): Promise<void> {
-  const { via, ip, place, device } = where;
-  await env.DB.prepare("INSERT INTO activity (user_id, kind, what, detail, via, ip, place, device, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    .bind(userId, kind, what.slice(0, 200), detail, via, ip, place, device, Date.now())
+  const { via, ip, place, device, dev } = where;
+  await env.DB.prepare("INSERT INTO activity (user_id, kind, what, detail, via, ip, place, device, dev, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .bind(userId, kind, what.slice(0, 200), detail, via, ip, place, device, dev, Date.now())
     .run();
 }
 
