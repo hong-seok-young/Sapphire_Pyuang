@@ -27,10 +27,13 @@ import {
   addMileage,
   addRent,
   applyRent,
+  deleteMileageLine,
+  deleteRentLog,
   diaGold,
   editRent,
   fetchMileage,
   fetchRent,
+  fetchRentLog,
   lendRent,
   levelOf,
   manGold,
@@ -44,7 +47,7 @@ import {
   talkRent,
   weaponOf,
 } from "../rental";
-import type { AppRequest, LedgerLine, RentApp, RentData, RentFields, RentItem, RentTerm } from "../rental";
+import type { AppRequest, LedgerLine, RentApp, RentData, RentFields, RentItem, RentLogRow, RentTerm } from "../rental";
 import { MARKET_PIC, itemFacts, jobsFor, rollHint } from "../market";
 import { readShot, shrinkShot } from "../shot";
 import { KakaoButton, useKakao } from "../kakao";
@@ -114,12 +117,14 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
   const toggle = (id: number) =>
     setPicked((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : cur.length >= MAX_PICK ? cur : [...cur, id]));
 
-  const tab = view === "apps" || (view === "staff" && data.manager) ? view : "list";
+  const tab = view === "apps" || ((view === "staff" || view === "log") && data.manager) ? view : "list";
   const views: { key: string; name: string; to: string; badge?: number }[] = [
     { key: "list", name: "목록", to: "#/rent", badge: news["rent.list"] },
     { key: "apps", name: myApps.length ? `신청함 ${myApps.length}` : "신청함", to: "#/rent?v=apps", badge: news["rent.apps"] },
     // 운영: 확인 전 신청 수 (없으면 새 대화 같은 새 것 수)
     ...(data.manager ? [{ key: "staff", name: "운영", to: "#/rent?v=staff", badge: waitCount || news["rent.staff"] }] : []),
+    // 운영 오른쪽에 기록: 누가 언제 대여하고 반납했는지 (제작자 요청 2026-11-02)
+    ...(data.manager ? [{ key: "log", name: "기록", to: "#/rent?v=log" }] : []),
   ];
 
   return (
@@ -199,6 +204,11 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
           {panel === "mileage" && <DonationPanel wiki={wiki} data={data} onDone={() => void load()} />}
         </section>
       )}
+      {tab === "log" && (
+        <section className="panel rent-admin">
+          <RentLog wiki={wiki} />
+        </section>
+      )}
 
       {tab === "list" && (
         <>
@@ -276,7 +286,7 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
 }
 
 /** 무기 그림 칸 (+강 표) */
-function Slot({ wiki, item }: { wiki: Wiki; item: RentItem }) {
+function Slot({ wiki, item }: { wiki: Wiki; item: { weapon: string } }) {
   const it = weaponOf(wiki, item.weapon);
   return <span className="rent-slot">{it?.icon ? <PicImg pic={it.icon} fit={20} /> : "?"}</span>;
 }
@@ -885,6 +895,15 @@ function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; s
   const [error, setError] = useState("");
   const [reading, setReading] = useState(false);
   const set = <K extends keyof RentFields>(k: K, v: RentFields[K]) => setF((cur) => ({ ...cur, [k]: v }));
+  // 대여 중인 물건은 반납 기한도 여기서 고친다 (제작자 요청 2026-11-02: 기한을 조정하는 곳이 없다). 기한 칸을 바꾸면 빌린 날 + 기한으로 다시 맞춘다
+  const rentedAt = start.renter ? (start.rentedAt ?? null) : null;
+  const [due, setDue] = useState<number | null>(start.dueAt ?? null);
+  const DAY = 86_400_000;
+  const setTerm = (t: RentTerm) => {
+    set("term", t);
+    if (rentedAt !== null) setDue(t === "none" ? null : rentedAt + (t === "2w" ? 14 : 28) * DAY);
+  };
+  const moveDue = (days: number) => setDue((d) => (d === null ? null : Math.max((rentedAt ?? 0) + DAY, d + days * DAY)));
   /**
    * 무기 스샷으로 칸 채우기 (제작자 요청 2026-11-02: 데이터에 없는 장비를 넣을 때). 운영진이 갤러리에서 고른 스샷을 읽어 직업, 무기, 레벨, +강, 옵션을 채운다.
    * 위키 무기면 레벨과 직업은 위키 값으로. 채운 뒤 사람이 보고 고친다
@@ -938,7 +957,7 @@ function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; s
     setBusy(true);
     setError("");
     try {
-      if (start.id) await editRent(start.id, f);
+      if (start.id) await editRent(start.id, f, rentedAt !== null ? due : undefined);
       else {
         const r = await addRent(f);
         if (r.warning) {
@@ -962,13 +981,43 @@ function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; s
           </button>
         ))}
       </div>
-      <div className="pill-row">
-        {TERMS.map((t) => (
-          <button key={t} type="button" className={"pill" + (f.term === t ? " pill-on" : "")} onClick={() => set("term", t as RentTerm)}>
-            {TERM_NAME[t]}
-          </button>
-        ))}
+      {/* 기한 (제작자 요청 2026-11-02: 무엇을 고르는 단추인지 이름을 붙였다) */}
+      <div className="mk-field">
+        <span className="rent-field-head">대여 기한</span>
+        <div className="pill-row">
+          {TERMS.map((t) => (
+            <button key={t} type="button" className={"pill" + (f.term === t ? " pill-on" : "")} onClick={() => setTerm(t as RentTerm)}>
+              {TERM_NAME[t]}
+            </button>
+          ))}
+        </div>
       </div>
+      {rentedAt !== null && (
+        <div className="mk-field">
+          <span className="rent-field-head">
+            반납 기한 · {start.renter} {md(rentedAt)} 대여
+          </span>
+          <div className="rent-due">
+            <b>{due === null ? "기한 없음" : md(due)}</b>
+            {due !== null && (
+              <>
+                <button type="button" className="pill" onClick={() => moveDue(-7)}>
+                  −1주
+                </button>
+                <button type="button" className="pill" onClick={() => moveDue(-1)}>
+                  −1일
+                </button>
+                <button type="button" className="pill" onClick={() => moveDue(1)}>
+                  +1일
+                </button>
+                <button type="button" className="pill" onClick={() => moveDue(7)}>
+                  +1주
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       {/* 무기 칸 머리 오른쪽에 작은 '스샷' (데이터에 없는 장비를 넣을 때 칸을 채운다) */}
       <div className="mk-field">
         <span className="rent-field-head">
@@ -1350,7 +1399,27 @@ function DonationPanel({ wiki, data, onDone }: { wiki: Wiki; data: RentData; onD
                       ))}
                     </p>
                   )}
-                  {view?.who === b.person ? <Ledger lines={view.ledger} rate={data.rate} /> : <p className="rent-muted">불러오는 중…</p>}
+                  {view?.who === b.person ? (
+                    <Ledger
+                      lines={view.ledger}
+                      rate={data.rate}
+                      onDelete={async (id) => {
+                        setError("");
+                        try {
+                          await deleteMileageLine(id);
+                          const left = view.ledger.filter((l) => l.id !== id);
+                          // 줄이 다 없어지면 그 사람 카드도 없어진다 (목록을 다시 받는다)
+                          if (!left.length) setOpen(null);
+                          else void show(b.person);
+                          onDone();
+                        } catch (e) {
+                          setError(errorText(e));
+                        }
+                      }}
+                    />
+                  ) : (
+                    <p className="rent-muted">불러오는 중…</p>
+                  )}
                   <div className="pill-row">
                     {(["donate", "adjust", "minus"] as const).map((m) => (
                       <button
@@ -1484,12 +1553,15 @@ function DonationForm({ wiki, data, start, onClose, onDone }: {
 }
 
 /** 장부 줄들 */
-function Ledger({ lines, rate }: { lines: LedgerLine[]; rate: number }) {
+/** 장부 줄들. onDelete 를 주면(운영 '기부 현황') 줄마다 '삭제' (한 번 더 눌러 확인, 제작자 요청 2026-11-02: 시험으로 적립·차감한 줄을 지우게) */
+function Ledger({ lines, rate, onDelete }: { lines: LedgerLine[]; rate: number; onDelete?: (id: number) => Promise<void> }) {
+  const [sure, setSure] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
   if (!lines.length) return <p className="rent-muted">아직 기록이 없어요</p>;
   return (
-    <ul className="rent-ledger">
+    <ul className={"rent-ledger" + (onDelete ? " rent-ledger-edit" : "")}>
       {lines.map((l, n) => (
-        <li key={n}>
+        <li key={l.id ?? n}>
           <span className={l.delta > 0 ? "rent-plus" : "rent-minus"}>
             💎{l.delta > 0 ? "+" : ""}
             {l.delta}
@@ -1501,9 +1573,104 @@ function Ledger({ lines, rate }: { lines: LedgerLine[]; rate: number }) {
             {l.gold ? ` · 골드 ${diaGold(l.gold / rate, rate)}` : ""}
           </span>
           <small>{md(l.at)}</small>
+          {onDelete && l.id !== undefined && (
+            <button
+              className={"pill rent-ledger-del" + (sure === l.id ? " pill-on" : "")}
+              disabled={busy}
+              onClick={async () => {
+                if (sure !== l.id) return setSure(l.id!);
+                setBusy(true);
+                try {
+                  await onDelete(l.id!);
+                  setSure(null);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {sure === l.id ? "기록 삭제" : "삭제"}
+            </button>
+          )}
         </li>
       ))}
     </ul>
   );
 }
 
+
+/**
+ * 운영 '기록' (제작자 요청 2026-11-02: '누가 언제 대여하고 반납했었다 이런 기록을 다 남겨 주라, 장비 대여 기록도 지울 수 있게'):
+ * 건넨 줄마다 무기, 빌린 사람, 대여한 날, 반납한 날(대여 중이면 '대여 중'), 보증금. 반납한 줄은 '삭제'(한 번 더 눌러 확인)로 지운다
+ */
+function RentLog({ wiki }: { wiki: Wiki }) {
+  const [rows, setRows] = useState<RentLogRow[] | null>(null);
+  const [error, setError] = useState("");
+  const [sure, setSure] = useState<number | null>(null);
+  const load = useCallback(() => {
+    fetchRentLog().then(
+      (r) => setRows(r.log),
+      (e) => setError(errorText(e)),
+    );
+  }, []);
+  useEffect(load, [load]);
+  if (!rows) return <Loading error={error || undefined} />;
+  if (!rows.length) return <p className="rent-muted">아직 기록이 없어요</p>;
+  const when = (t: number) => {
+    const d = new Date(t + 9 * 3_600_000);
+    return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+  };
+  const remove = async (id: number) => {
+    setError("");
+    try {
+      await deleteRentLog(id);
+      setSure(null);
+      load();
+    } catch (e) {
+      setError(errorText(e));
+    }
+  };
+  return (
+    <>
+      {error && <p className="form-error">{error}</p>}
+      <ul className="rent-log">
+        {rows.map((r) => (
+          <li key={r.id} className={r.returnedAt ? "" : "rent-log-now"}>
+            <div className="rent-log-top">
+              {r.weapon && <Slot wiki={wiki} item={{ weapon: r.weapon }} />}
+              <span className="rent-nm">
+                {r.weapon ?? "지운 물건"}
+                {r.enhance !== null && <em>+{r.enhance}</em>}
+              </span>
+              <b className="rent-back-who">{r.user}</b>
+            </div>
+            <p className="rent-log-info">
+              {r.rentedAt ? `${when(r.rentedAt)} 대여` : "대여"}
+              {" → "}
+              {r.returnedAt ? `${when(r.returnedAt)} 반납` : <span className="rent-log-on">대여 중</span>}
+              {(r.useDia > 0 || !!r.gold) && ` · 보증금 ${[r.useDia > 0 ? `💎${r.useDia}` : "", r.gold ? `골드 ${manGold(r.gold)}` : ""].filter(Boolean).join(" + ")}`}
+              {r.by && ` · ${r.by}`}
+            </p>
+            {r.returnedAt && (
+              <div className="rent-log-acts">
+                {sure === r.id ? (
+                  <>
+                    <button className="pill pill-on" onClick={() => void remove(r.id)}>
+                      기록 삭제
+                    </button>
+                    <button className="pill" onClick={() => setSure(null)}>
+                      취소
+                    </button>
+                  </>
+                ) : (
+                  <button className="pill" onClick={() => setSure(r.id)}>
+                    삭제
+                  </button>
+                )}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}

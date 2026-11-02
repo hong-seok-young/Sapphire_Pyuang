@@ -325,9 +325,18 @@ function Face({ e, size }: { e: GrowthEntry; size: number }) {
 }
 
 /** 2026-10-27(월) */
-function dayText(t: number): string {
-  const d = new Date(t);
-  return `${d.getMonth() + 1}월 ${d.getDate()}일(${"일월화수목금토"[d.getDay()]})`;
+/** 한국 시간 '10/29(목) 10:00' */
+function whenText(t: number): string {
+  const d = new Date(t + 9 * 3_600_000);
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}(${"일월화수목금토"[d.getUTCDay()]}) ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+/** 기간이 끝나는 때: 오늘은 다음 날 0시, 주간은 다음 목요일 오전 10시, 월간은 다음 달 1일 0시 (한국 시간) */
+function periodEnd(period: GrowthPeriod, start: number): number {
+  if (period === "day") return start + 86_400_000;
+  if (period === "week") return start + 7 * 86_400_000;
+  const d = new Date(start + 9 * 3_600_000);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1) - 9 * 3_600_000;
 }
 
 /**
@@ -347,10 +356,9 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
       <div className="rank-filters">
         <GuildCards items={data.entries} selected={guild} onSelect={onGuild} withAverage={false} />
       </div>
+      {/* 기간만 딱 (제작자 요청 2026-11-02: 설명은 빼고 언제부터 언제까지만) */}
       <p className="growth-note">
-        {/* 주간은 목요일 오전 10시부터 (제작자 요청, week.ts) */}
-        {period === "day" ? "오늘 0시" : `${dayText(data.start)} ${period === "week" ? "오전 10시" : "0시"}`}부터 지금까지 오른 만큼이에요.
-        레벨, 경험치를 적을 때마다 기록돼요. 닉네임을 누르면 그래프가 보여요.
+        {whenText(data.start)} ~ {whenText(periodEnd(period, data.start))}
       </p>
       {!first ? (
         <div className="empty">{PERIOD_NAME[period]} 아직 오른 사람이 없어요. 레벨업 하면 '내 정보'에서 적어 주세요!</div>

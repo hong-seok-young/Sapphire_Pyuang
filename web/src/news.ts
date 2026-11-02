@@ -50,6 +50,8 @@ export interface Maint {
   extended: boolean;
   /** 인스턴스 던전 입장 제한이 시작되는 때 */
   dungeonFrom: number | null;
+  /** 점검 내용 (띠의 아랫줄, 없으면 null) */
+  content?: string | null;
 }
 let maint: Maint[] = [];
 let user = "";

@@ -1,7 +1,7 @@
 import type { Me } from "../auth";
 import { Bell, CharacterSwitch, FitLine, HeroTitle, MeButton, NewsDot, PixelIcon, TopBar } from "../ui";
 import { VERSION } from "../patchnotes";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { enablePush, markPushAsked, shouldAskPush } from "../push";
 import { INFO_TILES, canPreview, canSee, clickItem, isLocked, isUpdated, itemOf, pressItem, resetLayout, setEditing, useLauncher } from "../launcher";
@@ -223,29 +223,55 @@ function PushAsk() {
 }
 
 const DOW = "일월화수목금토";
-/** 한국 시간 '11월 5일(목)', '10:30' */
+/** 한국 시간 '11/5(목)', '10:30' */
 function kstParts(ms: number) {
   const d = new Date(ms + 9 * 3_600_000);
   return {
-    day: `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일(${DOW[d.getUTCDay()]})`,
+    day: `${d.getUTCMonth() + 1}/${d.getUTCDate()}(${DOW[d.getUTCDay()]})`,
     hm: `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`,
   };
 }
 
-/** '지금 아이모 정기 점검 중 · 11월 5일(목) 10:30 ~ 15:00 (연장) · 시리온 서버' */
-function maintText(m: Maint, now: number): string {
+/** 띠의 윗줄: '11/5(목) 10:30 ~ 15:00 정기 점검 (연장) · 시리온 서버' */
+function maintTop(m: Maint): string {
   const s = kstParts(m.start);
   const e = m.end !== null ? kstParts(m.end) : null;
-  const range = `${s.day} ${s.hm} ~ ${e ? (e.day === s.day ? "" : e.day + " ") + e.hm : "종료 시까지"}${m.extended ? " (연장)" : ""}`;
-  const head = now >= m.start ? `지금 아이모 ${m.label} 중` : `아이모 ${m.label} 예정`;
-  const dungeon = m.dungeonFrom !== null && now < m.start ? ` · 인던은 ${kstParts(m.dungeonFrom).hm}부터 입장 제한` : "";
-  return `${head} · ${range}${m.servers ? " · " + m.servers : ""}${dungeon}`;
+  const range = `${s.day} ${s.hm} ~ ${e ? (e.day === s.day ? "" : e.day + " ") + e.hm : "종료 시까지"}`;
+  return `${range} ${m.label}${m.extended ? " (연장)" : ""}${m.servers ? " · " + m.servers : ""}`;
+}
+
+/** 한 줄에 다 안 들어가면 오른쪽에서 왼쪽으로 흐른다 (다 들어가면 그대로) */
+function FlowLine({ text }: { text: string }) {
+  const box = useRef<HTMLSpanElement>(null);
+  const [flow, setFlow] = useState(false);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const check = () => {
+      const inner = el.firstElementChild as HTMLElement | null;
+      if (inner) setFlow(inner.scrollWidth > el.clientWidth + 1);
+    };
+    setFlow(false);
+    check();
+    const watch = new ResizeObserver(check);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [text]);
+  return (
+    <span className={"maint-sub" + (flow ? " maint-flow" : "")} ref={box}>
+      {/* 흐를 때는 같은 글을 두 번 이어 붙여 끊김 없이 (절반만큼 옮기고 처음으로) */}
+      <span className="maint-run" style={flow ? { animationDuration: `${Math.max(8, text.length * 0.28)}s` } : undefined}>
+        <span>{text}</span>
+        {flow && <span aria-hidden>{text}</span>}
+      </span>
+    </span>
+  );
 }
 
 /**
- * 아이모 점검 전광판 (제작자 요청 2026-11-01): '사파이어 길드 포탈' 아래에 언제부터 언제 점검인지 글씨가 왼쪽으로 계속 흐른다.
- * 서버가 공식 점검 글을 2분마다 새로 받아 읽는다 (연장 공지도, server/maint.ts). 끝나는 시각이 지나면 바로 사라진다.
- * 누르면 그 공식 글. 움직임 줄이기면 흐르지 않고 줄을 바꿔 다 보인다
+ * 아이모 점검 띠 (제작자 요청 2026-11-01, 2026-11-02 고침: 상자 말고 테두리 없이 좌우를 꽉 채운 노란 띠, 두 줄):
+ * 윗줄은 언제부터 언제 무슨 점검, 아랫줄은 점검 내용 (공식 글의 '■ 점검내용', 없으면 비움, 길면 흐른다).
+ * 서버가 공식 점검 글을 2분마다 새로 받아 읽는다 (연장 공지도, server/maint.ts). 끝나는 시각이 지나면 바로 사라진다. 누르면 그 공식 글
  */
 function MaintBanner() {
   const list = useMaint();
@@ -256,20 +282,21 @@ function MaintBanner() {
   }, []);
   const shown = list.filter((m) => (m.end !== null ? m.end > now : now < m.start + 12 * 3_600_000));
   if (!shown.length) return null;
-  const text = shown.map((m) => maintText(m, now)).join("   ✦   ");
   return (
-    <a className={"maint" + (shown.some((m) => now >= m.start) ? " maint-on" : "")} href={`#/official/${shown[0].id}`} aria-label={text}>
-      <span className="maint-icon" aria-hidden>
-        🔧
-      </span>
-      <span className="maint-track">
-        {/* 같은 글을 두 번 이어 붙여 끊김 없이 흐른다 (절반만큼 옮기고 처음으로) */}
-        <span className="maint-run" style={{ animationDuration: `${Math.max(10, text.length * 0.3)}s` }}>
-          <span>{text}</span>
-          <span aria-hidden>{text}</span>
-        </span>
-      </span>
-    </a>
+    <div className="maint-wrap">
+      {shown.map((m) => {
+        const on = now >= m.start;
+        return (
+          <a key={m.id} className={"maint" + (on ? " maint-on" : "")} href={`#/official/${m.id}`}>
+            <span className="maint-top">
+              {on && <b className="maint-now">점검 중</b>}
+              <FitLine text={maintTop(m)} wrap={false} />
+            </span>
+            {m.content ? <FlowLine text={m.content} /> : <span className="maint-sub" />}
+          </a>
+        );
+      })}
+    </div>
   );
 }
 

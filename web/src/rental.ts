@@ -81,6 +81,8 @@ export interface RentApp {
 }
 
 export interface LedgerLine {
+  /** 장부 줄 번호 (운영진이 보는 기부 현황에서만, 지울 때) */
+  id?: number;
   who: string;
   delta: number;
   gold: number | null;
@@ -135,7 +137,27 @@ export interface RentFields {
   note: string;
 }
 export const addRent = (f: RentFields) => api<{ id: number; warning?: string }>("/api/rent", "POST", f);
-export const editRent = (id: number, f: RentFields) => api<{ ok: boolean }>(`/api/rent/${id}`, "PUT", f);
+/** dueAt: 대여 중인 물건의 반납 기한 (ms, 기한 없음은 null). 대여 중이 아니면 넣지 않는다 */
+export const editRent = (id: number, f: RentFields, dueAt?: number | null) =>
+  api<{ ok: boolean }>(`/api/rent/${id}`, "PUT", dueAt === undefined ? f : { ...f, dueAt });
+/** 장비대여 기록 한 줄 (운영 '기록', 제작자 요청 2026-11-02) */
+export interface RentLogRow {
+  id: number;
+  itemId: number;
+  weapon: string | null;
+  enhance: number | null;
+  job: Job | null;
+  itemStatus: string | null;
+  user: string;
+  rentedAt: number | null;
+  returnedAt: number | null;
+  by: string | null;
+  useDia: number;
+  gold: number | null;
+}
+export const fetchRentLog = () => api<{ log: RentLogRow[] }>("/api/rent/log");
+export const deleteRentLog = (id: number) => api<{ ok: boolean }>(`/api/rent/log?id=${id}`, "DELETE");
+export const deleteMileageLine = (id: number) => api<{ ok: boolean }>(`/api/rent/mileage?id=${id}`, "DELETE");
 export const removeRent = (id: number) => api<{ ok: boolean }>(`/api/rent/${id}`, "DELETE");
 export const fetchMileage = (who: string) =>
   api<{ who: string; names: string[]; mileage: number; ledger: LedgerLine[] }>(`/api/rent/mileage?who=${encodeURIComponent(who)}`);

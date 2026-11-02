@@ -1,6 +1,7 @@
 // GET /api/rent/mileage?who=닉네임 -> 그 사람(묶은 캐릭터 모두)의 마일리지와 장부 최근 100줄 (운영진)
 // POST /api/rent/mileage { who, delta, reason: "donate" | "adjust", note } -> 마일리지 적립·차감 (운영진: 장비 기부는 옵션 시세를 보고 💎 로, 기부는 note 에 장비 이름이 꼭)
-// 장부는 지우지 않는다. 남는 마일리지가 0 보다 작아지게는 못 뺀다. 앱 계정이면 그 사람에게 알림
+// DELETE /api/rent/mileage?id=N -> 장부 한 줄 지우기 (운영진, 제작자 요청 2026-11-02: 시험으로 적립·차감한 줄을 지우게. 그 사람의 줄이 다 없어지면 기부 현황 카드도 없어진다)
+// 남는 마일리지가 0 보다 작아지게는 못 뺀다 (지우기는 막지 않는다). 앱 계정이면 그 사람에게 알림
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { notify } from "../../../server/alerts";
@@ -22,7 +23,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (!who) return json({ error: "닉네임을 적어 주세요" }, 400);
   const names = await namesOf(env, who);
   const { results } = await env.DB.prepare(
-    `SELECT who, delta, gold, reason, note, by_user AS by, created_at AS at FROM rental_mileage WHERE who IN (${names.map(() => "?").join(",")}) ORDER BY created_at DESC LIMIT 100`,
+    `SELECT id, who, delta, gold, reason, note, by_user AS by, created_at AS at FROM rental_mileage WHERE who IN (${names.map(() => "?").join(",")}) ORDER BY created_at DESC LIMIT 100`,
   )
     .bind(...names)
     .all();
@@ -49,4 +50,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .run();
   await notify(env, [who], "rent", `마일리지 💎${delta > 0 ? "+" : ""}${delta}${note ? ` (${note})` : ""} · 지금 💎${now + delta}`, "#/rent?v=apps", me.id);
   return json({ ok: true, mileage: now + delta });
+};
+
+export const onRequestDelete: PagesFunction<Env> = async ({ request, env }) => {
+  const me = await currentUser(env, request);
+  if (!me) return NEED_LOGIN();
+  if (!canEnter(me) || !isManager(me)) return FORBIDDEN();
+  const id = Number(new URL(request.url).searchParams.get("id"));
+  if (!Number.isInteger(id) || id <= 0) return json({ error: "잘못된 요청이에요" }, 400);
+  const r = await env.DB.prepare("DELETE FROM rental_mileage WHERE id = ?").bind(id).run();
+  if (!r.meta.changes) return json({ error: "없는 기록이에요" }, 404);
+  return json({ ok: true });
 };

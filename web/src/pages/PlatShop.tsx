@@ -3,7 +3,7 @@ import { useEntryState } from "../router";
 import type { ChangeEvent, ReactNode } from "react";
 import { errorText } from "../auth";
 import { ago, goldText, goldWords } from "../market";
-import { PLAT_PACKS, SHOP_PIC, actOrder, budget, discount, fetchShop, goldOf, orderItem, packsFor, packsOf, packsWithin, saveShopItem, saveShopSettings, setOrderGold } from "../platshop";
+import { PLAT_PACKS, SHOP_PIC, actOrder, budget, discount, fetchShop, goldOf, orderItem, packsOf, packsWithin, saveShopItem, saveShopSettings, setOrderGold } from "../platshop";
 import type { ShopData, ShopItem, ShopOrder, ShopSettings, Wallet } from "../platshop";
 import { Loading, TopBar } from "../ui";
 import { WEEK } from "../week";
@@ -753,7 +753,7 @@ function Gain({ v, className = "" }: { v: number; className?: string }) {
 /**
  * 예산 검토 (오피서 이상, 제작자 요청 2026-10-31). 맨 위에서 충전할 양을 정한다: 현금(게임 상점 정가로 얼마어치 충전) 또는 플래티넘 몇 개.
  * 상점 상품마다 충전 비율이 달라서 현금이면 그 돈 안에서 플래티넘이 가장 많은 상품 조합(packsWithin), 개수면 그만큼을 가장 싸게(packsFor).
- * 비우면 길드원이 사 갈 만큼. 원스토어 할인(그때그때 다르다)은 실제 결제액에만 든다. 1군과 고스펙이 지금 설정대로 주당 플래티넘을 다 사 가면:
+ * 충전할 양은 적은 그대로 (비우면 0, 제작자 요청 2026-11-02: '비우면 자동'과 결제액 설명 상자는 번잡해서 뺐다). 원스토어 할인(그때그때 다르다)은 실제 결제액에만 든다. 1군과 고스펙이 지금 설정대로 주당 플래티넘을 다 사 가면:
  * 구매(플래티넘, 쓴 돈) | 판매(들어오는 골드, 남는 플래티넘은 1군 비율로 골드로) | 손익(쓴 돈을 1원 = 75골드처럼 골드로 바꿔 견준다).
  * 할인율과 골드 비율은 이 폰에 기억한다
  */
@@ -775,7 +775,8 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
   /** 통 설정으로 셈한 결과 */
   const review = (st: ShopSettings) => {
     const bb = budget(st, int(n), int(h), w);
-    const by = mode === "pick" ? packsOf(counts) : want > 0 ? packsWithin(want) : packsFor(bb.plat);
+    // 충전할 양은 적은 그대로 (제작자 요청 2026-11-02: '비우면 자동'은 번잡해서 뺐다. 비우면 0)
+    const by = mode === "pick" ? packsOf(counts) : packsWithin(want);
     const pd = Math.round(by.won * (1 - rate / 100));
     const sd = Math.min(by.plat, bb.plat);
     const part = bb.plat > 0 ? sd / bb.plat : 0;
@@ -796,29 +797,6 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
   /** 1군, 고스펙 따로: 쓴 돈을 산 플래티넘 중 그쪽이 사 간 만큼으로 나눠 친다 */
   const share = (plat: number) => (buy.plat > 0 ? (paid * plat) / buy.plat : 0);
   const gem = <img src={SHOP_PIC + "plat.png"} alt="" />;
-  /**
-   * 실제로 결제할 돈과 그 돈이 무엇인지 (제작자 요청 2026-11-02: 금액만 덩그러니 있어서 무슨 돈인지 바로 안 와닿았다,
-   * 좁은 폰에서는 금액과 설명이 다른 줄로 흩어졌다): 금액 바로 옆에 이름, 아래에 어떻게 셈했는지
-   */
-  const payBox = (
-    <div className="ps-pay">
-      <div className="ps-pay-head">
-        <span>원스토어 실제 결제</span>
-        <b>{won(paid)}</b>
-      </div>
-      <small>
-        {gem}
-        {buy.plat.toLocaleString("ko-KR")}개 · 게임 상점 정가 {won(buy.won)}에서 원스토어 {rate}% 할인
-      </small>
-      {mode === "won" && want === 0 && (
-        <small>
-          충전 칸을 비워서 1군 {int(n)}명·고스펙 {int(h)}명이 {w}주 동안 다 사 갈 만큼({gem}
-          {b.plat.toLocaleString("ko-KR")}개)으로 셈했어요
-        </small>
-      )}
-      {mode === "won" && want > 0 && <small>{won(want)} 안에서 플래티넘이 가장 많은 상품 조합{want > buy.won && ` · 남는 돈 ${won(want - buy.won)}`}</small>}
-    </div>
-  );
   return (
     <>
       <section className="panel ps-settings">
@@ -841,11 +819,10 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
                 inputMode="numeric"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value.replace(/\D/g, "").slice(0, 9))}
-                placeholder="비우면 자동"
+                placeholder="110000"
               />{" "}
-              원어치 (정가)
+              원어치
             </label>
-            {payBox}
           </>
         ) : (
           <>
@@ -870,7 +847,6 @@ function BudgetPanel({ settings }: { settings: ShopSettings }) {
                 </li>
               ))}
             </ul>
-            {payBox}
           </>
         )}
         <label>

@@ -1707,26 +1707,22 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 .off-body td, .off-body th { border: 1px solid var(--hi); padding: 4px 6px; }
 .off-text { white-space: pre-line; }
 
-/* IMO maintenance marquee under the home subtitle (Home.tsx MaintBanner): amber LED-board text scrolling left until the maintenance ends */
-.maint {
-  display: flex; align-items: center; gap: 8px; margin: -4px 0 12px; padding: 7px 10px;
-  background: #1c0f06; color: #ffb547; font-size: 13px; line-height: 18px; overflow: hidden;
-  border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 #5a3412, inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #0d0603;
-  text-shadow: 0 0 4px rgba(255, 170, 60, 0.75);
-}
-.maint-on { color: #ff8a5c; text-shadow: 0 0 4px rgba(255, 110, 70, 0.8); }
-.maint-icon { flex: none; text-shadow: none; }
-.maint-track {
-  flex: 1; min-width: 0; overflow: hidden; white-space: nowrap;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
-}
-.maint-run { display: inline-flex; animation: maint-scroll linear infinite; will-change: transform; }
-.maint-run > span { padding-right: 56px; }
+/* 아이모 점검 띠 (Home.tsx MaintBanner, 제작자 요청 2026-11-02): 테두리 없이 좌우를 꽉 채운 연한 노란 띠, 두 줄 (윗줄 때와 점검, 아랫줄 점검 내용) */
+.maint-wrap { margin: -4px -12px 12px; display: grid; grid-template-columns: minmax(0, 1fr); }
+.maint { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; padding: 6px 12px 5px; background: #ffe58f; color: #3a2a00; }
+.maint + .maint { border-top: 1px solid rgba(58, 42, 0, 0.18); }
+.maint-on { background: #ffd166; }
+.maint-top { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 700; }
+.maint-top .fit-line { flex: 1; min-width: 0; }
+.maint-now { flex: none; padding: 0 5px; font-size: 11px; line-height: 16px; font-weight: 400; color: #fff; background: #d6452b; }
+.maint-sub { display: block; min-height: 17px; overflow: hidden; white-space: nowrap; font-size: 12px; line-height: 17px; color: #6b5200; }
+.maint-run { display: inline-flex; }
+.maint-flow .maint-run { animation: maint-scroll linear infinite; will-change: transform; }
+.maint-flow .maint-run > span { padding-right: 48px; }
 @keyframes maint-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @media (prefers-reduced-motion: reduce) {
-  .maint-run { animation: none; display: inline; }
-  .maint-track { white-space: normal; -webkit-mask-image: none; mask-image: none; }
+  .maint-flow .maint-run { animation: none; }
+  .maint-sub { white-space: normal; }
   .maint-run > span[aria-hidden] { display: none; }
 }
 
@@ -2175,10 +2171,20 @@ input, textarea { min-width: 0; max-width: 100%; }
 .todo-link { justify-self: start; margin-top: 2px; padding: 3px 10px; font-size: 13px; color: var(--edge); background: var(--gold); border: var(--px) solid var(--edge); overflow-wrap: anywhere; }
 /* 홈 제목: 오른쪽 위 '내 정보' 단추(.hero-me) 자리는 비우고, 좁은 폰에서는 글자를 조금 줄여 'web' 까지 보이게 (화면 폭 대원칙, 320px 에서 가려졌다) */
 .hero-title { padding-right: 44px; font-size: clamp(20px, 7vw, 30px); }
-/* 예산 검토의 실제 결제 상자: 금액 바로 옆에 무슨 돈인지, 아래에 어떻게 셈했는지 (제작자 요청 2026-11-02) */
-.ps-pay { display: grid; gap: 3px; margin: 6px 0 12px; padding: 8px 10px; background: rgba(11, 10, 26, 0.45); border-left: 3px solid var(--gold); }
-.ps-pay-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; }
-.ps-pay-head span { font-size: 13px; color: var(--text); }
-.ps-pay-head b { font-size: 20px; color: var(--gold); white-space: nowrap; }
-.ps-pay small { font-size: 11px; color: var(--muted); }
-.ps-pay small img { width: 12px; height: 12px; margin-right: 2px; vertical-align: -1px; image-rendering: pixelated; }
+/* 장비대여 운영 '기록' (제작자 요청 2026-11-02): 줄마다 무기·빌린 사람, 그 아래 대여 → 반납, 반납한 줄은 '삭제' */
+.rent-log { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.rent-log li { padding: 5px 7px; background: var(--night-2); border: 1px solid var(--edge); }
+.rent-log li.rent-log-now { border-color: var(--sunset); }
+.rent-log-top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.rent-log-top .rent-nm { flex: 1 1 auto; min-width: 0; white-space: normal; }
+.rent-log-info { margin: 3px 0 0 30px; font-size: 11px; color: var(--muted); }
+.rent-log-on { color: var(--sunset); }
+.rent-log-acts { display: flex; justify-content: flex-end; gap: 4px; margin-top: 3px; }
+.rent-log-acts .pill, .rent-ledger-del { padding: 2px 10px; font-size: 12px; }
+/* 기부 현황의 장부 줄 '삭제' */
+.rent-ledger-edit li { align-items: center; }
+.rent-ledger-del { flex: none; }
+/* 정보 수정의 반납 기한 (대여 중인 물건) */
+.rent-due { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.rent-due b { min-width: 52px; font-size: 15px; color: var(--gold); }
+.rent-due .pill { padding: 3px 9px; }

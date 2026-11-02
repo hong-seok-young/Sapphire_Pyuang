@@ -566,7 +566,7 @@ CREATE TABLE IF NOT EXISTS rental_apps (
 );
 CREATE INDEX IF NOT EXISTS rental_apps_user ON rental_apps (user_id, created_at);
 
--- 무기마다의 신청과 대여 기록. 무기마다 선착순으로 줄을 선다 (wait, ok 를 신청한 순서로). 운영진이 직접 빌려준 것도 status 'done' 으로 남긴다. 지우지 않는다
+-- 무기마다의 신청과 대여 기록. 무기마다 선착순으로 줄을 선다 (wait, ok 를 신청한 순서로). 운영진이 직접 빌려준 것도 status 'done' 으로 남긴다. 운영진이 '기록'에서 직접 지우는 것만 지운다
 CREATE TABLE IF NOT EXISTS rental_requests (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   item_id INTEGER NOT NULL,
@@ -595,7 +595,7 @@ CREATE TABLE IF NOT EXISTS rental_talk (
 );
 CREATE INDEX IF NOT EXISTS rental_talk_app ON rental_talk (app_id, id);
 
--- 마일리지 장부: 줄마다 더하거나 뺀 💎 (합이 그 사람의 마일리지, 묶은 캐릭터는 합쳐서). 닉네임 글자로 두어 아직 앱에 없는 기부자도 적립할 수 있다. 지우지 않는다
+-- 마일리지 장부: 줄마다 더하거나 뺀 💎 (합이 그 사람의 마일리지, 묶은 캐릭터는 합쳐서). 닉네임 글자로 두어 아직 앱에 없는 기부자도 적립할 수 있다. 운영진이 기부 현황에서 직접 지우는 것만 지운다
 CREATE TABLE IF NOT EXISTS rental_mileage (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   who TEXT NOT NULL,                      -- 길드원 닉네임

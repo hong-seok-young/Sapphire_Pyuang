@@ -20,6 +20,20 @@ export interface MaintInfo {
   extended: boolean;
   /** 인스턴스 던전 입장 제한이 시작되는 때 (정기 점검 글의 '인스턴스 던전 제한시간') */
   dungeonFrom: number | null;
+  /** 점검 내용 ('■ 점검내용' 아래 줄들, 없으면 null). 띠의 아랫줄 (제작자 요청 2026-11-02) */
+  content: string | null;
+}
+
+/** '■ 점검내용' 아래 줄들을 한 줄로 (바로가기 링크 줄, 빈 줄은 빼고 다음 '■' 까지). 없으면 null */
+function contentOf(body: string): string | null {
+  const m = /■\s*점검\s*(?:내용|사항|항목)\s*\n([\s\S]*?)(?=\n\s*■|$)/.exec(body);
+  if (!m) return null;
+  const lines = m[1]
+    .split("\n")
+    .map((l) => l.replace(/^\s*[-·•※*]\s*/, "").trim())
+    .filter((l) => l && !/^▶|바로\s*가기|\(클릭\)/.test(l));
+  const text = lines.join(" · ").replace(/\s+/g, " ").trim();
+  return text ? text.slice(0, 160) : null;
 }
 
 const HOUR = 3_600_000;
@@ -99,7 +113,7 @@ export function parseMaint(row: { id: number; title: string; body: string; start
     const at = kst(year, sm, sd, h, mi);
     if (at < start && start - at < 6 * HOUR) dungeonFrom = at;
   }
-  return { id: row.id, label, start, end, servers, extended: /연장/.test(title), dungeonFrom };
+  return { id: row.id, label, start, end, servers, extended: /연장/.test(title), dungeonFrom, content: contentOf(row.body) };
 }
 
 /** 지금 띄울 점검들: 끝나기 전 것 (끝을 모르면 시작하고 12시간까지). 시작 순서 */
