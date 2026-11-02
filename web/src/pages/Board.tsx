@@ -562,9 +562,9 @@ function Write({ me, cat: startCat, editId }: { me: Me; cat?: Cat; editId?: numb
       <TopBar title={editId ? "글 수정" : "글쓰기"} />
       <section className="panel form bd-write-form">
         {!editId && (
-          <div className="sub-tabs bd-write-cats">
+          <div className="pill-row">
             {CATS.filter((c) => canWrite(me, c)).map((c) => (
-              <button key={c} type="button" className={"sub-tab" + (cat === c ? " sub-tab-on" : "")} aria-pressed={cat === c} onClick={() => setCat(c)}>
+              <button key={c} type="button" className={"pill" + (cat === c ? " pill-on" : "")} aria-pressed={cat === c} onClick={() => setCat(c)}>
                 {CAT_NAME[c]}
               </button>
             ))}

@@ -61,12 +61,12 @@ export function OfficialList({ tab }: { tab: OfficialTab }) {
   const fresh = kstDay(2);
   return (
     <>
-      {/* 아이모 소식 안의 칸: 위 칸 줄(게시판 칸) 바로 아래에 붙은 작은 줄 (제작자 요청 2026-11-02: 위아래가 구분되게) */}
-      <nav className="sub-tabs">
+      {/* 아이모 소식 안의 칸: 위 탭 아래 기존 단추 모양, 폭은 모두 같게 (제작자 요청 2026-11-02) */}
+      <nav className="pill-row">
         {OFFICIAL_TABS.map((t) => (
           <button
             key={t.key}
-            className={"sub-tab" + (tab === t.key ? " sub-tab-on" : "")}
+            className={"pill" + (tab === t.key ? " pill-on" : "")}
             aria-pressed={tab === t.key}
             onClick={() => go(`#/board?cat=imo&t=${t.key}`, true)}
           >
