@@ -414,12 +414,6 @@ button { font: inherit; color: inherit; }
 .diamond-glyph { fill: #fff; }
 
 /* guild ranking: colours taken from the game ranking screen */
-.rank-banner {
-  display: flex; flex-direction: column; align-items: center; margin: 0 auto 10px; padding: 6px 28px 8px; max-width: 280px;
-  background: linear-gradient(#4d4f9a, #34357a); border: var(--px) solid var(--edge); clip-path: polygon(6% 0, 94% 0, 100% 50%, 94% 100%, 6% 100%, 0 50%);
-}
-.rank-banner-en { font-size: 10px; letter-spacing: 2px; color: #b9c2ff; }
-.rank-banner-ko { font-size: 18px; color: #fff; text-shadow: 1px 1px 0 var(--edge); }
 .rank-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 12px; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
 .rank-stats b { color: var(--gold); }
 .rank-views { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }

@@ -222,10 +222,6 @@ export function RequestsPage({ me }: { me: Me }) {
   return (
     <>
       <TopBar title="길드원 의뢰소" />
-      <div className="rank-banner">
-        <span className="rank-banner-en">GUILD REQUESTS</span>
-        <span className="rank-banner-ko">길드원 의뢰소</span>
-      </div>
       <p className="growth-note">
         필요한 걸 의뢰로 올리면, 다 모은 길드원이 선착순으로 수락해요. 수락하면 이틀 안에 게임에서 거래해 주세요 (지나면 다시 모집 중).
       </p>
