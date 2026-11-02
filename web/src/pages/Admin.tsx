@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useEntryState } from "../router";
 import type { FormEvent } from "react";
 import {
-  RANK, ROLE_NAME, canManage, createAccount, decideSignup, deleteAccount, errorText, linkAccounts, listAccounts, listSignups, positionOf, renameAccount,
+  RANK, ROLE_NAME, canManage, createAccount, decideDelete, decideSignup, deleteAccount, errorText, linkAccounts, listAccounts, listDeleteRequests,
+  listSignups, positionOf, renameAccount,
   resetPassword, setMainCharacter, setRole, unlinkAccount,
 } from "../auth";
-import type { SignupRequest } from "../auth";
+import type { DeleteRequest, SignupRequest } from "../auth";
 import type { Account, Me, Role } from "../auth";
 import { GUILD_NAME, GUILD_TIER, JOB_NAME, clearLevelBadge, deleteAvatarOf, deleteLevelLog, expText, fetchLevelLog, saveProfileOf, setHighSpec } from "../auth";
 import type { LevelLogEntry } from "../auth";
@@ -75,11 +76,13 @@ export function AdminPage({ me }: { me: Me }) {
   }
 
   const [signups, setSignups] = useState<SignupRequest[]>([]);
+  const [deletes, setDeletes] = useState<DeleteRequest[]>([]);
   const reload = useCallback(
     () =>
       Promise.all([
         listAccounts().then(setAccounts, (e) => setError(errorText(e))),
         listSignups().then(setSignups, () => setSignups([])),
+        listDeleteRequests().then(setDeletes, () => setDeletes([])),
       ]).then(() => undefined),
     [],
   );
@@ -140,12 +143,36 @@ export function AdminPage({ me }: { me: Me }) {
                 <b>{s.id}</b>
                 {/* '내 정보'의 캐릭터 추가 요청: 승낙하면 그 사람의 부캐 */}
                 {s.owner && <small className="account-link">{s.owner}의 부캐</small>}
+                <small>{new Date(s.createdAt).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</small>
               </span>
-              <small>{new Date(s.createdAt).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</small>
               <button className="pill pill-on" disabled={busy} onClick={() => run(() => decideSignup(s.id, "approve").then(() => undefined))}>
                 승낙
               </button>
               <button className="pill" disabled={busy} onClick={() => run(() => decideSignup(s.id, "reject").then(() => undefined))}>
+                거절
+              </button>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* 본인이 '내 정보'에서 보낸 계정 삭제 요청 (제작자 요청 2026-11-02). 승낙하면 그 캐릭터의 계정을 지운다 (계정 삭제와 같다) */}
+      {deletes.length > 0 && (
+        <section className="panel signup-requests">
+          <h2 className="panel-title">계정 삭제 요청 {deletes.length}</h2>
+          {deletes.map((d) => (
+            <div key={d.id} className="signup-row">
+              <span className="signup-who">
+                <b>{d.id}</b>
+                <small className="account-link">
+                  {[d.mainId ? `${d.mainId}의 부캐` : null, d.level ? `Lv.${d.level}` : null, ROLE_NAME[positionOf(d.role)]].filter(Boolean).join(" · ")}
+                </small>
+                <small>{new Date(d.createdAt).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</small>
+              </span>
+              <button className="pill pill-on" disabled={busy} onClick={() => run(() => decideDelete(d.id, "approve").then(() => undefined))}>
+                삭제 승낙
+              </button>
+              <button className="pill" disabled={busy} onClick={() => run(() => decideDelete(d.id, "reject").then(() => undefined))}>
                 거절
               </button>
             </div>

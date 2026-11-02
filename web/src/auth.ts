@@ -315,3 +315,20 @@ export const requestSignup = (id: string, password: string) => api<{ ok: true }>
 export const listSignups = () => api<SignupRequest[]>("/api/signup");
 export const decideSignup = (id: string, action: "approve" | "reject") =>
   api<{ ok: true }>(`/api/signup/${encodeURIComponent(id)}`, "POST", { action });
+
+/** 계정 삭제 요청 (제작자 요청 2026-11-02: '내 정보' 로그아웃 아래 '계정 삭제', 오피서가 승낙하면 지운다) */
+export interface DeleteRequest {
+  id: string;
+  createdAt: number;
+  role: Role;
+  mainId: string | null;
+  guild: Guild | null;
+  job: Job | null;
+  level: number | null;
+}
+export const myDeleteRequest = () => api<{ at: number | null }>("/api/delete-requests?mine=1");
+export const requestDelete = () => api<{ ok: true }>("/api/delete-requests", "POST");
+export const cancelDelete = () => api<{ ok: true }>("/api/delete-requests", "DELETE");
+export const listDeleteRequests = () => api<DeleteRequest[]>("/api/delete-requests");
+export const decideDelete = (id: string, action: "approve" | "reject") =>
+  api<{ ok: true }>(`/api/delete-requests/${encodeURIComponent(id)}`, "POST", { action });

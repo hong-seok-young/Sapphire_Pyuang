@@ -3,7 +3,8 @@ import { KakaoButton, KakaoField, useKakao } from "../kakao";
 import type { FormEvent, ReactNode } from "react";
 import {
   EXP_MAX, GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, MAX_LEVEL, ROLE_NAME, avatarUrl, deleteMyAvatar, errorText, expText,
-  TEST_IDS, fetchMe, logout, positionOf, renameAccount, requestCharacter, saveMyProfile, setMainCharacter, switchAccount,
+  TEST_IDS, cancelDelete, fetchMe, logout, myDeleteRequest, positionOf, renameAccount, requestCharacter, requestDelete, saveMyProfile,
+  setMainCharacter, switchAccount,
 } from "../auth";
 import type { ChangeKind, Guild, Job, Me } from "../auth";
 import { JobEmblem, JobGlyph } from "../emblems";
@@ -380,7 +381,72 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
       >
         로그아웃
       </button>
+      {me.role !== "developer" && <DeleteAccountText me={me} />}
     </>
+  );
+}
+
+/**
+ * 로그아웃 아래 회색 작은 글씨 '계정 삭제' (제작자 요청 2026-11-02: 단추 말고 글씨만, 오피서가 승낙하면 지워지게).
+ * 누르면 한 번 더 묻고(글씨로) 요청, 요청한 뒤에는 '계정 삭제 요청함 · 승낙 대기 · 요청 취소'. 지금 캐릭터만 지운다
+ */
+function DeleteAccountText({ me }: { me: Me }) {
+  const [at, setAt] = useState<number | null | undefined>(undefined);
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    myDeleteRequest().then((r) => setAt(r.at), () => setAt(null));
+  }, []);
+  async function run(fn: () => Promise<void>) {
+    setBusy(true);
+    setError("");
+    try {
+      await fn();
+    } catch (x) {
+      setError(errorText(x));
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (at === undefined) return null;
+  return (
+    <div className="me-delete">
+      {at ? (
+        <>
+          <span>계정 삭제 요청함 · 운영진 승낙 대기</span>
+          <button type="button" className="me-delete-link" disabled={busy} onClick={() => run(async () => (await cancelDelete(), setAt(null)))}>
+            요청 취소
+          </button>
+        </>
+      ) : asking ? (
+        <>
+          <span>{me.id} 계정을 지울까요? 운영진이 승낙하면 기록과 함께 지워져요.</span>
+          <button
+            type="button"
+            className="me-delete-link me-delete-go"
+            disabled={busy}
+            onClick={() =>
+              run(async () => {
+                await requestDelete();
+                setAt(Date.now());
+                setAsking(false);
+              })
+            }
+          >
+            삭제 요청
+          </button>
+          <button type="button" className="me-delete-link" disabled={busy} onClick={() => setAsking(false)}>
+            취소
+          </button>
+        </>
+      ) : (
+        <button type="button" className="me-delete-link" onClick={() => setAsking(true)}>
+          계정 삭제
+        </button>
+      )}
+      {error && <p className="form-error">{error}</p>}
+    </div>
   );
 }
 

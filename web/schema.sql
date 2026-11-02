@@ -424,6 +424,13 @@ CREATE TABLE IF NOT EXISTS layouts (
 
 -- 아이디 생성 요청 (functions/api/signup, 제작자 요청 2026-11-01): 로그인 화면에서 본인이 닉네임과 비밀번호를 넣어 요청하고
 -- 길드마스터·오피서가 '길드원 관리'에서 승낙하면 이 해시 그대로 users 에 계정을 만든다. 비밀번호 원문은 두지 않는다
+-- 계정 삭제 요청 (제작자 요청 2026-11-02: '내 정보'의 로그아웃 아래 '계정 삭제'로 본인이 요청하고 길드마스터·오피서가 승낙하면 지운다).
+-- 캐릭터마다 (요청한 캐릭터만 지운다). 승낙하면 계정과 함께 이 줄도 지우고, 거절하면 이 줄만 지운다
+CREATE TABLE IF NOT EXISTS delete_requests (
+  user_id TEXT PRIMARY KEY,
+  created_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS signup_requests (
   id TEXT PRIMARY KEY,                    -- 바라는 아이디 (게임 닉네임)
   pw_hash TEXT NOT NULL,
