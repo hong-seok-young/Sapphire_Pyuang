@@ -2241,11 +2241,6 @@ input, textarea { min-width: 0; max-width: 100%; }
   max-width: 46%; padding: 0; white-space: nowrap; overflow: hidden; font-size: 10px; color: var(--muted); opacity: 0.85;
   background: none; border: 0; cursor: pointer;
 }
-.wx-ask {
-  position: fixed; z-index: 11; left: 12px; right: 12px; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 20px);
-  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
-}
-.wx-ask span { flex: 1; min-width: 0; font-size: 13px; }
 
 /* 사용 기록: 기기 표시 (제작자 요청 2026-11-02, pages/ActivityLog.tsx) */
 .log-flag { display: inline-block; margin-left: 6px; padding: 0 4px; font-style: normal; font-size: 10px; line-height: 1.5; border: 1px solid; }

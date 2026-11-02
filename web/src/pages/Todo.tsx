@@ -5,7 +5,7 @@
 // 오른쪽 '›' 는 인던·길드던전의 위키 화면이나 이벤트 공식 글. 칸을 만드는 것은 src/todo.ts
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Me } from "../auth";
-import { GUILD_NAME, JOB_NAME, errorText } from "../auth";
+import { errorText } from "../auth";
 import type { Wiki } from "../types";
 import { Loading, TopBar } from "../ui";
 import {
@@ -118,10 +118,7 @@ export function TodoPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   return (
     <>
       <TopBar title="To do" />
-      <p className="todo-who">
-        {me.id} · Lv.{me.level ?? "?"} {me.job ? JOB_NAME[me.job] : ""}
-        {me.guild ? ` · ${GUILD_NAME[me.guild]}` : ""}
-      </p>
+      {/* 맨 위의 '닉네임 · Lv.45 마법사 · Sapphire' 줄은 뺐다 (제작자 요청 2026-11-02: '왜 써 놨냐') */}
       {error && <p className="form-error">{error}</p>}
       <Section title="일간" reset={`초기화 ${leftText(data.dayEnd - now)} 뒤`} items={lists.daily} ctx={ctx} />
       <Section title="주간" reset={`목 10:00 초기화 · ${leftText(data.weekEnd - now)} 뒤`} items={lists.weekly} ctx={ctx} />

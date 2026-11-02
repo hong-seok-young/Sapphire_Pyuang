@@ -4,13 +4,15 @@
 // - 날씨: Open-Meteo (무료, 키 없음, 기상청 자료 포함)에 브라우저가 바로 묻는다. 'current' 의 WMO 날씨 코드로 맑음·비·눈·천둥 …
 // - 게임과 상관없는 화면 꾸밈이라 게임 안전 규칙에 맞는다. 게임 위 위키 창(inFloat)에서는 쓰지 않는다.
 // 지금은 초안이라 앱개발자(와 테스트 계정)에게만 보인다 (WEATHER_OPEN). 앱개발자는 아래 날씨 표를 눌러 효과를 하나씩 미리 본다.
+// 켜고 끄기는 '내 정보'의 '날씨 효과' (제작자 요청 2026-11-02: 위치를 허용했을 때만 뜨게, 허용은 내 정보에서 켜고 끄게). 홈에서 따로 묻지 않는다.
 import { useEffect, useState } from "react";
 import { inFloat } from "./platform";
 
 /** 초안: 열기 전에는 앱개발자와 테스트 계정만 */
 export const WEATHER_OPEN = false;
 
-export type Sky = "clear" | "cloud" | "fog" | "drizzle" | "rain" | "heavy" | "snow" | "blizzard" | "storm";
+/** 화면 효과. 안개는 뺐다 (제작자 요청 2026-11-02: '안개는 하지 마') */
+export type Sky = "clear" | "cloud" | "drizzle" | "rain" | "heavy" | "snow" | "blizzard" | "storm";
 export interface Weather {
   sky: Sky;
   /** 기온 °C */
@@ -29,15 +31,13 @@ export function skyOf(code: number): Sky {
   if (code === 65 || code === 67 || code === 82) return "heavy"; // 강한 비, 강한 어는비, 강한 소나기
   if ((code >= 61 && code <= 66) || code === 80 || code === 81) return "rain";
   if (code >= 51 && code <= 57) return "drizzle";
-  if (code === 45 || code === 48) return "fog";
-  if (code === 3) return "cloud";
+  if (code === 3 || code === 45 || code === 48) return "cloud"; // 안개는 흐림으로 (효과 없음)
   return "clear";
 }
 
 export const SKY_NAME: Record<Sky, string> = {
   clear: "맑음",
   cloud: "흐림",
-  fog: "안개",
   drizzle: "이슬비",
   rain: "비",
   heavy: "폭우",
@@ -46,12 +46,12 @@ export const SKY_NAME: Record<Sky, string> = {
   storm: "천둥번개",
 };
 export function skyIcon(sky: Sky, day = true): string {
-  return { clear: day ? "☀️" : "🌙", cloud: "☁️", fog: "🌫️", drizzle: "🌦️", rain: "🌧️", heavy: "🌧️", snow: "🌨️", blizzard: "❄️", storm: "⛈️" }[sky];
+  return { clear: day ? "☀️" : "🌙", cloud: "☁️", drizzle: "🌦️", rain: "🌧️", heavy: "🌧️", snow: "🌨️", blizzard: "❄️", storm: "⛈️" }[sky];
 }
 /** 앱개발자 미리 보기 순서 (날씨 표를 누를 때마다 다음 것, 마지막 다음은 실제 날씨) */
-export const PREVIEW: Sky[] = ["drizzle", "rain", "heavy", "storm", "snow", "blizzard", "fog"];
+export const PREVIEW: Sky[] = ["drizzle", "rain", "heavy", "storm", "snow", "blizzard"];
 
-const PREF = "sapphire.wx"; // '1' 켬, '0' 끔(나중에·거절)
+const PREF = "sapphire.wx"; // '1' 켬 (내 정보에서 켜고 위치를 허락했을 때), 아니면 끔
 const CACHE = "sapphire.wx.cache";
 const FRESH = 30 * 60_000;
 
@@ -102,7 +102,7 @@ export async function loadWeather(force = false): Promise<Weather> {
   if (!force) {
     try {
       const c = JSON.parse(read(CACHE) ?? "null") as Weather | null;
-      if (c && Date.now() - c.at < FRESH) return c;
+      if (c && c.sky in SKY_NAME && Date.now() - c.at < FRESH) return c;
     } catch {
       // 다시 받는다
     }
@@ -113,65 +113,62 @@ export async function loadWeather(force = false): Promise<Weather> {
   return w;
 }
 
-/** 폰이 위치를 이미 허락했는지 ('granted' | 'denied' | 'prompt', 모르면 null: 아이폰 예전 사파리 등) */
-async function permission(): Promise<PermissionState | null> {
-  try {
-    const p = await navigator.permissions?.query({ name: "geolocation" as PermissionName });
-    return p?.state ?? null;
-  } catch {
+export type WxState = { status: "off" } | { status: "loading" } | { status: "on"; weather: Weather };
+
+/** 내 정보의 '날씨 효과'가 켜져 있는지 */
+export const weatherOn = () => read(PREF) === "1";
+
+/**
+ * 내 정보의 '날씨 효과' 켜기·끄기. 켤 때 폰이 위치 허락을 묻고, 허락하지 않으면 켜지지 않는다 (오류 글을 돌려준다)
+ */
+export async function setWeatherOn(on: boolean): Promise<string | null> {
+  if (!on) {
+    write(PREF, "0");
+    try {
+      localStorage.removeItem(CACHE);
+    } catch {
+      // 다음에 다시 받는다
+    }
     return null;
+  }
+  try {
+    await loadWeather(true);
+    write(PREF, "1");
+    return null;
+  } catch (e) {
+    write(PREF, "0");
+    const code = typeof e === "object" && e !== null ? (e as GeolocationPositionError).code : 0;
+    if (code === 1) return "위치를 허용해야 켜져요. 폰 설정에서 이 사이트의 위치를 허용해 주세요";
+    if (code === 2 || code === 3) return "위치를 못 받았어요. 잠시 뒤 다시 눌러 주세요";
+    return e instanceof Error ? e.message : "날씨를 못 받았어요";
   }
 }
 
-export type WxState = { status: "off" } | { status: "ask" } | { status: "loading" } | { status: "on"; weather: Weather } | { status: "error"; reason: string };
-
-/**
- * 홈의 날씨: 켜 두었으면 받아 오고, 아직 안 정했으면 'ask'(홈에 켜기 카드). 'enable' 은 카드의 '켜기' (여기서 폰이 허락을 묻는다)
- */
+/** 홈의 날씨: 내 정보에서 켜 두었을 때만 받아 온다 (위치를 허용하지 않았으면 아무것도 안 보인다) */
 export function useWeather(allowed: boolean) {
   const [state, setState] = useState<WxState>({ status: "off" });
-  const start = (force = false) => {
-    setState((s) => (s.status === "on" ? s : { status: "loading" }));
-    loadWeather(force)
-      .then((weather) => setState({ status: "on", weather }))
-      .catch((e: unknown) => {
-        const denied = typeof e === "object" && e !== null && (e as GeolocationPositionError).code === 1;
-        if (denied) write(PREF, "0");
-        setState(denied ? { status: "off" } : { status: "error", reason: e instanceof Error ? e.message : "위치를 못 받았어요" });
-      });
-  };
   useEffect(() => {
-    if (!allowed || inFloat) return;
+    if (!allowed || inFloat || !weatherOn()) return;
     let gone = false;
-    const pref = read(PREF);
-    if (pref === "1") start();
-    else if (pref !== "0")
-      void permission().then((p) => {
-        if (gone) return;
-        if (p === "granted") {
-          write(PREF, "1");
-          start();
-        } else if (p !== "denied") setState({ status: "ask" });
-      });
+    const start = () => {
+      setState((s) => (s.status === "on" ? s : { status: "loading" }));
+      loadWeather()
+        .then((weather) => !gone && setState({ status: "on", weather }))
+        .catch((e: unknown) => {
+          // 위치 허락을 거두었으면 끈다
+          if (typeof e === "object" && e !== null && (e as GeolocationPositionError).code === 1) write(PREF, "0");
+          if (!gone) setState({ status: "off" });
+        });
+    };
+    start();
     // 30분마다 다시 (홈을 오래 켜 둘 때)
     const t = window.setInterval(() => {
-      if (read(PREF) === "1" && document.visibilityState === "visible") start();
+      if (weatherOn() && document.visibilityState === "visible") start();
     }, FRESH);
     return () => {
       gone = true;
       window.clearInterval(t);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allowed]);
-  return {
-    state,
-    enable: () => {
-      write(PREF, "1");
-      start(true);
-    },
-    later: () => {
-      write(PREF, "0");
-      setState({ status: "off" });
-    },
-  };
+  return state;
 }

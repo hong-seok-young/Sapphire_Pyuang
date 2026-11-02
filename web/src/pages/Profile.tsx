@@ -11,6 +11,7 @@ import { ChangeAsk, HeroTitle, TopBar } from "../ui";
 import { AvatarMaker } from "./AvatarMaker";
 import { useBackToLogin } from "./Login";
 import { goCharacter, refreshMe } from "../characters";
+import { WEATHER_OPEN, setWeatherOn, weatherOn } from "../weather";
 
 /** "12.345" -> 12345, 비었으면 null, 틀렸으면 undefined */
 function parseExp(text: string): number | null | undefined {
@@ -196,6 +197,36 @@ export function ProfileSetupPage({
   );
 }
 
+/** 홈 날씨 효과 켜기·끄기: 켤 때 폰이 위치 허락을 묻는다. 허락하지 않으면 꺼진 그대로 */
+function WeatherPanel() {
+  const [on, setOn] = useState(weatherOn);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const pick = async (next: boolean) => {
+    if (busy || next === on) return;
+    setBusy(true);
+    setError("");
+    const err = await setWeatherOn(next);
+    setBusy(false);
+    if (err) setError(err);
+    setOn(weatherOn());
+  };
+  return (
+    <section className="panel profile-panel">
+      <h2 className="panel-title">날씨 효과</h2>
+      <div className="pill-row">
+        <button className={"pill" + (on ? " pill-on" : "")} disabled={busy} onClick={() => void pick(true)}>
+          {busy && !on ? "위치 확인 중…" : "켜기"}
+        </button>
+        <button className={"pill" + (!on ? " pill-on" : "")} disabled={busy} onClick={() => void pick(false)}>
+          끄기
+        </button>
+      </div>
+      {error && <p className="form-error">{error}</p>}
+    </section>
+  );
+}
+
 /** 내 캐릭터 사진: 성장 랭킹에 나온다 (1등이면 크게). 스샷에서 직접 잘라 올린다 (AvatarMaker) */
 function AvatarPanel({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
   const [making, setMaking] = useState(false);
@@ -299,6 +330,8 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
         <KakaoField name={me.id} />
       </section>
       <RenamePanel me={me} onMe={onMe} />
+      {/* 홈 날씨 효과 (초안: 앱개발자와 테스트 계정만). 켜면 폰이 위치 허락을 묻고, 허용해야 켜진다 (제작자 요청 2026-11-02) */}
+      {(WEATHER_OPEN || me.role === "developer" || TEST_IDS.includes(me.id)) && <WeatherPanel />}
       {/* 앱개발자만: 테스트 계정으로 바꿔서 상대방 쪽 화면과 알림을 혼자 시험한다 (제작자 요청) */}
       {me.role === "developer" && (
         <section className="panel profile-panel">
