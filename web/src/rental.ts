@@ -1,6 +1,7 @@
 // 장비대여 (제작자 요청 2026-11-01, 서버 server/rental.ts, functions/api/rent): 길드가 기부받은 무기를 기한(없음, 1~52주)마다 💎 가격으로 빌려준다.
 // 💎 1개 = 10만 골드. 장비를 기부하면 운영진이 옵션 시세로 마일리지 💎 를 적립하고, 빌릴 때 골드 대신 쓴다. 실제 주고받기는 게임 안에서.
 import { api } from "./auth";
+import { JOBS, JOB_NAME } from "./auth";
 import type { Job } from "./auth";
 import type { Item, Wiki } from "./types";
 
@@ -19,12 +20,37 @@ export const termName = (t: RentTerm) => {
   return w === null ? "기한 없음" : `${w}주`;
 };
 
+/**
+ * 물건의 직업 칸 (제작자 요청 2026-11-02: 공용이거나 전사·레인저처럼 여럿일 수도): 'warrior', 'warrior,ranger', 네 직업 모두면 공용.
+ * 목록은 그 직업 칸마다 보인다 (서버 server/rental.ts readJobs)
+ */
+export const jobsOf = (s: string | null | undefined): Job[] => JOBS.filter((j) => (s ?? "").split(",").includes(j));
+/** 위키 장비를 쓰는 직업: 무기는 그 직업, 방어구·장신구는 '직업' 칸 ('공용'이면 넷 다) */
+export function wikiJobs(it: Item): Job[] {
+  const out = new Set<Job>();
+  for (const e of it.equip ?? []) {
+    const w = JOBS.find((j) => e.slot === `${JOB_NAME[j]} 무기`);
+    if (w) out.add(w);
+    else {
+      const t = e.info?.["직업"] ?? "";
+      for (const j of JOBS) if (t.includes("공용") || t.includes(JOB_NAME[j])) out.add(j);
+    }
+  }
+  return JOBS.filter((j) => out.has(j));
+}
+/** '공용', '전사·레인저', '전사' */
+export function jobsText(s: string | null | undefined): string {
+  const js = jobsOf(s);
+  return js.length === JOBS.length ? "공용" : js.map((j) => JOB_NAME[j]).join("·");
+}
+
 export type ReqStatus = "wait" | "ok" | "done" | "no" | "cancel";
 export const STATUS_NAME: Record<ReqStatus, string> = { wait: "확인 전", ok: "수락", done: "대여 완료", no: "거절", cancel: "취소" };
 
 export interface RentItem {
   id: number;
-  job: Job;
+  /** 직업 하나나 여럿 ('warrior,ranger', 네 직업 모두면 공용). jobsOf */
+  job: string;
   level: number;
   weapon: string;
   /** 옵션 줄임말 ('명6크3') */
@@ -135,7 +161,8 @@ export const returnRent = (id: number) => api<{ ok: boolean; refund: { dia: numb
 export const requestReturn = (id: number, opt: { cancel?: boolean; when?: string } = {}) =>
   api<{ ok: boolean; returnReqAt: number | null; returnAppId: number | null }>(`/api/rent/${id}/return-request`, "POST", opt);
 export interface RentFields {
-  job: Job;
+  /** 고른 직업 (넷 다면 공용) */
+  job: Job[];
   level: number;
   weapon: string;
   options: string;
@@ -157,7 +184,7 @@ export interface RentLogRow {
   itemId: number;
   weapon: string | null;
   enhance: number | null;
-  job: Job | null;
+  job: string | null;
   itemStatus: string | null;
   user: string;
   rentedAt: number | null;

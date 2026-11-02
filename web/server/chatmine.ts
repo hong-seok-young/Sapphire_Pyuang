@@ -15,6 +15,11 @@ import type { RentTerm } from "./rentalParse";
 const KST = 9 * 3_600_000;
 const DAY = 86_400_000;
 const JOB: Record<Job, string> = { warrior: "전사", ranger: "레인저", mage: "마법사", monk: "무도가" };
+/** 장비대여 물건의 직업 칸 ("warrior,ranger") -> '전사·레인저', 네 직업 모두면 '공용' */
+const jobsText = (s: string) => {
+  const js = s.split(",");
+  return js.length >= 4 ? "공용" : js.map((j) => JOB[j as Job] ?? j).join("·");
+};
 const REQ_STATUS: Record<string, string> = { wait: "확인 전", ok: "수락", done: "대여 완료", no: "거절", cancel: "취소" };
 const LEDGER: Record<string, string> = { donate: "기부 적립", rent: "대여 보증금", adjust: "고침", return: "반납 · 보증금 돌려받음" };
 
@@ -221,13 +226,13 @@ async function rentalSection(env: Env, me: User, manager: boolean, mentioned: st
   ]);
   const line = new Map<number, { user_id: string; status: string }[]>();
   for (const r of queueR.results as { item_id: number; user_id: string; status: string }[]) line.set(r.item_id, [...(line.get(r.item_id) ?? []), r]);
-  const items = itemsR.results as { id: number; job: Job; level: number; weapon: string; options: string; enhance: number; term: RentTerm; price: number; donor: string | null; renter: string | null; rented_at: number | null; note: string | null }[];
+  const items = itemsR.results as { id: number; job: string; level: number; weapon: string; options: string; enhance: number; term: RentTerm; price: number; donor: string | null; renter: string | null; rented_at: number | null; note: string | null }[];
   const lines = items.map((i) => {
     const days = termDays(i.term);
     const due = i.renter && i.rented_at && days ? i.rented_at + days * DAY : null;
     const q = line.get(i.id) ?? [];
     return (
-      `#${i.id} ${JOB[i.job]} Lv.${i.level} ${i.weapon} +${i.enhance}${i.options ? ` ${i.options}` : ""} · ${termName(i.term)} · 보증금 💎${i.price}(${manText(i.price * DIA_GOLD)} 골드)` +
+      `#${i.id} ${jobsText(i.job)} Lv.${i.level} ${i.weapon} +${i.enhance}${i.options ? ` ${i.options}` : ""} · ${termName(i.term)} · 보증금 💎${i.price}(${manText(i.price * DIA_GOLD)} 골드)` +
       `${i.renter ? ` · 대여 중 ${i.renter}${due ? ` ${md(due)}까지` : ""}` : ""}${q.length ? ` · 대기 ${q.length}명${manager ? ` (${q.map((x) => `${x.user_id} ${REQ_STATUS[x.status]}`).join(", ")})` : ""}` : ""}` +
       `${i.donor ? ` · 기부 ${i.donor}` : ""}${i.note ? ` · "${oneLine(i.note)}"` : ""}`
     );

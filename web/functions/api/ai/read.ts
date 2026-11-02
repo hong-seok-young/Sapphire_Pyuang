@@ -39,7 +39,7 @@ const SCHEMA = {
     properties: {
       name: nullable({ type: "string" }),
       enhance: nullable({ type: "integer" }),
-      job: nullable({ type: "string", enum: JOBS }),
+      job: nullable({ type: "string", enum: [...JOBS, "공용"] }),
       level: nullable({ type: "integer" }),
       options: {
         type: "array",
@@ -65,7 +65,7 @@ const PROMPT = {
   rental: `이 사진은 모바일 게임 아이모(IMO)의 무기 정보창 스샷이야. 보이는 글자만 읽어서 채워. 짐작하지 마.
 - name: 무기 이름 (앞의 '+7' 같은 강화 숫자는 빼고, 화면에 적힌 그대로)
 - enhance: 이름 앞 '+숫자' 강화 (없으면 0)
-- job: 착용 직업이 글자나 직업 그림으로 하나만 분명하면 (${JOBS.join(", ")}), 아니면 null
+- job: 착용 직업이 글자나 직업 그림으로 하나만 분명하면 (${JOBS.join(", ")}), 모든 직업이 쓰는 공용이 분명하면 공용, 아니면 null
 - level: 요구 레벨 숫자, 안 보이면 null
 - options: 이 무기에 붙은 옵션 값 (${OPTIONS.join(", ")}). 공격력, 공격 속도는 넣지 마. 값이 0 인 것도 넣지 마`,
 };
@@ -137,7 +137,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return json({
       name: name || null,
       enhance,
-      job: typeof raw.job === "string" && JOBS.includes(raw.job) ? raw.job : null,
+      job: typeof raw.job === "string" && (JOBS.includes(raw.job) || raw.job === "공용") ? raw.job : null,
       level: Number.isInteger(level) && level >= 1 && level <= 99 ? level : null,
       options,
     });

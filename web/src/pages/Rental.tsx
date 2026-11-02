@@ -22,6 +22,9 @@ import { useNews, useNewsSeen } from "../news";
 import {
   STATUS_NAME,
   MAX_WEEKS,
+  jobsOf,
+  jobsText,
+  wikiJobs,
   termName,
   termWeeks,
   actRequest,
@@ -49,7 +52,7 @@ import {
   weaponOf,
 } from "../rental";
 import type { AppRequest, LedgerLine, RentApp, RentData, RentFields, RentItem, RentLogRow, RentTerm } from "../rental";
-import { MARKET_PIC, itemFacts, jobsFor, rollHint } from "../market";
+import { MARKET_PIC, itemFacts, rollHint } from "../market";
 import { readShot, shrinkShot } from "../shot";
 import { KakaoButton, useKakao } from "../kakao";
 
@@ -112,7 +115,8 @@ export function RentalPage({ wiki, me, view }: { wiki: Wiki; me: Me; view: strin
     .sort((a, b) => Number(!a.returnReqAt) - Number(!b.returnReqAt) || (a.dueAt ?? Infinity) - (b.dueAt ?? Infinity) || (a.rentedAt ?? 0) - (b.rentedAt ?? 0));
   const backAsked = lent.filter((i) => i.returnReqAt).length;
   const waitCount = openApps.reduce((n, a) => n + a.requests.filter((r) => r.status === "wait").length, 0);
-  const ofJob = data.items.filter((i) => i.job === job);
+  // 공용이거나 여러 직업인 물건은 그 직업 칸마다 보인다
+  const ofJob = data.items.filter((i) => jobsOf(i.job).includes(job));
   // 레벨별로 쭉 (같은 레벨 안에서는 무기, 강화, 기한 순서)
   const levels = [...new Set(ofJob.map((i) => levelOf(wiki, i)))].sort((a, b) => a - b);
   const toggle = (id: number) =>
@@ -350,9 +354,10 @@ function ItemPopup({ wiki, item, data, picked, onPick, onClose, onDone }: {
               {s}
             </p>
           ))}
-          {facts.job && (
-            <div className="mk-tip-jobs" aria-label={`직업 ${facts.job}`}>
-              {jobsFor(facts.job).map((j) => (
+          {/* 직업 그림: 운영진이 물건 추가에서 고른 직업 (공용이면 넷 다) */}
+          {jobsOf(item.job).length > 0 && (
+            <div className="mk-tip-jobs" aria-label={`직업 ${jobsText(item.job)}`}>
+              {jobsOf(item.job).map((j) => (
                 <img key={j} src={`${MARKET_PIC}job_${j}.png`} alt={JOB_NAME[j]} title={JOB_NAME[j]} />
               ))}
             </div>
@@ -880,7 +885,7 @@ function NameInput({ value, onChange, members, placeholder }: { value: string; o
 /** 물건 더하기·고치기. 기부 💎 를 적으면 기부자 마일리지에 쌓인다 (고치면 차이만, 제작자 요청 2026-11-02) */
 function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; start: Partial<RentItem>; onDone: () => void }) {
   const [f, setF] = useState<RentFields>({
-    job: start.job ?? "warrior",
+    job: jobsOf(start.job).length ? jobsOf(start.job) : ["warrior"],
     level: start.level ?? 1,
     weapon: start.weapon ?? "",
     options: start.options ?? "",
@@ -896,6 +901,15 @@ function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; s
   const [error, setError] = useState("");
   const [reading, setReading] = useState(false);
   const set = <K extends keyof RentFields>(k: K, v: RentFields[K]) => setF((cur) => ({ ...cur, [k]: v }));
+  // 직업은 여럿 고를 수 있고 넷 다면 공용 (제작자 요청 2026-11-02: '아이템 공용일 수도 있음, 직업도 전·렌 이렇게 할 수도'). 하나는 남긴다
+  const common = f.job.length === JOBS.length;
+  // 공용을 다시 누르면 처음 직업으로 (처음부터 공용이었으면 전사)
+  const startJobs: Job[] = jobsOf(start.job).length && jobsOf(start.job).length < JOBS.length ? jobsOf(start.job) : ["warrior"];
+  const toggleJob = (j: Job) =>
+    setF((cur) => {
+      if (!cur.job.includes(j)) return { ...cur, job: JOBS.filter((x) => x === j || cur.job.includes(x)) };
+      return cur.job.length > 1 ? { ...cur, job: cur.job.filter((x) => x !== j) } : cur;
+    });
   // 대여 중인 물건은 반납 기한도 여기서 고친다 (제작자 요청 2026-11-02: 기한을 조정하는 곳이 없다). 기한 칸을 바꾸면 빌린 날 + 기한으로 다시 맞춘다
   const rentedAt = start.renter ? (start.rentedAt ?? null) : null;
   const [due, setDue] = useState<number | null>(start.dueAt ?? null);
@@ -924,12 +938,13 @@ function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; s
     try {
       const r = await readShot("rental", await shrinkShot(file));
       const it = r.name ? weaponOf(wiki, r.name) : undefined;
-      const slotJob = JOBS.find((j) => it?.equip?.some((e) => e.slot === `${JOB_NAME[j]} 무기`));
-      const readJob = JOBS.find((j) => JOB_NAME[j] === r.job);
+      // 위키 장비면 위키의 직업 (무기는 그 직업, 방어구·장신구는 '직업' 칸), 아니면 AI 가 읽은 직업 (공용이면 넷 다)
+      const slotJobs = it ? wikiJobs(it) : [];
+      const readJobs = r.job === "공용" ? [...JOBS] : JOBS.filter((j) => JOB_NAME[j] === r.job);
       const wikiLv = Number(it?.equip?.[0]?.info["레벨제한"]) || null;
       setF((cur) => ({
         ...cur,
-        job: slotJob ?? readJob ?? cur.job,
+        job: slotJobs.length ? slotJobs : readJobs.length ? readJobs : cur.job,
         weapon: it?.name ?? r.name ?? cur.weapon,
         level: wikiLv ?? r.level ?? cur.level,
         enhance: r.enhance ?? cur.enhance,
@@ -941,11 +956,14 @@ function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; s
       setReading(false);
     }
   }
-  // 그 직업의 위키 무기 (이름을 누르면 레벨도 위키 값으로)
+  // 고른 직업이 쓰는 위키 장비 (무기는 그 직업 것, 방어구·장신구는 고른 직업이 모두 쓸 수 있는 것. 이름을 누르면 레벨도 위키 값으로)
   const weapons = useMemo(
     () =>
       Object.values(wiki.items)
-        .filter((it) => it.equip?.some((e) => e.slot === `${JOB_NAME[f.job]} 무기`))
+        .filter((it) => {
+          const js = wikiJobs(it);
+          return it.equip?.some((e) => e.slot.endsWith(" 무기")) ? js.some((j) => f.job.includes(j)) : js.length > 0 && f.job.every((j) => js.includes(j));
+        })
         .map((it) => ({ name: it.name, level: Number(it.equip[0].info["레벨제한"]) || 1 }))
         .sort((a, b) => a.level - b.level),
     [wiki, f.job],
@@ -985,10 +1003,13 @@ function ItemForm({ wiki, data, start, onDone }: { wiki: Wiki; data: RentData; s
     <div className="mk-form rent-form">
       <div className="pill-row">
         {JOBS.map((j) => (
-          <button key={j} type="button" className={"pill" + (f.job === j ? " pill-on" : "")} onClick={() => set("job", j)}>
+          <button key={j} type="button" className={"pill" + (f.job.includes(j) ? " pill-on" : "")} aria-pressed={f.job.includes(j)} onClick={() => toggleJob(j)}>
             {JOB_NAME[j]}
           </button>
         ))}
+        <button type="button" className={"pill" + (common ? " pill-on" : "")} aria-pressed={common} onClick={() => set("job", common ? startJobs : [...JOBS])}>
+          공용
+        </button>
       </div>
       {/* 기한 (제작자 요청 2026-11-02: 무엇을 고르는 단추인지 이름을 붙였다) */}
       <div className="mk-field">

@@ -26,6 +26,18 @@ export function goldOf(v: unknown, price: number, useDia: number): number | null
 /** 골드 -> '80만' */
 export const manText = (gold: number) => (gold >= 100_000_000 ? `${(gold / 100_000_000).toLocaleString()}억` : `${Math.round(gold / 10_000).toLocaleString()}만`);
 export const JOBS: RentJob[] = ["warrior", "ranger", "mage", "monk"];
+/**
+ * 물건의 직업 칸 (제작자 요청 2026-11-02: '아이템이 공용일 수도 있고 전사·레인저처럼 여럿일 수도'): 'warrior' 하나, 'warrior,ranger' 여럿,
+ * 네 직업 모두면 공용. 배열이나 쉼표 글을 받아 정한 순서로 잇는다. 맞지 않으면 null
+ */
+export function readJobs(v: unknown): string | null {
+  const list = Array.isArray(v) ? v : typeof v === "string" ? v.split(",") : [];
+  const set = new Set(list.map((x) => String(x).trim()));
+  const jobs = JOBS.filter((j) => set.has(j));
+  return jobs.length && jobs.length === set.size ? jobs.join(",") : null;
+}
+/** 'warrior,ranger' -> ['warrior', 'ranger'] */
+export const jobsOf = (s: string) => JOBS.filter((j) => s.split(",").includes(j));
 /** 신청서 하나에 담는 무기 수, 한 사람(묶은 캐릭터 모두)이 동시에 줄 서는 무기 수 */
 export const MAX_APP_ITEMS = 30;
 export const MAX_WAIT = 30;
@@ -77,7 +89,8 @@ const STAFF_WHERE =
 /** 표 rental_items 한 줄 */
 export interface RentalRow {
   id: number;
-  job: RentJob;
+  /** 직업 하나나 여럿 (쉼표, 네 직업 모두면 공용). readJobs */
+  job: string;
   level: number;
   weapon: string;
   options: string;
@@ -132,7 +145,7 @@ export const dueOf = (term: RentTerm, from: number) => {
 
 /** 물건 고치기·더하기 값 검사. 맞지 않으면 오류 글 */
 export function checkItem(b: Record<string, unknown>): { error: string } | { item: Omit<RentalRow, "id" | "renter" | "rented_at" | "due_at" | "status"> } {
-  const job = b.job as RentJob;
+  const job = readJobs(b.job);
   const term = b.term as RentTerm;
   const level = Number(b.level);
   const enhance = Number(b.enhance);
@@ -141,7 +154,7 @@ export function checkItem(b: Record<string, unknown>): { error: string } | { ite
   const options = typeof b.options === "string" ? b.options.replace(/\s+/g, "") : "";
   const donor = typeof b.donor === "string" ? b.donor.trim() : "";
   const note = typeof b.note === "string" ? b.note.trim() : "";
-  if (!JOBS.includes(job)) return { error: "직업을 골라 주세요" };
+  if (!job) return { error: "직업을 골라 주세요" };
   if (!isTerm(term)) return { error: "기한을 골라 주세요 (기한 없음이나 1~52주)" };
   if (!weapon || weapon.length > 30) return { error: "무기 이름을 적어 주세요" };
   if (!Number.isInteger(level) || level < 1 || level > 200) return { error: "레벨이 맞지 않아요" };
