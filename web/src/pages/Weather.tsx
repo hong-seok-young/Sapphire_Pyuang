@@ -220,46 +220,66 @@ export function WeatherFx({ sky }: { sky: Sky }) {
      * 물은 수면이 평평하다: 바람 때문에 한쪽에 더 떨어져도, 평균보다 두 칸 넘게 높은 칸의 물을 평균보다 낮은 칸으로 조금씩 옮긴다
      * (옆으로만 흘리면 화면 끝에서 끝까지 펴지는 데 너무 오래 걸려 비스듬했다)
      */
-    const level = () => {
+    const level = (arr: number[], high: number, low: number, max = 40) => {
       let total = 0;
-      for (let c = 0; c < cols; c++) total += water[c];
+      for (let c = 0; c < cols; c++) total += arr[c];
       const mean = total / cols;
       if (mean < 1) return;
       const lo = Math.floor(Math.random() * cols);
-      for (let moved = 0, tries = 0; moved < 40 && tries < cols; tries++) {
+      for (let moved = 0, tries = 0; moved < max && tries < cols; tries++) {
         const c = (lo + tries * 7) % cols;
-        if (water[c] < mean + 2) continue;
+        if (arr[c] < mean + high) continue;
         // 가까운 낮은 칸부터
         for (let d = 1; d < cols * 2; d++) {
           const t = c + (d % 2 ? (d + 1) / 2 : -d / 2);
-          if (t < 0 || t >= cols || water[t] > mean - 1) continue;
-          water[c]--;
-          water[t]++;
+          if (t < 0 || t >= cols || arr[t] > mean - low) continue;
+          arr[c]--;
+          arr[t]++;
           moved++;
           break;
         }
       }
     };
     /** 눈송이가 닿으면 그 자리에 그 송이만큼 도트를 바로 얹는다 (한 톨 한 톨 보이게) */
+    /**
+     * 눈송이가 닿으면 그 송이만큼 도트를 얹는다. 한 칸에 몰아 얹지 않고 닿은 자리 둘레(±3칸)에서 가장 낮은 칸부터 한 톨씩
+     * (2026-11-02 제작자: 뾰족뾰족 올라오는 게 보기 싫다. 빨리 쌓을 때(boost) 한 칸에 수십 톨이 쌓여 바늘처럼 솟았다)
+     */
     const land = (x: number, size: number) => {
       const c0 = Math.floor(x / P);
-      for (const [dx, n] of FLAKE_CELLS[size]) {
-        const c = c0 + dx;
-        if (c >= 0 && c < cols) pile[c] = Math.min(topCells(), pile[c] + n * snow!.grow * boost());
+      const total = FLAKE_CELLS[size].reduce((t, [, n]) => t + n, 0) * snow!.grow * boost();
+      const top = topCells();
+      for (let k = 0; k < total; k++) {
+        let best = -1;
+        for (let dx = -3; dx <= 3; dx++) {
+          const c = c0 + dx;
+          if (c < 0 || c >= cols || pile[c] >= top) continue;
+          if (best < 0 || pile[c] < pile[best] || (pile[c] === pile[best] && Math.abs(dx) < Math.abs(best - c0))) best = c;
+        }
+        if (best < 0) return;
+        pile[best]++;
       }
     };
-    /** 옆 칸보다 두 칸 넘게 높으면 맨 위 한 톨이 낮은 쪽으로 굴러 내린다 (뾰족하지 않은 둔덕). 매번 방향을 바꿔 한쪽으로 쏠리지 않게 */
+    /**
+     * 옆 칸보다 두 칸 넘게 높으면 차이의 절반이 낮은 쪽으로 굴러 내린다 (뾰족하지 않은 둔덕, 눈의 안식각).
+     * 매번 방향을 바꿔 한쪽으로 쏠리지 않게. 빨리 쌓일 때도 따라가게 한 번에 여러 번 훑는다
+     */
     let sweep = 1;
     const settle = () => {
-      sweep = -sweep;
-      for (let i = 0; i < cols; i++) {
-        const c = sweep > 0 ? i : cols - 1 - i;
-        const l = c > 0 ? pile[c - 1] : Infinity;
-        const r = c < cols - 1 ? pile[c + 1] : Infinity;
-        const low = l < r ? c - 1 : l > r ? c + 1 : Math.random() < 0.5 ? c - 1 : c + 1;
-        if (low >= 0 && low < cols && pile[c] - pile[low] >= 2) {
-          pile[c]--;
-          pile[low]++;
+      for (let pass = 0; pass < 3; pass++) {
+        sweep = -sweep;
+        for (let i = 0; i < cols; i++) {
+          const c = sweep > 0 ? i : cols - 1 - i;
+          const l = c > 0 ? pile[c - 1] : Infinity;
+          const r = c < cols - 1 ? pile[c + 1] : Infinity;
+          const low = l < r ? c - 1 : l > r ? c + 1 : Math.random() < 0.5 ? c - 1 : c + 1;
+          if (low < 0 || low >= cols) continue;
+          const diff = pile[c] - pile[low];
+          if (diff >= 2) {
+            const move = Math.max(1, Math.floor(diff / 2));
+            pile[c] -= move;
+            pile[low] += move;
+          }
         }
       }
     };
@@ -294,7 +314,7 @@ export function WeatherFx({ sky }: { sky: Sky }) {
         }
         // 고인 빗물: 도트가 칸마다 쌓여 옆으로 흐른다 (높이 찰수록 여러 번 흘려 수면이 평평하게). 맨 위 도트는 밝게, 천천히 반짝인다
         for (let pass = 0; pass < 2; pass++) flow();
-        level();
+        level(water, 2, 1);
         const t = now / 600;
         for (let c = 0; c < cols; c++) {
           const n = water[c];
@@ -344,7 +364,7 @@ export function WeatherFx({ sky }: { sky: Sky }) {
         for (const f of flakes) {
           f.ph += f.f * k;
           f.y += f.v * k;
-          f.x += (snow.wind + Math.sin(f.ph) * 0.5) * k;
+          f.x += (snow.wind * Math.sin(now / 15000) + Math.sin(f.ph) * 0.5) * k;
           // 옆으로 나가면 반대편에서 같은 높이로 이어서 (예전에는 위에서 다시 떨어져 한쪽으로 쏠렸다)
           if (f.x > w + 24) f.x -= w + 48;
           else if (f.x < -24) f.x += w + 48;
@@ -369,6 +389,8 @@ export function WeatherFx({ sky }: { sky: Sky }) {
           } else ctx.fillRect(x, y, P * f.s, P * f.s);
         }
         settle();
+        // 눈은 둔덕은 두되 전체가 한쪽으로 기울지 않게 (평균보다 8칸 넘게 높은 곳의 눈을 4칸 넘게 낮은 곳으로 조금씩. 2026-11-02 제작자 폰: 비스듬히 쌓였다)
+        level(pile, 8, 4, 12);
         // 쌓인 눈: 칸마다 도트로 (맨 위 한 칸은 더 밝게, 맨 아래는 살짝 푸르게)
         for (let c = 0; c < cols; c++) {
           const ph = pile[c] * P;
