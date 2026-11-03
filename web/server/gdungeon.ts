@@ -39,10 +39,11 @@ export function slotText(week: number, i: number): string {
 }
 
 /** 파티 명단을 모두에게 보이는지 (제작자 2026-11-03: '파티명단 아직 미정이니까 공지 후 반영할게, 일단 파티 목록 안 보이게 해 놔').
- *  false 면 길드원은 내 시간표만 칠하고(파티가 열리면 바로 후보가 나오게), 내 파티·후보·다른 파티·파티 만들기는 운영진(길드마스터·오피서)과 앱개발자,
- *  테스트 계정만 미리 본다 (canSeeParties, 화면 src/gdungeon.ts 의 hidden). 제작자가 공지한 뒤 true 로 바꾼다 (화면·챗봇·알림이 같이 열린다). */
+ *  false 면 길드원은 내 시간표만 칠하고(파티가 열리면 바로 후보가 나오게), 내 파티·후보·다른 파티·파티 만들기는 길드마스터와 앱개발자만 미리 본다
+ *  (제작자 2026-11-03 '공지 전 숨기기는 길마와 나만': 오피서와 테스트 계정도 길드원과 같이 숨긴다. canSeeParties, 화면 src/gdungeon.ts 의 hidden).
+ *  제작자가 공지한 뒤 true 로 바꾼다 (화면·챗봇·알림이 같이 열린다). */
 export const GD_PARTIES_OPEN = false;
-export const canSeeParties = (me: User) => GD_PARTIES_OPEN || RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
+export const canSeeParties = (me: User) => GD_PARTIES_OPEN || RANK[me.role] >= 2;
 
 /** 들어올 수 있는지: 1군 (앱개발자는 시험하려고 길드와 상관없이) */
 export async function canUseGd(env: Env, me: User): Promise<boolean> {
@@ -200,7 +201,7 @@ export async function tellParty(env: Env, p: PartyState, text: string, from: str
   // 명단을 숨긴 동안은 파티 알림('[향단 팀] 시간표가 다 모였어요')도 미리 보는 사람에게만 (길드원에게 가면 명단이 새 나간다)
   if (!GD_PARTIES_OPEN && to.length) {
     const { results } = await env.DB.prepare(`SELECT id, role FROM users WHERE id IN (${to.map(() => "?").join(",")})`).bind(...to).all<{ id: string; role: User["role"] }>();
-    to = results.filter((u) => RANK[u.role] >= 1 || TEST_IDS.includes(u.id)).map((u) => u.id);
+    to = results.filter((u) => RANK[u.role] >= 2).map((u) => u.id);
   }
   await notify(env, to, "gdungeon", text, "#/match", from);
 }
