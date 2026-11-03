@@ -156,8 +156,8 @@ export async function mineExtras(
   }
 
   // ---------- 길드 던전 (1군 전용, 2026-11-02 열었다): 내 파티와 이번 주 정한 때·지금 후보, 다른 파티는 이름·파티원·정한 때만 ----------
-  // 파티 명단을 숨긴 동안(GD_PARTIES_OPEN = false)은 미리 보는 사람에게만 (길드원에게는 '아직 볼 수 없다'로 답하게 자료를 넣지 않는다)
-  if ((ASK_MORE.gdungeon.test(q) || ASK_MORE.doNow.test(q)) && canSeeParties(me) && (await canUseGd(env, me))) {
+  // 파티 명단을 숨긴 동안(partiesOpen 아님)은 길드마스터·앱개발자에게만 (길드원에게는 '아직 볼 수 없다'로 답하게 자료를 넣지 않는다)
+  if ((ASK_MORE.gdungeon.test(q) || ASK_MORE.doNow.test(q)) && (await canSeeParties(env, me)) && (await canUseGd(env, me))) {
     const { week } = weeks(now);
     const parties = await allParties(env, week, now);
     const mine = parties.find((p) => p.members.some((m) => m.id === me.id));

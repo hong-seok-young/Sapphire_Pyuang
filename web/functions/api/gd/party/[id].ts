@@ -31,7 +31,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!(await canUseGd(env, me))) return FORBIDDEN();
-  if (!canSeeParties(me)) return json({ error: "파티 명단은 운영진이 공지한 뒤에 열려요" }, 403);
+  if (!(await canSeeParties(env, me))) return json({ error: "파티 명단은 운영진이 공지한 뒤에 열려요" }, 403);
   const id = Number(params.id);
   const p = await load(env, id);
   if (!p) return json({ error: "없는 파티예요" }, 404);
@@ -86,7 +86,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!(await canUseGd(env, me))) return FORBIDDEN();
-  if (!canSeeParties(me)) return json({ error: "파티 명단은 운영진이 공지한 뒤에 열려요" }, 403);
+  if (!(await canSeeParties(env, me))) return json({ error: "파티 명단은 운영진이 공지한 뒤에 열려요" }, 403);
   const id = Number(params.id);
   const p = await load(env, id);
   if (!p) return json({ error: "없는 파티예요" }, 404);

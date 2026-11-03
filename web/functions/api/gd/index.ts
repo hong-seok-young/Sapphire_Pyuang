@@ -1,11 +1,12 @@
 // 길드 던전 (server/gdungeon.ts, 제작자 요청 2026-11-02, 1군 전용)
 // GET  /api/gd -> { week, end, now, party(내 파티 상태), mine(내 이번 주 가능한 때), prev(지난주 것), parties(모든 파티 요약), people(넣을 수 있는 1군), staff }
-//      파티 명단을 숨긴 동안(server/gdungeon.ts GD_PARTIES_OPEN = false, 제작자 2026-11-03 '공지 후 반영')은 미리 보는 사람이 아니면
-//      hidden: true 와 내 시간표(mine, prev)만 주고 party·parties·people 은 비운다. 화면은 내 시간표와 안내 한 줄만 그린다
+//      파티 명단을 숨긴 동안(server/gdungeon.ts partiesOpen, 제작자 2026-11-03 '공지 후 반영')은 길드마스터·앱개발자가 아니면
+//      hidden: true 와 내 시간표(mine, prev)만 주고 party·parties·people 은 비운다. 화면은 내 시간표와 안내 한 줄만 그린다.
+//      open(명단이 열렸는지)과 canOpen(열고 숨길 수 있는지: 길드마스터·앱개발자)은 화면 맨 위 '명단 열기'·'공지까지 숨기기' 줄에 (PUT /api/gd/open)
 // POST /api/gd { members } -> 파티 만들기 (만든 사람이 파티장, 나 빼고 3명까지. 이름은 파티장 닉네임으로 'OO 팀')
 import { FORBIDDEN, NEED_LOGIN, RANK, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { MAX_MEMBERS, allParties, canSeeParties, canUseGd, gdPeople, memberProblem, partyIdOf, teamName, weeks } from "../../../server/gdungeon";
+import { MAX_MEMBERS, allParties, canOpenParties, canSeeParties, canUseGd, gdPeople, memberProblem, partiesOpen, partyIdOf, teamName, weeks } from "../../../server/gdungeon";
 import { notify } from "../../../server/alerts";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
@@ -14,7 +15,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (!(await canUseGd(env, me))) return json({ error: "1군 전용이에요" }, 403);
   const now = Date.now();
   const { week, prev, end } = weeks(now);
-  const hidden = !canSeeParties(me);
+  const open = await partiesOpen(env);
+  const canOpen = canOpenParties(me);
+  const hidden = !open && !canOpen;
   const [parties, mineR, people] = await Promise.all([
     hidden ? [] : allParties(env, week, now),
     env.DB.prepare("SELECT week, slots FROM gd_avail WHERE user_id = ? AND week IN (?, ?)").bind(me.id, week, prev).all<{ week: number; slots: string }>(),
@@ -22,7 +25,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   ]);
   const mine = mineR.results.find((r) => r.week === week)?.slots ?? null;
   const prevMine = mineR.results.find((r) => r.week === prev)?.slots ?? null;
-  if (hidden) return json({ week, end, now, hidden: true, party: null, mine, prev: prevMine, parties: [], people: [], staff: false }, 200, { "cache-control": "no-store" });
+  if (hidden) return json({ week, end, now, hidden: true, open: false, canOpen: false, party: null, mine, prev: prevMine, parties: [], people: [], staff: false }, 200, { "cache-control": "no-store" });
   const myParty = parties.find((p) => p.members.some((m) => m.id === me.id)) ?? null;
   return json(
     {
@@ -36,6 +39,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       parties: parties.map((p) => ({ id: p.id, name: p.name, leader: p.leader, stage: p.stage, members: p.members.map((m) => m.id), confirmed: p.confirmed, current: p.current })),
       people,
       staff: RANK[me.role] >= 1,
+      open,
+      canOpen,
     },
     200,
     { "cache-control": "no-store" },
@@ -46,7 +51,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!(await canUseGd(env, me))) return FORBIDDEN();
-  if (!canSeeParties(me)) return json({ error: "파티 명단은 운영진이 공지한 뒤에 열려요" }, 403);
+  if (!(await canSeeParties(env, me))) return json({ error: "파티 명단은 운영진이 공지한 뒤에 열려요" }, 403);
   const b = await readJson<{ members: unknown }>(request);
   const name = teamName(me.id);
   const others = Array.isArray(b.members) ? [...new Set(b.members.filter((x): x is string => typeof x === "string" && x !== me.id))] : [];

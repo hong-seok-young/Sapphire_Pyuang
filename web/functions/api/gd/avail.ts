@@ -30,5 +30,5 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
     await tellParty(env, after, `[${after.name}] ${text}`, me.id);
   }
   // 파티 명단을 숨긴 동안은 길드원에게 내 파티 상태를 돌려주지 않는다 (시간표는 저장된다)
-  return json({ ok: true, party: canSeeParties(me) ? after : null });
+  return json({ ok: true, party: (await canSeeParties(env, me)) ? after : null });
 };

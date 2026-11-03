@@ -11,7 +11,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!(await canUseGd(env, me))) return FORBIDDEN();
-  if (!canSeeParties(me)) return json({ error: "파티 명단은 운영진이 공지한 뒤에 열려요" }, 403);
+  if (!(await canSeeParties(env, me))) return json({ error: "파티 명단은 운영진이 공지한 뒤에 열려요" }, 403);
   const b = await readJson<{ slot: unknown; answer: unknown; reset: unknown }>(request);
   const now = Date.now();
   const { week } = weeks(now);
@@ -56,7 +56,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!(await canUseGd(env, me))) return FORBIDDEN();
-  if (!canSeeParties(me)) return json({ error: "파티 명단은 운영진이 공지한 뒤에 열려요" }, 403);
+  if (!(await canSeeParties(env, me))) return json({ error: "파티 명단은 운영진이 공지한 뒤에 열려요" }, 403);
   const slot = Number(new URL(request.url).searchParams.get("slot"));
   const now = Date.now();
   const { week } = weeks(now);

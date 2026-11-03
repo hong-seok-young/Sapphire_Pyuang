@@ -38,12 +38,15 @@ export function slotText(week: number, i: number): string {
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}(${"일월화수목금토"[d.getUTCDay()]}) ${hm}`;
 }
 
-/** 파티 명단을 모두에게 보이는지 (제작자 2026-11-03: '파티명단 아직 미정이니까 공지 후 반영할게, 일단 파티 목록 안 보이게 해 놔').
- *  false 면 길드원은 내 시간표만 칠하고(파티가 열리면 바로 후보가 나오게), 내 파티·후보·다른 파티·파티 만들기는 길드마스터와 앱개발자만 미리 본다
- *  (제작자 2026-11-03 '공지 전 숨기기는 길마와 나만': 오피서와 테스트 계정도 길드원과 같이 숨긴다. canSeeParties, 화면 src/gdungeon.ts 의 hidden).
- *  제작자가 공지한 뒤 true 로 바꾼다 (화면·챗봇·알림이 같이 열린다). */
-export const GD_PARTIES_OPEN = false;
-export const canSeeParties = (me: User) => GD_PARTIES_OPEN || RANK[me.role] >= 2;
+/** 파티 명단이 모두에게 열렸는지 (제작자 2026-11-03: '파티 명단 아직 미정이니까 공지 후 반영할게, 일단 파티 목록 안 보이게 해 놔' -> '공지까지 숨기기 버튼 어딨음').
+ *  D1 setup 'gd_parties_open' 줄이 있으면 열림. 길드마스터와 앱개발자가 길드 던전 화면 맨 위의 '명단 열기'·'공지까지 숨기기'로 바꾼다 (PUT /api/gd/open).
+ *  숨긴 동안 길드원(오피서·테스트 계정도)은 내 시간표만 칠하고(명단이 열리면 바로 후보가 나오게), 내 파티·후보·다른 파티·파티 만들기·파티 알림·챗봇 자료는
+ *  길드마스터와 앱개발자만 (제작자 '공지 전 숨기기는 길마와 나만'. canSeeParties, 화면 src/gdungeon.ts 의 hidden). */
+export const OPEN_KEY = "gd_parties_open";
+export const partiesOpen = async (env: Env): Promise<boolean> => !!(await env.DB.prepare("SELECT 1 AS x FROM setup WHERE key = ?").bind(OPEN_KEY).first());
+/** 명단을 열고 숨길 수 있는 사람: 길드마스터와 앱개발자 */
+export const canOpenParties = (me: User) => RANK[me.role] >= 2;
+export const canSeeParties = async (env: Env, me: User): Promise<boolean> => canOpenParties(me) || partiesOpen(env);
 
 /** 들어올 수 있는지: 1군 (앱개발자는 시험하려고 길드와 상관없이) */
 export async function canUseGd(env: Env, me: User): Promise<boolean> {
@@ -198,8 +201,8 @@ export async function memberProblem(env: Env, ids: string[], partyId: number | n
 /** 파티원에게 알림 (나 빼고) */
 export async function tellParty(env: Env, p: PartyState, text: string, from: string): Promise<void> {
   let to = p.members.map((m) => m.id).filter((id) => id !== from);
-  // 명단을 숨긴 동안은 파티 알림('[향단 팀] 시간표가 다 모였어요')도 미리 보는 사람에게만 (길드원에게 가면 명단이 새 나간다)
-  if (!GD_PARTIES_OPEN && to.length) {
+  // 명단을 숨긴 동안은 파티 알림('[향단 팀] 시간표가 다 모였어요')도 길드마스터·앱개발자에게만 (길드원에게 가면 명단이 새 나간다)
+  if (to.length && !(await partiesOpen(env))) {
     const { results } = await env.DB.prepare(`SELECT id, role FROM users WHERE id IN (${to.map(() => "?").join(",")})`).bind(...to).all<{ id: string; role: User["role"] }>();
     to = results.filter((u) => RANK[u.role] >= 2).map((u) => u.id);
   }

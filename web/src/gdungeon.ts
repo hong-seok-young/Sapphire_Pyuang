@@ -51,8 +51,11 @@ export interface GdData {
   week: number;
   end: number;
   now: number;
-  /** 파티 명단을 숨긴 동안(서버 GD_PARTIES_OPEN = false, 제작자 2026-11-03 '공지 후 반영') 미리 보는 사람이 아니면 true: 내 시간표만 */
+  /** 파티 명단을 숨긴 동안(서버 partiesOpen 아님, 제작자 2026-11-03 '공지 후 반영') 길드마스터·앱개발자가 아니면 true: 내 시간표만 */
   hidden?: boolean;
+  /** 파티 명단이 모두에게 열렸는지, 내가 열고 숨길 수 있는지 (길드마스터·앱개발자: 화면 맨 위 '명단 열기'·'공지까지 숨기기') */
+  open?: boolean;
+  canOpen?: boolean;
   party: PartyState | null;
   mine: string | null;
   prev: string | null;
@@ -62,6 +65,7 @@ export interface GdData {
 }
 
 export const fetchGd = () => api<GdData>("/api/gd");
+export const setPartiesOpen = (open: boolean) => api<{ open: boolean }>("/api/gd/open", "PUT", { open });
 export const createParty = (members: string[]) => api<{ id: number }>("/api/gd", "POST", { members });
 export const saveAvail = (slots: string) => api<{ ok: boolean; party?: PartyState | null }>("/api/gd/avail", "PUT", { slots });
 export const answerGd = (slot: number, answer: "yes" | "no") => api<{ ok: boolean; party?: PartyState | null }>("/api/gd/answer", "POST", { slot, answer });
