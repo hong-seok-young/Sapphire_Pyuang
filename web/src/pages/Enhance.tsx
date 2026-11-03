@@ -3,6 +3,7 @@
 // 강화 데미지 = 기본 데미지 x (1 + 가산값 / 100): 전사·레인저·무도가는 공통 가산치, 마법사는 무기마다 다른 가산치.
 // 화면: 무기마다 한 줄(그림 · 이름 칸 · − +N +), 결과(평균 % 차이, 최소·최대, 같은 데미지가 되는 강화), 톡방 시세(시세 동향 자료),
 // 바꿀 무기 강화별 표(+N 마다 지금 무기 대비 %, 같은 강화끼리는 견주지 않는다: 제작자 2026-11-04 '그래프는 뭐고 같은 강화끼리 비교하면 뭐해').
+// 맨 위 직업 칸을 고르면 그 직업 무기 목록(레벨 순)이 비어 있는 줄 아래에 뜨고, 무기를 고르면 ◀ ▶ 로 그 직업의 이전·다음 무기 (제작자 2026-11-04).
 import { useCallback, useMemo, useState } from "react";
 import type { Me } from "../auth";
 import { loadEnhance, loadTrend, useAsync } from "../data";
@@ -15,6 +16,10 @@ const key = (s: string) => s.replace(/\s+/g, "");
 /** 톡방 줄임말의 한 글자 (닼 = 다크, 롭 = 로브) */
 const squeeze = (s: string) => s.replace(/닼/g, "다크").replace(/롭/g, "로브");
 const JOB_OF: Record<string, string> = { warrior: "전사", ranger: "레인저", mage: "마법사", monk: "무도가" };
+const JOBS = ["전사", "레인저", "마법사", "무도가"] as const;
+/** 그 직업 무기, 레벨 순 (같은 레벨은 강화 수치가 있는 것 먼저) */
+const jobWeapons = (d: Enhance, job: string) =>
+  d.weapons.filter((w) => w.job === job).sort((a, b) => (a.lv ?? 0) - (b.lv ?? 0) || Number(!a.bonus) - Number(!b.bonus) || a.name.localeCompare(b.name));
 
 /** '8윙의날개', '+8 윙의날개', '8강 윙의날개', '팔헌보' -> 강화와 이름 */
 function parse(text: string): { plus: number | null; name: string } {
@@ -80,31 +85,27 @@ function initial(d: Enhance | undefined, text: string | null): Pick {
   return { q: text, w, plus: w ? Math.min(plus ?? 0, maxPlus(d, w)) : plus ?? 0 };
 }
 
-/** 무기 한 줄: 그림 · 이름 칸 · − +N +. 아래에 직업·레벨·기본 데미지와 다음 강화의 오름, 적는 동안 후보 */
-function WeaponRow({ d, wiki, me, side, hint, pick, onPick }: { d: Enhance; wiki: Wiki; me: Me; side: "a" | "b"; hint: string; pick: Pick; onPick: (p: Pick) => void }) {
-  const [focus, setFocus] = useState(false);
+/** 무기 한 줄: ◀ 그림 · 이름 칸 ▶, 아래에 레벨·데미지·다음 강화의 오름과 − +N +. 적는 동안은 찾은 무기, 목록을 펼친 줄은 고른 직업의 무기 전부 */
+function WeaponRow({ d, wiki, side, hint, pick, onPick, job, list, onFocus }: {
+  d: Enhance; wiki: Wiki; side: "a" | "b"; hint: string; pick: Pick; onPick: (p: Pick) => void;
+  job: string; list: boolean; onFocus: () => void;
+}) {
   const { name } = parse(pick.q);
   const q = squeeze(key(name));
-  const hits = useMemo(() => {
-    if (pick.w && key(pick.w.name) === q) return [];
-    if (!q) {
-      // 비어 있으면 내 직업의 내 레벨 근처 무기 (제작자 요청 2026-11-04 고도화)
-      const job = me.job ? JOB_OF[me.job] : null;
-      if (!focus || !job) return [];
-      const lv = me.level ?? 30;
-      return d.weapons
-        .filter((w) => w.job === job && w.bonus)
-        .sort((a, b) => Math.abs((a.lv ?? 0) - lv) - Math.abs((b.lv ?? 0) - lv))
-        .slice(0, 6)
-        .sort((a, b) => (a.lv ?? 0) - (b.lv ?? 0));
-    }
-    return d.weapons
-      .map((w) => ({ w, s: score(q, w.name) }))
-      .filter((x) => x.s > 0)
-      .sort((a, b) => b.s - a.s || (a.w.lv ?? 0) - (b.w.lv ?? 0))
-      .slice(0, 6)
-      .map((x) => x.w);
-  }, [d, q, pick.w, focus, me.job, me.level]);
+  const typing = !!q && !(pick.w && key(pick.w.name) === q);
+  const hits = useMemo(
+    () =>
+      typing
+        ? d.weapons
+            .map((w) => ({ w, s: score(q, w.name) }))
+            .filter((x) => x.s > 0)
+            .sort((a, b) => b.s - a.s || (a.w.lv ?? 0) - (b.w.lv ?? 0))
+            .slice(0, 6)
+            .map((x) => x.w)
+        : [],
+    [d, q, typing],
+  );
+  const all = useMemo(() => jobWeapons(d, job), [d, job]);
   const type = (text: string) => {
     const r = parse(text);
     const k = squeeze(key(r.name));
@@ -115,45 +116,59 @@ function WeaponRow({ d, wiki, me, side, hint, pick, onPick }: { d: Enhance; wiki
   const set = (w: EnhanceWeapon, plus: number) => onPick({ q: `${plus ? `+${plus} ` : ""}${w.name}`, w, plus });
   const choose = (w: EnhanceWeapon) => set(w, Math.min(pick.plus, maxPlus(d, w)));
   const step = (n: number) => pick.w && set(pick.w, Math.max(0, Math.min(maxPlus(d, pick.w), pick.plus + n)));
+  // ◀ ▶: 고른 무기의 직업 목록에서 이전·다음 (강화는 그 무기가 되는 만큼까지 그대로)
+  const mine = pick.w ? jobWeapons(d, pick.w.job) : [];
+  const at = pick.w ? mine.findIndex((w) => w.name === pick.w!.name) : -1;
+  const prev = at > 0 ? mine[at - 1] : null;
+  const next = at >= 0 && at < mine.length - 1 ? mine[at + 1] : null;
   const pic = pick.w ? wiki.items[pick.w.name]?.icon : null;
   const top = pick.w ? maxPlus(d, pick.w) : 0;
   const cur = pick.w ? damage(d, pick.w, pick.plus) : null;
-  const next = pick.w && pick.plus < top ? pct(cur!.avg, damage(d, pick.w, pick.plus + 1).avg) : null;
+  const up = pick.w && pick.plus < top ? pct(cur!.avg, damage(d, pick.w, pick.plus + 1).avg) : null;
+  const shown = typing ? hits : list ? all : [];
   return (
     <div className={"enh-pick enh-" + side}>
       <div className="enh-row">
+        <button type="button" className="pill enh-nav" onClick={() => prev && choose(prev)} disabled={!prev} aria-label={prev ? `이전 무기 ${prev.name}` : "이전 무기"}>
+          ◀
+        </button>
         <span className="mk-slot enh-slot">{pic ? <PicImg pic={pic} max={26} /> : null}</span>
-        <input
-          className="enh-input"
-          value={pick.q}
-          placeholder={hint}
-          onChange={(e) => type(e.target.value)}
-          onFocus={() => setFocus(true)}
-          onBlur={() => setFocus(false)}
-          enterKeyHint="done"
-        />
-        <span className="enh-step">
-          <button type="button" className="pill" onClick={() => step(-1)} disabled={!pick.w || pick.plus <= 0}>
-            −
-          </button>
-          <b>+{pick.plus}</b>
-          <button type="button" className="pill" onClick={() => step(1)} disabled={!pick.w || pick.plus >= top}>
-            +
-          </button>
-        </span>
+        <input className="enh-input" value={pick.q} placeholder={hint} onChange={(e) => type(e.target.value)} onFocus={onFocus} enterKeyHint="done" />
+        <button type="button" className="pill enh-nav" onClick={() => next && choose(next)} disabled={!next} aria-label={next ? `다음 무기 ${next.name}` : "다음 무기"}>
+          ▶
+        </button>
       </div>
       {pick.w && cur && (
         <div className="enh-meta">
-          Lv.{pick.w.lv ?? "?"} · {fmt(cur.min)}~{fmt(cur.max)}
-          {top === 0 ? <span className="muted"> · 강화 수치 없음</span> : next !== null ? <span className="enh-up"> · 다음 {pctText(next)}</span> : null}
+          <span className="enh-metatext">
+            <span>
+              Lv.{pick.w.lv ?? "?"} · {fmt(cur.min)}~{fmt(cur.max)}
+            </span>
+            {top === 0 ? <span className="muted">강화 수치 없음</span> : up !== null ? <span className="enh-up">다음 강화 {pctText(up)}</span> : null}
+          </span>
+          <span className="enh-step">
+            <button type="button" className="pill" onClick={() => step(-1)} disabled={pick.plus <= 0} aria-label="강화 내리기">
+              −
+            </button>
+            <b>+{pick.plus}</b>
+            <button type="button" className="pill" onClick={() => step(1)} disabled={pick.plus >= top} aria-label="강화 올리기">
+              +
+            </button>
+          </span>
         </div>
       )}
-      {hits.length > 0 && (
-        <div className="enh-hits">
-          {hits.map((w) => (
-            <button key={w.name} type="button" className="enh-hit" onMouseDown={(e) => e.preventDefault()} onClick={() => choose(w)}>
-              {w.name}
+      {shown.length > 0 && (
+        <div className={"enh-hits" + (typing ? "" : " enh-list")}>
+          {shown.map((w) => (
+            <button
+              key={w.name}
+              type="button"
+              className={"enh-hit" + (pick.w?.name === w.name ? " enh-hit-on" : "") + (w.bonus ? "" : " enh-hit-nob")}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => choose(w)}
+            >
               <small>Lv.{w.lv ?? "?"}</small>
+              {w.name}
             </button>
           ))}
         </div>
@@ -274,18 +289,36 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
   const [b, setB] = useState<Pick | null>(null);
   const pa = a ?? initial(d, query.get("a"));
   const pb = b ?? initial(d, query.get("b"));
+  const [jobPick, setJob] = useState<string | null>(null);
+  const job = jobPick ?? pa.w?.job ?? (me.job ? JOB_OF[me.job] : null) ?? "전사";
+  // 목록을 펼칠 줄: 처음은 비어 있는 첫 줄, 줄을 누르면 그 줄, 고르면 다음 빈 줄 (둘 다 차면 닫힘)
+  const [listAt, setListAt] = useState<"a" | "b" | null | undefined>(undefined);
+  const firstEmpty = !pa.w ? "a" : !pb.w ? "b" : null;
+  const list = listAt === undefined ? firstEmpty : listAt;
+  const after = (row: "a" | "b", p: Pick) => {
+    if (!p.w) return;
+    if (!jobPick || p.w.job !== job) setJob(p.w.job);
+    const other = row === "a" ? pb : pa;
+    setListAt(other.w ? null : row === "a" ? "b" : "a");
+  };
   const pickA = (p: Pick) => {
     setA(p);
     keepInUrl(p, pb);
+    if (p.w && p.w !== pa.w) after("a", p);
   };
   const pickB = (p: Pick) => {
     setB(p);
     keepInUrl(pa, p);
+    if (p.w && p.w !== pb.w) after("b", p);
   };
   const swap = () => {
     setA(pb);
     setB(pa);
     keepInUrl(pb, pa);
+  };
+  const pickJob = (j: string) => {
+    setJob(j);
+    setListAt(list ?? firstEmpty ?? "a");
   };
   return (
     <>
@@ -295,14 +328,20 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
       ) : (
         <div className="enh">
           <section className="enh-card enh-picks">
-            <WeaponRow d={d} wiki={wiki} me={me} side="a" hint="지금 무기 (8헌터보우)" pick={pa} onPick={pickA} />
+            <div className="mk-sub enh-jobs" role="tablist">
+              {JOBS.map((j) => (
+                <button key={j} type="button" role="tab" aria-selected={job === j} className={"sub-tab" + (job === j ? " sub-tab-on" : "")} onClick={() => pickJob(j)}>
+                  {j}
+                </button>
+              ))}
+            </div>
+            <WeaponRow d={d} wiki={wiki} side="a" hint="지금 무기" pick={pa} onPick={pickA} job={job} list={list === "a"} onFocus={() => setListAt("a")} />
             <button type="button" className="enh-swap" onClick={swap} aria-label="위아래 바꾸기">
               ⇅
             </button>
-            <WeaponRow d={d} wiki={wiki} me={me} side="b" hint="바꿀 무기 (8윙의날개)" pick={pb} onPick={pickB} />
+            <WeaponRow d={d} wiki={wiki} side="b" hint="바꿀 무기" pick={pb} onPick={pickB} job={job} list={list === "b"} onFocus={() => setListAt("b")} />
           </section>
           <Result d={d} t={t} a={pa} b={pb} />
-          <p className="trend-src muted">카페 '아이모 장비 강화 수치' 무기 강화수치(26.10)</p>
         </div>
       )}
     </>
