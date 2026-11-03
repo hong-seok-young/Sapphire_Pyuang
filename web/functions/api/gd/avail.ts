@@ -2,7 +2,7 @@
 // 내가 칠해서 파티원이 모두 칠하게 되면 파티원에게 1번 후보를 알린다
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { canUseGd, cleanBits, oneParty, partyIdOf, slotText, tellParty, weeks } from "../../../server/gdungeon";
+import { canSeeParties, canUseGd, cleanBits, oneParty, partyIdOf, slotText, tellParty, weeks } from "../../../server/gdungeon";
 
 export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
@@ -29,5 +29,6 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
         : "시간표가 다 모였는데 교집합이 없어요 · 시간표를 더 칠해 주세요";
     await tellParty(env, after, `[${after.name}] ${text}`, me.id);
   }
-  return json({ ok: true, party: after });
+  // 파티 명단을 숨긴 동안은 길드원에게 내 파티 상태를 돌려주지 않는다 (시간표는 저장된다)
+  return json({ ok: true, party: canSeeParties(me) ? after : null });
 };

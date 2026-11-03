@@ -75,6 +75,16 @@ export function GuildDungeonPage({ me }: { me: Me }) {
   const setParty = (p: PartyState | null | undefined) => {
     if (p !== undefined) setData((d) => (d ? { ...d, party: p } : d));
   };
+  // 파티 명단을 숨긴 동안 (제작자 2026-11-03 '일단 파티 목록 안 보이게'): 안내 한 줄과 내 시간표만. 칠해 두면 명단이 열릴 때 바로 후보가 나온다
+  if (data.hidden && !party)
+    return (
+      <>
+        <TopBar title="길드 던전" />
+        {error && <p className="form-error">{error}</p>}
+        <p className="gd-hidden">파티 명단은 운영진이 공지한 뒤에 열려요 · 먼저 내 시간표를 칠해 두세요</p>
+        <MyTimes key={data.week} me={me.id} data={data} onSaved={setParty} onError={setError} />
+      </>
+    );
   return (
     <>
       <TopBar title="길드 던전" />
@@ -203,8 +213,7 @@ function PartyPanel({
   return (
     <section className="panel gd-party">
       <div className="gd-party-head">
-        <b>{p.name}</b>
-        {/* 길드던전 단계 (제작자 2026-11-03: 파티마다 '4단계'). 파티장·운영진은 − + 로 바꾼다 (1에서 − 는 없앰) */}
+        {/* 길드던전 단계 (제작자 2026-11-03: 파티마다 '4단계', 팀 이름 앞에). 파티장·운영진은 − + 로 바꾼다 (1에서 − 는 없앰) */}
         {(p.stage !== null || canManage) && (
           <span className="gd-stage">
             {canManage && (
@@ -236,6 +245,7 @@ function PartyPanel({
             )}
           </span>
         )}
+        <b>{p.name}</b>
       </div>
       {/* 파티원 카드: 한 줄에 닉네임 · 카톡 · 파티장 · 상태. 파티장·운영진은 카드를 누르면 아래에 파티장 지정 · 빼기 (파티장 카드는 파티 지우기)
           (제작자 요청 2026-11-02: 아래에 닉네임을 늘어놓은 관리 칸 대신 카드를 눌러서) */}
@@ -985,8 +995,8 @@ function AllParties({ data }: { data: GdData }) {
           <li key={p.id}>
             <div className="gd-all-head">
               <b>
-                {p.name}
                 {p.stage !== null && <i className="gd-stage-tag">{p.stage}단계</i>}
+                {p.name}
               </b>
               <small>
                 {p.confirmed !== null

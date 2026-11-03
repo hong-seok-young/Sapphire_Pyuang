@@ -51,6 +51,8 @@ export interface GdData {
   week: number;
   end: number;
   now: number;
+  /** 파티 명단을 숨긴 동안(서버 GD_PARTIES_OPEN = false, 제작자 2026-11-03 '공지 후 반영') 미리 보는 사람이 아니면 true: 내 시간표만 */
+  hidden?: boolean;
   party: PartyState | null;
   mine: string | null;
   prev: string | null;

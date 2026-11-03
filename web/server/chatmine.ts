@@ -10,7 +10,7 @@ import { activeMaint } from "./maint";
 import { TYPE_NAME, officialUrl } from "./official";
 import { effective, loadCatalog, loadRules, loadSettings, wallet } from "./platshop";
 import { DIA_GOLD, termDays, termName, canEnter, isManager, manText, mileageOf } from "./rental";
-import { allParties, canUseGd, candidateNo, slotText, weeks } from "./gdungeon";
+import { allParties, canSeeParties, canUseGd, candidateNo, slotText, weeks } from "./gdungeon";
 import type { RentTerm } from "./rentalParse";
 
 const KST = 9 * 3_600_000;
@@ -156,7 +156,8 @@ export async function mineExtras(
   }
 
   // ---------- 길드 던전 (1군 전용, 2026-11-02 열었다): 내 파티와 이번 주 정한 때·지금 후보, 다른 파티는 이름·파티원·정한 때만 ----------
-  if ((ASK_MORE.gdungeon.test(q) || ASK_MORE.doNow.test(q)) && (await canUseGd(env, me))) {
+  // 파티 명단을 숨긴 동안(GD_PARTIES_OPEN = false)은 미리 보는 사람에게만 (길드원에게는 '아직 볼 수 없다'로 답하게 자료를 넣지 않는다)
+  if ((ASK_MORE.gdungeon.test(q) || ASK_MORE.doNow.test(q)) && canSeeParties(me) && (await canUseGd(env, me))) {
     const { week } = weeks(now);
     const parties = await allParties(env, week, now);
     const mine = parties.find((p) => p.members.some((m) => m.id === me.id));
@@ -164,7 +165,7 @@ export async function mineExtras(
     if (mine) {
       const waiting = mine.members.filter((m) => !m.filled).map((m) => m.id);
       lines.push(
-        `내 파티 ${mine.name} (파티장 ${mine.leader}${mine.stage !== null ? `, ${mine.stage}단계` : ""}): ${mine.members.map((m) => m.id).join(", ")}`,
+        `내 파티 ${mine.stage !== null ? `${mine.stage}단계 ` : ""}${mine.name} (파티장 ${mine.leader}): ${mine.members.map((m) => m.id).join(", ")}`,
         waiting.length
           ? `시간표를 아직 안 칠한 사람: ${waiting.join(", ")}`
           : mine.confirmed !== null
@@ -176,7 +177,7 @@ export async function mineExtras(
       if (mine.rejected.length) lines.push(`무산된 후보: ${mine.rejected.map((r) => `${slotText(week, r.slot)}(${r.by.join(", ")} 불참)`).join(", ")}`);
     } else lines.push(`${me.id}은 아직 파티가 없음 (길드 던전 화면에서 파티 만들기)`);
     const others = parties.filter((p) => p !== mine);
-    if (others.length) lines.push(`다른 파티: ${others.map((p) => `${p.name}${p.stage !== null ? ` ${p.stage}단계` : ""}(${p.members.map((m) => m.id).join(", ")}${p.confirmed !== null ? ` · ${slotText(week, p.confirmed)} 확정` : ""})`).join(" / ")}`);
+    if (others.length) lines.push(`다른 파티: ${others.map((p) => `${p.stage !== null ? `${p.stage}단계 ` : ""}${p.name}(${p.members.map((m) => m.id).join(", ")}${p.confirmed !== null ? ` · ${slotText(week, p.confirmed)} 확정` : ""})`).join(" / ")}`);
     parts.push(section("길드 던전 (1군 전용, 4인 파티가 이번 주 가능한 때를 칠하고 모두 되는 때를 빠른 순 후보로 확정·불참)", lines, 1500));
   }
 
