@@ -1,6 +1,4 @@
 import { useEffect, useState } from "react";
-import { isSample, sampleGap } from "../sample";
-import { useSample } from "../tutorialState";
 import { errorText } from "../auth";
 import { fixGap, listGaps } from "../chat";
 import type { ChatGap } from "../chat";
@@ -17,10 +15,7 @@ export function ChatGapsPage({ role }: { role: string }) {
   const [gaps, setGaps] = useState<ChatGap[] | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
-  // 튜토리얼 동안은 맨 앞에 예시 (src/sample.ts)
-  const sample = useSample();
-  const shown =
-    sample && tab === "open" ? [sampleGap(), ...(gaps ?? [])] : gaps;
+  const shown = gaps;
 
   useEffect(() => {
     let alive = true;
@@ -123,14 +118,10 @@ function GapCard({
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   return (
-    <section
-      className="panel gap-card"
-      data-tut-sample={isSample(g.id) ? "" : undefined}
-    >
+    <section className="panel gap-card">
       <div className="gap-head">
         <span>
           {g.kind === "user" ? "👎" : "🤔"} {g.user_id}
-          {isSample(g.id) && <i className="sample-tag">예시</i>}
         </span>
         <span>
           {ago(g.status === "fixed" && g.fixed_at ? g.fixed_at : g.created_at)}

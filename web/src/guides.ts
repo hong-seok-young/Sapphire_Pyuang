@@ -322,18 +322,8 @@ export const GUIDES: Guide[] = [
       { sel: ".log-list", head: "기록", text: "같은 메뉴에서 이어서 한 기록은 한 줄로 묶여요. 누르면 펼쳐져요." },
     ],
   },
-  {
-    key: "gaps",
-    title: "챗봇 개선",
-    tutorial: [
-      {
-        sel: "[data-tut-sample], .gap-card",
-        head: "모르는 질문",
-        text: "목록 복사로 Claude 에게 넘겨 고친 뒤 개선 완료를 누르면, 물은 사람에게 알림이 가고 같은 질문을 다시 물어요.",
-      },
-    ],
-  },
 ];
+// 챗봇 개선(gaps)은 튜토리얼이 없다 (제작자 2026-11-03 '챗봇 개선 설명은 빼자': 제목을 눌러도 아무 일 없고 Click! 표도 없다)
 
 export const guideOf = (key: string) => GUIDES.find((g) => g.key === key) ?? null;
 /** 제목으로 (TopBar 가 title 만 안다). 챗봇은 대화 제목이 떠 있어도 */

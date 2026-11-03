@@ -3,7 +3,6 @@
 // 튜토리얼이 끝나면 useSample 이 false 가 되어 그대로 사라진다. 각 화면은 목록 맨 앞에 끼워 넣기만 한다 (실제 자료는 손대지 않는다).
 import { JOB_NAME } from "./auth";
 import type { Job } from "./auth";
-import type { ChatGap } from "./chat";
 import { EMPTY, slotOf } from "./gdungeon";
 import type { PartyState } from "./gdungeon";
 import type { Listing } from "./market";
@@ -127,23 +126,6 @@ export function sampleParty(me: string): PartyState {
     current: cands[0],
     yes: [SAMPLE_NAME],
     confirmed: null,
-  };
-}
-
-/** 챗봇 개선 예시 */
-export function sampleGap(now = Date.now()): ChatGap {
-  return {
-    id: SAMPLE_ID,
-    user_id: SAMPLE_NAME,
-    thread_id: 0,
-    question: "예시: 고대의봉은 어디서 구해요?",
-    answer: null,
-    reason: "자료에 획득처가 없어요 (예시)",
-    kind: "bot",
-    status: "open",
-    note: null,
-    created_at: now - 1_800_000,
-    fixed_at: null,
   };
 }
 
