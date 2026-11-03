@@ -2606,6 +2606,12 @@ button.gd-member-row { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .tut-spot-tap { animation: none; } .tut-spot { transition: none; } }
 /* 시세 동향 (개발중, Trend.tsx): gold rate chart and item price rows. Colours are the app tokens: 팝니다 sapphire, 삽니다 gold */
 .trend-tabs { margin: 0 0 10px; }
+/* 단계 (제작자 2026-11-04 '버튼 상하위 개념'): 맨 위 같은 폭 칸 > 어두운 띠의 팝니다·삽니다와 거르기 칩 > 오른쪽 작은 정렬 글자 (중개인 .mk-sub 와 같은 모양) */
+.trend-strip { margin-bottom: 6px; }
+.trend-strip .mk-cats { display: flex; flex-wrap: wrap; }
+.trend-sortline { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 2px 12px; margin: 0 2px 6px; font-size: 12px; }
+.trend-sortline button { padding: 2px 0; color: var(--muted); background: none; border: none; cursor: pointer; white-space: nowrap; }
+.trend-sortline button.on { color: var(--gold); }
 .trend-vars-chart { padding: 8px 8px 4px; }
 .trend-group .trend-var-label { color: var(--gold); font-size: 14px; }
 .trend-group-body { padding: 4px 8px 8px; border-top: var(--px) dashed var(--edge); }
@@ -2620,7 +2626,6 @@ button.gd-member-row { cursor: pointer; }
 .trend-s4 { color: #c9b8ff; background: #c9b8ff; }
 .trend-item-chart .trend-legend span { color: var(--muted); }
 .trend-item-chart svg g { background: none; }
-.trend-tabs .pill { font-size: 14px; padding: 7px 16px; }
 .trend-dev { padding: 3px 8px; font-size: 11px; background: #3fe0a0; color: var(--edge); cursor: default; }
 .trend-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 10px; }
 .trend-stat { display: flex; flex-direction: column; gap: 2px; padding: 8px 6px; background: var(--night-2); border: var(--px) solid var(--edge); font-size: 11px; text-align: center; }
@@ -2755,10 +2760,6 @@ button.gd-member-row { cursor: pointer; }
 .trend-tel-none { color: var(--muted); }
 .trend-sample-list li { font-size: 11px; line-height: 1.35; }
 .trend-sample-list b { color: var(--gold); font-weight: 400; }
-.trend-filter { gap: 4px; margin-bottom: 6px; }
-.trend-filter .pill { padding: 4px 9px; font-size: 12px; }
-.trend-filter-gap { flex-basis: 100%; height: 0; }
-.trend-sort:not(.pill-on) { opacity: 0.85; }
 .trend-bands { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 8px; font-size: 11px; }
 .trend-lv { width: 40px; height: 36px; margin-top: 1px; }
 .trend-lv small { font-size: 8px; }
@@ -2769,9 +2770,6 @@ button.gd-member-row { cursor: pointer; }
 .trend-dexgrid dt { white-space: nowrap; }
 .trend-dexgrid dd { margin: 0; color: #8fb4ff; text-align: right; white-space: nowrap; }
 .trend-src { margin-top: 6px; font-size: 10px; }
-.trend-side { align-items: center; margin-bottom: 6px; }
-.trend-side .pill small { font-size: 10px; opacity: 0.8; margin-left: 2px; }
-.trend-sidenote { font-size: 11px; }
 .trend-other { color: var(--gold); }
 
 /* 시세 동향: 도감 스샷에서 자른 그림 (위키에 없는 물건) */

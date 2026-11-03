@@ -180,6 +180,7 @@ function GoldPanel({ t }: { t: Trend }) {
   const buy = weekMedians(t.gold, "buy", t.lastWeek);
   const posts = t.gold.reduce((s, d) => s + d.posts.sell + d.posts.buy, 0);
   const today = t.gold[t.gold.length - 1];
+  const [who, setWho] = useState<"sell" | "buy">("sell");
   return (
     <Panel title="골드 시세 (1만 원에 몇 만 골드)">
       <div className="trend-stats">
@@ -201,14 +202,22 @@ function GoldPanel({ t }: { t: Trend }) {
       </div>
       <GoldChart days={t.gold} />
       <p className="trend-note muted">숫자가 작을수록 비싼 골드 (70:1 = 1만 원에 70만 골드)</p>
-      <GoldPeople title="파는 사람" people={t.goldPeople.sell} />
-      <GoldPeople title="사는 사람" people={t.goldPeople.buy} />
+      <div className="mk-sub trend-strip">
+        <div className="mk-side" role="tablist">
+          {(["sell", "buy"] as const).map((x) => (
+            <button key={x} type="button" role="tab" aria-selected={who === x} className={"sub-tab" + (who === x ? " sub-tab-on" : "")} onClick={() => setWho(x)}>
+              {x === "sell" ? "파는 사람" : "사는 사람"} <small>{t.goldPeople[x].length}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+      <GoldPeople key={who} people={t.goldPeople[who]} />
     </Panel>
   );
 }
 
 /** 골드 올린 사람 표: 닉 · 시세 · 글 · 마지막 날, 최신순. 가장 싼 값 초록, 가장 비싼 값 빨강 */
-function GoldPeople({ title, people }: { title: string; people: TrendPerson[] }) {
+function GoldPeople({ people }: { people: TrendPerson[] }) {
   const [all, setAll] = useState(false);
   if (!people.length) return null;
   const list = [...people].sort((a, b) => (a.last < b.last ? 1 : a.last > b.last ? -1 : b.n - a.n));
@@ -217,9 +226,6 @@ function GoldPeople({ title, people }: { title: string; people: TrendPerson[] })
   const shown = all ? list : list.slice(0, 8);
   return (
     <div className="trend-tablebox">
-      <div className="trend-tablehead">
-        <b>{title}</b> <span className="muted">{people.length}명 · 최신순</span>
-      </div>
       <table className="trend-table">
         <tbody>
           {shown.map((p) => (
@@ -256,6 +262,19 @@ const SORTS: { key: Sort; label: string }[] = [
   { key: "recent", label: "최근 순" },
 ];
 const PAGE = 30;
+
+/** 정렬은 띠 아래 오른쪽 작은 글자 (거르기 칸과 단계를 나눈다) */
+function SortLine({ sort, onSort }: { sort: Sort; onSort: (k: Sort) => void }) {
+  return (
+    <div className="trend-sortline">
+      {SORTS.map((f) => (
+        <button key={f.key} type="button" className={sort === f.key ? "on" : ""} aria-pressed={sort === f.key} onClick={() => onSort(f.key)}>
+          {f.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /** 물건의 묶음(속성별 / 강화 단계별)마다 날짜 그림 (제작자 요청 2026-11-03): 묶음 5개까지 한 줄씩, 날짜별 중간값(만 원). 누르면 그날 값 */
 const SERIES_MAX = 5;
@@ -463,40 +482,43 @@ function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
         (filter !== "many" || it.sellers >= 2) &&
         (filter !== "recent" || it.last >= t.lastWeek) &&
         (filter !== "wiki" || it.wiki) &&
-        (filter !== "unknown" || !it.wiki) &&
+        (filter !== "unknown" || it.unknown) &&
         (!needle || it.name.replace(/\s/g, "").toLowerCase().includes(needle) || it.abbr.some((a) => a.toLowerCase().includes(needle))),
     );
     if (sort === "price") xs.sort((a, b) => b.med - a.med);
     else if (sort === "recent") xs.sort((a, b) => (a.last < b.last ? 1 : a.last > b.last ? -1 : b.n - a.n));
     return xs;
   }, [source, t.lastWeek, q, filter, sort]);
+  const counts: Record<Filter, number> = {
+    all: source.length,
+    many: source.filter((it) => it.sellers >= 2).length,
+    recent: source.filter((it) => it.last >= t.lastWeek).length,
+    wiki: source.filter((it) => it.wiki).length,
+    unknown: source.filter((it) => it.unknown).length,
+  };
   return (
     <Panel title={`물건 시세 (${list.length})`}>
-      <div className="filter trend-side">
-        <button type="button" className={"pill" + (side === "sell" ? " pill-on" : "")} onClick={() => { setSide("sell"); setShown(PAGE); setOpen(null); }}>
-          팝니다 <small>{t.items.length}</small>
-        </button>
-        <button type="button" className={"pill" + (side === "buy" ? " pill-on" : "")} onClick={() => { setSide("buy"); setShown(PAGE); setOpen(null); }}>
-          삽니다 <small>{t.itemsBuy.length}</small>
-        </button>
-        <span className="trend-sidenote muted">{side === "sell" ? "파는 사람이 부른 값" : "사는 사람이 부른 값"}</span>
-      </div>
       <div className="search-box">
         <input value={q} onChange={(e) => { setQ(e.target.value); setShown(PAGE); }} placeholder="물건 이름 또는 톡방 줄임말" aria-label="물건 찾기" />
       </div>
-      <div className="filter trend-filter">
-        {FILTERS.map((f) => (
-          <button key={f.key} type="button" className={"pill" + (filter === f.key ? " pill-on" : "")} onClick={() => { setFilter(f.key); setShown(PAGE); }}>
-            {f.label}
-          </button>
-        ))}
-        <span className="trend-filter-gap" />
-        {SORTS.map((f) => (
-          <button key={f.key} type="button" className={"pill trend-sort" + (sort === f.key ? " pill-on" : "")} onClick={() => { setSort(f.key); setShown(PAGE); }}>
-            {f.label}
-          </button>
-        ))}
+      <div className="mk-sub trend-strip">
+        <div className="mk-side" role="tablist">
+          {(["sell", "buy"] as const).map((x) => (
+            <button key={x} type="button" role="tab" aria-selected={side === x} className={"sub-tab" + (side === x ? " sub-tab-on" : "")}
+              onClick={() => { setSide(x); setShown(PAGE); setOpen(null); }}>
+              {x === "sell" ? "팝니다" : "삽니다"} <small>{(x === "sell" ? t.items : t.itemsBuy).length}</small>
+            </button>
+          ))}
+        </div>
+        <div className="mk-cats">
+          {FILTERS.map((f) => (
+            <button key={f.key} type="button" className={"sub-tab" + (filter === f.key ? " sub-tab-on" : "")} onClick={() => { setFilter(f.key); setShown(PAGE); }}>
+              {f.label} <small>{counts[f.key]}</small>
+            </button>
+          ))}
+        </div>
       </div>
+      <SortLine sort={sort} onSort={(k) => { setSort(k); setShown(PAGE); }} />
       <ul className="mk-list trend-list">
         {list.slice(0, shown).map((it) => (
           <ItemRow key={side + it.name} it={it} t={t} wiki={wiki} side={side} open={open === it.name} onToggle={() => setOpen(open === it.name ? null : it.name)} />
@@ -511,45 +533,50 @@ function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
   );
 }
 
-type CharFilter = "all" | "sell" | "buy" | "char" | "bundle";
+type CharFilter = "all" | "char" | "bundle";
 const CHAR_FILTERS: { key: CharFilter; label: string }[] = [
   { key: "all", label: "전체" },
-  { key: "sell", label: "팝니다" },
-  { key: "buy", label: "삽니다" },
   { key: "char", label: "캘" },
   { key: "bundle", label: "템통" },
 ];
 
 /** 캐릭터 시세: 레벨대별 한 줄 요약과 캐릭터 줄 (레벨, 서버·직업·캘/템통, 닉, 스킬·보석·쟁·도감 칩, 도감 요약, 가격) */
 function CharsPanel({ t }: { t: Trend }) {
+  const [side, setSide] = useState<"sell" | "buy">("sell");
   const [filter, setFilter] = useState<CharFilter>("all");
   const [shown, setShown] = useState(PAGE);
-  const rows = t.chars.rows.filter(
-    (r) =>
-      (filter !== "sell" || r.side === "sell") &&
-      (filter !== "buy" || r.side === "buy") &&
-      (filter !== "char" || r.scope === "캘") &&
-      (filter !== "bundle" || r.scope === "템통"),
-  );
+  const bySide = t.chars.rows.filter((r) => r.side === side);
+  const ofScope = (f: CharFilter) => bySide.filter((r) => (f !== "char" || r.scope === "캘") && (f !== "bundle" || r.scope === "템통"));
+  const rows = ofScope(filter);
   return (
     <Panel title={`캐릭터 시세 (${rows.length})`}>
-      {t.chars.bands.length > 0 && (
+      <div className="mk-sub trend-strip">
+        <div className="mk-side" role="tablist">
+          {(["sell", "buy"] as const).map((x) => (
+            <button key={x} type="button" role="tab" aria-selected={side === x} className={"sub-tab" + (side === x ? " sub-tab-on" : "")}
+              onClick={() => { setSide(x); setShown(PAGE); }}>
+              {x === "sell" ? "팝니다" : "삽니다"} <small>{t.chars.rows.filter((r) => r.side === x).length}</small>
+            </button>
+          ))}
+        </div>
+        <div className="mk-cats">
+          {CHAR_FILTERS.map((f) => (
+            <button key={f.key} type="button" className={"sub-tab" + (filter === f.key ? " sub-tab-on" : "")} onClick={() => { setFilter(f.key); setShown(PAGE); }}>
+              {f.label} <small>{ofScope(f.key).length}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+      {/* 레벨대별 팝니다 중간값 (템통 제외) */}
+      {side === "sell" && filter !== "bundle" && t.chars.bands.length > 0 && (
         <div className="trend-bands">
           {t.chars.bands.map((b) => (
             <span key={b.band} className="trend-gchip">
               <em>{b.band}</em> {shortWon(b.med)} <small className="muted">{b.n}개 · {shortWon(b.min)}~{shortWon(b.max)}</small>
             </span>
           ))}
-          <small className="muted">팝니다 중간값 (템통 제외)</small>
         </div>
       )}
-      <div className="filter">
-        {CHAR_FILTERS.map((f) => (
-          <button key={f.key} type="button" className={"pill" + (filter === f.key ? " pill-on" : "")} onClick={() => { setFilter(f.key); setShown(PAGE); }}>
-            {f.label}
-          </button>
-        ))}
-      </div>
       <ul className="mk-list trend-list">
         {rows.slice(0, shown).map((r, i) => <CharRow key={i} r={r} />)}
       </ul>
@@ -588,7 +615,7 @@ function CharRow({ r }: { r: TrendChar }) {
             {!skills.length && !r.gems && !r.pvp && !r.dex && <span className="trend-gchip muted">상세 없음</span>}
           </span>
           <span className="trend-sub">
-            {dexShort && r.dex !== "노도감" && r.dex !== "저도감" && <span className="trend-dex">{dexShort}</span>}
+            {!open && dexShort && r.dex !== "노도감" && r.dex !== "저도감" && <span className="trend-dex">{dexShort}</span>}
             <span className="muted"> {md(r.first)}{r.first !== r.last && `~${md(r.last)}`}{r.n > 1 && ` · ${r.n}번`}</span>
           </span>
         </span>
@@ -646,19 +673,18 @@ export function TrendPage({ wiki }: { wiki: Wiki }) {
         <Loading error={error?.includes("404") ? "시세 자료가 아직 없어요" : error} />
       ) : (
         <>
-          <div className="filter trend-tabs">
+          <nav className="pill-row trend-tabs" role="tablist">
             {TABS.map((x) => (
-              <button key={x.key} type="button" className={"pill" + (tab === x.key ? " pill-on" : "")} onClick={() => pick(x.key)}>
+              <button key={x.key} type="button" role="tab" aria-selected={tab === x.key} className={"pill" + (tab === x.key ? " pill-on" : "")} onClick={() => pick(x.key)}>
                 {x.label}
               </button>
             ))}
-          </div>
+          </nav>
           {tab === "gold" && <GoldPanel t={t} />}
           {tab === "item" && <ItemsPanel t={t} wiki={wiki} />}
           {tab === "char" && <CharsPanel t={t} />}
           <p className="trend-src muted">
-            시리온 거래 톡방 {t.source.rooms.length}곳 · {md(t.source.from)} ~ {md(t.source.to)} · 글 {t.source.messages.toLocaleString("ko-KR")}개 · 1장(콩) = 1만 원, 뒤에 붙은 숫자는 만 원 (300 이상은 만 골드),
-            만 골드는 {t.source.rate}:1 로 바꿈. 줄임말은 위키 아이템 이름으로 풀었고 옵션(지3 = 지능3, 체3 = 체력30)과 강화마다 따로 셈
+            시리온 거래 톡방 {t.source.rooms.length}곳 · {md(t.source.from)} ~ {md(t.source.to)} · 글 {t.source.messages.toLocaleString("ko-KR")}개 · 1장 = 1만 원 · 골드 {t.source.rate}:1
           </p>
         </>
       )}
