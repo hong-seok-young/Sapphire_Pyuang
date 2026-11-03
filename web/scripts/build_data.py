@@ -886,6 +886,9 @@ def main():
     print("완료", meta["counts"], f"그림 {size / 1e6:.1f}MB")
     copy_rank_pictures()
     build_odds()
+    # 시세 동향 (개발중): 자료/카톡 의 거래 톡방 대화 -> data/trend.json (없으면 건너뛴다)
+    import build_trend
+    build_trend.main()
 
 
 def write_place_parts(posts: dict, places: dict) -> None:

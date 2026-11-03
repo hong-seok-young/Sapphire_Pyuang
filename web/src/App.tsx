@@ -94,6 +94,9 @@ const MarketPage = lazy(() =>
 const RequestsPage = lazy(() =>
   import("./pages/Requests").then((m) => ({ default: m.RequestsPage })),
 );
+const TrendPage = lazy(() =>
+  import("./pages/Trend").then((m) => ({ default: m.TrendPage })),
+);
 const ActivityLogPage = lazy(() =>
   import("./pages/ActivityLog").then((m) => ({ default: m.ActivityLogPage })),
 );
@@ -463,6 +466,8 @@ function Wiki({
   // 장비대여: 대여 무기 목록, 신청, 마일리지 (제작자 요청 2026-11-01, 개발 중이라 앱개발자만). 무기 그림과 레벨이 위키 자료라서 위키를 기다린다
   else if (page === "rent")
     body = <RentalPage wiki={wiki} me={me} view={route.query.get("v") ?? ""} />;
+  // 시세 동향 (개발중, 제작자 요청 2026-11-03): 거래 톡방 대화에서 모은 골드·물건·캐릭터 시세
+  else if (page === "trend") body = <TrendPage wiki={wiki} />;
   else if (page === "log")
     body =
       RANK[me.role] >= 2 ? (

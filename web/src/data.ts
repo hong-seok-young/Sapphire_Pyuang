@@ -54,6 +54,41 @@ export function loadPosts(): Promise<Record<string, Post>> {
   return postsPromise;
 }
 
+/** 시세 동향 (개발중): build_trend.py 가 거래 톡방 대화에서 만든 자료 (CLAUDE.md '시세 동향') */
+/** q1~q3 = 가운데 절반 (그림의 띠) */
+export interface TrendStat { n: number; min: number; q1: number; med: number; q3: number; max: number }
+export interface GoldDay { date: string; sell: TrendStat | null; buy: TrendStat | null; posts: { sell: number; buy: number } }
+/** 올린 사람 한 명의 값 (물건은 만 원, 골드는 N:1) 중간값과 범위, 글 수. 제작자 요청: 누가 싸게 팔고 누가 비싸게 파는지 */
+/** tel: 톡방 닉네임 뒤 휴대폰 뒷자리 (있으면 인증된 사용자, 없으면 미인증). 닉네임에는 넣지 않는다 */
+export interface TrendPerson { who: string; tel: string; n: number; med: number; min: number; max: number; last: string }
+/** 물건의 강화·옵션 묶음 하나 ('+8 지능3'). 옵션마다 값이 달라서 따로 센다 */
+export interface TrendVariant {
+  label: string; n: number; sellers: number; sell: number; buy: number;
+  /** 가격은 만 원 (1장 = 1만 원) */
+  med: number; min: number; max: number; recent: number | null; before: number | null;
+  first: string; last: string; days: [string, number][]; samples: { date: string; price: number; who: string; tel: string; raw: string }[];
+  /** 싼 사람부터 */
+  people: TrendPerson[];
+}
+export interface TrendItem extends TrendVariant {
+  /** 위키 아이템 이름 (wiki 가 true) 또는 톡방 줄임말 그대로 */
+  name: string; wiki: boolean; abbr: string[]; variants: TrendVariant[];
+}
+/** 캐릭터 글 하나. 캘 = 캐릭터만, 템통 = 템까지 */
+export interface TrendChar {
+  who: string; tel: string; side: "sell" | "buy"; server: string | null; level: number; job: string | null; skills: string;
+  /** 도감 요약 한 줄, 게임 '획득 옵션' 순서의 [이름, 값] 표, 도감 랭킹 % (일반, 코스튬, 라이딩) */
+  dex: string; dexTable: [string, string][]; collect: Record<string, number>; gems: string;
+  pvp: boolean; scope: "" | "캘" | "템통"; price: number; raw: string; n: number; first: string; last: string;
+}
+export interface TrendBand { band: string; n: number; med: number; min: number; max: number }
+export interface Trend {
+  source: { rooms: string[]; from: string; to: string; messages: number; built: string; rate: number };
+  lastWeek: string; gold: GoldDay[]; goldPeople: { sell: TrendPerson[]; buy: TrendPerson[] }; items: TrendItem[];
+  chars: { rows: TrendChar[]; bands: TrendBand[] };
+}
+export const loadTrend = () => getJson<Trend>("trend");
+
 export function useAsync<T>(fn: () => Promise<T>): { data?: T; error?: string } {
   const [state, setState] = useState<{ data?: T; error?: string }>({});
   useEffect(() => {

@@ -1081,6 +1081,7 @@ button { font: inherit; color: inherit; }
 .tile-ring { --ring-a: #ffd34d; --ring-b: #fff3b0; overflow: hidden; isolation: isolate; }
 .tile-ring-blue { --ring-a: #6fb6ff; --ring-b: #d8ecff; }
 .tile-ring-purple { --ring-a: #b98cff; --ring-b: #efe2ff; }
+.tile-ring-mint { --ring-a: #3fe0a0; --ring-b: #c8fff0; }
 .tile-ring > * { position: relative; z-index: 2; }
 .tile-ring > .tile-ribbon { position: absolute; z-index: 3; }
 /* 띠도 있고 개발 중이기도 한 칸 (길드 던전: 1군 전용 + 개발 중): 개발 중 표는 오른쪽 위 그대로, 둘 다 조금 작게 해서 좁은 폰에서도 겹치지 않게 */
@@ -2581,3 +2582,73 @@ button.gd-member-row { cursor: pointer; }
 .tut-acts { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .tut-acts .bd-mini { margin-right: auto; }
 @media (prefers-reduced-motion: reduce) { .tut-spot-tap { animation: none; } .tut-spot { transition: none; } }
+/* 시세 동향 (개발중, Trend.tsx): gold rate chart and item price rows. Colours are the app tokens: 팝니다 sapphire, 삽니다 gold */
+.trend-dev { padding: 3px 8px; font-size: 11px; background: #3fe0a0; color: var(--edge); cursor: default; }
+.trend-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 10px; }
+.trend-stat { display: flex; flex-direction: column; gap: 2px; padding: 8px 6px; background: var(--night-2); border: var(--px) solid var(--edge); font-size: 11px; text-align: center; }
+.trend-stat b { font-size: 18px; color: var(--gold); font-weight: 400; }
+.trend-up { color: var(--red); font-size: 11px; }
+.trend-down { color: #8fb4ff; font-size: 11px; }
+.trend-flat { color: var(--muted); font-size: 11px; }
+.trend-chart svg { display: block; width: 100%; height: auto; touch-action: pan-y; background: var(--night-2); border: var(--px) solid var(--edge); }
+.trend-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 6px; font-size: 11px; color: var(--muted); }
+.trend-dot { display: inline-block; width: 10px; height: 10px; margin-right: 4px; vertical-align: -1px; border: 1px solid var(--edge); }
+.trend-dot-sell, .trend-end-sell { background: var(--sapphire); fill: var(--sapphire); }
+.trend-dot-buy, .trend-end-buy { background: var(--gold); fill: var(--gold); }
+.trend-grid { stroke: rgba(169, 162, 207, 0.25); stroke-width: 1; }
+.trend-tick { font-size: 9px; fill: var(--muted); font-family: inherit; }
+.trend-band { fill: var(--sapphire); opacity: 0.18; }
+.trend-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.trend-line-sell { stroke: var(--sapphire); }
+.trend-line-buy { stroke: var(--gold); }
+.trend-end { stroke: var(--edge); stroke-width: 1; }
+.trend-cursor { stroke: var(--text); stroke-width: 1; stroke-dasharray: 3 3; }
+.trend-pick { min-height: 20px; margin-top: 6px; font-size: 12px; }
+.trend-pick b { color: var(--text); font-weight: 400; }
+.trend-note { margin: 8px 0 0; font-size: 11px; }
+.trend-row { padding-right: 8px; }
+.trend-slot { width: 36px; height: 36px; }
+.trend-sub { font-size: 11px; }
+.trend-price { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex: none; text-align: right; }
+.trend-price b { color: var(--gold); font-weight: 400; font-size: 14px; }
+.trend-price small { font-size: 10px; }
+.trend-samples { list-style: none; margin: 0 0 4px; padding: 6px 8px; display: grid; gap: 4px; font-size: 12px; background: var(--night-2); border: var(--px) solid var(--edge); border-top: 0; }
+.trend-samples b { color: var(--gold); font-weight: 400; }
+.trend-raw { font-size: 11px; }
+.trend-more { display: block; margin: 4px auto 0; }
+.trend-src { margin: 4px 0 0; font-size: 11px; }
+.trend-abbr { font-size: 11px; font-weight: 400; }
+.trend-vars { list-style: none; margin: 0 0 4px; padding: 0; border: var(--px) solid var(--edge); border-top: 0; background: var(--night-2); }
+.trend-vars > li + li { border-top: var(--px) solid var(--edge); }
+.trend-var { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; background: none; border: 0; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.trend-var-open { background: rgba(169, 162, 207, 0.08); }
+.trend-var-label { flex: 1; min-width: 0; font-size: 13px; color: #ffb35c; }
+.trend-var .trend-sub { flex: none; }
+.trend-vars .trend-samples { border: 0; border-top: var(--px) dashed var(--edge); }
+.trend-bands { grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); }
+.trend-lv { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 44px; height: 40px; flex: none; background: var(--night-2); border: var(--px) solid var(--edge); }
+.trend-lv small { font-size: 9px; color: var(--sapphire); }
+.trend-lv b { font-size: 16px; font-weight: 400; color: var(--text); }
+.trend-lv-buy small { color: var(--gold); }
+.trend-dex { color: #3fe0a0; }
+.trend-dexbox { display: block; }
+.trend-people { margin: 6px 0; }
+.trend-people > .pill { font-size: 11px; }
+.trend-people ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
+.trend-people li { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; align-items: center; padding: 4px 6px; border: var(--px) solid var(--edge); font-size: 12px; }
+.trend-people li b { color: var(--gold); font-weight: 400; grid-row: 1; grid-column: 2; }
+.trend-people li small { grid-column: 2; font-size: 10px; text-align: right; }
+.trend-people li.trend-cheap { border-color: #3fe0a0; }
+.trend-people li.trend-cheap .trend-people-who::before { content: '가장 쌈 · '; color: #3fe0a0; }
+.trend-people li.trend-dear { border-color: var(--red); }
+.trend-people li.trend-dear .trend-people-who::before { content: '가장 비쌈 · '; color: var(--red); }
+.trend-people-who { color: #c9b8ff; font-size: 12px; }
+.trend-tel { margin-left: 5px; font-size: 10px; color: #3fe0a0; }
+.trend-tel-none { color: var(--muted); }
+.trend-sample-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.trend-collect { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 6px 0; font-size: 12px; }
+.trend-collect b { color: #3fe0a0; font-weight: 400; }
+.trend-dex-table { width: 100%; margin-top: 4px; border-collapse: collapse; font-size: 12px; }
+.trend-dex-table th { text-align: left; font-weight: 400; color: var(--muted); padding: 2px 4px; border-bottom: var(--px) solid var(--edge); }
+.trend-dex-table td { padding: 3px 4px; border-bottom: var(--px) dashed var(--edge); }
+.trend-dex-table td:last-child, .trend-dex-table th:last-child { text-align: right; color: var(--sapphire-light, #8fb4ff); white-space: nowrap; }
