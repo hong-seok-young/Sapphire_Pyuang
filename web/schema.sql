@@ -94,9 +94,10 @@ CREATE TABLE IF NOT EXISTS listings (
   note TEXT,                              -- 한마디
   status TEXT NOT NULL DEFAULT 'selling', -- selling 판매 중 | sold 거래 완료 (30일 뒤 지운다)
   options TEXT,                           -- 판 사람이 적은 옵션 값 JSON [{name, value, unit}] (옵션이 범위에서 뜨는 아이템)
-  mode TEXT NOT NULL DEFAULT 'sale',      -- sale 바로 판매 (흥정은 listing_wants.offer) | auction 경매 (price = 시작가)
+  mode TEXT NOT NULL DEFAULT 'sale',      -- sale 바로 판매 (흥정은 listing_wants.offer) | reserve 예약 판매 (sale_when) | auction 경매 (price = 시작가)
   ends_at INTEGER,                        -- 경매가 끝나는 때
   auto_auction INTEGER,                   -- 바로 판매인데 '살래요'가 2명 이상이면 저절로 이 시간짜리 경매로 (올릴 때 정함)
+  sale_when TEXT,                         -- 예약 판매(mode reserve)의 판매 조건: '11/10 저녁', '50레벨 찍으면', '다음 무기 구하면' (제작자 요청 2026-11-02)
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );

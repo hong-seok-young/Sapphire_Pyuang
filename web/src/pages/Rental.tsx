@@ -327,7 +327,7 @@ function ItemPopup({ wiki, item, data, picked, onPick, onClose, onDone }: {
   const holding = !!item.renter && data.mine.includes(item.renter);
   return (
     <>
-      <div className="rent-pop-back" onClick={onClose} />
+      <div className="rent-pop-back" onClick={onClose} data-tut-dismiss />
       <div className="rent-pop" role="dialog" aria-label={`${item.weapon} +${item.enhance}`}>
         <div className="mk-tip">
           <b className="mk-tip-name rent-pop-name">

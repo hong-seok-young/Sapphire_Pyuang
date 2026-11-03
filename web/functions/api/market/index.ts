@@ -3,7 +3,7 @@
 //      내 글에는 누른 사람 명단(wanters, 흥정 가격 포함)과 입찰 명단(bids)도 준다 (판 사람에게만)
 // POST /api/market { item, category, enhance, enchant, enchantValue, qty, price, note, options, mode, hours } -> 팔 물건 올리기
 //      options: 옵션이 범위에서 뜨는 아이템이면 판 사람이 적은 값 [{ name, value, unit }]
-//      mode: sale 바로 판매 | auction 경매 (price = 시작가, hours 시간 동안)
+//      mode: sale 바로 판매 | reserve 예약 판매 (saleWhen 판매 조건, 나머지는 바로 판매와 같다) | auction 경매 (price = 시작가, hours 시간 동안)
 //      shot: 위키에 없는 물건의 스샷 { type, data(base64) } (제작자 요청 2026-11-02: 옵션은 데이터로 만들지 않고 그림을 정보창처럼 보여 준다, D1 listing_shots)
 import { NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
@@ -100,18 +100,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .first<{ n: number }>();
   if ((selling?.n ?? 0) >= MAX_SELLING) return json({ error: `한 사람이 ${MAX_SELLING}개까지 팔 수 있어요. 다 판 것은 '거래 완료'를 눌러 주세요` }, 409);
   const row = await env.DB.prepare(
-    "INSERT INTO listings (seller, item, category, enhance, enchant, enchant_value, qty, price, note, options, mode, ends_at, auto_auction, " +
-      "status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'selling', ?, ?) RETURNING *",
+    "INSERT INTO listings (seller, item, category, enhance, enchant, enchant_value, qty, price, note, options, mode, sale_when, ends_at, auto_auction, " +
+      "status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'selling', ?, ?) RETURNING *",
   )
     .bind(
       me.id, input.item, input.category, input.enhance, input.enchant, input.enchantValue, input.qty, input.price, input.note,
-      input.options ? JSON.stringify(input.options) : null, input.mode, input.hours ? now + input.hours * 3_600_000 : null, input.autoAuction, now, now,
+      input.options ? JSON.stringify(input.options) : null, input.mode, input.saleWhen, input.hours ? now + input.hours * 3_600_000 : null, input.autoAuction, now, now,
     )
     .first<ListingRow>();
   if (!row) return json({ error: "올리지 못했어요" }, 500);
   if (shot) {
     await env.DB.prepare("INSERT INTO listing_shots (listing_id, type, data, created_at) VALUES (?, ?, ?, ?)").bind(row.id, shot.type, shot.bytes, now).run();
   }
-  await notify(env, "all", "market_new", `${me.id}님이 ${itemName(row)} 올림${row.mode === "auction" ? " (경매)" : ""}`, "#/market", me.id);
+  await notify(env, "all", "market_new", `${me.id}님이 ${itemName(row)} 올림${row.mode === "auction" ? " (경매)" : row.mode === "reserve" ? ` (예약 · ${row.sale_when})` : ""}`, "#/market", me.id);
   return json({ ...listingOut(row), wants: 0, wanted: false, myOffer: null, bidCount: 0, highestBid: null, myBid: null, talkCount: 0, shot: !!shot, wanters: [], bids: [] }, 201);
 };

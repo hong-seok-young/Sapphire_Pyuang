@@ -121,7 +121,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
           "ORDER BY p.level IS NULL, p.level DESC, p.exp IS NULL, p.exp DESC, p.level_at ASC, u.id ASC",
       ),
       env.DB.prepare(
-        "SELECT l.id, l.seller, l.item, l.category, l.enhance, l.enchant, l.enchant_value, l.qty, l.price, l.note, l.options, l.mode, l.ends_at, l.created_at, " +
+        "SELECT l.id, l.seller, l.item, l.category, l.enhance, l.enchant, l.enchant_value, l.qty, l.price, l.note, l.options, l.mode, l.sale_when, l.ends_at, l.created_at, " +
           "(SELECT COUNT(*) FROM listing_wants w WHERE w.listing_id = l.id) AS wants, " +
           "(SELECT COUNT(*) FROM listing_bids b WHERE b.listing_id = l.id) AS bids, " +
           "(SELECT MAX(amount) FROM listing_bids b WHERE b.listing_id = l.id) AS top_bid, " +
@@ -249,7 +249,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
   // ---------- 중개인 ----------
   type Listing = {
     id: number; seller: string; item: string; category: string; enhance: number; enchant: string | null; enchant_value: number | null;
-    qty: number; price: number; note: string | null; options: string | null; mode: string; ends_at: number | null; created_at: number;
+    qty: number; price: number; note: string | null; options: string | null; mode: string; sale_when: string | null; ends_at: number | null; created_at: number;
     wants: number; bids: number; top_bid: number | null; talk: number;
   };
   const listings = listingsR.results as Listing[];
@@ -278,7 +278,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
       const price =
         l.mode === "auction"
           ? `경매 시작가 ${gold(l.price)}, ${l.top_bid ? `최고가 ${gold(l.top_bid)} (입찰 ${l.bids}번)` : "입찰 없음"}, ${l.ends_at ? `${when(l.ends_at)}${l.ends_at < now ? " 끝남" : " 끝"}` : ""}`
-          : `${gold(l.price)} (≈ ${(l.price / rate / 10_000).toFixed(1)}만 원)`;
+          : `${gold(l.price)} (≈ ${(l.price / rate / 10_000).toFixed(1)}만 원)${l.mode === "reserve" ? ` · 예약 판매 (조건: ${l.sale_when ?? ""})` : ""}`;
       const own = l.seller === me.id ? [wantersBy.get(l.id)?.length ? ` · 살래요 명단: ${wantersBy.get(l.id)!.join("; ")}` : "", bidsBy.get(l.id)?.length ? ` · 입찰 명단: ${bidsBy.get(l.id)!.join("; ")}` : ""].join("") : "";
       return `#${l.id} ${what} · ${price} · 판매 ${l.seller}${l.wants ? ` · 살래요 ${l.wants}명` : ""}${l.talk ? ` · 토론방 글 ${l.talk}` : ""}${l.note ? ` · 한마디 "${oneLine(l.note)}"` : ""}${optionsText(l.options)}${mine.has(l.id) ? ` · ${mine.get(l.id)}` : ""}${own} · ${when(l.created_at)} 올림`;
     });

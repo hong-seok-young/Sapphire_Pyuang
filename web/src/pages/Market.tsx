@@ -8,12 +8,12 @@ import {
   AUCTION_HOURS, CATEGORIES, ENCHANTS, ENCHANT_CATEGORIES, ENHANCE_CATEGORIES, MARKET_PIC, OTHER_CATEGORIES, auctionOver, bidListing,
   cashText, currentPrice, deleteTalk, fetchTalk, nextBid, postTalk, MAX_ENHANCE, MAX_NOTE, MAX_PRICE, MAX_QTY, ago, categoryOf, categoryPic, createListing,
   deleteListing, enchantText, fetchMarket, goldText, goldWords, inRoll, itemFacts, jobsFor, listingName, rollHint, unwantListing,
-  updateListing, wantListing, wikiItem, WANTS_FOR_AUCTION, toAuction, shotUrl,
+  updateListing, wantListing, wikiItem, WANTS_FOR_AUCTION, toAuction, shotUrl, MAX_WHEN,
 } from "../market";
 import { readShot, shrinkShot } from "../shot";
 import { KakaoButton, Nick } from "../kakao";
 import type { Shot } from "../shot";
-import type { Category, Enchant, Listing, ListingOption, TalkLine } from "../market";
+import type { Category, Enchant, Listing, ListingMode, ListingOption, TalkLine } from "../market";
 import type { Wiki } from "../types";
 import { Loading, NewsDot, PicImg, TopBar } from "../ui";
 import { useNews, useNewsSeen } from "../news";
@@ -174,6 +174,12 @@ function Detail({ wiki, me, l, rate, onChanged }: {
       ) : (
         <p className="mk-deal">
           <Coin /> {goldText(l.price)} <small>{cashText(l.price, rate)} (골드 시세 {rate}:1)</small>
+          {l.mode === "reserve" && (
+            <>
+              <br />
+              <small className="mk-reserve-tag">예약 판매 · {l.saleWhen}</small>
+            </>
+          )}
         </p>
       )}
 
@@ -218,7 +224,7 @@ function Detail({ wiki, me, l, rate, onChanged }: {
             <p className="mk-meta">아직 '살래요'를 누른 사람이 없어요.</p>
           )}
           {/* '살래요'가 여러 명이면 경매로 (제작자 요청): 올릴 때 정해 두지 않았으면 여기서 묻는다 */}
-          {!auction && l.status === "selling" && l.wants >= WANTS_FOR_AUCTION && (
+          {l.mode === "sale" && l.status === "selling" && l.wants >= WANTS_FOR_AUCTION && (
             <div className="mk-convert">
               <b>
                 ♥ 살래요 {l.wants}명 · 경매로 바꿀까요?
@@ -236,7 +242,7 @@ function Detail({ wiki, me, l, rate, onChanged }: {
               <small className="mk-meta">지금 가격이 시작가가 되고, 살래요 누른 사람들에게 입찰 알림이 가요.</small>
             </div>
           )}
-          {!auction && l.status === "selling" && l.autoAuction && l.wants < WANTS_FOR_AUCTION && (
+          {l.mode === "sale" && l.status === "selling" && l.autoAuction && l.wants < WANTS_FOR_AUCTION && (
             <p className="mk-meta">
               🔨 살래요 {WANTS_FOR_AUCTION}명이 되면 {AUCTION_HOURS.find((h) => h.hours === l.autoAuction)?.label ?? `${l.autoAuction}시간`} 경매로 바뀌어요
             </p>
@@ -568,6 +574,7 @@ function Rows({ wiki, me, list, rate, onChanged, empty }: {
                 <b>{listingName(l)}</b>
                 <small>
                   {auction && <span className={"mk-auction-tag" + (ending ? " mk-ending" : "")}>🔨 경매{auctionOver(l) ? " 끝" : l.endsAt ? ` ${timeLeft(l.endsAt)}` : ""}</span>}
+                  {l.mode === "reserve" && <span className="mk-reserve-tag">예약 · {l.saleWhen}</span>}
                   {l.enchant && <span className="mk-ench">{enchantText(l)}</span>}
                   {auction ? l.bidCount > 0 && <span>입찰 {l.bidCount}</span> : l.wants > 0 && <span className={"mk-wants" + (l.wanted ? " mk-wants-me" : "")}>♥ {l.wants}</span>}
                   {l.talkCount > 0 && <span className="mk-talk-count">💬 {l.talkCount}</span>}
@@ -602,7 +609,9 @@ const squash = (s: string) => s.replace(/\s+/g, "").toLowerCase();
  * 강화는 갑옷~신발, 속성부여는 벨트~반지만 적는다.
  */
 function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: () => void }) {
-  const [mode, setMode] = useState<"sale" | "auction">("sale");
+  const [mode, setMode] = useState<ListingMode>("sale");
+  /** 예약 판매의 판매 조건 (제작자 요청 2026-11-02: 판매 예정 일자, 특정 레벨 찍으면, 다음 무기 구해지면 …) */
+  const [saleWhen, setSaleWhen] = useState("");
   const [hours, setHours] = useState(24);
   /** 바로 판매인데 '살래요'가 2명 이상이면 저절로 경매로 (시간, null 이면 끔. 끄면 그때 판 사람에게 묻는다) */
   const [autoHours, setAutoHours] = useState<number | null>(null);
@@ -657,7 +666,7 @@ function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: ()
   const optionsFilled = rolls.every((r) => (optionText[r.name] ?? "") !== "");
   const ok =
     name.length > 0 && cat !== null && priceN >= 1 && priceN <= MAX_PRICE && Number.isInteger(qtyN) && qtyN >= 1 && qtyN <= MAX_QTY &&
-    (!enchantOk || !enchant || enchantValue !== null) && optionsFilled;
+    (!enchantOk || !enchant || enchantValue !== null) && optionsFilled && (mode !== "reserve" || saleWhen.trim().length > 0);
   const options: ListingOption[] | null = rolls.length
     ? rolls.map((r) => ({ name: r.name, value: Number(optionText[r.name]), unit: r.unit }))
     : null;
@@ -699,7 +708,7 @@ function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: ()
       await createListing({
         item: name, category: cat, enhance: enhanceOk ? enhance : 0, enchant: enchantOk ? enchant : null,
         enchantValue: enchantOk && enchant ? enchantValue : null, qty: qtyN, price: priceN, note: note.trim() || null, options,
-        mode, hours: mode === "auction" ? hours : null, autoAuction: mode === "sale" ? autoHours : null,
+        mode, saleWhen: mode === "reserve" ? saleWhen.trim() : null, hours: mode === "auction" ? hours : null, autoAuction: mode === "sale" ? autoHours : null,
         // 스샷은 위키에 없는 물건일 때만 (위키 물건은 위키 정보창으로 보인다)
         shot: shot && !known ? { type: shot.type, data: shot.data } : null,
       });
@@ -716,6 +725,10 @@ function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: ()
       <div className="mk-chips">
         <button type="button" className={"pill" + (mode === "sale" ? " pill-on" : "")} onClick={() => setMode("sale")}>
           바로 판매
+        </button>
+        {/* 예약 판매 (제작자 요청 2026-11-02): 화면은 바로 판매와 같고 판매 조건만 적는다 */}
+        <button type="button" className={"pill" + (mode === "reserve" ? " pill-on" : "")} onClick={() => setMode("reserve")}>
+          예약 판매
         </button>
         <button type="button" className={"pill" + (mode === "auction" ? " pill-on" : "")} onClick={() => setMode("auction")}>
           🔨 경매
@@ -946,6 +959,12 @@ function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: ()
           </div>
         </div>
       )}
+      {mode === "reserve" && (
+        <label className="mk-field">
+          <span>판매 조건</span>
+          <input className="mk-input" value={saleWhen} onChange={(e) => setSaleWhen(e.target.value.slice(0, MAX_WHEN))} placeholder="예: 11/10 저녁, 50레벨 찍으면, 다음 무기 구하면" />
+        </label>
+      )}
       {mode === "auction" && (
         <div className="mk-field">
           <span>경매 시간 (시작가부터 남들이 점점 높게 불러요. 끝나면 가장 높게 부른 사람에게 팔아요)</span>
@@ -964,7 +983,7 @@ function SellForm({ wiki, rate, onDone }: { wiki: Wiki; rate: number; onDone: ()
       </label>
       {error && <p className="form-error">{error}</p>}
       <button className="btn" disabled={busy || !ok}>
-        {busy ? "올리는 중…" : mode === "auction" ? "경매 등록" : "등록"}
+        {busy ? "올리는 중…" : mode === "auction" ? "경매 등록" : mode === "reserve" ? "예약 등록" : "등록"}
       </button>
     </form>
   );

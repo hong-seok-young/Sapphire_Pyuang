@@ -345,7 +345,7 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
         </MeRow>
       </MeGroup>
 
-      {/* 날씨 반영 (제작자 요청 2026-11-02 '내 정보에서 위치 허용하게, 날씨 반영된다고'). 날씨가 초안인 동안은 쓰는 사람에게만 (canUseWeather) */}
+      {/* 날씨 반영 (제작자 요청 2026-11-02 '내 정보에서 위치 허용하게, 날씨 반영된다고'). 쓰는 사람에게만 (canUseWeather, 지금은 모두) */}
       {canUseWeather(me) && (
         <MeGroup title="앱 설정">
           <MeRow label="날씨 반영" value={wxOn ? "켜짐" : "꺼짐"} {...row("weather")}>

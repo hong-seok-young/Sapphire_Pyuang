@@ -2,7 +2,8 @@
 // -> '설명서 필요 없고 바로 튜토리얼 시작하게' -> '홈 화면 설명은 길드마크 누르면. 패치나 배치도, 날씨도 비·눈·함박눈·빈 곳 누르기도 샘플로. 모든 메뉴 적용, 설명 다 빼').
 // -> 같은 날 '직관적으로 한 번에 알 수 있는 설명은 다 빼': 단추 이름·탭처럼 보면 아는 것은 적지 않고, 숨은 동작(꾹 누르기, 끌기, 줄 누르면 열림)과 규칙(보증금, 초기화 때, 선착순)만.
 // 제목(위 줄 배너, 홈은 길드마크)을 누르면 src/tutorial.tsx 의 Tutorial 이 화면의 그 자리를 하나씩 비춘다. 단계마다 head(무엇인지) 한 줄과 text(보면 모르는 것) 한두 문장.
-// 숨은 것이 없는 메뉴(정보, 공식 확률)는 튜토리얼이 없다 (제목을 눌러도 아무 일 없음).
+// 숨은 것이 없는 메뉴(정보, 공식 확률)는 튜토리얼이 없다 (제목을 눌러도 아무 일 없음). 첫 화면만이 아니라 안의 칸(팔기·내 판매·골드, 운영의 장비반납·물건 추가, 상점의 정산·예산,
+// 내 정보의 줄들)도 들어가 보며 거기에 설명할 것이 있을 때만 (제작자 2026-11-02 '버튼 하나하나 들어가면서 거기서 설명할 게 있으면. 설명할 게 없으면 안 해도 돼').
 // 단계는 그 사람의 권한(who)에 맞는 것만 돌고, 자리를 못 찾으면(자료가 없어서) 건너뛴다. 새 메뉴를 만들거나 단추를 바꾸면 여기도 같이 고친다. 이모지는 쓰지 않는다.
 import type { Me } from "./auth";
 import { RANK, TEST_IDS } from "./auth";
@@ -18,8 +19,14 @@ export interface GuideStep {
   head?: string;
   /** 보면 모르는 것 한두 문장 (줄을 바꾸려면 \n). 제작자 요청 2026-11-02: 명사형일 필요 없고 '캐릭터가 여러 개면 캐릭터 목록이 떠요' 처럼 */
   text: string;
-  /** true 면 그 자리를 직접 누르면 다음으로 (바꾸지 않는 것만: 칸 열기, 탭 바꾸기). 다음을 눌러도 된다. fx 와 같이 쓰면 빈 곳을 누르면 다음으로 */
+  /** true 면 그 자리를 눌러 보는 단계 (바꾸지 않는 것만: 칸 열기, 탭 바꾸기). 어디를 누르든 튜토리얼이 그 자리를 대신 눌러 주고 다음으로. fx 와 같이 쓰면 빈 곳을 누르면 다음으로 */
   tap?: boolean;
+  /** 눌러 보기가 여는 것 (선택자): 벌써 보이면 다시 누르지 않고, 이전으로 돌아오면 닫는다(undo). 없으면 aria-expanded 로 안다 */
+  opens?: string;
+  /** 눌러 보기가 닫는 것 (선택자, 예: 완료 단추가 닫는 배치 편집 줄): 벌써 안 보이면 다시 누르지 않는다 */
+  closes?: string;
+  /** false 면 이전으로 돌아와도 되돌리지 않는다 (탭 바꾸기: 그 탭이 보이는 채로 설명한다) */
+  undo?: false;
   /** 이 단계 전에 이동할 주소 */
   go?: string;
   /** 날씨 샘플: 이 단계 동안 그 날씨 효과를 화면에 그린다 (홈, 제작자 요청 2026-11-02) */
@@ -61,11 +68,12 @@ export const GUIDES: Guide[] = [
     title: "홈",
     tutorial: [
       { sel: ".hero-me", head: "내 정보 버튼", text: "캐릭터가 여러 개면 캐릭터 목록이 떠요." },
-      { sel: ".home-edit", head: "배치 편집", text: "홈 칸을 꾹 눌러도 편집이 시작돼요.", tap: true },
+      { sel: ".home-edit", head: "배치 편집", text: "홈 칸을 꾹 눌러도 편집이 시작돼요.", tap: true, opens: ".launch-bar" },
       { sel: ".tiles", head: "칸 옮기기", text: "끌어서 옮겨요. 아래 탭에 넣거나 아래 탭 칸과 바꿀 수도 있어요." },
-      { sel: ".launch-bar .pill-on", head: "완료", text: "배치는 계정에 저장돼서 다른 폰에서도 같아요.", tap: true },
-      { fx: "rain", head: "비", text: "우리 동네에 비가 오면 홈에 비가 내려요. 아래 선에 빗물이 고여요." },
-      { fx: "snow", head: "눈", text: "눈은 아래에 쌓여요. 안 만지고 두면 화면 위까지 차요." },
+      { sel: ".launch-bar .pill-on", head: "완료", text: "배치는 계정에 저장돼서 다른 폰에서도 같아요.", tap: true, closes: ".launch-bar", undo: false },
+      { sel: ".home-weather", head: "날씨 표", text: "우리 동네 날씨를 홈에 반영해요. 누르면 비, 눈, 함박눈을 미리 봐요." },
+      { fx: "rain", head: "비", text: "아래 선에 빗물이 고여요." },
+      { fx: "snow", head: "눈", text: "아래에 쌓여요. 안 만지고 두면 화면 위까지 차요." },
       { fx: "blizzard", head: "함박눈", text: "큰 송이가 천천히 내려요." },
       { fx: "blizzard", head: "빈 곳 누르기", text: "비나 눈이 올 때 빈 곳을 누르면 그 자리에서 팡 터져요. 눌러 보세요.", tap: true },
       { sel: ".home-version", head: "패치 내역", text: "v1.0 글씨를 누르면 바뀐 것을 볼 수 있어요.", tap: true },
@@ -75,23 +83,38 @@ export const GUIDES: Guide[] = [
     key: "ranking",
     title: "길드 랭킹",
     tutorial: [
-      { sel: ".rank-row .nick-btn", head: "닉네임", text: "누르면 그 사람의 레벨과 경험치 그래프가 펼쳐져요.", tap: true },
+      { sel: ".rank-row .nick-btn", head: "닉네임", text: "누르면 그 사람의 레벨과 경험치 그래프가 펼쳐져요.", tap: true, opens: ".gc-svg" },
       { sel: ".rank-mine-bar, .rank-mine", head: "내 줄의 경험치 막대", text: "누르면 여기서 바로 레벨과 경험치를 적어요." },
-      { sel: ".rank-views button:has-text('주간')", head: "주간 성장", text: "목요일 오전 10시마다 새로 시작해요. 1등 카드의 사진은 내 정보의 캐릭터 사진이에요.", tap: true },
+      {
+        sel: ".rank-views button:has-text('주간')",
+        head: "주간 성장",
+        text: "목요일 오전 10시마다 새로 시작해요. 1등 카드의 사진은 내 정보의 캐릭터 사진이에요.",
+        tap: true,
+        opens: ".growth-hero",
+        undo: false,
+      },
     ],
   },
   {
     key: "market",
     title: "사파이어 중개인",
     tutorial: [
-      { sel: ".mk-list .mk-row", head: "물건 줄", text: "살래요에 흥정 가격을 붙일 수 있어요. 누가 눌렀는지와 흥정 가격은 판 사람만 봐요.", tap: true },
+      { sel: ".mk-list .mk-row", head: "물건 줄", text: "살래요에 흥정 가격을 붙일 수 있어요. 누가 눌렀는지와 흥정 가격은 판 사람만 봐요.", tap: true, opens: ".mk-open .mk-detail" },
       { sel: ".mk-open .mk-detail", head: "정보창", text: "살래요가 2명 넘으면 경매로 바꿀 수 있어요. 올릴 때 미리 정해 두면 저절로 경매가 돼요." },
-      { sel: "[role=tab]:has-text('팔기')", head: "팔기", text: "위키에 없는 물건도 올릴 수 있어요.", tap: true },
+      { sel: "[role=tab]:has-text('팔기')", head: "팔기", text: "예약 판매는 언제 팔지 조건(날짜, 레벨, 다음 무기 구하면)을 적어 미리 올려요.", tap: true, opens: ".mk-form", undo: false },
       {
         sel: ".mk-form",
         head: "스샷 올리기",
         text: "위키에 없는 이름을 적으면 스샷 올리기가 나와요. AI 가 이름, 종류, 강화를 읽어 채워요.\n가격은 현금으로 적어도 돼요. 시세로 골드를 계산해 올라가요.",
       },
+      {
+        sel: "[role=tab]:has-text('내 판매')",
+        head: "내 판매",
+        text: "거래 완료를 누른 글은 30일 동안만 보여요. 경매가 끝나면 낙찰자를 보고 게임 안에서 거래한 뒤 거래 완료를 눌러요.",
+        tap: true,
+        undo: false,
+      },
+      { sel: "[role=tab]:has-text('골드')", head: "골드", text: "여기 올라온 골드 팝니다 글의 평균이 시세가 돼서 물건 가격 옆 원화 환산에 쓰여요.", tap: true, undo: false },
     ],
   },
   {
@@ -105,7 +128,15 @@ export const GUIDES: Guide[] = [
     key: "board",
     title: "게시판",
     tutorial: [
-      { sel: ".main-tabs *:has-text('아이모 소식')", head: "아이모 소식", text: "컴투스 공식 공지, 점검, 이벤트가 여기 들어와요. 새 글이 오면 알림이 가요.", tap: true },
+      { sel: ".main-tabs *:has-text('건의')", head: "건의", text: "글을 올리면 길드마스터와 오피서에게 알림이 가요." },
+      {
+        sel: ".main-tabs *:has-text('아이모 소식')",
+        head: "아이모 소식",
+        text: "컴투스 공식 공지, 점검, 이벤트가 여기 들어와요. 새 글이 오면 알림이 가요.",
+        tap: true,
+        opens: ".main-tab-on:has-text('아이모 소식')",
+        undo: false,
+      },
       { go: "#/board?cat=imo", sel: ".off-row", head: "공식 글", text: "누르면 앱 안에서 읽어요. 위에 AI 핵심 요약이 붙고, 패치노트면 내 직업 변경점도 나와요.", tap: true },
     ],
   },
@@ -115,15 +146,56 @@ export const GUIDES: Guide[] = [
     tutorial: [
       { sel: ".ps-limit, .ps-week", head: "플래티넘 이용한도", text: "목요일 오전 10시마다 300 이 들어와요. 안 쓴 것은 쌓여요." },
       { sel: ".ps-grid li", head: "구매 신청", text: "신청하면 이용한도에서 플래티넘이 빠져요. 골드는 게임 안에서 할인가로 내고, 취소하면 플래티넘이 돌아와요." },
+      { sel: ".ps-tabs [data-tab=pending]", head: "신청", text: "게임 안에서 건넨 뒤 거래 완료를 누르면 정산에 쌓여요.", tap: true, undo: false, who: "officer" },
+      {
+        sel: ".ps-tabs [data-tab=ledger]",
+        head: "정산",
+        text: "줄을 누르면 기록 삭제, 복구, 골드 수정이 나와요. 삭제한 줄은 합계와 그 사람 이용한도에서 빠져요.",
+        tap: true,
+        undo: false,
+        who: "officer",
+      },
+      {
+        sel: ".ps-tabs [data-tab=budget]",
+        head: "예산",
+        text: "현금으로 충전을 적으면 그 돈 안에서 플래티넘이 가장 많은 상품 조합을 골라요. 할인율은 실제 결제액에만 들어가요.",
+        tap: true,
+        undo: false,
+        who: "officer",
+      },
     ],
   },
   {
     key: "rent",
     title: "장비대여",
     tutorial: [
-      { sel: ".rent-main", head: "무기 줄", text: "왼쪽 네모는 신청 담기예요. 여러 개 담아 아래 대여 신청으로 한 번에 보내요.", tap: true },
+      { sel: ".rent-main", head: "무기 줄", text: "왼쪽 네모는 신청 담기예요. 여러 개 담아 아래 대여 신청으로 한 번에 보내요.", tap: true, opens: ".rent-pop" },
       { sel: ".rent-pop", head: "보증금", text: "다이아 가격은 보증금이에요. 1다이아 = 10만 골드. 반납하면 마일리지와 골드를 돌려받아요." },
       { go: "#/rent?v=apps", sel: "main", head: "신청함", text: "쓰는 무기 줄에서 반납 신청과 대화를 해요. 기부한 장비의 마일리지도 여기 보여요." },
+      {
+        go: "#/rent?v=staff",
+        sel: ".rent-sub button:has-text('장비대여')",
+        head: "장비대여",
+        text: "수락한 뒤 게임 안에서 건네고 대여 완료를 눌러요. 거기서 마일리지로 낼 다이아와 받은 골드를 적어요.",
+        who: "rentStaff",
+      },
+      {
+        sel: ".rent-sub button:has-text('장비반납')",
+        head: "장비반납",
+        text: "반납을 누르면 쓴 마일리지는 저절로 돌아가고 골드는 게임 안에서 돌려줘요. 줄 선 다음 사람에게 알림이 가요.",
+        tap: true,
+        undo: false,
+        who: "rentStaff",
+      },
+      {
+        sel: ".rent-sub button:has-text('물건 추가')",
+        head: "물건 추가",
+        text: "위키 무기 이름을 고르면 레벨과 옵션 칸이 채워지고, 스샷을 고르면 AI 가 읽어 채워요.\n기부와 기부 다이아를 적으면 그 사람 장부에 적립돼요.",
+        tap: true,
+        undo: false,
+        who: "rentStaff",
+      },
+      { sel: ".rent-sub button:has-text('기부 현황')", head: "기부 현황", text: "사람을 누르면 기부한 무기와 장부가 나와요.", tap: true, undo: false, who: "rentStaff" },
     ],
   },
   {
@@ -136,16 +208,16 @@ export const GUIDES: Guide[] = [
         head: "후보",
         text: "모두 되는 가장 빠른 때부터 1번 후보예요. 모두 확정하면 정해지고, 한 명이라도 불참이면 다음 후보로 넘어가요.",
       },
-      { sel: ".gd-tabs button:has-text('내 시간표')", head: "내 시간표", text: "누르고 끌어서 되는 때를 칠해요. 손을 떼면 저장돼요.", tap: true },
+      { sel: ".gd-tabs button:has-text('내 시간표')", head: "내 시간표", text: "누르고 끌어서 되는 때를 칠해요. 손을 떼면 저장돼요.", tap: true, undo: false },
       { sel: ".gd-grid", head: "시간표", text: "지난 칸도 칠할 수 있어요. 목요일 10시에 새 주가 되면 전주 복사로 가져와요." },
-      { sel: ".gd-tabs button:has-text('교집합')", head: "교집합", text: "칸을 누르면 누가 되는지 보여요.", tap: true },
+      { sel: ".gd-tabs button:has-text('교집합')", head: "교집합", text: "칸을 누르면 누가 되는지 보여요.", tap: true, undo: false },
     ],
   },
   {
     key: "todo",
     title: "To do",
     tutorial: [
-      { sel: ".todo-row .todo-hit", head: "할 일 이름", text: "누르면 할 것과 손해 주의가 펼쳐져요.", tap: true },
+      { sel: ".todo-row .todo-hit", head: "할 일 이름", text: "누르면 할 것과 손해 주의가 펼쳐져요.", tap: true, opens: ".todo-detail, .todo-acts" },
       { sel: ".todo-detail, .todo-acts", head: "함께", text: "고른 사람의 To do 에도 같은 줄이 생겨요. 수정과 숨김은 나에게만 적용돼요." },
     ],
   },
@@ -153,12 +225,20 @@ export const GUIDES: Guide[] = [
     key: "me",
     title: "내 정보",
     tutorial: [
-      { sel: ".me-row:has-text('카톡 오픈프로필')", head: "카톡 오픈프로필", text: "적어 두면 다른 길드원 화면의 내 이름 옆에 카톡 단추가 생겨요.", tap: true },
       {
         sel: ".me-row:has-text('캐릭터 정보')",
         head: "캐릭터 정보",
         text: "레벨과 경험치를 바꾸면 실제 성장인지 오타 수정인지 물어요. 오타 수정은 성장 랭킹에 안 들어가요.",
       },
+      { sel: ".me-row:has-text('캐릭터 사진')", head: "캐릭터 사진", text: "성장 랭킹 1등 카드에 나와요. 스샷을 고르고 AI 보정을 누르면 배경을 따고 가운데에 맞춰요.", tap: true },
+      {
+        sel: ".me-row:has-text('내 캐릭터')",
+        head: "내 캐릭터",
+        text: "부캐를 추가하면 운영진이 승낙한 뒤 묶여요. 본캐 지정을 누르면 로그인 아이디가 그 캐릭터로 바뀌어요.",
+        tap: true,
+      },
+      { sel: ".me-row:has-text('닉네임 변경')", head: "닉네임 변경", text: "다른 캐릭터로 바꿨어요를 고르면 성장 기록을 새로 시작해서 랭킹이 튀지 않아요.", tap: true },
+      { sel: ".me-row:has-text('카톡 오픈프로필')", head: "카톡 오픈프로필", text: "적어 두면 다른 길드원 화면의 내 이름 옆에 카톡 단추가 생겨요.", tap: true },
       { sel: ".me-delete, .me-logout", head: "계정 삭제", text: "로그아웃 아래 회색 글씨예요. 운영진이 승낙하면 지워져요." },
     ],
   },
@@ -184,17 +264,19 @@ export const GUIDES: Guide[] = [
         head: "질문 칸",
         text: "내 레벨과 직업, 길드 앱 자료까지 알아요. '내가 지금 할 것'처럼 물어보세요.\n사진을 올리면 직업과 레벨을 읽어 맞는 공략을 찾아요.",
       },
+      { sel: ".topbar-action:has-text('목록')", head: "목록", text: "대화는 계정에 남아서 다른 폰에서도 이어서 물어요." },
     ],
   },
   {
     key: "admin",
     title: "길드원 관리",
     tutorial: [
+      { sel: ".signup-row", head: "요청", text: "승낙하면 본인이 적은 비밀번호 그대로 계정이 생겨요." },
       { sel: ".account-list .account-row", head: "사람 줄", text: "누르면 그 아래로 관리 칸이 펼쳐져요.", tap: true },
       {
         sel: ".account-panel",
         head: "관리 칸",
-        text: "새 계정과 비밀번호 초기화의 처음 비밀번호는 123123 이에요.\n계정 통합은 같은 사람의 부캐를 하나로 묶어요.",
+        text: "새 계정과 비밀번호 초기화의 처음 비밀번호는 123123 이에요.\n계정 통합은 같은 사람의 부캐를 하나로 묶고, 성장 기록에서는 잘못 적힌 줄과 레벨업 표시를 지워요.",
       },
     ],
   },
@@ -207,6 +289,7 @@ export const GUIDES: Guide[] = [
         head: "사람 줄",
         text: "금색 새 기기, 붉은 같은 때 다른 곳은 아이디를 빌려줬을 수 있다는 표시예요. 누르면 기기 목록이 나와요.",
         tap: true,
+        opens: ".log-person-on",
       },
       { sel: ".log-list", head: "기록", text: "같은 메뉴에서 이어서 한 기록은 한 줄로 묶여요. 누르면 펼쳐져요." },
     ],

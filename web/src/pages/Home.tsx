@@ -132,7 +132,7 @@ export function Home({ me }: { me: Me }) {
           <button className="pill" onClick={resetLayout}>
             기본 배치
           </button>
-          <button className="pill pill-on" onClick={() => setEditing(false)}>
+          <button className="pill pill-on" onClick={() => setEditing(false)} data-tut-dismiss>
             완료
           </button>
         </div>

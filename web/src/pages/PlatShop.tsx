@@ -144,7 +144,7 @@ export function PlatShopPage() {
       {/* 칸 고르는 단추가 맨 위 (제작자 요청 2026-11-02) */}
       <div className="filter ps-tabs">
         {tabs.map((t) => (
-          <button key={t.key} className={"pill" + (tab === t.key ? " pill-on" : "")} onClick={() => setTab(t.key)}>
+          <button key={t.key} data-tab={t.key} className={"pill" + (tab === t.key ? " pill-on" : "")} aria-pressed={tab === t.key} onClick={() => setTab(t.key)}>
             {t.label}
           </button>
         ))}

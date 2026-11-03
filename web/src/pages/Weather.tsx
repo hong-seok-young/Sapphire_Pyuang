@@ -487,9 +487,9 @@ export function WeatherFx({ sky }: { sky: Sky }) {
 /**
  * 홈의 날씨: 아직 안 정했으면 '화면에 우리 동네 날씨를 반영하는 기능이 생겼어요 [켜기] [나중에]' ('화면 꾸미기' 같은 말은 쓰지 않는다,
  * 제작자 2026-11-02), 켜면 아래 가운데 작은 날씨 표('🌧️ 비 12°')와 효과. 못 받았으면 '위치를 못 받았어요 ↻' / '날씨 연결이 안 돼요 ↻',
- * 누르면 다시 받는다. 초안이라 앱개발자와 테스트 계정만 (WEATHER_OPEN). 그동안 날씨 표를 누르면 효과를 하나씩 미리 본다 (마지막 다음은 실제 날씨)
+ * 누르면 다시 받는다. 날씨 표를 누르면 비·눈·함박눈을 하나씩 미리 본다 (마지막 다음은 실제 날씨. 2026-11-02 제작자 요청으로 모두에게: '굳이 막아 둘 필요가 없는 듯')
  */
-/** 날씨 기능을 쓰는 사람 (초안: 앱개발자와 테스트 계정, 열면 모두) */
+/** 날씨 기능을 쓰는 사람 (WEATHER_OPEN 이면 모두) */
 export const canUseWeather = (me: Me) => WEATHER_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
 
 export function HomeWeather({ me }: { me: Me }) {
@@ -515,7 +515,7 @@ export function HomeWeather({ me }: { me: Me }) {
           </button>
         </div>
       )}
-      <button className="home-weather" onClick={next} title={failed ? `${failed.reason} · 눌러서 다시` : "눌러서 날씨 효과 미리 보기 (초안)"}>
+      <button className="home-weather" onClick={next} title={failed ? `${failed.reason} · 눌러서 다시` : "눌러서 날씨 효과 미리 보기"}>
         {preview >= 0
           ? `${skyIcon(PREVIEW[preview])} 미리 보기 · ${SKY_NAME[PREVIEW[preview]]}`
           : real

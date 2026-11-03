@@ -86,8 +86,10 @@ export interface Listing {
   /** 옵션이 범위에서 뜨는 아이템이면 판 사람이 적은 값 */
   options: ListingOption[] | null;
   status: "selling" | "sold";
-  /** sale 바로 판매 | auction 경매 (price 가 시작가) */
-  mode: "sale" | "auction";
+  /** sale 바로 판매 | reserve 예약 판매 (saleWhen 조건이 되면 팔기, 나머지는 바로 판매와 같다) | auction 경매 (price 가 시작가) */
+  mode: ListingMode;
+  /** 예약 판매의 판매 조건 ('11/10 저녁', '50레벨 찍으면', '다음 무기 구하면') */
+  saleWhen: string | null;
   /** 경매가 끝나는 때 */
   endsAt: number | null;
   /** 바로 판매인데 '살래요'가 2명 이상이면 저절로 이 시간짜리 경매로 */
@@ -122,10 +124,15 @@ export interface ListingInput {
   price: number;
   note: string | null;
   options: ListingOption[] | null;
-  mode: "sale" | "auction";
+  mode: ListingMode;
+  /** 예약 판매의 판매 조건 (60자) */
+  saleWhen: string | null;
   hours: number | null;
   autoAuction: number | null;
 }
+/** 판매 방식 (제작자 요청 2026-11-02: 바로 판매 오른쪽에 예약 판매. 화면은 바로 판매와 같고 판매 조건만 적는다) */
+export type ListingMode = "sale" | "reserve" | "auction";
+export const MAX_WHEN = 60;
 
 /** 글 전부와 골드 시세(1만 원에 몇 만 골드, 현금 환산용) */
 export const fetchMarket = () => api<{ listings: Listing[]; goldRate: number }>("/api/market");
