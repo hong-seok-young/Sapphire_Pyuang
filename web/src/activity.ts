@@ -40,8 +40,15 @@ export interface Person {
   devices7: number;
   /** 7일 안에 처음 나온 기기 (전에 쓰던 다른 기기가 있을 때만) */
   newDev: boolean;
-  /** 7일 동안 같은 때(10분 안) 다른 기기가 다른 도시에서 쓴 번 수 */
+  /** 7일 동안 같은 때(10분 안) 다른 기기가 다른 도시에서 쓴 번 수 (화면은 '다른 도시 동시 접속 N번') */
   together: number;
+}
+
+/** 고른 사람의 겹친 접속 하나 (60일): 기기 a 가 도시 a 에서 쓴 지 10분 안에 다른 기기 b 가 다른 도시 b 에서 */
+export interface OverlapInfo {
+  at: number;
+  a: { name: string | null; city: string; char: string };
+  b: { name: string | null; city: string; char: string };
 }
 
 /** 고른 사람의 기기 하나 (최근 60일, 같은 기기는 캐릭터를 합쳐서) */
@@ -94,7 +101,7 @@ export function fetchActivity(q: { user?: string | null; kind?: Kind | null; bef
   if (q.user) p.set("user", q.user);
   if (q.kind) p.set("kind", q.kind);
   if (q.before) p.set("before", String(q.before));
-  return api<{ rows: ActivityRow[]; more: boolean; people?: Person[]; devices?: DeviceInfo[]; storage?: Storage }>(
+  return api<{ rows: ActivityRow[]; more: boolean; people?: Person[]; devices?: DeviceInfo[]; overlaps?: OverlapInfo[]; storage?: Storage }>(
     `/api/activity?${p}`,
   );
 }

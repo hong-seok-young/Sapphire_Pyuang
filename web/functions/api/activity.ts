@@ -5,7 +5,8 @@
 //      부캐 묶기: 사람별 요약은 같은 사람의 캐릭터를 합쳐 본캐 한 줄로 (alts 에 부캐), user 로 고르면 그 사람의 모든 캐릭터 기록 (제작자 요청 2026-11-01)
 //      기기 (제작자 요청 2026-11-02: 'IP 가 바뀌면 아이디를 빌려준 거냐'. IP 는 데이터·와이파이, 통신사가 수시로 바꿔서 그것만으로는 모른다):
 //      사람마다 7일 동안 쓴 기기 수(devices7), 7일 안에 처음 나온 기기(newDev, 전에 쓰던 다른 기기가 있을 때만),
-//      같은 때(10분 안) 다른 기기가 다른 도시에서 쓴 번 수(together). user 로 고르면 그 사람의 기기 목록(devices, 60일).
+//      같은 때(10분 안) 다른 기기가 다른 도시에서 쓴 번 수(together). user 로 고르면 그 사람의 기기 목록(devices, 60일)과
+//      그 겹친 때의 목록(overlaps, 60일: 언제, 어느 기기가 어느 도시에서 ↔ 어느 기기가 어느 도시에서. 제작자 2026-11-03: 붉은 표만으로는 뭔지 몰랐다).
 //      기기는 화면이 보내는 기기 표(activity.dev)로 가린다. 기기 표가 없던 예전 기록은 기기 글(device)로 묶어 목록에만 보인다
 import { FORBIDDEN, NEED_LOGIN, RANK, currentUser, json, readJson } from "../../server/auth";
 import type { Env } from "../../server/auth";
@@ -177,6 +178,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     logFull: LOG_FULL,
   };
   const devices = user ? await devicesOf(env, dbs, user) : undefined;
+  const overlaps = user ? await overlapsOf(env, dbs, user) : undefined;
   const now = Date.now();
   const users = await env.DB.prepare("SELECT id, role, main_id FROM users").all<{ id: string; role: string; main_id: string | null }>();
   const stats = await fromLogs<Omit<Stat, "role" | "main_id">>(dbs, (db) =>
@@ -234,7 +236,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const merged = [...byOwner.values()]
     .map(({ main_id: _m, ...p }) => ({ ...p, ...(flags.get(p.id) ?? { devices7: 0, newDev: false, together: 0 }) }))
     .sort((a, b) => (a.last === null ? 1 : 0) - (b.last === null ? 1 : 0) || (b.last ?? 0) - (a.last ?? 0) || a.id.localeCompare(b.id));
-  return json({ rows, more, people: merged, devices, storage });
+  return json({ rows, more, people: merged, devices, overlaps, storage });
 };
 
 /** 기기마다 묶은 기록 (사람의 모든 캐릭터, 최근 60일). 기기 표가 없던 예전 기록은 기기 글로. 여러 DB 에 걸친 것은 합친다 */
@@ -310,6 +312,51 @@ async function devicesOf(env: Env, dbs: LogDb[], user: string) {
       chars: [...d.chars],
       isNew: !!d.dev && d.first > now - 7 * DAY && d.first > firstDev,
     }));
+}
+
+/**
+ * 겹친 접속 하나: 기기 a 가 도시 a 에서 쓴 지 10분 안에 다른 기기 b 가 다른 도시 b 에서 썼다.
+ * 한 번 겹치면 30분은 한 번으로 센다 (deviceFlags 의 together 와 같은 규칙)
+ */
+interface Overlap {
+  at: number;
+  a: { name: string | null; city: string; char: string };
+  b: { name: string | null; city: string; char: string };
+}
+
+/**
+ * 고른 사람의 겹친 접속 목록 (모든 캐릭터, 60일, 새것부터 30개). 사람 줄의 붉은 '다른 도시 동시 접속 N번'이 무엇인지 그 자리에서 보이려고
+ * (제작자 2026-11-03: '붉은 같은 때 ? 뭔 소린지 모르겠다'). 기기 표(dev)가 있는 기록만 (예전 기록은 기기를 가리지 못한다)
+ */
+async function overlapsOf(env: Env, dbs: LogDb[], user: string): Promise<Overlap[]> {
+  const since = Date.now() - DEVICE_DAYS * DAY;
+  const o = "(SELECT COALESCE(main_id, id) FROM users WHERE id = ?1)";
+  let ids = (await env.DB.prepare(`SELECT id FROM users WHERE id = ${o} OR main_id = ${o}`).bind(user).all<{ id: string }>()).results.map((r) => r.id);
+  if (!ids.length) ids = [user];
+  const ev = (
+    await fromLogs<{ user: string; dev: string; device: string | null; place: string | null; at: number }>(covering(dbs, since), (db) =>
+      db
+        .prepare(
+          "SELECT user_id AS user, dev, device, place, at FROM activity WHERE at > ?1 AND dev IS NOT NULL AND user_id IN (SELECT value FROM json_each(?2)) ORDER BY at",
+        )
+        .bind(since, JSON.stringify(ids)),
+    )
+  ).sort((a, b) => a.at - b.at);
+  const last = new Map<string, { at: number; city: string; name: string | null; char: string }>();
+  const out: Overlap[] = [];
+  let lastHit = 0;
+  for (const e of ev) {
+    const city = cityOf(e.place);
+    for (const [dev, l] of last) {
+      if (dev !== e.dev && e.at - l.at < TOGETHER_MS && city && l.city && city !== l.city && e.at - lastHit > 30 * 60_000) {
+        out.push({ at: e.at, a: { name: l.name, city: l.city, char: l.char }, b: { name: e.device, city, char: e.user } });
+        lastHit = e.at;
+        break;
+      }
+    }
+    last.set(e.dev, { at: e.at, city, name: e.device, char: e.user });
+  }
+  return out.reverse().slice(0, 30);
 }
 
 /** 사람(본캐)마다 7일 동안의 기기 수, 새 기기, 같은 때 다른 곳 */

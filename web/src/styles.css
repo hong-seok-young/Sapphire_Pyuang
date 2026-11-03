@@ -2407,6 +2407,12 @@ input, textarea { min-width: 0; max-width: 100%; }
 .log-dev b { font-weight: 400; font-size: 13px; color: var(--text); }
 .log-dev small { font-size: 11px; color: var(--muted); }
 .log-dev-old { opacity: 0.6; }
+/* 사용 기록: 고른 사람의 다른 도시 동시 접속 (제작자 2026-11-03). 칸마다 때, 도시 · 기기, ↔ 도시 · 기기 한 줄씩 */
+.log-overlap-why { margin: 0 0 6px; font-size: 11px; color: var(--muted); }
+.log-overlaps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.log-overlap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 6px 8px; font-size: 12px; color: var(--text); background: var(--night-2); border-left: 2px solid #8a3a52; }
+.log-overlap b { font-weight: 400; font-size: 11px; color: #ff8fa3; }
+.log-overlap-vs { font-style: normal; color: var(--muted); }
 
 /* 길드 던전 (pages/GuildDungeon.tsx, 제작자 요청 2026-11-02, 1군 전용): 파티, 지금 후보와 확정·불참, 시간표 */
 .gd-week { margin-bottom: 8px; }

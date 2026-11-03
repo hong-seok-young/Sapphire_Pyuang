@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { errorText } from "../auth";
 import { KIND_NAME, VIA_NAME, actionText, fetchActivity, fetchUsage, pageName, sectionOf } from "../activity";
-import type { ActivityRow, DeviceInfo, Kind, LogDbInfo, Person, Storage } from "../activity";
+import type { ActivityRow, DeviceInfo, Kind, LogDbInfo, OverlapInfo, Person, Storage } from "../activity";
 import { ago } from "../market";
 import type { Wiki } from "../types";
 import { Loading, MasterNote, TopBar } from "../ui";
@@ -22,6 +22,11 @@ function dayText(t: number): string {
 
 const timeText = (t: number) => new Date(t).toTimeString().slice(0, 5);
 const mdText = (t: number) => `${new Date(t).getMonth() + 1}/${new Date(t).getDate()}`;
+/** '11/2 21:10' */
+const whenText = (t: number) => {
+  const d = new Date(t);
+  return `${mdText(t)} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
 const squash = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 /** 무료 요금제의 DB 하나 크기 한도 (Cloudflare D1 Free 500MB, Workers Paid 10GB) */
 const DB_LIMIT = 500 * 1024 * 1024;
@@ -57,7 +62,8 @@ function groupRows(rows: ActivityRow[]): Item[] {
  * 사용 기록 (앱개발자만, 제작자 요청): 사람별 접속 수와 마지막으로 쓴 때, 그리고 누가 어디서 무엇을 했는지.
  * 사람을 누르면 그 사람 기록과 기기 목록, 칩으로 접속/화면/한 일만 본다. 기록은 지우지 않는다 (영구 보관).
  * 줄마다 붙던 기기·도시·IP 는 뺐다 (제작자 요청 2026-11-02: '주소 뜨는 거 불필요'. IP 는 데이터·와이파이만 바꿔도 바뀌어 다른 사람인지 알 수 없다).
- * 대신 사람마다 기기 표로 센 기기 수, '새 기기', '같은 때 다른 곳'(10분 안에 다른 기기가 다른 도시에서)을 보인다. 기록에는 그대로 남긴다
+ * 대신 사람마다 기기 표로 센 기기 수, '새 기기', 붉은 '다른 도시 동시 접속 N번'(10분 안에 다른 기기가 다른 도시에서)을 보인다. 기록에는 그대로 남긴다.
+ * 사람을 누르면 그 겹친 때마다 언제, 어느 기기가 어디서 ↔ 어느 기기가 어디서를 보인다 (제작자 2026-11-03: 표만으로는 '뭔 소린지' 몰랐다)
  */
 export function ActivityLogPage({ wiki, role }: { wiki: Wiki; role: string }) {
   /** 묶음 요약에 쓰는 짧은 이름 ('게시판: 자유' -> '자유', '게시판 글: 제목' -> '제목') */
@@ -69,6 +75,7 @@ export function ActivityLogPage({ wiki, role }: { wiki: Wiki; role: string }) {
   const [kind, setKind] = useState<Kind | null>(null);
   const [rows, setRows] = useState<ActivityRow[] | null>(null);
   const [devices, setDevices] = useState<DeviceInfo[] | null>(null);
+  const [overlaps, setOverlaps] = useState<OverlapInfo[] | null>(null);
   const [people, setPeople] = useState<Person[]>([]);
   const [more, setMore] = useState(false);
   const [error, setError] = useState("");
@@ -93,6 +100,7 @@ export function ActivityLogPage({ wiki, role }: { wiki: Wiki; role: string }) {
         if (r.people) setPeople(r.people);
         if (r.storage) setStorage(r.storage);
         setDevices(r.devices ?? null);
+        setOverlaps(r.overlaps ?? null);
       },
       (x) => alive && setError(errorText(x)),
     );
@@ -194,7 +202,7 @@ export function ActivityLogPage({ wiki, role }: { wiki: Wiki; role: string }) {
                   {p.alts?.length ? ` · 부캐 ${p.alts.join(", ")}` : ""}
                   {p.devices7 > 1 && ` · 기기 ${p.devices7}대`}
                   {p.newDev && <em className="log-flag log-flag-new">새 기기</em>}
-                  {p.together > 0 && <em className="log-flag log-flag-warn">같은 때 다른 곳 {p.together}</em>}
+                  {p.together > 0 && <em className="log-flag log-flag-warn">다른 도시 동시 접속 {p.together}번</em>}
                 </small>
               </button>
             </li>
@@ -206,6 +214,29 @@ export function ActivityLogPage({ wiki, role }: { wiki: Wiki; role: string }) {
           </button>
         )}
       </section>
+
+      {/* 고른 사람의 겹친 접속 (60일): 붉은 표가 무엇인지 그 자리에서. 칸마다 언제, 도시 · 기기, ↔ 도시 · 기기 */}
+      {user && overlaps && overlaps.length > 0 && (
+        <section className="panel">
+          <h2 className="panel-title">{user}의 다른 도시 동시 접속 (60일)</h2>
+          <p className="log-overlap-why">10분 안에 다른 기기가 다른 도시에서 썼어요. 아이디를 빌려줬거나 같이 쓰는 걸 수 있어요 (확실하지는 않아요).</p>
+          <ul className="log-overlaps">
+            {overlaps.map((o, i) => (
+              <li key={i} className="log-overlap">
+                <b>{whenText(o.at)}</b>
+                <span>
+                  {o.a.city} · {o.a.name ?? "알 수 없는 기기"}
+                  {o.a.char !== user ? ` · ${o.a.char}` : ""}
+                </span>
+                <span>
+                  <i className="log-overlap-vs">↔</i> {o.b.city} · {o.b.name ?? "알 수 없는 기기"}
+                  {o.b.char !== user ? ` · ${o.b.char}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* 고른 사람의 기기 (60일): 기기와 브라우저, 처음·마지막, 접속 수, 도시 */}
       {user && devices && devices.length > 0 && (
