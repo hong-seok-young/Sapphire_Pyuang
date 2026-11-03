@@ -2520,7 +2520,25 @@ button.gd-member-row { cursor: pointer; }
 
 /* 메뉴 튜토리얼 (src/tutorial.tsx, 제작자 요청 2026-11-02: 제목을 누르면 바로 그 메뉴 튜토리얼) */
 .tb-guide { cursor: pointer; }
-.hero-mark-btn { flex: none; padding: 0; margin: 0; line-height: 0; background: none; border: 0; cursor: pointer; }
+.hero-mark-btn { position: relative; flex: none; padding: 0; margin: 0; line-height: 0; background: none; border: 0; cursor: pointer; }
+/* 한 번도 안 연 메뉴의 'Click!' 표 (src/tutorial.tsx ClickHint, 제작자 요청 2026-11-03): 금색 도트 말풍선이 통통 튄다 (transform 만 움직여 가볍다) */
+.tb-banner { position: relative; }
+.click-tag {
+  position: absolute; z-index: 5; top: -9px; left: 50%; transform: translateX(-50%); padding: 0 4px; pointer-events: none; white-space: nowrap;
+  font-style: normal; font-weight: 700; font-size: 9px; line-height: 14px; letter-spacing: 0.5px; color: var(--edge); background: var(--gold);
+  border: var(--px) solid var(--edge); box-shadow: var(--px) var(--px) 0 var(--lo), 0 0 5px rgba(255, 195, 92, 0.5);
+  animation: click-bob 0.9s ease-in-out infinite;
+}
+/* 위 줄 배너: 작은 영문 자리(제목 위 가운데)에 두고 그동안 영문은 숨긴다. 꼬리는 아래(제목)를 가리킨다.
+   위 줄 위쪽에 두면 화면 맨 위에서 잘렸고, 오른쪽에 두면 긴 제목에서 🔔 과 겹쳤다 (320px 플래티넘 할인 상점) */
+.tb-click .tb-en { visibility: hidden; }
+.click-tag::after { content: ""; position: absolute; left: 50%; margin-left: -3px; bottom: -6px; border: 3px solid transparent; border-top-color: var(--edge); }
+/* 홈 길드마크: 오른쪽 위에 붙어 왼쪽 아래(마크)를 가리킨다 */
+.hero-mark-btn .click-tag { top: -8px; left: auto; right: -16px; transform: none; }
+.hero-mark-btn .click-tag::after { left: 5px; margin-left: 0; border-right-color: var(--edge); }
+/* 통통 튀기는 translate 로 (transform 은 가운데 맞추기에 쓴다) */
+@keyframes click-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -3px; } }
+@media (prefers-reduced-motion: reduce) { .click-tag { animation: none; } }
 .tut { position: fixed; inset: 0; z-index: 70; }
 .tut-dim { position: absolute; inset: 0; background: rgba(5, 5, 14, 0.6); }
 .tut-spot {

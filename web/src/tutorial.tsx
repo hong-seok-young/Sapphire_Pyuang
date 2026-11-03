@@ -24,9 +24,11 @@ import type { Me } from "./auth";
 import { GUIDES, canSee, guideByTitle } from "./guides";
 import { go as goRoute } from "./router";
 import {
+  markTutorialSeen,
   startTutorial,
   stopTutorial,
   tutorialOpen,
+  tutorialSeen,
   useTutorial,
 } from "./tutorialState";
 import type { Guide, GuideStep } from "./guides";
@@ -37,9 +39,27 @@ import { WeatherFx } from "./pages/Weather";
 export function openGuide(title: string) {
   const g = guideByTitle(title);
   if (!g) return;
+  markTutorialSeen(g.key);
   startTutorial(g.key);
 }
 export const hasGuide = (title: string) => !!guideByTitle(title);
+/**
+ * 한 번도 안 연 메뉴의 제목(길드마크) 옆 'Click!' 표 (제작자 요청 2026-11-03). 그 메뉴 튜토리얼을 한 번 열면 이 기기에서는 사라진다.
+ * 도는 중에도 숨긴다. 움직임은 transform 만 (가볍게)
+ */
+export function useClickHint(title: string): boolean {
+  const open = useTutorial();
+  const g = guideByTitle(title);
+  return !!g && !open && !tutorialSeen(g.key);
+}
+export const ClickTag = () => (
+  <i className="click-tag" aria-hidden="true">
+    Click!
+  </i>
+);
+export function ClickHint({ title }: { title: string }) {
+  return useClickHint(title) ? <ClickTag /> : null;
+}
 const close = () => stopTutorial();
 /** 넣어 둔 튜토리얼 기록이 시작한 화면과 같은 주소 그대로인지 (튜토리얼이 go 로 옮긴 채 끝났으면 다른 주소라 진짜 화면 하나로 남긴다) */
 const dupEntry = () =>

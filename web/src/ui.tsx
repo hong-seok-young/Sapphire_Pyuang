@@ -8,7 +8,7 @@ import { useUnread } from "./alerts";
 import { JOB_NAME, errorText } from "./auth";
 import { goCharacter, refreshMe, useMyCharacters } from "./characters";
 import { goBack } from "./router";
-import { hasGuide, openGuide } from "./tutorial";
+import { ClickTag, hasGuide, openGuide, useClickHint } from "./tutorial";
 import type { Pic } from "./types";
 
 /**
@@ -130,6 +130,8 @@ export function TopBar({
   // 설명이 있는 메뉴: 제목을 누르면 단추별 기능·흐름·튜토리얼 (제작자 요청 2026-11-02, src/tutorial.tsx). guide 를 주면 그 이름의 설명 (챗봇은 대화 제목이 뜰 때도)
   const gname =
     guide ?? (typeof title === "string" && hasGuide(title) ? title : null);
+  // 한 번도 안 연 메뉴면 제목 오른쪽 ◆ 자리에 Click! (src/tutorial.tsx)
+  const hint = useClickHint(gname ?? "");
   const tap = gname
     ? {
         role: "button",
@@ -154,7 +156,15 @@ export function TopBar({
         <h1 className="topbar-title topbar-title-banner">
           {/* 제작자가 고른 E: 판 없이 금빛 글자, 양옆 보석 장식과 밑줄, 잔잔한 움직임 (2026-11-02, styles.css .tb-banner).
               설명이 있는 메뉴는 제목을 누르면 단추별 기능·흐름·튜토리얼 (제작자 요청 2026-11-02, src/tutorial.tsx) */}
-          <span className={"tb-banner" + (gname ? " tb-guide" : "")} {...tap}>
+          <span
+            className={
+              "tb-banner" +
+              (gname ? " tb-guide" : "") +
+              (hint ? " tb-click" : "")
+            }
+            {...tap}
+          >
+            {hint && <ClickTag />}
             <span className="tb-b">
               <span className="tb-i">
                 <span className="tb-en">{en}</span>

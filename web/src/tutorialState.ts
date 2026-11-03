@@ -27,3 +27,25 @@ const subscribe = (l: () => void) => {
 export const useTutorial = () => useSyncExternalStore(subscribe, snapshot);
 /** 튜토리얼 동안 화면에 예시 자료를 보일지 */
 export const useSample = () => useTutorial() !== "";
+
+// ---------- 한 번도 안 연 메뉴의 'Click!' 표 (제작자 요청 2026-11-03: 길드마크와 메뉴 맨 위 단추를 한 번도 안 눌렀으면 배지 애니메이션). 이 기기에 적는다 ----------
+const SEEN_KEY = "sapphire.tut.seen";
+const readSeen = (): string[] => {
+  try {
+    return JSON.parse(localStorage.getItem(SEEN_KEY) ?? "[]") as string[];
+  } catch {
+    return [];
+  }
+};
+let seen = readSeen();
+export const tutorialSeen = (key: string) => seen.includes(key);
+export function markTutorialSeen(key: string) {
+  if (seen.includes(key)) return;
+  seen = [...seen, key];
+  try {
+    localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
+  } catch {
+    /* 저장 못 해도 이번엔 숨긴다 */
+  }
+  emit();
+}
