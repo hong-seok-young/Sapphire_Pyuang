@@ -443,7 +443,8 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
 
     def job_hint() -> str | None:
         """줄에서 직업: 힘·민첩·지능 옵션 하나만 있으면 그 직업, 아니면 줄의 직업 말"""
-        stats = {j for o in opts for k, j in (("힘", "전사"), ("민첩", "레인저"), ("지능", "마법사")) if o.startswith(k)}
+        # 힘 = 전사, 민첩 = 레인저, 지능·마나 = 마법사 (제작자 2026-11-04 도감 스샷: 세계수잎로브만 마나가 붙는다). 크리티컬은 레인저·무도가 둘 다라 못 가른다
+        stats = {j for o in opts for k, j in (("힘", "전사"), ("민첩", "레인저"), ("지능", "마법사"), ("마나", "마법사")) if o.startswith(k)}
         if len(stats) == 1:
             return stats.pop()
         jm = JOB_IN_LINE.search(line)
