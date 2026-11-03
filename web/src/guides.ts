@@ -73,7 +73,7 @@ export const GUIDES: Guide[] = [
     tutorial: [
       { sel: ".hero-me", head: "내 정보 버튼", text: "캐릭터가 여러 개면 캐릭터 목록이 떠요." },
       { sel: ".home-edit", head: "배치 편집", text: "홈 칸을 꾹 눌러도 편집이 시작돼요.", tap: true, opens: ".launch-bar" },
-      { sel: ".tiles", head: "칸 옮기기", text: "끌어서 옮겨요. 아래 탭에 넣거나 아래 탭 칸과 바꿀 수도 있어요." },
+      { sel: ".tiles", head: "칸 옮기기", text: "끌어서 정해진 자리에 놓아요. 빈 자리에 놓으면 거기 그대로 있고, 다른 칸 위에 놓으면 둘이 자리를 바꿔요. 아래 탭에 넣을 수도 있어요." },
       { sel: ".launch-bar .pill-on", head: "완료", text: "배치는 계정에 저장돼서 다른 폰에서도 같아요.", tap: true, closes: ".launch-bar", undo: false },
       { sel: ".home-weather", head: "날씨 표", text: "우리 동네 날씨를 홈에 반영해요. 누르면 비, 눈, 함박눈을 미리 봐요." },
       { fx: "rain", head: "비", text: "아래 선에 빗물이 고여요." },

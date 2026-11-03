@@ -17,19 +17,23 @@ import type {
 } from "react";
 import { enablePush, markPushAsked, shouldAskPush } from "../push";
 import {
+  COLS,
   INFO_TILES,
+  MAX_SLOTS,
   canPreview,
   canSee,
   clickItem,
+  gridSlots,
   isLocked,
   isUpdated,
   itemOf,
   pressItem,
   resetLayout,
+  searchUp,
   setEditing,
   useLauncher,
 } from "../launcher";
-import type { LaunchItem } from "../launcher";
+import type { LaunchItem, Layout } from "../launcher";
 import { newsFor, useMaint, useNews } from "../news";
 import type { Maint } from "../news";
 import { ClickHint, openGuide } from "../tutorial";
@@ -47,83 +51,130 @@ export function TileIcon({ t }: { t: LaunchItem }) {
 }
 
 /**
- * 칸 그리기 (홈과 정보가 같이 쓴다). editable: 홈 칸 (꾹 눌러 편집, 끌어서 옮기기, launcher.ts)
+ * 칸 하나 (홈과 정보가 같이 쓴다). editable: 홈 칸 (꾹 눌러 편집, 끌어서 옮기기, launcher.ts), index: 홈 격자의 자리 번호
  */
-function Tiles({
+function TileCell({
   me,
-  tiles,
+  t,
   editable = false,
+  dragKey,
+  index,
+}: {
+  me: Me;
+  t: LaunchItem;
+  editable?: boolean;
+  dragKey?: string;
+  index?: number;
+}) {
+  const news = useNews();
+  // 고친 메뉴: 다른 색 테두리와 'UPDATE' (그 메뉴에 처음 들어가면 사라진다, updates.ts). '정보'는 안의 메뉴가 고쳐졌을 때도
+  const updated = isUpdated(me.id, t);
+  // 개발 중인 칸: 길드원은 못 들어가고 앱개발자는 들어간다 (표시는 같이 보인다)
+  const locked = isLocked(t, me);
+  const className =
+    "tile" +
+    (t.soon ? " tile-soon" : "") +
+    (locked ? " tile-locked" : "") +
+    (t.ring ? ` tile-ring tile-ring-${t.ring}` : "") +
+    (updated ? " tile-new" : "") +
+    (dragKey === t.key ? " launch-drag-src" : "");
+  const inside = (
+    <>
+      {t.ribbon && <span className="tile-ribbon">{t.ribbon}</span>}
+      {updated && <span className="tile-update">UPDATE</span>}
+      {/* 사람들이 새로 올린 글·물건 수 (news.ts, 'UPDATE' 와 따로) */}
+      {newsFor(news, t.key) > 0 && (
+        <span className="news-badge tile-news">
+          {newsFor(news, t.key) > 99 ? "99+" : newsFor(news, t.key)}
+        </span>
+      )}
+      <span className="tile-icon">
+        <TileIcon t={t} />
+      </span>
+      {/* 칸 크기는 모두 같게 (제작자 요청: 작은 칸 기준): 이름은 줄을 바꾸지 않고 들어갈 만큼 글자를 줄인다 */}
+      <FitLine className="tile-title" text={t.title} wrap={false} />
+      {t.soon && <span className="tile-badge">{t.badge ?? "준비 중"}</span>}
+    </>
+  );
+  const handlers = editable
+    ? {
+        "data-slot": t.key,
+        "data-zone": "grid",
+        "data-index": index,
+        onPointerDown: (e: ReactPointerEvent<HTMLElement>) =>
+          pressItem(e, t.key, true),
+        onClick: clickItem,
+        onContextMenu: (e: ReactMouseEvent) => e.preventDefault(),
+      }
+    : {};
+  return locked ? (
+    <span className={className} aria-disabled="true" {...handlers}>
+      {inside}
+    </span>
+  ) : (
+    <a className={className} href={t.to} draggable={false} {...handlers}>
+      {inside}
+    </a>
+  );
+}
+
+/** 칸 목록을 위부터 채워 그린다 (정보 화면, 홈의 '개발 중' 묶음) */
+function Tiles({ me, tiles }: { me: Me; tiles: LaunchItem[] }) {
+  return (
+    <nav className="tiles">
+      {tiles.map((t) => (
+        <TileCell key={t.key} me={me} t={t} />
+      ))}
+    </nav>
+  );
+}
+
+/**
+ * 홈 칸 격자: 배치의 자리 그대로 (제작자 요청 2026-11-03: 위로 몰지 말고 중간에 빈 자리가 있어도 그대로, 편집 때는 정해진 자리에만 놓는다).
+ * 빈 자리와 이 사람에게 안 보이는 칸(운영진 칸, 개발 중 칸)의 자리는 빈 칸으로 둔다 (평소에는 안 보이고 편집 중에만 점선 칸).
+ * 편집 중에는 아래에 빈 줄을 하나 더 두어 더 아래로도 놓을 수 있다
+ */
+function HomeGrid({
+  me,
+  layout,
+  editing,
   dragKey,
 }: {
   me: Me;
-  tiles: LaunchItem[];
-  editable?: boolean;
+  layout: Layout;
+  editing: boolean;
   dragKey?: string;
 }) {
-  const news = useNews();
+  const slots = gridSlots(layout).map((k) => (k ? itemOf(k) : undefined));
+  const shown = (t: LaunchItem | undefined): t is LaunchItem =>
+    !!t && canSee(t, me) && !t.soon;
+  let last = -1;
+  slots.forEach((t, i) => {
+    if (shown(t)) last = i;
+  });
+  const rows = Math.ceil((last + 1) / COLS) + (editing ? 1 : 0);
+  const n = Math.min(rows * COLS, MAX_SLOTS);
   return (
-    <nav className="tiles" {...(editable ? { "data-zone": "grid" } : {})}>
-      {tiles.map((t) => {
-        // 고친 메뉴: 다른 색 테두리와 'UPDATE' (그 메뉴에 처음 들어가면 사라진다, updates.ts). '정보'는 안의 메뉴가 고쳐졌을 때도
-        const updated = isUpdated(me.id, t);
-        // 개발 중인 칸: 길드원은 못 들어가고 앱개발자는 들어간다 (표시는 같이 보인다)
-        const locked = isLocked(t, me);
-        const className =
-          "tile" +
-          (t.soon ? " tile-soon" : "") +
-          (locked ? " tile-locked" : "") +
-          (t.ring ? ` tile-ring tile-ring-${t.ring}` : "") +
-          (updated ? " tile-new" : "") +
-          (dragKey === t.key ? " launch-drag-src" : "");
-        const inside = (
-          <>
-            {t.ribbon && <span className="tile-ribbon">{t.ribbon}</span>}
-            {updated && <span className="tile-update">UPDATE</span>}
-            {/* 사람들이 새로 올린 글·물건 수 (news.ts, 'UPDATE' 와 따로) */}
-            {newsFor(news, t.key) > 0 && (
-              <span className="news-badge tile-news">
-                {newsFor(news, t.key) > 99 ? "99+" : newsFor(news, t.key)}
-              </span>
-            )}
-            <span className="tile-icon">
-              <TileIcon t={t} />
-            </span>
-            {/* 칸 크기는 모두 같게 (제작자 요청: 작은 칸 기준): 이름은 줄을 바꾸지 않고 들어갈 만큼 글자를 줄인다 */}
-            <FitLine className="tile-title" text={t.title} wrap={false} />
-            {t.soon && (
-              <span className="tile-badge">{t.badge ?? "준비 중"}</span>
-            )}
-          </>
-        );
-        const handlers = editable
-          ? {
-              "data-slot": t.key,
-              "data-zone": "grid",
-              onPointerDown: (e: ReactPointerEvent<HTMLElement>) =>
-                pressItem(e, t.key, true),
-              onClick: clickItem,
-              onContextMenu: (e: ReactMouseEvent) => e.preventDefault(),
-            }
-          : {};
-        return locked ? (
-          <span
+    <nav className="tiles home-tiles" data-zone="grid">
+      {Array.from({ length: n }, (_, i) => {
+        const t = slots[i];
+        return shown(t) ? (
+          <TileCell
             key={t.key}
-            className={className}
-            aria-disabled="true"
-            {...handlers}
-          >
-            {inside}
-          </span>
+            me={me}
+            t={t}
+            editable
+            dragKey={dragKey}
+            index={i}
+          />
         ) : (
-          <a
-            key={t.key}
-            className={className}
-            href={t.to}
-            draggable={false}
-            {...handlers}
-          >
-            {inside}
-          </a>
+          <span
+            key={"empty-" + i}
+            className="tile tile-empty"
+            data-index={i}
+            data-zone="grid"
+            aria-hidden="true"
+          />
         );
       })}
     </nav>
@@ -143,14 +194,12 @@ export function InfoPage({ me }: { me: Me }) {
 export function Home({ me }: { me: Me }) {
   const L = useLauncher();
   const layout = L.preview ?? L.layout;
-  const grid = layout.grid
-    .map(itemOf)
-    .filter((t): t is LaunchItem => !!t && canSee(t, me));
   // 검색은 아래 탭에 있으면 홈에 검색 칸을 두지 않고, 홈으로 올리면 맨 위에 검색 칸이 생긴다 (제작자 요청 2026-11-01)
-  const searchUp = grid.some((t) => t.key === "search");
-  // 열린 칸만 홈에 보이고, 개발 중·검토 후 오픈 칸은 그 아래 접힌 '개발 중' 묶음에 (제작자 요청 2026-11-02: 평소에는 접혀서 안 보이게)
-  const tiles = grid.filter((t) => t.key !== "search" && !t.soon);
-  const soon = grid.filter((t) => t.soon);
+  const hasSearch = searchUp(layout);
+  // 열린 칸만 홈 격자에 보이고, 개발 중·검토 후 오픈 칸은 그 아래 접힌 '개발 중' 묶음에 (제작자 요청 2026-11-02: 평소에는 접혀서 안 보이게)
+  const soon = gridSlots(layout)
+    .map(itemOf)
+    .filter((t): t is LaunchItem => !!t && canSee(t, me) && !!t.soon);
   const [showSoon, setShowSoon] = useState(false);
   const foldNews = useNews();
   const dragKey = L.drag?.moved ? L.drag.key : undefined;
@@ -213,7 +262,7 @@ export function Home({ me }: { me: Me }) {
 
       <PushAsk />
 
-      {searchUp && (
+      {hasSearch && (
         <a
           className={
             "search-entry" + (dragKey === "search" ? " launch-drag-src" : "")
@@ -230,7 +279,7 @@ export function Home({ me }: { me: Me }) {
         </a>
       )}
 
-      <Tiles me={me} tiles={tiles} editable dragKey={dragKey} />
+      <HomeGrid me={me} layout={layout} editing={L.editing} dragKey={dragKey} />
 
       {soon.length > 0 && !L.editing && (
         <>
