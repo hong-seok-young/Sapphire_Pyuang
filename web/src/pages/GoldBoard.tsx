@@ -273,7 +273,6 @@ export function GoldBoard({ me }: { me: Me }) {
     <>
       <p className="gold-warn">
         ⚠ 골드 현금거래는 게임 운영정책에 걸리면 계정이 정지될 수 있어요. 앱은 돈을 받거나 보내지 않고, 거래는 각자 책임이에요.
-        먼저 보내는 쪽이 사기를 당하지 않게 조심해 주세요.
       </p>
       <div className="gold-market">
         <span>

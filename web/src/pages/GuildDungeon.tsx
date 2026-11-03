@@ -204,6 +204,38 @@ function PartyPanel({
     <section className="panel gd-party">
       <div className="gd-party-head">
         <b>{p.name}</b>
+        {/* 길드던전 단계 (제작자 2026-11-03: 파티마다 '4단계'). 파티장·운영진은 − + 로 바꾼다 (1에서 − 는 없앰) */}
+        {(p.stage !== null || canManage) && (
+          <span className="gd-stage">
+            {canManage && (
+              <button
+                className="pill gd-stage-btn"
+                disabled={busy || p.stage === null}
+                onClick={() =>
+                  run(() =>
+                    editParty(p.id, {
+                      stage: p.stage !== null && p.stage > 1 ? p.stage - 1 : null,
+                    }),
+                  )
+                }
+                aria-label="단계 내리기"
+              >
+                −
+              </button>
+            )}
+            <i>{p.stage !== null ? `${p.stage}단계` : "단계"}</i>
+            {canManage && (
+              <button
+                className="pill gd-stage-btn"
+                disabled={busy || (p.stage ?? 0) >= 9}
+                onClick={() => run(() => editParty(p.id, { stage: (p.stage ?? 0) + 1 }))}
+                aria-label="단계 올리기"
+              >
+                +
+              </button>
+            )}
+          </span>
+        )}
       </div>
       {/* 파티원 카드: 한 줄에 닉네임 · 카톡 · 파티장 · 상태. 파티장·운영진은 카드를 누르면 아래에 파티장 지정 · 빼기 (파티장 카드는 파티 지우기)
           (제작자 요청 2026-11-02: 아래에 닉네임을 늘어놓은 관리 칸 대신 카드를 눌러서) */}
@@ -952,7 +984,10 @@ function AllParties({ data }: { data: GdData }) {
         {others.map((p) => (
           <li key={p.id}>
             <div className="gd-all-head">
-              <b>{p.name}</b>
+              <b>
+                {p.name}
+                {p.stage !== null && <i className="gd-stage-tag">{p.stage}단계</i>}
+              </b>
               <small>
                 {p.confirmed !== null
                   ? `${slotShort(data.week, p.confirmed)} 확정`

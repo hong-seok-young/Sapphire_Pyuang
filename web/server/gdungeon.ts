@@ -47,6 +47,10 @@ export async function canUseGd(env: Env, me: User): Promise<boolean> {
 
 /** 파티 이름은 파티장 닉네임으로 'OO 팀' (제작자 요청 2026-11-02: '파티장 이름으로, 팀 이름 유어아너 팀'). 파티장이 바뀌면 같이 바뀐다 */
 export const teamName = (leader: string) => `${leader} 팀`;
+/** 길드던전 단계 (제작자 2026-11-03: 파티마다 1~4단계처럼 도는 단계가 있다. 여유 있게 9까지) */
+export const MAX_STAGE = 9;
+export const readStage = (v: unknown): number | null | undefined =>
+  v === null ? null : typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= MAX_STAGE ? v : undefined;
 
 /** 파티를 다룰 수 있는지: 파티장 또는 운영진(오피서 이상) */
 export const canManageParty = (me: User, leader: string) => me.id === leader || RANK[me.role] >= 1;
@@ -60,6 +64,8 @@ export interface PartyState {
   id: number;
   name: string;
   leader: string;
+  /** 길드던전 단계 (없으면 null) */
+  stage: number | null;
   members: { id: string; filled: boolean }[];
   /** 파티원의 이번 주 가능한 때 ('0'/'1' 336자, 안 칠한 사람은 없다) */
   avail: Record<string, string>;
@@ -77,7 +83,7 @@ export interface PartyState {
 
 /** 파티 하나의 이번 주 상태 */
 export function partyState(
-  p: { id: number; name: string; leader: string },
+  p: { id: number; name: string; leader: string; stage?: number | null },
   memberIds: string[],
   availRows: Map<string, string>,
   answers: Answer[],
@@ -115,6 +121,7 @@ export function partyState(
     id: p.id,
     name: teamName(p.leader),
     leader: p.leader,
+    stage: p.stage ?? null,
     members,
     avail,
     candidates,
@@ -128,7 +135,7 @@ export function partyState(
 /** 이번 주 모든 파티의 상태 (파티는 많아야 수십 개라 한꺼번에 읽어 계산한다) */
 export async function allParties(env: Env, week: number, now = Date.now()): Promise<PartyState[]> {
   const [parties, members, avail, answers] = await env.DB.batch([
-    env.DB.prepare("SELECT id, name, leader FROM gd_parties ORDER BY id"),
+    env.DB.prepare("SELECT id, name, leader, stage FROM gd_parties ORDER BY id"),
     env.DB.prepare("SELECT party_id, user_id FROM gd_members ORDER BY joined_at, user_id"),
     env.DB.prepare("SELECT user_id, slots FROM gd_avail WHERE week = ?").bind(week),
     env.DB.prepare("SELECT party_id, slot, user_id AS user, answer FROM gd_answers WHERE week = ?").bind(week),
@@ -137,7 +144,7 @@ export async function allParties(env: Env, week: number, now = Date.now()): Prom
   for (const m of members.results as { party_id: number; user_id: string }[]) byParty.set(m.party_id, [...(byParty.get(m.party_id) ?? []), m.user_id]);
   const availOf = new Map((avail.results as { user_id: string; slots: string }[]).map((r) => [r.user_id, r.slots]));
   const ans = answers.results as (Answer & { party_id: number })[];
-  return (parties.results as { id: number; name: string; leader: string }[]).map((p) => {
+  return (parties.results as { id: number; name: string; leader: string; stage: number | null }[]).map((p) => {
     // 파티장이 맨 앞
     const ids = byParty.get(p.id) ?? [];
     const ordered = [p.leader, ...ids.filter((id) => id !== p.leader)].filter((id) => ids.includes(id));

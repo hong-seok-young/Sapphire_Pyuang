@@ -164,7 +164,7 @@ export async function mineExtras(
     if (mine) {
       const waiting = mine.members.filter((m) => !m.filled).map((m) => m.id);
       lines.push(
-        `내 파티 ${mine.name} (파티장 ${mine.leader}): ${mine.members.map((m) => m.id).join(", ")}`,
+        `내 파티 ${mine.name} (파티장 ${mine.leader}${mine.stage !== null ? `, ${mine.stage}단계` : ""}): ${mine.members.map((m) => m.id).join(", ")}`,
         waiting.length
           ? `시간표를 아직 안 칠한 사람: ${waiting.join(", ")}`
           : mine.confirmed !== null
@@ -176,7 +176,7 @@ export async function mineExtras(
       if (mine.rejected.length) lines.push(`무산된 후보: ${mine.rejected.map((r) => `${slotText(week, r.slot)}(${r.by.join(", ")} 불참)`).join(", ")}`);
     } else lines.push(`${me.id}은 아직 파티가 없음 (길드 던전 화면에서 파티 만들기)`);
     const others = parties.filter((p) => p !== mine);
-    if (others.length) lines.push(`다른 파티: ${others.map((p) => `${p.name}(${p.members.map((m) => m.id).join(", ")}${p.confirmed !== null ? ` · ${slotText(week, p.confirmed)} 확정` : ""})`).join(" / ")}`);
+    if (others.length) lines.push(`다른 파티: ${others.map((p) => `${p.name}${p.stage !== null ? ` ${p.stage}단계` : ""}(${p.members.map((m) => m.id).join(", ")}${p.confirmed !== null ? ` · ${slotText(week, p.confirmed)} 확정` : ""})`).join(" / ")}`);
     parts.push(section("길드 던전 (1군 전용, 4인 파티가 이번 주 가능한 때를 칠하고 모두 되는 때를 빠른 순 후보로 확정·불참)", lines, 1500));
   }
 

@@ -29,7 +29,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       mine,
       prev: prevMine,
       // 다른 파티는 이름, 파티원, 정한 때만
-      parties: parties.map((p) => ({ id: p.id, name: p.name, leader: p.leader, members: p.members.map((m) => m.id), confirmed: p.confirmed, current: p.current })),
+      parties: parties.map((p) => ({ id: p.id, name: p.name, leader: p.leader, stage: p.stage, members: p.members.map((m) => m.id), confirmed: p.confirmed, current: p.current })),
       people,
       staff: RANK[me.role] >= 1,
     },

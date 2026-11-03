@@ -2450,6 +2450,11 @@ button.gd-member-row { cursor: pointer; }
 .gd-member-row > small { margin-left: auto; flex: none; font-size: 9.5px; color: var(--muted); }
 .gd-member-row > small.gd-st-yes { color: #7ee0a8; }
 .gd-member-row > .kakao-btn { flex: none; padding: 0 2px; font-size: 9px; line-height: 14px; }
+/* 길드던전 단계 (제작자 2026-11-03): 파티 이름 옆 민트 표, 파티장·운영진은 − + */
+.gd-stage { display: inline-flex; align-items: center; gap: 4px; }
+.gd-stage i, .gd-stage-tag { font-style: normal; font-size: 11px; line-height: 16px; padding: 0 5px; color: var(--edge); background: #7fe0a0; border: 1px solid var(--edge); }
+.gd-stage-tag { margin-left: 6px; font-size: 10px; line-height: 15px; padding: 0 4px; vertical-align: 1px; }
+.gd-stage-btn { width: 22px; height: 22px; padding: 0; font-size: 14px; line-height: 20px; }
 .gd-leader { flex: none; padding: 0 1px; font-size: 8.5px; font-style: normal; line-height: 14px; color: var(--edge); background: var(--gold); }
 .gd-new-name { margin: 0; font-size: 14px; color: var(--gold); }
 .gd-state { margin: 4px 0; font-size: 13px; }

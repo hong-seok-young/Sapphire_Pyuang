@@ -22,6 +22,8 @@ export interface PartyState {
   id: number;
   name: string;
   leader: string;
+  /** 길드던전 단계 (파티장·운영진이 정한다, 없으면 null) */
+  stage: number | null;
   members: { id: string; filled: boolean }[];
   avail: Record<string, string>;
   candidates: number[];
@@ -34,6 +36,7 @@ export interface PartySummary {
   id: number;
   name: string;
   leader: string;
+  stage: number | null;
   members: string[];
   confirmed: number | null;
   current: number | null;
@@ -62,7 +65,7 @@ export const saveAvail = (slots: string) => api<{ ok: boolean; party?: PartyStat
 export const answerGd = (slot: number, answer: "yes" | "no") => api<{ ok: boolean; party?: PartyState | null }>("/api/gd/answer", "POST", { slot, answer });
 export const undoAnswer = (slot: number) => api<{ ok: boolean; party?: PartyState | null }>(`/api/gd/answer?slot=${slot}`, "DELETE");
 export const resetGd = () => api<{ ok: boolean; party?: PartyState | null }>("/api/gd/answer", "POST", { reset: true });
-export const editParty = (id: number, change: { add?: string[]; remove?: string[]; leader?: string }) =>
+export const editParty = (id: number, change: { add?: string[]; remove?: string[]; leader?: string; stage?: number | null }) =>
   api<{ ok: boolean; party?: PartyState | null }>(`/api/gd/party/${id}`, "PUT", change);
 export const leaveParty = (id: number) => api<{ ok: boolean }>(`/api/gd/party/${id}`, "PUT", { leave: true });
 export const deleteParty = (id: number) => api<{ ok: boolean }>(`/api/gd/party/${id}`, "DELETE");

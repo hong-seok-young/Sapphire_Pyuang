@@ -1,9 +1,10 @@
 // PUT    /api/gd/party/:id { add?, remove?, leader? } -> 파티원 넣고 빼기, 파티장 지정 (파티장, 운영진. 화면은 파티원 카드를 눌러서). 4명까지. 이름은 파티장 닉네임으로 'OO 팀'
 // PUT    /api/gd/party/:id { leave: true } -> 파티 나가기 (파티원 누구나. 파티장이 나가면 다음 사람이 파티장, 아무도 없으면 파티를 지운다)
+// PUT    /api/gd/party/:id { stage: 1~9 | null } -> 길드던전 단계 (파티장, 운영진. 제작자 2026-11-03: 파티마다 '4단계')
 // DELETE /api/gd/party/:id -> 파티 지우기 (파티장, 운영진)
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
-import { MAX_MEMBERS, canManageParty, canUseGd, memberProblem, oneParty, teamName, weeks } from "../../../../server/gdungeon";
+import { MAX_MEMBERS, MAX_STAGE, canManageParty, canUseGd, memberProblem, oneParty, readStage, teamName, weeks } from "../../../../server/gdungeon";
 import { notify } from "../../../../server/alerts";
 
 const strs = (v: unknown) => (Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === "string" && !!x))] : []);
@@ -33,8 +34,16 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
   const id = Number(params.id);
   const p = await load(env, id);
   if (!p) return json({ error: "없는 파티예요" }, 404);
-  const b = await readJson<{ add: unknown; remove: unknown; leader: unknown; leave: unknown }>(request);
+  const b = await readJson<{ add: unknown; remove: unknown; leader: unknown; leave: unknown; stage: unknown }>(request);
   const now = Date.now();
+
+  if (b.stage !== undefined) {
+    if (!canManageParty(me, p.leader)) return FORBIDDEN();
+    const stage = readStage(b.stage);
+    if (stage === undefined) return json({ error: `단계는 1 ~ ${MAX_STAGE} 사이예요` }, 400);
+    await env.DB.prepare("UPDATE gd_parties SET stage = ? WHERE id = ?").bind(stage, id).run();
+    return json({ ok: true, party: await oneParty(env, id, weeks(now).week, now) });
+  }
 
   if (b.leave === true) {
     if (!p.members.includes(me.id)) return json({ error: "이 파티에 없어요" }, 400);

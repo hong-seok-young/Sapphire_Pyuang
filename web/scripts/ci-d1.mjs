@@ -102,6 +102,8 @@ const ADDED_COLUMNS = [
   ["users", "main_id", "TEXT"], ["signup_requests", "owner", "TEXT"],
   ["listings", "sale_when", "TEXT"],
   ["users", "kakao", "TEXT"],
+  // 길드 던전 파티 단계 (제작자 2026-11-03)
+  ["gd_parties", "stage", "INTEGER"],
   ["plat_orders", "voided_at", "INTEGER"], ["plat_orders", "voided_by", "TEXT"], ["plat_orders", "gold_paid", "INTEGER"],
   ["official_news", "html", "TEXT"], ["official_news", "src", "TEXT"], ["official_news", "added_at", "INTEGER"],
   ["rental_requests", "app_id", "INTEGER"],

@@ -660,7 +660,8 @@ CREATE TABLE IF NOT EXISTS gd_parties (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   leader TEXT NOT NULL,                   -- 파티장 (만든 사람. 나가면 먼저 들어온 사람)
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  stage INTEGER                           -- 길드던전 단계 (1~9, 파티장·운영진이 정한다. 제작자 2026-11-03: 파티마다 '4단계' 같은 단계가 있다)
 );
 CREATE TABLE IF NOT EXISTS gd_members (
   user_id TEXT PRIMARY KEY,               -- 한 캐릭터는 파티 하나에만
