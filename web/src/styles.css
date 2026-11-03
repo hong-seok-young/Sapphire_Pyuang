@@ -2773,3 +2773,6 @@ button.gd-member-row { cursor: pointer; }
 .trend-side .pill small { font-size: 10px; opacity: 0.8; margin-left: 2px; }
 .trend-sidenote { font-size: 11px; }
 .trend-other { color: var(--gold); }
+
+/* 시세 동향: 도감 스샷에서 자른 그림 (위키에 없는 물건) */
+.trend-icon { max-width: 30px; max-height: 30px; image-rendering: pixelated; }

@@ -955,7 +955,8 @@ def build_odds():
 def copy_rank_pictures():
     """게임 화면 스샷에서 자른 그림: 길드 랭킹(자료/scripts/make_rank_marks.py), 사파이어 중개인(make_market_marks.py).
     data/ 아래에 두어 위키 자료처럼 로그인한 길드원에게만 보인다 (functions/data/_middleware.ts)."""
-    for src, dst in (("랭킹", "rank"), ("중개인", "market"), ("상점", "shop")):
+    # 시세동향: 위키에 없는 물건(코스튬 등)의 그림, 제작자가 보낸 도감 스샷에서 자른 것 (자료/scripts/make_trend_icons.py)
+    for src, dst in (("랭킹", "rank"), ("중개인", "market"), ("상점", "shop"), ("시세동향", "trend")):
         out = OUT / "data" / dst
         if out.exists():
             shutil.rmtree(out)

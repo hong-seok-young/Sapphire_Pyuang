@@ -75,6 +75,8 @@ export interface TrendGroup extends TrendVariant { variants: TrendVariant[] }
 export interface TrendItem extends TrendVariant {
   /** 위키 아이템 이름 (wiki 가 true) 또는 톡방 줄임말 그대로 */
   name: string; wiki: boolean; abbr: string[];
+  /** 위키에 없는 물건의 그림 (data/trend/…png, 제작자 도감 스샷에서 자른 것) */
+  icon?: string;
   /** enchant = 속성부여 부위 (벨트, 망토, 목걸이, 반지), enhance = 강화 부위, none = 그 밖 */
   kind: "enchant" | "enhance" | "none"; groups: TrendGroup[]; variants: TrendVariant[];
   /** 반대쪽(팝니다 목록이면 삽니다)의 중간값과 글 수. 없으면 null */

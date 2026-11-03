@@ -24,6 +24,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "자료" / "카톡"
 OUT = ROOT / "web" / "public" / "data" / "trend.json"
+ICON_DIR = ROOT / "자료" / "이미지" / "시세동향"
 
 USUAL_RATE = 75  # 만 골드로 적은 가격을 만 원으로 바꿀 때 (web/src/gold.ts 의 USUAL_RATE 와 같다)
 NOT_ITEM = re.compile(r"^(골드|구매시|통 구매시|일괄구매시|통|개당|통당|장당)$|구매시$")
@@ -1131,6 +1132,11 @@ def main() -> None:
             o = other.get(it["name"])
             it["other"] = {"med": o["med"], "n": o["n"]} if o else None
     chars = char_prices(msgs, rs)
+    # 위키에 없는 물건의 그림: 자료/이미지/시세동향/<이름>.png (제작자 도감 스샷에서 자른 것, make_trend_icons.py). 이름의 괄호 설명은 뺀다
+    for it in items + items_buy:
+        base = re.sub(r"\s*\(.*\)\s*$", "", it["name"])
+        if (ICON_DIR / f"{base}.png").exists():
+            it["icon"] = f"trend/{base}.png"
     data = {
         "source": {"rooms": sorted(set(rooms)), "from": dates[0], "to": dates[-1], "messages": len(msgs),
                    "built": datetime.date.today().isoformat(), "rate": USUAL_RATE},
