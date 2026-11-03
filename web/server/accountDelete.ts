@@ -67,10 +67,10 @@ export async function deleteAccountData(env: Env, user: { id: string; main_id: s
       "DELETE FROM gold_wants WHERE user_id = ? OR offer_id IN (SELECT id FROM gold_offers WHERE owner = ?)",
     ).bind(user.id, user.id),
     env.DB.prepare("DELETE FROM gold_offers WHERE owner = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM request_offers WHERE request_id IN (SELECT id FROM requests WHERE owner = ?)").bind(user.id),
     env.DB.prepare("DELETE FROM requests WHERE owner = ?").bind(user.id),
-    env.DB.prepare(
-      "UPDATE requests SET status = 'open', accepter = NULL, accepted_at = NULL WHERE accepter = ? AND status = 'accepted'",
-    ).bind(user.id),
+    // 의뢰소: 기다리던 내 수락은 포기로 (받은 것은 기록으로 남긴다)
+    env.DB.prepare("UPDATE request_offers SET status = 'giveup' WHERE user_id = ? AND status = 'pledged'").bind(user.id),
     env.DB.prepare("DELETE FROM delete_requests WHERE user_id = ?").bind(user.id),
     // 길드 던전: 파티에서 빼고, 파티장이었으면 먼저 들어온 사람에게 넘긴다 (아무도 없으면 파티를 지운다)
     env.DB.prepare("DELETE FROM gd_members WHERE user_id = ?").bind(user.id),

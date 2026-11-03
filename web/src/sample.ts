@@ -48,21 +48,19 @@ export function sampleListing(now = Date.now()): Listing {
   };
 }
 
-/** 의뢰소 예시 의뢰 */
+/** 의뢰소 예시 의뢰: 수락한 사람 하나와 한마디가 보이게 */
 export function sampleRequest(now = Date.now()): GuildRequest {
   return {
     id: SAMPLE_ID,
     owner: SAMPLE_NAME,
     title: "검은진액 100개 (예시)",
-    detail: "다 모으면 게임 안에서 거래해요",
+    detail: "이번 주말까지요. 20개씩 나눠서 줘도 돼요",
     rewardGold: 50_000,
     rewardText: null,
     status: "open",
-    accepter: null,
-    acceptedAt: null,
-    dueAt: null,
+    offers: [{ id: SAMPLE_ID, user: "길동무", note: "저 20개 있어요", status: "pledged", createdAt: now - 3_600_000 }],
     createdAt: now - 7_200_000,
-    updatedAt: now - 7_200_000,
+    updatedAt: now - 3_600_000,
   };
 }
 

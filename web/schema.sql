@@ -147,20 +147,33 @@ CREATE TABLE IF NOT EXISTS gold_wants (
   PRIMARY KEY (offer_id, user_id)
 );
 
--- 길드원 의뢰소: 의뢰를 올리고 모아 둔 길드원이 선착순으로 수락한 뒤 게임 안에서 거래한다 (server/requests.ts)
+-- 길드원 의뢰소: 의뢰를 자유롭게 올리고 길드원이 수락한 뒤 게임 안에서 거래하거나 함께 한다 (server/requests.ts).
+-- 2026-11-03: 상태는 모집 중·완료 둘뿐(의뢰한 사람이 완료를 누르면 끝), 수락은 request_offers 에 사람마다 한 줄(한마디). 예전 accepter 칸은 안 쓴다
 CREATE TABLE IF NOT EXISTS requests (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   owner TEXT NOT NULL,                    -- 의뢰한 길드원
-  title TEXT NOT NULL,                    -- 의뢰 (예: 검은진액 100개)
-  detail TEXT,                            -- 자세한 설명 (없어도 됨)
+  title TEXT NOT NULL,                    -- 의뢰 (예: 검은진액 100개, 토요일 밤 인던 같이 가요)
+  detail TEXT,                            -- 자세히 (없어도 됨. 수량, 기한, 나눠 줘도 되는지 같은 조건을 글로)
   reward_gold INTEGER,                    -- 보상 골드 (골드로 줄 때)
   reward_text TEXT,                       -- 보상 (골드가 아닐 때 자유롭게)
-  status TEXT NOT NULL DEFAULT 'open',    -- open 모집 중 | accepted 진행 중 (이틀 지나면 다시 open) | done 완료 (30일 뒤 지운다)
-  accepter TEXT,                          -- 수락한 길드원 (선착순 한 명)
+  status TEXT NOT NULL DEFAULT 'open',    -- open 모집 중 | done 완료 (30일 동안만 보이고 지우지 않는다). accepted 는 예전 '진행 중' (배포가 open 으로)
+  accepter TEXT,                          -- (예전) 수락한 길드원. 2026-11-03 부터 request_offers
   accepted_at INTEGER,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
+
+-- 의뢰 수락: 여러 사람이 할 수 있고 한 사람은 한 의뢰에 한 번. 한마디에 '저 20개 있어요', '토요일 밤 돼요' 같은 것을 자유롭게 (앱은 세지 않는다)
+CREATE TABLE IF NOT EXISTS request_offers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,                  -- 수락한 길드원
+  note TEXT,                              -- 한마디 (예: 저 20개 있어요)
+  status TEXT NOT NULL DEFAULT 'pledged', -- pledged 수락함 | giveup 포기
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS request_offers_req ON request_offers (request_id, status);
 
 -- 길드원이 직접 올린 자기 캐릭터 그림 (랭킹 시상대에 선다). '내 정보'에서 사용자가 고른 스샷을 잘라 만든 PNG
 CREATE TABLE IF NOT EXISTS avatars (

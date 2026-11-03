@@ -177,6 +177,15 @@ for (const [table, column, type] of ADDED_COLUMNS) {
   }
 }
 
+// 의뢰소 고도화 (제작자 요청 2026-11-03): 예전 한 사람 수락(accepter)을 수락 줄(request_offers)로 옮기고, 예전 '진행 중'은 모집 중으로.
+// NOT EXISTS 라 몇 번을 해도 된다
+runSql([
+  "INSERT INTO request_offers (request_id, user_id, note, status, created_at, updated_at) " +
+    "SELECT id, accepter, NULL, 'pledged', COALESCE(accepted_at, updated_at), updated_at FROM requests " +
+    "WHERE accepter IS NOT NULL AND NOT EXISTS (SELECT 1 FROM request_offers o WHERE o.request_id = requests.id);",
+  "UPDATE requests SET status = 'open' WHERE status = 'accepted';",
+]);
+
 // 더한 칸의 색인 (schema.sql 은 칸이 생기기 전에 돌아서 여기서 만든다)
 wrangler("d1", "execute", DB, "--remote", "--yes", "--command", "CREATE INDEX IF NOT EXISTS official_news_added ON official_news (added_at)");
 

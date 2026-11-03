@@ -300,7 +300,7 @@ const ACTIONS: [RegExp, (d: Rec, m: RegExpMatchArray, at: number) => string][] =
   [/^DELETE \/api\/gold\/\d+\/want$/, () => "골드 거래할래요 취소"],
   // 의뢰소
   [/^POST \/api\/requests$/, (d) => join("의뢰 올림", quote(d.title), num(d.rewardGold) ? `보상 ${won(d.rewardGold as number)} 골드` : quote(d.rewardText))],
-  [/^PATCH \/api\/requests\/\d+$/, (d) => `의뢰 ${REQUEST_ACTION[String(d.action)] ?? "고침"}`],
+  [/^PATCH \/api\/requests\/\d+$/, (d) => join(`의뢰 ${REQUEST_ACTION[String(d.action)] ?? "고침"}`, quote(d.note))],
   [/^DELETE \/api\/requests\/\d+$/, () => "의뢰 내림"],
   // 게시판
   [/^POST \/api\/board$/, (d) => join("게시판 글 씀", quote(d.title))],

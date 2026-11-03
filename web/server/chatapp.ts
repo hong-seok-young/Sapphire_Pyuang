@@ -18,7 +18,6 @@ import { CAT_NAME } from "./board";
 import type { Cat } from "./board";
 import { growthEntries } from "./growth";
 import type { Period } from "./growth";
-import { ACCEPT_MS } from "./requests";
 import { weekStart } from "./week";
 import { TODO_OPEN, doneKeys, eventTasks, todoExtras } from "./todo";
 import { ASK_MORE, mineExtras, newsNow, shopCatalog } from "./chatmine";
@@ -112,7 +111,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
   const today = Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate()) - KST;
   const week = weekStart(now);
 
-  const [peopleR, listingsR, myWantersR, myBidsR, myWantsR, rateR, goldR, myGoldWantsR, requestsR, boardR, platR, myOrdersR, openOrdersR] =
+  const [peopleR, listingsR, myWantersR, myBidsR, myWantsR, rateR, goldR, myGoldWantsR, requestsR, offersR, boardR, platR, myOrdersR, openOrdersR] =
     await env.DB.batch([
       env.DB.prepare(
         "SELECT u.id AS id, u.role AS role, u.high_spec AS high_spec, u.must_change AS must_change, u.main_id AS main_id, " +
@@ -152,8 +151,12 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
           "WHERE o.owner = ? AND o.status = 'open' ORDER BY w.created_at",
       ).bind(me.id),
       env.DB.prepare(
-        "SELECT id, owner, title, detail, reward_gold, reward_text, status, accepter, accepted_at, created_at FROM requests " +
+        "SELECT id, owner, title, detail, reward_gold, reward_text, status, created_at FROM requests " +
           "WHERE status != 'done' ORDER BY created_at DESC LIMIT 40",
+      ),
+      env.DB.prepare(
+        "SELECT request_id, user_id, note FROM request_offers WHERE status = 'pledged' " +
+          "AND request_id IN (SELECT id FROM requests WHERE status != 'done') ORDER BY created_at",
       ),
       env.DB.prepare(
         "SELECT p.id, p.cat, p.author, p.title, substr(p.body, 1, 400) AS body, p.pinned, p.created_at, " +
@@ -318,19 +321,23 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
   }
 
   // ---------- 의뢰소 ----------
+  // 2026-11-03: 상태는 모집 중뿐(의뢰한 사람이 완료를 누르면 끝), 수락은 여러 사람이 한마디('저 20개 있어요')와 함께
   type Req = {
     id: number; owner: string; title: string; detail: string | null; reward_gold: number | null; reward_text: string | null;
-    status: string; accepter: string | null; accepted_at: number | null; created_at: number;
+    status: string; created_at: number;
   };
+  type Offer = { request_id: number; user_id: string; note: string | null };
   const reqs = requestsR.results as Req[];
-  if (reqs.length && (ASK.requests.test(q) || reqs.some((r) => mentioned.includes(r.owner) || (r.accepter !== null && mentioned.includes(r.accepter))))) {
+  const reqOffers = offersR.results as Offer[];
+  const offersOf = (id: number) => reqOffers.filter((o) => o.request_id === id);
+  const offerText = (id: number) => offersOf(id).map((o) => `${o.user_id}${o.note ? `("${oneLine(o.note).slice(0, 40)}")` : ""}`).join(", ");
+  if (reqs.length && (ASK.requests.test(q) || reqs.some((r) => mentioned.includes(r.owner) || offersOf(r.id).some((o) => mentioned.includes(o.user_id))))) {
     const lines = reqs.map((r) => {
-      const late = r.status === "accepted" && r.accepted_at !== null && r.accepted_at + ACCEPT_MS < now;
-      const state = r.status === "accepted" && !late ? `진행 중 (수락: ${r.accepter}, ${when((r.accepted_at ?? 0) + ACCEPT_MS)}까지)` : "모집 중";
+      const who = offerText(r.id);
       const reward = r.reward_gold ? gold(r.reward_gold) : r.reward_text ?? "";
-      return `#${r.id} ${oneLine(r.title)}${reward ? ` · 보상 ${reward}` : ""} · 의뢰 ${r.owner} · ${state}${r.detail ? ` · "${oneLine(r.detail).slice(0, 120)}"` : ""} · ${when(r.created_at)}`;
+      return `#${r.id} ${oneLine(r.title)}${reward ? ` · 보상 ${reward}` : ""} · 의뢰 ${r.owner} · 모집 중${who ? ` · 수락: ${who}` : ""}${r.detail ? ` · "${oneLine(r.detail).slice(0, 120)}"` : ""} · ${when(r.created_at)}`;
     });
-    parts.push(section("길드원 의뢰소: 끝나지 않은 의뢰", lines, 3000));
+    parts.push(section("길드원 의뢰소: 끝나지 않은 의뢰 (수락한 사람마다 게임 안에서 거래하고, 의뢰한 사람이 완료를 누르면 끝)", lines, 3000));
   }
 
   // ---------- 게시판 ----------
@@ -454,9 +461,9 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
     const myGold = goldOffers.filter((o) => o.owner === me.id);
     if (myGold.length) lines.push(`골드 거래 내 글: ${myGold.map((o) => `${o.side === "sell" ? "팝니다" : "삽니다"} ${o.gold.toLocaleString("ko-KR")}만${o.wants ? ` (${o.wants}명)` : ""}`).join(", ")}`);
     const myReqs = reqs.filter((r) => r.owner === me.id);
-    if (myReqs.length) lines.push(`의뢰소 내 의뢰: ${myReqs.map((r) => `${oneLine(r.title)} (${r.status === "accepted" ? `수락 ${r.accepter}` : "모집 중"})`).join(", ")}`);
-    const took = reqs.filter((r) => r.accepter === me.id && r.status === "accepted");
-    if (took.length) lines.push(`의뢰소 내가 수락한 의뢰 (수락하고 이틀 안에 끝내야 한다): ${took.map((r) => `${oneLine(r.title)} (의뢰 ${r.owner}, ${when((r.accepted_at ?? 0) + ACCEPT_MS)}까지)`).join(", ")}`);
+    if (myReqs.length) lines.push(`의뢰소 내 의뢰: ${myReqs.map((r) => `${oneLine(r.title)} (모집 중${offerText(r.id) ? `, 수락: ${offerText(r.id)}` : ", 아직 수락 없음"})`).join(", ")}`);
+    const took = reqs.filter((r) => offersOf(r.id).some((o) => o.user_id === me.id));
+    if (took.length) lines.push(`의뢰소 내가 수락한 의뢰 (게임 안에서 의뢰한 사람과 거래한다): ${took.map((r) => { const o = offersOf(r.id).find((x) => x.user_id === me.id); return `${oneLine(r.title)} (의뢰 ${r.owner}${o?.note ? `, 내 한마디 "${oneLine(o.note).slice(0, 40)}"` : ""})`; }).join(", ")}`);
     const orders = (myOrdersR.results as { item_name: string; status: string }[]).filter((o) => o.status === "requested");
     if (orders.length) lines.push(`플래티넘 상점 거래 기다리는 신청: ${orders.map((o) => o.item_name).join(", ")}`);
     if (lines.length) parts.push(section(`${me.id}가 앱에서 한 것 (진행 중)`, lines, 1500));

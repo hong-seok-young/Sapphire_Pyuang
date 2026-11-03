@@ -126,7 +126,18 @@ export const GUIDES: Guide[] = [
     key: "requests",
     title: "길드원 의뢰소",
     tutorial: [
-      { sel: "[data-tut-sample] .mk-row, .mk-list .mk-row", head: "수락", text: "선착순이에요. 수락하고 이틀 안에 못 끝내면 다시 모집 중이 돼요. 실제 거래는 게임 안에서 해요." },
+      {
+        sel: "[data-tut-sample] .mk-row, .mk-list .mk-row",
+        head: "의뢰",
+        text: "선착순이 아니에요. 여러 명이 수락할 수 있고, 거래는 게임 안에서 각자 해요. 수량이나 기한은 자세히 칸에 글로 적어요.",
+        tap: true,
+        opens: "[data-tut-sample] .mk-detail, .mk-list .mk-detail",
+      },
+      {
+        sel: "[data-tut-sample] .rq-accept, .mk-list .rq-accept",
+        head: "수락",
+        text: "한마디에 저 20개 있어요, 토요일 밤 돼요처럼 적어요. 올린 사람에게 알림이 가고, 올린 사람이 완료를 누르면 끝나요.",
+      },
     ],
   },
   {

@@ -738,6 +738,16 @@ button { font: inherit; color: inherit; }
 .rq-reward { display: inline-flex; align-items: center; gap: 4px; color: var(--gold); }
 .rq-detail { height: 72px; padding: 8px 10px; resize: vertical; line-height: 1.4; }
 .rq-detail-text { white-space: pre-line; }
+/* 의뢰소 2026-11-03: 수락한 사람들(한마디)과 수락 칸. 한 줄에 닉네임 · 카톡 · 한마디 · 때 · (내 것이면) 포기, 좁으면 줄을 바꾼다 */
+.rq-offers { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.rq-offer { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; padding: 6px 8px; font-size: 12px; color: var(--text); background: var(--night-2); }
+.rq-offer-note { min-width: 0; color: var(--gold); }
+.rq-offer small { font-size: 11px; color: var(--muted); }
+.rq-offer-btn { margin-left: auto; padding: 2px 8px; font-size: 11px; }
+.rq-accept { display: flex; gap: 6px; margin: 0 0 8px; }
+.rq-accept .mk-input { flex: 1; min-width: 0; }
+.rq-accept .pill { flex: none; white-space: nowrap; }
+.rq-who { margin-left: 6px; }
 /* 1군 Sapphire / 2군 FairyTale (ranking cards, profile picker) */
 .guild-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; }
 .guild-stat {
