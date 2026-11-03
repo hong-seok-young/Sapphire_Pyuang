@@ -2459,6 +2459,11 @@ button.gd-member-row { cursor: pointer; }
 .gd-stage i, .gd-stage-tag { font-style: normal; font-size: 11px; line-height: 16px; padding: 0 5px; color: var(--edge); background: #7fe0a0; border: 1px solid var(--edge); }
 .gd-stage-tag { margin-right: 6px; font-size: 10px; line-height: 15px; padding: 0 4px; vertical-align: 1px; }
 /* 파티 명단을 숨긴 동안의 안내 한 줄 (GuildDungeon.tsx) */
+.gd-hidden { margin: 0 0 8px; padding: 6px 10px; font-size: 12px; color: var(--muted); background: rgba(11, 10, 26, 0.45); border: 1px solid var(--edge); }
+/* 파티 명단 열기·숨기기 줄 (길드마스터·앱개발자, GuildDungeon.tsx OpenBar) */
+.gd-open-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; margin: 0 0 8px; padding: 6px 6px 6px 10px; font-size: 12px; color: var(--muted); background: rgba(11, 10, 26, 0.45); border: 1px solid var(--edge); }
+.gd-open-bar > span { flex: 1; min-width: 0; }
+.gd-open-bar > .pill { flex: none; }
 .gd-stage-btn { width: 22px; height: 22px; padding: 0; font-size: 14px; line-height: 20px; }
 .gd-leader { flex: none; padding: 0 1px; font-size: 8.5px; font-style: normal; line-height: 14px; color: var(--edge); background: var(--gold); }
 .gd-new-name { margin: 0; font-size: 14px; color: var(--gold); }

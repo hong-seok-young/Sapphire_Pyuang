@@ -4,7 +4,7 @@
 // DELETE /api/gd/party/:id -> 파티 지우기 (파티장, 운영진)
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
-import { MAX_MEMBERS, MAX_STAGE, canManageParty, canUseGd, memberProblem, oneParty, readStage, teamName, weeks } from "../../../../server/gdungeon";
+import { MAX_MEMBERS, MAX_STAGE, canManageParty, canSeeParties, canUseGd, memberProblem, oneParty, readStage, teamName, weeks } from "../../../../server/gdungeon";
 import { notify } from "../../../../server/alerts";
 
 const strs = (v: unknown) => (Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === "string" && !!x))] : []);
@@ -31,6 +31,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!(await canUseGd(env, me))) return FORBIDDEN();
+  if (!(await canSeeParties(env, me))) return json({ error: "파티 명단은 운영진이 공지한 뒤에 열려요" }, 403);
   const id = Number(params.id);
   const p = await load(env, id);
   if (!p) return json({ error: "없는 파티예요" }, 404);
@@ -85,6 +86,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!(await canUseGd(env, me))) return FORBIDDEN();
+  if (!(await canSeeParties(env, me))) return json({ error: "파티 명단은 운영진이 공지한 뒤에 열려요" }, 403);
   const id = Number(params.id);
   const p = await load(env, id);
   if (!p) return json({ error: "없는 파티예요" }, 404);

@@ -5,12 +5,13 @@
 // POST   /api/gd/answer { reset: true } -> 처음부터 다시 정하기 (파티장, 운영진): 이번 주 대답을 모두 지운다
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { canManageParty, canUseGd, candidateNo, oneParty, partyIdOf, slotText, tellParty, weeks } from "../../../server/gdungeon";
+import { canManageParty, canSeeParties, canUseGd, candidateNo, oneParty, partyIdOf, slotText, tellParty, weeks } from "../../../server/gdungeon";
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!(await canUseGd(env, me))) return FORBIDDEN();
+  if (!(await canSeeParties(env, me))) return json({ error: "파티 명단은 운영진이 공지한 뒤에 열려요" }, 403);
   const b = await readJson<{ slot: unknown; answer: unknown; reset: unknown }>(request);
   const now = Date.now();
   const { week } = weeks(now);
@@ -55,6 +56,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!(await canUseGd(env, me))) return FORBIDDEN();
+  if (!(await canSeeParties(env, me))) return json({ error: "파티 명단은 운영진이 공지한 뒤에 열려요" }, 403);
   const slot = Number(new URL(request.url).searchParams.get("slot"));
   const now = Date.now();
   const { week } = weeks(now);
