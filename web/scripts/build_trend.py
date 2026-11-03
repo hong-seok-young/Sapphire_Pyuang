@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import math
 import re
 import statistics
 import sys
@@ -188,7 +189,9 @@ def gold_days(msgs: list[dict]) -> list[dict]:
 # 옵션마다 값이 다르므로 (지3 대자연 30, 힘3 대자연 35) 물건 + 강화 + 옵션 묶음(variants)으로 따로 센다.
 # 뒤에 단위 없이 붙은 숫자는 현금 만 원 ('1콩' = 1만 원). 300 이상이면 만 골드로 본다 ('지3 대자연 2500' = 2500만 골드 ≈ 33만 원).
 ITEMS_JSON = ROOT / "web" / "public" / "data" / "items.json"
-BARE_GOLD_FROM = 300  # 단위 없는 숫자가 이보다 크면 만 골드
+# 단위 없는 숫자 (제작자: '8페일 750' = 750만 원, '지3 대자연 2500' = 2500만 골드): 같은 물건·묶음에서 단위를 적은 글의 중간값에 가까운 쪽으로
+# 읽는다 (만 원 그대로 vs 만 골드 ÷ 75). 비교할 글이 없으면 이 값까지는 만 원, 넘으면 만 골드
+BARE_GOLD_FROM = 1000
 
 KNUM = {"일": 1, "이": 2, "삼": 3, "사": 4, "오": 5, "육": 6, "칠": 7, "팔": 8, "구": 9, "십": 10}
 # 옵션 줄임말 -> 옵션 이름. 체/마나 1~3 은 속성부여 10, 20, 30 (제작자: '체력 30 = 체3')
@@ -209,7 +212,7 @@ SKIP_WORDS = {"제국", "왕국", "중립", "팝니다", "삽니다", "팔아요
               "개당", "통당", "장당", "통", "노작", "노강", "싸게", "급매", "빠르게", "각개", "통매입", "매입", "노옵", "투옵", "쓰리옵", "이상", "이하", "판완", "완료", "예약", "골드", "현금", "보유", "각", "개"}
 NOT_ITEM_WORDS = {"보석", "코튬", "코스튬", "아이템", "장비", "무기", "방어구", "캐릭터", "계정", "통판매", "대리판매", "도감", "도감용",
                   "전사", "렌저", "레인저", "법사", "마법사", "무도가", "신발", "투구", "갑옷", "장갑", "모자", "반지", "벨트", "망토", "목걸이", "이상", "이하",
-                  "아드", "싸게", "급매", "빠르게", "각개", "일괄", "통매입", "매입", "판완", "예약"}
+                  "아드", "아드골드", "아골", "싸게", "급매", "빠르게", "각개", "일괄", "통매입", "매입", "판완", "예약"}  # 아드골드 = 도감의 아이템·골드 드랍율 (제작자)
 # 줄임말 한 글자가 두 글자를 줄인 것
 SQUEEZE = {"닼": "다크", "롭": "로브", "렌": "레인"}
 # 자동으로 풀기 어려운 줄임말 (제작자 확인). 값이 None 이면 위키에 없는 물건이라 줄임말 그대로 둔다
@@ -234,12 +237,14 @@ ALIASES: dict[str, str | None] = {
 # '지2 아드셋' = 2번 보석이 아드레날린 보석이고 셋 다 2등급, 등급만큼 속성(지능2)이 붙는다. 캐릭터 글의 '보석 333' 도 같은 등급 표시.
 # '12번보석셋' = 1, 2번 보석이 있는 세트
 GEMSET = re.compile(r"^(\d{1,3})번?보석셋$")
+SKILL_BOOK = {"화폭": "화염폭풍", "치격": "치명적일격", "소드": "소울드레인샷", "쉴드": "쉴드", "휩": "휩쓸기", "덥": "더블샷", "충": "충격샷",
+              "와": "와일드스윙", "프": "프레임쇼크"}
 NON_WIKI = {"아드셋": "아드레날린 보석 세트 (아드셋)", "목청높여": "목청높여 (코스튬)", "목청": "목청높여 (코스튬)",
             # 마법서: 스 = S등급, 에 = A등급, 갑 = 갑옷마법서, 무 = 무기마법서 (제작자 설명). 거불 = 거래불가, 거가 = 거래가능
             "스갑": "S등급 갑옷마법서", "스무": "S등급 무기마법서", "에갑": "A등급 갑옷마법서", "에무": "A등급 무기마법서",
             "SS무": "SS등급 무기마법서", "SS갑": "SS등급 갑옷마법서", "거불스무": "S등급 무기마법서 (거래불가)", "거불스갑": "S등급 갑옷마법서 (거래불가)",
             "거가스무": "S등급 무기마법서 (거래가능)", "거가스갑": "S등급 갑옷마법서 (거래가능)",
-            "고주": "고대의 주화", "고대의주화": "고대의 주화"}
+            "고주": "고대의 주화", "고대의주화": "고대의 주화", "화폭": "화염폭풍 스킬북"}
 
 
 def _norm_name(name: str) -> str:
@@ -356,6 +361,7 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
     if not words:
         return None
     # 가격: 단위 붙은 것 중 현금(장, 콩) 우선, 없으면 만 골드, 없으면 맨 뒤 단위 없는 숫자
+    bare: float | None = None
     priced = [(i, PRICE.fullmatch(w)) for i, w in enumerate(words)]
     priced = [(i, m) for i, m in priced if m]
     if priced:
@@ -366,6 +372,7 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
         rest = [w for j, w in enumerate(words) if j not in drop]
     elif re.fullmatch(r"\d+(?:\.\d+)?", words[-1]) and len(words) >= 2:
         price = to_manwon(words[-1], "")
+        bare = float(words[-1])
         rest = words[:-1]
     else:
         return None
@@ -409,6 +416,11 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
 
     def try_word(w: str) -> tuple[str, str, int] | None:
         """낱말 하나 -> (위키 이름, 줄임말, 강화). 통째로 먼저, 안 되면 앞의 강화 숫자(8헌보, 팔닼소)를 떼고"""
+        sk = re.fullmatch(r"(화폭|치격|소드|쉴드|휩|덥|충|와|프)\s?(\d)\s?단?", w)
+        if sk:  # 스킬북 '화폭2단' = 화염폭풍 2단 (제작자). 위키에 있으면 그 이름, 없으면 '화염폭풍 3단'
+            full = SKILL_BOOK[sk.group(1)]
+            name = f"{full}{sk.group(2)}"
+            return (rs.names.get(name) or f"{full} {sk.group(2)}단"), w, 0
         m = ENHANCE_RE.match(w)
         for k, c in enumerate([w] + ([w[m.end():]] if m else [])):
             c = re.sub(r"[^가-힣a-zA-Z0-9]", "", c)
@@ -446,7 +458,7 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
         wiki = False
         rs.unknown[c] += 1
     enh = enh or enh_word
-    return {"name": name, "wiki": wiki, "enh": enh if enh <= 20 else 0, "opts": opts, "price": round(price, 2), "abbr": abbr}
+    return {"name": name, "wiki": wiki, "enh": enh if enh <= 20 else 0, "opts": opts, "price": round(price, 2), "bare": bare, "abbr": abbr}
 
 
 EQUIP_JSON = ROOT / "web" / "public" / "data" / "equipment.json"
@@ -491,6 +503,25 @@ def group_label(kind: str, x: dict) -> str:
     if kind == "enhance":
         return f"+{x['enh']}" if x["enh"] else "노강"
     return "전체"
+
+
+def resolve_bare(kind: str, xs: list[dict]) -> None:
+    """단위 없는 숫자: 같은 묶음(없으면 같은 물건)에서 단위를 적은 글의 중간값에 가까운 쪽(만 원 / 만 골드)으로 다시 읽는다"""
+    # 기준: 같은 묶음의 모든 값 (단위 없는 값은 일단 BARE_GOLD_FROM 규칙으로 읽은 것). 단위 적은 글 하나가 잘못돼도 다수를 따른다
+    ref_group: dict[str, list[float]] = defaultdict(list)
+    for x in xs:
+        ref_group[group_label(kind, x)].append(x["price"])
+    for x in xs:
+        v = x.get("bare")
+        if v is None:
+            continue
+        ref = ref_group[group_label(kind, x)]
+        if len(ref) < 2:
+            continue
+        mid = statistics.median(ref)
+        as_won, as_gold = v, v / USUAL_RATE
+        pick = as_won if abs(math.log(as_won / mid)) <= abs(math.log(as_gold / mid)) else as_gold
+        x["price"] = round(max(pick, 0.01), 2)
 
 
 def group_sort_key(kind: str, g: dict) -> tuple:
@@ -575,6 +606,7 @@ def item_prices(msgs: list[dict], last_week: str, rs: Resolver, side: str = "sel
         if len(xs) < (2 if side == "sell" else 1):
             continue
         kind = item_kind(name, xs, kinds)
+        resolve_bare(kind, xs)
         by_group: dict[str, list[dict]] = defaultdict(list)
         for x in xs:
             by_group[group_label(kind, x)].append(x)
