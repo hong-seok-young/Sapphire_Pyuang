@@ -32,7 +32,7 @@ const dates = (r: Row) => (r.start_date ?? "") + (r.end_date ? ` ~ ${r.end_date}
  * 챗봇에 붙일 공식 소식: 최근 글 목록과, 질문에 맞는 글 3개까지의 본문.
  * 점검을 물으면 가장 최근 점검 글, 패치를 물으면 가장 최근 패치노트, 그 밖에는 제목에 질문 낱말이 많이 든 글.
  * 2026-11-03 (제작자: '밀가루 사용처 대답 왜 못해, 이벤트 있는데'): 질문에 점검·이벤트 같은 말이 없어도 질문의 낱말(밀가루, 주모 …)이 최근 글 **본문**에
- * 나오면 그 글을 붙이고, 본문은 처음부터가 아니라 그 낱말 둘레를 잘라 준다 (이벤트 글은 길어서 처음 3500자에는 교환 안내가 없었다).
+ * 나오면 그 글을 붙이고, 본문은 자르지 않고 전부 준다 (제작자 '3500자 한도 이딴 거 하지 마, 무조건 다 봐').
  * 진행 중인 이벤트(끝나는 날이 안 지난 것)를 먼저, 그다음 새 글.
  */
 export async function officialContext(env: Env, question: string): Promise<string> {
@@ -87,20 +87,11 @@ export async function officialContext(env: Env, question: string): Promise<strin
   if (!picks.length && /이벤트|쿠폰|보상|프로모션|콜라보/.test(question)) add(results.find((r) => r.kind === "event"));
   if (!asked && !picks.length) return "";
 
-  // 본문: 처음 1200자 + 질문 낱말 둘레 2400자 (처음 3500자 안에 있으면 처음 3500자만)
-  const bodies = await Promise.all(
-    picks.map(async (p) => {
-      const hit = inBody.get(p.id);
-      if (hit && hit.pos > 3000) {
-        const r = await env.DB.prepare("SELECT substr(body, 1, 1200) AS head, substr(body, max(?2 - 600, 1), 2400) AS win FROM official_news WHERE id = ?1")
-          .bind(p.id, hit.pos)
-          .first<{ head: string; win: string }>();
-        return [p.id, r ? `${r.head}\n…\n${r.win}` : ""] as const;
-      }
-      const r = await env.DB.prepare("SELECT substr(body, 1, 3500) AS body FROM official_news WHERE id = ?1").bind(p.id).first<{ body: string }>();
-      return [p.id, r?.body ?? ""] as const;
-    }),
-  );
+  // 본문은 자르지 않고 전부 준다 (제작자 2026-11-03 '3500자 한도 이딴 거 하지 마, 무조건 다 봐'. 전에는 처음 3500자만 줘서 글 깊숙한 교환 안내를 못 봤다)
+  const bodies = picks.length
+    ? (await env.DB.prepare(`SELECT id, body FROM official_news WHERE id IN (${picks.map(() => "?").join(",")})`).bind(...picks.map((p) => p.id)).all<{ id: number; body: string }>())
+        .results.map((b) => [b.id, b.body] as const)
+    : [];
   const bodyOf = new Map(bodies);
   const list = results
     .slice(0, 30)
