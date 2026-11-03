@@ -537,6 +537,8 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
         label, by_job = JOB_GROUPS[m.group(4)]
         key = next(k for k in ("세계수갑", "바슬신", "아요장", "금서고신") if JOB_GROUPS[k] is JOB_GROUPS[m.group(4)])
         job = GROUP_JOB.get(m.group(2) or "") or job_hint(key)
+        if job is None and key == "세계수갑":
+            job = "레인저"  # 옵션으로 못 가르면(크리만, 옵션 없음) 보통 레인저 것 (유어 2026-11-04 '보통 그런 건 렌이에요')
         if m.group(4) in ("아요장", "아이요장", "아이요장갑") and not enh and not enh_word and job is None and all(o.startswith("체력") for o in opts):
             # 강화·직업·장비 옵션이 하나도 없으면 아이요 코스튬 장갑 (유어 2026-11-04: '아요셋 사요'는 코스튬, '육아요장'은 +6 장비)
             return "아이요의장갑 (코스튬)", m.group(4), 0, False
@@ -629,20 +631,20 @@ JOB_IN_LINE = re.compile(r"전사|렌저|레인저|법사|마법사|무도가")
 # 묶음마다 직업을 가르는 옵션 (옵션 하나로 한 직업만 남을 때만)
 GROUP_STAT_JOB = {
     "세계수갑": {"힘": "전사", "민첩": "레인저", "지능": "마법사", "마나": "마법사"},
-    "바슬신": {"힘": "전사", "민첩": "레인저", "마나": "마법사"},  # 지능은 마법사(빛새김)·무도가(바다) 둘 다
-    "아요장": {"민첩": "레인저", "마나": "마법사"},  # 힘은 전사·무도가, 지능은 마법사·무도가: 조합은 pick_job 에서
-    "금서고신": {"힘": "전사", "민첩": "레인저"},  # 지능은 마법사(끈질긴 기억의 단화)·무도가(극한의 발걸음) 둘 다
+    # 지능은 마법사(빛새김)·무도가(바다) 둘 다 붙지만 톡방에서 지능 바슬신은 법사 장화로 읽는다 (제작자 2026-11-04 '문맥을 봐, 지능 붙었잖아')
+    "바슬신": {"힘": "전사", "민첩": "레인저", "지능": "마법사", "마나": "마법사"},
+    "아요장": {"민첩": "레인저", "지능": "마법사", "마나": "마법사"},  # 힘은 전사·무도가: 힘+지능 = 무도가, 힘+크리 = 전사 (pick_job)
+    "금서고신": {"힘": "전사", "민첩": "레인저", "지능": "마법사", "마나": "마법사"},  # 지능은 바슬신처럼 법사 것으로 (제작자 2026-11-04)
 }
 
 
 def pick_job(group: str, opts: list[str]) -> str | None:
     """옵션 이름으로 묶음 안의 직업을 고른다. 못 가르면 None"""
     stats = {re.sub(r"[\d.]+%?$", "", o) for o in opts}
-    if group == "아요장":
-        if "힘" in stats and "지능" in stats:
-            return "무도가"  # 연속공격의장갑만 힘과 지능이 같이
-        if "힘" in stats and "크리" in stats:
-            return "전사"  # 수호병의손껍질
+    if "힘" in stats and "지능" in stats:
+        return "무도가" if group == "아요장" else None  # 연속공격의장갑만 힘과 지능이 같이
+    if group == "아요장" and "힘" in stats and "크리" in stats:
+        return "전사"  # 수호병의손껍질
     table = GROUP_STAT_JOB[group]
     jobs = {table[k] for k in stats if k in table}
     return jobs.pop() if len(jobs) == 1 else None
