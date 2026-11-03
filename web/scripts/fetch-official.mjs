@@ -26,6 +26,9 @@ const KINDS = [
 ];
 const local = process.argv.includes("--local");
 const where = local ? "--local" : "--remote";
+/** 로컬 시험용: wrangler pages dev 가 쓰는 D1 폴더 (--persist-to <폴더>, 없으면 wrangler 기본 자리) */
+const persistAt = process.argv.indexOf("--persist-to");
+const PERSIST = local && persistAt >= 0 ? ["--persist-to", process.argv[persistAt + 1]] : [];
 
 const CREATE = `CREATE TABLE IF NOT EXISTS official_news (
   id INTEGER PRIMARY KEY, kind TEXT NOT NULL, type TEXT NOT NULL, title TEXT NOT NULL, start_date TEXT, end_date TEXT,
@@ -53,7 +56,7 @@ function ensureDbId() {
 function runFile(sql) {
   writeFileSync("official-news.sql", sql);
   try {
-    wrangler("d1", "execute", DB, where, "--yes", "--file=official-news.sql");
+    wrangler("d1", "execute", DB, where, ...PERSIST, "--yes", "--file=official-news.sql");
   } finally {
     rmSync("official-news.sql", { force: true });
   }
@@ -131,9 +134,9 @@ if (saveTo) {
 ensureDbId();
 runFile(CREATE + "\n");
 {
-  const cols = parseJson(wrangler("d1", "execute", DB, where, "--json", "--command", "PRAGMA table_info(official_news)"))[0]?.results ?? [];
+  const cols = parseJson(wrangler("d1", "execute", DB, where, ...PERSIST, "--json", "--command", "PRAGMA table_info(official_news)"))[0]?.results ?? [];
   for (const col of ["html", "src"]) {
-    if (!cols.some((c) => c.name === col)) wrangler("d1", "execute", DB, where, "--yes", "--command", `ALTER TABLE official_news ADD COLUMN ${col} TEXT`);
+    if (!cols.some((c) => c.name === col)) wrangler("d1", "execute", DB, where, ...PERSIST, "--yes", "--command", `ALTER TABLE official_news ADD COLUMN ${col} TEXT`);
   }
 }
 let all = false;
@@ -146,7 +149,7 @@ if (loadFrom) {
   now = Date.parse(file.savedAt) || now;
   console.log(`파일에서 ${found.length}개를 읽었어요`);
 } else {
-  const count = Number(parseJson(wrangler("d1", "execute", DB, where, "--json", "--command", "SELECT COUNT(*) AS n FROM official_news"))[0]?.results?.[0]?.n ?? 0);
+  const count = Number(parseJson(wrangler("d1", "execute", DB, where, ...PERSIST, "--json", "--command", "SELECT COUNT(*) AS n FROM official_news"))[0]?.results?.[0]?.n ?? 0);
   all = process.argv.includes("--all") || count === 0;
   found = await fetchRows(all);
 }
