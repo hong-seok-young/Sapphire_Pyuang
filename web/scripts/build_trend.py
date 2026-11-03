@@ -241,6 +241,10 @@ ALIASES: dict[str, str | None] = {
 # '지2 아드셋' = 2번 보석이 아드레날린 보석이고 셋 다 2등급, 등급만큼 속성(지능2)이 붙는다. 캐릭터 글의 '보석 333' 도 같은 등급 표시.
 # '12번보석셋' = 1, 2번 보석이 있는 세트
 GEMSET = re.compile(r"^(\d{1,3})번?보석셋$")
+# 펫 (제작자 2026-11-03): 레어펫, 수룡펫, 베스페라, 모스가디는 펫. 값은 속성강화와 펫 종류로 정해지는데 매물이 적어 '펫' 하나로 묶고
+# 묶음·원글에 무슨 펫인지 적는다
+PET_WORDS = {"레어펫": "레어펫", "수룡펫": "수룡펫", "수룡": "수룡펫", "베스페라": "베스페라", "모스가디": "모스가디", "펫": "펫"}
+PET_RE = re.compile(r"^(?:펫)?(레어펫|수룡펫|수룡|베스페라|모스가디|[가-힣]{1,4}펫)$")
 SKILL_BOOK = {"화폭": "화염폭풍", "치격": "치명적일격", "소드": "소울드레인샷", "쉴드": "쉴드", "휩": "휩쓸기", "덥": "더블샷", "충": "충격샷",
               "와": "와일드스윙", "프": "프레임쇼크"}
 NON_WIKI = {"아드셋": "아드레날린 보석 세트 (아드셋)", "목청높여": "목청높여 (코스튬)", "목청": "목청높여 (코스튬)",
@@ -436,6 +440,10 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
         return None
 
     joined = "".join(names)
+    pm = PET_RE.match(re.sub(r"[^가-힣]", "", joined))
+    if pm:
+        pet = PET_WORDS.get(pm.group(1), pm.group(1))
+        return {"name": "펫", "wiki": False, "enh": 0, "opts": opts, "price": round(price, 2), "bare": bare, "abbr": joined, "pet": pet}
     gs = GEMSET.match(joined)
     if gs:  # '12번보석셋' = 1, 2번 보석이 있는 세트 (제작자 설명). 앞 숫자는 강화가 아니다
         name = "·".join(gs.group(1)) + "번 보석 세트"
@@ -491,6 +499,8 @@ def item_kind(name: str, xs: list[dict], kinds: dict[str, str]) -> str:
     """위키 장비는 부위로, 아니면 글에서 짐작: 강화 숫자가 있으면 enhance, 속성부여 옵션만 있으면 enchant, 둘 다 없으면 none"""
     if name in kinds:
         return kinds[name]
+    if name == "펫":
+        return "enchant"  # 펫 값은 속성강화로 정해진다 (제작자)
     if any(x["enh"] for x in xs):
         return "enhance"
     if any(ENCHANT_RE.match(o) for x in xs for o in x["opts"]):
@@ -618,7 +628,10 @@ def item_prices(msgs: list[dict], last_week: str, rs: Resolver, side: str = "sel
         for label, gx in by_group.items():
             by_var: dict[str, list[dict]] = defaultdict(list)
             for x in gx:
-                by_var[variant_label(x["enh"], x["opts"])].append(x)
+                vl = variant_label(x["enh"], x["opts"])
+                if x.get("pet"):
+                    vl = (vl + " · " if vl else "") + x["pet"]
+                by_var[vl].append(x)
             variants = [{"label": vl, **summary(v)} for vl, v in by_var.items()]
             variants.sort(key=lambda v: (-v["n"], v["label"]))
             groups.append({"label": label, **summary(gx), "variants": variants})
@@ -627,7 +640,9 @@ def item_prices(msgs: list[dict], last_week: str, rs: Resolver, side: str = "sel
         variants.sort(key=lambda v: (-v["n"], v["label"]))
         abbrs: dict[str, int] = defaultdict(int)
         for x in xs:
-            if x["abbr"] != name.replace(" ", ""):
+            if x.get("pet"):
+                abbrs[x["pet"]] += 1
+            elif x["abbr"] != name.replace(" ", ""):
                 abbrs[x["abbr"]] += 1
         out.append({"name": name, "wiki": xs[0]["wiki"], "kind": kind,
                     "abbr": [a for a, _ in sorted(abbrs.items(), key=lambda kv: -kv[1])[:4]],
