@@ -43,6 +43,8 @@ export interface ListingOption {
 }
 
 export interface ListingInput {
+  /** sell 팝니다 | buy 삽니다 (제작자 2026-11-03 '템도 팝니다 삽니다'): 삽니다는 price 가 희망가, note 가 조건, 예약·경매·옵션 값은 없다 */
+  side: "sell" | "buy";
   item: string;
   category: string;
   enhance: number;
@@ -97,6 +99,8 @@ export function readOptions(v: unknown): ListingOption[] | null | string {
 
 /** 화면이 보낸 판매 글을 검사한다. 맞으면 ListingInput, 아니면 이유 */
 export function readListing(b: Record<string, unknown>): ListingInput | string {
+  const side = b.side ?? "sell";
+  if (side !== "sell" && side !== "buy") return "팝니다인지 삽니다인지 골라 주세요";
   const item = typeof b.item === "string" ? b.item.trim().replace(/\s+/g, " ") : "";
   if (!ITEM_NAME.test(item)) return "아이템 이름을 30자까지 적어 주세요";
   const category = b.category;
@@ -115,12 +119,12 @@ export function readListing(b: Record<string, unknown>): ListingInput | string {
   if (enchant && !ENCHANT_CATEGORIES.includes(category)) return "속성부여는 벨트, 망토, 목걸이, 반지만 돼요";
   const qty = b.qty ?? 1;
   if (!Number.isInteger(qty) || (qty as number) < 1 || (qty as number) > MAX_QTY) return `수량은 1~${MAX_QTY} 로 적어 주세요`;
-  if (!validPrice(b.price)) return "가격을 골드로 적어 주세요";
+  if (!validPrice(b.price)) return side === "buy" ? "희망가를 골드로 적어 주세요" : "가격을 골드로 적어 주세요";
   const note = readNote(b.note);
   if (note === undefined) return `한마디는 ${MAX_NOTE}자까지예요`;
-  const options = readOptions(b.options);
+  const options = side === "buy" ? null : readOptions(b.options);
   if (typeof options === "string") return options;
-  const mode = b.mode ?? "sale";
+  const mode = side === "buy" ? "sale" : (b.mode ?? "sale");
   if (mode !== "sale" && mode !== "auction" && mode !== "reserve") return "판매 방식이 맞지 않아요";
   // 예약 판매 (제작자 요청 2026-11-02): 바로 판매와 같고 판매 조건(날짜, 레벨, 다음 무기 구하면 …)을 적는다
   let saleWhen: string | null = null;
@@ -134,15 +138,17 @@ export function readListing(b: Record<string, unknown>): ListingInput | string {
     hours = b.hours as number;
   }
   let autoAuction: number | null = null;
-  if (mode === "sale" && b.autoAuction != null) {
+  if (side === "sell" && mode === "sale" && b.autoAuction != null) {
     if (!AUCTION_HOURS.includes(b.autoAuction as number)) return "경매로 바꿀 때의 시간을 골라 주세요";
     autoAuction = b.autoAuction as number;
   }
-  return { item, category, enhance: enhance as number, enchant, enchantValue, qty: qty as number, price: b.price, note, options, mode, saleWhen, hours, autoAuction };
+  return { side, item, category, enhance: enhance as number, enchant, enchantValue, qty: qty as number, price: b.price, note, options, mode, saleWhen, hours, autoAuction };
 }
 
 export interface ListingRow {
   id: number;
+  /** sell 팝니다 | buy 삽니다 (칸이 생기기 전 글은 null = sell) */
+  side: "sell" | "buy" | null;
   seller: string;
   item: string;
   category: string;
@@ -178,7 +184,7 @@ function parseOptions(json: string | null): ListingOption[] | null {
 /** 화면에 주는 모양 */
 export function listingOut(r: ListingRow) {
   return {
-    id: r.id, seller: r.seller, item: r.item, category: r.category, enhance: r.enhance, enchant: r.enchant,
+    id: r.id, side: r.side ?? "sell", seller: r.seller, item: r.item, category: r.category, enhance: r.enhance, enchant: r.enchant,
     enchantValue: r.enchant_value, qty: r.qty, price: r.price, note: r.note, options: parseOptions(r.options), status: r.status,
     mode: r.mode ?? "sale", saleWhen: r.sale_when ?? null, endsAt: r.ends_at, autoAuction: r.auto_auction ?? null, createdAt: r.created_at, updatedAt: r.updated_at,
   };
@@ -192,7 +198,7 @@ export async function toAuction(env: Env, id: number, hours: number, by: string,
   const now = Date.now();
   const endsAt = now + hours * 3_600_000;
   const res = await env.DB.prepare(
-    "UPDATE listings SET mode = 'auction', ends_at = ?, auto_auction = NULL, updated_at = ? WHERE id = ? AND mode = 'sale' AND status = 'selling'",
+    "UPDATE listings SET mode = 'auction', ends_at = ?, auto_auction = NULL, updated_at = ? WHERE id = ? AND mode = 'sale' AND status = 'selling' AND side = 'sell'",
   )
     .bind(endsAt, now, id)
     .run();

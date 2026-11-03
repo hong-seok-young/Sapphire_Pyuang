@@ -81,6 +81,18 @@ function TileCell({
   const inside = (
     <>
       {t.ribbon && <span className="tile-ribbon">{t.ribbon}</span>}
+<<<<<<< Updated upstream
+=======
+      {/* 오른쪽 위 글자만 (장비대여 담당자 '관리자' / '멍멍', 제작자 요청 2026-11-03). UPDATE 표와 자리가 같아 표가 붙어 있는 동안은 숨기고,
+          표가 사라지면(한 번 들어가면) 보인다 (제작자: '업데이트는 어차피 한 번 누르면 사라지니까 우측 위로 해도 돼') */}
+      {t.corner && !updated && (
+        <span className="tile-corner">
+          {t.corner.map((line) => (
+            <span key={line}>{line}</span>
+          ))}
+        </span>
+      )}
+>>>>>>> Stashed changes
       {updated && <span className="tile-update">UPDATE</span>}
       {/* 사람들이 새로 올린 글·물건 수 (news.ts, 'UPDATE' 와 따로) */}
       {newsFor(news, t.key) > 0 && (

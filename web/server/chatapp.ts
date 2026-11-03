@@ -120,7 +120,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
           "ORDER BY p.level IS NULL, p.level DESC, p.exp IS NULL, p.exp DESC, p.level_at ASC, u.id ASC",
       ),
       env.DB.prepare(
-        "SELECT l.id, l.seller, l.item, l.category, l.enhance, l.enchant, l.enchant_value, l.qty, l.price, l.note, l.options, l.mode, l.sale_when, l.ends_at, l.created_at, " +
+        "SELECT l.id, l.side, l.seller, l.item, l.category, l.enhance, l.enchant, l.enchant_value, l.qty, l.price, l.note, l.options, l.mode, l.sale_when, l.ends_at, l.created_at, " +
           "(SELECT COUNT(*) FROM listing_wants w WHERE w.listing_id = l.id) AS wants, " +
           "(SELECT COUNT(*) FROM listing_bids b WHERE b.listing_id = l.id) AS bids, " +
           "(SELECT MAX(amount) FROM listing_bids b WHERE b.listing_id = l.id) AS top_bid, " +
@@ -251,7 +251,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
 
   // ---------- 중개인 ----------
   type Listing = {
-    id: number; seller: string; item: string; category: string; enhance: number; enchant: string | null; enchant_value: number | null;
+    id: number; side: string | null; seller: string; item: string; category: string; enhance: number; enchant: string | null; enchant_value: number | null;
     qty: number; price: number; note: string | null; options: string | null; mode: string; sale_when: string | null; ends_at: number | null; created_at: number;
     wants: number; bids: number; top_bid: number | null; talk: number;
   };
@@ -283,9 +283,11 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
           ? `경매 시작가 ${gold(l.price)}, ${l.top_bid ? `최고가 ${gold(l.top_bid)} (입찰 ${l.bids}번)` : "입찰 없음"}, ${l.ends_at ? `${when(l.ends_at)}${l.ends_at < now ? " 끝남" : " 끝"}` : ""}`
           : `${gold(l.price)} (≈ ${(l.price / rate / 10_000).toFixed(1)}만 원)${l.mode === "reserve" ? ` · 예약 판매 (조건: ${l.sale_when ?? ""})` : ""}`;
       const own = l.seller === me.id ? [wantersBy.get(l.id)?.length ? ` · 살래요 명단: ${wantersBy.get(l.id)!.join("; ")}` : "", bidsBy.get(l.id)?.length ? ` · 입찰 명단: ${bidsBy.get(l.id)!.join("; ")}` : ""].join("") : "";
-      return `#${l.id} ${what} · ${price} · 판매 ${l.seller}${l.wants ? ` · 살래요 ${l.wants}명` : ""}${l.talk ? ` · 토론방 글 ${l.talk}` : ""}${l.note ? ` · 한마디 "${oneLine(l.note)}"` : ""}${optionsText(l.options)}${mine.has(l.id) ? ` · ${mine.get(l.id)}` : ""}${own} · ${when(l.created_at)} 올림`;
+      // 삽니다 글 (제작자 2026-11-03): 가격은 희망가, 팔 사람이 '팔래요'
+      const buy = l.side === "buy";
+      return `#${l.id} ${buy ? "[삽니다] " : ""}${what} · ${buy ? `희망가 ${price}` : price} · ${buy ? "구하는 사람" : "판매"} ${l.seller}${l.wants ? ` · ${buy ? "팔래요" : "살래요"} ${l.wants}명` : ""}${l.talk ? ` · 토론방 글 ${l.talk}` : ""}${l.note ? ` · ${buy ? "조건" : "한마디"} "${oneLine(l.note)}"` : ""}${optionsText(l.options)}${mine.has(l.id) ? ` · ${mine.get(l.id)}` : ""}${own} · ${when(l.created_at)} 올림`;
     });
-    parts.push(section(`사파이어 중개인: 판매 중 ${listings.length}개 (새 글 먼저, 골드 시세 1만 원 = ${Math.round(rate)}만 골드). 살래요·입찰한 사람과 흥정 가격은 판 사람만 본다`, lines, 6000));
+    parts.push(section(`사파이어 중개인: 올라온 글 ${listings.length}개 (팝니다와 [삽니다], 새 글 먼저, 골드 시세 1만 원 = ${Math.round(rate)}만 골드). 살래요·팔래요·입찰한 사람과 흥정 가격은 올린 사람만 본다`, lines, 6000));
     // 질문에 이름이 나온 물건의 종목 토론방 (모든 길드원이 본다)
     for (const l of listings.filter((x) => x.talk && x.item.length >= 2 && q.includes(x.item)).slice(0, 2)) {
       const { results } = await env.DB.prepare("SELECT user_id, parent_id, text, created_at FROM listing_talk WHERE listing_id = ? ORDER BY id DESC LIMIT 20")

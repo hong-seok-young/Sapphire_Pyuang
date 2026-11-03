@@ -20,6 +20,7 @@ export const isSample = (id: number) => id < 0;
 export function sampleListing(now = Date.now()): Listing {
   return {
     id: SAMPLE_ID,
+    side: "sell",
     seller: SAMPLE_NAME,
     item: "고대의봉",
     category: "주장비",

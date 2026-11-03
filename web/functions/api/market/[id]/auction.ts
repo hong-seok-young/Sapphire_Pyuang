@@ -10,13 +10,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   const id = Number(paramId(params));
   const row = Number.isInteger(id)
     ? await env.DB.prepare(
-        "SELECT seller, status, mode, (SELECT COUNT(*) FROM listing_wants w WHERE w.listing_id = listings.id) AS wants FROM listings WHERE id = ?",
+        "SELECT seller, status, mode, side, (SELECT COUNT(*) FROM listing_wants w WHERE w.listing_id = listings.id) AS wants FROM listings WHERE id = ?",
       )
         .bind(id)
-        .first<{ seller: string; status: string; mode: string; wants: number }>()
+        .first<{ seller: string; status: string; mode: string; side: string | null; wants: number }>()
     : null;
   if (!row) return json({ error: "없는 글이에요" }, 404);
   if (row.seller !== me.id) return json({ error: "내 글만 바꿀 수 있어요" }, 403);
+  if (row.side === "buy") return json({ error: "삽니다 글은 경매로 바꿀 수 없어요" }, 409);
   if (row.status !== "selling" || row.mode !== "sale") return json({ error: "판매 중인 글만 경매로 바꿀 수 있어요" }, 409);
   if (row.wants < WANTS_FOR_AUCTION) return json({ error: `'살래요'가 ${WANTS_FOR_AUCTION}명 이상일 때 바꿀 수 있어요` }, 409);
   const { hours } = await readJson<{ hours: unknown }>(request);

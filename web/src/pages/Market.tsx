@@ -33,7 +33,6 @@ import {
   MAX_QTY,
   ago,
   categoryOf,
-  categoryPic,
   createListing,
   deleteListing,
   enchantText,
@@ -53,6 +52,8 @@ import {
   toAuction,
   shotUrl,
   MAX_WHEN,
+  SIDE_NAME,
+  wantVerb,
 } from "../market";
 import { readShot, shrinkShot } from "../shot";
 import { isSample, sampleListing } from "../sample";
@@ -65,6 +66,7 @@ import type {
   Listing,
   ListingMode,
   ListingOption,
+  Side,
   TalkLine,
 } from "../market";
 import type { Wiki } from "../types";
@@ -73,30 +75,14 @@ import { useNews, useNewsSeen } from "../news";
 import { timeLeft } from "../requests";
 import { GoldBoard } from "./GoldBoard";
 
-type Tab = "buy" | "mine" | "sell" | "gold";
+/** 맨 위 같은 폭 단추 넷 (제작자 2026-11-03 '이모지 다 빼', '버튼 상하위 개념': 그림 없이 글자만, 그 아래 팝니다·삽니다와 종류는 어두운 띠 안에) */
+type Tab = "list" | "mine" | "post" | "gold";
 const TABS: { key: Tab; label: string }[] = [
-  { key: "buy", label: "사기" },
-  { key: "mine", label: "내 판매" },
-  { key: "sell", label: "팔기" },
+  { key: "list", label: "목록" },
+  { key: "mine", label: "내 글" },
+  { key: "post", label: "올리기" },
   { key: "gold", label: "골드" },
 ];
-
-/** 게임 거래소의 흰 그림을 글자 색으로 칠한다 (종류 그림) */
-function MaskIcon({ src, size }: { src: string; size: number }) {
-  const mask = `url(${src})`;
-  return (
-    <span
-      className="mask-icon"
-      style={{
-        width: size,
-        height: size,
-        WebkitMaskImage: mask,
-        maskImage: mask,
-      }}
-      aria-hidden="true"
-    />
-  );
-}
 
 const Coin = () => (
   <img className="mk-coin" src={MARKET_PIC + "coin.png"} alt="골드" />
@@ -160,6 +146,9 @@ function Detail({
   const manager = RANK[me.role] >= 1;
   const auction = l.mode === "auction";
   const over = auctionOver(l);
+  // 삽니다 글 (제작자 2026-11-03): 가격은 희망가, 남은 '팔래요' (살래요와 같은 방식, 흥정 가격·한마디는 올린 사람만)
+  const buy = l.side === "buy";
+  const verb = wantVerb(l);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
@@ -177,7 +166,7 @@ function Detail({
       onClick={() => setTalkOpen((v) => !v)}
       aria-expanded={talkOpen}
     >
-      💬<span className="mk-talk-label"> 토론방</span>
+      토론방
       {talkCount > 0 && <b>{talkCount}</b>}
     </button>
   );
@@ -274,12 +263,12 @@ function Detail({
       {l.note && <p className="mk-note">“{l.note}”</p>}
       <p className="mk-meta">
         {/* 판 사람과 카톡은 바로 위 목록 줄에 있어서 여기서는 뺀다 (제작자 요청 2026-11-02) */}
-        {ago(l.createdAt)} 올림{l.qty > 1 && ` · ${l.qty}개 한꺼번에`}
+        {ago(l.createdAt)} 올림{l.qty > 1 && (buy ? ` · ${l.qty}개 구해요` : ` · ${l.qty}개 한꺼번에`)}
         {l.status === "sold" && " · 거래 완료"}
       </p>
       {auction ? (
         <p className="mk-deal">
-          🔨 {l.highestBid !== null ? "지금 최고가" : "시작가"} <Coin />{" "}
+          {l.highestBid !== null ? "지금 최고가" : "시작가"} <Coin />{" "}
           {goldText(currentPrice(l))}{" "}
           <small>{cashText(currentPrice(l), rate)}</small>
           <br />
@@ -295,6 +284,7 @@ function Detail({
         </p>
       ) : (
         <p className="mk-deal">
+          {buy && <span className="mk-buy-tag">희망가 </span>}
           <Coin /> {goldText(l.price)}{" "}
           <small>
             {cashText(l.price, rate)} (골드 시세 {rate}:1)
@@ -315,7 +305,7 @@ function Detail({
               <ul className="mk-wanters">
                 {l.bids!.map((b, i) => (
                   <li key={b.id + b.at}>
-                    {i === 0 ? (over ? "🏆 낙찰 " : "🔨 최고 ") : "· "}
+                    {i === 0 ? (over ? "낙찰 " : "최고 ") : "· "}
                     <b>
                       <Nick name={b.id} />
                     </b>{" "}
@@ -331,7 +321,6 @@ function Detail({
             <ul className="mk-wanters">
               {l.wanters!.map((w) => (
                 <li key={w.id}>
-                  ♥{" "}
                   <b>
                     <Nick name={w.id} />
                   </b>{" "}
@@ -348,14 +337,15 @@ function Detail({
               ))}
             </ul>
           ) : (
-            <p className="mk-meta">아직 '살래요'를 누른 사람이 없어요.</p>
+            <p className="mk-meta">아직 '{verb}'를 누른 사람이 없어요.</p>
           )}
-          {/* '살래요'가 여러 명이면 경매로 (제작자 요청): 올릴 때 정해 두지 않았으면 여기서 묻는다 */}
-          {l.mode === "sale" &&
+          {/* '살래요'가 여러 명이면 경매로 (제작자 요청): 올릴 때 정해 두지 않았으면 여기서 묻는다 (팝니다 글만) */}
+          {!buy &&
+            l.mode === "sale" &&
             l.status === "selling" &&
             l.wants >= WANTS_FOR_AUCTION && (
               <div className="mk-convert">
-                <b>♥ 살래요 {l.wants}명 · 경매로 바꿀까요?</b>
+                <b>살래요 {l.wants}명 · 경매로 바꿀까요?</b>
                 <div className="mk-chips">
                   {AUCTION_HOURS.map((h) => (
                     <button
@@ -381,7 +371,7 @@ function Detail({
                       )
                     }
                   >
-                    🔨 경매 전환
+                    경매 전환
                   </button>
                 </div>
                 <small className="mk-meta">
@@ -390,12 +380,13 @@ function Detail({
                 </small>
               </div>
             )}
-          {l.mode === "sale" &&
+          {!buy &&
+            l.mode === "sale" &&
             l.status === "selling" &&
             l.autoAuction &&
             l.wants < WANTS_FOR_AUCTION && (
               <p className="mk-meta">
-                🔨 살래요 {WANTS_FOR_AUCTION}명이 되면{" "}
+                살래요 {WANTS_FOR_AUCTION}명이 되면{" "}
                 {AUCTION_HOURS.find((h) => h.hours === l.autoAuction)?.label ??
                   `${l.autoAuction}시간`}{" "}
                 경매로 바뀌어요
@@ -447,7 +438,7 @@ function Detail({
                     )
                   }
                 >
-                  ✔ 거래 완료
+                  거래 완료
                 </button>
               ) : (
                 <button
@@ -504,7 +495,7 @@ function Detail({
                   경매가 끝났어요.
                   {l.myBid !== null &&
                     l.myBid === l.highestBid &&
-                    " 🏆 내가 낙찰받았어요! 판 사람과 게임에서 거래해요."}
+                    " 내가 낙찰받았어요! 판 사람과 게임에서 거래해요."}
                 </p>
               ) : (
                 <>
@@ -551,7 +542,7 @@ function Detail({
                       })
                     }
                   >
-                    🔨 입찰
+                    입찰
                   </button>
                   <small className="mk-meta mk-full">
                     {bidN > 0 && `${cashText(bidN, rate)} · `}지금 최고가보다
@@ -580,7 +571,7 @@ function Detail({
                     )
                   }
                 >
-                  ♥ 살래요 취소
+                  {verb} 취소
                 </button>
               </>
             ) : (
@@ -599,7 +590,7 @@ function Detail({
                   className="mk-input mk-full"
                   value={note}
                   onChange={(e) => setNote(e.target.value.slice(0, MAX_NOTE))}
-                  placeholder="판 사람에게 한마디 (안 적어도 돼요)"
+                  placeholder={(buy ? "구하는 사람" : "판 사람") + "에게 한마디 (안 적어도 돼요)"}
                   aria-label="한마디"
                 />
                 <button
@@ -618,11 +609,11 @@ function Detail({
                     )
                   }
                 >
-                  ♥ 살래요
+                  {verb}
                 </button>
                 <small className="mk-meta mk-full">
                   {offerN > 0 && `${cashText(offerN, rate)} · `}흥정 가격과
-                  한마디는 판 사람만 봐요.
+                  한마디는 올린 사람만 봐요.
                 </small>
               </>
             )}
@@ -731,7 +722,6 @@ function Talk({
           (t.user === l.seller ? " mk-talk-seller" : "")
         }
       >
-        {reply && <span className="mk-talk-arrow">↳</span>}
         <b>
           <Nick name={t.user} />
         </b>
@@ -762,7 +752,7 @@ function Talk({
               }
             }}
           >
-            ✕
+            삭제
           </button>
         )}
       </li>
@@ -785,13 +775,13 @@ function Talk({
       )}
       {replyTo !== null && (
         <p className="mk-talk-replying">
-          ↳ {replyName}에게 답글
+          {replyName}에게 답글
           <button
             className="mk-talk-act"
             onClick={() => setReplyTo(null)}
             aria-label="답글 취소"
           >
-            ✕
+            취소
           </button>
         </p>
       )}
@@ -868,13 +858,20 @@ function Rows({
                   {isSample(l.id) && <i className="sample-tag">예시</i>}
                 </b>
                 <small>
+                  {/* 삽니다 글: 하늘색 '삽니다' 표와 조건 (제작자 2026-11-03) */}
+                  {l.side === "buy" && (
+                    <span className="mk-buy-tag">삽니다</span>
+                  )}
+                  {l.side === "buy" && l.note && (
+                    <span className="mk-row-note">{l.note}</span>
+                  )}
                   {auction && (
                     <span
                       className={
                         "mk-auction-tag" + (ending ? " mk-ending" : "")
                       }
                     >
-                      🔨 경매
+                      경매
                       {auctionOver(l)
                         ? " 끝"
                         : l.endsAt
@@ -896,11 +893,11 @@ function Rows({
                             "mk-wants" + (l.wanted ? " mk-wants-me" : "")
                           }
                         >
-                          ♥ {l.wants}
+                          {wantVerb(l)} {l.wants}
                         </span>
                       )}
                   {l.talkCount > 0 && (
-                    <span className="mk-talk-count">💬 {l.talkCount}</span>
+                    <span className="mk-talk-count">토론 {l.talkCount}</span>
                   )}
                   {l.status === "sold" && <span>거래 완료</span>}
                   {!auction &&
@@ -920,7 +917,10 @@ function Rows({
                 >
                   <Coin /> {goldText(shownPrice)}
                 </b>
-                <small className="mk-cash">{cashText(shownPrice, rate)}</small>
+                <small className="mk-cash">
+                  {l.side === "buy" && "희망가 · "}
+                  {cashText(shownPrice, rate)}
+                </small>
               </span>
             </button>
             {open === l.id && (
@@ -956,6 +956,9 @@ function SellForm({
   rate: number;
   onDone: () => void;
 }) {
+  /** 팝니다 | 삽니다 (제작자 2026-11-03): 삽니다는 희망가와 조건·한마디만 적는다 (예약·경매·옵션 값·자동 경매 없음) */
+  const [side, setSide] = useState<Side>("sell");
+  const buy = side === "buy";
   const [mode, setMode] = useState<ListingMode>("sale");
   /** 예약 판매의 판매 조건 (제작자 요청 2026-11-02: 판매 예정 일자, 특정 레벨 찍으면, 다음 무기 구해지면 …) */
   const [saleWhen, setSaleWhen] = useState("");
@@ -1021,7 +1024,7 @@ function SellForm({
       )
       .slice(0, 12);
   }, [wiki, name]);
-  const optionsFilled = rolls.every((r) => (optionText[r.name] ?? "") !== "");
+  const optionsFilled = buy || rolls.every((r) => (optionText[r.name] ?? "") !== "");
   const ok =
     name.length > 0 &&
     cat !== null &&
@@ -1032,8 +1035,8 @@ function SellForm({
     qtyN <= MAX_QTY &&
     (!enchantOk || !enchant || enchantValue !== null) &&
     optionsFilled &&
-    (mode !== "reserve" || saleWhen.trim().length > 0);
-  const options: ListingOption[] | null = rolls.length
+    (buy || mode !== "reserve" || saleWhen.trim().length > 0);
+  const options: ListingOption[] | null = !buy && rolls.length
     ? rolls.map((r) => ({
         name: r.name,
         value: Number(optionText[r.name]),
@@ -1076,6 +1079,7 @@ function SellForm({
     setError("");
     try {
       await createListing({
+        side,
         item: name,
         category: cat,
         enhance: enhanceOk ? enhance : 0,
@@ -1085,10 +1089,10 @@ function SellForm({
         price: priceN,
         note: note.trim() || null,
         options,
-        mode,
-        saleWhen: mode === "reserve" ? saleWhen.trim() : null,
-        hours: mode === "auction" ? hours : null,
-        autoAuction: mode === "sale" ? autoHours : null,
+        mode: buy ? "sale" : mode,
+        saleWhen: !buy && mode === "reserve" ? saleWhen.trim() : null,
+        hours: !buy && mode === "auction" ? hours : null,
+        autoAuction: !buy && mode === "sale" ? autoHours : null,
         // 스샷은 위키에 없는 물건일 때만 (위키 물건은 위키 정보창으로 보인다)
         shot: shot && !known ? { type: shot.type, data: shot.data } : null,
       });
@@ -1102,6 +1106,23 @@ function SellForm({
 
   return (
     <form className="panel mk-form" onSubmit={submit}>
+      {/* 팝니다 | 삽니다 (제작자 2026-11-03). 삽니다는 아래 판매 방식 줄이 없다 */}
+      <div className="mk-field">
+        <span>무엇을</span>
+        <div className="pill-row mk-side-pick">
+          {(["sell", "buy"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={"pill" + (side === s ? " pill-on" : "")}
+              onClick={() => setSide(s)}
+            >
+              {SIDE_NAME[s]}
+            </button>
+          ))}
+        </div>
+      </div>
+      {!buy && (
       <div className="mk-chips">
         <button
           type="button"
@@ -1123,9 +1144,10 @@ function SellForm({
           className={"pill" + (mode === "auction" ? " pill-on" : "")}
           onClick={() => setMode("auction")}
         >
-          🔨 경매
+          경매
         </button>
       </div>
+      )}
       <label className="mk-field">
         <span>아이템 이름</span>
         <input
@@ -1174,7 +1196,7 @@ function SellForm({
                 aria-label="스샷 빼기"
                 onClick={() => setShot(null)}
               >
-                ✕
+                빼기
               </button>
             </span>
           )}
@@ -1229,7 +1251,7 @@ function SellForm({
           주세요.
         </p>
       )}
-      {rolls.length > 0 && (
+      {!buy && rolls.length > 0 && (
         <div className="mk-field">
           <span>
             옵션 (이 아이템은 옵션이 범위에서 떠요. 내 아이템에 뜬 값을 적어
@@ -1279,7 +1301,7 @@ function SellForm({
         <span>종류</span>
         {wikiCat && known ? (
           <p className="mk-fixed-cat">
-            <MaskIcon src={categoryPic(wikiCat)} size={16} /> {wikiCat}
+            {wikiCat}
             <small>({known.equip[0]?.slot}, 위키에서 정해져요)</small>
           </p>
         ) : (
@@ -1291,7 +1313,7 @@ function SellForm({
                 className={"pill mk-chip" + (cat === c ? " pill-on" : "")}
                 onClick={() => setCategory(c)}
               >
-                <MaskIcon src={categoryPic(c)} size={16} /> {c}
+                {c}
               </button>
             ))}
           </div>
@@ -1394,7 +1416,7 @@ function SellForm({
         </label>
         <label className="mk-field">
           <span className="mk-price-label">
-            {mode === "auction" ? "시작가" : "가격"}
+            {buy ? "희망가" : mode === "auction" ? "시작가" : "가격"}
             <span className="mk-unit">
               <button
                 type="button"
@@ -1442,7 +1464,7 @@ function SellForm({
           )}
         </label>
       </div>
-      {mode === "sale" && (
+      {!buy && mode === "sale" && (
         <div className="mk-field">
           <span>살래요 {WANTS_FOR_AUCTION}명 이상이면 경매로</span>
           <div className="mk-chips">
@@ -1466,7 +1488,7 @@ function SellForm({
           </div>
         </div>
       )}
-      {mode === "reserve" && (
+      {!buy && mode === "reserve" && (
         <label className="mk-field">
           <span>판매 조건</span>
           <input
@@ -1477,7 +1499,7 @@ function SellForm({
           />
         </label>
       )}
-      {mode === "auction" && (
+      {!buy && mode === "auction" && (
         <div className="mk-field">
           <span>
             경매 시간 (시작가부터 남들이 점점 높게 불러요. 끝나면 가장 높게 부른
@@ -1498,23 +1520,25 @@ function SellForm({
         </div>
       )}
       <label className="mk-field">
-        <span>한마디 (안 적어도 돼요)</span>
+        <span>{buy ? "조건 · 한마디 (안 적어도 돼요)" : "한마디 (안 적어도 돼요)"}</span>
         <input
           className="mk-input"
           value={note}
           onChange={(e) => setNote(e.target.value.slice(0, MAX_NOTE))}
-          placeholder="예: 저녁 9시 이후 접속해요"
+          placeholder={buy ? "예: 명중 9 이상, 저녁에 거래해요" : "예: 저녁 9시 이후 접속해요"}
         />
       </label>
       {error && <p className="form-error">{error}</p>}
       <button className="btn" disabled={busy || !ok}>
         {busy
           ? "올리는 중…"
-          : mode === "auction"
-            ? "경매 등록"
-            : mode === "reserve"
-              ? "예약 등록"
-              : "등록"}
+          : buy
+            ? "삽니다 등록"
+            : mode === "auction"
+              ? "경매 등록"
+              : mode === "reserve"
+                ? "예약 등록"
+                : "등록"}
       </button>
     </form>
   );
@@ -1531,11 +1555,13 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const [listings, setListings] = useState<Listing[] | null>(null);
   const [rate, setRate] = useState(75);
   const [onlyAuction, setOnlyAuction] = useEntryState("onlyAuction", false);
-  const [tab, setTab] = useEntryState<Tab>("tab", "buy");
-  // 새 물건·새 골드 글 수는 '사기'와 '골드' 단추에 (news.ts, 제작자 요청 2026-11-02). 보고 있는 칸은 본 것으로
+  const [tab, setTab] = useEntryState<Tab>("tab", "list");
+  /** 목록의 팝니다 | 삽니다 (제작자 2026-11-03) */
+  const [side, setSide] = useEntryState<Side>("side", "sell");
+  // 새 물건·새 골드 글 수는 '목록'과 '골드' 단추에 (news.ts, 제작자 요청 2026-11-02). 보고 있는 칸은 본 것으로
   const news = useNews();
   useNewsSeen(
-    tab === "buy" ? ["market.items"] : tab === "gold" ? ["market.gold"] : [],
+    tab === "list" ? ["market.items"] : tab === "gold" ? ["market.gold"] : [],
   );
   const [query, setQuery] = useEntryState("query", "");
   const [cat, setCat] = useEntryState<Category | "전체">("cat", "전체");
@@ -1564,16 +1590,19 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
     .filter((l) => l.status === "selling")
     .reduce((s, l) => s + l.wants, 0);
   const q = squash(query);
-  const shown = selling.filter(
+  // 팝니다 / 삽니다 는 따로 센다 (제작자 2026-11-03)
+  const sideList = selling.filter((l) => l.side === side);
+  const shown = sideList.filter(
     (l) =>
       (cat === "전체" || l.category === cat) &&
       (!onlyWanted || l.wanted) &&
       (!onlyAuction || l.mode === "auction") &&
       (!q || squash(listingName(l)).includes(q)),
   );
-  const cats = CATEGORIES.filter((c) => selling.some((l) => l.category === c));
-  const auctions = selling.filter((l) => l.mode === "auction").length;
-  const wanted = selling.filter((l) => l.wanted).length;
+  const cats = CATEGORIES.filter((c) => sideList.some((l) => l.category === c));
+  const auctions = sideList.filter((l) => l.mode === "auction").length;
+  const wanted = sideList.filter((l) => l.wanted).length;
+  const countOf = (s: Side) => selling.filter((l) => l.side === s).length;
   const changed = (id: number, next: Listing | null) =>
     setListings((ls) =>
       (ls ?? []).flatMap((l) => (l.id !== id ? [l] : next ? [next] : [])),
@@ -1582,96 +1611,97 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   return (
     <>
       <TopBar title="사파이어 중개인" />
-      <div className="mk-tabs" role="tablist">
+      {/* 맨 위 같은 폭 단추 넷, 그림·이모지 없이 (제작자 2026-11-03). 내 글의 숫자는 내 팝니다·삽니다 글에 온 살래요·팔래요 수 */}
+      <nav className="pill-row mk-tabs" role="tablist">
         {TABS.map((t) => (
           <button
             key={t.key}
             role="tab"
             aria-selected={tab === t.key}
-            className={"pill mk-tab" + (tab === t.key ? " pill-on" : "")}
+            className={"pill" + (tab === t.key ? " pill-on" : "")}
             onClick={() => setTab(t.key)}
           >
-            <img
-              src={
-                t.key === "gold"
-                  ? `${MARKET_PIC}coin.png`
-                  : `${MARKET_PIC}tab_${t.key}_${tab === t.key ? "on" : "off"}.png`
-              }
-              alt=""
-            />
             {t.label}
             {t.key === "mine" && wantsOnMine > 0 && (
-              <span className="mk-badge">♥{wantsOnMine}</span>
+              <span className="mk-badge">{wantsOnMine}</span>
             )}
-            {t.key === "buy" && <NewsDot n={news["market.items"]} />}
+            {t.key === "list" && <NewsDot n={news["market.items"]} />}
             {t.key === "gold" && <NewsDot n={news["market.gold"]} />}
           </button>
         ))}
-      </div>
+      </nav>
 
       {tab === "gold" ? (
         <GoldBoard me={me} />
       ) : !listings ? (
         <Loading error={error} />
-      ) : tab === "buy" ? (
+      ) : tab === "list" ? (
         <>
           <div className="mk-search">
             <input
               className="mk-input"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="🔍 아이템 이름"
+              placeholder="아이템 이름"
               aria-label="아이템 찾기"
             />
             {query && (
-              <button
-                className="pill"
-                onClick={() => setQuery("")}
-                aria-label="지우기"
-              >
-                ✕
+              <button className="pill" onClick={() => setQuery("")}>
+                지우기
               </button>
             )}
-            <button
-              className="pill"
-              onClick={() => setReload((n) => n + 1)}
-              aria-label="새로 보기"
-            >
-              ⟳
+            <button className="pill" onClick={() => setReload((n) => n + 1)}>
+              새로고침
             </button>
           </div>
-          <div className="mk-cats">
-            {(["전체", ...cats] as const).map((c) => (
-              <button
-                key={c}
-                className={"pill mk-chip" + (cat === c ? " pill-on" : "")}
-                onClick={() => setCat(c)}
-              >
-                <MaskIcon src={categoryPic(c)} size={16} /> {c}{" "}
-                <small>
-                  {c === "전체"
-                    ? selling.length
-                    : selling.filter((l) => l.category === c).length}
-                </small>
-              </button>
-            ))}
-            {/* 경매, 내가 '살래요'를 누른 물건: 있을 때만 (켜 둔 채 없어지면 끌 수 있게 그대로 둔다) */}
-            {(auctions > 0 || onlyAuction) && (
-              <button
-                className={"pill mk-chip" + (onlyAuction ? " pill-on" : "")}
-                onClick={() => setOnlyAuction((v) => !v)}
-              >
-                🔨 경매 <small>{auctions}</small>
-              </button>
-            )}
-            {(wanted > 0 || onlyWanted) && (
-              <button
-                className={"pill mk-chip" + (onlyWanted ? " pill-on" : "")}
-                onClick={() => setOnlyWanted((v) => !v)}
-              >
-                ♥ 관심 물건 <small>{wanted}</small>
-              </button>
-            )}
+          {/* 아래 단계: 어두운 띠 안에 팝니다 · 삽니다 와 종류·경매·관심 물건 (제작자 2026-11-03 '버튼 상하위 개념', 장비대여의 .sub-tabs 와 같은 구분) */}
+          <div className="mk-sub">
+            <div className="mk-side" role="tablist">
+              {(["sell", "buy"] as const).map((s) => (
+                <button
+                  key={s}
+                  role="tab"
+                  aria-selected={side === s}
+                  className={"sub-tab" + (side === s ? " sub-tab-on" : "")}
+                  onClick={() => setSide(s)}
+                >
+                  {SIDE_NAME[s]} <small>{countOf(s)}</small>
+                </button>
+              ))}
+            </div>
+            <div className="mk-cats">
+              {(["전체", ...cats] as const).map((c) => (
+                <button
+                  key={c}
+                  className={"sub-tab" + (cat === c ? " sub-tab-on" : "")}
+                  onClick={() => setCat(c)}
+                >
+                  {c}{" "}
+                  <small>
+                    {c === "전체"
+                      ? sideList.length
+                      : sideList.filter((l) => l.category === c).length}
+                  </small>
+                </button>
+              ))}
+              {/* 경매(팝니다만), 내가 살래요·팔래요를 누른 글: 있을 때만 (켜 둔 채 없어지면 끌 수 있게 그대로 둔다) */}
+              {side === "sell" && (auctions > 0 || onlyAuction) && (
+                <button
+                  className={"sub-tab" + (onlyAuction ? " sub-tab-on" : "")}
+                  onClick={() => setOnlyAuction((v) => !v)}
+                >
+                  경매 <small>{auctions}</small>
+                </button>
+              )}
+              {(wanted > 0 || onlyWanted) && (
+                <button
+                  className={"sub-tab" + (onlyWanted ? " sub-tab-on" : "")}
+                  onClick={() => setOnlyWanted((v) => !v)}
+                >
+                  관심 물건 <small>{wanted}</small>
+                </button>
+              )}
+            </div>
           </div>
           <Rows
             wiki={wiki}
@@ -1680,9 +1710,11 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
             rate={rate}
             onChanged={changed}
             empty={
-              selling.length
+              sideList.length
                 ? "찾는 물건이 없어요."
-                : "아직 올라온 물건이 없어요. '팔기'에서 첫 물건을 올려 보세요!"
+                : side === "buy"
+                  ? "아직 삽니다 글이 없어요. '올리기'에서 삽니다를 골라 올려요."
+                  : "아직 올라온 물건이 없어요. '올리기'에서 첫 물건을 올려 보세요!"
             }
           />
         </>
@@ -1693,7 +1725,7 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
           list={mine}
           rate={rate}
           onChanged={changed}
-          empty="아직 판 물건이 없어요. '팔기'에서 올려요."
+          empty="아직 올린 글이 없어요. '올리기'에서 올려요."
         />
       ) : (
         <SellForm

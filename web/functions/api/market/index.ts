@@ -1,7 +1,8 @@
 // GET  /api/market -> 사파이어 중개인: 판매 중인 글 전부와 내 글(거래 완료 포함), 골드 시세(goldRate, 현금 환산용).
 //      글마다 '살래요' 수와 내가 눌렀는지, 내가 제시한 흥정 가격(myOffer). 경매는 입찰 수, 최고가, 내 최고 입찰.
 //      내 글에는 누른 사람 명단(wanters, 흥정 가격 포함)과 입찰 명단(bids)도 준다 (판 사람에게만)
-// POST /api/market { item, category, enhance, enchant, enchantValue, qty, price, note, options, mode, hours } -> 팔 물건 올리기
+// POST /api/market { side, item, category, enhance, enchant, enchantValue, qty, price, note, options, mode, hours } -> 팝니다·삽니다 글 올리기
+//      side: sell 팝니다 | buy 삽니다 (제작자 2026-11-03: 삽니다는 price 가 희망가, note 가 조건. 예약·경매·옵션 값 없음. 팔 사람이 '팔래요'(want)를 누른다)
 //      options: 옵션이 범위에서 뜨는 아이템이면 판 사람이 적은 값 [{ name, value, unit }]
 //      mode: sale 바로 판매 | reserve 예약 판매 (saleWhen 판매 조건, 나머지는 바로 판매와 같다) | auction 경매 (price = 시작가, hours 시간 동안)
 //      shot: 위키에 없는 물건의 스샷 { type, data(base64) } (제작자 요청 2026-11-02: 옵션은 데이터로 만들지 않고 그림을 정보창처럼 보여 준다, D1 listing_shots)
@@ -98,13 +99,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const selling = await env.DB.prepare("SELECT COUNT(*) AS n FROM listings WHERE seller = ? AND status = 'selling'")
     .bind(me.id)
     .first<{ n: number }>();
-  if ((selling?.n ?? 0) >= MAX_SELLING) return json({ error: `한 사람이 ${MAX_SELLING}개까지 팔 수 있어요. 다 판 것은 '거래 완료'를 눌러 주세요` }, 409);
+  if ((selling?.n ?? 0) >= MAX_SELLING) return json({ error: `한 사람이 ${MAX_SELLING}개까지 올릴 수 있어요. 끝난 것은 '거래 완료'를 눌러 주세요` }, 409);
   const row = await env.DB.prepare(
-    "INSERT INTO listings (seller, item, category, enhance, enchant, enchant_value, qty, price, note, options, mode, sale_when, ends_at, auto_auction, " +
-      "status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'selling', ?, ?) RETURNING *",
+    "INSERT INTO listings (side, seller, item, category, enhance, enchant, enchant_value, qty, price, note, options, mode, sale_when, ends_at, auto_auction, " +
+      "status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'selling', ?, ?) RETURNING *",
   )
     .bind(
-      me.id, input.item, input.category, input.enhance, input.enchant, input.enchantValue, input.qty, input.price, input.note,
+      input.side, me.id, input.item, input.category, input.enhance, input.enchant, input.enchantValue, input.qty, input.price, input.note,
       input.options ? JSON.stringify(input.options) : null, input.mode, input.saleWhen, input.hours ? now + input.hours * 3_600_000 : null, input.autoAuction, now, now,
     )
     .first<ListingRow>();
@@ -112,6 +113,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (shot) {
     await env.DB.prepare("INSERT INTO listing_shots (listing_id, type, data, created_at) VALUES (?, ?, ?, ?)").bind(row.id, shot.type, shot.bytes, now).run();
   }
-  await notify(env, "all", "market_new", `${me.id}님이 ${itemName(row)} 올림${row.mode === "auction" ? " (경매)" : row.mode === "reserve" ? ` (예약 · ${row.sale_when})` : ""}`, "#/market", me.id);
+  await notify(
+    env,
+    "all",
+    "market_new",
+    input.side === "buy"
+      ? `${me.id}님이 ${itemName(row)} 삽니다 · 희망가 ${row.price.toLocaleString("ko-KR")}골드`
+      : `${me.id}님이 ${itemName(row)} 올림${row.mode === "auction" ? " (경매)" : row.mode === "reserve" ? ` (예약 · ${row.sale_when})` : ""}`,
+    "#/market",
+    me.id,
+  );
   return json({ ...listingOut(row), wants: 0, wanted: false, myOffer: null, bidCount: 0, highestBid: null, myBid: null, talkCount: 0, shot: !!shot, wanters: [], bids: [] }, 201);
 };

@@ -31,16 +31,14 @@ export const MAX_QTY = 9999;
 export const MAX_PRICE = 99_999_999_999;
 export const MAX_NOTE = 60;
 
-/** 게임 거래소 스샷에서 자른 그림 (자료/scripts/make_market_marks.py) */
+/** 게임 거래소 스샷에서 자른 그림 (자료/scripts/make_market_marks.py). 2026-11-03 개편 뒤에는 동전과 정보창의 직업 그림만 쓴다 (종류·탭 그림은 뺐다, 제작자 '이모지 다 빼') */
 export const MARKET_PIC = "/data/market/";
 
-/** 종류 그림 파일 (주소에 한글을 안 쓰려고 영문. make_market_marks.py 와 같다) */
-const CATEGORY_FILE: Record<Category | "전체", string> = {
-  전체: "all", 갑옷: "armor", 주장비: "weapon", 투구: "helmet", 보조장비: "sub", 장갑: "gloves", 신발: "shoes", 벨트: "belt",
-  망토: "cape", 목걸이: "necklace", 반지: "ring", 가방: "bag", 소모품: "potion", 인챈트: "enchant", 기타: "etc",
-  스킬북: "skillbook", 펫: "pet", 코스튬: "costume",
-};
-export const categoryPic = (c: Category | "전체") => `${MARKET_PIC}cat_${CATEGORY_FILE[c]}.png`;
+/** 팝니다 | 삽니다 (제작자 2026-11-03 '템도 팝니다 삽니다'): 삽니다 글은 price 가 희망가, note 가 조건, 팔 사람이 '팔래요'(살래요와 같은 want) */
+export type Side = "sell" | "buy";
+export const SIDE_NAME: Record<Side, string> = { sell: "팝니다", buy: "삽니다" };
+/** 남이 누르는 단추 이름: 팝니다 글은 '살래요', 삽니다 글은 '팔래요' */
+export const wantVerb = (l: { side: Side }) => (l.side === "buy" ? "팔래요" : "살래요");
 
 /** 판 사람이 적은 옵션 하나 (예: 명중 5, 이동속도 3%) */
 export interface ListingOption {
@@ -74,6 +72,8 @@ export const AUCTION_HOURS: { hours: number; label: string }[] = [
 
 export interface Listing {
   id: number;
+  side: Side;
+  /** 올린 사람 (삽니다 글이면 구하는 사람) */
   seller: string;
   item: string;
   category: Category;
@@ -115,6 +115,7 @@ export interface Listing {
 }
 
 export interface ListingInput {
+  side: Side;
   item: string;
   category: Category;
   enhance: number;

@@ -103,9 +103,10 @@ export const GUIDES: Guide[] = [
     key: "market",
     title: "사파이어 중개인",
     tutorial: [
-      { sel: "[data-tut-sample] .mk-row, .mk-list .mk-row", head: "물건 줄", text: "살래요에 흥정 가격을 붙일 수 있어요. 누가 눌렀는지와 흥정 가격은 판 사람만 봐요.", tap: true, opens: ".mk-open .mk-detail" },
+      { sel: ".mk-side", head: "팝니다 · 삽니다", text: "삽니다 글은 구하는 사람이 희망가와 조건을 적은 거예요. 팔 사람이 '팔래요'를 눌러요." },
+      { sel: "[data-tut-sample] .mk-row, .mk-list .mk-row", head: "물건 줄", text: "살래요(삽니다 글은 팔래요)에 흥정 가격을 붙일 수 있어요. 누가 눌렀는지와 흥정 가격은 올린 사람만 봐요.", tap: true, opens: ".mk-open .mk-detail" },
       { sel: ".mk-open .mk-detail", head: "정보창", text: "살래요가 2명 넘으면 경매로 바꿀 수 있어요. 올릴 때 미리 정해 두면 저절로 경매가 돼요." },
-      { sel: "[role=tab]:has-text('팔기')", head: "팔기", text: "예약 판매는 언제 팔지 조건(날짜, 레벨, 다음 무기 구하면)을 적어 미리 올려요.", tap: true, opens: ".mk-form", undo: false },
+      { sel: "[role=tab]:has-text('올리기')", head: "올리기", text: "맨 위에서 팝니다와 삽니다를 골라요. 예약 판매는 언제 팔지 조건(날짜, 레벨, 다음 무기 구하면)을 적어 미리 올려요.", tap: true, opens: ".mk-form", undo: false },
       {
         sel: ".mk-shot-btn",
         type: { sel: ".mk-form .mk-input", value: "길잡이의 검" },
@@ -113,8 +114,8 @@ export const GUIDES: Guide[] = [
         text: "위키에 없는 이름을 적으면 이 단추가 나와요. 스샷을 고르면 AI 가 이름, 종류, 강화를 읽어 채워요.\n가격은 현금으로 적어도 돼요. 시세로 골드를 계산해 올라가요.",
       },
       {
-        sel: "[role=tab]:has-text('내 판매')",
-        head: "내 판매",
+        sel: "[role=tab]:has-text('내 글')",
+        head: "내 글",
         text: "거래 완료를 누른 글은 30일 동안만 보여요. 경매가 끝나면 낙찰자를 보고 게임 안에서 거래한 뒤 거래 완료를 눌러요.",
         tap: true,
         undo: false,

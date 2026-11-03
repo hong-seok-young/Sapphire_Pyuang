@@ -98,6 +98,7 @@ CREATE TABLE IF NOT EXISTS listings (
   ends_at INTEGER,                        -- 경매가 끝나는 때
   auto_auction INTEGER,                   -- 바로 판매인데 '살래요'가 2명 이상이면 저절로 이 시간짜리 경매로 (올릴 때 정함)
   sale_when TEXT,                         -- 예약 판매(mode reserve)의 판매 조건: '11/10 저녁', '50레벨 찍으면', '다음 무기 구하면' (제작자 요청 2026-11-02)
+  side TEXT NOT NULL DEFAULT 'sell',      -- sell 팝니다 | buy 삽니다 (price 는 희망가, note 는 조건, '팔래요'는 listing_wants. 제작자 2026-11-03)
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );

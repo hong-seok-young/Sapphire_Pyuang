@@ -143,7 +143,6 @@ function GoldDetail({ me, o, onChanged }: { me: Me; o: GoldOffer; onChanged: (ne
             <ul className="mk-wanters">
               {o.wanters!.map((w) => (
                 <li key={w.id}>
-                  ♥{" "}
                   <b>
                     <Nick name={w.id} />
                   </b>{" "}
@@ -179,7 +178,7 @@ function GoldDetail({ me, o, onChanged }: { me: Me; o: GoldOffer; onChanged: (ne
             <div className="mk-actions">
               {o.status === "open" ? (
                 <button className="pill" disabled={busy} onClick={() => run(async () => onChanged({ ...o, ...(await updateGold(o.id, { status: "done" })) }))}>
-                  ✔ 거래 완료
+                  거래 완료
                 </button>
               ) : (
                 <button className="pill" disabled={busy} onClick={() => run(async () => onChanged({ ...o, ...(await updateGold(o.id, { status: "open" })) }))}>
@@ -208,7 +207,7 @@ function GoldDetail({ me, o, onChanged }: { me: Me; o: GoldOffer; onChanged: (ne
           <div className="mk-actions">
             {o.wanted ? (
               <button className="pill pill-on" disabled={busy} onClick={() => run(async () => onChanged({ ...o, ...(await unwantGold(o.id)) }))}>
-                ♥ {want} 취소
+                {want} 취소
               </button>
             ) : (
               <>
@@ -220,7 +219,7 @@ function GoldDetail({ me, o, onChanged }: { me: Me; o: GoldOffer; onChanged: (ne
                   aria-label="한마디"
                 />
                 <button className="pill mk-want" disabled={busy} onClick={() => run(async () => onChanged({ ...o, ...(await wantGold(o.id, note.trim() || null)) }))}>
-                  ♥ {want}
+                  {want}
                 </button>
               </>
             )}
@@ -272,7 +271,7 @@ export function GoldBoard({ me }: { me: Me }) {
   return (
     <>
       <p className="gold-warn">
-        ⚠ 골드 현금거래는 게임 운영정책에 걸리면 계정이 정지될 수 있어요. 앱은 돈을 받거나 보내지 않고, 거래는 각자 책임이에요.
+        골드 현금거래는 게임 운영정책에 걸리면 계정이 정지될 수 있어요. 앱은 돈을 받거나 보내지 않고, 거래는 각자 책임이에요.
       </p>
       <div className="gold-market">
         <span>
@@ -293,9 +292,7 @@ export function GoldBoard({ me }: { me: Me }) {
         <button className={"pill mk-chip" + (writing ? " pill-on" : "")} onClick={() => setWriting((w) => !w)}>
           ＋ 글쓰기
         </button>
-        <button className="pill mk-chip" onClick={() => setReload((n) => n + 1)} aria-label="새로 보기">
-          ⟳
-        </button>
+        <button className="pill mk-chip" onClick={() => setReload((n) => n + 1)} aria-label="새로 보기">새로고침</button>
       </div>
       {writing && (
         <GoldForm
@@ -322,7 +319,7 @@ export function GoldBoard({ me }: { me: Me }) {
                   </b>
                   <small>
                     <span>{o.rate}:1</span>
-                    {o.wants > 0 && <span className={"mk-wants" + (o.wanted ? " mk-wants-me" : "")}>♥ {o.wants}</span>}
+                    {o.wants > 0 && <span className={"mk-wants" + (o.wanted ? " mk-wants-me" : "")}>{o.side === "sell" ? "살래요" : "팔래요"} {o.wants}</span>}
                     {o.status === "done" && <span>거래 완료</span>}
                   </small>
                 </span>

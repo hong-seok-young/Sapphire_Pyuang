@@ -612,9 +612,19 @@ button { font: inherit; color: inherit; }
   -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
   -webkit-mask-position: center; mask-position: center;
 }
-.mk-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 10px; }
-.mk-tab { position: relative; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 2px; font-size: 13px; }
-.mk-tab img { height: 22px; width: auto; }
+/* 맨 위 단추 넷은 .pill-row (같은 폭, 글자만. 2026-11-03 개편: 탭 그림과 이모지를 뺐다). 내 글의 숫자는 모서리에 */
+.mk-tabs { margin-bottom: 8px; }
+.mk-tabs .pill { position: relative; }
+/* 아래 단계: 어두운 띠 안에 팝니다·삽니다 한 줄과 종류 칩 (장비대여 .sub-tabs·랭킹 .rank-filters 와 같은 상하위 구분) */
+.mk-sub { display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; margin: 0 0 10px; padding: 5px; background: rgba(11, 10, 26, 0.5); }
+.mk-side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.mk-side .sub-tab { padding: 5px 4px; font-size: 13px; }
+.mk-sub .mk-cats { margin: 0; gap: 4px; }
+.mk-sub .sub-tab small { font-size: 10px; opacity: 0.8; }
+.mk-sub .sub-tab-on small { opacity: 1; }
+/* 삽니다 글: 하늘색 표, 줄의 조건 글 */
+.mk-buy-tag { color: #8fd3ff; }
+.mk-row-note { color: var(--muted); }
 .mk-badge {
   position: absolute; top: -9px; right: -4px; padding: 0 5px; font-size: 10px; line-height: 16px; color: #fff;
   background: var(--red); border: 1px solid var(--edge);
@@ -1154,6 +1164,12 @@ button { font: inherit; color: inherit; }
 
 /* updated menu on home (updates.ts, 제작자 요청): a mint border and an 'UPDATE' tag at the top right for a day after the first visit */
 .tile-new { border-color: #3fe0a0; box-shadow: inset var(--px) var(--px) 0 rgba(63, 224, 160, 0.45), inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--lo), 0 0 6px rgba(63, 224, 160, 0.55); }
+<<<<<<< Updated upstream
+=======
+/* 칸 오른쪽 위 글자만 (장비대여 담당자: '관리자' 아래 '멍멍', 제작자 요청 2026-11-03 '텍스트로만'). UPDATE 표는 그 칸에서는 왼쪽 위로 */
+.tile-corner { position: absolute; z-index: 3; top: 4px; right: 6px; display: flex; flex-direction: column; align-items: flex-end; line-height: 11px; font-size: 9px; color: var(--muted); pointer-events: none; }
+.tile-corner span:last-child { color: var(--gold); }
+>>>>>>> Stashed changes
 .tile-update {
   position: absolute; z-index: 3; top: 4px; right: 4px; padding: 0 3px; font-size: 8px; font-weight: 700; line-height: 14px;
   color: var(--edge); background: #3fe0a0; border: 1px solid var(--edge); animation: update-pop 1.8s ease-in-out infinite;
