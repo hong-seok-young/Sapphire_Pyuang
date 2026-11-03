@@ -218,7 +218,7 @@ SQUEEZE = {"닼": "다크", "롭": "로브", "렌": "레인"}
 # 자동으로 풀기 어려운 줄임말 (제작자 확인). 값이 None 이면 위키에 없는 물건이라 줄임말 그대로 둔다
 ALIASES: dict[str, str | None] = {
     "의망": "의지의 망토", "반죽망": "반죽음의망토", "죽망": "죽음의망토", "헌보": "헌터보우",
-    "닼스": "다크스컬", "닼소": "다크스틸소드", "닼쉴": "다크스틸쉴드", "닼아": "다크스틸아머", "닼투": "다크스틸투구",
+    "닼": "다크스틸소드", "닼스": "다크스컬", "닼소": "다크스틸소드",  # 닼 혼자(8닼, 팔닼)는 다크스틸소드 (제작자 2026-11-04) "닼쉴": "다크스틸쉴드", "닼아": "다크스틸아머", "닼투": "다크스틸투구",
     "뿌벨": "거친뿌리의벨트", "뿌리벨": "거친뿌리의벨트", "건마벨": "건조한마력의벨트", "마재벨": "마나재생벨트", "서약벨": "서약자의벨트",
     "가지갑": "세계수가지갑옷", "껍갑": "세계수껍질갑옷", "세계롭": "세계수잎로브", "세계수롭": "세계수잎로브",
     "광전사": "광전사의부츠", "정반": "정화된힘의반지", "약반": "약속의반지", "현인장": "현인의장갑", "정화장": "정화의장갑",
@@ -472,6 +472,9 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
                     break
                 opts.append(o)
                 w = w[g.end():]
+            if re.fullmatch(r"\+?(?:\d{1,2}|[오육칠팔구십])?닼", w):  # '8닼', '팔닼' = +8 다크스틸소드 (제작자 2026-11-04)
+                names.append(w)
+                continue
             if len(re.sub(r"[^가-힣a-zA-Z]", "", STAT_RE.sub("", w))) < 2:
                 continue  # 스펙 말만 남음
             if w:
@@ -521,7 +524,7 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
         m = ENHANCE_RE.match(w)
         for k, c in enumerate([w] + ([w[m.end():]] if m else [])):
             c = re.sub(r"[^가-힣a-zA-Z0-9]", "", c)
-            if len(c) < 2 or c in NOT_ITEM_WORDS:
+            if (len(c) < 2 and c != "닼") or c in NOT_ITEM_WORDS:
                 continue
             found = rs.resolve(c)
             if found:
