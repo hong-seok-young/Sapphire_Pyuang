@@ -81,8 +81,11 @@ function rangeOf(title: string): [number, number] | null {
 
 /** 글로 가는 링크: 원글에서만 보는 글(공략 글, 지도·스샷뿐인 글)은 카페 원글로 바로 (새 창), 나머지는 위키 글 화면 */
 type LinkTo = (id: string) => { href: string; target?: string; rel?: string };
-/** 원글로 바로 가는 글은 단추에 '원글 ↗' (제작자 요청 2026-11-01: 바로 원글 가는 건 단추에 써 놓고) */
-const Out = ({ to, id }: { to: LinkTo; id: string }) => (to(id).target ? <i className="mn-out">원글 ↗</i> : null);
+/**
+ * 원글로 바로 가는 글은 단추에 '원글 ↗' (제작자 요청 2026-11-01: 바로 원글 가는 건 단추에 써 놓고).
+ * 카드에서는 제목 글자 흐름 안에 오른쪽으로 띄워(float) 제목이 표 밑으로 흐르지 않는다 (2026-11-03 제작자: 제목 글자가 '원글 ↗' 와 겹쳐 잘려 보였다)
+ */
+const Out = ({ to, id, inline }: { to: LinkTo; id: string; inline?: boolean }) => (to(id).target ? <i className={inline ? "mn-out mn-out-in" : "mn-out"}>원글 ↗</i> : null);
 
 export function MenuPage({ wiki, title, me }: { wiki: Wiki; title: string; me?: Me }) {
   const sec = wiki.menu.find((m) => m.title === title);
@@ -206,10 +209,12 @@ function Grouped({ items, groups, to }: { items: Item[]; groups?: { name: string
                 const { label, sub } = labelOf(x.title);
                 return (
                   <a key={x.id} className="card mn-card" {...to(x.id)}>
-                    <Out to={to} id={x.id} />
                     <span className="mn-card-icon">{iconOf(x.title)}</span>
                     <span className="mn-card-text">
-                      <b>{label}</b>
+                      <b>
+                        <Out to={to} id={x.id} inline />
+                        {label}
+                      </b>
                       {sub && <small>{sub}</small>}
                     </span>
                   </a>

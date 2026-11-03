@@ -54,7 +54,9 @@ const close = () => {
   emit();
 };
 /** 넣어 둔 튜토리얼 기록이 시작한 화면과 같은 주소 그대로인지 (튜토리얼이 go 로 옮긴 채 끝났으면 다른 주소라 진짜 화면 하나로 남긴다) */
-const dupEntry = () => !!history.state?.tut && norm(location.hash) === norm(history.state.tutFrom ?? "");
+const dupEntry = () =>
+  !!history.state?.tut &&
+  norm(location.hash) === norm(history.state.tutFrom ?? "");
 const norm = (h: string) => h.replace(/^#\/?/, "");
 // 튜토리얼이 닫힌 뒤 남은 '튜토리얼 기록'(state.tut, 같은 주소)에 뒤로 가기로 닿으면 한 번 더 뒤로 가서 건너뛴다 (화면이 안 바뀌는 헛도는 뒤로 가기를 없앤다)
 window.addEventListener("popstate", () => {
@@ -67,7 +69,9 @@ export function GuideHost({ me }: { me: Me }) {
   if (!open) return null;
   const key = open.slice(open.indexOf(":") + 1);
   const guide = GUIDES.find((g) => g.key === key);
-  return guide ? <Tutorial key={open} guide={guide} me={me} onEnd={close} /> : null;
+  return guide ? (
+    <Tutorial key={open} guide={guide} me={me} onEnd={close} />
+  ) : null;
 }
 
 // ---------- 튜토리얼 ----------
@@ -85,7 +89,11 @@ function find(sel: string): HTMLElement | null {
     if (m) list = list.filter((el) => (el.textContent ?? "").includes(m[2]));
     const el = list.find((e) => {
       const r = e.getBoundingClientRect();
-      return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== "hidden";
+      return (
+        r.width > 0 &&
+        r.height > 0 &&
+        getComputedStyle(e).visibility !== "hidden"
+      );
     });
     if (el) return el;
   }
@@ -99,7 +107,11 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 function alreadyDone(el: HTMLElement | null, step: GuideStep): boolean {
   if (step.opens) return !!find(step.opens);
   if (step.closes) return !find(step.closes);
-  const state = el ? (el.getAttribute("aria-expanded") ?? el.getAttribute("aria-selected") ?? el.getAttribute("aria-pressed")) : null;
+  const state = el
+    ? (el.getAttribute("aria-expanded") ??
+      el.getAttribute("aria-selected") ??
+      el.getAttribute("aria-pressed"))
+    : null;
   return state === "true";
 }
 /**
@@ -107,7 +119,8 @@ function alreadyDone(el: HTMLElement | null, step: GuideStep): boolean {
  * 장비대여 정보창의 바깥, 배치 편집의 완료) 그것을, 없으면 그 자리를 한 번 더 눌러 접는다 (토글). 탭(undo: false)은 그대로 둔다. 닫았으면 true
  */
 function undoTap(el: HTMLElement | null, step: GuideStep): boolean {
-  if (!step.tap || step.fx || step.undo === false || !alreadyDone(el, step)) return false;
+  if (!step.tap || step.fx || step.undo === false || !alreadyDone(el, step))
+    return false;
   const dismiss = find("[data-tut-dismiss]");
   if (dismiss) dismiss.click();
   else if (el) el.click();
@@ -117,7 +130,15 @@ function undoTap(el: HTMLElement | null, step: GuideStep): boolean {
 /** 주소의 첫 칸 ('#/rent?v=apps' -> 'rent', '#/' -> '') */
 const hashKey = () => location.hash.replace(/^#\/?/, "").split(/[/?]/)[0];
 
-function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => void }) {
+function Tutorial({
+  guide,
+  me,
+  onEnd,
+}: {
+  guide: Guide;
+  me: Me;
+  onEnd: () => void;
+}) {
   const steps = guide.tutorial.filter((s) => canSee(s.who, me));
   const [i, setI] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
@@ -132,6 +153,12 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
   const going = useRef(false);
   /** 이 단계에서 눌러 이미 넘어가는 중 (두 번 눌러 두 단계 건너뛰지 않게) */
   const fired = useRef(false);
+  /** 눌러 준 뒤 잠깐 기다렸다 넘어가는 타이머: 단계가 바뀌면 지운다 (제작자 2026-11-03: 이전을 눌렀는데 전으로 갔다가 다시 돌아왔다 = 남아 있던 타이머) */
+  const timer = useRef(0);
+  const later = (fn: () => void, ms: number) => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(fn, ms);
+  };
   /** 단계마다 보였을 때의 주소 (이전으로 돌아올 때 그 주소로) */
   const shownAddr = useRef<Record<number, string>>({});
   const sameAddr = (a: string, b: string) => norm(a) === norm(b);
@@ -141,7 +168,8 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
     if (pushed.current) {
       pushed.current = false;
       if (dupEntry()) history.back();
-      else if (history.state?.tut) history.replaceState({ ...history.state, tut: false }, "");
+      else if (history.state?.tut)
+        history.replaceState({ ...history.state, tut: false }, "");
     }
     onEnd();
   };
@@ -156,9 +184,11 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
     }
     let alive = true;
     fired.current = false;
+    window.clearTimeout(timer.current);
     (async () => {
       // 이 단계의 주소로: go 가 있으면 그 주소, 이전으로 돌아오는 것이면 그 단계를 보였을 때의 주소 (기록 칸은 늘리지 않는다)
-      const addr = step.go ?? (dir.current < 0 ? shownAddr.current[i] : undefined);
+      const addr =
+        step.go ?? (dir.current < 0 ? shownAddr.current[i] : undefined);
       const move = !!addr && !sameAddr(location.hash, addr);
       if (move) {
         going.current = true;
@@ -170,7 +200,12 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
       if (step.sel) {
         // 이전으로 돌아올 때, 연 것이 무엇인지(opens·closes) 아는 눌러 보기 단계는 자리를 찾기 전에 먼저 닫는다
         // (배치 편집 단추는 편집 중에는 없어서, 완료를 눌러 편집을 끝내야 비출 수 있다)
-        if (dir.current < 0 && (step.opens || step.closes) && undoTap(null, step)) await wait(300);
+        if (
+          dir.current < 0 &&
+          (step.opens || step.closes) &&
+          undoTap(null, step)
+        )
+          await wait(300);
         for (let t = 0; t < (move ? 15 : 8) && alive; t++) {
           el = find(step.sel);
           if (el) break;
@@ -181,7 +216,8 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
         if (!el && dir.current < 0) {
           for (let k = i - 1; k >= 0 && !el; k--) {
             const s = steps[k];
-            if (!s.tap || !s.opens || s.undo === false || find(s.opens)) continue;
+            if (!s.tap || !s.opens || s.undo === false || find(s.opens))
+              continue;
             const e = s.sel ? find(s.sel) : null;
             if (!e) continue;
             e.click();
@@ -200,7 +236,12 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
           return;
         }
         // 이전으로 눌러 보기 단계에 돌아온 것이면 열어 둔 것을 닫아 그때 화면으로 (opens·closes 가 없는 것: aria-expanded 로 안다)
-        if (dir.current < 0 && !step.opens && !step.closes && undoTap(el, step)) {
+        if (
+          dir.current < 0 &&
+          !step.opens &&
+          !step.closes &&
+          undoTap(el, step)
+        ) {
           await wait(250);
           if (!alive) return;
         }
@@ -223,7 +264,10 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
 
   // 폰의 뒤로 가기로 닫기: 열 때 방문 기록을 하나 넣어 두고, 뒤로 가기가 오면(popstate) 닫는다. 그만·끝은 finish 가 그 기록을 뺀다
   useEffect(() => {
-    history.pushState({ ...(history.state ?? {}), tut: true, tutFrom: location.hash }, "");
+    history.pushState(
+      { ...(history.state ?? {}), tut: true, tutFrom: location.hash },
+      "",
+    );
     pushed.current = true;
     const onPop = () => {
       pushed.current = false;
@@ -257,7 +301,8 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
     const onHash = () => {
       if (going.current) return;
       const k = hashKey();
-      if (k !== guide.key && GUIDES.some((g) => g.key === k)) finishRef.current();
+      if (k !== guide.key && GUIDES.some((g) => g.key === k))
+        finishRef.current();
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
@@ -275,31 +320,21 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
       if (fromScreen && step.tap && !step.fx && el && !alreadyDone(el, step)) {
         fired.current = true;
         el.click();
-        window.setTimeout(finish, 300);
+        later(finish, 300);
       } else finish();
       return;
     }
     if (step.tap && !step.fx && el && !alreadyDone(el, step)) {
       fired.current = true;
       el.click();
-      window.setTimeout(() => setI(i + 1), 450);
+      later(() => setI(i + 1), 450);
     } else setI(i + 1);
   };
-  // 날씨 샘플의 '빈 곳을 눌러 보세요': 글 상자 밖을 누르면 터지는 것을 보고(1.8초) 넘어간다 (다른 단계의 누름은 아래 onOverlay)
-  useEffect(() => {
-    if (!step?.tap || !step.fx) return;
-    const onDown = (e: Event) => {
-      const t = e.target as Element | null;
-      if (t && t.closest(".tut-box")) return;
-      if (fired.current) return;
-      fired.current = true;
-      dir.current = 1;
-      window.setTimeout(() => setI((n) => n + 1), 1800);
-    };
-    document.addEventListener("pointerdown", onDown, true);
-    return () => document.removeEventListener("pointerdown", onDown, true);
-  }, [step]);
-  /** 어두운 막·네모 위 아무 데나 누르면 다음으로 (글 상자 안과 찾는 중은 빼고. 날씨 샘플의 빈 곳 누르기는 위 pointerdown 이 맡는다) */
+  /**
+   * 어두운 막·네모 위 아무 데나 누르면 다음으로 (글 상자 안과 찾는 중은 빼고).
+   * 날씨 샘플의 '빈 곳을 눌러 보세요'(fx + tap)는 누를 때마다 터지기만 하고 넘어가지 않는다: 다음 단추로 넘어간다
+   * (제작자 2026-11-03: 여기서는 아무 데나 눌러서 넘어가게 하지 말고 다음 버튼을 눌러야. 전에는 1.8초 뒤 저절로 넘어가 '14번 누르니 넘어갔다')
+   */
   const onOverlay = (e: React.MouseEvent) => {
     if ((e.target as Element).closest(".tut-box")) return;
     if (shownAt !== i) return;
@@ -309,10 +344,16 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
 
   if (nothing)
     return createPortal(
-      <div className="tut" onClick={(e) => !(e.target as Element).closest(".tut-box") && finish()}>
+      <div
+        className="tut"
+        onClick={(e) => !(e.target as Element).closest(".tut-box") && finish()}
+      >
         <div className="tut-box" style={{ bottom: 80 }}>
           <small>{guide.title} 튜토리얼</small>
-          <p>지금 이 화면에는 보여 줄 게 없어요. 글이나 신청, 파티가 생기면 다시 눌러 보세요.</p>
+          <p>
+            지금 이 화면에는 보여 줄 게 없어요. 글이나 신청, 파티가 생기면 다시
+            눌러 보세요.
+          </p>
           <div className="tut-acts">
             <button className="pill pill-on" onClick={finish}>
               닫기
@@ -323,15 +364,21 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
       document.body,
     );
   if (!step) return null;
-  // 다음 자리를 찾는 동안(건너뛰는 단계가 있으면 1~2초)은 어두운 막만 두어 화면이 깜박이지 않게 (옛 단계 자리에 새 글이 잠깐 뜨지 않게 단계 번호로 가린다)
-  if (shownAt !== i)
+  // 다음 자리를 찾는 동안(0.1~2초)은 앞 단계의 네모(또는 날씨 샘플)를 그대로 두고 글 상자만 숨긴다: 어두운 막을 껐다 켜면 화면이 한 번 깜박였다
+  // (제작자 2026-11-03 '이전 다음 누를 때마다 화면이 깜빡'). 네모는 새 자리로 미끄러져 간다 (.tut-spot transition). 처음(아직 아무것도 못 비춤)은 어두운 막
+  const cur = shownAt === i;
+  const vstep: GuideStep | undefined = cur
+    ? step
+    : shownAt >= 0
+      ? steps[shownAt]
+      : undefined;
+  if (!vstep)
     return createPortal(
       <div className="tut">
         <div className="tut-dim" />
       </div>,
       document.body,
     );
-  // 그만·이전·다음 단추 (글 상자 안)
   const pad = 6;
   const r = rect;
   const W = window.innerWidth;
@@ -344,7 +391,7 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
   // 글 상자: 비춘 자리 아래, 자리가 아래쪽이면 위, 자리가 크면 아래쪽에. 날씨 샘플은 위에 (아래에 쌓이는 것을 보게)
   const tall = !!r && r.height > H * 0.45;
   const below = !!r && !tall && r.bottom + 160 < H;
-  const boxStyle: CSSProperties = step.fx
+  const boxStyle: CSSProperties = vstep.fx
     ? { top: 12 }
     : !r || tall
       ? { bottom: 80 }
@@ -353,47 +400,62 @@ function Tutorial({ guide, me, onEnd }: { guide: Guide; me: Me; onEnd: () => voi
         : { bottom: Math.max(8, Math.min(H - 170, H - sy + 10)) };
   return createPortal(
     <>
-      {step.fx && <WeatherFx key={step.fx} sky={step.fx} />}
+      {vstep.fx && <WeatherFx key={vstep.fx} sky={vstep.fx} />}
       <div className="tut" aria-live="polite" onClick={onOverlay}>
-        {step.fx ? null : r && !missing ? (
-          <div className={"tut-spot" + (step.tap ? " tut-spot-tap" : "")} style={{ left: sx, top: sy, width: Math.max(0, ex - sx), height: Math.max(0, ey - sy) }} />
+        {vstep.fx ? null : r && !missing ? (
+          <div
+            className={"tut-spot" + (vstep.tap && cur ? " tut-spot-tap" : "")}
+            style={{
+              left: sx,
+              top: sy,
+              width: Math.max(0, ex - sx),
+              height: Math.max(0, ey - sy),
+            }}
+          />
         ) : (
           <div className="tut-dim" />
         )}
-        <div className="tut-box" style={boxStyle}>
-          <small>
-            {guide.title} 튜토리얼 {i + 1}/{steps.length}
-          </small>
-          {step.head && (
-            <b className="tut-head">
-              {step.tap && <span className="tut-tap">눌러 보기</span>}
-              {step.head}
-            </b>
-          )}
-          <p>
-            {!step.head && step.tap && <span className="tut-tap">눌러 보기</span>}
-            {step.text}
-          </p>
-          <div className="tut-acts">
-            <button className="bd-mini" onClick={finish}>
-              그만
-            </button>
-            {i > 0 && (
-              <button
-                className="pill"
-                onClick={() => {
-                  dir.current = -1;
-                  setI(i - 1);
-                }}
-              >
-                이전
-              </button>
+        {cur && (
+          <div className="tut-box" style={boxStyle}>
+            <small>
+              {guide.title} 튜토리얼 {i + 1}/{steps.length}
+            </small>
+            {step.head && (
+              <b className="tut-head">
+                {step.tap && <span className="tut-tap">눌러 보기</span>}
+                {step.head}
+              </b>
             )}
-            <button className={"pill" + (step.tap ? "" : " pill-on")} onClick={() => next()}>
-              {i + 1 >= steps.length ? "끝" : "다음"}
-            </button>
+            <p>
+              {!step.head && step.tap && (
+                <span className="tut-tap">눌러 보기</span>
+              )}
+              {step.text}
+            </p>
+            <div className="tut-acts">
+              <button className="bd-mini" onClick={finish}>
+                그만
+              </button>
+              {i > 0 && (
+                <button
+                  className="pill"
+                  onClick={() => {
+                    dir.current = -1;
+                    setI(i - 1);
+                  }}
+                >
+                  이전
+                </button>
+              )}
+              <button
+                className={"pill" + (step.tap ? "" : " pill-on")}
+                onClick={() => next()}
+              >
+                {i + 1 >= steps.length ? "끝" : "다음"}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </>,
     document.body,

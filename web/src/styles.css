@@ -1117,20 +1117,22 @@ button { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .hs-text { animation: none; }
 }
-/* 닉네임이 뜨는 곳마다 고스펙 반짝임 (src/kakao.tsx Nick, 제작자 요청 2026-11-02 '어디서든, 폰트 크기나 글씨체는 바꾸지 말고 딱 애니메이션만'):
-   글자는 그 자리 색 그대로, 같은 글자를 위에 겹쳐(::after) 금빛 띠만 흐르고 은은히 빛난다 (.hs-text 와 같은 띠·빛) */
+/* 닉네임이 뜨는 곳마다 고스펙 반짝임 (src/kakao.tsx Nick, ui.tsx FitLine hs, 제작자 요청 2026-11-02 '어디서든, 폰트 크기나 글씨체는 바꾸지 말고 딱 애니메이션만'):
+   글자는 그 자리 색 그대로, 같은 글자 두 벌을 inline-grid 한 칸에 겹쳐(.hs-g) 금빛 띠만 흐르고 은은히 빛난다 (.hs-text 와 같은 띠·빛).
+   전에는 ::after 를 절대 위치(top 0)로 얹었는데 줄 높이와 글자 상자 높이가 달라 폰에서 위치가 어긋났다 (제작자 2026-11-03). 같은 칸의 같은 글자라 늘 꼭 맞는다 */
 .hs {
   --hs-deep: #c8901e; --hs-hi: #ffd34d; --hs-core: #fffbe6; --hs-glow: rgba(255, 196, 50, 0.9);
-  position: relative; white-space: nowrap; animation: hs-glow 1.2s ease-in-out infinite alternate;
+  display: inline-grid; vertical-align: baseline; white-space: nowrap; animation: hs-glow 1.2s ease-in-out infinite alternate;
 }
-.hs::after {
-  content: attr(data-hs); position: absolute; left: 0; top: 0; color: transparent; pointer-events: none; white-space: nowrap;
+.hs > span { grid-area: 1 / 1; white-space: nowrap; }
+.hs-g {
+  color: transparent; pointer-events: none; user-select: none;
   background: linear-gradient(100deg, transparent 0 30%, var(--hs-deep) 38%, var(--hs-hi) 45%, var(--hs-core) 50%, var(--hs-hi) 55%, var(--hs-deep) 62%, transparent 70% 100%);
   background-size: 150% 100%; -webkit-background-clip: text; background-clip: text; animation: hs-run 1.8s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .hs { animation: none; }
-  .hs::after { display: none; }
+  .hs-g { display: none; }
 }
 
 /* updated menu on home (updates.ts, 제작자 요청): a mint border and an 'UPDATE' tag at the top right for a day after the first visit */
@@ -1576,7 +1578,8 @@ p.ps-charge { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px;
 .mn-tag { margin-left: auto; padding: 0 6px; font-style: normal; font-size: 11px; line-height: 18px; color: var(--edge); background: var(--gold); border: 1px solid var(--edge); }
 .mn-stages { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .mn-stage {
-  position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 9px 4px 8px; text-align: center;
+  /* 위 여백은 오른쪽 위 '원글 ↗' 표 높이만큼 (글자와 겹치지 않게, 2026-11-03) */
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 20px 4px 8px; text-align: center;
   background: var(--panel-2); border: var(--px) solid var(--edge);
   box-shadow: inset var(--px) var(--px) 0 var(--hi), inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--lo);
 }
@@ -1607,6 +1610,8 @@ a.mn-stage:active { transform: translate(1px, 1px); }
 .mn-chips .pill { min-width: 44px; text-align: center; }
 .mn-card { position: relative; }
 .mn-out { position: absolute; top: 3px; right: 5px; font-style: normal; font-size: 11px; color: var(--gold); }
+/* 카드 제목 안의 '원글 ↗': 오른쪽으로 띄워 제목 글자가 옆·아래로 흐른다 (겹치지 않게, 2026-11-03) */
+.mn-out-in { position: static; float: right; margin: 0 0 0 6px; line-height: 1.35; }
 
 /* '원글 보기' line at the top of every wiki post, hunting ground and equipment screen (Blocks.tsx OriginalLink, 제작자 요청) */
 .orig-link {
@@ -2511,7 +2516,7 @@ button.gd-member-row { cursor: pointer; }
 .tb-guide { cursor: pointer; }
 .hero-mark-btn { flex: none; padding: 0; margin: 0; line-height: 0; background: none; border: 0; cursor: pointer; }
 .tut { position: fixed; inset: 0; z-index: 70; }
-.tut-dim { position: absolute; inset: 0; background: rgba(5, 5, 14, 0.55); }
+.tut-dim { position: absolute; inset: 0; background: rgba(5, 5, 14, 0.6); }
 .tut-spot {
   position: absolute; border: 2px solid var(--gold); box-shadow: 0 0 0 9999px rgba(5, 5, 14, 0.6), 0 0 12px rgba(255, 195, 92, 0.8);
   transition: left 0.15s, top 0.15s, width 0.15s, height 0.15s;

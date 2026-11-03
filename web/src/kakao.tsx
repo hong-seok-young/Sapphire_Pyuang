@@ -46,22 +46,36 @@ export function Nick({ name }: { name: string | null | undefined }) {
   const { high } = useKakao();
   if (!name) return null;
   if (!high.includes(name)) return <>{name}</>;
+  // 같은 글자 두 벌을 inline-grid 한 칸에 겹친다 (styles.css .hs). 전에는 ::after 를 절대 위치로 얹었는데 폰에서 줄 높이·글꼴 차이로 위치가 어긋났다
+  // (제작자 2026-11-03 '고스펙 애니메이션이랑 닉넴 폰트랑 위치가 안 맞음')
   return (
-    <span className="hs" data-hs={name}>
-      {name}
+    <span className="hs">
+      <span>{name}</span>
+      <span className="hs-g" aria-hidden="true">
+        {name}
+      </span>
     </span>
   );
 }
 
 /** 내 링크 적기 (user 를 주면 그 사람 것: 운영진) */
-export const saveKakao = (link: string, user?: string) => api<{ ok: boolean; link: string | null }>("/api/kakao", "PUT", { link, user });
+export const saveKakao = (link: string, user?: string) =>
+  api<{ ok: boolean; link: string | null }>("/api/kakao", "PUT", {
+    link,
+    user,
+  });
 
 /**
  * 이름 옆 작은 '카톡' 단추 (그 사람이 링크를 적어 뒀을 때만). label 을 주면 그 글자로.
  * mine 이면 내 글의 내 이름 옆에도 보인다 (제작자 요청 2026-11-02: 내 판매의 '퓨앙 · 방금 올림'에도): 적어 두었으면 눌러서 내 링크를 확인하고,
  * 안 적었으면 흐린 '카톡'을 눌러 내 정보의 카톡 오픈프로필로 간다
  */
-export function KakaoButton({ name, label = "카톡", mine = false, nested = false }: {
+export function KakaoButton({
+  name,
+  label = "카톡",
+  mine = false,
+  nested = false,
+}: {
   name: string | null | undefined;
   label?: string;
   mine?: boolean;
@@ -72,7 +86,10 @@ export function KakaoButton({ name, label = "카톡", mine = false, nested = fal
   const link = name ? links[name] : undefined;
   if (nested) {
     if (!link) return null;
-    const open = (e: { preventDefault: () => void; stopPropagation: () => void }) => {
+    const open = (e: {
+      preventDefault: () => void;
+      stopPropagation: () => void;
+    }) => {
       e.preventDefault();
       e.stopPropagation();
       // 진짜 링크를 눌러 연다 (앱 WebView 도 바깥 주소를 브라우저·카톡으로 넘기는 같은 길)
@@ -98,7 +115,12 @@ export function KakaoButton({ name, label = "카톡", mine = false, nested = fal
   if (!link) {
     if (!mine) return null;
     return (
-      <a className="kakao-btn kakao-btn-off" href="#/me?open=kakao" onClick={(e) => e.stopPropagation()} aria-label="카톡 오픈프로필 적기">
+      <a
+        className="kakao-btn kakao-btn-off"
+        href="#/me?open=kakao"
+        onClick={(e) => e.stopPropagation()}
+        aria-label="카톡 오픈프로필 적기"
+      >
         {label}
       </a>
     );
@@ -150,7 +172,11 @@ export function KakaoField({ user, name }: { user?: string; name: string }) {
         placeholder="https://open.kakao.com/o/..."
         aria-label="카톡 오픈프로필 링크"
       />
-      <button className="pill" disabled={busy || text === null} onClick={() => void save()}>
+      <button
+        className="pill"
+        disabled={busy || text === null}
+        onClick={() => void save()}
+      >
         저장
       </button>
       {note && <small className="kakao-note">{note}</small>}
