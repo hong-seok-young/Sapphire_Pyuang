@@ -82,14 +82,10 @@ const growthText = (g: number) => `+${Number((g / 1000).toFixed(3))}%`;
 const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
 
 /** 제목 + 줄들, cap 글자를 넘으면 나머지는 수만 알린다 */
-function section(title: string, lines: string[], cap: number): string {
+/** 자료 칸. 글자 수로 자르지 않는다 (제작자 2026-11-03 '무조건 다 봐': 칸마다 있던 1500~6000자 한도를 뺐다) */
+function section(title: string, lines: string[]): string {
   if (!lines.length) return "";
-  let out = `[${title}]`;
-  for (let i = 0; i < lines.length; i++) {
-    if (out.length + lines[i].length + 1 > cap) return `${out}\n(나머지 ${lines.length - i}개는 길이 때문에 뺐다)`;
-    out += `\n${lines[i]}`;
-  }
-  return out;
+  return [`[${title}]`, ...lines].join("\n");
 }
 
 function optionsText(raw: string | null): string {
@@ -159,7 +155,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
           "AND request_id IN (SELECT id FROM requests WHERE status != 'done') ORDER BY created_at",
       ),
       env.DB.prepare(
-        "SELECT p.id, p.cat, p.author, p.title, substr(p.body, 1, 400) AS body, p.pinned, p.created_at, " +
+        "SELECT p.id, p.cat, p.author, p.title, p.body AS body, p.pinned, p.created_at, " +
           "(SELECT COUNT(*) FROM board_comments c WHERE c.post_id = p.id) AS comments, (SELECT COUNT(*) FROM board_likes k WHERE k.post_id = p.id) AS likes, " +
           "(SELECT COUNT(*) FROM board_views v WHERE v.post_id = p.id) AS views FROM board_posts p ORDER BY p.pinned DESC, p.id DESC LIMIT 20",
       ),
@@ -232,7 +228,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
       );
     else lines.push(`캐릭터: ${me.id} · 직업·레벨을 아직 안 정함 ('내 정보'에서 정한다)`);
     lines.push(...extra.me);
-    parts.push(section(`내 정보: 묻는 사람 ${me.id} (질문의 '나', '내', '제'는 이 사람. 레벨·직업을 안 말해도 이 값으로 답한다)`, lines, 2500));
+    parts.push(section(`내 정보: 묻는 사람 ${me.id} (질문의 '나', '내', '제'는 이 사람. 레벨·직업을 안 말해도 이 값으로 답한다)`, lines));
   }
 
   // ---------- 성장 랭킹 ----------
@@ -245,7 +241,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
       const lines = entries.map(
         (e, i) => `${i + 1}. ${e.id} (${e.guild ? GUILD[e.guild] : "-"}, ${JOB[e.job]}) Lv.${e.fromLevel}→${e.level} ${growthText(e.growth)}`,
       );
-      parts.push(section(`성장 랭킹 ${label}, 오른 사람만 (레벨 1 = 100%)`, lines.length ? lines : ["아직 오른 사람 없음"], 2500));
+      parts.push(section(`성장 랭킹 ${label}, 오른 사람만 (레벨 1 = 100%)`, lines.length ? lines : ["아직 오른 사람 없음"]));
     }
   }
 
@@ -287,7 +283,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
       const buy = l.side === "buy";
       return `#${l.id} ${buy ? "[삽니다] " : ""}${what} · ${buy ? `희망가 ${price}` : price} · ${buy ? "구하는 사람" : "판매"} ${l.seller}${l.wants ? ` · ${buy ? "팔래요" : "살래요"} ${l.wants}명` : ""}${l.talk ? ` · 토론방 글 ${l.talk}` : ""}${l.note ? ` · ${buy ? "조건" : "한마디"} "${oneLine(l.note)}"` : ""}${optionsText(l.options)}${mine.has(l.id) ? ` · ${mine.get(l.id)}` : ""}${own} · ${when(l.created_at)} 올림`;
     });
-    parts.push(section(`사파이어 중개인: 올라온 글 ${listings.length}개 (팝니다와 [삽니다], 새 글 먼저, 골드 시세 1만 원 = ${Math.round(rate)}만 골드). 살래요·팔래요·입찰한 사람과 흥정 가격은 올린 사람만 본다`, lines, 6000));
+    parts.push(section(`사파이어 중개인: 올라온 글 ${listings.length}개 (팝니다와 [삽니다], 새 글 먼저, 골드 시세 1만 원 = ${Math.round(rate)}만 골드). 살래요·팔래요·입찰한 사람과 흥정 가격은 올린 사람만 본다`, lines));
     // 질문에 이름이 나온 물건의 종목 토론방 (모든 길드원이 본다)
     for (const l of listings.filter((x) => x.talk && x.item.length >= 2 && q.includes(x.item)).slice(0, 2)) {
       const { results } = await env.DB.prepare("SELECT user_id, parent_id, text, created_at FROM listing_talk WHERE listing_id = ? ORDER BY id DESC LIMIT 20")
@@ -297,7 +293,6 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
         section(
           `중개인 #${l.id} ${l.item} 토론방 (최근 글)`,
           results.reverse().map((t) => `${t.parent_id ? "  └ " : ""}${t.user_id}${t.user_id === l.seller ? "(판매자)" : ""}: ${oneLine(t.text)} (${when(t.created_at)})`),
-          1500,
         ),
       );
     }
@@ -319,7 +314,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
         `${o.wants ? ` · ${o.side === "sell" ? "살래요" : "팔래요"} ${o.wants}명` : ""}${o.note ? ` · "${oneLine(o.note)}"` : ""}` +
         `${o.owner === me.id && wantBy.get(o.id)?.length ? ` · 명단: ${wantBy.get(o.id)!.join("; ")}` : ""} · ${when(o.created_at)}`,
     );
-    parts.push(section("골드 거래: 올라와 있는 글 (현금 거래는 게임 운영정책상 계정 정지 위험이 있다)", lines, 2500));
+    parts.push(section("골드 거래: 올라와 있는 글 (현금 거래는 게임 운영정책상 계정 정지 위험이 있다)", lines));
   }
 
   // ---------- 의뢰소 ----------
@@ -337,9 +332,9 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
     const lines = reqs.map((r) => {
       const who = offerText(r.id);
       const reward = r.reward_gold ? gold(r.reward_gold) : r.reward_text ?? "";
-      return `#${r.id} ${oneLine(r.title)}${reward ? ` · 보상 ${reward}` : ""} · 의뢰 ${r.owner} · 모집 중${who ? ` · 수락: ${who}` : ""}${r.detail ? ` · "${oneLine(r.detail).slice(0, 120)}"` : ""} · ${when(r.created_at)}`;
+      return `#${r.id} ${oneLine(r.title)}${reward ? ` · 보상 ${reward}` : ""} · 의뢰 ${r.owner} · 모집 중${who ? ` · 수락: ${who}` : ""}${r.detail ? ` · "${oneLine(r.detail)}"` : ""} · ${when(r.created_at)}`;
     });
-    parts.push(section("길드원 의뢰소: 끝나지 않은 의뢰 (수락한 사람마다 게임 안에서 거래하고, 의뢰한 사람이 완료를 누르면 끝)", lines, 3000));
+    parts.push(section("길드원 의뢰소: 끝나지 않은 의뢰 (수락한 사람마다 게임 안에서 거래하고, 의뢰한 사람이 완료를 누르면 끝)", lines));
   }
 
   // ---------- 게시판 ----------
@@ -351,7 +346,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
         `#${p.id} [${CAT_NAME[p.cat] ?? p.cat}]${p.pinned ? " (고정)" : ""} "${oneLine(p.title)}" · ${p.author} · ${when(p.created_at)} · 댓글 ${p.comments} · 좋아요 ${p.likes} · 본 사람 ${p.views}` +
         ` · 내용: ${oneLine(p.body).slice(0, p.cat === "free" ? 120 : 300)}`,
     );
-    parts.push(section("게시판: 고정 글과 최근 글", lines, 4000));
+    parts.push(section("게시판: 고정 글과 최근 글", lines));
   }
   // 질문이 가리키는 글 (제목 낱말이 둘 넘게 맞거나 '#번호'): 본문과 댓글까지 (게시판은 모든 길드원이 본다)
   {
@@ -364,14 +359,14 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
       .map((x) => x.p);
     for (const p of hit) {
       const [bodyR, commentsR] = await env.DB.batch([
-        env.DB.prepare("SELECT substr(body, 1, 2500) AS body FROM board_posts WHERE id = ?").bind(p.id),
+        env.DB.prepare("SELECT body FROM board_posts WHERE id = ?").bind(p.id),
         env.DB.prepare("SELECT user_id, parent_id, text, created_at FROM board_comments WHERE post_id = ? ORDER BY id LIMIT 40").bind(p.id),
       ]);
       const body = (bodyR.results[0] as { body: string } | undefined)?.body ?? "";
       const comments = (commentsR.results as { user_id: string; parent_id: number | null; text: string; created_at: number }[]).map(
-        (c) => `${c.parent_id ? "  └ 답글 " : "댓글 "}${c.user_id}: ${oneLine(c.text).slice(0, 200)} (${when(c.created_at)})`,
+        (c) => `${c.parent_id ? "  └ 답글 " : "댓글 "}${c.user_id}: ${oneLine(c.text)} (${when(c.created_at)})`,
       );
-      parts.push(section(`게시판 글 #${p.id} "${oneLine(p.title)}" (${p.author}) 본문과 댓글`, [body, ...comments], 3500));
+      parts.push(section(`게시판 글 #${p.id} "${oneLine(p.title)}" (${p.author}) 본문과 댓글`, [body, ...comments]));
     }
   }
 
@@ -390,7 +385,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
           )
         : []),
     ];
-    parts.push(section("플래티넘 할인 상점", lines, 2000));
+    parts.push(section("플래티넘 할인 상점", lines));
     if (request)
       parts.push(
         await shopCatalog(env, request, me, meP?.guild === "main", !!meP?.high_spec, now).catch((e) => {
@@ -434,7 +429,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
       lines.push(
         `함께 하는 할 일: ${s.text}${s.at ? ` · 언제 ${s.at}` : ""} · 만든 사람 ${s.owner} · 함께: ` + s.members.map((m) => m.id + (m.done ? "(했음)" : "")).join(", "),
       );
-    parts.push(section(`To do: ${me.id}의 레벨·직업에 맞는 할 일 (홈 'To do' 화면, 공식 글에서 뽑은 이벤트 할 일 포함)`, lines, 2500));
+    parts.push(section(`To do: ${me.id}의 레벨·직업에 맞는 할 일 (홈 'To do' 화면, 공식 글에서 뽑은 이벤트 할 일 포함)`, lines));
   }
 
   // ---------- 길드마스터와 앱개발자만: 사용 기록, 챗봇 개선 (2026-11-02 길드마스터에게도 열었다) ----------
@@ -449,7 +444,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
       (g) => `#${g.id} ${g.user_id} · "${oneLine(g.question).slice(0, 80)}" · ${g.kind === "user" ? "👎 별로" : "모름"}: ${oneLine(g.reason).slice(0, 80)} · ${when(g.created_at)}`,
     );
     const usage = (usageR.results as { user_id: string; count: number }[]).map((u) => `${u.user_id} ${u.count}번`).join(", ");
-    parts.push(section("앱개발자 전용: 챗봇 개선 목록 (아직 안 고친 것)", gaps.length ? gaps : ["없음"], 2000));
+    parts.push(section("앱개발자 전용: 챗봇 개선 목록 (아직 안 고친 것)", gaps.length ? gaps : ["없음"]));
     parts.push(`[앱개발자 전용: 오늘 챗봇 질문 수] ${usage || "아직 없음"}`);
   }
 
@@ -468,7 +463,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
     if (took.length) lines.push(`의뢰소 내가 수락한 의뢰 (게임 안에서 의뢰한 사람과 거래한다): ${took.map((r) => { const o = offersOf(r.id).find((x) => x.user_id === me.id); return `${oneLine(r.title)} (의뢰 ${r.owner}${o?.note ? `, 내 한마디 "${oneLine(o.note).slice(0, 40)}"` : ""})`; }).join(", ")}`);
     const orders = (myOrdersR.results as { item_name: string; status: string }[]).filter((o) => o.status === "requested");
     if (orders.length) lines.push(`플래티넘 상점 거래 기다리는 신청: ${orders.map((o) => o.item_name).join(", ")}`);
-    if (lines.length) parts.push(section(`${me.id}가 앱에서 한 것 (진행 중)`, lines, 1500));
+    if (lines.length) parts.push(section(`${me.id}가 앱에서 한 것 (진행 중)`, lines));
   }
 
   // ---------- 아이모 소식 지금 (늘), 장비대여·알림·기록 등 (server/chatmine.ts) ----------
@@ -488,7 +483,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
     return `${i + 1}. ${p.id} | ${p.guild ? GUILD[p.guild] : "길드 안 정함"} | ${JOB[p.job as Job]} Lv.${p.level} ${expText(p.exp)}${extra.length ? ` | ${extra.join(" | ")}` : ""}`;
   });
   if (unset.length) lines.push(`직업·레벨 아직 안 정한 계정: ${unset.map((p) => `${p.id}${ROLE[p.role] ? `(${ROLE[p.role]})` : ""}`).join(", ")}`);
-  parts.push(section("길드원 명단: 레벨 랭킹 순서 (같은 레벨이면 경험치, 그다음 먼저 오른 사람). 닉네임 | 길드 | 직업 레벨 경험치 | 표시", lines, 8000));
+  parts.push(section("길드원 명단: 레벨 랭킹 순서 (같은 레벨이면 경험치, 그다음 먼저 오른 사람). 닉네임 | 길드 | 직업 레벨 경험치 | 표시", lines));
 
   // ---------- 한 줄 요약 (자세히 붙이지 않은 칸) ----------
   const summary = [
@@ -566,12 +561,10 @@ async function activityParts(env: Env, mentioned: string[], now: number, today: 
     section(
       "앱개발자 전용: 사용 기록 7일 요약 (최근 접속 순). 화면 주소: #/ranking 랭킹, #/market 중개인, #/requests 의뢰소, #/board 게시판, #/shop 상점, #/chat 챗봇, #/me 내 정보, #/admin 길드원 관리, #/alerts 알림, #/info 정보",
       sum.length ? sum : ["7일 동안 기록 없음"],
-      3500,
     ),
     section(
       "앱개발자 전용: 최근 접속과 한 일 50개 (새 것 먼저)",
       (recentR.results as { user_id: string; kind: string; what: string; detail: string | null; via: string | null; at: number }[]).map((r) => `${r.user_id} ${row(r)}`),
-      4500,
     ),
   ];
   people.forEach((id, i) => {
@@ -581,7 +574,6 @@ async function activityParts(env: Env, mentioned: string[], now: number, today: 
       section(
         `앱개발자 전용: ${id} 의 최근 기록 40개${first ? ` (마지막 IP ${first.ip ?? "-"}, ${first.place ?? "위치 모름"}, ${first.device ?? "기기 모름"})` : ""}`,
         rows.length ? rows.map(row) : ["기록 없음"],
-        3500,
       ),
     );
   });

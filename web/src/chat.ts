@@ -58,10 +58,8 @@ export async function readAttachment(file: File): Promise<ChatFile> {
   throw new Error(`${file.name}: 사진, PDF, 글 파일(txt, csv, json 등)만 올릴 수 있어요`);
 }
 
-/** 위키 자료 전체 글자 수 (서버도 16000 자에서 자른다) */
-const MAX_CONTEXT = 15000;
-/** 글 하나(육성 공략, 사냥터 원글 등)에서 가져올 글자 수 */
-const MAX_POST = 2500;
+// 위키 자료는 글자 수로 자르지 않는다 (제작자 2026-11-03 '무조건 다 봐', '없애': 전체 1만 5천 자, 글마다 2500자, 사냥터 원글 600자,
+// 공식 확률 표 1500자 한도를 모두 뺐다). 무엇을 붙일지(글 2~3개, 표 2개)만 고른다.
 const JOBS = ["전사", "레인저", "마법사", "무도가"];
 /** 직업을 줄여 부르는 말 (챗봇 개선 2026-11-01: '35 8고봉 법사'의 '법사'를 마법사로 못 알아들었다) */
 const JOB_ALIAS: [RegExp, string][] = [
@@ -88,7 +86,7 @@ function blockText(b: Block): string {
 
 function postText(post: Post, blocks?: number[]): string {
   const list = blocks ? blocks.map((i) => post.blocks[i]).filter(Boolean) : post.blocks;
-  return list.map(blockText).filter(Boolean).join("\n").slice(0, MAX_POST);
+  return list.map(blockText).filter(Boolean).join("\n");
 }
 
 /** 모든 글의 글자 (본문 찾기용, 한 번만 만든다). flat 은 띄어쓰기를 뺀 소문자 */
@@ -203,7 +201,7 @@ export function wikiContext(
   const parts: string[] = [];
   const found: string[] = [];
   const add = (s: string) => {
-    if (s && parts.join("\n").length + s.length < MAX_CONTEXT) parts.push(s);
+    if (s) parts.push(s);
   };
   const askedLevel = levelOf(question);
   const askedJob = jobOf(question);
@@ -298,7 +296,7 @@ export function wikiContext(
           near
             .map(({ p }) => {
               const mons = p.monsters.map((k) => wiki.monsters[k]).filter(Boolean);
-              const gear = [...new Set(mons.flatMap((m) => m.drops))].filter((d) => wiki.items[d]?.equip.length).slice(0, 8);
+              const gear = [...new Set(mons.flatMap((m) => m.drops))].filter((d) => wiki.items[d]?.equip.length);
               return (
                 `${p.name} (${p.region}, ${levelText(p.level)}) 몬스터: ` +
                 mons.map((m) => m.name + (m.level ? ` Lv.${m.level}` : "")).join(", ") +
@@ -313,8 +311,8 @@ export function wikiContext(
         const post = posts?.[p.id];
         add(
           `[${p.name} 자세히]\n` +
-            mons.map((m) => `${m.name}${m.level ? ` Lv.${m.level}` : ""}${m.drops.length ? ` 드랍: ${m.drops.slice(0, 8).join(", ")}` : ""}`).join("\n") +
-            (post ? "\n" + postText(post, [...p.above, ...p.below]).slice(0, 600) : ""),
+            mons.map((m) => `${m.name}${m.level ? ` Lv.${m.level}` : ""}${m.drops.length ? ` 드랍: ${m.drops.join(", ")}` : ""}`).join("\n") +
+            (post ? "\n" + postText(post, [...p.above, ...p.below]) : ""),
         );
       }
     }
@@ -370,7 +368,7 @@ export function wikiContext(
     }
 
     // 3-1. 컴투스 공식 확률 (제작자 요청 2026-10-31): 확률을 묻거나, 질문의 이름(아이템, 상자, 옵션)이 공식 표에 나오면 그 표.
-    // 이름이 든 섹션을 먼저, 표마다 1500자까지
+    // 이름이 든 섹션을 먼저, 표 전체 (자르지 않는다, 제작자 2026-11-03)
     if (odds) {
       const askOdds = /확률|가챠|뽑기|상자|합성|세공|재설정|염색|퍼센트|%/.test(question);
       const terms = [...new Set([...picked.map((n) => n.name), ...ws.filter((w) => !/\d/.test(w) && !ASK_WORD.test(w) && !JOB_WORDS.includes(w) && w !== "확률")])].filter((w) => w.length >= 2);
@@ -386,16 +384,12 @@ export function wikiContext(
         .slice(0, 2);
       for (const { t, secs } of scoredOdds) {
         const order = [...secs, ...t.sections.map((_, i) => i).filter((i) => !secs.includes(i))];
-        let body = "";
-        for (const i of order) {
-          const s = t.sections[i];
-          const part = [s.t && `## ${s.t}`, s.d, s.c.join(" | "), ...s.r.map((r) => r.join(" | "))].filter(Boolean).join("\n");
-          if (body.length + part.length > 1500) {
-            if (!body) body = part.slice(0, 1500);
-            break;
-          }
-          body += (body ? "\n" : "") + part;
-        }
+        const body = order
+          .map((i) => {
+            const s = t.sections[i];
+            return [s.t && `## ${s.t}`, s.d, s.c.join(" | "), ...s.r.map((r) => r.join(" | "))].filter(Boolean).join("\n");
+          })
+          .join("\n");
         found.push(`공식 확률: ${oddsName(t)}`);
         add(`[컴투스 공식 확률: ${t.path.join(" > ")}]\n${body}`);
       }

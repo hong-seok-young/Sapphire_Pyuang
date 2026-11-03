@@ -49,14 +49,10 @@ const md = (ms: number) => {
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
 };
 const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
-function section(title: string, lines: string[], cap: number): string {
+/** 자료 칸. 글자 수로 자르지 않는다 (제작자 2026-11-03 '무조건 다 봐': 칸마다 있던 1500~6000자 한도를 뺐다) */
+function section(title: string, lines: string[]): string {
   if (!lines.length) return "";
-  let out = `[${title}]`;
-  for (let i = 0; i < lines.length; i++) {
-    if (out.length + lines[i].length + 1 > cap) return `${out}\n(나머지 ${lines.length - i}개는 길이 때문에 뺐다)`;
-    out += `\n${lines[i]}`;
-  }
-  return out;
+  return [`[${title}]`, ...lines].join("\n");
 }
 
 /** 묻는 사람의 캐릭터들 (본캐와 부캐) */
@@ -92,7 +88,7 @@ export async function newsNow(env: Env, now: number): Promise<string> {
     const started = !e.start_date || e.start_date <= today;
     lines.push(`진행 ${started ? "중" : "예정"} 이벤트: ${e.title} · ${e.start_date ?? ""}${e.end_date ? ` ~ ${e.end_date}` : ""} · ${officialUrl(e.kind, e.id)}`);
   }
-  return section("아이모 소식 지금 (컴투스 공식 홈페이지, 게시판 '아이모 소식'과 같은 자료): 점검과 진행 중인 이벤트", lines.length ? lines : ["진행 중인 이벤트와 점검 없음"], 2500);
+  return section("아이모 소식 지금 (컴투스 공식 홈페이지, 게시판 '아이모 소식'과 같은 자료): 점검과 진행 중인 이벤트", lines.length ? lines : ["진행 중인 이벤트와 점검 없음"]);
 }
 
 /**
@@ -137,8 +133,7 @@ export async function mineExtras(
     parts.push(
       section(
         `${me.id}의 최근 알림 (🔔 알림함, 묶은 캐릭터 것 모두, 새 것 먼저)`,
-        alerts.map((a) => `${when(a.created_at)}${a.read_at ? "" : " (안 읽음)"}${a.user_id !== me.id ? ` [${a.user_id}]` : ""} ${oneLine(a.text).slice(0, 160)}`),
-        2500,
+        alerts.map((a) => `${when(a.created_at)}${a.read_at ? "" : " (안 읽음)"}${a.user_id !== me.id ? ` [${a.user_id}]` : ""} ${oneLine(a.text)}`),
       ),
     );
   const favs = favR.results as { kind: string; name: string }[];
@@ -150,7 +145,6 @@ export async function mineExtras(
       section(
         `${rows[0].who}의 레벨·경험치 기록 (랭킹에서 닉네임을 누르면 보이는 그래프, 새 것 먼저)`,
         rows.map((r) => `${when(r.at)} Lv.${r.level}${r.exp !== null ? ` ${(r.exp / 1000).toFixed(3)}%` : ""}`),
-        1500,
       ),
     );
   }
@@ -177,7 +171,7 @@ export async function mineExtras(
     } else lines.push(`${me.id}은 아직 파티가 없음 (길드 던전 화면에서 파티 만들기)`);
     const others = parties.filter((p) => p !== mine);
     if (others.length) lines.push(`다른 파티: ${others.map((p) => `${p.stage !== null ? `${p.stage}단계 ` : ""}${p.name}(${p.members.map((m) => m.id).join(", ")}${p.confirmed !== null ? ` · ${slotText(week, p.confirmed)} 확정` : ""})`).join(" / ")}`);
-    parts.push(section("길드 던전 (1군 전용, 4인 파티가 이번 주 가능한 때를 칠하고 모두 되는 때를 빠른 순 후보로 확정·불참)", lines, 1500));
+    parts.push(section("길드 던전 (1군 전용, 4인 파티가 이번 주 가능한 때를 칠하고 모두 되는 때를 빠른 순 후보로 확정·불참)", lines));
   }
 
   // ---------- 장비대여 (2026-11-02 열었다, canEnter) ----------
@@ -226,7 +220,6 @@ export async function mineExtras(
       section(
         "길드원 관리 (오피서 이상): 승낙 기다리는 요청",
         results.length ? results.map((r) => `${r.owner ? `캐릭터 추가 ${r.id} (${r.owner}의 부캐로)` : `아이디 생성 ${r.id}`} · ${when(r.created_at)}`) : ["없음"],
-        1500,
       ),
     );
   }
@@ -269,7 +262,6 @@ async function rentalSection(env: Env, me: User, manager: boolean, mentioned: st
     section(
       "장비대여 (길드가 기부받은 무기를 빌려준다. 💎 가격은 보증금이고 반납하면 마일리지와 골드를 돌려받는다. 1인 1개가 원칙, 실제 주고받기는 게임 안에서 대여 담당자와. 목록에서 골라 '대여 신청')",
       lines.length ? lines : ["대여 무기 없음"],
-      5000,
     ),
   ];
   if (ledger.length)
@@ -277,7 +269,6 @@ async function rentalSection(env: Env, me: User, manager: boolean, mentioned: st
       section(
         `${me.id}의 마일리지 장부 (신청함 '장부')`,
         ledger.map((l) => `${when(l.created_at)} ${LEDGER[l.reason] ?? l.reason} ${l.delta > 0 ? "+" : ""}${l.delta}💎${l.gold ? ` 골드 ${manText(l.gold)}` : ""}${l.note ? ` ${oneLine(l.note)}` : ""}`),
-        1200,
       ),
     );
   if (manager) {
@@ -286,7 +277,7 @@ async function rentalSection(env: Env, me: User, manager: boolean, mentioned: st
     for (const who of mentioned.slice(0, 2)) {
       const { results } = await env.DB.prepare("SELECT delta, gold, reason, note, created_at FROM rental_mileage WHERE who = ? ORDER BY created_at DESC LIMIT 10").bind(who).all<LedgerRow>();
       if (results.length)
-        out.push(section(`장비대여 운영 전용: ${who}의 마일리지 장부`, results.map((l) => `${when(l.created_at)} ${LEDGER[l.reason] ?? l.reason} ${l.delta > 0 ? "+" : ""}${l.delta}💎${l.note ? ` ${oneLine(l.note)}` : ""}`), 800));
+        out.push(section(`장비대여 운영 전용: ${who}의 마일리지 장부`, results.map((l) => `${when(l.created_at)} ${LEDGER[l.reason] ?? l.reason} ${l.delta > 0 ? "+" : ""}${l.delta}💎${l.note ? ` ${oneLine(l.note)}` : ""}`)));
     }
   }
   return out.filter(Boolean).join("\n\n");
@@ -304,7 +295,7 @@ export async function shopCatalog(env: Env, request: Request, me: User, main: bo
     .map((it) => ({ it, e: effective(it, s, rules.get(it.id)) }))
     .filter(({ e }) => e.enabled || officer)
     .map(({ it, e }) => `${it.name}${it.count > 1 ? ` x${it.count}` : ""} · 플래티넘 ${it.plat} · 1군 ${manText(e.gold)} 골드 · 고스펙 ${manText(e.highGold)} 골드 (시중 ${manText(e.marketGold)})${e.enabled ? "" : " · 판매 중지(운영진만 보임)"}`);
-  const out = [section("플래티넘 할인 상점 물건 (게임 상점 첫 탭, 거래 되는 것만)", lines, 2500)];
+  const out = [section("플래티넘 할인 상점 물건 (게임 상점 첫 탭, 거래 되는 것만)", lines)];
   if (main) {
     const w = await wallet(env, me.id, main, high, s, now);
     out.push(`[${me.id}의 플래티넘 이용한도] 남은 플래티넘 ${w.balance} · 매주 목요일 오전 10시 +${w.weekly} (다음 ${when(w.nextAt)})`);

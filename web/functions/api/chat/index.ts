@@ -25,7 +25,6 @@ const MODEL = "claude-opus-5-5";
 const DAILY_LIMIT: number | null = null;
 const MAX_TURNS = 20; // 앞 대화는 최근 20개 말까지만
 const MAX_TEXT = 4000; // 말 하나의 글자 수 (답은 길 수 있다)
-const MAX_CONTEXT = 16000; // 위키 자료 글자 수
 const MAX_IMAGES = 4;
 const MAX_IMAGE_B64 = 1_500_000; // 사진 하나 (화면이 1568px, JPEG 로 줄여서 보내서 보통 훨씬 작다)
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
@@ -168,7 +167,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
   const body = await readJson<{ messages: unknown; context: string; thread: unknown; again: unknown }>(request);
   const turns = parseTurns(body.messages);
   if (!turns) return json({ error: "질문을 다시 보내 주세요 (사진 4장, 파일 3개까지)" }, 400);
-  const context = typeof body.context === "string" ? body.context.slice(0, MAX_CONTEXT) : "";
+  // 위키 자료는 자르지 않는다 (제작자 2026-11-03 '무조건 다 봐', '없애': 1만 6천 자 한도를 뺐다)
+  const context = typeof body.context === "string" ? body.context : "";
   const thread = body.thread == null ? null : await ownThread(env, me.id, body.thread);
   if (body.thread != null && !thread) return json({ error: "대화를 찾지 못했어요" }, 404);
   const again = body.again === true && thread !== null;
