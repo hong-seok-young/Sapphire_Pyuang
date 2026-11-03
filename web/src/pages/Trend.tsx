@@ -253,7 +253,7 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "many", label: "여러 명" },
   { key: "recent", label: "최근 7일" },
   { key: "wiki", label: "위키 아이템" },
-  { key: "unknown", label: "모르는 줄임말" },
+  { key: "unknown", label: "정보 없음" },  // 예전 이름 '모르는 줄임말' (제작자 2026-11-04 '정보없음 ㅇㅇ, 모르는 줄임말 ㄴㄴ': 데블랑사탕처럼 줄임말이 아닌 이름도 있다)
 ];
 type Sort = "posts" | "price" | "recent";
 const SORTS: { key: Sort; label: string }[] = [

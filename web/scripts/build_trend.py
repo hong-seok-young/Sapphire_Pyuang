@@ -706,7 +706,7 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
             rs.unknown[c] += 1
             unknown = True
     enh = enh or enh_word
-    # unknown: 아무도 풀지 못한 줄임말만 '모르는 줄임말' (제작자 2026-11-04: 알려 준 펫·완망·아드셋·코스튬이 아직 거기 있었다)
+    # unknown: 아무도 풀지 못한 것만 화면의 '정보 없음' (예전 이름 '모르는 줄임말') (제작자 2026-11-04: 알려 준 펫·완망·아드셋·코스튬이 아직 거기 있었다)
     return {"name": name, "wiki": wiki, "unknown": unknown, "enh": enh if enh <= 20 else 0, "opts": opts, "price": round(price, 2), "bare": bare, "abbr": abbr}
 
 
