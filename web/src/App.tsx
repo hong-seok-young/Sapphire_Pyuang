@@ -333,7 +333,9 @@ function Wiki({
   // 업데이트된 메뉴에 처음 들어간 때 (홈 칸의 'UPDATE' 가 그때 사라진다)
   useEffect(() => markMenuVisit(me.id, location.hash), [route, me.id]);
   // 홈 칸과 아래 탭 배치 (계정마다). 홈을 떠나면 배치 편집은 끝낸다
-  useEffect(() => loadLayout(me.id), [me.id]);
+  useEffect(() => {
+    loadLayout(me);
+  }, [me]);
   const launcher = useLauncher();
   // 정식 오픈 축하 (폭죽과 길드마스터의 오픈 글, 오픈 뒤 2주 동안 이 기기에서 한 번. pages/Opening.tsx)
   // '더 이상 보지 않기'는 사람마다 (부캐로 바꿔도 같다), 캐릭터를 바꿔 새로 연 것은 들어온 것으로 치지 않는다

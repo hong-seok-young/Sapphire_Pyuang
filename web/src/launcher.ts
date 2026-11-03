@@ -133,11 +133,18 @@ function firstEmpty(slots: string[], from = 0): number {
   for (let i = from; i < slots.length; i++) if (slots[i] === EMPTY) return i;
   return slots.length;
 }
-/** 자리 목록과 검색 여부로 배치를 만든다 (끝의 빈 자리는 뗀다) */
+/**
+ * 이 사람의 홈 격자에 보이는 칸인지 (loadLayout 이 정한다). 안 보이는 칸(운영진 칸, 개발 중 칸)은 자리를 차지하지 않고 끝에 붙여 둔다
+ * (제작자 2026-11-03: 새로고침하니 '앱 받기'(개발 중)가 있던 자리가 빈 칸으로 떠서 '또 지랄났네'. 안 보이는 칸이 빈 자리를 만들면 안 된다)
+ */
+let visible: (key: string) => boolean = () => true;
+const hidden = (k: string) => k !== EMPTY && !visible(k);
+/** 자리 목록과 검색 여부로 배치를 만든다: 안 보이는 칸은 자리에서 빼 끝에 붙이고, 끝의 빈 자리는 뗀다 */
 function build(dock: string[], slots: string[], search: boolean): Layout {
-  const s = slots.slice(0, MAX_SLOTS);
+  const tail = slots.filter(hidden);
+  const s = slots.map((k) => (hidden(k) ? EMPTY : k)).slice(0, MAX_SLOTS);
   while (s.length && s[s.length - 1] === EMPTY) s.pop();
-  return { dock, grid: search ? ["search", ...s] : s };
+  return { dock, grid: [...(search ? ["search"] : []), ...s, ...tail].slice(0, MAX_SLOTS + 1) };
 }
 /** 처음 배치 (제작자 요청 2026-11-02: 제작자 폰의 배치 그대로 '이걸 기본 배치로') */
 export const DEFAULT_LAYOUT: Layout = {
@@ -155,7 +162,9 @@ export function normalize(raw: Partial<Layout> | null | undefined): Layout {
   const dock = ["home", ...(Array.isArray(raw?.dock) ? raw.dock : []).filter(ok)];
   const rawGrid = Array.isArray(raw?.grid) ? raw.grid : [];
   const search = rawGrid.includes("search") && ok("search");
-  const slots = rawGrid.filter((k) => k !== "search").map((k) => (ok(k) ? k : EMPTY));
+  let slots = rawGrid.filter((k) => k !== "search").map((k) => (ok(k) ? k : EMPTY));
+  // 빈 자리가 하나도 없는 배치(예전 배치, 기본 배치)는 위부터 채운 것: 안 보이는 칸을 빼고 붙여 그 자리가 빈 칸이 되지 않게 한다
+  if (!slots.includes(EMPTY)) slots = [...slots.filter((k) => !hidden(k)), ...slots.filter(hidden)];
   const put = (k: string) => {
     const i = firstEmpty(slots);
     slots[i] = k;
@@ -199,9 +208,18 @@ export const useLauncher = () => useSyncExternalStore(subscribe, () => state);
 
 const cacheKey = (user: string) => "sapphire.layout." + user;
 
-/** 로그인한 사람의 배치: 이 기기에 적어 둔 것으로 먼저 그리고, 서버 것으로 맞춘다 */
-export function loadLayout(user: string) {
-  if (state.user === user) return;
+/** 로그인한 사람의 배치: 이 기기에 적어 둔 것으로 먼저 그리고, 서버 것으로 맞춘다. 안 보이는 칸(역할, 개발 중)은 자리에서 빼 둔다 */
+export function loadLayout(me: Me) {
+  const user = me.id;
+  visible = (k) => {
+    const t = BY_KEY.get(k);
+    return !!t && canSee(t, me) && !t.soon;
+  };
+  if (state.user === user) {
+    // 역할이 바뀌어 보이는 칸이 달라졌으면 자리만 다시 맞춘다
+    if (!state.drag) set({ layout: normalize(state.layout) });
+    return;
+  }
   let cached: Layout | null = null;
   try {
     cached = JSON.parse(localStorage.getItem(cacheKey(user)) ?? "null") as Layout | null;
@@ -247,7 +265,9 @@ export function placeItem(base: Layout, key: string, drop: Drop): Layout {
   const dock = base.dock.filter((k) => k !== key);
   const before = gridSlots(base);
   const from = before.indexOf(key);
-  const slots = before.map((k) => (k === key ? EMPTY : k));
+  // 끌던 칸과 안 보이는 칸은 자리에서 뺀다 (안 보이는 칸은 build 가 끝에 붙인다: 그 자리에 놓으면 빈 자리처럼 들어간다)
+  const slots = before.map((k) => (k === key || hidden(k) ? EMPTY : k));
+  const tail = before.filter((k) => k !== key && hidden(k));
   let search = searchUp(base) && key !== "search";
   const putAt = (k: string, i: number) => {
     while (slots.length <= i) slots.push(EMPTY);
@@ -260,18 +280,18 @@ export function placeItem(base: Layout, key: string, drop: Drop): Layout {
     const other = slots[i];
     if (other !== EMPTY) putAt(other, from >= 0 ? from : firstEmpty(slots, i + 1));
     putAt(key, i);
-    return build(dock, slots, search);
+    return build(dock, [...slots, ...tail], search);
   }
   if (dock.length >= DOCK_MAX) {
     const out = drop.target && drop.target !== "home" && dock.includes(drop.target) ? drop.target : dock[dock.length - 1];
     dock[dock.indexOf(out)] = key;
     if (out === "search") search = true;
     else putAt(out, from >= 0 ? from : firstEmpty(slots));
-    return build(dock, slots, search);
+    return build(dock, [...slots, ...tail], search);
   }
   const at = drop.target && dock.includes(drop.target) ? dock.indexOf(drop.target) + (drop.after ? 1 : 0) : dock.length;
   dock.splice(Math.max(1, at), 0, key);
-  return build(dock, slots, search);
+  return build(dock, [...slots, ...tail], search);
 }
 
 /** 손가락(마우스) 아래의 놓을 자리: 홈 격자의 [data-index] 자리, 아래 탭의 [data-slot] 칸 앞/뒤, 아니면 그 줄([data-zone]) */
