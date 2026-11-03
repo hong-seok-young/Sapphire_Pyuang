@@ -30,7 +30,7 @@ export interface LaunchItem {
   match: string[];
   /** 칸 왼쪽 위 작은 띠 (예: 1군 전용) */
   ribbon?: string;
-  /** 칸 오른쪽 위 작은 글자 줄들 (상자 없이 글자만. 장비대여의 '관리자' / '멍멍', 제작자 요청 2026-11-03) */
+  /** 칸 오른쪽 위 작은 글자 줄들 (상자 없이 글자만. 장비대여의 '담당자' / '멍멍', 제작자 요청 2026-11-03) */
   corner?: string[];
   /** 특정 사람만 들어가는 칸: 테두리에 빛이 돈다 (gold 1군 전용, blue 운영진, purple 개발자) */
   ring?: "gold" | "blue" | "purple";
