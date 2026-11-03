@@ -712,10 +712,6 @@ button { font: inherit; color: inherit; }
 .mk-tip-jobs { display: flex; justify-content: flex-end; gap: 4px; margin-top: 6px; }
 .mk-tip-jobs img { width: 22px; height: auto; image-rendering: pixelated; }
 /* gold trade (GoldBoard.tsx) */
-.gold-warn {
-  margin: 0 0 8px; padding: 8px 10px; font-size: 12px; line-height: 1.5; color: #ffd9a8;
-  background: rgba(242, 138, 38, 0.12); border: 1px solid rgba(242, 138, 38, 0.5);
-}
 /* 골드 줄의 왼쪽 동전 칸 (물건 줄의 아이템 칸과 같은 자리, 2026-11-03 통일) */
 .gold-slot img { width: 26px; height: 26px; image-rendering: pixelated; }
 .mk-search .mk-grow { flex: 1; min-width: 0; }

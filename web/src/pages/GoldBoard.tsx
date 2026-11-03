@@ -285,7 +285,7 @@ export function GoldRows({
 
 /**
  * 골드 거래: 골드 팝니다 / 삽니다 글과 '살래요'(팝니다 글), '팔래요'(삽니다 글). 시세는 1만 원에 몇 만 골드(75:1).
- * 앱은 돈을 받거나 보내지 않는다. 현금거래는 계정 정지 위험이 있어 화면 맨 위에 알린다 (제작자 결정, CLAUDE.md).
+ * 앱은 돈을 받거나 보내지 않는다. 현금거래의 계정 정지 위험은 제작자에게 알렸고, 화면의 주의 문구는 뺐다 (제작자 2026-11-03 '조잡하다', CLAUDE.md).
  * 모양은 물건 칸과 같다 (제작자 2026-11-03 '골드 메뉴도 통일감 있게'): 위 줄에 글쓰기·새로고침, 어두운 띠 안에 팝니다 N·삽니다 N(평균 시세), 아래 줄 목록.
  * 내 골드 글은 중개인 맨 위 '내 글' 칸에 물건과 같이 보인다 (MarketPage).
  */
@@ -305,9 +305,6 @@ export function GoldBoard({ me }: { me: Me }) {
 
   return (
     <>
-      <p className="gold-warn">
-        골드 현금거래는 게임 운영정책에 걸리면 계정이 정지될 수 있어요. 앱은 돈을 받거나 보내지 않고, 거래는 각자 책임이에요.
-      </p>
       <div className="mk-search">
         <button className={"pill mk-grow" + (writing ? " pill-on" : "")} onClick={() => setWriting((w) => !w)} aria-expanded={writing}>
           골드 글쓰기
