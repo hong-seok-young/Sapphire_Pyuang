@@ -2583,6 +2583,22 @@ button.gd-member-row { cursor: pointer; }
 .tut-acts .bd-mini { margin-right: auto; }
 @media (prefers-reduced-motion: reduce) { .tut-spot-tap { animation: none; } .tut-spot { transition: none; } }
 /* 시세 동향 (개발중, Trend.tsx): gold rate chart and item price rows. Colours are the app tokens: 팝니다 sapphire, 삽니다 gold */
+.trend-tabs { margin: 0 0 10px; }
+.trend-vars-chart { padding: 8px 8px 4px; }
+.trend-group .trend-var-label { color: var(--gold); font-size: 14px; }
+.trend-group-body { padding: 4px 8px 8px; border-top: var(--px) dashed var(--edge); }
+.trend-vars-in { border: var(--px) solid var(--edge); margin: 6px 0 0; }
+.trend-vars-in .trend-var-label { font-size: 12px; }
+.trend-item-chart .trend-line { stroke: currentColor; }
+.trend-item-chart .trend-end { fill: currentColor; stroke: var(--edge); }
+.trend-s0 { color: var(--sapphire); background: var(--sapphire); }
+.trend-s1 { color: var(--gold); background: var(--gold); }
+.trend-s2 { color: #3fe0a0; background: #3fe0a0; }
+.trend-s3 { color: #ffb35c; background: #ffb35c; }
+.trend-s4 { color: #c9b8ff; background: #c9b8ff; }
+.trend-item-chart .trend-legend span { color: var(--muted); }
+.trend-item-chart svg g { background: none; }
+.trend-tabs .pill { font-size: 14px; padding: 7px 16px; }
 .trend-dev { padding: 3px 8px; font-size: 11px; background: #3fe0a0; color: var(--edge); cursor: default; }
 .trend-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 10px; }
 .trend-stat { display: flex; flex-direction: column; gap: 2px; padding: 8px 6px; background: var(--night-2); border: var(--px) solid var(--edge); font-size: 11px; text-align: center; }

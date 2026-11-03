@@ -373,6 +373,7 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
     rest = [w for w in rest if w not in ("or", "OR", "혹은", "ㅍ", "ㅍㅍ", "ㅅ", "ㅅㅅ")]
     opts: list[str] = []
     names: list[str] = []
+    enh_word = 0
     for w in rest:
         if w in SKIP_WORDS or SELL.fullmatch(w) or BUY.fullmatch(w):
             continue
@@ -382,8 +383,13 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
             continue
         if re.fullmatch(r"\d+(?:\.\d+)?%?", w):
             continue  # 옵션을 숫자만으로 적은 것 ('3 1 10 엘프의덧신')
+        em = re.fullmatch(r"\+?(\d{1,2}|[오육칠팔구십])강", w)
+        if em:  # '6강', '육강' (제작자 지적)
+            enh_word = KNUM.get(em.group(1)) or int(em.group(1))
+            continue
         if re.search(r"[가-힣a-zA-Z]", w):
             w = re.sub(r"팝니다|삽니다|판매|구매|노강|노작", "", w)
+            w = re.sub(r"^(\+?(?:\d{1,2}|[오육칠팔구십]))강(?=[가-힣])", r"\1", w)  # '6강바슬신' -> '6바슬신'
             while True:  # 이름 앞에 붙은 옵션 ('지3대자')
                 g = OPT_GLUED.match(w)
                 if not g:
@@ -438,7 +444,65 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
         name = NON_WIKI.get(c, c)
         wiki = False
         rs.unknown[c] += 1
+    enh = enh or enh_word
     return {"name": name, "wiki": wiki, "enh": enh if enh <= 20 else 0, "opts": opts, "price": round(price, 2), "abbr": abbr}
+
+
+EQUIP_JSON = ROOT / "web" / "public" / "data" / "equipment.json"
+# 게임 규칙 (CLAUDE.md 중개인): 강화는 갑옷, 주장비(무기), 투구, 보조장비, 장갑, 신발만, 속성부여는 벨트, 망토, 목걸이, 반지만
+ENCHANT_SLOTS = ("망토", "벨트", "목걸이", "반지")
+ENHANCE_SLOTS = ("무기", "보조 장비", "투구", "갑옷", "장갑", "신발")
+MAIN_STATS = ("힘", "민첩", "지능")  # 제작자: 힘, 민, 지가 주요 스탯. '지능2 체력30' 은 지능2 로 묶는다
+ENCHANT_RE = re.compile(r"^(힘|민첩|지능)([123])$|^(체력|마나)(10|20|30)$")
+
+
+def load_kinds() -> dict[str, str]:
+    """위키 장비 이름 -> 'enchant' (속성부여 되는 부위) / 'enhance' (강화 되는 부위)"""
+    if not EQUIP_JSON.exists():
+        return {}
+    out: dict[str, str] = {}
+    for table in json.loads(EQUIP_JSON.read_text(encoding="utf-8")):
+        slot = table["slot"]
+        kind = "enchant" if any(k in slot for k in ENCHANT_SLOTS) else "enhance" if any(k in slot for k in ENHANCE_SLOTS) else ""
+        if kind:
+            for row in table["rows"]:
+                out.setdefault(row["name"], kind)
+    return out
+
+
+def item_kind(name: str, xs: list[dict], kinds: dict[str, str]) -> str:
+    """위키 장비는 부위로, 아니면 글에서 짐작: 강화 숫자가 있으면 enhance, 속성부여 옵션만 있으면 enchant, 둘 다 없으면 none"""
+    if name in kinds:
+        return kinds[name]
+    if any(x["enh"] for x in xs):
+        return "enhance"
+    if any(ENCHANT_RE.match(o) for x in xs for o in x["opts"]):
+        return "enchant"
+    return "none"
+
+
+def group_label(kind: str, x: dict) -> str:
+    """속성부여 템은 주 스탯(힘·민첩·지능, 없으면 체력·마나)으로, 강화 템은 강화 단계로, 나머지는 하나로"""
+    if kind == "enchant":
+        ench = [o for o in x["opts"] if ENCHANT_RE.match(o)]
+        main = [o for o in ench if o.startswith(MAIN_STATS)]
+        return (main or ench or ["노작"])[0]
+    if kind == "enhance":
+        return f"+{x['enh']}" if x["enh"] else "노강"
+    return "전체"
+
+
+def group_sort_key(kind: str, g: dict) -> tuple:
+    if kind == "enhance":  # 강화 센 것부터 (제작자 요청)
+        return (0, -int(g["label"][1:])) if g["label"].startswith("+") else (1, 0)
+    if kind == "enchant":  # 주 스탯 높은 것부터, 힘 민첩 지능 체력 마나 순
+        m = ENCHANT_RE.match(g["label"])
+        if m:
+            stat = m.group(1) or m.group(3)
+            val = int(m.group(2) or m.group(4))
+            return (0, -val, ("힘", "민첩", "지능", "체력", "마나").index(stat))
+        return (1, 0, 0)
+    return (0, -g["n"])
 
 
 def variant_label(enh: int, opts: list[str]) -> str:
@@ -460,7 +524,9 @@ def people(xs: list[dict], key: str = "price") -> list[dict]:
 
 
 def item_prices(msgs: list[dict], last_week: str, rs: Resolver) -> list[dict]:
-    """물건마다 강화·옵션 묶음(variants)별 (날짜, 만 원 가격) 모음. 글 2개 이상인 물건만. 닉네임은 넣지 않고 글 본문 한 줄만 보기로 남긴다"""
+    """물건마다 묶음(groups: 속성부여 템은 주 스탯별, 강화 템은 강화 단계별)과 그 안의 강화·옵션 묶음(variants)별 (날짜, 만 원 가격) 모음.
+    글 2개 이상인 물건만. 글 본문 한 줄과 닉네임을 보기로 남긴다"""
+    kinds = load_kinds()
     items: dict[str, list[dict]] = defaultdict(list)
     for m in msgs:
         t = m["text"]
@@ -505,18 +571,28 @@ def item_prices(msgs: list[dict], last_week: str, rs: Resolver) -> list[dict]:
     for name, xs in items.items():
         if len(xs) < 2:
             continue
-        groups: dict[str, list[dict]] = defaultdict(list)
+        kind = item_kind(name, xs, kinds)
+        by_group: dict[str, list[dict]] = defaultdict(list)
         for x in xs:
-            groups[variant_label(x["enh"], x["opts"])].append(x)
-        variants = [{"label": label, **summary(v)} for label, v in groups.items()]
+            by_group[group_label(kind, x)].append(x)
+        groups = []
+        for label, gx in by_group.items():
+            by_var: dict[str, list[dict]] = defaultdict(list)
+            for x in gx:
+                by_var[variant_label(x["enh"], x["opts"])].append(x)
+            variants = [{"label": vl, **summary(v)} for vl, v in by_var.items()]
+            variants.sort(key=lambda v: (-v["n"], v["label"]))
+            groups.append({"label": label, **summary(gx), "variants": variants})
+        groups.sort(key=lambda g: group_sort_key(kind, g))
+        variants = [v for g in groups for v in g["variants"]]
         variants.sort(key=lambda v: (-v["n"], v["label"]))
         abbrs: dict[str, int] = defaultdict(int)
         for x in xs:
             if x["abbr"] != name.replace(" ", ""):
                 abbrs[x["abbr"]] += 1
-        out.append({"name": name, "wiki": xs[0]["wiki"],
+        out.append({"name": name, "wiki": xs[0]["wiki"], "kind": kind,
                     "abbr": [a for a, _ in sorted(abbrs.items(), key=lambda kv: -kv[1])[:4]],
-                    **summary(xs), "variants": variants})
+                    **summary(xs), "groups": groups, "variants": variants})
     out.sort(key=lambda it: (-it["sellers"], -it["n"], it["name"]))
     return out
 

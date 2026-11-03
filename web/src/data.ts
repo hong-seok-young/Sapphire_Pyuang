@@ -70,9 +70,13 @@ export interface TrendVariant {
   /** 싼 사람부터 */
   people: TrendPerson[];
 }
+/** 묶음: 속성부여 템은 주 스탯(지능2 = '지능2', '지능2 체력30' 둘 다), 강화 템은 강화 단계(+8, 노강), 나머지는 '전체'. 안에 옵션 묶음들 */
+export interface TrendGroup extends TrendVariant { variants: TrendVariant[] }
 export interface TrendItem extends TrendVariant {
   /** 위키 아이템 이름 (wiki 가 true) 또는 톡방 줄임말 그대로 */
-  name: string; wiki: boolean; abbr: string[]; variants: TrendVariant[];
+  name: string; wiki: boolean; abbr: string[];
+  /** enchant = 속성부여 부위 (벨트, 망토, 목걸이, 반지), enhance = 강화 부위, none = 그 밖 */
+  kind: "enchant" | "enhance" | "none"; groups: TrendGroup[]; variants: TrendVariant[];
 }
 /** 캐릭터 글 하나. 캘 = 캐릭터만, 템통 = 템까지 */
 export interface TrendChar {
