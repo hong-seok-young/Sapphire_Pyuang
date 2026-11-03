@@ -188,15 +188,18 @@ runSql([
   "UPDATE requests SET status = 'open' WHERE status = 'accepted';",
 ]);
 
-// 길드 던전 파티는 미리 짜 주지 않는다 (제작자 2026-11-03 '파티 미리 짜 주지 말자, 사용 좀 해 보라고, 각자 직접 짜게'): 11/3 에 세팅 스크립트(gd-seed.mjs, 지금은 없음)가
-// 자료 파일로 만든 파티 8개와 그때 보낸 알림을 지운다. 세팅은 파티·파티원·알림·setup 'gd_seed_<해시>' 를 모두 같은 때(done_at)로 넣었으므로 그 때로 찾는다.
-// 길드원이 직접 만든 파티와 시간표(gd_avail)는 그대로. setup 줄을 마지막에 지우므로 한 번 지우면 다시 돌아도 아무것도 안 한다. 공지 전 숨김 스위치('gd_parties_open')도 뺀다
+// 길드 던전 파티는 미리 짜 주지 않는다 (제작자 2026-11-03 '파티 미리 짜 주지 말자, 사용 좀 해 보라고' -> '아니다 냅두자' -> '아니다 그냥 파티 다 없애고 공지 후 공개 이딴 거 없애고
+// 직접 만들게 하자, 깔끔하게'): 11/3 에 세팅 스크립트(gd-seed.mjs, 지금은 없음)로 만든 것을 포함해 **파티를 모두** 지우고(파티·파티원·대답), 길드 던전 알림도 모두 지운다
+// (파티가 없어졌으니 '팀에 들어왔어요', '명단이 열렸어요' 같은 알림은 모두 지난 것). 시간표(gd_avail)는 각자 것이라 그대로. 공지 전 숨김 스위치('gd_parties_open')와 세팅 표시도 뺀다.
+// setup 'gd_reset_20261103' 로 한 번만 돈다 (그 뒤 길드원이 직접 만든 파티는 건드리지 않는다)
+const GD_RESET = "gd_reset_20261103";
 runSql([
-  "DELETE FROM gd_answers WHERE party_id IN (SELECT id FROM gd_parties WHERE created_at IN (SELECT done_at FROM setup WHERE key LIKE 'gd_seed_%'));",
-  "DELETE FROM gd_members WHERE party_id IN (SELECT id FROM gd_parties WHERE created_at IN (SELECT done_at FROM setup WHERE key LIKE 'gd_seed_%'));",
-  "DELETE FROM alerts WHERE kind = 'gdungeon' AND created_at IN (SELECT done_at FROM setup WHERE key LIKE 'gd_seed_%');",
-  "DELETE FROM gd_parties WHERE created_at IN (SELECT done_at FROM setup WHERE key LIKE 'gd_seed_%');",
+  `DELETE FROM gd_answers WHERE NOT EXISTS (SELECT 1 FROM setup WHERE key = '${GD_RESET}');`,
+  `DELETE FROM gd_members WHERE NOT EXISTS (SELECT 1 FROM setup WHERE key = '${GD_RESET}');`,
+  `DELETE FROM gd_parties WHERE NOT EXISTS (SELECT 1 FROM setup WHERE key = '${GD_RESET}');`,
+  `DELETE FROM alerts WHERE kind = 'gdungeon' AND NOT EXISTS (SELECT 1 FROM setup WHERE key = '${GD_RESET}');`,
   "DELETE FROM setup WHERE key LIKE 'gd_seed_%' OR key = 'gd_parties_open';",
+  `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${GD_RESET}', ${Date.now()});`,
 ]);
 
 // 더한 칸의 색인 (schema.sql 은 칸이 생기기 전에 돌아서 여기서 만든다)
