@@ -343,6 +343,7 @@ const ACTIONS: [RegExp, (d: Rec, m: RegExpMatchArray, at: number) => string][] =
   // 길드 던전
   [/^POST \/api\/gd$/, (d) => join("길드 던전 파티 만듦", names(d.members).length ? `함께 ${names(d.members).join(", ")}` : null)],
   [/^PUT \/api\/gd\/avail$/, (d) => join("길드 던전 시간표 저장", hours(d.slots))],
+  [/^POST \/api\/gd\/confirm$/, () => "길드 던전 시간표 확정"],
   [/^POST \/api\/gd\/answer$/, (d, _m, at) =>
     d.reset ? "길드 던전 처음부터 다시 정하기" : join(d.answer === "yes" ? "길드 던전 후보 확정" : d.answer === "no" ? "길드 던전 후보 불참" : "길드 던전 대답", gdSlot(d.slot, at))],
   [/^DELETE \/api\/gd\/answer$/, () => "길드 던전 불참 되돌리기"],

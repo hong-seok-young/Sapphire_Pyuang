@@ -14,6 +14,7 @@ import {
   answerGd,
   candidateNo,
   colHead,
+  confirmAvail,
   createParty,
   deleteParty,
   editParty,
@@ -692,6 +693,8 @@ function MyTimes({
     } catch {
       // 저장 못 해도 이번에 연 동안은 잠긴다
     }
+    // 확정하면 아직 안 칠한 파티원에게 알림 (제작자 2026-11-03, 서버가 한 주에 한 번만 보낸다). 못 보내도 잠금은 그대로
+    if (v && bitsRef.current.includes("1")) void confirmAvail().catch(() => undefined);
   };
   // 지난 칸도 칠할 수 있다: 매주 같은 루틴을 그대로 적어 두려고 (제작자 요청 2026-11-02 '시간 지났다고 비활성화하지 마'). 후보는 앞으로 올 때만 (서버)
   const locked = (i: number) => !validSlot(i);

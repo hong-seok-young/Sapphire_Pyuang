@@ -673,8 +673,9 @@ CREATE INDEX IF NOT EXISTS gd_members_party ON gd_members (party_id);
 CREATE TABLE IF NOT EXISTS gd_avail (
   user_id TEXT NOT NULL,
   week INTEGER NOT NULL,                  -- 그 주가 시작한 때 (목 10시, server/week.ts weekStart)
-  slots TEXT NOT NULL,                    -- 30분 칸마다 '0'/'1' 336자 (목 10:00 부터, 하루 09:00 ~ 02:00 만 쓴다)
+  slots TEXT NOT NULL,                    -- 30분 칸마다 '0'/'1' 336자 (목 10:30 부터, 하루 09:00 ~ 02:00 만 쓴다)
   updated_at INTEGER NOT NULL,
+  confirmed_at INTEGER,                   -- '확정'을 처음 누른 때 (그때 아직 안 칠한 파티원에게 알림, 한 주에 한 번. 제작자 2026-11-03)
   PRIMARY KEY (user_id, week)
 );
 CREATE INDEX IF NOT EXISTS gd_avail_week ON gd_avail (week);

@@ -62,6 +62,8 @@ export interface GdData {
 
 export const fetchGd = () => api<GdData>("/api/gd");
 export const createParty = (members: string[]) => api<{ id: number }>("/api/gd", "POST", { members });
+/** 내 시간표 '확정': 이번 주 처음이면 아직 안 칠한 파티원에게 알림 (서버 functions/api/gd/confirm.ts) */
+export const confirmAvail = () => api<{ ok: boolean; nudged: number }>("/api/gd/confirm", "POST");
 export const saveAvail = (slots: string) => api<{ ok: boolean; party?: PartyState | null }>("/api/gd/avail", "PUT", { slots });
 export const answerGd = (slot: number, answer: "yes" | "no") => api<{ ok: boolean; party?: PartyState | null }>("/api/gd/answer", "POST", { slot, answer });
 export const undoAnswer = (slot: number) => api<{ ok: boolean; party?: PartyState | null }>(`/api/gd/answer?slot=${slot}`, "DELETE");
