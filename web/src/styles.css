@@ -2804,19 +2804,11 @@ button.gd-member-row { cursor: pointer; }
 .enh-eq { margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.08); font-size: 13px; line-height: 1.6; }
 .enh-dot { display: inline-block; width: 7px; height: 7px; margin-right: 5px; vertical-align: 1px; background: var(--sapphire); }
 .enh-dot-b { background: var(--gold); }
-.enh-curve { display: block; width: 100%; height: 96px; margin-top: 6px; }
-.enh-grid { stroke: rgba(255, 255, 255, 0.08); stroke-width: 1; }
-.enh-axis { font-size: 9px; fill: var(--muted); }
-.enh-line-a polyline { stroke: var(--sapphire); stroke-width: 2; }
-.enh-line-b polyline { stroke: var(--gold); stroke-width: 2; }
-.enh-line-a circle { fill: var(--sapphire); }
-.enh-line-b circle { fill: var(--gold); }
 .enh-price { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; margin-top: 4px; }
 .enh-more { display: block; margin: 6px auto 0; padding: 3px 12px; font-size: 12px; background: none; border: none; color: var(--muted); }
 .enh-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; margin-top: 4px; }
 .enh-table th, .enh-table td { padding: 3px 2px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.06); }
 .enh-table thead th { font-weight: 500; color: var(--muted); overflow-wrap: anywhere; }
-.enh-table tbody th { font-weight: 500; color: var(--muted); width: 34px; }
-.enh-table tr.enh-on { background: rgba(255, 255, 255, 0.04); }
-.enh-cur-a { color: var(--sapphire); font-weight: 700; }
-.enh-cur-b { color: var(--gold); font-weight: 700; }
+.enh-table tbody th { font-weight: 500; color: var(--muted); }
+.enh-table tr.enh-on { background: rgba(255, 196, 92, 0.1); }
+.enh-table tr.enh-cross td, .enh-table tr.enh-cross th { border-top: 2px solid var(--gold); }

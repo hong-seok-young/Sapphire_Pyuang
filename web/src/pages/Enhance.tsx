@@ -1,7 +1,8 @@
 // 강화 비교 (개발중, 제작자 요청 2026-11-04: '8윙의날개와 8헌터보우 입력하면 이제 몇 퍼센트가 강해지는지', 같은 날 '콤팩트하게, 고도화').
 // 자료는 data/enhance.json (scripts/build_enhance.py: 카페 글 331665 첨부 '무기 강화수치 26.10' + 위키 장비 표).
 // 강화 데미지 = 기본 데미지 x (1 + 가산값 / 100): 전사·레인저·무도가는 공통 가산치, 마법사는 무기마다 다른 가산치.
-// 화면: 무기마다 한 줄(그림 · 이름 칸 · − +N +), 결과(평균 % 차이, 최소·최대, 같은 데미지가 되는 강화), 강화 곡선, 단계별 표, 톡방 시세(시세 동향 자료).
+// 화면: 무기마다 한 줄(그림 · 이름 칸 · − +N +), 결과(평균 % 차이, 최소·최대, 같은 데미지가 되는 강화), 톡방 시세(시세 동향 자료),
+// 바꿀 무기 강화별 표(+N 마다 지금 무기 대비 %, 같은 강화끼리는 견주지 않는다: 제작자 2026-11-04 '그래프는 뭐고 같은 강화끼리 비교하면 뭐해').
 import { useCallback, useMemo, useState } from "react";
 import type { Me } from "../auth";
 import { loadEnhance, loadTrend, useAsync } from "../data";
@@ -161,37 +162,6 @@ function WeaponRow({ d, wiki, me, side, hint, pick, onPick }: { d: Enhance; wiki
   );
 }
 
-/** 강화 곡선: +0~+15 평균 데미지, 고른 강화에 점. 단계별 표의 '지금 대비'는 바꿀 무기 +N 이 지금 무기(고른 강화)보다 몇 % 센지 */
-function Curve({ d, a, b }: { d: Enhance; a: Pick & { w: EnhanceWeapon }; b: Pick & { w: EnhanceWeapon } }) {
-  const W = 300, H = 96, L = 4, R = 4, T = 8, B = 14;
-  const top = Math.max(maxPlus(d, a.w), maxPlus(d, b.w), 1);
-  const series = [a, b].map((p) => Array.from({ length: maxPlus(d, p.w) + 1 }, (_, i) => damage(d, p.w, i).avg));
-  const ymax = Math.max(...series.flat()) * 1.05;
-  const x = (i: number) => L + (i / top) * (W - L - R);
-  const y = (v: number) => T + (1 - v / ymax) * (H - T - B);
-  return (
-    <svg className="enh-curve" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="강화 곡선">
-      {[0, 5, 10, 15].filter((i) => i <= top).map((i) => (
-        <g key={i}>
-          <line x1={x(i)} x2={x(i)} y1={T} y2={H - B} className="enh-grid" />
-          <text x={x(i)} y={H - 3} className="enh-axis" textAnchor={i === 0 ? "start" : i === top ? "end" : "middle"}>
-            +{i}
-          </text>
-        </g>
-      ))}
-      {series.map((s, k) => (
-        <g key={k} className={k ? "enh-line-b" : "enh-line-a"}>
-          <polyline fill="none" points={s.map((v, i) => `${x(i)},${y(v)}`).join(" ")} />
-          {(() => {
-            const p = k ? b.plus : a.plus;
-            return <circle cx={x(p)} cy={y(s[p])} r={3.5} />;
-          })()}
-        </g>
-      ))}
-    </svg>
-  );
-}
-
 /** 톡방 시세 (시세 동향 자료): 그 무기 그 강화의 팝니다 중간값 */
 function priceOf(t: Trend | undefined, w: EnhanceWeapon, plus: number): { med: number; n: number } | null {
   if (!t) return null;
@@ -213,7 +183,6 @@ function Result({ d, t, a, b }: { d: Enhance; t?: Trend; a: Pick; b: Pick }) {
   const aReach = reach(d, A.w, y.avg);
   const pa = priceOf(t, A.w, A.plus);
   const pb = priceOf(t, B.w, B.plus);
-  const top = Math.max(maxPlus(d, A.w), maxPlus(d, B.w));
   return (
     <section className="enh-card enh-result">
       <div className="enh-head">
@@ -240,7 +209,6 @@ function Result({ d, t, a, b }: { d: Enhance; t?: Trend; a: Pick; b: Pick }) {
           {label(B.w, B.plus)} ≈ {A.w.name} {aReach === null ? <b className="enh-down">+{maxPlus(d, A.w)}로도 못 미침</b> : <b>+{aReach}</b>}
         </div>
       </div>
-      <Curve d={d} a={A} b={B} />
       {(pa || pb) && (
         <div className="enh-price">
           <span className="muted">톡방 시세</span>
@@ -256,34 +224,31 @@ function Result({ d, t, a, b }: { d: Enhance; t?: Trend; a: Pick; b: Pick }) {
         </div>
       )}
       <button type="button" className="enh-more" onClick={() => setTable(!table)} aria-expanded={table}>
-        단계별 {table ? "▴" : "▾"}
+        {B.w.name} 강화별 {table ? "▴" : "▾"}
       </button>
       {table && (
         <table className="enh-table">
           <thead>
             <tr>
-              <th />
-              <th>
-                <span className="enh-dot enh-dot-a" />
-                {A.w.name}
-              </th>
               <th>
                 <span className="enh-dot enh-dot-b" />
                 {B.w.name}
               </th>
-              <th>지금 대비</th>
+              <th>평균</th>
+              <th>
+                <span className="enh-dot enh-dot-a" />
+                {label(A.w, A.plus)} 대비
+              </th>
             </tr>
           </thead>
           <tbody>
-            {Array.from({ length: top + 1 }, (_, i) => {
-              const u = i <= maxPlus(d, A.w) ? damage(d, A.w, i).avg : null;
-              const v = i <= maxPlus(d, B.w) ? damage(d, B.w, i).avg : null;
+            {Array.from({ length: maxPlus(d, B.w) + 1 }, (_, i) => {
+              const v = damage(d, B.w, i).avg;
               return (
-                <tr key={i} className={i === A.plus || i === B.plus ? "enh-on" : ""}>
+                <tr key={i} className={(i === B.plus ? "enh-on" : "") + (i === bReach ? " enh-cross" : "")}>
                   <th>+{i}</th>
-                  <td className={i === A.plus ? "enh-cur-a" : ""}>{u === null ? "-" : fmt(u)}</td>
-                  <td className={i === B.plus ? "enh-cur-b" : ""}>{v === null ? "-" : fmt(v)}</td>
-                  <td className={v !== null ? tone(pct(x.avg, v)) : ""}>{v !== null ? pctText(pct(x.avg, v)) : ""}</td>
+                  <td>{fmt(v)}</td>
+                  <td className={tone(pct(x.avg, v))}>{pctText(pct(x.avg, v))}</td>
                 </tr>
               );
             })}
