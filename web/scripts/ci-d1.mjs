@@ -210,6 +210,25 @@ runSql([
   `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${GD_RESET}', ${Date.now()});`,
 ]);
 
+// 챗봇 개선 완료를 배포가 대신 누른다 (제작자 2026-11-03 '개선완료도 너가 보내': 여기서는 실서비스 화면에 로그인할 수 없어서). functions/api/chat/gaps/[id].ts 와 같은 일:
+// '밀가루' 질문의 열린 항목을 완료로 바꾸고 물어본 사람에게 '챗봇이 개선됐어요' 알림(누르면 그 대화에서 다시 묻기). setup 'gap_fix_flour_20261103' 로 한 번만.
+// 알림 설정을 끈 사람에게는 안 넣는다 (notify 와 같다). 폰 알림(푸시)은 서버가 아니라서 안 간다. 실행 기록에는 개수만
+{
+  const KEY = "gap_fix_flour_20261103";
+  const WHERE = `g.status = 'open' AND (g.question LIKE '%밀가루%' OR g.reason LIKE '%밀가루%') AND NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}')`;
+  const n = queryFirst(`SELECT COUNT(*) AS n FROM chat_gaps g WHERE ${WHERE}`)?.n ?? 0;
+  const now = Date.now();
+  runSql([
+    "INSERT INTO alerts (user_id, kind, text, link, created_at) " +
+      "SELECT g.user_id, 'chat_fixed', '챗봇이 개선됐어요. 물어봤던 “' || substr(replace(replace(g.question, char(10), ' '), char(13), ' '), 1, 40) || '” · 이벤트 글을 끝까지 읽고 답해요', " +
+      "CASE WHEN EXISTS (SELECT 1 FROM chat_threads t WHERE t.id = g.thread_id AND t.user_id = g.user_id) THEN '#/chat/' || g.thread_id || '?again=' || g.id ELSE '#/chat' END, " +
+      `${now} FROM chat_gaps g WHERE ${WHERE} AND COALESCE((SELECT p.enabled FROM alert_prefs p WHERE p.user_id = g.user_id AND p.kind = 'chat_fixed'), 1) = 1;`,
+    `UPDATE chat_gaps SET status = 'fixed', note = '공식 이벤트 글을 끝까지 읽고 답하게 고침', fixed_at = ${now} WHERE id IN (SELECT g.id FROM chat_gaps g WHERE ${WHERE});`,
+    `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+  ]);
+  console.log(`챗봇 개선 완료(밀가루 질문) ${n}건`);
+}
+
 // 더한 칸의 색인 (schema.sql 은 칸이 생기기 전에 돌아서 여기서 만든다)
 wrangler("d1", "execute", DB, "--remote", "--yes", "--command", "CREATE INDEX IF NOT EXISTS official_news_added ON official_news (added_at)");
 
