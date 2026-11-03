@@ -1,0 +1,23 @@
+# 길드 던전 새 주 알림 (제작자 요청 2026-11-03 '목요일 10시반 알림도'): 매주 목요일 오전 10시 30분(한국 시간, UTC 01:30. 게임의 길드 던전 초기화 때)에
+# 파티원 중 아직 시간표를 안 칠한 사람에게 '[○○ 팀] 새 주가 시작됐어요 · 이번 주 시간표를 칠해 주세요' 알림을 보낸다.
+# 서버 POST /api/gd/remind 를 부른다 (web/server/gdungeon.ts remindWeek: 주마다 한 번만, 주 시작 하루 안에서만 보내므로 비밀값 없이 부른다).
+# GitHub 예약이 늦거나 안 돌아도 /api/news 가 그 하루 안에 보충한다 (remindIfDue). 공개 저장소라 실행 기록에는 보낸 수만 찍는다.
+name: Guild dungeon weekly reminder
+
+on:
+  schedule:
+    - cron: "30 1 * * 4"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Remind party members
+        run: |
+          out=$(curl -fsS -X POST https://sapphire-guild.pages.dev/api/gd/remind) || { echo "::warning::알림 요청이 실패했어요"; exit 0; }
+          echo "보낸 알림: $(printf '%s' "$out" | tr -cd '0-9')"

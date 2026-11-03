@@ -190,6 +190,33 @@ export async function memberProblem(env: Env, ids: string[], partyId: number | n
 }
 
 /** 파티원에게 알림 (나 빼고) */
+/** 목요일 10:30 새 주 알림 (제작자 2026-11-03 '목요일 10시반 알림도'): 파티원 중 아직 안 칠한 사람에게 '[○○ 팀] 새 주가 시작됐어요 · 이번 주 시간표를 칠해 주세요'.
+ *  GitHub Actions(gd-remind.yml)가 POST /api/gd/remind 로 부르고, 예약이 늦거나 안 돌면 /api/news 가 그 하루 안에 보충한다 (remindIfDue).
+ *  주마다 한 번만 (setup 'gd_remind_<주>'), 주 시작 하루가 지났으면 표시만 하고 보내지 않는다 (배포 직후 주 중간에 뜬금없이 가지 않게) */
+export const REMIND_WINDOW = 24 * 3_600_000;
+export const remindKey = (week: number) => `gd_remind_${week}`;
+export async function remindWeek(env: Env, now = Date.now()): Promise<number> {
+  const { week } = weeks(now);
+  const r = await env.DB.prepare("INSERT OR IGNORE INTO setup (key, done_at) VALUES (?, ?)").bind(remindKey(week), now).run();
+  if (!r.meta.changes || now - week > REMIND_WINDOW) return 0;
+  const parties = await allParties(env, week, now);
+  let n = 0;
+  for (const p of parties) {
+    const to = p.members.filter((m) => !m.filled).map((m) => m.id);
+    if (!to.length) continue;
+    await notify(env, to, "gdungeon", `[${p.name}] 새 주가 시작됐어요 · 이번 주 시간표를 칠해 주세요`, "#/match", "");
+    n += to.length;
+  }
+  return n;
+}
+/** /api/news 가 2분마다 부른다: 주 시작 하루 안이고 아직 안 보냈으면 보낸다 (읽기 하나, 쓰기는 보낼 때만) */
+export async function remindIfDue(env: Env, now = Date.now()): Promise<void> {
+  const { week } = weeks(now);
+  if (now - week > REMIND_WINDOW) return;
+  const done = await env.DB.prepare("SELECT 1 AS x FROM setup WHERE key = ?").bind(remindKey(week)).first();
+  if (!done) await remindWeek(env, now);
+}
+
 export async function tellParty(env: Env, p: PartyState, text: string, from: string): Promise<void> {
   await notify(env, p.members.map((m) => m.id).filter((id) => id !== from), "gdungeon", text, "#/match", from);
 }
