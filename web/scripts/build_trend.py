@@ -25,6 +25,25 @@ ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "자료" / "카톡"
 OUT = ROOT / "web" / "public" / "data" / "trend.json"
 ICON_DIR = ROOT / "자료" / "이미지" / "시세동향"
+# 세트·묶음 이름이면 그 코스튬의 몸통 부위 그림 (플랑 세트 -> 플랑의드레스)
+BODY = re.compile(r"갑옷|옷|로브|드레스|비늘|흉골|협의|화복|풍운의|경갑|경기의상|나들이복")
+
+
+def icon_for(name: str) -> str | None:
+    """시세 동향 물건 이름 -> data/trend/<그림>.png. 괄호 설명을 떼고 같은 이름, 없으면 '플랑 세트'처럼 앞말로 시작하는 부위 중 몸통"""
+    if not ICON_DIR.exists():
+        return None
+    base = re.sub(r"\s*\(.*\)\s*$", "", name).strip()
+    if (ICON_DIR / f"{base}.png").exists():
+        return f"trend/{base}.png"
+    head = re.split(r"[ ·]", re.sub(r"\s*(세트|셋)$", "", base))[0]
+    if len(head) < 2:
+        return None
+    cands = sorted(p.stem for p in ICON_DIR.glob(f"{head}*.png"))
+    if not cands:
+        return None
+    body = [c for c in cands if BODY.search(c[len(head):])]
+    return f"trend/{(body or cands)[0]}.png"
 
 USUAL_RATE = 75  # 만 골드로 적은 가격을 만 원으로 바꿀 때 (web/src/gold.ts 의 USUAL_RATE 와 같다)
 NOT_ITEM = re.compile(r"^(골드|구매시|통 구매시|일괄구매시|통|개당|통당|장당)$|구매시$")
@@ -1136,9 +1155,9 @@ def main() -> None:
     chars = char_prices(msgs, rs)
     # 위키에 없는 물건의 그림: 자료/이미지/시세동향/<이름>.png (제작자 도감 스샷에서 자른 것, make_trend_icons.py). 이름의 괄호 설명은 뺀다
     for it in items + items_buy:
-        base = re.sub(r"\s*\(.*\)\s*$", "", it["name"])
-        if (ICON_DIR / f"{base}.png").exists():
-            it["icon"] = f"trend/{base}.png"
+        icon = icon_for(it["name"])
+        if icon:
+            it["icon"] = icon
     data = {
         "source": {"rooms": sorted(set(rooms)), "from": dates[0], "to": dates[-1], "messages": len(msgs),
                    "built": datetime.date.today().isoformat(), "rate": USUAL_RATE},
