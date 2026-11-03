@@ -5,17 +5,34 @@
 // 오른쪽 '›' 는 인던·길드던전의 위키 화면이나 이벤트 공식 글. 칸을 만드는 것은 src/todo.ts
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Me } from "../auth";
+import { sampleTodo } from "../sample";
+import { useSample } from "../tutorialState";
 import { errorText } from "../auth";
 import type { Wiki } from "../types";
 import { Loading, TopBar } from "../ui";
+import { KakaoButton, Nick } from "../kakao";
 import {
-  addCustom, buildLists, deleteCustom, digestTodo, editCustom, editTodo, eventItems, fetchPeople, fetchTodo, leaveShare, leftText, routineItems,
-  setTodoDone, shareTodo, updateShare,
+  addCustom,
+  buildLists,
+  deleteCustom,
+  digestTodo,
+  editCustom,
+  editTodo,
+  eventItems,
+  fetchPeople,
+  fetchTodo,
+  leaveShare,
+  leftText,
+  routineItems,
+  setTodoDone,
+  shareTodo,
+  updateShare,
 } from "../todo";
 import type { TodoData, TodoItem, TodoPerson } from "../todo";
 
 export function TodoPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const [data, setData] = useState<TodoData | null>(null);
+  const sample = useSample();
   const [error, setError] = useState("");
   const [done, setDone] = useState<Set<string>>(new Set());
   const [digesting, setDigesting] = useState(false);
@@ -51,13 +68,22 @@ export function TodoPage({ wiki, me }: { wiki: Wiki; me: Me }) {
       setDigesting(true);
       const until = Date.now() + 180_000;
       let cur: TodoData | null = d;
-      while (!stop && cur && (cur.pending || cur.working) && Date.now() < until) {
+      while (
+        !stop &&
+        cur &&
+        (cur.pending || cur.working) &&
+        Date.now() < until
+      ) {
         if (cur.pending) await digestTodo().catch(() => null);
         else await new Promise((ok) => setTimeout(ok, 15_000));
         if (stop) break;
         const next: TodoData | null = await load();
         // 서버가 더 할 수 없으면(API 키 없음 등) 그만
-        if (!next || (next.pending && next.pending === cur.pending && !next.working)) break;
+        if (
+          !next ||
+          (next.pending && next.pending === cur.pending && !next.working)
+        )
+          break;
         cur = next;
       }
       if (alive.current) setDigesting(false);
@@ -71,17 +97,27 @@ export function TodoPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   }, [load]);
 
   useEffect(() => {
-    if (data && (Date.now() >= data.dayEnd || Date.now() >= data.weekEnd)) void load();
+    if (data && (Date.now() >= data.dayEnd || Date.now() >= data.weekEnd))
+      void load();
   });
 
-  if (!data) return (
-    <>
-      <TopBar title="To do" />
-      <Loading error={error || undefined} onRetry={() => void load()} />
-    </>
-  );
+  if (!data)
+    return (
+      <>
+        <TopBar title="To do" />
+        <Loading error={error || undefined} onRetry={() => void load()} />
+      </>
+    );
 
-  const lists = buildLists(routineItems(wiki, me.level, me.guild), eventItems(data.tasks, data.dayEnd), data);
+  // 튜토리얼 동안은 이벤트 칸 맨 앞에 예시 할 일 (src/sample.ts: 펼치면 할 것과 손해 주의가 보이게)
+  const events = sample
+    ? [sampleTodo(), ...eventItems(data.tasks, data.dayEnd)]
+    : eventItems(data.tasks, data.dayEnd);
+  const lists = buildLists(
+    routineItems(wiki, me.level, me.guild),
+    events,
+    data,
+  );
 
   const toggle = (key: string) => {
     const on = !done.has(key);
@@ -120,10 +156,27 @@ export function TodoPage({ wiki, me }: { wiki: Wiki; me: Me }) {
       <TopBar title="To do" />
       {/* 맨 위의 '닉네임 · Lv.45 마법사 · Sapphire' 줄은 뺐다 (제작자 요청 2026-11-02: '왜 써 놨냐') */}
       {error && <p className="form-error">{error}</p>}
-      <Section title="일간" reset={`초기화 ${leftText(data.dayEnd - now)} 뒤`} items={lists.daily} ctx={ctx} />
-      <Section title="주간" reset={`목 10:00 초기화 · ${leftText(data.weekEnd - now)} 뒤`} items={lists.weekly} ctx={ctx} />
-      <Section title="이벤트" items={lists.events} ctx={ctx} empty={digesting ? undefined : "진행 중인 이벤트 할 일이 없어요"} />
-      {lists.mine.length > 0 && <Section title="내 할 일" items={lists.mine} ctx={ctx} />}
+      <Section
+        title="일간"
+        reset={`초기화 ${leftText(data.dayEnd - now)} 뒤`}
+        items={lists.daily}
+        ctx={ctx}
+      />
+      <Section
+        title="주간"
+        reset={`목 10:00 초기화 · ${leftText(data.weekEnd - now)} 뒤`}
+        items={lists.weekly}
+        ctx={ctx}
+      />
+      <Section
+        title="이벤트"
+        items={lists.events}
+        ctx={ctx}
+        empty={digesting ? undefined : "진행 중인 이벤트 할 일이 없어요"}
+      />
+      {lists.mine.length > 0 && (
+        <Section title="내 할 일" items={lists.mine} ctx={ctx} />
+      )}
       {digesting && <p className="todo-working">📝 새 공식 글 정리 중…</p>}
       <AddTodo act={act} />
       {lists.hidden.length > 0 && <HiddenList items={lists.hidden} act={act} />}
@@ -139,7 +192,19 @@ interface RowCtx {
   act: (run: () => Promise<unknown>) => Promise<boolean>;
 }
 
-function Section({ title, reset, items, ctx, empty }: { title: string; reset?: string; items: TodoItem[]; ctx: RowCtx; empty?: string }) {
+function Section({
+  title,
+  reset,
+  items,
+  ctx,
+  empty,
+}: {
+  title: string;
+  reset?: string;
+  items: TodoItem[];
+  ctx: RowCtx;
+  empty?: string;
+}) {
   const [showDone, setShowDone] = useState(false);
   if (!items.length && !empty) return null;
   // 끝낸 일은 아래로 접는다 (제작자 요청 2026-11-02: 할 일이 너무 많아 보인다). 누르면 펼쳐 다시 풀 수 있다
@@ -149,11 +214,17 @@ function Section({ title, reset, items, ctx, empty }: { title: string; reset?: s
     <section className="panel todo">
       <h2 className="todo-head">
         <span>{title}</span>
-        {items.length > 0 && <b className={finished.length === items.length ? "todo-all" : ""}>{finished.length}/{items.length}</b>}
+        {items.length > 0 && (
+          <b className={finished.length === items.length ? "todo-all" : ""}>
+            {finished.length}/{items.length}
+          </b>
+        )}
         {reset && <small>{reset}</small>}
       </h2>
       {!items.length && <p className="todo-empty">{empty}</p>}
-      {items.length > 0 && !left.length && <p className="todo-empty">다 했어요 ✓</p>}
+      {items.length > 0 && !left.length && (
+        <p className="todo-empty">다 했어요 ✓</p>
+      )}
       <ul className="todo-list">
         {left.map((i) => (
           <Row key={i.key} item={i} ctx={ctx} />
@@ -189,9 +260,11 @@ function linkName(url: string): string {
   })();
   if (/discord\.(gg|com)/.test(host)) return "디스코드에서 참여";
   if (/cafe\.naver\.com/.test(host)) return "카페에서 참여";
-  if (/forms\.gle|docs\.google\.com|naver\.me|form/.test(host + url)) return "설문·응모 열기";
+  if (/forms\.gle|docs\.google\.com|naver\.me|form/.test(host + url))
+    return "설문·응모 열기";
   if (/coupon/i.test(url)) return "쿠폰 입력하러 가기";
-  if (/instagram|youtube|youtu\.be|x\.com|twitter|facebook|kakao/.test(host)) return "참여 페이지 열기";
+  if (/instagram|youtube|youtu\.be|x\.com|twitter|facebook|kakao/.test(host))
+    return "참여 페이지 열기";
   return "참여하러 가기";
 }
 
@@ -201,30 +274,52 @@ function Row({ item: i, ctx }: { item: TodoItem; ctx: RowCtx }) {
   const on = ctx.done.has(i.key);
   const s = i.share;
   // 남이 만든 '함께' 의 할 일 (내게는 없던 줄)은 숨기기·수정 대신 나가기
-  const foreign = !!s && s.owner !== ctx.me.id && !i.custom && i.key.includes(":c:");
+  const foreign =
+    !!s && s.owner !== ctx.me.id && !i.custom && i.key.includes(":c:");
   return (
-    <li className={"todo-row" + (on ? " todo-done" : "")}>
+    <li
+      className={"todo-row" + (on ? " todo-done" : "")}
+      data-tut-sample={i.key.startsWith("sample:") ? "" : undefined}
+    >
       <div className="todo-line">
         {/* 체크 칸만 끝낸 일로 보낸다 */}
-        <button className="todo-check" onClick={() => ctx.onToggle(i.key)} aria-pressed={on} aria-label={i.text + (on ? " 끝냄 취소" : " 끝냄")}>
+        <button
+          className="todo-check"
+          onClick={() => ctx.onToggle(i.key)}
+          aria-pressed={on}
+          aria-label={i.text + (on ? " 끝냄 취소" : " 끝냄")}
+        >
           <span className="todo-box" aria-hidden>
             {on ? "✓" : ""}
           </span>
         </button>
         {/* 이름: 펼치기 */}
-        <button className="todo-hit" onClick={() => setOpened((v) => !v)} aria-expanded={opened}>
+        <button
+          className="todo-hit"
+          onClick={() => setOpened((v) => !v)}
+          aria-expanded={opened}
+        >
           <span className="todo-text">
             <span className="todo-name">
               {i.tag && <span className="todo-tag">{i.tag}</span>}
               {i.text}
+              {i.key.startsWith("sample:") && (
+                <i className="sample-tag">예시</i>
+              )}
             </span>
             {i.note && <span className="todo-note">{i.note}</span>}
             {s && (
               <span className="todo-with">
                 {s.members.map((m) => (
                   <span key={m.id} className={m.done ? "todo-with-done" : ""}>
-                    {m.id}
+                    <Nick name={m.id} />
                     {m.done ? " ✓" : ""}
+                    {m.id !== ctx.me.id && (
+                      <>
+                        {" "}
+                        <KakaoButton name={m.id} nested />
+                      </>
+                    )}
                   </span>
                 ))}
                 {s.at && <b>{s.at}</b>}
@@ -256,12 +351,21 @@ function Row({ item: i, ctx }: { item: TodoItem; ctx: RowCtx }) {
           ))}
           {/* 게임 밖에서 하는 응모·쿠폰: 그곳으로 바로 (제작자 요청 2026-11-02: 원글을 무조건 봐야 하면 요약한 의미가 없다) */}
           {i.link && (
-            <a className="todo-link" href={i.link} target="_blank" rel="noopener noreferrer">
+            <a
+              className="todo-link"
+              href={i.link}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               {linkName(i.link)} ↗
             </a>
           )}
-          {mode === "edit" && <EditForm item={i} act={ctx.act} onDone={() => setMode("")} />}
-          {mode === "share" && <ShareForm item={i} ctx={ctx} onDone={() => setMode("")} />}
+          {mode === "edit" && (
+            <EditForm item={i} act={ctx.act} onDone={() => setMode("")} />
+          )}
+          {mode === "share" && (
+            <ShareForm item={i} ctx={ctx} onDone={() => setMode("")} />
+          )}
           {!mode && (
             <div className="todo-acts">
               {!foreign && (
@@ -269,17 +373,30 @@ function Row({ item: i, ctx }: { item: TodoItem; ctx: RowCtx }) {
                   수정
                 </button>
               )}
-              <button className={"pill" + (s ? " pill-on" : "")} onClick={() => setMode("share")}>
+              <button
+                className={"pill" + (s ? " pill-on" : "")}
+                onClick={() => setMode("share")}
+              >
                 함께{s ? ` ${s.members.length}` : ""}
               </button>
               {i.custom ? (
-                <DeleteButton onDelete={() => ctx.act(() => deleteCustom(i.custom!))} />
+                <DeleteButton
+                  onDelete={() => ctx.act(() => deleteCustom(i.custom!))}
+                />
               ) : foreign ? (
-                <button className="pill" onClick={() => void ctx.act(() => leaveShare(s!.id))}>
+                <button
+                  className="pill"
+                  onClick={() => void ctx.act(() => leaveShare(s!.id))}
+                >
                   나가기
                 </button>
               ) : (
-                <button className="pill" onClick={() => void ctx.act(() => editTodo(i.key, { hidden: true }))}>
+                <button
+                  className="pill"
+                  onClick={() =>
+                    void ctx.act(() => editTodo(i.key, { hidden: true }))
+                  }
+                >
                   숨김
                 </button>
               )}
@@ -306,7 +423,15 @@ function DeleteButton({ onDelete }: { onDelete: () => void }) {
 }
 
 /** 이름·어디서 고치기 (내 할 일은 그 할 일을, 다른 것은 나에게만 보이게) */
-function EditForm({ item: i, act, onDone }: { item: TodoItem; act: RowCtx["act"]; onDone: () => void }) {
+function EditForm({
+  item: i,
+  act,
+  onDone,
+}: {
+  item: TodoItem;
+  act: RowCtx["act"];
+  onDone: () => void;
+}) {
   const [text, setText] = useState(i.text);
   const [note, setNote] = useState(i.note ?? "");
   const [busy, setBusy] = useState(false);
@@ -317,18 +442,45 @@ function EditForm({ item: i, act, onDone }: { item: TodoItem; act: RowCtx["act"]
   };
   return (
     <div className="todo-form">
-      <input className="todo-input" value={text} maxLength={30} onChange={(e) => setText(e.target.value)} placeholder="할 일" aria-label="할 일" />
-      <input className="todo-input" value={note} maxLength={20} onChange={(e) => setNote(e.target.value)} placeholder="어디서 (선택)" aria-label="어디서" />
+      <input
+        className="todo-input"
+        value={text}
+        maxLength={30}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="할 일"
+        aria-label="할 일"
+      />
+      <input
+        className="todo-input"
+        value={note}
+        maxLength={20}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="어디서 (선택)"
+        aria-label="어디서"
+      />
       <div className="todo-acts">
         <button
           className="pill pill-on"
           disabled={busy || !text.trim()}
-          onClick={() => void save(() => (i.custom ? editCustom(i.custom, text, note) : editTodo(i.key, { text: text === (i.base?.text ?? "") ? "" : text, note })))}
+          onClick={() =>
+            void save(() =>
+              i.custom
+                ? editCustom(i.custom, text, note)
+                : editTodo(i.key, {
+                    text: text === (i.base?.text ?? "") ? "" : text,
+                    note,
+                  }),
+            )
+          }
         >
           저장
         </button>
         {i.base && (
-          <button className="pill" disabled={busy} onClick={() => void save(() => editTodo(i.key, { reset: true }))}>
+          <button
+            className="pill"
+            disabled={busy}
+            onClick={() => void save(() => editTodo(i.key, { reset: true }))}
+          >
             원래대로
           </button>
         )}
@@ -341,16 +493,30 @@ function EditForm({ item: i, act, onDone }: { item: TodoItem; act: RowCtx["act"]
 }
 
 /** 함께: 같이 하는 사람 고르기와 언제 (제작자 요청 2026-11-02: 길드던전 고정 멤버처럼). 만든 사람만 사람을 넣고 빼고, 언제는 누구나 */
-function ShareForm({ item: i, ctx, onDone }: { item: TodoItem; ctx: RowCtx; onDone: () => void }) {
+function ShareForm({
+  item: i,
+  ctx,
+  onDone,
+}: {
+  item: TodoItem;
+  ctx: RowCtx;
+  onDone: () => void;
+}) {
   const s = i.share;
   const owner = !s || s.owner === ctx.me.id;
   const [at, setAt] = useState(s?.at ?? "");
-  const [picked, setPicked] = useState<string[]>(s ? s.members.map((m) => m.id).filter((id) => id !== ctx.me.id) : []);
+  const [picked, setPicked] = useState<string[]>(
+    s ? s.members.map((m) => m.id).filter((id) => id !== ctx.me.id) : [],
+  );
   const [people, setPeople] = useState<TodoPerson[] | null>(null);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (owner) fetchPeople().then((r) => setPeople(r.people), () => setPeople([]));
+    if (owner)
+      fetchPeople().then(
+        (r) => setPeople(r.people),
+        () => setPeople([]),
+      );
   }, [owner]);
   const save = async (run: () => Promise<unknown>) => {
     setBusy(true);
@@ -358,24 +524,52 @@ function ShareForm({ item: i, ctx, onDone }: { item: TodoItem; ctx: RowCtx; onDo
     setBusy(false);
   };
   const query = q.replace(/\s+/g, "").toLowerCase();
-  const found = (people ?? []).filter((p) => !picked.includes(p.id) && (!query || p.id.toLowerCase().includes(query))).slice(0, 8);
+  const found = (people ?? [])
+    .filter(
+      (p) =>
+        !picked.includes(p.id) &&
+        (!query || p.id.toLowerCase().includes(query)),
+    )
+    .slice(0, 8);
   return (
     <div className="todo-form">
-      <input className="todo-input" value={at} maxLength={20} onChange={(e) => setAt(e.target.value)} placeholder="언제 (예: 토 21:00)" aria-label="언제" />
+      <input
+        className="todo-input"
+        value={at}
+        maxLength={20}
+        onChange={(e) => setAt(e.target.value)}
+        placeholder="언제 (예: 토 21:00)"
+        aria-label="언제"
+      />
       {owner ? (
         <>
           <div className="todo-people">
             {picked.map((id) => (
-              <button key={id} className="pill pill-on" onClick={() => setPicked(picked.filter((x) => x !== id))} aria-label={id + " 빼기"}>
+              <button
+                key={id}
+                className="pill pill-on"
+                onClick={() => setPicked(picked.filter((x) => x !== id))}
+                aria-label={id + " 빼기"}
+              >
                 {id} ✕
               </button>
             ))}
           </div>
-          <input className="todo-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="닉네임 찾기" aria-label="닉네임 찾기" />
+          <input
+            className="todo-input"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="닉네임 찾기"
+            aria-label="닉네임 찾기"
+          />
           <div className="todo-people">
             {people === null && <span className="todo-note">불러오는 중…</span>}
             {found.map((p) => (
-              <button key={p.id} className="pill" onClick={() => setPicked([...picked, p.id])}>
+              <button
+                key={p.id}
+                className="pill"
+                onClick={() => setPicked([...picked, p.id])}
+              >
                 {p.id}
                 {p.level ? <small> Lv.{p.level}</small> : null}
               </button>
@@ -391,14 +585,26 @@ function ShareForm({ item: i, ctx, onDone }: { item: TodoItem; ctx: RowCtx; onDo
           disabled={busy || (owner && !picked.length)}
           onClick={() =>
             void save(() =>
-              s ? updateShare(s.id, owner ? { at, members: picked } : { at }) : shareTodo(i.key, i.base?.text ?? i.text, i.base ? i.base.note : (i.note ?? null), at, picked),
+              s
+                ? updateShare(s.id, owner ? { at, members: picked } : { at })
+                : shareTodo(
+                    i.key,
+                    i.base?.text ?? i.text,
+                    i.base ? i.base.note : (i.note ?? null),
+                    at,
+                    picked,
+                  ),
             )
           }
         >
           {s ? "저장" : "공유"}
         </button>
         {s && (
-          <button className="pill" disabled={busy} onClick={() => void save(() => leaveShare(s.id))}>
+          <button
+            className="pill"
+            disabled={busy}
+            onClick={() => void save(() => leaveShare(s.id))}
+          >
             {owner ? "끄기" : "나가기"}
           </button>
         )}
@@ -442,15 +648,39 @@ function AddTodo({ act }: { act: RowCtx["act"] }) {
             ["o", "한 번"],
           ] as const
         ).map(([c, name]) => (
-          <button key={c} className={"pill" + (cycle === c ? " pill-on" : "")} onClick={() => setCycle(c)} aria-pressed={cycle === c}>
+          <button
+            key={c}
+            className={"pill" + (cycle === c ? " pill-on" : "")}
+            onClick={() => setCycle(c)}
+            aria-pressed={cycle === c}
+          >
             {name}
           </button>
         ))}
       </div>
-      <input className="todo-input" value={text} maxLength={30} onChange={(e) => setText(e.target.value)} placeholder="할 일" aria-label="할 일" autoFocus />
-      <input className="todo-input" value={note} maxLength={20} onChange={(e) => setNote(e.target.value)} placeholder="어디서 (선택)" aria-label="어디서" />
+      <input
+        className="todo-input"
+        value={text}
+        maxLength={30}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="할 일"
+        aria-label="할 일"
+        autoFocus
+      />
+      <input
+        className="todo-input"
+        value={note}
+        maxLength={20}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="어디서 (선택)"
+        aria-label="어디서"
+      />
       <div className="todo-acts">
-        <button className="pill pill-on" disabled={busy || !text.trim()} onClick={() => void save()}>
+        <button
+          className="pill pill-on"
+          disabled={busy || !text.trim()}
+          onClick={() => void save()}
+        >
           추가
         </button>
         <button className="pill" onClick={() => setOpen(false)}>
@@ -466,7 +696,10 @@ function HiddenList({ items, act }: { items: TodoItem[]; act: RowCtx["act"] }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button className="todo-fold todo-hidden-fold" onClick={() => setOpen((v) => !v)}>
+      <button
+        className="todo-fold todo-hidden-fold"
+        onClick={() => setOpen((v) => !v)}
+      >
         숨긴 일 {items.length} {open ? "▴" : "▾"}
       </button>
       {open && (
@@ -479,7 +712,12 @@ function HiddenList({ items, act }: { items: TodoItem[]; act: RowCtx["act"] }) {
                   {i.text}
                 </span>
               </span>
-              <button className="pill" onClick={() => void act(() => editTodo(i.key, { hidden: false }))}>
+              <button
+                className="pill"
+                onClick={() =>
+                  void act(() => editTodo(i.key, { hidden: false }))
+                }
+              >
                 다시 보기
               </button>
             </li>

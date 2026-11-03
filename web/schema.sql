@@ -94,9 +94,10 @@ CREATE TABLE IF NOT EXISTS listings (
   note TEXT,                              -- 한마디
   status TEXT NOT NULL DEFAULT 'selling', -- selling 판매 중 | sold 거래 완료 (30일 뒤 지운다)
   options TEXT,                           -- 판 사람이 적은 옵션 값 JSON [{name, value, unit}] (옵션이 범위에서 뜨는 아이템)
-  mode TEXT NOT NULL DEFAULT 'sale',      -- sale 바로 판매 (흥정은 listing_wants.offer) | auction 경매 (price = 시작가)
+  mode TEXT NOT NULL DEFAULT 'sale',      -- sale 바로 판매 (흥정은 listing_wants.offer) | reserve 예약 판매 (sale_when) | auction 경매 (price = 시작가)
   ends_at INTEGER,                        -- 경매가 끝나는 때
   auto_auction INTEGER,                   -- 바로 판매인데 '살래요'가 2명 이상이면 저절로 이 시간짜리 경매로 (올릴 때 정함)
+  sale_when TEXT,                         -- 예약 판매(mode reserve)의 판매 조건: '11/10 저녁', '50레벨 찍으면', '다음 무기 구하면' (제작자 요청 2026-11-02)
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
@@ -146,20 +147,33 @@ CREATE TABLE IF NOT EXISTS gold_wants (
   PRIMARY KEY (offer_id, user_id)
 );
 
--- 길드원 의뢰소: 의뢰를 올리고 모아 둔 길드원이 선착순으로 수락한 뒤 게임 안에서 거래한다 (server/requests.ts)
+-- 길드원 의뢰소: 의뢰를 자유롭게 올리고 길드원이 수락한 뒤 게임 안에서 거래하거나 함께 한다 (server/requests.ts).
+-- 2026-11-03: 상태는 모집 중·완료 둘뿐(의뢰한 사람이 완료를 누르면 끝), 수락은 request_offers 에 사람마다 한 줄(한마디). 예전 accepter 칸은 안 쓴다
 CREATE TABLE IF NOT EXISTS requests (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   owner TEXT NOT NULL,                    -- 의뢰한 길드원
-  title TEXT NOT NULL,                    -- 의뢰 (예: 검은진액 100개)
-  detail TEXT,                            -- 자세한 설명 (없어도 됨)
+  title TEXT NOT NULL,                    -- 의뢰 (예: 검은진액 100개, 토요일 밤 인던 같이 가요)
+  detail TEXT,                            -- 자세히 (없어도 됨. 수량, 기한, 나눠 줘도 되는지 같은 조건을 글로)
   reward_gold INTEGER,                    -- 보상 골드 (골드로 줄 때)
   reward_text TEXT,                       -- 보상 (골드가 아닐 때 자유롭게)
-  status TEXT NOT NULL DEFAULT 'open',    -- open 모집 중 | accepted 진행 중 (이틀 지나면 다시 open) | done 완료 (30일 뒤 지운다)
-  accepter TEXT,                          -- 수락한 길드원 (선착순 한 명)
+  status TEXT NOT NULL DEFAULT 'open',    -- open 모집 중 | done 완료 (30일 동안만 보이고 지우지 않는다). accepted 는 예전 '진행 중' (배포가 open 으로)
+  accepter TEXT,                          -- (예전) 수락한 길드원. 2026-11-03 부터 request_offers
   accepted_at INTEGER,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
+
+-- 의뢰 수락: 여러 사람이 할 수 있고 한 사람은 한 의뢰에 한 번. 한마디에 '저 20개 있어요', '토요일 밤 돼요' 같은 것을 자유롭게 (앱은 세지 않는다)
+CREATE TABLE IF NOT EXISTS request_offers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,                  -- 수락한 길드원
+  note TEXT,                              -- 한마디 (예: 저 20개 있어요)
+  status TEXT NOT NULL DEFAULT 'pledged', -- pledged 수락함 | giveup 포기
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS request_offers_req ON request_offers (request_id, status);
 
 -- 길드원이 직접 올린 자기 캐릭터 그림 (랭킹 시상대에 선다). '내 정보'에서 사용자가 고른 스샷을 잘라 만든 PNG
 CREATE TABLE IF NOT EXISTS avatars (
@@ -186,6 +200,16 @@ CREATE TABLE IF NOT EXISTS activity (
 );
 CREATE INDEX IF NOT EXISTS activity_at ON activity (at);
 CREATE INDEX IF NOT EXISTS activity_user_at ON activity (user_id, at);
+
+-- 사용 기록 DB 2~10 (server/logdb.ts, 제작자 요청 2026-11-02: '1부터 채우고 2 3 4 진행하고 10까지 차면 1을 비우고').
+-- 위 activity 는 이 기능 전의 기록만 남고, 새 기록은 sapphire-log-2 부터 차례로 쓴다. 쓰기 시작한 때와 그 DB 의 첫 기록 번호(base 보다 크다).
+-- 자동 배포가 가장 오래된 DB 를 비우면 started_at, base 를 비우고 cleared_at 을 적는다
+CREATE TABLE IF NOT EXISTS log_ring (
+  n INTEGER PRIMARY KEY,                  -- DB 번호 2~10 (wrangler.toml LOG2 ~ LOG10)
+  started_at INTEGER,
+  base INTEGER,
+  cleared_at INTEGER
+);
 
 -- 알림 (server/alerts.ts, 30일 보관): 나와 관련된 일 (살래요, 입찰, 의뢰 수락 ...). read_at 이 없으면 안 읽음
 CREATE TABLE IF NOT EXISTS alerts (
@@ -630,3 +654,35 @@ CREATE INDEX IF NOT EXISTS board_comments_user ON board_comments (user_id, creat
 CREATE INDEX IF NOT EXISTS listing_talk_user ON listing_talk (user_id, created_at);
 CREATE INDEX IF NOT EXISTS listing_wants_user ON listing_wants (user_id);
 CREATE INDEX IF NOT EXISTS listing_bids_user ON listing_bids (user_id);
+
+-- 길드 던전 (server/gdungeon.ts, 제작자 요청 2026-11-02, 1군 전용): 4인 파티와 이번 주(목 10시부터) 가능한 때, 후보마다 확정·불참. 지우지 않는다
+CREATE TABLE IF NOT EXISTS gd_parties (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  leader TEXT NOT NULL,                   -- 파티장 (만든 사람. 나가면 먼저 들어온 사람)
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS gd_members (
+  user_id TEXT PRIMARY KEY,               -- 한 캐릭터는 파티 하나에만
+  party_id INTEGER NOT NULL,
+  joined_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS gd_members_party ON gd_members (party_id);
+CREATE TABLE IF NOT EXISTS gd_avail (
+  user_id TEXT NOT NULL,
+  week INTEGER NOT NULL,                  -- 그 주가 시작한 때 (목 10시, server/week.ts weekStart)
+  slots TEXT NOT NULL,                    -- 30분 칸마다 '0'/'1' 336자 (목 10:00 부터, 하루 09:00 ~ 02:00 만 쓴다)
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, week)
+);
+CREATE INDEX IF NOT EXISTS gd_avail_week ON gd_avail (week);
+CREATE TABLE IF NOT EXISTS gd_answers (
+  party_id INTEGER NOT NULL,
+  week INTEGER NOT NULL,
+  slot INTEGER NOT NULL,                  -- 후보 칸 번호 (gd_avail.slots 의 자리)
+  user_id TEXT NOT NULL,
+  answer TEXT NOT NULL,                   -- yes 확정 | no 불참 (불참이 하나라도 있으면 그 후보는 무산)
+  at INTEGER NOT NULL,
+  PRIMARY KEY (party_id, week, slot, user_id)
+);
+CREATE INDEX IF NOT EXISTS gd_answers_week ON gd_answers (week);

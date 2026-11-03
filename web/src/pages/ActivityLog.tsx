@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { errorText } from "../auth";
 import { KIND_NAME, VIA_NAME, actionText, fetchActivity, fetchUsage, pageName, sectionOf } from "../activity";
-import type { ActivityRow, DeviceInfo, Kind, Person } from "../activity";
+import type { ActivityRow, DeviceInfo, Kind, LogDbInfo, OverlapInfo, Person, Storage } from "../activity";
 import { ago } from "../market";
 import type { Wiki } from "../types";
-import { Loading, TopBar } from "../ui";
+import { Loading, MasterNote, TopBar } from "../ui";
 
 const KINDS: (Kind | null)[] = [null, "visit", "view", "act"];
 const SHOWN_PEOPLE = 12;
@@ -22,6 +22,11 @@ function dayText(t: number): string {
 
 const timeText = (t: number) => new Date(t).toTimeString().slice(0, 5);
 const mdText = (t: number) => `${new Date(t).getMonth() + 1}/${new Date(t).getDate()}`;
+/** '11/2 21:10' */
+const whenText = (t: number) => {
+  const d = new Date(t);
+  return `${mdText(t)} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
 const squash = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 /** 무료 요금제의 DB 하나 크기 한도 (Cloudflare D1 Free 500MB, Workers Paid 10GB) */
 const DB_LIMIT = 500 * 1024 * 1024;
@@ -57,25 +62,27 @@ function groupRows(rows: ActivityRow[]): Item[] {
  * 사용 기록 (앱개발자만, 제작자 요청): 사람별 접속 수와 마지막으로 쓴 때, 그리고 누가 어디서 무엇을 했는지.
  * 사람을 누르면 그 사람 기록과 기기 목록, 칩으로 접속/화면/한 일만 본다. 기록은 지우지 않는다 (영구 보관).
  * 줄마다 붙던 기기·도시·IP 는 뺐다 (제작자 요청 2026-11-02: '주소 뜨는 거 불필요'. IP 는 데이터·와이파이만 바꿔도 바뀌어 다른 사람인지 알 수 없다).
- * 대신 사람마다 기기 표로 센 기기 수, '새 기기', '같은 때 다른 곳'(10분 안에 다른 기기가 다른 도시에서)을 보인다. 기록에는 그대로 남긴다
+ * 대신 사람마다 기기 표로 센 기기 수, '새 기기', 붉은 '다른 도시 동시 접속 N번'(10분 안에 다른 기기가 다른 도시에서)을 보인다. 기록에는 그대로 남긴다.
+ * 사람을 누르면 그 겹친 때마다 언제, 어느 기기가 어디서 ↔ 어느 기기가 어디서를 보인다 (제작자 2026-11-03: 표만으로는 '뭔 소린지' 몰랐다)
  */
-export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
+export function ActivityLogPage({ wiki, role }: { wiki: Wiki; role: string }) {
   /** 묶음 요약에 쓰는 짧은 이름 ('게시판: 자유' -> '자유', '게시판 글: 제목' -> '제목') */
   const itemText = (r: ActivityRow) =>
-    r.kind === "view" ? pageName(r.what, wiki, r.detail).replace(/^(게시판|게시판 글|아이모 소식 글|글|사냥터|몬스터|아이템|메뉴|장비|검색): /, "") : actionText(r.what, r.detail);
+    r.kind === "view" ? pageName(r.what, wiki, r.detail).replace(/^(게시판|게시판 글|아이모 소식 글|글|사냥터|몬스터|아이템|메뉴|장비|검색): /, "") : actionText(r.what, r.detail, r.at);
   const lineText = (r: ActivityRow) =>
-    r.kind === "visit" ? "🟢 접속" : r.kind === "view" ? `📖 ${pageName(r.what, wiki, r.detail)}` : `✏️ ${actionText(r.what, r.detail)}`;
+    r.kind === "visit" ? "🟢 접속" : r.kind === "view" ? `📖 ${pageName(r.what, wiki, r.detail)}` : `✏️ ${actionText(r.what, r.detail, r.at)}`;
   const [user, setUser] = useState<string | null>(null);
   const [kind, setKind] = useState<Kind | null>(null);
   const [rows, setRows] = useState<ActivityRow[] | null>(null);
   const [devices, setDevices] = useState<DeviceInfo[] | null>(null);
+  const [overlaps, setOverlaps] = useState<OverlapInfo[] | null>(null);
   const [people, setPeople] = useState<Person[]>([]);
   const [more, setMore] = useState(false);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [allPeople, setAllPeople] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [storage, setStorage] = useState<{ rows: number; bytes: number | null } | null>(null);
+  const [storage, setStorage] = useState<Storage | null>(null);
   /** '자세히': DB 를 무엇이 얼마나 쓰는지 */
   const [usage, setUsage] = useState<{ total: number | null; parts: { name: string; bytes: number }[] } | "loading" | null>(null);
   /** 펼친 묶음 (그 묶음 맨 위 기록 번호) */
@@ -93,6 +100,7 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
         if (r.people) setPeople(r.people);
         if (r.storage) setStorage(r.storage);
         setDevices(r.devices ?? null);
+        setOverlaps(r.overlaps ?? null);
       },
       (x) => alive && setError(errorText(x)),
     );
@@ -123,17 +131,26 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
   return (
     <>
       <TopBar title="사용 기록" />
+      <MasterNote role={role}>
+        길드원이 언제 접속해서 어떤 화면을 보고 무엇을 했는지 남아요. 앱을 더 낫게 고치고, 오류나 사고가 났을 때 무슨 일이 있었는지 원인을 찾으려고
+        쓰는 메뉴예요. 길드원에게는 보이지 않아요.
+      </MasterNote>
       {/* 기록은 지우지 않고 쌓는다. 한도는 DB 크기뿐이라 얼마나 찼는지 (제작자 2026-11-02 '사용 기록 무제한으로 못 쌓아?') */}
       {storage && (
         <div className="log-storage">
-          <span>
-            기록 {storage.rows.toLocaleString()}건{storage.bytes !== null && ` · 저장 ${mbText(storage.bytes)} / ${mbText(DB_LIMIT)}`}
-          </span>
+          <span>기록 {storage.rows.toLocaleString()}건</span>
           {storage.bytes !== null && (
-            <span className="log-storage-bar">
-              <i style={{ width: `${Math.min(100, (storage.bytes / DB_LIMIT) * 100)}%` }} />
-            </span>
+            <>
+              <span className="log-storage-line">
+                <b>DB 1 계정·글·사진</b> {mbText(storage.bytes)} / {mbText(DB_LIMIT)}
+              </span>
+              <span className="log-storage-bar">
+                <i style={{ width: `${Math.min(100, (storage.bytes / DB_LIMIT) * 100)}%` }} />
+              </span>
+            </>
           )}
+          {/* 사용 기록 DB 2~10 (제작자 요청 2026-11-02: 차례로 채우고 10까지 차면 가장 오래된 것을 비운다, server/logdb.ts) */}
+          {storage.logs && storage.logFull && <LogRing logs={storage.logs} full={storage.logFull} />}
           {usage === null ? (
             <button
               type="button"
@@ -185,7 +202,7 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
                   {p.alts?.length ? ` · 부캐 ${p.alts.join(", ")}` : ""}
                   {p.devices7 > 1 && ` · 기기 ${p.devices7}대`}
                   {p.newDev && <em className="log-flag log-flag-new">새 기기</em>}
-                  {p.together > 0 && <em className="log-flag log-flag-warn">같은 때 다른 곳 {p.together}</em>}
+                  {p.together > 0 && <em className="log-flag log-flag-warn">다른 도시 동시 접속 {p.together}번</em>}
                 </small>
               </button>
             </li>
@@ -197,6 +214,29 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
           </button>
         )}
       </section>
+
+      {/* 고른 사람의 겹친 접속 (60일): 붉은 표가 무엇인지 그 자리에서. 칸마다 언제, 도시 · 기기, ↔ 도시 · 기기 */}
+      {user && overlaps && overlaps.length > 0 && (
+        <section className="panel">
+          <h2 className="panel-title">{user}의 다른 도시 동시 접속 (60일)</h2>
+          <p className="log-overlap-why">10분 안에 다른 기기가 다른 도시에서 썼어요. 아이디를 빌려줬거나 같이 쓰는 걸 수 있어요 (확실하지는 않아요).</p>
+          <ul className="log-overlaps">
+            {overlaps.map((o, i) => (
+              <li key={i} className="log-overlap">
+                <b>{whenText(o.at)}</b>
+                <span>
+                  {o.a.city} · {o.a.name ?? "알 수 없는 기기"}
+                  {o.a.char !== user ? ` · ${o.a.char}` : ""}
+                </span>
+                <span>
+                  <i className="log-overlap-vs">↔</i> {o.b.city} · {o.b.name ?? "알 수 없는 기기"}
+                  {o.b.char !== user ? ` · ${o.b.char}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* 고른 사람의 기기 (60일): 기기와 브라우저, 처음·마지막, 접속 수, 도시 */}
       {user && devices && devices.length > 0 && (
@@ -330,6 +370,27 @@ export function ActivityLogPage({ wiki }: { wiki: Wiki }) {
           </button>
         </div>
       )}
+    </>
+  );
+}
+
+/** 사용 기록 DB 2~10: 칸마다 찬 만큼, 지금 쓰는 칸은 금색 테두리 */
+function LogRing({ logs, full }: { logs: LogDbInfo[]; full: number }) {
+  const cur = logs.find((l) => l.cur);
+  return (
+    <>
+      <span className="log-storage-line">
+        <b>사용 기록 DB 2~10</b>
+        {cur && cur.bytes !== null && ` 지금 DB ${cur.n} ${mbText(cur.bytes)} / ${mbText(full)}`}
+      </span>
+      <span className="log-ring" role="img" aria-label={`사용 기록 DB ${cur ? cur.n : 2}에 쓰는 중`}>
+        {logs.map((l) => (
+          <span key={l.n} className={"log-ring-cell" + (l.cur ? " log-ring-cur" : "") + (l.since === null ? " log-ring-empty" : "")}>
+            <i style={{ height: `${l.since === null || l.bytes === null ? 0 : Math.min(100, Math.max(4, (l.bytes / full) * 100))}%` }} />
+            <small>{l.n}</small>
+          </span>
+        ))}
+      </span>
     </>
   );
 }

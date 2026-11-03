@@ -3,18 +3,19 @@ import { errorText } from "../auth";
 import { fixGap, listGaps } from "../chat";
 import type { ChatGap } from "../chat";
 import { ago } from "../market";
-import { Loading, TopBar } from "../ui";
+import { Loading, MasterNote, TopBar } from "../ui";
 
 /**
  * 챗봇 개선 (앱개발자만, 제작자 요청): 길잡이가 짐작하거나 자료가 없다고 한 답, 길드원이 '👎 별로'를 누른 답.
  * '목록 복사'로 Claude 에게 넘겨 위키 자료나 프롬프트를 고치고 배포한 뒤 '개선 완료'를 누르면,
  * 물은 사람에게 '챗봇이 개선됐어요' 알림이 가고 누르면 그 대화에서 새 답을 받는다
  */
-export function ChatGapsPage() {
+export function ChatGapsPage({ role }: { role: string }) {
   const [tab, setTab] = useState<"open" | "fixed">("open");
   const [gaps, setGaps] = useState<ChatGap[] | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const shown = gaps;
 
   useEffect(() => {
     let alive = true;
@@ -39,7 +40,9 @@ export function ChatGapsPage() {
             `#${g.id} ${new Date(g.created_at).toLocaleString("ko-KR")} ${g.user_id} (${g.kind === "user" ? "길드원이 별로라고 함" : "길잡이가 모름"})`,
             `질문: ${g.question}`,
             `모자란 것: ${g.reason}`,
-            g.answer ? `답: ${g.answer.replace(/\s+/g, " ").slice(0, 400)}` : "",
+            g.answer
+              ? `답: ${g.answer.replace(/\s+/g, " ").slice(0, 400)}`
+              : "",
           ]
             .filter(Boolean)
             .join("\n"),
@@ -54,11 +57,22 @@ export function ChatGapsPage() {
   return (
     <>
       <TopBar title="챗봇 개선" />
+      <MasterNote role={role}>
+        챗봇이 몰라서 짐작한 답과 길드원이 '별로'를 누른 답이 모여요. 개발자가
+        보고 자료를 채워 챗봇을 고치는 메뉴예요. 고치고 '개선 완료'를 누르면
+        물어본 길드원에게 알림이 가요.
+      </MasterNote>
       <div className="gap-top">
-        <button className={"pill" + (tab === "open" ? " pill-on" : "")} onClick={() => setTab("open")}>
+        <button
+          className={"pill" + (tab === "open" ? " pill-on" : "")}
+          onClick={() => setTab("open")}
+        >
           대기
         </button>
-        <button className={"pill" + (tab === "fixed" ? " pill-on" : "")} onClick={() => setTab("fixed")}>
+        <button
+          className={"pill" + (tab === "fixed" ? " pill-on" : "")}
+          onClick={() => setTab("fixed")}
+        >
           개선함
         </button>
         {tab === "open" && gaps && gaps.length > 0 && (
@@ -69,15 +83,36 @@ export function ChatGapsPage() {
       </div>
       {error && <p className="form-error">{error}</p>}
       {!gaps && !error && <Loading />}
-      {gaps?.length === 0 && <p className="muted chat-empty">{tab === "open" ? "모르는 질문이 없어요" : "아직 개선한 질문이 없어요"}</p>}
-      {gaps?.map((g) => (
-        <GapCard key={g.id} g={g} onFixed={() => setGaps((all) => (all ?? []).filter((x) => x.id !== g.id))} onError={setError} />
+      {gaps?.length === 0 && (
+        <p className="muted chat-empty">
+          {tab === "open"
+            ? "모르는 질문이 없어요"
+            : "아직 개선한 질문이 없어요"}
+        </p>
+      )}
+      {shown?.map((g) => (
+        <GapCard
+          key={g.id}
+          g={g}
+          onFixed={() =>
+            setGaps((all) => (all ?? []).filter((x) => x.id !== g.id))
+          }
+          onError={setError}
+        />
       ))}
     </>
   );
 }
 
-function GapCard({ g, onFixed, onError }: { g: ChatGap; onFixed: () => void; onError: (e: string) => void }) {
+function GapCard({
+  g,
+  onFixed,
+  onError,
+}: {
+  g: ChatGap;
+  onFixed: () => void;
+  onError: (e: string) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [fixing, setFixing] = useState(false);
   const [note, setNote] = useState("");
@@ -88,7 +123,9 @@ function GapCard({ g, onFixed, onError }: { g: ChatGap; onFixed: () => void; onE
         <span>
           {g.kind === "user" ? "👎" : "🤔"} {g.user_id}
         </span>
-        <span>{ago(g.status === "fixed" && g.fixed_at ? g.fixed_at : g.created_at)}</span>
+        <span>
+          {ago(g.status === "fixed" && g.fixed_at ? g.fixed_at : g.created_at)}
+        </span>
       </div>
       <div className="gap-q">{g.question}</div>
       <div className="gap-reason">{g.reason}</div>
@@ -118,11 +155,21 @@ function GapCard({ g, onFixed, onError }: { g: ChatGap; onFixed: () => void; onE
             });
           }}
         >
-          <input className="chat-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="고친 것 (물은 사람에게 보여요)" maxLength={200} />
+          <input
+            className="chat-input"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="고친 것 (물은 사람에게 보여요)"
+            maxLength={200}
+          />
           <button className="pill pill-on" disabled={busy}>
             알림 보내기
           </button>
-          <button type="button" className="pill" onClick={() => setFixing(false)}>
+          <button
+            type="button"
+            className="pill"
+            onClick={() => setFixing(false)}
+          >
             취소
           </button>
         </form>

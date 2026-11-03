@@ -9,20 +9,19 @@
 //   사용 기록은 앱개발자만 보는 기능이라 (CLAUDE.md '사용 기록') 다른 사람의 질문에는 붙이지 않는다
 // - 내 정보 (늘, 2026-11-02 제작자 요청: '내가 지금 할 것' 치면 내 레벨, 직업 등 내 데이터를 다 읽고): 캐릭터, 묶은 캐릭터, 순위, 알림 수,
 //   중개인·골드·의뢰소·상점에서 내가 한 것, 장비대여 내 것 (server/chatmine.ts). 아이모 소식(진행 중 이벤트, 점검)도 늘 짧게
-// - To do 는 개발 중이라 미리 보는 사람(운영진, 앱개발자, 테스트 계정)에게만, 장비대여는 2026-11-02 열었다
+// - To do 와 장비대여는 2026-11-02 열었다 (To do 는 server/todo.ts TODO_OPEN)
 // 칸마다 글자 수를 정해 두어 질문이 너무 길어지지 않게 한다.
 import { RANK, TEST_IDS } from "./auth";
+import { covering, fromLogs, logDbs, newestLogs } from "./logdb";
 import type { Env, Guild, Job, Role, User } from "./auth";
 import { CAT_NAME } from "./board";
 import type { Cat } from "./board";
 import { growthEntries } from "./growth";
 import type { Period } from "./growth";
-import { ACCEPT_MS } from "./requests";
 import { weekStart } from "./week";
 import { TODO_OPEN, doneKeys, eventTasks, todoExtras } from "./todo";
 import { ASK_MORE, mineExtras, newsNow, shopCatalog } from "./chatmine";
 
-/** To do 를 길드원에게 열었는지 (지금은 개발 중이라 앱개발자만, 제작자 요청 2026-11-01. 열 때 true 와 챗봇 안내 줄, src/launcher.ts) */
 
 /** 길드 앱 자료 전체 글자 수 (내 정보, 아이모 소식, 장비대여를 더해 늘렸다. 2026-11-02) */
 export const MAX_APP = 36000;
@@ -112,7 +111,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
   const today = Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate()) - KST;
   const week = weekStart(now);
 
-  const [peopleR, listingsR, myWantersR, myBidsR, myWantsR, rateR, goldR, myGoldWantsR, requestsR, boardR, platR, myOrdersR, openOrdersR] =
+  const [peopleR, listingsR, myWantersR, myBidsR, myWantsR, rateR, goldR, myGoldWantsR, requestsR, offersR, boardR, platR, myOrdersR, openOrdersR] =
     await env.DB.batch([
       env.DB.prepare(
         "SELECT u.id AS id, u.role AS role, u.high_spec AS high_spec, u.must_change AS must_change, u.main_id AS main_id, " +
@@ -121,7 +120,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
           "ORDER BY p.level IS NULL, p.level DESC, p.exp IS NULL, p.exp DESC, p.level_at ASC, u.id ASC",
       ),
       env.DB.prepare(
-        "SELECT l.id, l.seller, l.item, l.category, l.enhance, l.enchant, l.enchant_value, l.qty, l.price, l.note, l.options, l.mode, l.ends_at, l.created_at, " +
+        "SELECT l.id, l.seller, l.item, l.category, l.enhance, l.enchant, l.enchant_value, l.qty, l.price, l.note, l.options, l.mode, l.sale_when, l.ends_at, l.created_at, " +
           "(SELECT COUNT(*) FROM listing_wants w WHERE w.listing_id = l.id) AS wants, " +
           "(SELECT COUNT(*) FROM listing_bids b WHERE b.listing_id = l.id) AS bids, " +
           "(SELECT MAX(amount) FROM listing_bids b WHERE b.listing_id = l.id) AS top_bid, " +
@@ -152,8 +151,12 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
           "WHERE o.owner = ? AND o.status = 'open' ORDER BY w.created_at",
       ).bind(me.id),
       env.DB.prepare(
-        "SELECT id, owner, title, detail, reward_gold, reward_text, status, accepter, accepted_at, created_at FROM requests " +
+        "SELECT id, owner, title, detail, reward_gold, reward_text, status, created_at FROM requests " +
           "WHERE status != 'done' ORDER BY created_at DESC LIMIT 40",
+      ),
+      env.DB.prepare(
+        "SELECT request_id, user_id, note FROM request_offers WHERE status = 'pledged' " +
+          "AND request_id IN (SELECT id FROM requests WHERE status != 'done') ORDER BY created_at",
       ),
       env.DB.prepare(
         "SELECT p.id, p.cat, p.author, p.title, substr(p.body, 1, 400) AS body, p.pinned, p.created_at, " +
@@ -249,7 +252,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
   // ---------- 중개인 ----------
   type Listing = {
     id: number; seller: string; item: string; category: string; enhance: number; enchant: string | null; enchant_value: number | null;
-    qty: number; price: number; note: string | null; options: string | null; mode: string; ends_at: number | null; created_at: number;
+    qty: number; price: number; note: string | null; options: string | null; mode: string; sale_when: string | null; ends_at: number | null; created_at: number;
     wants: number; bids: number; top_bid: number | null; talk: number;
   };
   const listings = listingsR.results as Listing[];
@@ -278,7 +281,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
       const price =
         l.mode === "auction"
           ? `경매 시작가 ${gold(l.price)}, ${l.top_bid ? `최고가 ${gold(l.top_bid)} (입찰 ${l.bids}번)` : "입찰 없음"}, ${l.ends_at ? `${when(l.ends_at)}${l.ends_at < now ? " 끝남" : " 끝"}` : ""}`
-          : `${gold(l.price)} (≈ ${(l.price / rate / 10_000).toFixed(1)}만 원)`;
+          : `${gold(l.price)} (≈ ${(l.price / rate / 10_000).toFixed(1)}만 원)${l.mode === "reserve" ? ` · 예약 판매 (조건: ${l.sale_when ?? ""})` : ""}`;
       const own = l.seller === me.id ? [wantersBy.get(l.id)?.length ? ` · 살래요 명단: ${wantersBy.get(l.id)!.join("; ")}` : "", bidsBy.get(l.id)?.length ? ` · 입찰 명단: ${bidsBy.get(l.id)!.join("; ")}` : ""].join("") : "";
       return `#${l.id} ${what} · ${price} · 판매 ${l.seller}${l.wants ? ` · 살래요 ${l.wants}명` : ""}${l.talk ? ` · 토론방 글 ${l.talk}` : ""}${l.note ? ` · 한마디 "${oneLine(l.note)}"` : ""}${optionsText(l.options)}${mine.has(l.id) ? ` · ${mine.get(l.id)}` : ""}${own} · ${when(l.created_at)} 올림`;
     });
@@ -318,19 +321,23 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
   }
 
   // ---------- 의뢰소 ----------
+  // 2026-11-03: 상태는 모집 중뿐(의뢰한 사람이 완료를 누르면 끝), 수락은 여러 사람이 한마디('저 20개 있어요')와 함께
   type Req = {
     id: number; owner: string; title: string; detail: string | null; reward_gold: number | null; reward_text: string | null;
-    status: string; accepter: string | null; accepted_at: number | null; created_at: number;
+    status: string; created_at: number;
   };
+  type Offer = { request_id: number; user_id: string; note: string | null };
   const reqs = requestsR.results as Req[];
-  if (reqs.length && (ASK.requests.test(q) || reqs.some((r) => mentioned.includes(r.owner) || (r.accepter !== null && mentioned.includes(r.accepter))))) {
+  const reqOffers = offersR.results as Offer[];
+  const offersOf = (id: number) => reqOffers.filter((o) => o.request_id === id);
+  const offerText = (id: number) => offersOf(id).map((o) => `${o.user_id}${o.note ? `("${oneLine(o.note).slice(0, 40)}")` : ""}`).join(", ");
+  if (reqs.length && (ASK.requests.test(q) || reqs.some((r) => mentioned.includes(r.owner) || offersOf(r.id).some((o) => mentioned.includes(o.user_id))))) {
     const lines = reqs.map((r) => {
-      const late = r.status === "accepted" && r.accepted_at !== null && r.accepted_at + ACCEPT_MS < now;
-      const state = r.status === "accepted" && !late ? `진행 중 (수락: ${r.accepter}, ${when((r.accepted_at ?? 0) + ACCEPT_MS)}까지)` : "모집 중";
+      const who = offerText(r.id);
       const reward = r.reward_gold ? gold(r.reward_gold) : r.reward_text ?? "";
-      return `#${r.id} ${oneLine(r.title)}${reward ? ` · 보상 ${reward}` : ""} · 의뢰 ${r.owner} · ${state}${r.detail ? ` · "${oneLine(r.detail).slice(0, 120)}"` : ""} · ${when(r.created_at)}`;
+      return `#${r.id} ${oneLine(r.title)}${reward ? ` · 보상 ${reward}` : ""} · 의뢰 ${r.owner} · 모집 중${who ? ` · 수락: ${who}` : ""}${r.detail ? ` · "${oneLine(r.detail).slice(0, 120)}"` : ""} · ${when(r.created_at)}`;
     });
-    parts.push(section("길드원 의뢰소: 끝나지 않은 의뢰", lines, 3000));
+    parts.push(section("길드원 의뢰소: 끝나지 않은 의뢰 (수락한 사람마다 게임 안에서 거래하고, 의뢰한 사람이 완료를 누르면 끝)", lines, 3000));
   }
 
   // ---------- 게시판 ----------
@@ -428,9 +435,9 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
     parts.push(section(`To do: ${me.id}의 레벨·직업에 맞는 할 일 (홈 'To do' 화면, 공식 글에서 뽑은 이벤트 할 일 포함)`, lines, 2500));
   }
 
-  // ---------- 앱개발자만: 사용 기록, 챗봇 개선 ----------
-  if (dev && (ASK.logs.test(q) || mentioned.length)) parts.push(...(await activityParts(env, mentioned, now, today)));
-  if (dev && ASK.gaps.test(q)) {
+  // ---------- 길드마스터와 앱개발자만: 사용 기록, 챗봇 개선 (2026-11-02 길드마스터에게도 열었다) ----------
+  if (RANK[me.role] >= 2 && (ASK.logs.test(q) || mentioned.length)) parts.push(...(await activityParts(env, mentioned, now, today)));
+  if (RANK[me.role] >= 2 && ASK.gaps.test(q)) {
     const day = new Date(now + KST).toISOString().slice(0, 10);
     const [gapsR, usageR] = await env.DB.batch([
       env.DB.prepare("SELECT id, user_id, question, reason, kind, created_at FROM chat_gaps WHERE status = 'open' ORDER BY id DESC LIMIT 15"),
@@ -454,9 +461,9 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
     const myGold = goldOffers.filter((o) => o.owner === me.id);
     if (myGold.length) lines.push(`골드 거래 내 글: ${myGold.map((o) => `${o.side === "sell" ? "팝니다" : "삽니다"} ${o.gold.toLocaleString("ko-KR")}만${o.wants ? ` (${o.wants}명)` : ""}`).join(", ")}`);
     const myReqs = reqs.filter((r) => r.owner === me.id);
-    if (myReqs.length) lines.push(`의뢰소 내 의뢰: ${myReqs.map((r) => `${oneLine(r.title)} (${r.status === "accepted" ? `수락 ${r.accepter}` : "모집 중"})`).join(", ")}`);
-    const took = reqs.filter((r) => r.accepter === me.id && r.status === "accepted");
-    if (took.length) lines.push(`의뢰소 내가 수락한 의뢰 (수락하고 이틀 안에 끝내야 한다): ${took.map((r) => `${oneLine(r.title)} (의뢰 ${r.owner}, ${when((r.accepted_at ?? 0) + ACCEPT_MS)}까지)`).join(", ")}`);
+    if (myReqs.length) lines.push(`의뢰소 내 의뢰: ${myReqs.map((r) => `${oneLine(r.title)} (모집 중${offerText(r.id) ? `, 수락: ${offerText(r.id)}` : ", 아직 수락 없음"})`).join(", ")}`);
+    const took = reqs.filter((r) => offersOf(r.id).some((o) => o.user_id === me.id));
+    if (took.length) lines.push(`의뢰소 내가 수락한 의뢰 (게임 안에서 의뢰한 사람과 거래한다): ${took.map((r) => { const o = offersOf(r.id).find((x) => x.user_id === me.id); return `${oneLine(r.title)} (의뢰 ${r.owner}${o?.note ? `, 내 한마디 "${oneLine(o.note).slice(0, 40)}"` : ""})`; }).join(", ")}`);
     const orders = (myOrdersR.results as { item_name: string; status: string }[]).filter((o) => o.status === "requested");
     if (orders.length) lines.push(`플래티넘 상점 거래 기다리는 신청: ${orders.map((o) => o.item_name).join(", ")}`);
     if (lines.length) parts.push(section(`${me.id}가 앱에서 한 것 (진행 중)`, lines, 1500));
@@ -497,26 +504,60 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
 async function activityParts(env: Env, mentioned: string[], now: number, today: number): Promise<string[]> {
   const since = now - 7 * DAY;
   const people = mentioned.slice(0, 2);
-  const [sumR, lastR, recentR, ...personR] = await env.DB.batch([
-    env.DB.prepare(
-      "SELECT user_id, SUM(kind = 'visit') AS visits, SUM(kind = 'view') AS views, SUM(kind = 'act') AS acts, " +
-        "SUM(kind = 'visit' AND at >= ?2) AS today_visits, MAX(at) AS last FROM activity WHERE at > ?1 GROUP BY user_id ORDER BY last DESC LIMIT 100",
-    ).bind(since, today),
-    env.DB.prepare(
-      "SELECT a.user_id AS user_id, a.via AS via, a.place AS place, a.device AS device FROM activity a " +
-        "JOIN (SELECT user_id, MAX(at) AS at FROM activity WHERE at > ? GROUP BY user_id) m ON m.user_id = a.user_id AND m.at = a.at",
-    ).bind(since),
-    env.DB.prepare("SELECT user_id, kind, what, detail, via, at FROM activity WHERE kind != 'view' ORDER BY at DESC LIMIT 50"),
+  // 사용 기록은 DB 2~10 을 차례로 쓴다 (server/logdb.ts): 7일 안의 것이 있는 DB 마다 묻고 합친다
+  const dbs = await logDbs(env);
+  const week = covering(dbs, since);
+  type Sum = { user_id: string; visits: number; views: number; acts: number; today_visits: number; last: number };
+  type Last = { user_id: string; via: string | null; place: string | null; device: string | null; at: number };
+  type Recent = { user_id: string; kind: string; what: string; detail: string | null; via: string | null; at: number };
+  type Person = { kind: string; what: string; detail: string | null; via: string | null; place: string | null; ip: string | null; device: string | null; at: number };
+  const [sums, lasts, recentRows, ...personRows] = await Promise.all([
+    fromLogs<Sum>(week, (db) =>
+      db
+        .prepare(
+          "SELECT user_id, SUM(kind = 'visit') AS visits, SUM(kind = 'view') AS views, SUM(kind = 'act') AS acts, " +
+            "SUM(kind = 'visit' AND at >= ?2) AS today_visits, MAX(at) AS last FROM activity WHERE at > ?1 GROUP BY user_id",
+        )
+        .bind(since, today),
+    ),
+    fromLogs<Last>(week, (db) =>
+      db
+        .prepare(
+          "SELECT a.user_id AS user_id, a.via AS via, a.place AS place, a.device AS device, a.at AS at FROM activity a " +
+            "JOIN (SELECT user_id, MAX(at) AS at FROM activity WHERE at > ? GROUP BY user_id) m ON m.user_id = a.user_id AND m.at = a.at",
+        )
+        .bind(since),
+    ),
+    newestLogs<Recent>(dbs, 50, (db, left) => db.prepare(`SELECT user_id, kind, what, detail, via, at FROM activity WHERE kind != 'view' ORDER BY id DESC LIMIT ${left}`)),
     ...people.map((id) =>
-      env.DB.prepare("SELECT kind, what, detail, via, place, ip, device, at FROM activity WHERE user_id = ? ORDER BY at DESC LIMIT 40").bind(id),
+      newestLogs<Person>(dbs, 40, (db, left) =>
+        db.prepare(`SELECT kind, what, detail, via, place, ip, device, at FROM activity WHERE user_id = ? ORDER BY id DESC LIMIT ${left}`).bind(id),
+      ),
     ),
   ]);
-  const last = new Map<string, { via: string | null; place: string | null; device: string | null }>();
-  for (const r of lastR.results as { user_id: string; via: string | null; place: string | null; device: string | null }[]) last.set(r.user_id, r);
-  const sum = (sumR.results as { user_id: string; visits: number; views: number; acts: number; today_visits: number; last: number }[]).map((r) => {
-    const l = last.get(r.user_id);
-    return `${r.user_id} · 접속 ${r.visits}번 (오늘 ${r.today_visits}) · 화면 ${r.views} · 한 일 ${r.acts} · 마지막 ${when(r.last)}${l?.via ? ` ${VIA[l.via] ?? l.via}` : ""}${l?.place ? ` ${l.place}` : ""}${l?.device ? ` (${l.device})` : ""}`;
-  });
+  const last = new Map<string, Last>();
+  for (const r of lasts) if (!last.has(r.user_id) || last.get(r.user_id)!.at < r.at) last.set(r.user_id, r);
+  const total = new Map<string, Sum>();
+  for (const r of sums) {
+    const o = total.get(r.user_id);
+    if (!o) total.set(r.user_id, { ...r });
+    else {
+      o.visits += r.visits;
+      o.views += r.views;
+      o.acts += r.acts;
+      o.today_visits += r.today_visits;
+      o.last = Math.max(o.last, r.last);
+    }
+  }
+  const sum = [...total.values()]
+    .sort((a, b) => b.last - a.last)
+    .slice(0, 100)
+    .map((r) => {
+      const l = last.get(r.user_id);
+      return `${r.user_id} · 접속 ${r.visits}번 (오늘 ${r.today_visits}) · 화면 ${r.views} · 한 일 ${r.acts} · 마지막 ${when(r.last)}${l?.via ? ` ${VIA[l.via] ?? l.via}` : ""}${l?.place ? ` ${l.place}` : ""}${l?.device ? ` (${l.device})` : ""}`;
+    });
+  const recentR = { results: recentRows };
+  const personR = personRows.map((results) => ({ results }));
   const row = (r: { kind: string; what: string; detail: string | null; via: string | null; at: number }) =>
     `${when(r.at)} ${r.kind === "visit" ? "접속" : r.kind === "view" ? "화면" : "한 일"} ${r.what}${r.detail ? ` ${oneLine(r.detail).slice(0, 100)}` : ""}${r.via ? ` [${VIA[r.via] ?? r.via}]` : ""}`;
   const out = [

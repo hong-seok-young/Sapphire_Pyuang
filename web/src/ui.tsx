@@ -8,6 +8,7 @@ import { useUnread } from "./alerts";
 import { JOB_NAME, errorText } from "./auth";
 import { goCharacter, refreshMe, useMyCharacters } from "./characters";
 import { goBack } from "./router";
+import { ClickTag, hasGuide, openGuide, useClickHint } from "./tutorial";
 import type { Pic } from "./types";
 
 /**
@@ -15,7 +16,14 @@ import type { Pic } from "./types";
  * fit 을 주면 원본 크기와 상관없이 긴 쪽을 fit 픽셀에 맞춘다 (같은 아이템이 드랍표에선 12px,
  * 장비표에선 30px 로 저장돼 있어서, 아이템 아이콘은 fit 으로 크기를 맞춘다)
  */
-export function PicImg({ pic, scale = 1, max, fit, alt = "", className }: {
+export function PicImg({
+  pic,
+  scale = 1,
+  max,
+  fit,
+  alt = "",
+  className,
+}: {
   pic: Pic | null | undefined;
   scale?: number;
   max?: number;
@@ -25,13 +33,26 @@ export function PicImg({ pic, scale = 1, max, fit, alt = "", className }: {
 }) {
   if (!pic) {
     const style = fit ? { width: fit, height: fit } : undefined;
-    return <span className={"pic-empty " + (className ?? "")} style={style} aria-hidden />;
+    return (
+      <span
+        className={"pic-empty " + (className ?? "")}
+        style={style}
+        aria-hidden
+      />
+    );
   }
   if (fit) {
     const k = fit / Math.max(pic.w, pic.h);
     return (
-      <img className={"pic " + (className ?? "")} src={pic.src} width={Math.round(pic.w * k)} height={Math.round(pic.h * k)}
-        alt={alt} loading="lazy" decoding="async" />
+      <img
+        className={"pic " + (className ?? "")}
+        src={pic.src}
+        width={Math.round(pic.w * k)}
+        height={Math.round(pic.h * k)}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+      />
     );
   }
   let w = pic.w * scale;
@@ -41,7 +62,17 @@ export function PicImg({ pic, scale = 1, max, fit, alt = "", className }: {
     w = Math.round(w * k);
     h = Math.round(h * k);
   }
-  return <img className={"pic " + (className ?? "")} src={pic.src} width={w} height={h} alt={alt} loading="lazy" decoding="async" />;
+  return (
+    <img
+      className={"pic " + (className ?? "")}
+      src={pic.src}
+      width={w}
+      height={h}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+    />
+  );
 }
 
 /** 화면 위 줄: 뒤로, 제목, 오른쪽에는 따로 준 것이 없으면 '내 정보' 단추 (내 정보 화면에서는 빼고) */
@@ -79,11 +110,38 @@ export const TITLE_EN: Record<string, string> = {
   "인던 · 길드던전": "DUNGEONS",
   "전장 · 헌팅그라운드": "BATTLEFIELD",
   "퀘스트 · 지도": "QUESTS · MAPS",
-  "길던&인던 매칭": "PARTY MATCHING",
+  "길드 던전": "GUILD DUNGEON",
 };
 
-export function TopBar({ title, back = true, right, star }: { title: ReactNode; back?: boolean; right?: ReactNode; star?: ReactNode }) {
+export function TopBar({
+  title,
+  back = true,
+  right,
+  star,
+  guide,
+}: {
+  title: ReactNode;
+  back?: boolean;
+  right?: ReactNode;
+  star?: ReactNode;
+  guide?: string;
+}) {
   const en = typeof title === "string" ? TITLE_EN[title] : undefined;
+  // 설명이 있는 메뉴: 제목을 누르면 단추별 기능·흐름·튜토리얼 (제작자 요청 2026-11-02, src/tutorial.tsx). guide 를 주면 그 이름의 설명 (챗봇은 대화 제목이 뜰 때도)
+  const gname =
+    guide ?? (typeof title === "string" && hasGuide(title) ? title : null);
+  // 한 번도 안 연 메뉴면 제목 오른쪽 ◆ 자리에 Click! (src/tutorial.tsx)
+  const hint = useClickHint(gname ?? "");
+  const tap = gname
+    ? {
+        role: "button",
+        tabIndex: 0,
+        title: "눌러서 이 메뉴 설명 보기",
+        onClick: () => openGuide(gname),
+        onKeyDown: (e: { key: string }) =>
+          (e.key === "Enter" || e.key === " ") && openGuide(gname),
+      }
+    : {};
   return (
     // 위 줄 (제작자 요청 2026-11-02): 왼쪽 ◀, 가운데 제목(메뉴 화면은 작은 배너, 화면 가운데), 오른쪽 🔔 과 👤. 단추는 상자 없이 작게
     <header className={"topbar" + (right ? "" : " topbar-std")}>
@@ -96,24 +154,47 @@ export function TopBar({ title, back = true, right, star }: { title: ReactNode; 
       )}
       {en ? (
         <h1 className="topbar-title topbar-title-banner">
-          {/* 제작자가 고른 E: 판 없이 금빛 글자, 양옆 보석 장식과 밑줄, 잔잔한 움직임 (2026-11-02, styles.css .tb-banner) */}
-          <span className="tb-banner">
+          {/* 제작자가 고른 E: 판 없이 금빛 글자, 양옆 보석 장식과 밑줄, 잔잔한 움직임 (2026-11-02, styles.css .tb-banner).
+              설명이 있는 메뉴는 제목을 누르면 단추별 기능·흐름·튜토리얼 (제작자 요청 2026-11-02, src/tutorial.tsx) */}
+          <span
+            className={
+              "tb-banner" +
+              (gname ? " tb-guide" : "") +
+              (hint ? " tb-click" : "")
+            }
+            {...tap}
+          >
+            {hint && <ClickTag />}
             <span className="tb-b">
               <span className="tb-i">
                 <span className="tb-en">{en}</span>
-                <FitLine className="tb-ko" text={title as string} wrap={false} />
+                <FitLine
+                  className="tb-ko"
+                  text={title as string}
+                  wrap={false}
+                />
               </span>
             </span>
           </span>
         </h1>
       ) : (
-        <h1 className="topbar-title">{typeof title === "string" ? <FitLine text={title} shrink={2} /> : title}</h1>
+        <h1 className={"topbar-title" + (gname ? " tb-guide" : "")} {...tap}>
+          {typeof title === "string" ? (
+            <FitLine text={title} shrink={2} />
+          ) : (
+            title
+          )}
+        </h1>
       )}
       {right ?? (
         <span className="topbar-right">
           {star}
-          {!location.hash.startsWith("#/alerts") && <Bell className="topbar-me" size={18} />}
-          {!location.hash.startsWith("#/me") && <MeButton className="topbar-me" size={18} />}
+          {!location.hash.startsWith("#/alerts") && (
+            <Bell className="topbar-me" size={18} />
+          )}
+          {!location.hash.startsWith("#/me") && (
+            <MeButton className="topbar-me" size={18} />
+          )}
         </span>
       )}
     </header>
@@ -124,7 +205,15 @@ export function TopBar({ title, back = true, right, star }: { title: ReactNode; 
  * 캐릭터 목록 (부캐 묶기): 고르면 그 캐릭터로 바꿔 지금 화면을 다시 연다. me 를 주면 맨 아래에 '내 정보' 줄
  * (제작자 요청 2026-11-02: 위 줄 프로필 단추를 누르면 아이디 목록과 내 정보)
  */
-function CharacterMenu({ top, me, onClose }: { top: number; me?: boolean; onClose: () => void }) {
+function CharacterMenu({
+  top,
+  me,
+  onClose,
+}: {
+  top: number;
+  me?: boolean;
+  onClose: () => void;
+}) {
   const { current, list } = useMyCharacters();
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -148,7 +237,13 @@ function CharacterMenu({ top, me, onClose }: { top: number; me?: boolean; onClos
       <div className="char-menu-back" onClick={onClose} />
       <div className="char-menu" role="menu" style={{ top }}>
         {list.map((c) => (
-          <button key={c.id} className={"char-item" + (c.id === current ? " char-on" : "")} disabled={!!busy} onClick={() => pick(c.id)} role="menuitem">
+          <button
+            key={c.id}
+            className={"char-item" + (c.id === current ? " char-on" : "")}
+            disabled={!!busy}
+            onClick={() => pick(c.id)}
+            role="menuitem"
+          >
             <span className="char-name">
               <b>{c.id}</b>
               <small>
@@ -157,11 +252,18 @@ function CharacterMenu({ top, me, onClose }: { top: number; me?: boolean; onClos
                 {c.job ? ` ${JOB_NAME[c.job]}` : ""}
               </small>
             </span>
-            <span className="char-mark">{busy === c.id ? "…" : c.id === current ? "✓" : ""}</span>
+            <span className="char-mark">
+              {busy === c.id ? "…" : c.id === current ? "✓" : ""}
+            </span>
           </button>
         ))}
         {me && (
-          <a className="char-item char-me" href="#/me" onClick={onClose} role="menuitem">
+          <a
+            className="char-item char-me"
+            href="#/me"
+            onClick={onClose}
+            role="menuitem"
+          >
             <span className="char-name">
               <b>내 정보</b>
             </span>
@@ -178,7 +280,13 @@ function CharacterMenu({ top, me, onClose }: { top: number; me?: boolean; onClos
  * 프로필 단추 (👤): 캐릭터가 하나면 누르면 바로 내 정보, 묶은 캐릭터가 있으면 아이디 목록과 '내 정보'가 뜨고 고르면 그 캐릭터로 바꾼다
  * (제작자 요청 2026-11-02: '알림 + 프로필 모양으로 두고 한 번 누르면 아이디 목록 + 내 정보, 부캐 없으면 바로 내 정보')
  */
-export function MeButton({ className, size }: { className: string; size: number }) {
+export function MeButton({
+  className,
+  size,
+}: {
+  className: string;
+  size: number;
+}) {
   const { list } = useMyCharacters();
   const [at, setAt] = useState<number | null>(null);
   if (list.length < 2)
@@ -191,7 +299,13 @@ export function MeButton({ className, size }: { className: string; size: number 
     <>
       <button
         className={className}
-        onClick={(e) => setAt(at === null ? e.currentTarget.getBoundingClientRect().bottom + 6 : null)}
+        onClick={(e) =>
+          setAt(
+            at === null
+              ? e.currentTarget.getBoundingClientRect().bottom + 6
+              : null,
+          )
+        }
         aria-label="캐릭터 · 내 정보"
         aria-expanded={at !== null}
       >
@@ -220,12 +334,20 @@ export function CharacterSwitch() {
     <>
       <button
         className="char-switch"
-        onClick={(e) => setAt(at === null ? e.currentTarget.getBoundingClientRect().bottom + 6 : null)}
+        onClick={(e) =>
+          setAt(
+            at === null
+              ? e.currentTarget.getBoundingClientRect().bottom + 6
+              : null,
+          )
+        }
         aria-label="캐릭터 바꾸기"
         aria-expanded={at !== null}
       >
         {label}
-        <span className="char-switch-arrow" aria-hidden="true">▾</span>
+        <span className="char-switch-arrow" aria-hidden="true">
+          ▾
+        </span>
       </button>
       {at !== null && <CharacterMenu top={at} onClose={() => setAt(null)} />}
     </>
@@ -237,8 +359,19 @@ export function CharacterSwitch() {
  * 그래도 넘치면 낱말 사이(띄어쓰기와 · 뒤)에서만 줄을 바꾼다. 낱말 가운데에서는 자르지 않는다 (제작자 요청).
  * wrap={false} (닉네임처럼 줄을 바꿀 자리가 없는 글)는 들어갈 만큼 글자를 줄인다
  */
-export function FitLine({ text, shrink = 1, wrap = true, className }: {
-  text: string; shrink?: number; wrap?: boolean; className?: string;
+export function FitLine({
+  text,
+  shrink = 1,
+  wrap = true,
+  className,
+  hs = false,
+}: {
+  text: string;
+  shrink?: number;
+  wrap?: boolean;
+  className?: string;
+  /** 고스펙 닉네임: 글자 위로 금빛 반짝임 (styles.css .hs, src/kakao.tsx Nick 과 같다) */
+  hs?: boolean;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {
@@ -257,7 +390,10 @@ export function FitLine({ text, shrink = 1, wrap = true, className }: {
       el.dataset.fit = "tight";
       if (!wrap) {
         // 글자 폭이 크기에 꼭 비례하지 않아서(픽셀 글꼴) 맞을 때까지 0.5px 씩 더 줄인다 (2026-11-02: 320px 폭에서 3~5px 잘렸다)
-        let px = Math.max(9, Math.floor(((base * el.clientWidth) / el.scrollWidth) * 2) / 2);
+        let px = Math.max(
+          9,
+          Math.floor(((base * el.clientWidth) / el.scrollWidth) * 2) / 2,
+        );
         el.style.fontSize = px + "px";
         while (!fits() && px > 8) {
           px -= 0.5;
@@ -273,33 +409,52 @@ export function FitLine({ text, shrink = 1, wrap = true, className }: {
       el.dataset.fit = "wrap";
     };
     fit();
-    // 폰을 돌리는 등 너비가 바뀔 때와 글꼴을 다 받았을 때 다시 맞춘다 (높이만 바뀐 건 무시)
+    // 폰을 돌리는 등 너비가 바뀔 때와 글꼴을 다 받았을 때 다시 맞춘다 (높이만 바뀐 건 무시).
+    // 옆에 나중에 붙는 것(카톡 단추 등)에 자리를 내줘 이 글자 칸만 좁아진 때도 (2026-11-02: 길드 던전 파티원 카드의 긴 닉네임이 잘렸다)
     let width = box.clientWidth;
+    let own = el.clientWidth;
     const watch = new ResizeObserver(() => {
-      if (box.clientWidth === width) return;
+      if (box.clientWidth === width && el.clientWidth === own) return;
       width = box.clientWidth;
       fit();
+      own = el.clientWidth;
     });
     watch.observe(box);
+    watch.observe(el);
     let alive = true;
     // 글꼴을 아직 받는 중일 때만 다 받은 뒤에 한 번 더 맞춘다
-    if (document.fonts.status !== "loaded") document.fonts.ready.then(() => alive && fit());
+    if (document.fonts.status !== "loaded")
+      document.fonts.ready.then(() => alive && fit());
     return () => {
       alive = false;
       watch.disconnect();
     };
   }, [text, shrink, wrap]);
 
+  // · 뒤와 ( 앞의 폭 없는 공백이 줄을 바꿀 자리다 (<wbr> 은 크롬에서 한 줄로 둘 때도 줄을 바꿔서 쓰지 않는다)
+  const content = text.split(" · ").map((part, i) => (
+    <Fragment key={i}>
+      {i > 0 && <span className="fit-sep">·</span>}
+      {i > 0 && "\u200b"}
+      {part.replace(/(\S)\(/g, "$1\u200b(")}
+    </Fragment>
+  ));
   return (
     <span ref={ref} className={"fit-line" + (className ? " " + className : "")}>
-      {/* · 뒤와 ( 앞의 폭 없는 공백이 줄을 바꿀 자리다 (<wbr> 은 크롬에서 한 줄로 둘 때도 줄을 바꿔서 쓰지 않는다) */}
-      {text.split(" · ").map((part, i) => (
-        <Fragment key={i}>
-          {i > 0 && <span className="fit-sep">·</span>}
-          {i > 0 && "\u200b"}
-          {part.replace(/(\S)\(/g, "$1\u200b(")}
-        </Fragment>
-      ))}
+      {hs ? (
+        // 고스펙: 같은 글자 두 벌을 한 칸에 겹친다 (kakao.tsx Nick 과 같은 모양, styles.css .hs)
+        <span className="hs">
+          <span>{content}</span>
+          <span className="hs-g" aria-hidden="true">
+            {content}
+          </span>
+          <span className="hs-s" aria-hidden="true">
+            {content}
+          </span>
+        </span>
+      ) : (
+        content
+      )}
     </span>
   );
 }
@@ -311,7 +466,13 @@ const TIP_MS = 2000;
  * 누르면 옆에 잠깐 떴다가 저절로 사라지는 작은 설명. 마우스는 올려 두는 동안 보이고 치우면 사라진다.
  * 화면을 가리는 창 대신, 무엇인지 모를 수 있는 마크에 쓴다 (제작자 요청)
  */
-export function TapTip({ tip, children }: { tip: string; children: ReactNode }) {
+export function TapTip({
+  tip,
+  children,
+}: {
+  tip: string;
+  children: ReactNode;
+}) {
   // 0 이면 숨김. 누를 때마다 숫자를 올려서 애니메이션을 처음부터 다시 튼다
   const [shown, setShown] = useState(0);
   const [hold, setHold] = useState(false);
@@ -348,7 +509,11 @@ export function TapTip({ tip, children }: { tip: string; children: ReactNode }) 
     >
       {children}
       {shown > 0 && (
-        <span key={shown} className={"tap-tip" + (hold ? " tap-tip-hold" : "")} role="tooltip">
+        <span
+          key={shown}
+          className={"tap-tip" + (hold ? " tap-tip-hold" : "")}
+          role="tooltip"
+        >
           {tip}
         </span>
       )}
@@ -361,21 +526,65 @@ export function TapTip({ tip, children }: { tip: string; children: ReactNode }) 
  * 앱 단추의 픽셀 아이콘 (public/icons, scripts/make_pixel_icons.py). 아이모 아이템 그림과 어울리게 16칸 그림을 정수배로 키운다
  * (제작자 요청: 아이콘을 아이모 그래픽 느낌으로). 게임에 그림이 있는 것(책, 메달, 동전 ...)은 게임 그림을 쓴다 (Home.tsx)
  */
-export function PixelIcon({ name, size = 16, className }: { name: "bell" | "home" | "map" | "search" | "gear" | "info" | "chat" | "me" | "phone"; size?: number; className?: string }) {
-  return <img className={"px-icon " + (className ?? "")} src={`/icons/${name}.png`} width={size} height={size} alt="" aria-hidden />;
+export function PixelIcon({
+  name,
+  size = 16,
+  className,
+}: {
+  name:
+    | "bell"
+    | "home"
+    | "map"
+    | "search"
+    | "gear"
+    | "info"
+    | "chat"
+    | "me"
+    | "phone";
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <img
+      className={"px-icon " + (className ?? "")}
+      src={`/icons/${name}.png`}
+      width={size}
+      height={size}
+      alt=""
+      aria-hidden
+    />
+  );
 }
 
-export function Bell({ className, size = 24 }: { className?: string; size?: number }) {
+export function Bell({
+  className,
+  size = 24,
+}: {
+  className?: string;
+  size?: number;
+}) {
   const n = useUnread();
   return (
-    <a className={"bell " + (className ?? "")} href="#/alerts" aria-label={n ? `알림 ${n}개` : "알림"}>
+    <a
+      className={"bell " + (className ?? "")}
+      href="#/alerts"
+      aria-label={n ? `알림 ${n}개` : "알림"}
+    >
       <PixelIcon name="bell" size={size} />
       {n > 0 && <i className="bell-dot">{n > 99 ? "99+" : n}</i>}
     </a>
   );
 }
 
-export function Panel({ title, children, className }: { title?: ReactNode; children: ReactNode; className?: string }) {
+export function Panel({
+  title,
+  children,
+  className,
+}: {
+  title?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
     <section className={"panel " + (className ?? "")}>
       {title && <h2 className="panel-title">{title}</h2>}
@@ -384,7 +593,13 @@ export function Panel({ title, children, className }: { title?: ReactNode; child
   );
 }
 
-export function Loading({ error, onRetry }: { error?: string; onRetry?: () => void }) {
+export function Loading({
+  error,
+  onRetry,
+}: {
+  error?: string;
+  onRetry?: () => void;
+}) {
   return (
     <div className="loading">
       {error ? "자료를 불러오지 못했어요: " + error : "불러오는 중…"}
@@ -400,11 +615,17 @@ export function Loading({ error, onRetry }: { error?: string; onRetry?: () => vo
 }
 
 /** 개발 중인 칸을 길드원이 열었을 때 (앱개발자만 들어가는 동안, 제작자 요청 2026-11-01) */
-export function DevSoon({ title }: { title: string }) {
+export function DevSoon({
+  title,
+  text = "🚧 개발 중이에요",
+}: {
+  title: string;
+  text?: string;
+}) {
   return (
     <>
       <TopBar title={title} />
-      <div className="empty">🚧 개발 중이에요</div>
+      <div className="empty">{text}</div>
     </>
   );
 }
@@ -418,9 +639,13 @@ export function NotFound({ what }: { what: string }) {
   );
 }
 
-export function levelText(level: [number, number | null] | null | undefined): string {
+export function levelText(
+  level: [number, number | null] | null | undefined,
+): string {
   if (!level) return "";
-  return level[1] === null ? `Lv.${level[0]} 이상` : `Lv.${level[0]}~${level[1]}`;
+  return level[1] === null
+    ? `Lv.${level[0]} 이상`
+    : `Lv.${level[0]}~${level[1]}`;
 }
 
 export function num(n: number | null | undefined): string {
@@ -437,13 +662,25 @@ export function HeroTitle() {
 }
 
 /** 즐겨찾기 별 (제작자 요청): 누르면 달고 다시 누르면 뺀다. 검색 화면 위 '즐겨찾기'에 모인다 */
-export function FavStar({ kind, fkey, name, className }: { kind: FavKind; fkey: string; name: string; className?: string }) {
+export function FavStar({
+  kind,
+  fkey,
+  name,
+  className,
+}: {
+  kind: FavKind;
+  fkey: string;
+  name: string;
+  className?: string;
+}) {
   const list = useFavorites();
   const on = isFavorite(list, kind, fkey);
   return (
     <button
       type="button"
-      className={"fav-star" + (on ? " fav-on" : "") + (className ? " " + className : "")}
+      className={
+        "fav-star" + (on ? " fav-on" : "") + (className ? " " + className : "")
+      }
       aria-pressed={on}
       aria-label={on ? "즐겨찾기 빼기" : "즐겨찾기"}
       onClick={(e) => {
@@ -489,7 +726,12 @@ export function UpdateBar() {
  * 레벨·경험치가 바뀌었을 때 까닭을 묻는다 (제작자 요청): 실제로 오르내린 것인지, 잘못 쓴 것을 고친 것인지.
  * 오타 수정은 성장 랭킹과 레벨업 표시에 들어가지 않는다. 화면을 가리지 않고 그 자리에 뜬다
  */
-export function ChangeAsk({ onPick, onCancel, busy, compact }: {
+export function ChangeAsk({
+  onPick,
+  onCancel,
+  busy,
+  compact,
+}: {
   onPick: (change: "grow" | "fix") => void;
   onCancel: () => void;
   busy?: boolean;
@@ -497,11 +739,25 @@ export function ChangeAsk({ onPick, onCancel, busy, compact }: {
 }) {
   return (
     <span className={"change-ask" + (compact ? " change-ask-compact" : "")}>
-      {!compact && <span className="change-ask-q">레벨이나 경험치가 바뀌었어요. 어떤 변경이에요?</span>}
-      <button type="button" className="pill" disabled={busy} onClick={() => onPick("grow")}>
+      {!compact && (
+        <span className="change-ask-q">
+          레벨이나 경험치가 바뀌었어요. 어떤 변경이에요?
+        </span>
+      )}
+      <button
+        type="button"
+        className="pill"
+        disabled={busy}
+        onClick={() => onPick("grow")}
+      >
         실제 성장
       </button>
-      <button type="button" className="pill" disabled={busy} onClick={() => onPick("fix")}>
+      <button
+        type="button"
+        className="pill"
+        disabled={busy}
+        onClick={() => onPick("fix")}
+      >
         오타 수정
       </button>
       <button type="button" className="pill" disabled={busy} onClick={onCancel}>
@@ -511,10 +767,31 @@ export function ChangeAsk({ onPick, onCancel, busy, compact }: {
   );
 }
 
-
 /**
  * 단추 안의 새 것 수 (제작자 요청 2026-11-02: 홈 칸의 빨간 숫자처럼 그 안의 어느 단추에서 새로 올라왔는지도). src/news.ts 의 단추 key 하나나 여럿의 합
  */
 export function NewsDot({ n }: { n: number }) {
-  return n > 0 ? <span className="news-badge in-news">{n > 99 ? "99+" : n}</span> : null;
+  return n > 0 ? (
+    <span className="news-badge in-news">{n > 99 ? "99+" : n}</span>
+  ) : null;
+}
+
+/**
+ * 길드마스터에게만 보이는 메뉴 설명 (사용 기록, 챗봇 개선. 제작자 요청 2026-11-02: '길드마스터한테만 설명이 뜨게,
+ * 길드마스터와 개발자에게만 보이는 메뉴, 앱을 개선하기 위한, 디버깅과 사고 원인을 찾기 위한 메뉴'). 앱개발자에게는 안 보인다
+ */
+export function MasterNote({
+  role,
+  children,
+}: {
+  role: string;
+  children: ReactNode;
+}) {
+  if (role !== "master") return null;
+  return (
+    <div className="panel master-note">
+      <b>길드마스터와 개발자에게만 보이는 메뉴예요</b>
+      <p>{children}</p>
+    </div>
+  );
 }

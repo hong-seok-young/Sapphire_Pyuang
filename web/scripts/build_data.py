@@ -699,6 +699,7 @@ def parse_equipment(aid: str, title: str, box: Tag) -> dict | None:
             name = cells[name_col]
             if not name:
                 continue
+            cells = fix_cells(name, cells)
             row = {"name": name, "icon": first_picture(tds[0]), "cells": cells}
             if h != headers:  # one post can hold tables with different columns (보조 장비: 방패 / 마법 / 정밀)
                 row["h"] = h
@@ -709,6 +710,18 @@ def parse_equipment(aid: str, title: str, box: Tag) -> dict | None:
     if not rows:
         return None
     return {"slot": slot, "post": aid, "headers": headers, "rows": rows}
+
+
+# 원글 장비 표의 잘못: (아이템명, 칸에 든 글) -> 바꿀 글. 카페 원글(Made by iOS)의 표를 그대로 옮기지만 게임에 없는 값은 뺀다
+# (제작자 2026-11-03: 고대의봉의 '마법 데미지 +100' 은 인게임에 없는 옵션. 원글 346124 마법사 무기 표의 옵션 칸에 그대로 적혀 있던 것)
+ERRATA = {("고대의봉", " / 마법 데미지 +100"): ""}
+
+
+def fix_cells(name, cells):
+    for (item, bad), good in ERRATA.items():
+        if name == item:
+            cells = [c.replace(bad, good) for c in cells]
+    return cells
 
 
 def name_jobs(equipment: list[dict]) -> None:
@@ -873,6 +886,9 @@ def main():
     print("완료", meta["counts"], f"그림 {size / 1e6:.1f}MB")
     copy_rank_pictures()
     build_odds()
+    # 시세 동향 (개발중): 자료/카톡 의 거래 톡방 대화 -> data/trend.json (없으면 건너뛴다)
+    import build_trend
+    build_trend.main()
 
 
 def write_place_parts(posts: dict, places: dict) -> None:

@@ -1,20 +1,20 @@
-// GET  /api/requests -> 길드원 의뢰소: 모집 중, 진행 중, 끝난(30일 안, 그 전 것도 지우지 않고 둔다) 의뢰 전부. 수락하고 이틀 지난 것은 먼저 다시 모집 중으로
+// GET  /api/requests -> 길드원 의뢰소: 모집 중과 끝난(30일 안, 그 전 것도 지우지 않고 둔다) 의뢰 전부, 의뢰마다 수락한 사람과 한마디
 // POST /api/requests { title, detail?, rewardGold? | rewardText? } -> 의뢰 올리기 (보상은 골드나 글 중 하나)
 import { NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import { notify } from "../../../server/alerts";
 import type { Env } from "../../../server/auth";
-import { MAX_OPEN_REQUESTS, SHOW_DONE_MS, readRequest, requestOut, tidyRequests } from "../../../server/requests";
+import { MAX_OPEN_REQUESTS, SHOW_DONE_MS, offersOf, readRequest, requestOut } from "../../../server/requests";
 import type { RequestRow } from "../../../server/requests";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   const now = Date.now();
-  await env.DB.batch(tidyRequests(env.DB, now));
   const { results } = await env.DB.prepare("SELECT * FROM requests WHERE status != 'done' OR updated_at >= ? ORDER BY created_at DESC")
     .bind(now - SHOW_DONE_MS)
     .all<RequestRow>();
-  return json({ requests: results.map(requestOut) });
+  const offers = await offersOf(env.DB, results.map((r) => r.id));
+  return json({ requests: results.map((r) => requestOut(r, offers)) });
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
@@ -23,7 +23,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const input = readRequest(await readJson<Record<string, unknown>>(request));
   if (typeof input === "string") return json({ error: input }, 400);
   const now = Date.now();
-  await env.DB.batch(tidyRequests(env.DB, now));
   const open = await env.DB.prepare("SELECT COUNT(*) AS n FROM requests WHERE owner = ? AND status != 'done'")
     .bind(me.id)
     .first<{ n: number }>();
@@ -36,5 +35,5 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .first<RequestRow>();
   if (!row) return json({ error: "올리지 못했어요" }, 500);
   await notify(env, "all", "request_new", `${me.id}님의 새 의뢰 “${row.title}”`, "#/requests", me.id);
-  return json(requestOut(row), 201);
+  return json(requestOut(row, []), 201);
 };

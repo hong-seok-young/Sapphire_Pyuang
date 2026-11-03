@@ -8,8 +8,10 @@ interface Links {
   links: Record<string, string>;
   /** 링크가 있는 운영진 (장비대여 '담당자 카톡') */
   staff: string[];
+  /** 고스펙 닉네임 (닉네임이 뜨는 곳마다 반짝임, Nick) */
+  high: string[];
 }
-let data: Links = { links: {}, staff: [] };
+let data: Links = { links: {}, staff: [], high: [] };
 let loading: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 const subscribe = (l: () => void) => {
@@ -21,7 +23,7 @@ const subscribe = (l: () => void) => {
 export function refreshKakao(): Promise<void> {
   loading = api<Links>("/api/kakao")
     .then((r) => {
-      data = { links: r.links ?? {}, staff: r.staff ?? [] };
+      data = { links: r.links ?? {}, staff: r.staff ?? [], high: r.high ?? [] };
       listeners.forEach((l) => l());
     })
     .catch(() => undefined);
@@ -36,21 +38,92 @@ export function useKakao(): Links {
   return d;
 }
 
+/**
+ * 닉네임: 고스펙이면 금빛 반짝임이 글자 위로 흐른다 (제작자 요청 2026-11-02 '고스펙 닉네임 애니메이션은 어디서든, 폰트 크기나 글씨체는 바꾸지 말고 딱 애니메이션만').
+ * 글자는 그 자리의 색·크기·글꼴 그대로 두고, 같은 글자를 위에 겹쳐 반짝임 띠만 그린다 (styles.css .hs). 랭킹·길드원 관리는 예전 .hs-text 그대로
+ */
+export function Nick({ name }: { name: string | null | undefined }) {
+  const { high } = useKakao();
+  if (!name) return null;
+  if (!high.includes(name)) return <>{name}</>;
+  // 같은 글자 두 벌을 inline-grid 한 칸에 겹친다 (styles.css .hs). 전에는 ::after 를 절대 위치로 얹었는데 폰에서 줄 높이·글꼴 차이로 위치가 어긋났다
+  // (제작자 2026-11-03 '고스펙 애니메이션이랑 닉넴 폰트랑 위치가 안 맞음')
+  return (
+    <span className="hs">
+      <span>{name}</span>
+      <span className="hs-g" aria-hidden="true">
+        {name}
+      </span>
+      <span className="hs-s" aria-hidden="true">
+        {name}
+      </span>
+    </span>
+  );
+}
+
 /** 내 링크 적기 (user 를 주면 그 사람 것: 운영진) */
-export const saveKakao = (link: string, user?: string) => api<{ ok: boolean; link: string | null }>("/api/kakao", "PUT", { link, user });
+export const saveKakao = (link: string, user?: string) =>
+  api<{ ok: boolean; link: string | null }>("/api/kakao", "PUT", {
+    link,
+    user,
+  });
 
 /**
  * 이름 옆 작은 '카톡' 단추 (그 사람이 링크를 적어 뒀을 때만). label 을 주면 그 글자로.
  * mine 이면 내 글의 내 이름 옆에도 보인다 (제작자 요청 2026-11-02: 내 판매의 '퓨앙 · 방금 올림'에도): 적어 두었으면 눌러서 내 링크를 확인하고,
  * 안 적었으면 흐린 '카톡'을 눌러 내 정보의 카톡 오픈프로필로 간다
  */
-export function KakaoButton({ name, label = "카톡", mine = false }: { name: string | null | undefined; label?: string; mine?: boolean }) {
+export function KakaoButton({
+  name,
+  label = "카톡",
+  mine = false,
+  nested = false,
+}: {
+  name: string | null | undefined;
+  label?: string;
+  mine?: boolean;
+  /** 누르면 펼쳐지는 줄(단추)이나 링크 안에 둘 때: <a> 대신 span 으로 그리고, 눌러도 바깥 줄은 열리지 않는다 */
+  nested?: boolean;
+}) {
   const { links } = useKakao();
   const link = name ? links[name] : undefined;
+  if (nested) {
+    if (!link) return null;
+    const open = (e: {
+      preventDefault: () => void;
+      stopPropagation: () => void;
+    }) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // 진짜 링크를 눌러 연다 (앱 WebView 도 바깥 주소를 브라우저·카톡으로 넘기는 같은 길)
+      const a = document.createElement("a");
+      a.href = link;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.click();
+    };
+    return (
+      <span
+        className="kakao-btn"
+        role="link"
+        tabIndex={0}
+        aria-label={`${name} 카톡 오픈프로필`}
+        onClick={open}
+        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && open(e)}
+      >
+        {label}
+      </span>
+    );
+  }
   if (!link) {
     if (!mine) return null;
     return (
-      <a className="kakao-btn kakao-btn-off" href="#/me?open=kakao" onClick={(e) => e.stopPropagation()} aria-label="카톡 오픈프로필 적기">
+      <a
+        className="kakao-btn kakao-btn-off"
+        href="#/me?open=kakao"
+        onClick={(e) => e.stopPropagation()}
+        aria-label="카톡 오픈프로필 적기"
+      >
         {label}
       </a>
     );
@@ -102,7 +175,11 @@ export function KakaoField({ user, name }: { user?: string; name: string }) {
         placeholder="https://open.kakao.com/o/..."
         aria-label="카톡 오픈프로필 링크"
       />
-      <button className="pill" disabled={busy || text === null} onClick={() => void save()}>
+      <button
+        className="pill"
+        disabled={busy || text === null}
+        onClick={() => void save()}
+      >
         저장
       </button>
       {note && <small className="kakao-note">{note}</small>}

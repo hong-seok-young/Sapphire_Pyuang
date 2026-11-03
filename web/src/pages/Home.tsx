@@ -1,72 +1,180 @@
 import type { Me } from "../auth";
-import { Bell, CharacterSwitch, FitLine, HeroTitle, MeButton, NewsDot, PixelIcon, TopBar } from "../ui";
+import {
+  Bell,
+  CharacterSwitch,
+  FitLine,
+  HeroTitle,
+  MeButton,
+  NewsDot,
+  PixelIcon,
+  TopBar,
+} from "../ui";
 import { VERSION } from "../patchnotes";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
+import type {
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+} from "react";
 import { enablePush, markPushAsked, shouldAskPush } from "../push";
-import { INFO_TILES, canPreview, canSee, clickItem, isLocked, isUpdated, itemOf, pressItem, resetLayout, setEditing, useLauncher } from "../launcher";
-import type { LaunchItem } from "../launcher";
+import {
+  COLS,
+  INFO_TILES,
+  MAX_SLOTS,
+  canPreview,
+  canSee,
+  clickItem,
+  gridSlots,
+  isLocked,
+  isUpdated,
+  itemOf,
+  pressItem,
+  resetLayout,
+  searchUp,
+  setEditing,
+  useLauncher,
+} from "../launcher";
+import type { LaunchItem, Layout } from "../launcher";
 import { newsFor, useMaint, useNews } from "../news";
 import type { Maint } from "../news";
+import { ClickHint, openGuide } from "../tutorial";
 
 /**
  * 칸 그림: 이모지 (상점 칸만 게임 상점 그림). 제작자 요청 2026-10-31: 게임 아이템 그림을 키운 아이콘은 뭉개져서
  * 보기 싫다, 게임 그림을 굳이 쓸 필요 없다
  */
 export function TileIcon({ t }: { t: LaunchItem }) {
-  return t.iconPic ? <img className="tile-pic" src={t.iconPic} alt="" draggable={false} /> : <>{t.icon}</>;
+  return t.iconPic ? (
+    <img className="tile-pic" src={t.iconPic} alt="" draggable={false} />
+  ) : (
+    <>{t.icon}</>
+  );
 }
 
 /**
- * 칸 그리기 (홈과 정보가 같이 쓴다). editable: 홈 칸 (꾹 눌러 편집, 끌어서 옮기기, launcher.ts)
+ * 칸 하나 (홈과 정보가 같이 쓴다). editable: 홈 칸 (꾹 눌러 편집, 끌어서 옮기기, launcher.ts), index: 홈 격자의 자리 번호
  */
-function Tiles({ me, tiles, editable = false, dragKey }: { me: Me; tiles: LaunchItem[]; editable?: boolean; dragKey?: string }) {
+function TileCell({
+  me,
+  t,
+  editable = false,
+  dragKey,
+  index,
+}: {
+  me: Me;
+  t: LaunchItem;
+  editable?: boolean;
+  dragKey?: string;
+  index?: number;
+}) {
   const news = useNews();
+  // 고친 메뉴: 다른 색 테두리와 'UPDATE' (그 메뉴에 처음 들어가면 사라진다, updates.ts). '정보'는 안의 메뉴가 고쳐졌을 때도
+  const updated = isUpdated(me.id, t);
+  // 개발 중인 칸: 길드원은 못 들어가고 앱개발자는 들어간다 (표시는 같이 보인다)
+  const locked = isLocked(t, me);
+  const className =
+    "tile" +
+    (t.soon ? " tile-soon" : "") +
+    (locked ? " tile-locked" : "") +
+    (t.ring ? ` tile-ring tile-ring-${t.ring}` : "") +
+    (updated ? " tile-new" : "") +
+    (dragKey === t.key ? " launch-drag-src" : "");
+  const inside = (
+    <>
+      {t.ribbon && <span className="tile-ribbon">{t.ribbon}</span>}
+      {updated && <span className="tile-update">UPDATE</span>}
+      {/* 사람들이 새로 올린 글·물건 수 (news.ts, 'UPDATE' 와 따로) */}
+      {newsFor(news, t.key) > 0 && (
+        <span className="news-badge tile-news">
+          {newsFor(news, t.key) > 99 ? "99+" : newsFor(news, t.key)}
+        </span>
+      )}
+      <span className="tile-icon">
+        <TileIcon t={t} />
+      </span>
+      {/* 칸 크기는 모두 같게 (제작자 요청: 작은 칸 기준): 이름은 줄을 바꾸지 않고 들어갈 만큼 글자를 줄인다 */}
+      <FitLine className="tile-title" text={t.title} wrap={false} />
+      {t.soon && <span className="tile-badge">{t.badge ?? "준비 중"}</span>}
+    </>
+  );
+  const handlers = editable
+    ? {
+        "data-slot": t.key,
+        "data-zone": "grid",
+        "data-index": index,
+        onPointerDown: (e: ReactPointerEvent<HTMLElement>) =>
+          pressItem(e, t.key, true),
+        onClick: clickItem,
+        onContextMenu: (e: ReactMouseEvent) => e.preventDefault(),
+      }
+    : {};
+  return locked ? (
+    <span className={className} aria-disabled="true" {...handlers}>
+      {inside}
+    </span>
+  ) : (
+    <a className={className} href={t.to} draggable={false} {...handlers}>
+      {inside}
+    </a>
+  );
+}
+
+/** 칸 목록을 위부터 채워 그린다 (정보 화면, 홈의 '개발 중' 묶음) */
+function Tiles({ me, tiles }: { me: Me; tiles: LaunchItem[] }) {
   return (
-    <nav className="tiles" {...(editable ? { "data-zone": "grid" } : {})}>
-      {tiles.map((t) => {
-        // 고친 메뉴: 다른 색 테두리와 'UPDATE' (그 메뉴에 처음 들어가면 사라진다, updates.ts). '정보'는 안의 메뉴가 고쳐졌을 때도
-        const updated = isUpdated(me.id, t);
-        // 개발 중인 칸: 길드원은 못 들어가고 앱개발자는 들어간다 (표시는 같이 보인다)
-        const locked = isLocked(t, me);
-        const className =
-          "tile" +
-          (t.soon ? " tile-soon" : "") +
-          (locked ? " tile-locked" : "") +
-          (t.ring ? ` tile-ring tile-ring-${t.ring}` : "") +
-          (updated ? " tile-new" : "") +
-          (dragKey === t.key ? " launch-drag-src" : "");
-        const inside = (
-          <>
-            {t.ribbon && <span className="tile-ribbon">{t.ribbon}</span>}
-            {updated && <span className="tile-update">UPDATE</span>}
-            {/* 사람들이 새로 올린 글·물건 수 (news.ts, 'UPDATE' 와 따로) */}
-            {newsFor(news, t.key) > 0 && <span className="news-badge tile-news">{newsFor(news, t.key) > 99 ? "99+" : newsFor(news, t.key)}</span>}
-            <span className="tile-icon">
-              <TileIcon t={t} />
-            </span>
-            {/* 칸 크기는 모두 같게 (제작자 요청: 작은 칸 기준): 이름은 줄을 바꾸지 않고 들어갈 만큼 글자를 줄인다 */}
-            <FitLine className="tile-title" text={t.title} wrap={false} />
-            {t.soon && <span className="tile-badge">{t.badge ?? "준비 중"}</span>}
-          </>
-        );
-        const handlers = editable
-          ? {
-              "data-slot": t.key,
-              "data-zone": "grid",
-              onPointerDown: (e: ReactPointerEvent<HTMLElement>) => pressItem(e, t.key, true),
-              onClick: clickItem,
-              onContextMenu: (e: ReactMouseEvent) => e.preventDefault(),
-            }
-          : {};
-        return locked ? (
-          <span key={t.key} className={className} aria-disabled="true" {...handlers}>
-            {inside}
-          </span>
+    <nav className="tiles">
+      {tiles.map((t) => (
+        <TileCell key={t.key} me={me} t={t} />
+      ))}
+    </nav>
+  );
+}
+
+/**
+ * 홈 칸 격자: 배치의 자리 그대로 (제작자 요청 2026-11-03: 위로 몰지 말고 중간에 빈 자리가 있어도 그대로, 편집 때는 정해진 자리에만 놓는다).
+ * 빈 자리와 이 사람에게 안 보이는 칸(운영진 칸, 개발 중 칸)의 자리는 빈 칸으로 둔다 (평소에는 안 보이고 편집 중에만 점선 칸).
+ * 편집 중에는 아래에 빈 줄을 하나 더 두어 더 아래로도 놓을 수 있다
+ */
+function HomeGrid({
+  me,
+  layout,
+  editing,
+  dragKey,
+}: {
+  me: Me;
+  layout: Layout;
+  editing: boolean;
+  dragKey?: string;
+}) {
+  const slots = gridSlots(layout).map((k) => (k ? itemOf(k) : undefined));
+  const shown = (t: LaunchItem | undefined): t is LaunchItem =>
+    !!t && canSee(t, me) && !t.soon;
+  let last = -1;
+  slots.forEach((t, i) => {
+    if (shown(t)) last = i;
+  });
+  const rows = Math.ceil((last + 1) / COLS) + (editing ? 1 : 0);
+  const n = Math.min(rows * COLS, MAX_SLOTS);
+  return (
+    <nav className="tiles home-tiles" data-zone="grid">
+      {Array.from({ length: n }, (_, i) => {
+        const t = slots[i];
+        return shown(t) ? (
+          <TileCell
+            key={t.key}
+            me={me}
+            t={t}
+            editable
+            dragKey={dragKey}
+            index={i}
+          />
         ) : (
-          <a key={t.key} className={className} href={t.to} draggable={false} {...handlers}>
-            {inside}
-          </a>
+          <span
+            key={"empty-" + i}
+            className="tile tile-empty"
+            data-index={i}
+            data-zone="grid"
+            aria-hidden="true"
+          />
         );
       })}
     </nav>
@@ -86,12 +194,12 @@ export function InfoPage({ me }: { me: Me }) {
 export function Home({ me }: { me: Me }) {
   const L = useLauncher();
   const layout = L.preview ?? L.layout;
-  const grid = layout.grid.map(itemOf).filter((t): t is LaunchItem => !!t && canSee(t, me));
   // 검색은 아래 탭에 있으면 홈에 검색 칸을 두지 않고, 홈으로 올리면 맨 위에 검색 칸이 생긴다 (제작자 요청 2026-11-01)
-  const searchUp = grid.some((t) => t.key === "search");
-  // 열린 칸만 홈에 보이고, 개발 중·검토 후 오픈 칸은 그 아래 접힌 '개발 중' 묶음에 (제작자 요청 2026-11-02: 평소에는 접혀서 안 보이게)
-  const tiles = grid.filter((t) => t.key !== "search" && !t.soon);
-  const soon = grid.filter((t) => t.soon);
+  const hasSearch = searchUp(layout);
+  // 열린 칸만 홈 격자에 보이고, 개발 중·검토 후 오픈 칸은 그 아래 접힌 '개발 중' 묶음에 (제작자 요청 2026-11-02: 평소에는 접혀서 안 보이게)
+  const soon = gridSlots(layout)
+    .map(itemOf)
+    .filter((t): t is LaunchItem => !!t && canSee(t, me) && !!t.soon);
   const [showSoon, setShowSoon] = useState(false);
   const foldNews = useNews();
   const dragKey = L.drag?.moved ? L.drag.key : undefined;
@@ -100,7 +208,21 @@ export function Home({ me }: { me: Me }) {
     <div className={"home" + (L.editing ? " launch-editing" : "")}>
       <header className="hero">
         {/* 앱 안에서는 게임 속 1군 길드마크 (12칸 그대로), 폰 홈 화면 아이콘은 고화질 원본 (제작자 요청) */}
-        <img className="hero-mark" src="guild-mark.png" alt="" width={72} height={72} />
+        {/* 길드마크를 누르면 홈 튜토리얼 (제작자 요청 2026-11-02 '홈 화면 설명은 길드마크 누르면', src/tutorial.tsx) */}
+        <button
+          className="hero-mark-btn"
+          onClick={() => openGuide("홈")}
+          aria-label="홈 튜토리얼"
+        >
+          <img
+            className="hero-mark"
+            src="guild-mark.png"
+            alt=""
+            width={72}
+            height={72}
+          />
+          <ClickHint title="홈" />
+        </button>
         <div>
           <HeroTitle />
           <p className="hero-sub">
@@ -128,7 +250,11 @@ export function Home({ me }: { me: Me }) {
           <button className="pill" onClick={resetLayout}>
             기본 배치
           </button>
-          <button className="pill pill-on" onClick={() => setEditing(false)}>
+          <button
+            className="pill pill-on"
+            onClick={() => setEditing(false)}
+            data-tut-dismiss
+          >
             완료
           </button>
         </div>
@@ -136,9 +262,11 @@ export function Home({ me }: { me: Me }) {
 
       <PushAsk />
 
-      {searchUp && (
+      {hasSearch && (
         <a
-          className={"search-entry" + (dragKey === "search" ? " launch-drag-src" : "")}
+          className={
+            "search-entry" + (dragKey === "search" ? " launch-drag-src" : "")
+          }
           href="#/search"
           draggable={false}
           data-slot="search"
@@ -151,20 +279,32 @@ export function Home({ me }: { me: Me }) {
         </a>
       )}
 
-      <Tiles me={me} tiles={tiles} editable dragKey={dragKey} />
+      <HomeGrid me={me} layout={layout} editing={L.editing} dragKey={dragKey} />
 
       {soon.length > 0 && !L.editing && (
         <>
-          <button className="soon-fold" onClick={() => setShowSoon((v) => !v)} aria-expanded={showSoon}>
+          <button
+            className="soon-fold"
+            onClick={() => setShowSoon((v) => !v)}
+            aria-expanded={showSoon}
+          >
             개발 중 {soon.length} {showSoon ? "▴" : "▾"}
             {/* 접힌 칸 안의 새 것 수 (장비대여 새 신청 등, 미리 보는 사람만) */}
-            {canPreview(me) && !showSoon && <NewsDot n={soon.reduce((n, t) => n + newsFor(foldNews, t.key), 0)} />}
+            {canPreview(me) && !showSoon && (
+              <NewsDot
+                n={soon.reduce((n, t) => n + newsFor(foldNews, t.key), 0)}
+              />
+            )}
           </button>
           {/* 안의 칸은 운영진(길드마스터, 오피서)과 앱개발자만 (제작자 요청 2026-11-02). 길드원은 단추만 */}
-          {showSoon && (canPreview(me) ? <Tiles me={me} tiles={soon} /> : <p className="soon-closed">운영진에게만 보여요</p>)}
+          {showSoon &&
+            (canPreview(me) ? (
+              <Tiles me={me} tiles={soon} />
+            ) : (
+              <p className="soon-closed">운영진에게만 보여요</p>
+            ))}
         </>
       )}
-
     </div>
   );
 }
@@ -260,7 +400,14 @@ function FlowLine({ text }: { text: string }) {
   return (
     <span className={"maint-sub" + (flow ? " maint-flow" : "")} ref={box}>
       {/* 흐를 때는 같은 글을 두 번 이어 붙여 끊김 없이 (절반만큼 옮기고 처음으로) */}
-      <span className="maint-run" style={flow ? { animationDuration: `${Math.max(8, text.length * 0.28)}s` } : undefined}>
+      <span
+        className="maint-run"
+        style={
+          flow
+            ? { animationDuration: `${Math.max(8, text.length * 0.28)}s` }
+            : undefined
+        }
+      >
         <span>{text}</span>
         {flow && <span aria-hidden>{text}</span>}
       </span>
@@ -281,20 +428,32 @@ function MaintBanner() {
     const t = window.setInterval(() => setNow(Date.now()), 20_000);
     return () => window.clearInterval(t);
   }, []);
-  const shown = list.filter((m) => (m.end !== null ? m.end > now : now < m.start + 12 * 3_600_000));
+  const shown = list.filter((m) =>
+    m.end !== null ? m.end > now : now < m.start + 12 * 3_600_000,
+  );
   if (!shown.length) return null;
   return (
     <div className="maint-wrap">
       {shown.map((m) => {
         const on = now >= m.start;
         return (
-          <a key={m.id} className={"maint" + (on ? " maint-on" : "")} href={`#/official/${m.id}`} aria-label={maintTop(m)}>
+          <a
+            key={m.id}
+            className={"maint" + (on ? " maint-on" : "")}
+            href={`#/official/${m.id}`}
+            aria-label={maintTop(m)}
+          >
             <span className="maint-dot" aria-hidden />
-            <FlowLine text={(on ? "점검 중 · " : "") + maintTop(m) + (m.content ? "  ·  " + m.content : "")} />
+            <FlowLine
+              text={
+                (on ? "점검 중 · " : "") +
+                maintTop(m) +
+                (m.content ? "  ·  " + m.content : "")
+              }
+            />
           </a>
         );
       })}
     </div>
   );
 }
-

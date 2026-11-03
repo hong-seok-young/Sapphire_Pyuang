@@ -4,14 +4,15 @@
 //        예전 캐릭터의 기록은 지우지 않고 level_log_archive 로 옮긴다 (제작자 요청 2026-11-01: 레벨과 경험치 추이는 평생 기록)
 import { FORBIDDEN, NEED_LOGIN, canManageUser, currentUser, json, paramId, readJson, readProfile, samePerson, validId } from "../../../../server/auth";
 import type { Env, Role } from "../../../../server/auth";
+import { eachLog } from "../../../../server/logdb";
 
 /** 닉네임이 들어 있는 칸 (표, 칸) */
 const ID_COLUMNS: [string, string][] = [
   ["delete_requests", "user_id"],
   ["users", "created_by"], ["sessions", "user_id"], ["chat_usage", "user_id"], ["ai_usage", "user_id"], ["profiles", "user_id"], ["profiles", "updated_by"],
   ["level_log", "user_id"], ["level_log_archive", "user_id"], ["avatars", "user_id"], ["avatars", "updated_by"], ["listings", "seller"], ["listing_wants", "user_id"],
-  ["listing_bids", "user_id"], ["gold_offers", "owner"], ["gold_wants", "user_id"], ["requests", "owner"], ["requests", "accepter"],
-  ["activity", "user_id"], ["alerts", "user_id"], ["alert_prefs", "user_id"], ["listing_talk", "user_id"], ["plat_orders", "user_id"],
+  ["listing_bids", "user_id"], ["gold_offers", "owner"], ["gold_wants", "user_id"], ["requests", "owner"], ["requests", "accepter"], ["request_offers", "user_id"],
+  ["activity", "user_id"], ["alerts", "user_id"], ["gd_parties", "leader"], ["gd_members", "user_id"], ["gd_avail", "user_id"], ["gd_answers", "user_id"], ["alert_prefs", "user_id"], ["listing_talk", "user_id"], ["plat_orders", "user_id"],
   ["favorites", "user_id"], ["board_posts", "author"], ["board_comments", "user_id"], ["board_likes", "user_id"], ["board_views", "user_id"],
   ["chat_threads", "user_id"], ["chat_gaps", "user_id"], ["plat_wallets", "user_id"], ["layouts", "user_id"],
   ["users", "main_id"], ["signup_requests", "owner"],
@@ -61,5 +62,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     );
   }
   await env.DB.batch(stmts);
+  // 사용 기록 DB 2~10 의 기록도 새 닉네임으로 (server/logdb.ts)
+  await eachLog(env, "UPDATE activity SET user_id = ? WHERE user_id = ?", newId, user.id);
   return json({ id: newId, fresh: !!profile });
 };

@@ -21,6 +21,9 @@ on:
       - "web/**"
       - ".github/workflows/deploy-web.yml"
   workflow_dispatch:
+  # 한 주에 한 번은 코드가 안 바뀌어도 돈다: 사용 기록 DB 2~10 이 한 바퀴 돌았을 때 다음 차례 DB 를 미리 비운다 (web/scripts/ci-d1.mjs, server/logdb.ts)
+  schedule:
+    - cron: "41 19 * * 0"
 
 concurrency:
   group: deploy-wiki

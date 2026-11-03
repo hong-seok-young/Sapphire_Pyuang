@@ -24,6 +24,7 @@ const KIND_TITLE = {
   chat_gap: "🧙 챗봇 · 모르는 질문",
   rent: "🤝 장비대여",
   todo: "✅ To do · 함께",
+  gdungeon: "⚔️ 길드 던전",
 };
 
 self.addEventListener("install", () => self.skipWaiting());

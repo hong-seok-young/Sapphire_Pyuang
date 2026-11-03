@@ -4,12 +4,12 @@
 //   위치는 홈에 올 때, 앱으로 돌아올 때, 홈을 켜 둔 동안 10분마다 다시 본다 (폰이 1분 안에 잡은 위치까지 쓴다).
 // - 날씨: Open-Meteo (무료, 키 없음, 기상청 자료 포함)에 브라우저가 바로 묻는다. 'current' 의 WMO 날씨 코드로 맑음·비·눈·천둥 …
 // - 게임과 상관없는 화면 꾸밈이라 게임 안전 규칙에 맞는다. 게임 위 위키 창(inFloat)에서는 쓰지 않는다.
-// 지금은 초안이라 앱개발자(와 테스트 계정)에게만 보인다 (WEATHER_OPEN). 앱개발자는 아래 날씨 표를 눌러 효과를 하나씩 미리 본다.
+// 2026-11-02 모두에게 열었다 (WEATHER_OPEN, 제작자 요청 '다른 사람들한테도 나랑 똑같이, 굳이 막아 둘 필요가 없는 듯'). 누구나 아래 날씨 표를 눌러 비·눈·함박눈을 미리 본다.
 import { useEffect, useState } from "react";
 import { inFloat } from "./platform";
 
-/** 초안: 열기 전에는 앱개발자와 테스트 계정만 */
-export const WEATHER_OPEN = false;
+/** 모두에게 열었다 (2026-11-02). false 면 앱개발자와 테스트 계정만 */
+export const WEATHER_OPEN = true;
 
 export type Sky = "clear" | "cloud" | "fog" | "drizzle" | "rain" | "heavy" | "snow" | "blizzard" | "storm";
 export interface Weather {

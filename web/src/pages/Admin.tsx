@@ -13,7 +13,7 @@ import type { LevelLogEntry } from "../auth";
 import { JobEmblem } from "../emblems";
 import { refreshMe } from "../characters";
 import { ProfileForm } from "./Profile";
-import { KakaoField } from "../kakao";
+import { KakaoButton, KakaoField } from "../kakao";
 import { Loading, Panel, TopBar } from "../ui";
 
 /** 새 계정과 비밀번호 초기화의 처음 비밀번호 (제작자 요청: 칸 없이 늘 123123). 다음 로그인 때 바꾸게 한다 */
@@ -325,7 +325,10 @@ function AccountRow({
       <button className="account-row" onClick={onOpen} aria-expanded={open}>
         {account.job && account.level ? <JobEmblem job={account.job} level={account.level} size={30} /> : <span className="account-noemblem" />}
         <span className="account-main">
-          <b className={account.highSpec ? "hs-text" : undefined}>{account.id}</b>
+          <span className="account-nick">
+            <b className={account.highSpec ? "hs-text" : undefined}>{account.id}</b>
+            <KakaoButton name={account.id} nested />
+          </span>
           {/* 부캐 묶기: 부캐는 본캐 아이디, 본캐는 부캐 수 */}
           {account.mainId ? <small className="account-link">↳ {account.mainId}의 부캐</small> : alts > 0 && <small className="account-link">본캐 · 부캐 {alts}</small>}
           <small>

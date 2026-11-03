@@ -2,6 +2,9 @@
 // - 칸(LaunchItem) 하나는 홈 칸들(grid) 아니면 아래 탭(dock)에 있다. 아래 탭은 5칸까지, 홈은 늘 아래 탭 맨 앞 (옮길 수 없다).
 // - 검색이 홈 칸으로 올라오면 홈 맨 위에 검색 칸이 생긴다 (아래 탭에 있으면 없다, 같은 기능이라서).
 // - 홈에서 칸을 꾹 누르면(0.45초) 편집. 끌어서 홈 칸끼리, 홈 칸과 아래 탭 사이를 옮긴다. 아래 탭이 꽉 찼으면 놓은 자리의 칸과 바꾼다.
+// - 홈 칸은 3칸 격자의 정해진 자리(slot)에만 놓인다 (제작자 요청 2026-11-03: '위로 정렬 말고 중간에 빈칸 있더라도 지정된 칸에만, 너무 자유롭게는 말고'):
+//   grid 는 자리 순서대로 칸 이름이고 빈 자리는 "" 다. 빈 자리에 놓으면 거기 그대로, 다른 칸 위에 놓으면 둘이 자리를 바꾼다 (위로 몰리지 않는다).
+//   검색 칸은 자리가 아니라 맨 위 한 줄이라 grid 맨 앞에 "search" 로만 둔다 (gridSlots 는 그것을 뺀 자리 목록).
 // - 배치는 계정마다 서버에 둔다 (/api/layout, D1 layouts. 다른 기기에서도 같게). 이 기기에도 적어 두어 열자마자 그 배치로 그린다.
 // - 없는 칸이 새로 생기면 홈 칸 끝에 붙는다. 그 사람에게 안 보이는 칸(운영진, 개발자 칸)은 배치에 있어도 그리지 않는다.
 import { useSyncExternalStore } from "react";
@@ -41,6 +44,8 @@ export interface LaunchItem {
   managers?: boolean;
   /** 앱개발자에게만 보인다 */
   developer?: boolean;
+  /** 길드마스터와 앱개발자만 (사용 기록, 챗봇 개선: 제작자 요청 2026-11-02 '길드마스터도 보이게') */
+  masters?: boolean;
 }
 
 export const ITEMS: LaunchItem[] = [
@@ -54,20 +59,25 @@ export const ITEMS: LaunchItem[] = [
   // 1군 전용 플래티넘 할인 상점 (제작자 요청). 아이콘은 게임 첫 화면의 상점 그림. '1군 전용'은 왼쪽 위 띠로
   { key: "shop", title: "플래티넘 할인 상점", short: "상점", to: "#/shop", icon: "🏪", iconPic: "/data/shop/shop_icon.png", ribbon: "1군 전용", ring: "gold", match: ["shop"] },
   // To do: 이벤트를 안 읽어도 내 직업·레벨에 맞는 오늘·이번 주 할 일 (제작자 요청 2026-11-01, pages/Todo.tsx)
-  // 지금은 개발 중 (제작자 요청 2026-11-01): 길드원은 못 들어가고 앱개발자만. 열 때는 soon, badge, locked 를 빼고 CLAUDE.md 'To do' 의 순서대로
-  { key: "todo", title: "To do", to: "#/todo", icon: "✅", soon: true, badge: "개발 중", locked: true, match: ["todo"] },
+  // To do: 2026-11-02 열었다 (제작자 요청 '투두도 오픈')
+  { key: "todo", title: "To do", to: "#/todo", icon: "✅", match: ["todo"] },
   { key: "ranking", title: "길드 랭킹", short: "랭킹", to: "#/ranking", icon: "🏆", match: ["ranking"] },
   { key: "market", title: "사파이어 중개인", short: "중개인", to: "#/market", icon: "💰", match: ["market"] },
   { key: "requests", title: "길드원 의뢰소", short: "의뢰소", to: "#/requests", icon: "📋", match: ["requests"] },
+  // 시세 동향 (개발중, 제작자 요청 2026-11-03): 거래 톡방 대화에서 모은 골드·물건·캐릭터 시세. 아이콘은 거래소 동전. 개발 중 묶음 (운영진만)
+  { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
   // 장비대여 (2026-11-02 제작자 요청으로 열었다), 길드던전과 인던 같이 갈 사람 찾기 (칸만 먼저 두고 개발 중으로 막는다)
   { key: "rent", title: "장비대여", to: "#/rent", icon: "🤝", match: ["rent"] },
-  { key: "match", title: "길던&인던 매칭", short: "매칭", to: "#/match", icon: "⚔️", soon: true, badge: "개발 중", locked: true, match: ["match"] },
+  // 길드 던전 (제작자 요청 2026-11-02: '길던 인던 매칭을 길드 던전으로 바꾸고 1군 전용', 같은 날 오픈). 4인 파티가 이번 주에 갈 때를 정한다 (pages/GuildDungeon.tsx).
+  // 칸 이름(key match, 주소 #/match)은 그대로라 저장된 배치가 이어진다
+  { key: "match", title: "길드 던전", short: "길드던전", to: "#/match", icon: "⚔️", ribbon: "1군 전용", ring: "gold", match: ["match"] },
   // 시계와 보스 타이머는 안드로이드 앱에만 있다. 앱은 검토 후 오픈 (제작자 요청 2026-10-31: 지금은 웹만)
   { key: "app", title: "안드로이드 앱 받기", short: "앱 받기", to: "#/app", icon: "📲", androidOnly: true, soon: !APP_OPEN, badge: "검토 후 오픈", match: [] },
   { key: "admin", title: "길드원 관리", short: "관리", to: "#/admin", icon: "👥", managers: true, ribbon: "운영진", ring: "blue", match: ["admin"] },
-  { key: "log", title: "사용 기록", to: "#/log", icon: "📊", developer: true, ribbon: "개발자", ring: "purple", match: ["log"] },
+  { key: "log", title: "사용 기록", to: "#/log", icon: "📊", masters: true, ribbon: "길마", ring: "purple", match: ["log"] },
   // 챗봇이 모르는 질문 (제작자 요청: 보고 고친 뒤 물은 사람에게 알린다)
-  { key: "gaps", title: "챗봇 개선", to: "#/gaps", icon: "🧙", developer: true, ribbon: "개발자", ring: "purple", match: ["gaps"] },
+  // 아이콘은 고치는 연장 (제작자 요청 2026-11-02 '챗봇 개선 아이콘은 좀 바꾸자', 예전 🧙)
+  { key: "gaps", title: "챗봇 개선", to: "#/gaps", icon: "🛠️", masters: true, ribbon: "길마", ring: "purple", match: ["gaps"] },
 ];
 const BY_KEY = new Map(ITEMS.map((i) => [i.key, i]));
 export const itemOf = (key: string) => BY_KEY.get(key);
@@ -97,7 +107,7 @@ export const isLocked = (item: LaunchItem, me: Me) => !!item.locked && !canPrevi
 
 /** 이 사람에게 보이는 칸인지 */
 export const canSee = (item: LaunchItem, me: Me) =>
-  (!item.androidOnly || (isAndroid && !inApp)) && (!item.managers || RANK[me.role] >= 1) && (!item.developer || me.role === "developer");
+  (!item.androidOnly || (isAndroid && !inApp)) && (!item.managers || RANK[me.role] >= 1) && (!item.developer || me.role === "developer") && (!item.masters || RANK[me.role] >= 2);
 
 /** 'UPDATE' 를 달지 (updates.ts). '정보'는 안의 칸이 고쳐졌을 때도 */
 export const isUpdated = (user: string, item: LaunchItem) =>
@@ -105,24 +115,63 @@ export const isUpdated = (user: string, item: LaunchItem) =>
 
 export interface Layout {
   dock: string[];
+  /** 홈 칸 자리 순서 (3칸씩 한 줄). "" 는 빈 자리. 검색이 홈에 있으면 맨 앞에 "search" (자리를 차지하지 않는다) */
   grid: string[];
 }
 export const DOCK_MAX = 5;
+/** 홈 칸 격자의 가로 칸 수와 자리 수 한도 (20줄) */
+export const COLS = 3;
+export const MAX_SLOTS = 60;
+/** 빈 자리 */
+export const EMPTY = "";
+/** 홈 칸 자리 목록 (검색 칸은 뺀다) */
+export const gridSlots = (l: Layout) => l.grid.filter((k) => k !== "search");
+/** 검색 칸이 홈 맨 위에 있는지 */
+export const searchUp = (l: Layout) => l.grid.includes("search");
+/** from 부터 첫 빈 자리 (없으면 끝) */
+function firstEmpty(slots: string[], from = 0): number {
+  for (let i = from; i < slots.length; i++) if (slots[i] === EMPTY) return i;
+  return slots.length;
+}
+/**
+ * 이 사람의 홈 격자에 보이는 칸인지 (loadLayout 이 정한다). 안 보이는 칸(운영진 칸, 개발 중 칸)은 자리를 차지하지 않고 끝에 붙여 둔다
+ * (제작자 2026-11-03: 새로고침하니 '앱 받기'(개발 중)가 있던 자리가 빈 칸으로 떠서 '또 지랄났네'. 안 보이는 칸이 빈 자리를 만들면 안 된다)
+ */
+let visible: (key: string) => boolean = () => true;
+const hidden = (k: string) => k !== EMPTY && !visible(k);
+/** 자리 목록과 검색 여부로 배치를 만든다: 안 보이는 칸은 자리에서 빼 끝에 붙이고, 끝의 빈 자리는 뗀다 */
+function build(dock: string[], slots: string[], search: boolean): Layout {
+  const tail = slots.filter(hidden);
+  const s = slots.map((k) => (hidden(k) ? EMPTY : k)).slice(0, MAX_SLOTS);
+  while (s.length && s[s.length - 1] === EMPTY) s.pop();
+  return { dock, grid: [...(search ? ["search"] : []), ...s, ...tail].slice(0, MAX_SLOTS + 1) };
+}
+/** 처음 배치 (제작자 요청 2026-11-02: 제작자 폰의 배치 그대로 '이걸 기본 배치로') */
 export const DEFAULT_LAYOUT: Layout = {
-  dock: ["home", "board", "search", "info", "chat"],
-  grid: ["todo", "shop", "ranking", "market", "requests", "rent", "match", "app", "admin", "log", "gaps"],
+  dock: ["home", "board", "info", "search", "chat"],
+  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "trend", "app"],
 };
 
-/** 저장된 배치를 맞춘다: 모르는 칸과 겹친 칸은 빼고, 홈은 아래 탭 맨 앞, 아래 탭은 5칸까지, 새로 생긴 칸은 홈 칸 끝에 */
+/**
+ * 저장된 배치를 맞춘다: 모르는 칸과 겹친 칸은 빈 자리로, 홈은 아래 탭 맨 앞, 아래 탭은 5칸까지, 새로 생긴 칸은 홈 칸 끝에.
+ * 홈 칸의 자리(빈 자리 "")는 그대로 둔다 (예전 배치는 빈 자리가 없어 그대로 위부터 채워진다)
+ */
 export function normalize(raw: Partial<Layout> | null | undefined): Layout {
   const seen = new Set<string>();
-  const keep = (list: unknown) =>
-    (Array.isArray(list) ? list : []).filter((k): k is string => typeof k === "string" && BY_KEY.has(k) && k !== "home" && !seen.has(k) && !!seen.add(k));
-  const dock = ["home", ...keep(raw?.dock)];
-  const grid = keep(raw?.grid);
-  while (dock.length > DOCK_MAX) grid.unshift(dock.pop()!);
-  for (const k of [...DEFAULT_LAYOUT.dock, ...DEFAULT_LAYOUT.grid]) if (k !== "home" && !seen.has(k)) grid.push(k);
-  return { dock, grid };
+  const ok = (k: unknown): k is string => typeof k === "string" && BY_KEY.has(k) && k !== "home" && !seen.has(k) && !!seen.add(k);
+  const dock = ["home", ...(Array.isArray(raw?.dock) ? raw.dock : []).filter(ok)];
+  const rawGrid = Array.isArray(raw?.grid) ? raw.grid : [];
+  const search = rawGrid.includes("search") && ok("search");
+  let slots = rawGrid.filter((k) => k !== "search").map((k) => (ok(k) ? k : EMPTY));
+  // 빈 자리가 하나도 없는 배치(예전 배치, 기본 배치)는 위부터 채운 것: 안 보이는 칸을 빼고 붙여 그 자리가 빈 칸이 되지 않게 한다
+  if (!slots.includes(EMPTY)) slots = [...slots.filter((k) => !hidden(k)), ...slots.filter(hidden)];
+  const put = (k: string) => {
+    const i = firstEmpty(slots);
+    slots[i] = k;
+  };
+  while (dock.length > DOCK_MAX) put(dock.pop()!);
+  for (const k of [...DEFAULT_LAYOUT.dock, ...DEFAULT_LAYOUT.grid]) if (k !== "home" && !seen.has(k)) slots.push(k);
+  return build(dock, slots, search);
 }
 
 // ---------- 상태 (홈과 아래 탭이 같이 본다) ----------
@@ -159,9 +208,18 @@ export const useLauncher = () => useSyncExternalStore(subscribe, () => state);
 
 const cacheKey = (user: string) => "sapphire.layout." + user;
 
-/** 로그인한 사람의 배치: 이 기기에 적어 둔 것으로 먼저 그리고, 서버 것으로 맞춘다 */
-export function loadLayout(user: string) {
-  if (state.user === user) return;
+/** 로그인한 사람의 배치: 이 기기에 적어 둔 것으로 먼저 그리고, 서버 것으로 맞춘다. 안 보이는 칸(역할, 개발 중)은 자리에서 빼 둔다 */
+export function loadLayout(me: Me) {
+  const user = me.id;
+  visible = (k) => {
+    const t = BY_KEY.get(k);
+    return !!t && canSee(t, me) && !t.soon;
+  };
+  if (state.user === user) {
+    // 역할이 바뀌어 보이는 칸이 달라졌으면 자리만 다시 맞춘다
+    if (!state.drag) set({ layout: normalize(state.layout) });
+    return;
+  }
   let cached: Layout | null = null;
   try {
     cached = JSON.parse(localStorage.getItem(cacheKey(user)) ?? "null") as Layout | null;
@@ -194,42 +252,62 @@ export const resetLayout = () => save(normalize(DEFAULT_LAYOUT));
 
 // ---------- 옮기기 ----------
 
+/** 놓을 자리: 홈 칸 격자의 자리 번호(없으면 첫 빈 자리), 또는 아래 탭의 칸 앞/뒤 */
+export type Drop = { zone: "grid"; index: number | null } | { zone: "dock"; target: string | null; after: boolean };
+
 /**
- * key 를 zone 의 target 칸 앞(뒤)으로 옮긴 배치. target 이 없으면 그 줄 끝.
- * 아래 탭: 홈 앞에는 못 넣고, 꽉 찼으면 놓은 자리(없으면 마지막) 칸과 바꾼다 (빠진 칸은 끌던 칸이 있던 홈 자리로).
+ * key 를 놓은 배치 (제작자 요청 2026-11-03: 정해진 자리에만, 빈 자리 그대로):
+ * - 홈 자리: 빈 자리면 거기에, 다른 칸이 있으면 둘이 자리를 바꾼다 (끌던 칸이 아래 탭에서 왔으면 밀려난 칸은 다음 빈 자리로).
+ *   자리 번호가 없으면(검색 칸이나 격자 바탕에 놓음) 첫 빈 자리. 검색 칸은 자리 없이 맨 위.
+ * - 아래 탭: 홈 앞에는 못 넣고, 꽉 찼으면 놓은 자리(없으면 마지막) 칸과 바꾼다 (빠진 칸은 끌던 칸이 있던 홈 자리로, 없으면 첫 빈 자리).
  */
-export function moveItem(base: Layout, key: string, zone: "dock" | "grid", target: string | null, after: boolean): Layout {
+export function placeItem(base: Layout, key: string, drop: Drop): Layout {
   const dock = base.dock.filter((k) => k !== key);
-  const grid = base.grid.filter((k) => k !== key);
-  if (zone === "grid") {
-    const at = target && grid.includes(target) ? grid.indexOf(target) + (after ? 1 : 0) : grid.length;
-    grid.splice(at, 0, key);
-    return { dock, grid };
+  const before = gridSlots(base);
+  const from = before.indexOf(key);
+  // 끌던 칸과 안 보이는 칸은 자리에서 뺀다 (안 보이는 칸은 build 가 끝에 붙인다: 그 자리에 놓으면 빈 자리처럼 들어간다)
+  const slots = before.map((k) => (k === key || hidden(k) ? EMPTY : k));
+  const tail = before.filter((k) => k !== key && hidden(k));
+  let search = searchUp(base) && key !== "search";
+  const putAt = (k: string, i: number) => {
+    while (slots.length <= i) slots.push(EMPTY);
+    slots[i] = k;
+  };
+  if (drop.zone === "grid") {
+    if (key === "search") return build(dock, slots, true);
+    const i = Math.min(drop.index ?? firstEmpty(slots), MAX_SLOTS - 1);
+    while (slots.length <= i) slots.push(EMPTY);
+    const other = slots[i];
+    if (other !== EMPTY) putAt(other, from >= 0 ? from : firstEmpty(slots, i + 1));
+    putAt(key, i);
+    return build(dock, [...slots, ...tail], search);
   }
   if (dock.length >= DOCK_MAX) {
-    const out = target && target !== "home" && dock.includes(target) ? target : dock[dock.length - 1];
+    const out = drop.target && drop.target !== "home" && dock.includes(drop.target) ? drop.target : dock[dock.length - 1];
     dock[dock.indexOf(out)] = key;
-    const was = base.grid.indexOf(key);
-    grid.splice(was >= 0 ? Math.min(was, grid.length) : grid.length, 0, out);
-    return { dock, grid };
+    if (out === "search") search = true;
+    else putAt(out, from >= 0 ? from : firstEmpty(slots));
+    return build(dock, [...slots, ...tail], search);
   }
-  const at = target && dock.includes(target) ? dock.indexOf(target) + (after ? 1 : 0) : dock.length;
+  const at = drop.target && dock.includes(drop.target) ? dock.indexOf(drop.target) + (drop.after ? 1 : 0) : dock.length;
   dock.splice(Math.max(1, at), 0, key);
-  return { dock, grid };
+  return build(dock, [...slots, ...tail], search);
 }
 
-/** 손가락(마우스) 아래의 놓을 자리: [data-slot] 칸이면 그 칸 앞/뒤, 아니면 [data-zone] 줄 끝 */
-function dropTarget(x: number, y: number): { zone: "dock" | "grid"; target: string | null; after: boolean } | null {
+/** 손가락(마우스) 아래의 놓을 자리: 홈 격자의 [data-index] 자리, 아래 탭의 [data-slot] 칸 앞/뒤, 아니면 그 줄([data-zone]) */
+function dropTarget(x: number, y: number): Drop | null {
   const el = document.elementFromPoint(x, y);
+  const cell = el?.closest<HTMLElement>("[data-index]");
+  if (cell) return { zone: "grid", index: Number(cell.dataset.index) };
   const slot = el?.closest<HTMLElement>("[data-slot]");
   if (slot) {
+    if (slot.dataset.zone === "grid") return { zone: "grid", index: null };
     const r = slot.getBoundingClientRect();
-    const zone = slot.dataset.zone as "dock" | "grid";
-    // 홈 칸은 3칸 격자라 가로 위치로, 검색 칸(한 줄 전체)은 앞으로
-    return { zone, target: slot.dataset.slot!, after: slot.dataset.slot !== "search" && x > r.left + r.width / 2 };
+    return { zone: "dock", target: slot.dataset.slot!, after: x > r.left + r.width / 2 };
   }
   const zoneEl = el?.closest<HTMLElement>("[data-zone]");
-  return zoneEl ? { zone: zoneEl.dataset.zone as "dock" | "grid", target: null, after: true } : null;
+  if (!zoneEl) return null;
+  return zoneEl.dataset.zone === "dock" ? { zone: "dock", target: null, after: true } : { zone: "grid", index: null };
 }
 
 const LONG_PRESS_MS = 450;
@@ -244,7 +322,7 @@ function onMove(e: PointerEvent) {
   if (!d) return;
   const moved = d.moved || Math.hypot(e.clientX - d.startX, e.clientY - d.startY) > 6;
   const t = moved ? dropTarget(e.clientX, e.clientY) : null;
-  const preview = t && t.target !== d.key ? moveItem(d.base, d.key, t.zone, t.target, t.after) : state.preview;
+  const preview = t ? placeItem(d.base, d.key, t) : state.preview;
   set({ drag: { ...d, x: e.clientX, y: e.clientY, moved }, preview });
 }
 

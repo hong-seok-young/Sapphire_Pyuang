@@ -1,14 +1,14 @@
 // 챗봇이 모르는 질문 (제작자 요청: 짐작하거나 자료가 없는 답을 개발자에게 알리고, 고친 뒤 물은 사람에게 알린다. server/chatlog.ts)
-// GET /api/chat/gaps?status=open|fixed -> 목록 (앱개발자만)
+// GET /api/chat/gaps?status=open|fixed -> 목록 (길드마스터와 앱개발자)
 // POST /api/chat/gaps { msg } -> 길드원이 내 대화의 답에 '👎 별로'를 눌렀을 때
-import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../../server/auth";
+import { FORBIDDEN, NEED_LOGIN, RANK, currentUser, json, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
 import { recordGap } from "../../../../server/chatlog";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  if (me.role !== "developer") return FORBIDDEN();
+  if (RANK[me.role] < 2) return FORBIDDEN();
   const status = new URL(request.url).searchParams.get("status") === "fixed" ? "fixed" : "open";
   const { results } = await env.DB.prepare(
     "SELECT id, user_id, thread_id, question, answer, reason, kind, status, note, created_at, fixed_at FROM chat_gaps WHERE status = ? " +

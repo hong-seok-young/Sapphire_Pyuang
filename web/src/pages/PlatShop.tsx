@@ -6,6 +6,7 @@ import { ago, goldText, goldWords } from "../market";
 import { PLAT_PACKS, SHOP_PIC, actOrder, budget, discount, fetchShop, goldOf, orderItem, packsOf, packsWithin, saveShopItem, saveShopSettings, setOrderGold } from "../platshop";
 import type { ShopData, ShopItem, ShopOrder, ShopSettings, Wallet } from "../platshop";
 import { FitLine, Loading, TopBar } from "../ui";
+import { KakaoButton, Nick } from "../kakao";
 import { WEEK } from "../week";
 
 type Tab = "shop" | "mine" | "pending" | "ledger" | "settings" | "budget";
@@ -143,7 +144,7 @@ export function PlatShopPage() {
       {/* 칸 고르는 단추가 맨 위 (제작자 요청 2026-11-02) */}
       <div className="filter ps-tabs">
         {tabs.map((t) => (
-          <button key={t.key} className={"pill" + (tab === t.key ? " pill-on" : "")} onClick={() => setTab(t.key)}>
+          <button key={t.key} data-tab={t.key} className={"pill" + (tab === t.key ? " pill-on" : "")} aria-pressed={tab === t.key} onClick={() => setTab(t.key)}>
             {t.label}
           </button>
         ))}
@@ -281,7 +282,11 @@ function OrderList({ orders, empty, action }: { orders: ShopOrder[]; empty: stri
             <span className="ps-order-main">
               <b>{o.itemName}</b>
               <small>
-                {o.user && `${o.user} · `}
+                {o.user && (
+                  <>
+                    <Nick name={o.user} /> <KakaoButton name={o.user} /> ·{" "}
+                  </>
+                )}
                 {goldText(paid)} 골드
                 {/* 받은 골드를 직접 적었으면 신청 때 골드도 작게 */}
                 {o.goldPaid != null && o.goldPaid !== o.gold && ` (신청 ${goldText(o.gold)})`} · 플래티넘 {o.plat.toLocaleString("ko-KR")} · {ago(o.doneAt ?? o.at)}
@@ -400,11 +405,16 @@ function Settlement({ manage, items, busy, run }: {
                         <b className="st-item">{o.itemName}</b>
                         {/* 누가 샀고 누가 게임 안에서 팔았는지 ('구매 · 판매', 제작자 요청 2026-11-02) */}
                         <span className="st-flow">
-                          <span className="st-buyer">{o.user}</span>
+                          <span className="st-buyer">
+                            <Nick name={o.user} />
+                          </span>
+                          <KakaoButton name={o.user} nested />
                           <small>구매</small>
                           {o.status === "done" && o.doneBy && (
                             <>
-                              <span className="st-giver">{o.doneBy}</span>
+                              <span className="st-giver">
+                                <Nick name={o.doneBy} />
+                              </span>
                               <small>판매</small>
                             </>
                           )}

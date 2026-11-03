@@ -1,6 +1,7 @@
 // 계정 지우기 (길드원 관리의 '계정 삭제'와, 본인이 '내 정보'에서 요청한 계정 삭제를 운영진이 승낙할 때 같이 쓴다)
 // 본캐를 지우는데 부캐가 있으면 가장 먼저 묶은 부캐가 본캐가 되고 비밀번호를 이어받는다. 기록은 그 사람 것만 지우고 길드 장부(장비대여)는 남긴다
 import type { Env } from "./auth";
+import { eachLog } from "./logdb";
 
 export async function deleteAccountData(env: Env, user: { id: string; main_id: string | null }): Promise<void> {
   // 본캐를 지우는데 부캐가 있으면: 가장 먼저 묶은 부캐가 본캐가 되고 비밀번호를 이어받는다 (그 사람은 새 본캐 아이디로 로그인)
@@ -66,11 +67,21 @@ export async function deleteAccountData(env: Env, user: { id: string; main_id: s
       "DELETE FROM gold_wants WHERE user_id = ? OR offer_id IN (SELECT id FROM gold_offers WHERE owner = ?)",
     ).bind(user.id, user.id),
     env.DB.prepare("DELETE FROM gold_offers WHERE owner = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM request_offers WHERE request_id IN (SELECT id FROM requests WHERE owner = ?)").bind(user.id),
     env.DB.prepare("DELETE FROM requests WHERE owner = ?").bind(user.id),
-    env.DB.prepare(
-      "UPDATE requests SET status = 'open', accepter = NULL, accepted_at = NULL WHERE accepter = ? AND status = 'accepted'",
-    ).bind(user.id),
+    // 의뢰소: 기다리던 내 수락은 포기로 (받은 것은 기록으로 남긴다)
+    env.DB.prepare("UPDATE request_offers SET status = 'giveup' WHERE user_id = ? AND status = 'pledged'").bind(user.id),
     env.DB.prepare("DELETE FROM delete_requests WHERE user_id = ?").bind(user.id),
+    // 길드 던전: 파티에서 빼고, 파티장이었으면 먼저 들어온 사람에게 넘긴다 (아무도 없으면 파티를 지운다)
+    env.DB.prepare("DELETE FROM gd_members WHERE user_id = ?").bind(user.id),
+    env.DB.prepare(
+      "UPDATE gd_parties SET leader = COALESCE((SELECT m.user_id FROM gd_members m WHERE m.party_id = gd_parties.id ORDER BY m.joined_at LIMIT 1), leader) WHERE leader = ?",
+    ).bind(user.id),
+    env.DB.prepare("DELETE FROM gd_parties WHERE id NOT IN (SELECT party_id FROM gd_members)"),
+    env.DB.prepare("DELETE FROM gd_avail WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM gd_answers WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM users WHERE id = ?").bind(user.id),
   ]);
+  // 사용 기록 DB 2~10 의 그 사람 기록 (server/logdb.ts)
+  await eachLog(env, "DELETE FROM activity WHERE user_id = ?", user.id);
 }

@@ -20,6 +20,8 @@ export const MAX_ENHANCE = 20;
 export const MAX_QTY = 9999;
 export const MAX_PRICE = 99_999_999_999;
 export const MAX_NOTE = 60;
+/** 예약 판매의 판매 조건 글자 수 (제작자 요청 2026-11-02) */
+export const MAX_WHEN = 60;
 /** 한 사람이 한꺼번에 팔 수 있는 수 (게임 거래소처럼 20) */
 export const MAX_SELLING = 20;
 /** 거래 완료한 내 글은 이만큼만 목록에 보인다. 기록은 지우지 않는다 (제작자 요청 2026-11-01: 기록은 평생) */
@@ -50,8 +52,10 @@ export interface ListingInput {
   price: number;
   note: string | null;
   options: ListingOption[] | null;
-  /** sale 바로 판매 (흥정은 '살래요'에 적는다) | auction 경매 (price 가 시작가) */
-  mode: "sale" | "auction";
+  /** sale 바로 판매 (흥정은 '살래요'에 적는다) | reserve 예약 판매 (saleWhen 조건, 나머지는 바로 판매와 같다) | auction 경매 (price 가 시작가) */
+  mode: "sale" | "reserve" | "auction";
+  /** 예약 판매의 판매 조건 */
+  saleWhen: string | null;
   /** 경매면 몇 시간 동안 */
   hours: number | null;
   /** 바로 판매인데 '살래요'가 2명 이상이면 저절로 이 시간짜리 경매로 */
@@ -117,7 +121,13 @@ export function readListing(b: Record<string, unknown>): ListingInput | string {
   const options = readOptions(b.options);
   if (typeof options === "string") return options;
   const mode = b.mode ?? "sale";
-  if (mode !== "sale" && mode !== "auction") return "판매 방식이 맞지 않아요";
+  if (mode !== "sale" && mode !== "auction" && mode !== "reserve") return "판매 방식이 맞지 않아요";
+  // 예약 판매 (제작자 요청 2026-11-02): 바로 판매와 같고 판매 조건(날짜, 레벨, 다음 무기 구하면 …)을 적는다
+  let saleWhen: string | null = null;
+  if (mode === "reserve") {
+    saleWhen = typeof b.saleWhen === "string" ? b.saleWhen.trim().replace(/\s+/g, " ") : "";
+    if (!saleWhen || saleWhen.length > MAX_WHEN) return `판매 조건을 ${MAX_WHEN}자까지 적어 주세요`;
+  }
   let hours: number | null = null;
   if (mode === "auction") {
     if (!AUCTION_HOURS.includes(b.hours as number)) return "경매 시간을 골라 주세요";
@@ -128,7 +138,7 @@ export function readListing(b: Record<string, unknown>): ListingInput | string {
     if (!AUCTION_HOURS.includes(b.autoAuction as number)) return "경매로 바꿀 때의 시간을 골라 주세요";
     autoAuction = b.autoAuction as number;
   }
-  return { item, category, enhance: enhance as number, enchant, enchantValue, qty: qty as number, price: b.price, note, options, mode, hours, autoAuction };
+  return { item, category, enhance: enhance as number, enchant, enchantValue, qty: qty as number, price: b.price, note, options, mode, saleWhen, hours, autoAuction };
 }
 
 export interface ListingRow {
@@ -144,7 +154,9 @@ export interface ListingRow {
   note: string | null;
   /** ListingOption[] 의 JSON */
   options: string | null;
-  mode: "sale" | "auction";
+  mode: "sale" | "reserve" | "auction";
+  /** 예약 판매의 판매 조건 */
+  sale_when: string | null;
   /** 경매가 끝나는 때 */
   ends_at: number | null;
   /** '살래요' 2명 이상이면 저절로 경매로 (시간) */
@@ -168,7 +180,7 @@ export function listingOut(r: ListingRow) {
   return {
     id: r.id, seller: r.seller, item: r.item, category: r.category, enhance: r.enhance, enchant: r.enchant,
     enchantValue: r.enchant_value, qty: r.qty, price: r.price, note: r.note, options: parseOptions(r.options), status: r.status,
-    mode: r.mode ?? "sale", endsAt: r.ends_at, autoAuction: r.auto_auction ?? null, createdAt: r.created_at, updatedAt: r.updated_at,
+    mode: r.mode ?? "sale", saleWhen: r.sale_when ?? null, endsAt: r.ends_at, autoAuction: r.auto_auction ?? null, createdAt: r.created_at, updatedAt: r.updated_at,
   };
 }
 
