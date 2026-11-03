@@ -1,4 +1,5 @@
-import { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import { Component, Suspense, lazy, useCallback, useEffect, useState } from "react";
+import type { ErrorInfo, ReactNode } from "react";
 import type {
   CSSProperties,
   MouseEvent as ReactMouseEvent,
@@ -511,7 +512,9 @@ function Wiki({
         className="page"
         key={page === "chat" ? "chat" : route.parts.join("/")}
       >
-        <Suspense fallback={<Loading />}>{body}</Suspense>
+        <PageBoundary route={route.parts.join("/")}>
+          <Suspense fallback={<Loading />}>{body}</Suspense>
+        </PageBoundary>
       </main>
       {body.type === Home && <HomeCorner />}
       {/* 내 지역 날씨로 비·눈 (초안, 앱개발자만. pages/Weather.tsx) */}
@@ -625,4 +628,35 @@ function SwitchTo({ me, who, to }: { me: Me; who: string; to: string }) {
 function GoTo({ to }: { to: string }) {
   useEffect(() => go(to, true), [to]);
   return <Loading />;
+}
+
+/**
+ * 화면 조각을 못 받거나(배포 직후 폰에 남은 옛 조각, index.html 의 vite:preloadError 가 30초 안에 두 번은 새로 불러오지 않는다)
+ * 화면이 그리다 깨졌을 때 빈 화면 대신 '다시 불러오기' (2026-11-03 제작자 폰이 '불러오는 중'에서 먹통). 다른 화면으로 가면 다시 그려 본다
+ */
+class PageBoundary extends Component<{ children: ReactNode; route: string }, { failed: string }> {
+  state = { failed: "" };
+  static getDerivedStateFromError(e: unknown) {
+    return { failed: e instanceof Error ? e.message : String(e) };
+  }
+  componentDidCatch(e: unknown, info: ErrorInfo) {
+    console.error("화면을 그리지 못했어요", e, info.componentStack);
+  }
+  componentDidUpdate(prev: { route: string }) {
+    if (prev.route !== this.props.route && this.state.failed) this.setState({ failed: "" });
+  }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="loading">
+        화면을 여는 데 문제가 생겼어요.
+        <small className="loading-err">{this.state.failed}</small>
+        <div className="links">
+          <button className="btn btn-ghost" onClick={() => location.reload()}>
+            다시 불러오기
+          </button>
+        </div>
+      </div>
+    );
+  }
 }

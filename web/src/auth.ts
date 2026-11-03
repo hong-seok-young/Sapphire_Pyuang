@@ -158,15 +158,22 @@ export function apiHeaders(json: boolean): Record<string, string> {
 /** 서버 API (JSON). 실패하면 서버가 준 이유로 ApiError */
 export async function api<T>(path: string, method = "GET", body?: unknown): Promise<T> {
   let res: Response;
+  // 읽기(GET)가 망에서 멈추면 40초에 끊는다 (2026-11-03 제작자 폰이 '불러오는 중'에서 먹통: 끝나지 않는 요청을 오류로 돌려 '다시 시도'가 뜨게).
+  // 올리기(사진 첨부, 긴 글)는 느린 망에서 오래 걸릴 수 있어 그대로 둔다
+  const ctrl = method === "GET" ? new AbortController() : null;
+  const timer = ctrl ? window.setTimeout(() => ctrl.abort(), 40_000) : 0;
   try {
     res = await fetch(path, {
       method,
       credentials: "same-origin",
       headers: apiHeaders(body !== undefined),
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: ctrl?.signal,
     });
-  } catch {
-    throw new ApiError(0, "인터넷 연결을 확인해 주세요");
+  } catch (e) {
+    throw new ApiError(0, e instanceof DOMException && e.name === "AbortError" ? "응답이 없어요 (인터넷이 느려요)" : "인터넷 연결을 확인해 주세요");
+  } finally {
+    if (timer) window.clearTimeout(timer);
   }
   const data = (await res.json().catch(() => ({}))) as { error?: string };
   if (!res.ok) throw new ApiError(res.status, data.error ?? `문제가 생겼어요 (${res.status})`, data as Record<string, unknown>);

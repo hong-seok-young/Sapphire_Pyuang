@@ -600,13 +600,28 @@ export function Loading({
   error?: string;
   onRetry?: () => void;
 }) {
+  // 10초 넘게 걸리면 '다시 불러오기' (2026-11-03 제작자 폰이 '불러오는 중'에서 먹통이 됐는데 누를 것이 없었다).
+  // 새로 불러오면 멈춘 요청을 버리고 새 배포의 코드도 받는다
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (error) return;
+    const t = window.setTimeout(() => setSlow(true), 10_000);
+    return () => window.clearTimeout(t);
+  }, [error]);
   return (
     <div className="loading">
-      {error ? "자료를 불러오지 못했어요: " + error : "불러오는 중…"}
+      {error ? "자료를 불러오지 못했어요: " + error : slow ? "불러오는 데 오래 걸려요…" : "불러오는 중…"}
       {error && onRetry && (
         <div className="links">
           <button className="btn btn-ghost" onClick={onRetry}>
             다시 시도
+          </button>
+        </div>
+      )}
+      {!error && slow && (
+        <div className="links">
+          <button className="btn btn-ghost" onClick={() => location.reload()}>
+            다시 불러오기
           </button>
         </div>
       )}
