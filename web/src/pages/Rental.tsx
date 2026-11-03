@@ -1902,7 +1902,9 @@ function StaffKakao() {
     <p className="rent-kakao">
       <small className="rent-muted">담당자 카톡</small>
       {staff.map((s) => (
-        <KakaoButton key={s} name={s} label={s} />
+        <span key={s} className="rent-kakao-who">
+          <Nick name={s} /> <KakaoButton name={s} />
+        </span>
       ))}
     </p>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { KakaoButton, KakaoField, useKakao } from "../kakao";
+import { KakaoBubble, KakaoButton, KakaoField, useKakao } from "../kakao";
 import type { FormEvent, ReactNode } from "react";
 import {
   EXP_MAX, GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, MAX_LEVEL, ROLE_NAME, avatarUrl, deleteMyAvatar, errorText, expText,
@@ -461,7 +461,13 @@ function DeleteAccountText({ me }: { me: Me }) {
  * 그 화면들의 줄을 같은 모양(.mk-meta, .rent-app-head)으로 작게 그린다. 저장해 두었으면 단추를 눌러 열어 본다
  */
 function KakaoWhere({ me, link }: { me: Me; link: boolean }) {
-  const btn = link ? <KakaoButton name={me.id} /> : <span className="kakao-btn kakao-btn-off">카톡</span>;
+  const btn = link ? (
+    <KakaoButton name={me.id} />
+  ) : (
+    <span className="kakao-btn kakao-ico kakao-btn-off">
+      <KakaoBubble />
+    </span>
+  );
   return (
     <div className="me-kw">
       <p className="me-kw-head">{link ? "다른 길드원 화면에서 이렇게 보여요" : "링크를 저장하면 이렇게 보여요"}</p>
