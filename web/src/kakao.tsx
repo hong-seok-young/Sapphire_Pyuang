@@ -68,35 +68,40 @@ export const saveKakao = (link: string, user?: string) =>
     user,
   });
 
-/** 작은 도트 말풍선 (노란 말풍선에 점 셋, 왼쪽 아래 꼬리). 길드 던전처럼 글자 '카톡' 대신 그림으로 둘 때 (제작자 2026-11-03 '카톡 말풍선 작게, 버튼도 작게') */
+/** 작은 도트 카톡 아이콘 (제작자 2026-11-03: 카톡 앱 아이콘 느낌 그대로 안의 TALK 글자만 지우고 작게 도트화, 정사각형):
+ *  노란 정사각형(#fee500) 안에 어두운 갈색 말풍선(왼쪽 아래 꼬리). 12x12 도트, 화면 12px + 테두리 1px */
 const BUBBLE = [
-  ".1111111111.",
-  "122222222221",
-  "122222222221",
-  "122322322321",
-  "122222222221",
-  "122222222221",
-  ".1122111111.",
-  "..121.......",
-  "..11........",
+  "YYYYYYYYYYYY",
+  "YYYYYYYYYYYY",
+  "YYYDDDDDDYYY",
+  "YYDDDDDDDDYY",
+  "YDDDDDDDDDDY",
+  "YDDDDDDDDDDY",
+  "YDDDDDDDDDDY",
+  "YYDDDDDDDDYY",
+  "YYDDDDDDDYYY",
+  "YYDDDYYYYYYY",
+  "YYDDYYYYYYYY",
+  "YYYYYYYYYYYY",
 ];
-const BUBBLE_FILL: Record<string, string> = { "1": "#191600", "2": "#fee500", "3": "#191600" };
+const BUBBLE_FILL: Record<string, string> = { Y: "#fee500", D: "#3c1e1e" };
 export function KakaoBubble() {
   const rects: JSX.Element[] = [];
   BUBBLE.forEach((row, y) =>
     [...row].forEach((c, x) => {
-      if (BUBBLE_FILL[c]) rects.push(<rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={BUBBLE_FILL[c]} />);
+      if (c === "D") rects.push(<rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={BUBBLE_FILL.D} />);
     }),
   );
   return (
-    <svg className="kakao-bubble" viewBox="0 0 12 9" width={16} height={12} shapeRendering="crispEdges" aria-hidden="true">
+    <svg className="kakao-bubble" viewBox="0 0 12 12" width={12} height={12} shapeRendering="crispEdges" aria-hidden="true">
+      <rect x={0} y={0} width={12} height={12} fill={BUBBLE_FILL.Y} />
       {rects}
     </svg>
   );
 }
 
 /**
- * 이름 옆 작은 '카톡' 단추 (그 사람이 링크를 적어 뒀을 때만). label 을 주면 그 글자로, icon 이면 글자 없이 작은 도트 말풍선만 (길드 던전).
+ * 이름 옆 작은 '카톡' 단추 (그 사람이 링크를 적어 뒀을 때만). label 을 주면 그 글자로, icon 이면 글자 없이 작은 도트 카톡 아이콘만 (길드 던전).
  * mine 이면 내 글의 내 이름 옆에도 보인다 (제작자 요청 2026-11-02: 내 판매의 '퓨앙 · 방금 올림'에도): 적어 두었으면 눌러서 내 링크를 확인하고,
  * 안 적었으면 흐린 '카톡'을 눌러 내 정보의 카톡 오픈프로필로 간다
  */
@@ -110,7 +115,7 @@ export function KakaoButton({
   name: string | null | undefined;
   label?: string;
   mine?: boolean;
-  /** 글자 대신 작은 도트 말풍선 (노란 상자 없이 말풍선이 단추) */
+  /** 글자 대신 작은 도트 카톡 아이콘 (노란 정사각형 안 말풍선, 12px + 테두리) */
   icon?: boolean;
   /** 누르면 펼쳐지는 줄(단추)이나 링크 안에 둘 때: <a> 대신 span 으로 그리고, 눌러도 바깥 줄은 열리지 않는다 */
   nested?: boolean;

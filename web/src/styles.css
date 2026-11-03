@@ -2266,8 +2266,8 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
   display: inline-block; padding: 0 6px; font-size: 11px; line-height: 17px; font-weight: 400; color: #191600; text-decoration: none;
   vertical-align: 1px; background: #fee500; border: 1px solid var(--edge); white-space: nowrap;
 }
-/* 글자 대신 도트 말풍선만 (길드 던전 파티원 카드·다른 파티, 제작자 2026-11-03 '카톡 말풍선 작게, 버튼도 작게'): 노란 상자 없이 말풍선이 단추 */
-.kakao-btn.kakao-ico { padding: 0; line-height: 0; background: none; border: 0; vertical-align: -1px; }
+/* 글자 대신 작은 도트 카톡 아이콘 (길드 던전 파티원 카드·다른 파티, 제작자 2026-11-03 '카톡 앱 아이콘 느낌에서 글자만 지우고 작게 도트화, 정사각형'): 12px + 테두리 1px */
+.kakao-btn.kakao-ico { padding: 0; line-height: 0; vertical-align: -1px; }
 .kakao-bubble { display: block; }
 .gd-member-row > .kakao-btn.kakao-ico { padding: 0; }
 .kakao-field { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -2459,11 +2459,6 @@ button.gd-member-row { cursor: pointer; }
 .gd-stage i, .gd-stage-tag { font-style: normal; font-size: 11px; line-height: 16px; padding: 0 5px; color: var(--edge); background: #7fe0a0; border: 1px solid var(--edge); }
 .gd-stage-tag { margin-right: 6px; font-size: 10px; line-height: 15px; padding: 0 4px; vertical-align: 1px; }
 /* 파티 명단을 숨긴 동안의 안내 한 줄 (GuildDungeon.tsx) */
-.gd-hidden { margin: 0 0 8px; padding: 6px 10px; font-size: 12px; color: var(--muted); background: rgba(11, 10, 26, 0.45); border: 1px solid var(--edge); }
-/* 파티 명단 열기·숨기기 줄 (길드마스터·앱개발자, GuildDungeon.tsx OpenBar) */
-.gd-open-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; margin: 0 0 8px; padding: 6px 6px 6px 10px; font-size: 12px; color: var(--muted); background: rgba(11, 10, 26, 0.45); border: 1px solid var(--edge); }
-.gd-open-bar > span { flex: 1; min-width: 0; }
-.gd-open-bar > .pill { flex: none; }
 .gd-stage-btn { width: 22px; height: 22px; padding: 0; font-size: 14px; line-height: 20px; }
 .gd-leader { flex: none; padding: 0 1px; font-size: 8.5px; font-style: normal; line-height: 14px; color: var(--edge); background: var(--gold); }
 .gd-new-name { margin: 0; font-size: 14px; color: var(--gold); }

@@ -21,7 +21,6 @@ import {
   leaveParty,
   rowLabel,
   saveAvail,
-  setPartiesOpen,
   slotOf,
   slotShort,
   slotText,
@@ -76,21 +75,10 @@ export function GuildDungeonPage({ me }: { me: Me }) {
   const setParty = (p: PartyState | null | undefined) => {
     if (p !== undefined) setData((d) => (d ? { ...d, party: p } : d));
   };
-  // 파티 명단을 숨긴 동안 (제작자 2026-11-03 '일단 파티 목록 안 보이게'): 안내 한 줄과 내 시간표만. 칠해 두면 명단이 열릴 때 바로 후보가 나온다
-  if (data.hidden && !party)
-    return (
-      <>
-        <TopBar title="길드 던전" />
-        {error && <p className="form-error">{error}</p>}
-        <p className="gd-hidden">파티 명단은 운영진이 공지한 뒤에 열려요 · 먼저 내 시간표를 칠해 두세요</p>
-        <MyTimes key={data.week} me={me.id} data={data} onSaved={setParty} onError={setError} />
-      </>
-    );
   return (
     <>
       <TopBar title="길드 던전" />
       {error && <p className="form-error">{error}</p>}
-      {data.canOpen && <OpenBar data={data} onDone={load} onError={setError} />}
       {party ? (
         <PartyPanel
           me={me}
@@ -132,46 +120,6 @@ export function GuildDungeonPage({ me }: { me: Me }) {
       )}
       <AllParties data={data} />
     </>
-  );
-}
-
-/** 파티 명단 열기·숨기기 줄 (길드마스터·앱개발자, 제작자 2026-11-03 '공지까지 숨기기 버튼'): 숨긴 동안 길드원은 안내 한 줄과 내 시간표만 본다.
- *  '명단 열기'는 두 번 눌러야 하고(정말 열기), 열면 파티에 든 사람 모두에게 알림이 간다 (functions/api/gd/open.ts) */
-function OpenBar({ data, onDone, onError }: { data: GdData; onDone: () => void; onError: (m: string) => void }) {
-  const [sure, setSure] = useState(false);
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    setSure(false);
-  }, [data.open]);
-  const go = (open: boolean) => {
-    setBusy(true);
-    setPartiesOpen(open)
-      .then(
-        () => {
-          setSure(false);
-          onDone();
-        },
-        (e) => onError(errorText(e)),
-      )
-      .finally(() => setBusy(false));
-  };
-  return (
-    <div className="gd-open-bar">
-      <span>{data.open ? "파티 명단이 모두에게 열려 있어요" : "공지 전 숨김 · 길드원은 내 시간표만 봐요"}</span>
-      {data.open ? (
-        <button className="pill" disabled={busy} onClick={() => go(false)}>
-          공지까지 숨기기
-        </button>
-      ) : sure ? (
-        <button className="pill pill-gold" disabled={busy} onClick={() => go(true)}>
-          정말 열기
-        </button>
-      ) : (
-        <button className="pill" disabled={busy} onClick={() => setSure(true)}>
-          명단 열기
-        </button>
-      )}
-    </div>
   );
 }
 
