@@ -30,6 +30,8 @@ export interface LaunchItem {
   match: string[];
   /** 칸 왼쪽 위 작은 띠 (예: 1군 전용) */
   ribbon?: string;
+  /** 칸 오른쪽 위 작은 글자 줄들 (상자 없이 글자만. 장비대여의 '관리자' / '멍멍', 제작자 요청 2026-11-03) */
+  corner?: string[];
   /** 특정 사람만 들어가는 칸: 테두리에 빛이 돈다 (gold 1군 전용, blue 운영진, purple 개발자) */
   ring?: "gold" | "blue" | "purple";
   /** 개발 중·검토 후 오픈: 홈에서는 열린 칸 아래 접힌 '개발 중' 묶음에 들어간다 (제작자 요청 2026-11-02, Home.tsx) */
@@ -67,7 +69,8 @@ export const ITEMS: LaunchItem[] = [
   // 시세 동향 (개발중, 제작자 요청 2026-11-03): 거래 톡방 대화에서 모은 골드·물건·캐릭터 시세. 아이콘은 거래소 동전. 개발 중 묶음 (운영진만)
   { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
   // 장비대여 (2026-11-02 제작자 요청으로 열었다), 길드던전과 인던 같이 갈 사람 찾기 (칸만 먼저 두고 개발 중으로 막는다)
-  { key: "rent", title: "장비대여", to: "#/rent", icon: "🤝", match: ["rent"] },
+  // 오른쪽 위에 담당자 (제작자 요청 2026-11-03 '장비대여 담당자는 멍멍, 버튼 우측 상단에 텍스트로만 관리자 줄바꿈 멍멍'. 담당이 바뀌면 server/rental.ts RENT_STAFF 와 같이 고친다)
+  { key: "rent", title: "장비대여", to: "#/rent", icon: "🤝", corner: ["관리자", "멍멍"], match: ["rent"] },
   // 길드 던전 (제작자 요청 2026-11-02: '길던 인던 매칭을 길드 던전으로 바꾸고 1군 전용', 같은 날 오픈). 4인 파티가 이번 주에 갈 때를 정한다 (pages/GuildDungeon.tsx).
   // 칸 이름(key match, 주소 #/match)은 그대로라 저장된 배치가 이어진다
   { key: "match", title: "길드 던전", short: "길드던전", to: "#/match", icon: "⚔️", ribbon: "1군 전용", ring: "gold", match: ["match"] },
