@@ -95,6 +95,9 @@ const MarketPage = lazy(() =>
 const RequestsPage = lazy(() =>
   import("./pages/Requests").then((m) => ({ default: m.RequestsPage })),
 );
+const EnhancePage = lazy(() =>
+  import("./pages/Enhance").then((m) => ({ default: m.EnhancePage })),
+);
 const TrendPage = lazy(() =>
   import("./pages/Trend").then((m) => ({ default: m.TrendPage })),
 );
@@ -470,7 +473,10 @@ function Wiki({
   else if (page === "rent")
     body = <RentalPage wiki={wiki} me={me} view={route.query.get("v") ?? ""} />;
   // 시세 동향 (개발중, 제작자 요청 2026-11-03): 거래 톡방 대화에서 모은 골드·물건·캐릭터 시세
-  else if (page === "trend") body = <TrendPage wiki={wiki} />;
+  // 개발 중 칸은 미리 보는 사람(길드마스터, 오피서, 앱개발자, 테스트 계정)만. 길드원은 주소로 들어와도 개발 중 안내 (제작자 요청 2026-11-04)
+  else if (page === "trend") body = canPreview(me) ? <TrendPage wiki={wiki} /> : <DevSoon title="시세 동향" />;
+  // 강화 비교 (개발중, 제작자 요청 2026-11-04): 두 무기(+강)의 데미지와 몇 % 강해지는지
+  else if (page === "enhance") body = canPreview(me) ? <EnhancePage wiki={wiki} query={route.query} /> : <DevSoon title="강화 비교" />;
   else if (page === "log")
     body =
       RANK[me.role] >= 2 ? (

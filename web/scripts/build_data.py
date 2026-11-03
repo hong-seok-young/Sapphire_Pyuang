@@ -889,6 +889,9 @@ def main():
     # 시세 동향 (개발중): 자료/카톡 의 거래 톡방 대화 -> data/trend.json (없으면 건너뛴다)
     import build_trend
     build_trend.main()
+    # 강화 비교 (개발중): 자료/장비_강화·재설정 (카페 글 331665 첨부) + 위키 장비 표 -> data/enhance.json (없으면 건너뛴다)
+    import build_enhance
+    build_enhance.main()
 
 
 def write_place_parts(posts: dict, places: dict) -> None:

@@ -83,6 +83,7 @@ export function PicImg({
 export const TITLE_EN: Record<string, string> = {
   "사파이어 중개인": "SAPPHIRE BROKER",
   게시판: "NOTICE BOARD",
+  "강화 비교": "WEAPON COMPARE",
   장비대여: "EQUIPMENT RENTAL",
   "길드 랭킹": "RANKING",
   "플래티넘 할인 상점": "PLATINUM SHOP",

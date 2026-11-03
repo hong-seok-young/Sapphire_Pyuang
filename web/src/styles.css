@@ -2776,3 +2776,28 @@ button.gd-member-row { cursor: pointer; }
 
 /* 시세 동향: 도감 스샷에서 자른 그림 (위키에 없는 물건) */
 .trend-icon { max-width: 30px; max-height: 30px; image-rendering: pixelated; }
+
+/* 강화 비교 (개발중): 두 무기 고르기와 결과 */
+.enh { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.enh-card { background: var(--panel, #1b2233); border: 2px solid var(--edge, #0b0f18); padding: 10px; min-width: 0; }
+.enh-label { font-size: 12px; color: var(--muted, #9aa4b8); margin-bottom: 6px; }
+.enh-input { width: 100%; font-size: 16px; padding: 8px 10px; }
+.enh-hits { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.enh-hit { display: flex; flex-direction: column; align-items: flex-start; padding: 6px 10px; font-size: 14px; text-align: left; min-width: 0; }
+.enh-hit small { font-size: 11px; opacity: 0.7; }
+.enh-chosen { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.enh-slot { flex: none; }
+.enh-name { display: flex; flex-direction: column; flex: 1 1 120px; min-width: 0; }
+.enh-name small { font-size: 12px; opacity: 0.75; }
+.enh-step { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.enh-step b { min-width: 34px; text-align: center; font-size: 16px; }
+.enh-step .pill { min-width: 34px; padding: 4px 0; }
+.enh-result { text-align: center; }
+.enh-big { font-size: 34px; font-weight: 800; letter-spacing: -0.5px; }
+.enh-up { color: #3fe0a0; }
+.enh-down { color: #ff6b6b; }
+.enh-sub { font-size: 13px; opacity: 0.85; margin: 2px 0 10px; }
+.enh-table { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed; }
+.enh-table th, .enh-table td { padding: 5px 4px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.enh-table thead th { font-size: 12px; opacity: 0.7; font-weight: 500; }
+.enh-table tbody th { font-weight: 500; opacity: 0.8; }
