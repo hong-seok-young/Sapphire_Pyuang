@@ -2266,6 +2266,10 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
   display: inline-block; padding: 0 6px; font-size: 11px; line-height: 17px; font-weight: 400; color: #191600; text-decoration: none;
   vertical-align: 1px; background: #fee500; border: 1px solid var(--edge); white-space: nowrap;
 }
+/* 글자 대신 도트 말풍선만 (길드 던전 파티원 카드·다른 파티, 제작자 2026-11-03 '카톡 말풍선 작게, 버튼도 작게'): 노란 상자 없이 말풍선이 단추 */
+.kakao-btn.kakao-ico { padding: 0; line-height: 0; background: none; border: 0; vertical-align: -1px; }
+.kakao-bubble { display: block; }
+.gd-member-row > .kakao-btn.kakao-ico { padding: 0; }
 .kakao-field { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .kakao-field .mk-input { flex: 1; min-width: 0; }
 .kakao-field .pill { flex: none; }

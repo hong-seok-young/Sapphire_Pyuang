@@ -310,7 +310,7 @@ function PartyPanel({
                 wrap={false}
                 hs={high.includes(m.id)}
               />
-              <KakaoButton name={m.id} nested={canManage || m.id === me.id} />
+              <KakaoButton name={m.id} nested={canManage || m.id === me.id} icon />
               {m.id === p.leader && <i className="gd-leader">파티장</i>}
               <small className={state === "확정" ? "gd-st-yes" : undefined}>
                 {state}
@@ -1051,7 +1051,7 @@ function AllParties({ data }: { data: GdData }) {
             <p className="gd-all-members">
               {p.members.map((id) => (
                 <span key={id}>
-                  <Nick name={id} /> <KakaoButton name={id} />
+                  <Nick name={id} /> <KakaoButton name={id} icon />
                 </span>
               ))}
             </p>
