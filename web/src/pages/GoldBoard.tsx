@@ -13,14 +13,6 @@ import { MARKET_PIC, MAX_NOTE, ago } from "../market";
 import { Loading } from "../ui";
 import { KakaoButton, Nick } from "../kakao";
 
-type Filter = "all" | GoldSide | "mine";
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: "all", label: "전체" },
-  { key: "sell", label: "팝니다" },
-  { key: "buy", label: "삽니다" },
-  { key: "mine", label: "내 글" },
-];
-
 const Coin = () => <img className="mk-coin" src={MARKET_PIC + "coin.png"} alt="" />;
 
 /** 숫자만 남긴다 */
@@ -32,7 +24,7 @@ function averageRate(list: GoldOffer[]): number | null {
 }
 
 /** 골드 글 올리기: 팝니다/삽니다, 양(만 골드), 시세(1만 원에 몇 만 골드), 한마디. 원화는 저절로 계산 */
-function GoldForm({ onDone }: { onDone: () => void }) {
+function GoldForm({ onDone }: { onDone: (side: GoldSide) => void }) {
   const [side, setSide] = useState<GoldSide>("sell");
   const [gold, setGold] = useState("");
   const [rate, setRate] = useState(String(USUAL_RATE));
@@ -50,7 +42,7 @@ function GoldForm({ onDone }: { onDone: () => void }) {
     setError("");
     try {
       await createGold({ side, gold: goldN, rate: rateN, note: note.trim() || null });
-      onDone();
+      onDone(side);
     } catch (x) {
       setError(errorText(x));
     } finally {
@@ -60,12 +52,16 @@ function GoldForm({ onDone }: { onDone: () => void }) {
 
   return (
     <form className="panel mk-form" onSubmit={submit}>
-      <div className="mk-chips">
-        {(["sell", "buy"] as const).map((s) => (
-          <button key={s} type="button" className={"pill" + (side === s ? " pill-on" : "")} onClick={() => setSide(s)}>
-            골드 {SIDE_NAME[s]}
-          </button>
-        ))}
+      {/* 물건 올리기의 '무엇을: 팝니다 | 삽니다' 와 같은 모양 (제작자 2026-11-03 '골드 메뉴도 통일감 있게') */}
+      <div className="mk-field">
+        <span>무엇을</span>
+        <div className="pill-row mk-side-pick">
+          {(["sell", "buy"] as const).map((s) => (
+            <button key={s} type="button" className={"pill" + (side === s ? " pill-on" : "")} onClick={() => setSide(s)}>
+              골드 {SIDE_NAME[s]}
+            </button>
+          ))}
+        </div>
       </div>
       <label className="mk-field">
         <span>골드 (만 골드 단위: 750 = 750만 골드)</span>
@@ -95,7 +91,7 @@ function GoldForm({ onDone }: { onDone: () => void }) {
       </label>
       {error && <p className="form-error">{error}</p>}
       <button className="btn" disabled={busy || !ok}>
-        {busy ? "올리는 중…" : `골드 ${SIDE_NAME[side]} 올리기`}
+        {busy ? "올리는 중…" : `골드 ${SIDE_NAME[side]} 등록`}
       </button>
     </form>
   );
@@ -241,99 +237,110 @@ function GoldDetail({ me, o, onChanged }: { me: Me; o: GoldOffer; onChanged: (ne
   );
 }
 
+/** 골드 글 줄들 (물건 줄과 같은 .mk-list 모양: 왼쪽 동전 칸, 이름 자리에 양, 오른쪽에 올린 사람과 원화. 중개인 '내 글' 칸도 쓴다) */
+export function GoldRows({
+  me,
+  list,
+  onChanged,
+  empty,
+}: {
+  me: Me;
+  list: GoldOffer[];
+  onChanged: (id: number, next: GoldOffer | null) => void;
+  empty: string;
+}) {
+  const [open, setOpen] = useState<number | null>(null);
+  if (!list.length) return <div className="empty">{empty}</div>;
+  return (
+    <ul className="mk-list">
+      {list.map((o) => (
+        <li key={o.id} className={"mk-item" + (open === o.id ? " mk-open" : "") + (o.status === "done" ? " mk-done" : "")}>
+          <button className="mk-row" onClick={() => setOpen(open === o.id ? null : o.id)}>
+            <span className="mk-slot gold-slot" style={{ width: 46, height: 46 }}>
+              <img src={MARKET_PIC + "coin.png"} alt="" />
+            </span>
+            <span className="mk-name">
+              <b>{goldAmountText(o.gold)}</b>
+              <small>
+                {o.side === "buy" && <span className="mk-buy-tag">삽니다</span>}
+                {o.wants > 0 && <span className={"mk-wants" + (o.wanted ? " mk-wants-me" : "")}>{o.side === "sell" ? "살래요" : "팔래요"} {o.wants}</span>}
+                {o.status === "done" && <span>거래 완료</span>}
+                {!o.wants && o.status !== "done" && <span>{ago(o.createdAt)}</span>}
+              </small>
+            </span>
+            <span className="mk-price">
+              <small>
+                <Nick name={o.owner} /> <KakaoButton name={o.owner} nested />
+              </small>
+              <b className="gold-won">{wonText(wonOf(o.gold, o.rate))}</b>
+              <small className="mk-cash">{o.rate}:1</small>
+            </span>
+          </button>
+          {open === o.id && <GoldDetail me={me} o={o} onChanged={(next) => onChanged(o.id, next)} />}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /**
  * 골드 거래: 골드 팝니다 / 삽니다 글과 '살래요'(팝니다 글), '팔래요'(삽니다 글). 시세는 1만 원에 몇 만 골드(75:1).
  * 앱은 돈을 받거나 보내지 않는다. 현금거래는 계정 정지 위험이 있어 화면 맨 위에 알린다 (제작자 결정, CLAUDE.md).
+ * 모양은 물건 칸과 같다 (제작자 2026-11-03 '골드 메뉴도 통일감 있게'): 위 줄에 글쓰기·새로고침, 어두운 띠 안에 팝니다 N·삽니다 N(평균 시세), 아래 줄 목록.
+ * 내 골드 글은 중개인 맨 위 '내 글' 칸에 물건과 같이 보인다 (MarketPage).
  */
 export function GoldBoard({ me }: { me: Me }) {
   const [reload, setReload] = useState(0);
   const { data, error } = useAsync(useCallback(() => fetchGold(), [reload]));
   const [offers, setOffers] = useState<GoldOffer[] | null>(null);
-  const [filter, setFilter] = useEntryState<Filter>("filter", "all");
+  const [side, setSide] = useEntryState<GoldSide>("gside", "sell");
   const [writing, setWriting] = useState(false);
-  const [open, setOpen] = useState<number | null>(null);
   useEffect(() => {
     if (data) setOffers(data);
   }, [data]);
 
-  const all = offers ?? [];
-  const live = all.filter((o) => o.status === "open");
-  const sells = live.filter((o) => o.side === "sell");
-  const buys = live.filter((o) => o.side === "buy");
-  const shown =
-    filter === "mine"
-      ? all.filter((o) => o.owner === me.id).sort((a, b) => Number(a.status === "done") - Number(b.status === "done") || b.createdAt - a.createdAt)
-      : live.filter((o) => filter === "all" || o.side === filter);
+  const live = (offers ?? []).filter((o) => o.status === "open");
+  const ofSide = (s: GoldSide) => live.filter((o) => o.side === s);
   const changed = (id: number, next: GoldOffer | null) => setOffers((os) => (os ?? []).flatMap((o) => (o.id !== id ? [o] : next ? [next] : [])));
-  const avgSell = averageRate(sells);
-  const avgBuy = averageRate(buys);
 
   return (
     <>
       <p className="gold-warn">
         골드 현금거래는 게임 운영정책에 걸리면 계정이 정지될 수 있어요. 앱은 돈을 받거나 보내지 않고, 거래는 각자 책임이에요.
       </p>
-      <div className="gold-market">
-        <span>
-          팝니다 <b>{sells.length}</b>
-          {avgSell !== null && ` · 평균 ${avgSell}:1`}
-        </span>
-        <span>
-          삽니다 <b>{buys.length}</b>
-          {avgBuy !== null && ` · 평균 ${avgBuy}:1`}
-        </span>
-      </div>
-      <div className="mk-cats">
-        {FILTERS.map((f) => (
-          <button key={f.key} className={"pill mk-chip" + (filter === f.key ? " pill-on" : "")} onClick={() => setFilter(f.key)}>
-            {f.label}
-          </button>
-        ))}
-        <button className={"pill mk-chip" + (writing ? " pill-on" : "")} onClick={() => setWriting((w) => !w)}>
-          ＋ 글쓰기
+      <div className="mk-search">
+        <button className={"pill mk-grow" + (writing ? " pill-on" : "")} onClick={() => setWriting((w) => !w)} aria-expanded={writing}>
+          골드 글쓰기
         </button>
-        <button className="pill mk-chip" onClick={() => setReload((n) => n + 1)} aria-label="새로 보기">새로고침</button>
+        <button className="pill" onClick={() => setReload((n) => n + 1)}>
+          새로고침
+        </button>
       </div>
       {writing && (
         <GoldForm
-          onDone={() => {
+          onDone={(s) => {
             setWriting(false);
-            setFilter("mine");
+            setSide(s);
             setReload((n) => n + 1);
           }}
         />
       )}
+      <div className="mk-sub">
+        <div className="mk-side" role="tablist">
+          {(["sell", "buy"] as const).map((s) => {
+            const avg = averageRate(ofSide(s));
+            return (
+              <button key={s} role="tab" aria-selected={side === s} className={"sub-tab" + (side === s ? " sub-tab-on" : "")} onClick={() => setSide(s)}>
+                {SIDE_NAME[s]} <small>{ofSide(s).length}{avg !== null ? ` · ${avg}:1` : ""}</small>
+              </button>
+            );
+          })}
+        </div>
+      </div>
       {!offers ? (
         <Loading error={error} />
-      ) : shown.length === 0 ? (
-        <div className="empty">{filter === "mine" ? "아직 올린 골드 글이 없어요." : "아직 올라온 골드 글이 없어요."}</div>
       ) : (
-        <ul className="mk-list">
-          {shown.map((o) => (
-            <li key={o.id} className={"mk-item" + (open === o.id ? " mk-open" : "") + (o.status === "done" ? " mk-done" : "")}>
-              <button className="mk-row" onClick={() => setOpen(open === o.id ? null : o.id)}>
-                <span className={"gold-side gold-side-" + o.side}>{SIDE_NAME[o.side]}</span>
-                <span className="mk-name">
-                  <b>
-                    <Coin /> {goldAmountText(o.gold)}
-                  </b>
-                  <small>
-                    <span>{o.rate}:1</span>
-                    {o.wants > 0 && <span className={"mk-wants" + (o.wanted ? " mk-wants-me" : "")}>{o.side === "sell" ? "살래요" : "팔래요"} {o.wants}</span>}
-                    {o.status === "done" && <span>거래 완료</span>}
-                  </small>
-                </span>
-                <span className="mk-price">
-                  <small>
-                    <Nick name={o.owner} /> <KakaoButton name={o.owner} nested />
-                  </small>
-                  <b className="gold-won">{wonText(wonOf(o.gold, o.rate))}</b>
-                </span>
-              </button>
-              {open === o.id && <GoldDetail me={me} o={o} onChanged={(next) => changed(o.id, next)} />}
-            </li>
-          ))}
-        </ul>
+        <GoldRows me={me} list={ofSide(side)} onChanged={changed} empty={side === "sell" ? "아직 골드 팝니다 글이 없어요." : "아직 골드 삽니다 글이 없어요."} />
       )}
     </>
   );

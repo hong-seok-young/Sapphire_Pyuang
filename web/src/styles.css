@@ -716,11 +716,11 @@ button { font: inherit; color: inherit; }
   margin: 0 0 8px; padding: 8px 10px; font-size: 12px; line-height: 1.5; color: #ffd9a8;
   background: rgba(242, 138, 38, 0.12); border: 1px solid rgba(242, 138, 38, 0.5);
 }
-.gold-market { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; margin-bottom: 8px; font-size: 12px; color: var(--muted); }
-.gold-market b { color: var(--gold); }
-.gold-side { flex: none; width: 54px; padding: 4px 0; text-align: center; font-size: 12px; border: var(--px) solid var(--edge); }
-.gold-side-sell { color: var(--edge); background: var(--gold); }
-.gold-side-buy { color: #fff; background: var(--sapphire); }
+/* 골드 줄의 왼쪽 동전 칸 (물건 줄의 아이템 칸과 같은 자리, 2026-11-03 통일) */
+.gold-slot img { width: 26px; height: 26px; image-rendering: pixelated; }
+.mk-search .mk-grow { flex: 1; min-width: 0; }
+/* 중개인 '내 글' 의 골드 묶음 머리 */
+.mk-mine-head { margin: 12px 2px 6px; font-size: 13px; color: var(--muted); }
 .gold-won { color: #8ff0b0 !important; }
 .gold-rate { width: 72px; }
 .gold-rate-unit { font-size: 16px; color: var(--muted); }

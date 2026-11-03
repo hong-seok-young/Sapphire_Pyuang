@@ -73,7 +73,9 @@ import type { Wiki } from "../types";
 import { Loading, NewsDot, PicImg, TopBar } from "../ui";
 import { useNews, useNewsSeen } from "../news";
 import { timeLeft } from "../requests";
-import { GoldBoard } from "./GoldBoard";
+import { GoldBoard, GoldRows } from "./GoldBoard";
+import { fetchGold } from "../gold";
+import type { GoldOffer } from "../gold";
 
 /** 맨 위 같은 폭 단추 넷 (제작자 2026-11-03 '이모지 다 빼', '버튼 상하위 개념': 그림 없이 글자만, 그 아래 팝니다·삽니다와 종류는 어두운 띠 안에) */
 type Tab = "list" | "mine" | "post" | "gold";
@@ -1554,6 +1556,16 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const { data, error } = useAsync(useCallback(() => fetchMarket(), [reload]));
   const [listings, setListings] = useState<Listing[] | null>(null);
   const [rate, setRate] = useState(75);
+  // 내 골드 글도 '내 글' 칸에 (제작자 2026-11-03 '골드 메뉴도 통일감 있게'). 골드 칸 자체는 GoldBoard 가 따로 받는다
+  const { data: goldData } = useAsync(useCallback(() => fetchGold(), [reload]));
+  const [gold, setGold] = useState<GoldOffer[]>([]);
+  useEffect(() => {
+    if (goldData) setGold(goldData);
+  }, [goldData]);
+  const myGold = gold
+    .filter((o) => o.owner === me.id)
+    .sort((a, b) => Number(a.status === "done") - Number(b.status === "done") || b.createdAt - a.createdAt);
+  const goldChanged = (id: number, next: GoldOffer | null) => setGold((os) => os.flatMap((o) => (o.id !== id ? [o] : next ? [next] : [])));
   const [onlyAuction, setOnlyAuction] = useEntryState("onlyAuction", false);
   const [tab, setTab] = useEntryState<Tab>("tab", "list");
   /** 목록의 팝니다 | 삽니다 (제작자 2026-11-03) */
@@ -1586,9 +1598,9 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
         Number(a.status === "sold") - Number(b.status === "sold") ||
         b.createdAt - a.createdAt,
     );
-  const wantsOnMine = mine
-    .filter((l) => l.status === "selling")
-    .reduce((s, l) => s + l.wants, 0);
+  const wantsOnMine =
+    mine.filter((l) => l.status === "selling").reduce((s, l) => s + l.wants, 0) +
+    myGold.filter((o) => o.status === "open").reduce((s, o) => s + o.wants, 0);
   const q = squash(query);
   // 팝니다 / 삽니다 는 따로 센다 (제작자 2026-11-03)
   const sideList = selling.filter((l) => l.side === side);
@@ -1719,14 +1731,24 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
           />
         </>
       ) : tab === "mine" ? (
-        <Rows
-          wiki={wiki}
-          me={me}
-          list={mine}
-          rate={rate}
-          onChanged={changed}
-          empty="아직 올린 글이 없어요. '올리기'에서 올려요."
-        />
+        <>
+          {(mine.length > 0 || myGold.length === 0) && (
+            <Rows
+              wiki={wiki}
+              me={me}
+              list={mine}
+              rate={rate}
+              onChanged={changed}
+              empty="아직 올린 글이 없어요. '올리기'나 골드 칸의 '골드 글쓰기'에서 올려요."
+            />
+          )}
+          {myGold.length > 0 && (
+            <>
+              <h2 className="panel-title mk-mine-head">골드</h2>
+              <GoldRows me={me} list={myGold} onChanged={goldChanged} empty="" />
+            </>
+          )}
+        </>
       ) : (
         <SellForm
           wiki={wiki}
