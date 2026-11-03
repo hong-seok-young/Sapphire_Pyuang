@@ -2747,3 +2747,7 @@ button.gd-member-row { cursor: pointer; }
 .trend-dexgrid dt { white-space: nowrap; }
 .trend-dexgrid dd { margin: 0; color: #8fb4ff; text-align: right; white-space: nowrap; }
 .trend-src { margin-top: 6px; font-size: 10px; }
+.trend-side { align-items: center; margin-bottom: 6px; }
+.trend-side .pill small { font-size: 10px; opacity: 0.8; margin-left: 2px; }
+.trend-sidenote { font-size: 11px; }
+.trend-other { color: var(--gold); }

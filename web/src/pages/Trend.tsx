@@ -344,7 +344,7 @@ function ItemChart({ it }: { it: TrendItem }) {
 
 /** 물건 한 줄 (접힌 채로도 묶음별 가격이 보인다): 그림, 이름·줄임말, 묶음 칩(속성·강화마다 가격과 오르내림), 글·사람·기간, 가격, 추세선.
  *  펼치면 묶음별 날짜 그림과 표 */
-function ItemRow({ it, t, wiki, open, onToggle }: { it: TrendItem; t: Trend; wiki: Wiki; open: boolean; onToggle: () => void }) {
+function ItemRow({ it, t, wiki, side, open, onToggle }: { it: TrendItem; t: Trend; wiki: Wiki; side: "sell" | "buy"; open: boolean; onToggle: () => void }) {
   const pic = (wiki.items[it.name] ?? wiki.items[it.name.replace(/\s/g, "")])?.icon;
   const chips = it.groups.slice(0, 6);
   return (
@@ -367,6 +367,7 @@ function ItemRow({ it, t, wiki, open, onToggle }: { it: TrendItem; t: Trend; wik
           </span>
           <span className="trend-sub muted">
             글 {it.n} · {it.sellers}명 · {md(it.first)}{it.first !== it.last && `~${md(it.last)}`} · {shortWon(it.min)}~{shortWon(it.max)}
+            {it.other && <span className="trend-other"> · {side === "sell" ? "삽니다" : "팝니다"} {shortWon(it.other.med)} ({it.other.n})</span>}
             {it.abbr.length > 0 && <span className="trend-abbr"> · 톡방 {it.abbr.slice(0, 3).join(", ")}</span>}
           </span>
         </span>
@@ -442,15 +443,18 @@ function GroupRows({ g, t, open, onToggle }: { g: TrendGroup; t: Trend; open: bo
   );
 }
 
+/** 팝니다 = 파는 사람이 부른 값, 삽니다 = 사는 사람이 부른 값. 파는 쪽은 비싸게, 사는 쪽은 싸게 부르니 섞지 않는다 (제작자 지적) */
 function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
   const [q, setQ] = useState("");
+  const [side, setSide] = useState<"sell" | "buy">("sell");
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("posts");
   const [shown, setShown] = useState(PAGE);
   const [open, setOpen] = useState<string | null>(null);
+  const source = side === "sell" ? t.items : t.itemsBuy;
   const list = useMemo(() => {
     const needle = q.trim().replace(/\s/g, "").toLowerCase();
-    const xs = t.items.filter(
+    const xs = source.filter(
       (it) =>
         (filter !== "many" || it.sellers >= 2) &&
         (filter !== "recent" || it.last >= t.lastWeek) &&
@@ -461,9 +465,18 @@ function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
     if (sort === "price") xs.sort((a, b) => b.med - a.med);
     else if (sort === "recent") xs.sort((a, b) => (a.last < b.last ? 1 : a.last > b.last ? -1 : b.n - a.n));
     return xs;
-  }, [t, q, filter, sort]);
+  }, [source, t.lastWeek, q, filter, sort]);
   return (
     <Panel title={`물건 시세 (${list.length})`}>
+      <div className="filter trend-side">
+        <button type="button" className={"pill" + (side === "sell" ? " pill-on" : "")} onClick={() => { setSide("sell"); setShown(PAGE); setOpen(null); }}>
+          팝니다 <small>{t.items.length}</small>
+        </button>
+        <button type="button" className={"pill" + (side === "buy" ? " pill-on" : "")} onClick={() => { setSide("buy"); setShown(PAGE); setOpen(null); }}>
+          삽니다 <small>{t.itemsBuy.length}</small>
+        </button>
+        <span className="trend-sidenote muted">{side === "sell" ? "파는 사람이 부른 값" : "사는 사람이 부른 값"}</span>
+      </div>
       <div className="search-box">
         <input value={q} onChange={(e) => { setQ(e.target.value); setShown(PAGE); }} placeholder="물건 이름 또는 톡방 줄임말" aria-label="물건 찾기" />
       </div>
@@ -482,7 +495,7 @@ function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
       </div>
       <ul className="mk-list trend-list">
         {list.slice(0, shown).map((it) => (
-          <ItemRow key={it.name} it={it} t={t} wiki={wiki} open={open === it.name} onToggle={() => setOpen(open === it.name ? null : it.name)} />
+          <ItemRow key={side + it.name} it={it} t={t} wiki={wiki} side={side} open={open === it.name} onToggle={() => setOpen(open === it.name ? null : it.name)} />
         ))}
       </ul>
       {shown < list.length && (

@@ -523,7 +523,7 @@ def people(xs: list[dict], key: str = "price") -> list[dict]:
     return out
 
 
-def item_prices(msgs: list[dict], last_week: str, rs: Resolver) -> list[dict]:
+def item_prices(msgs: list[dict], last_week: str, rs: Resolver, side: str = "sell") -> list[dict]:
     """물건마다 묶음(groups: 속성부여 템은 주 스탯별, 강화 템은 강화 단계별)과 그 안의 강화·옵션 묶음(variants)별 (날짜, 만 원 가격) 모음.
     글 2개 이상인 물건만. 글 본문 한 줄과 닉네임을 보기로 남긴다"""
     kinds = load_kinds()
@@ -539,6 +539,8 @@ def item_prices(msgs: list[dict], last_week: str, rs: Resolver) -> list[dict]:
                 continue
             p.update({"date": m["date"], "side": side_of(line) or msg_side or "sell", "who": m["who"], "tel": m["tel"],
                       "raw": re.sub(r"\s+", " ", line).strip()[:60]})
+            if p["side"] != side:
+                continue  # 파는 사람이 부른 값과 사는 사람이 부른 값은 따로 센다 (제작자 지적 2026-11-03)
             items[p["name"]].append(p)
 
     def summary(xs: list[dict]) -> dict:
@@ -569,7 +571,7 @@ def item_prices(msgs: list[dict], last_week: str, rs: Resolver) -> list[dict]:
 
     out = []
     for name, xs in items.items():
-        if len(xs) < 2:
+        if len(xs) < (2 if side == "sell" else 1):
             continue
         kind = item_kind(name, xs, kinds)
         by_group: dict[str, list[dict]] = defaultdict(list)
@@ -897,7 +899,14 @@ def main() -> None:
     gold = gold_days(msgs)
     gold_who = gold_people(msgs)
     rs = Resolver()
-    items = item_prices(msgs, last_week, rs)
+    items = item_prices(msgs, last_week, rs, "sell")
+    items_buy = item_prices(msgs, last_week, rs, "buy")
+    # 반대쪽 값 (팝니다 줄에 '삽니다 25만' 처럼 같이 보인다)
+    for a, b in ((items, items_buy), (items_buy, items)):
+        other = {it["name"]: it for it in b}
+        for it in a:
+            o = other.get(it["name"])
+            it["other"] = {"med": o["med"], "n": o["n"]} if o else None
     chars = char_prices(msgs, rs)
     data = {
         "source": {"rooms": sorted(set(rooms)), "from": dates[0], "to": dates[-1], "messages": len(msgs),
@@ -906,11 +915,12 @@ def main() -> None:
         "gold": gold,
         "goldPeople": gold_who,
         "items": items,
+        "itemsBuy": items_buy,
         "chars": chars,
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    print("시세 동향", {"rooms": len(rooms), "messages": len(msgs), "days": len(gold), "items": len(items), "chars": len(chars["rows"]),
+    print("시세 동향", {"rooms": len(rooms), "messages": len(msgs), "days": len(gold), "items": len(items), "itemsBuy": len(items_buy), "chars": len(chars["rows"]),
                      "wiki": sum(1 for it in items if it["wiki"])})
     if "--unknown" in sys.argv:
         print("위키에 없는 줄임말:", sorted(rs.unknown.items(), key=lambda kv: -kv[1])[:80])

@@ -77,6 +77,8 @@ export interface TrendItem extends TrendVariant {
   name: string; wiki: boolean; abbr: string[];
   /** enchant = 속성부여 부위 (벨트, 망토, 목걸이, 반지), enhance = 강화 부위, none = 그 밖 */
   kind: "enchant" | "enhance" | "none"; groups: TrendGroup[]; variants: TrendVariant[];
+  /** 반대쪽(팝니다 목록이면 삽니다)의 중간값과 글 수. 없으면 null */
+  other: { med: number; n: number } | null;
 }
 /** 캐릭터 글 하나. 캘 = 캐릭터만, 템통 = 템까지 */
 export interface TrendChar {
@@ -88,7 +90,9 @@ export interface TrendChar {
 export interface TrendBand { band: string; n: number; med: number; min: number; max: number }
 export interface Trend {
   source: { rooms: string[]; from: string; to: string; messages: number; built: string; rate: number };
-  lastWeek: string; gold: GoldDay[]; goldPeople: { sell: TrendPerson[]; buy: TrendPerson[] }; items: TrendItem[];
+  lastWeek: string; gold: GoldDay[]; goldPeople: { sell: TrendPerson[]; buy: TrendPerson[] };
+  /** items = 파는 사람이 부른 값, itemsBuy = 사는 사람이 부른 값 (제작자: 파는 쪽은 비싸게, 사는 쪽은 싸게 부르니 구분) */
+  items: TrendItem[]; itemsBuy: TrendItem[];
   chars: { rows: TrendChar[]; bands: TrendBand[] };
 }
 export const loadTrend = () => getJson<Trend>("trend");
