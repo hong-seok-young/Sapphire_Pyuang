@@ -452,12 +452,11 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
     if not names:
         return None
 
-    def job_hint() -> str | None:
-        """줄에서 직업: 힘·민첩·지능 옵션 하나만 있으면 그 직업, 아니면 줄의 직업 말"""
-        # 힘 = 전사, 민첩 = 레인저, 지능·마나 = 마법사 (제작자 2026-11-04 도감 스샷: 세계수잎로브만 마나가 붙는다). 크리티컬은 레인저·무도가 둘 다라 못 가른다
-        stats = {j for o in opts for k, j in (("힘", "전사"), ("민첩", "레인저"), ("지능", "마법사"), ("마나", "마법사")) if o.startswith(k)}
-        if len(stats) == 1:
-            return stats.pop()
+    def job_hint(group: str) -> str | None:
+        """줄에서 직업: 묶음의 옵션 표(GROUP_STAT_JOB)로 하나만 남으면 그 직업, 아니면 줄의 직업 말"""
+        job = pick_job(group, opts)
+        if job:
+            return job
         jm = JOB_IN_LINE.search(line)
         return GROUP_JOB[jm.group(0)] if jm else None
 
@@ -473,7 +472,8 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
                 e = e.lstrip("+")
                 enh = KNUM.get(e) or int(e)
         label, by_job = JOB_GROUPS[m.group(4)]
-        job = GROUP_JOB.get(m.group(2) or "") or job_hint()
+        key = next(k for k in ("세계수갑", "바슬신", "아요장", "금서고신") if JOB_GROUPS[k] is JOB_GROUPS[m.group(4)])
+        job = GROUP_JOB.get(m.group(2) or "") or job_hint(key)
         if m.group(4) in ("아요장", "아이요장", "아이요장갑") and not enh and not enh_word and job is None and all(o.startswith("체력") for o in opts):
             # 강화·직업·장비 옵션이 하나도 없으면 아이요 코스튬 장갑 (유어 2026-11-04: '아요셋 사요'는 코스튬, '육아요장'은 +6 장비)
             return "아이요의장갑 (코스튬)", m.group(4), 0, False
@@ -545,9 +545,10 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
 EQUIP_JSON = ROOT / "web" / "public" / "data" / "equipment.json"
 # 직업마다 이름이 다른 장비를 하나로 부르는 말 (유어 설명 2026-11-04, 제작자 1:1 카톡): 바슬신 = 바슬라프 상자에서 나오는 Lv.44 신발,
 # 세계갑·세계수갑·뿌리갑·뿌갑 = 모르포시즈 정원(뿌리)의 베로에게서 교환하는 Lv.44 갑옷이라 뿌리갑 (제작자 2026-11-04. 법사는 보통 세계수롭, 껍갑은 전사), 금서고신 = 금서고 Lv.46 신발 (법사 것은 기억단화),
-# 아요장 = 뿌리 보스 아이요의 Lv.46 장갑 (아요셋은 코스튬, 육아요장은 +6 장갑). 이름은 위키 장비 표의 직업·레벨로 맞췄다.
-# 직업은 줄의 직업 말(전사아요장, 5렌저아요장, 법사 바슬신)이나 옵션(힘 = 전사, 민첩 = 레인저, 지능 = 마법사: 유어 '힘2 세계갑이면 껍갑')으로 고르고,
-# 모르면 묶음 이름 그대로 센다 (위키 그림 없음).
+# 아요장 = 모르포시즈 뿌리의 아이요의수호병이 떨구는 Lv.46 장갑 (아요셋·아이요의장갑은 코스튬, 육아요장은 +6 장비). 이름은 위키 장비 표의 직업·레벨로 맞췄다.
+# 직업은 줄의 직업 말(전사아요장, 5렌저아요장, 법사 바슬신)이나 옵션으로 고른다 (유어 '힘2 세계갑이면 껍갑', 제작자 도감 스샷 2026-11-04 의 옵션 이름:
+# 세계갑 껍질 힘 · 가지 크리 · 잎로브 지능·마나 · 도복 크리, 바슬신 광전사 힘 · 설원추적 민첩 · 빛새김 지능 · 바다 지능, 아요장 수호병 명중·크리·힘 · 연격 명중·크리·민첩 ·
+# 환영술사 마나·마재·지능 · 연속공격 명중·힘·지능). 어느 쪽인지 가를 수 없는 옵션(크리만, 바슬신·아요장의 지능만)은 두지 않고, 모르면 묶음 이름 그대로 센다 (위키 그림 없음).
 JOB_GROUPS: dict[str, tuple[str, dict[str, str]]] = {
     "바슬신": ("바슬신 (Lv.44 신발)", {"전사": "광전사의부츠", "레인저": "설원추적자장화", "마법사": "빛새김의신발", "무도가": "바다의장화"}),
     "세계수갑": ("세계수갑 (Lv.44 갑옷)", {"전사": "세계수껍질갑옷", "레인저": "세계수가지갑옷", "마법사": "세계수잎로브", "무도가": "세계수도복"}),
@@ -561,6 +562,26 @@ GROUP_JOB = {"전사": "전사", "전": "전사", "렌저": "레인저", "레인
 GROUP_RE = re.compile(r"^(\+?(?:\d{1,2}|[오육칠팔구십]))?(전사|렌저|레인저|법사|마법사|무도가|무도|[전렌법무])?(\+?(?:\d{1,2}|[오육칠팔구십]))?("
                       + "|".join(sorted(JOB_GROUPS, key=len, reverse=True)) + r")$")
 JOB_IN_LINE = re.compile(r"전사|렌저|레인저|법사|마법사|무도가")
+# 묶음마다 직업을 가르는 옵션 (옵션 하나로 한 직업만 남을 때만)
+GROUP_STAT_JOB = {
+    "세계수갑": {"힘": "전사", "민첩": "레인저", "지능": "마법사", "마나": "마법사"},
+    "바슬신": {"힘": "전사", "민첩": "레인저", "마나": "마법사"},  # 지능은 마법사(빛새김)·무도가(바다) 둘 다
+    "아요장": {"민첩": "레인저", "마나": "마법사"},  # 힘은 전사·무도가, 지능은 마법사·무도가: 조합은 pick_job 에서
+    "금서고신": {"힘": "전사", "민첩": "레인저", "지능": "마법사", "마나": "마법사"},
+}
+
+
+def pick_job(group: str, opts: list[str]) -> str | None:
+    """옵션 이름으로 묶음 안의 직업을 고른다. 못 가르면 None"""
+    stats = {re.sub(r"[\d.]+%?$", "", o) for o in opts}
+    if group == "아요장":
+        if "힘" in stats and "지능" in stats:
+            return "무도가"  # 연속공격의장갑만 힘과 지능이 같이
+        if "힘" in stats and "크리" in stats:
+            return "전사"  # 수호병의손껍질
+    table = GROUP_STAT_JOB[group]
+    jobs = {table[k] for k in stats if k in table}
+    return jobs.pop() if len(jobs) == 1 else None
 # 게임 규칙 (CLAUDE.md 중개인): 강화는 갑옷, 주장비(무기), 투구, 보조장비, 장갑, 신발만, 속성부여는 벨트, 망토, 목걸이, 반지만
 ENCHANT_SLOTS = ("망토", "벨트", "목걸이", "반지")
 ENHANCE_SLOTS = ("무기", "보조 장비", "투구", "갑옷", "장갑", "신발")
