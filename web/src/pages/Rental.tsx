@@ -1894,7 +1894,7 @@ function Num({
   );
 }
 
-/** 신청함 맨 위: 링크를 적어 둔 장비대여 담당(길드마스터, server/rental.ts RENT_STAFF)에게 바로 카톡 (제작자 요청 2026-11-02, 앱 안 대화와 같이) */
+/** 신청함 맨 위: 링크를 적어 둔 장비대여 담당(멍멍, server/rental.ts RENT_STAFF. 길드마스터는 권한만 있지 담당자가 아니다, 제작자 2026-11-03)에게 바로 카톡 (제작자 요청 2026-11-02, 앱 안 대화와 같이) */
 function StaffKakao() {
   const { staff } = useKakao();
   if (!staff.length) return null;
