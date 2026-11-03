@@ -2522,6 +2522,8 @@ button.gd-member-row { cursor: pointer; }
   transition: left 0.15s, top 0.15s, width 0.15s, height 0.15s;
 }
 .tut-spot-tap { animation: tut-pulse 1.1s ease-in-out infinite; }
+/* 새 단계의 첫 그림: 미끄러지지 않고 바로 그 자리에 (제작자 2026-11-03 '네모가 엉뚱한 곳에 갔다가 다시 제대로 버튼으로 간다') */
+.tut-spot-jump { transition: none; }
 @keyframes tut-pulse { 0%, 100% { border-color: var(--gold); } 50% { border-color: #fff3b0; box-shadow: 0 0 0 9999px rgba(5, 5, 14, 0.6), 0 0 20px rgba(255, 195, 92, 1); } }
 .tut-box {
   position: absolute; left: 12px; right: 12px; padding: 10px 12px; pointer-events: auto;

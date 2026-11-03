@@ -100,6 +100,40 @@ function find(sel: string): HTMLElement | null {
   return null;
 }
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** 화면을 n 번 그린 뒤 (React 가 눌러서 바뀐 것을 그릴 시간) */
+const raf = (n = 1) =>
+  new Promise<void>((r) => {
+    const step = () => (--n <= 0 ? r() : requestAnimationFrame(step));
+    requestAnimationFrame(step);
+  });
+/** 자리를 찾을 때까지: 바로 한 번, 그 뒤 40ms 마다 ms 까지 (고정으로 기다리지 않는다, 제작자 2026-11-03 '이전 다음 누를 때 렉') */
+async function poll(
+  fn: () => HTMLElement | null,
+  ms: number,
+): Promise<HTMLElement | null> {
+  const until = performance.now() + ms;
+  let el = fn();
+  while (!el && performance.now() < until) {
+    await wait(40);
+    el = fn();
+  }
+  return el;
+}
+/**
+ * 비출 자리가 화면 밖이면 바로(instant) 보이게 스크롤한다. 부드러운 스크롤 중에 자리를 재면 네모가 엉뚱한 곳에 갔다가 따라왔다 (제작자 2026-11-03).
+ * 위 줄(56px)과 아래 글 상자·탭(190px) 사이에 다 보이면 움직이지 않는다
+ */
+function reveal(el: HTMLElement) {
+  const r = el.getBoundingClientRect();
+  const top = 56;
+  const bottom = window.innerHeight - 190;
+  if (r.top >= top && r.bottom <= bottom) return;
+  const tall = r.height > window.innerHeight * 0.5;
+  el.scrollIntoView({
+    block: tall ? "start" : "center",
+    behavior: "instant" as ScrollBehavior,
+  });
+}
 /**
  * 눌러 보기 자리를 대신 누르지 않아도 되는지 (이전으로 왔다가 다시 다음을 누를 때 도로 닫히지 않게):
  * opens 가 벌써 보이거나, closes 가 벌써 안 보이거나, 그것도 없으면 aria-expanded / aria-selected / aria-pressed 가 true
@@ -142,6 +176,8 @@ function Tutorial({
   const steps = guide.tutorial.filter((s) => canSee(s.who, me));
   const [i, setI] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
+  /** 새 단계의 네모는 바로 그 자리에 (미끄러지는 transition 없이). 그 다음 그림부터 스크롤을 따라갈 때는 미끄러진다 */
+  const [jump, setJump] = useState(false);
   const [missing, setMissing] = useState(false);
   /** 자리를 찾아 글 상자를 보이는 단계 번호 (i 와 다르면 아직 찾는 중: 어두운 막만) */
   const [shownAt, setShownAt] = useState(-1);
@@ -193,7 +229,7 @@ function Tutorial({
       if (move) {
         going.current = true;
         goRoute(addr, true);
-        await wait(350);
+        await raf();
         going.current = false;
       }
       let el: HTMLElement | null = null;
@@ -205,12 +241,8 @@ function Tutorial({
           (step.opens || step.closes) &&
           undoTap(null, step)
         )
-          await wait(300);
-        for (let t = 0; t < (move ? 15 : 8) && alive; t++) {
-          el = find(step.sel);
-          if (el) break;
-          await wait(100);
-        }
+          await raf(2);
+        el = await poll(() => find(step.sel as string), move ? 1500 : 800);
         if (!alive) return;
         // 이전으로 돌아왔는데 자리가 없으면(완료 단추는 편집 중에만 있다) 앞 단계가 열었던 것을 다시 열어 본다
         if (!el && dir.current < 0) {
@@ -221,9 +253,9 @@ function Tutorial({
             const e = s.sel ? find(s.sel) : null;
             if (!e) continue;
             e.click();
-            await wait(400);
+            await raf(2);
             if (!alive) return;
-            el = find(step.sel);
+            el = await poll(() => find(step.sel as string), 600);
           }
         }
         if (!el) {
@@ -242,16 +274,18 @@ function Tutorial({
           !step.closes &&
           undoTap(el, step)
         ) {
-          await wait(250);
+          await raf(2);
           if (!alive) return;
         }
-        el.scrollIntoView({ block: "center", behavior: "smooth" });
-        await wait(300);
+        // 화면 밖이면 바로 스크롤하고 한 번 그린 뒤에 자리를 잰다 (스크롤이 끝난 자리로 한 번에)
+        reveal(el);
+        await raf();
       }
       if (!alive) return;
       elRef.current = el;
       setMissing(!el);
       setRect(el ? el.getBoundingClientRect() : null);
+      setJump(true);
       setShownAt(i);
       shownAddr.current[i] = location.hash;
       shown.current = true;
@@ -320,16 +354,23 @@ function Tutorial({
       if (fromScreen && step.tap && !step.fx && el && !alreadyDone(el, step)) {
         fired.current = true;
         el.click();
-        later(finish, 300);
+        later(finish, 120);
       } else finish();
       return;
     }
     if (step.tap && !step.fx && el && !alreadyDone(el, step)) {
       fired.current = true;
       el.click();
-      later(() => setI(i + 1), 450);
+      // 눌러서 열린 것이 그려지면 다음 단계가 자리를 찾는다 (다음 단계가 40ms 마다 찾으니 길게 기다리지 않는다)
+      later(() => setI(i + 1), 40);
     } else setI(i + 1);
   };
+  // 새 단계의 네모를 바로 그 자리에 그린 다음 그림부터는 다시 미끄러지게
+  useEffect(() => {
+    if (!jump) return;
+    const id = requestAnimationFrame(() => setJump(false));
+    return () => cancelAnimationFrame(id);
+  }, [jump]);
   /**
    * 어두운 막·네모 위 아무 데나 누르면 다음으로 (글 상자 안과 찾는 중은 빼고).
    * 날씨 샘플의 '빈 곳을 눌러 보세요'(fx + tap)는 누를 때마다 터지기만 하고 넘어가지 않는다: 다음 단추로 넘어간다
@@ -404,7 +445,11 @@ function Tutorial({
       <div className="tut" aria-live="polite" onClick={onOverlay}>
         {vstep.fx ? null : r && !missing ? (
           <div
-            className={"tut-spot" + (vstep.tap && cur ? " tut-spot-tap" : "")}
+            className={
+              "tut-spot" +
+              (vstep.tap && cur ? " tut-spot-tap" : "") +
+              (jump ? " tut-spot-jump" : "")
+            }
             style={{
               left: sx,
               top: sy,
