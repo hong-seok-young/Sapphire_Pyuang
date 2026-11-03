@@ -77,7 +77,7 @@ export interface TrendItem extends TrendVariant {
   name: string; wiki: boolean; abbr: string[];
   /** 아무도 풀지 못한 줄임말 (위키에도, 알려 준 이름 표에도 없다) */
   unknown?: boolean;
-  /** 위키에 없는 물건의 그림 (data/trend/…png, 제작자 도감 스샷에서 자른 것) */
+  /** 위키에 없는 물건의 그림 주소 (/data/trend/…png 제작자 도감 스샷에서 자른 것, 스킬북은 /img/… 위키 직업별 스킬의 아이콘) */
   icon?: string;
   /** enchant = 속성부여 부위 (벨트, 망토, 목걸이, 반지), enhance = 강화 부위, none = 그 밖 */
   kind: "enchant" | "enhance" | "none"; groups: TrendGroup[]; variants: TrendVariant[];

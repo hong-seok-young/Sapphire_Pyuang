@@ -2709,7 +2709,10 @@ button.gd-member-row { cursor: pointer; }
 .trend-itemrow .trend-slot { width: 32px; height: 32px; margin-top: 2px; }
 .trend-itemmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .trend-itemtitle { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-.trend-itemtitle .row-title { font-size: 14px; white-space: nowrap; overflow: hidden; }
+/* 이름은 자르지 않고 낱말 사이에서만 줄을 바꾼다 (320px 에서 '수호의기원 3단'의 3단이 가격에 밀려 잘렸고, 다음엔 '수호의기 / 원'으로 갈렸다).
+   이름의 가장 긴 낱말과 가격이 한 줄에 안 들어가면 가격이 다음 줄 오른쪽으로 내려간다 */
+.trend-itemtitle { flex-wrap: wrap; }
+.trend-itemtitle .row-title { flex: 1 1 0; min-width: auto; overflow-wrap: break-word; font-size: 14px; }
 .trend-itemtitle .trend-who { margin-left: auto; font-size: 11px; white-space: nowrap; }
 .trend-itemprice { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: none; }
 .trend-itemprice b { color: var(--gold); font-weight: 400; font-size: 14px; white-space: nowrap; }

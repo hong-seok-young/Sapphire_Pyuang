@@ -364,7 +364,7 @@ function ItemChart({ it }: { it: TrendItem }) {
 /** 물건 한 줄 (접힌 채로도 묶음별 가격이 보인다): 그림, 이름·줄임말, 묶음 칩(속성·강화마다 가격과 오르내림), 글·사람·기간, 가격, 추세선.
  *  펼치면 묶음별 날짜 그림과 표 */
 function ItemRow({ it, t, wiki, side, open, onToggle }: { it: TrendItem; t: Trend; wiki: Wiki; side: "sell" | "buy"; open: boolean; onToggle: () => void }) {
-  // 그림: 위키 아이템이면 위키 그림 (괄호 설명을 뗀 이름으로도 찾는다: '의지의 망토 (완망 …)'), 아니면 도감 스샷에서 자른 그림(it.icon), 그것도 없으면 동전
+  // 그림: 위키 아이템이면 위키 그림 (괄호 설명을 뗀 이름으로도 찾는다), 아니면 it.icon (도감 스샷에서 자른 그림, 스킬북은 위키 직업별 스킬의 아이콘), 그것도 없으면 동전
   const base = it.name.replace(/\s*\(.*\)\s*$/, "");
   const pic = (wiki.items[it.name] ?? wiki.items[base] ?? wiki.items[base.replace(/\s/g, "")])?.icon;
   const chips = it.groups.slice(0, 6);
@@ -372,7 +372,7 @@ function ItemRow({ it, t, wiki, side, open, onToggle }: { it: TrendItem; t: Tren
     <li className={"trend-item" + (open ? " mk-open" : "")}>
       <button type="button" className="trend-itemrow" onClick={onToggle}>
         <span className="mk-slot trend-slot">
-          {pic ? <PicImg pic={pic} max={30} /> : it.icon ? <img className="trend-icon" src={"/data/" + encodeURI(it.icon)} alt="" /> : <img className="mk-coin" src={MARKET_PIC + "coin.png"} alt="" />}
+          {pic ? <PicImg pic={pic} max={30} /> : it.icon ? <img className="trend-icon" src={encodeURI(it.icon)} alt="" /> : <img className="mk-coin" src={MARKET_PIC + "coin.png"} alt="" />}
         </span>
         <span className="trend-itemmain">
           <span className="trend-itemtitle">

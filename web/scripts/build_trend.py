@@ -35,7 +35,7 @@ def icon_for(name: str) -> str | None:
         return None
     base = re.sub(r"\s*\(.*\)\s*$", "", name).strip()
     if (ICON_DIR / f"{base}.png").exists():
-        return f"trend/{base}.png"
+        return f"/data/trend/{base}.png"
     head = re.split(r"[ ·]", re.sub(r"\s*(세트|셋)$", "", base))[0]
     if len(head) < 2:
         return None
@@ -43,7 +43,63 @@ def icon_for(name: str) -> str | None:
     if not cands:
         return None
     body = [c for c in cands if BODY.search(c[len(head):])]
-    return f"trend/{(body or cands)[0]}.png"
+    return f"/data/trend/{(body or cands)[0]}.png"
+
+POSTS_JSON = ROOT / "web" / "public" / "data" / "posts.json"
+MENU_JSON = ROOT / "web" / "public" / "data" / "menu.json"
+
+
+def load_skills() -> dict[str, dict]:
+    """위키 '직업별 스킬' 글의 스킬 표 -> {띄어쓰기 없는 이름: {name, max, icon}}. 표 첫 칸 = 아이콘(gif)과 굵은 이름, 둘째 칸 = 'N단 - …' 줄"""
+    if not POSTS_JSON.exists() or not MENU_JSON.exists():
+        return {}
+    posts = json.loads(POSTS_JSON.read_text(encoding="utf-8"))
+    menu = json.loads(MENU_JSON.read_text(encoding="utf-8"))
+    ids = [p["id"] for sec in menu if sec.get("title") == "직업별 스킬" for p in sec.get("posts", [])]
+    out: dict[str, dict] = {}
+    for pid in ids:
+        for b in posts.get(pid, {}).get("blocks", []):
+            if b.get("k") != "table" or not b.get("rows") or len(b["rows"][0]) < 2:
+                continue
+            head, desc = b["rows"][0][0].get("l", []), b["rows"][0][1].get("l", [])
+            icon = next((r["src"] for line in head for r in line if "src" in r), None)
+            name = next((r["t"].strip() for line in head for r in line if r.get("b") and r.get("t", "").strip() and not r["t"].strip().startswith("(")), None)
+            stages = [r["t"] for line in desc for r in line if re.match(r"\s*\d단", r.get("t", ""))]
+            if icon and name and stages:
+                out[name.replace(" ", "")] = {"name": name, "max": len(stages), "icon": "/" + icon}
+    return out
+
+
+SKILLS = load_skills()
+SKILL_ICONS: dict[str, str] = {}  # 스킬북 물건 이름 -> 위키 스킬 아이콘 (화면은 위키 그림이 없으면 이것)
+# 스킬북 (제작자 2026-11-04): 거래되는 스킬북은 거의 마지막 단계라, 단이 없거나 '마스터·마북'(수기마북, 포아마)이면 마지막 단계 ('수호의기원 3단').
+# 줄임말(SKILL_BOOK)과 위키 스킬 이름 뒤에 숫자(단)나 단·북·마북·마스터. 한 글자 줄임말(덥, 와 …)은 숫자나 '북'이 있어야 하고 '마'만 붙은 것은 캐릭터 말(덥마렌)이라 뺀다.
+# 스킬 이름만 적은 것은 네 글자 이상이거나 아는 줄임말(수기, 아프, 화폭, 치격, 포아)만: 공포·집중은 코스튬 이름이기도 하다 ('공포 체8 9장')
+SB_SUFFIX = r"(단|마스터스킬북|마스터북|마북|마스터|스킬북|스북|북|마)?"
+SB_ALONE = {"수기", "아프", "화폭", "치격", "포아"}
+
+
+def skill_book(w: str, rs) -> tuple[str, bool] | None:
+    """낱말 -> (스킬북 이름, 위키 아이템인지). '수기마북' -> '수호의기원 3단', '화폭2단' -> '화염폭풍 2단'"""
+    c = re.sub(r"[^가-힣0-9]", "", w)
+    keys = sorted(set(SKILL_BOOK) | {k for k in SKILLS if len(k) >= 2}, key=len, reverse=True)
+    m = re.fullmatch("(" + "|".join(keys) + r")(\d)?" + SB_SUFFIX, c) if keys else None
+    if not m:
+        return None
+    key, n, suf = m.group(1), m.group(2), m.group(3)
+    if not n and not suf and not (key in SB_ALONE or (key in SKILLS and len(key) >= 4)):
+        return None
+    if len(key) == 1 and not n and suf in (None, "마"):
+        return None
+    full = SKILL_BOOK.get(key, key).replace(" ", "")
+    sk = SKILLS.get(full)
+    stage = int(n) if n else (sk["max"] if sk else None)
+    disp = sk["name"] if sk else full
+    name = f"{disp} {stage}단" if stage else f"{disp} 스킬북"
+    if sk:
+        SKILL_ICONS[name] = sk["icon"]
+    return name, bool(stage and rs.names.get(f"{full}{stage}"))
+
 
 USUAL_RATE = 75  # 만 골드로 적은 가격을 만 원으로 바꿀 때 (web/src/gold.ts 의 USUAL_RATE 와 같다)
 NOT_ITEM = re.compile(r"^(골드|구매시|통 구매시|일괄구매시|통|개당|통당|장당)$|구매시$")
@@ -276,7 +332,7 @@ GEMSET = re.compile(r"^(\d{1,3})번?보석셋$")
 # 묶음·원글에 무슨 펫인지 적는다
 PET_WORDS = {"레어펫": "레어펫", "수룡펫": "수룡펫", "수룡": "수룡펫", "베스페라": "베스페라", "모스가디": "모스가디", "젤피": "젤피", "나이녹스": "나이녹스", "펫": "펫"}
 PET_RE = re.compile(r"^(?:펫)?(레어펫|수룡펫|수룡|베스페라|모스가디|젤피|나이녹스|[가-힣]{1,4}펫)$")  # 젤피 = 펫 (유어 2026-11-04), 나이녹스 = 펫 (제작자 2026-11-04)
-SKILL_BOOK = {"화폭": "화염폭풍", "치격": "치명적일격", "소드": "소울드레인샷", "쉴드": "쉴드", "휩": "휩쓸기", "덥": "더블샷", "충": "충격샷",
+SKILL_BOOK = {"포아": "포레스트아이", "화폭": "화염폭풍", "치격": "치명적일격", "소드": "소울드레인샷", "쉴드": "쉴드", "휩": "휩쓸기", "덥": "더블샷", "충": "충격샷",
               "아프": "아이스프리즌", "수기": "수호의기원", "강인함": "강인함",  # 유어 2026-11-04: 아프 = 법사 스킬 아이스프리즌, 수기 = 수호의기원
               "와": "와일드스윙", "프": "프레임쇼크"}
 NON_WIKI = {"아드셋": "아드레날린 보석 세트", "활발한강아지": "활발한 강아지 (코스튬)",
@@ -366,13 +422,16 @@ NON_WIKI = {"아드셋": "아드레날린 보석 세트", "활발한강아지": 
             # 드롤·게올 = 영웅 코스튬 4부위 세트, 회바 = 회색바위 Lv.24 전사 3종 세트 (제작자 도감 스샷 2026-11-04)
             "드롤모": "드롤의모자 (코스튬)", "드롤갑": "드롤 갑옷 (코스튬)", "드롤장": "드롤 장갑 (코스튬)", "드롤신": "드롤 신발 (코스튬)", "드롤셋": "드롤 세트 (코스튬)",
             "게올모": "게올의모자 (코스튬)", "게올갑": "게올 갑옷 (코스튬)", "게올장": "게올 장갑 (코스튬)", "게올신": "게올 신발 (코스튬)", "게올셋": "게올 세트 (코스튬)",
-            "에이무": "A등급 무기마법서", "에이갑": "A등급 갑옷마법서", "수기마북": "수호의기원 스킬북",
-            "아프": "아이스프리즌 스킬북", "수기": "수호의기원 스킬북",  # '아프 3단' 처럼 단이 떨어진 것
+            "에이무": "A등급 무기마법서", "에이갑": "A등급 갑옷마법서",
             # 마법서: 스 = S등급, 에 = A등급, 갑 = 갑옷마법서, 무 = 무기마법서 (제작자 설명). 거불 = 거래불가, 거가 = 거래가능
             "스갑": "S등급 갑옷마법서", "스무": "S등급 무기마법서", "에갑": "A등급 갑옷마법서", "에무": "A등급 무기마법서",
             "SS무": "SS등급 무기마법서", "SS갑": "SS등급 갑옷마법서", "거불스무": "S등급 무기마법서 (거래불가)", "거불스갑": "S등급 갑옷마법서 (거래불가)",
             "거가스무": "S등급 무기마법서 (거래가능)", "거가스갑": "S등급 갑옷마법서 (거래가능)",
-            "고주": "고대의 주화", "고대의주화": "고대의 주화", "화폭": "화염폭풍 스킬북"}
+            "고주": "고대의 주화", "고대의주화": "고대의 주화",
+            # 톡방의 코스튬 목록 '천날(15), 요정날개(8), 분노(8), 신속(8), 공포(6), 해적왕(8), 스나이퍼(8), 강탈(8), 집중(7), 화염마법사(5), 꿈의형태(3.5)'와
+            # '흑마법사 요정의날개 등 레어코튬 다수', '펌프킹(3.5장)' (펌프퀸과 짝). 악마소환사는 흑마법사·화염마법사와 같은 이름 꼴이라 코스튬으로 본다
+            **{k: f"{k} (코스튬)" for k in ("공포", "신속", "강탈", "해적왕", "집중", "흑마법사", "화염마법사", "악마소환사", "꿈의형태", "펌프킹", "악마날개")},
+            "요정날개": "요정의날개 (코스튬)", "요정의날개": "요정의날개 (코스튬)"}
 
 
 def _norm_name(name: str) -> str:
@@ -589,11 +648,6 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
         """낱말 하나 -> (위키 이름, 줄임말, 강화). 통째로 먼저, 안 되면 앞의 강화 숫자(8헌보, 팔닼소)를 떼고"""
         if re.fullmatch(r"\+?(6|육)강?장", w):  # '명8 육강장' = 명중 8 의 +6 강화가죽장갑 (제작자 2026-11-04: 명중에 따라 값이 천차만별)
             return "강화가죽장갑", w, 6
-        sk = re.fullmatch(r"(화폭|치격|소드|쉴드|휩|덥|충|와|프|아프|수기|강인함)\s?(\d)\s?단?", w)
-        if sk:  # 스킬북 '화폭2단' = 화염폭풍 2단 (제작자). 위키에 있으면 그 이름, 없으면 '화염폭풍 3단'
-            full = SKILL_BOOK[sk.group(1)]
-            name = f"{full}{sk.group(2)}"
-            return (rs.names.get(name) or f"{full} {sk.group(2)}단"), w, 0
         m = ENHANCE_RE.match(w)
         for k, c in enumerate([w] + ([w[m.end():]] if m else [])):
             c = re.sub(r"[^가-힣a-zA-Z0-9]", "", c)
@@ -613,6 +667,10 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
     if gs:  # '12번보석셋' = 1, 2번 보석이 있는 세트 (제작자 설명). 앞 숫자는 강화가 아니다
         name = "·".join(gs.group(1)) + "번 보석 세트"
         return {"name": name, "wiki": False, "enh": 0, "opts": opts, "price": round(price, 2), "abbr": joined}
+    for w in [joined] + (names if len(names) > 1 else []):
+        sb = skill_book(w, rs)
+        if sb:
+            return {"name": sb[0], "wiki": sb[1], "enh": 0, "opts": opts, "price": round(price, 2), "bare": bare, "abbr": w}
     for w in [joined] + (names if len(names) > 1 else []):
         g = try_group(w)
         if g:
@@ -1181,7 +1239,7 @@ def main() -> None:
     chars = char_prices(msgs, rs)
     # 위키에 없는 물건의 그림: 자료/이미지/시세동향/<이름>.png (제작자 도감 스샷에서 자른 것, make_trend_icons.py). 이름의 괄호 설명은 뺀다
     for it in items + items_buy:
-        icon = icon_for(it["name"])
+        icon = SKILL_ICONS.get(it["name"]) or icon_for(it["name"])
         if icon:
             it["icon"] = icon
     data = {
