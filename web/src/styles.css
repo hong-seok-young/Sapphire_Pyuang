@@ -1164,7 +1164,7 @@ button { font: inherit; color: inherit; }
 
 /* updated menu on home (updates.ts, 제작자 요청): a mint border and an 'UPDATE' tag at the top right for a day after the first visit */
 .tile-new { border-color: #3fe0a0; box-shadow: inset var(--px) var(--px) 0 rgba(63, 224, 160, 0.45), inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--lo), 0 0 6px rgba(63, 224, 160, 0.55); }
-/* 칸 오른쪽 위 글자만 (장비대여 담당자: '관리자' 아래 '멍멍', 제작자 요청 2026-11-03 '텍스트로만'). UPDATE 표가 붙어 있는 동안은 Home.tsx 가 숨긴다 */
+/* 칸 오른쪽 위 글자만 (장비대여 담당자: '담당자' 아래 '멍멍', 제작자 요청 2026-11-03 '텍스트로만'). UPDATE 표가 붙어 있는 동안은 Home.tsx 가 숨긴다 */
 .tile-corner { position: absolute; z-index: 3; top: 4px; right: 6px; display: flex; flex-direction: column; align-items: flex-end; line-height: 11px; font-size: 9px; color: var(--muted); pointer-events: none; }
 .tile-corner span:last-child { color: var(--gold); }
 .tile-update {
