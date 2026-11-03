@@ -438,6 +438,9 @@ export function FitLine({
           <span className="hs-g" aria-hidden="true">
             {content}
           </span>
+          <span className="hs-s" aria-hidden="true">
+            {content}
+          </span>
         </span>
       ) : (
         content

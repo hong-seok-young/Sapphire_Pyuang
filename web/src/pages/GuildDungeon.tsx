@@ -6,11 +6,31 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { JOB_NAME, errorText } from "../auth";
 import type { Job, Me } from "../auth";
 import {
-  COLS, EMPTY, MAX_MEMBERS, ROWS, SLOT_MS, answerGd, candidateNo, colHead, createParty, deleteParty, editParty, fetchGd, leaveParty, rowLabel,
-  saveAvail, slotOf, slotShort, slotText, undoAnswer, validSlot,
+  COLS,
+  EMPTY,
+  MAX_MEMBERS,
+  ROWS,
+  SLOT_MS,
+  answerGd,
+  candidateNo,
+  colHead,
+  createParty,
+  deleteParty,
+  editParty,
+  fetchGd,
+  leaveParty,
+  rowLabel,
+  saveAvail,
+  slotOf,
+  slotShort,
+  slotText,
+  undoAnswer,
+  validSlot,
 } from "../gdungeon";
 import type { GdData, GdPerson, PartyState } from "../gdungeon";
 import { KakaoButton, Nick, useKakao } from "../kakao";
+import { sampleParty } from "../sample";
+import { useSample } from "../tutorialState";
 import { useEntryState } from "../router";
 import { FitLine, Loading, TopBar } from "../ui";
 
@@ -18,6 +38,7 @@ export function GuildDungeonPage({ me }: { me: Me }) {
   const [data, setData] = useState<GdData | null>(null);
   const [error, setError] = useState("");
   const [tab, setTab] = useEntryState<"mine" | "heat">("gd.tab", "mine");
+  const sample = useSample();
   const load = useCallback(() => {
     fetchGd().then(
       (d) => {
@@ -30,7 +51,10 @@ export function GuildDungeonPage({ me }: { me: Me }) {
   useEffect(() => {
     load();
     // 파티원이 확정·불참을 누르면 바로 보이게: 화면을 보는 동안 30초마다, 앱으로 돌아올 때
-    const t = window.setInterval(() => document.visibilityState === "visible" && load(), 30_000);
+    const t = window.setInterval(
+      () => document.visibilityState === "visible" && load(),
+      30_000,
+    );
     const v = () => document.visibilityState === "visible" && load();
     document.addEventListener("visibilitychange", v);
     return () => {
@@ -39,13 +63,15 @@ export function GuildDungeonPage({ me }: { me: Me }) {
     };
   }, [load]);
 
-  if (!data) return (
-    <>
-      <TopBar title="길드 던전" />
-      <Loading error={error || undefined} onRetry={load} />
-    </>
-  );
-  const party = data.party;
+  if (!data)
+    return (
+      <>
+        <TopBar title="길드 던전" />
+        <Loading error={error || undefined} onRetry={load} />
+      </>
+    );
+  // 튜토리얼 동안 파티가 없으면 예시 파티 (src/sample.ts: 파티원 카드와 1번 후보가 보이게)
+  const party = data.party ?? (sample ? sampleParty(me.id) : null);
   const setParty = (p: PartyState | null | undefined) => {
     if (p !== undefined) setData((d) => (d ? { ...d, party: p } : d));
   };
@@ -54,22 +80,41 @@ export function GuildDungeonPage({ me }: { me: Me }) {
       <TopBar title="길드 던전" />
       {error && <p className="form-error">{error}</p>}
       {party ? (
-        <PartyPanel me={me} data={data} party={party} onParty={setParty} onReload={load} onError={setError} />
+        <PartyPanel
+          me={me}
+          data={data}
+          party={party}
+          onParty={setParty}
+          onReload={load}
+          onError={setError}
+        />
       ) : (
         <NewParty me={me} data={data} onDone={load} onError={setError} />
       )}
       {party && (
         <nav className="pill-row gd-tabs">
-          <button className={"pill" + (tab === "mine" ? " pill-on" : "")} onClick={() => setTab("mine")}>
+          <button
+            className={"pill" + (tab === "mine" ? " pill-on" : "")}
+            onClick={() => setTab("mine")}
+          >
             내 시간표
           </button>
-          <button className={"pill" + (tab === "heat" ? " pill-on" : "")} onClick={() => setTab("heat")}>
+          <button
+            className={"pill" + (tab === "heat" ? " pill-on" : "")}
+            onClick={() => setTab("heat")}
+          >
             교집합
           </button>
         </nav>
       )}
       {!party || tab === "mine" ? (
-        <MyTimes key={data.week} me={me.id} data={data} onSaved={setParty} onError={setError} />
+        <MyTimes
+          key={data.week}
+          me={me.id}
+          data={data}
+          onSaved={setParty}
+          onError={setError}
+        />
       ) : (
         <HeatTimes data={data} party={party} />
       )}
@@ -79,8 +124,20 @@ export function GuildDungeonPage({ me }: { me: Me }) {
 }
 
 /** 내 파티: 파티원 카드, 지금 후보와 확정·불참, 다음 후보, 무산된 후보 */
-function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
-  me: Me; data: GdData; party: PartyState; onParty: (p: PartyState | null | undefined) => void; onReload: () => void; onError: (e: string) => void;
+function PartyPanel({
+  me,
+  data,
+  party: p,
+  onParty,
+  onReload,
+  onError,
+}: {
+  me: Me;
+  data: GdData;
+  party: PartyState;
+  onParty: (p: PartyState | null | undefined) => void;
+  onReload: () => void;
+  onError: (e: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [sure, setSure] = useState<string | null>(null);
@@ -112,7 +169,8 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
       setSure(null);
     }
   }
-  const twice = (key: string, fn: () => void) => (sure === key ? fn() : setSure(key));
+  const twice = (key: string, fn: () => void) =>
+    sure === key ? fn() : setSure(key);
   /** 파티원 넣고 빼기, 파티장 지정, 파티 지우기: 끝나면 다시 받는다 */
   async function act(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -129,9 +187,18 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
       setSure(null);
     }
   }
-  const myNo = (slot: number) => p.rejected.some((r) => r.slot === slot && r.by.includes(me.id));
-  const next = p.current !== null ? p.candidates.filter((s) => s > p.current! && !p.rejected.some((r) => r.slot === s)).slice(0, 4) : [];
-  const past = p.confirmed !== null && week + p.confirmed * SLOT_MS + SLOT_MS <= data.now;
+  const myNo = (slot: number) =>
+    p.rejected.some((r) => r.slot === slot && r.by.includes(me.id));
+  const next =
+    p.current !== null
+      ? p.candidates
+          .filter(
+            (s) => s > p.current! && !p.rejected.some((r) => r.slot === s),
+          )
+          .slice(0, 4)
+      : [];
+  const past =
+    p.confirmed !== null && week + p.confirmed * SLOT_MS + SLOT_MS <= data.now;
 
   return (
     <section className="panel gd-party">
@@ -144,20 +211,46 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
         const cells = p.members.map((m) => {
           const said = p.current !== null && p.yes.includes(m.id);
           // 상태는 짧게 (한 칸에 닉네임 · 카톡 · 파티장 · 상태가 한 줄로 들어가게, 제작자 요청 2026-11-02)
-          const state = !m.filled ? "미입력" : p.confirmed !== null || said ? "확정" : all && p.current !== null ? "대기" : "입력";
+          const state = !m.filled
+            ? "미입력"
+            : p.confirmed !== null || said
+              ? "확정"
+              : all && p.current !== null
+                ? "대기"
+                : "입력";
           const row = (
             <>
-              <FitLine className="gd-member-name" text={m.id} wrap={false} hs={high.includes(m.id)} />
+              <FitLine
+                className="gd-member-name"
+                text={m.id}
+                wrap={false}
+                hs={high.includes(m.id)}
+              />
               <KakaoButton name={m.id} nested={canManage || m.id === me.id} />
               {m.id === p.leader && <i className="gd-leader">파티장</i>}
-              <small className={state === "확정" ? "gd-st-yes" : undefined}>{state}</small>
+              <small className={state === "확정" ? "gd-st-yes" : undefined}>
+                {state}
+              </small>
             </>
           );
           return (
-            <li key={m.id} className={(m.filled ? "" : "gd-member-wait") + (open === m.id ? " gd-member-open" : "")}>
+            <li
+              key={m.id}
+              className={
+                (m.filled ? "" : "gd-member-wait") +
+                (open === m.id ? " gd-member-open" : "")
+              }
+            >
               {/* 내 카드는 누구나 (파티 나가기), 남의 카드는 파티장·운영진만 (파티장 지정 · 빼기) */}
               {canManage || m.id === me.id ? (
-                <button className="gd-member-row" onClick={() => (setOpen(open === m.id ? null : m.id), setAdding(false))} aria-expanded={open === m.id}>
+                <button
+                  className="gd-member-row"
+                  onClick={() => (
+                    setOpen(open === m.id ? null : m.id),
+                    setAdding(false)
+                  )}
+                  aria-expanded={open === m.id}
+                >
                   {row}
                 </button>
               ) : (
@@ -169,14 +262,21 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
         if (canManage && p.members.length < MAX_MEMBERS)
           cells.push(
             <li key="+add" className="gd-member-add">
-              <button className="gd-member-row" onClick={() => (setAdding((v) => !v), setOpen(null))} aria-expanded={adding}>
+              <button
+                className="gd-member-row"
+                onClick={() => (setAdding((v) => !v), setOpen(null))}
+                aria-expanded={adding}
+              >
                 + 파티원 넣기
               </button>
             </li>,
           );
         // 누른 카드: 그 카드 줄 바로 아래 가로 꽉 차게. 남의 카드는 '파티장 지정 · 빼기', 내 카드는 '파티 나가기'(파티장은 '파티 지우기'도)
         // (제작자 요청 2026-11-02 '카드 누르면 파티장 주게', '파티 나가기도 본인 카드 누르면')
-        const at = open !== null && (canManage || open === me.id) ? p.members.findIndex((m) => m.id === open) : -1;
+        const at =
+          open !== null && (canManage || open === me.id)
+            ? p.members.findIndex((m) => m.id === open)
+            : -1;
         if (at >= 0)
           cells.splice(
             Math.min(cells.length, at - (at % 2) + 2),
@@ -186,27 +286,65 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
               <div className="pill-row">
                 {open === me.id ? (
                   <>
-                    <button className={"pill" + (sure === "leave" ? " gd-sure" : "")} disabled={busy} onClick={() => twice("leave", () => void act(() => leaveParty(p.id)))}>
+                    <button
+                      className={"pill" + (sure === "leave" ? " gd-sure" : "")}
+                      disabled={busy}
+                      onClick={() =>
+                        twice("leave", () => void act(() => leaveParty(p.id)))
+                      }
+                    >
                       {sure === "leave" ? "정말 나가기" : "파티 나가기"}
                     </button>
                     {canManage && open === p.leader && (
-                      <button className={"pill" + (sure === "del" ? " gd-sure" : "")} disabled={busy} onClick={() => twice("del", () => void act(() => deleteParty(p.id)))}>
+                      <button
+                        className={"pill" + (sure === "del" ? " gd-sure" : "")}
+                        disabled={busy}
+                        onClick={() =>
+                          twice("del", () => void act(() => deleteParty(p.id)))
+                        }
+                      >
                         {sure === "del" ? "정말 파티 지우기" : "파티 지우기"}
                       </button>
                     )}
                   </>
                 ) : open !== p.leader ? (
                   <>
-                    <button className="pill" disabled={busy} onClick={() => void act(() => editParty(p.id, { leader: open! }))}>
+                    <button
+                      className="pill"
+                      disabled={busy}
+                      onClick={() =>
+                        void act(() => editParty(p.id, { leader: open! }))
+                      }
+                    >
                       파티장 지정
                     </button>
-                    <button className={"pill" + (sure === "rm" + open ? " gd-sure" : "")} disabled={busy} onClick={() => twice("rm" + open, () => void act(() => editParty(p.id, { remove: [open!] })))}>
+                    <button
+                      className={
+                        "pill" + (sure === "rm" + open ? " gd-sure" : "")
+                      }
+                      disabled={busy}
+                      onClick={() =>
+                        twice(
+                          "rm" + open,
+                          () =>
+                            void act(() =>
+                              editParty(p.id, { remove: [open!] }),
+                            ),
+                        )
+                      }
+                    >
                       {sure === "rm" + open ? "정말 빼기" : "빼기"}
                     </button>
                   </>
                 ) : (
                   // 운영진이 남의 파티장 카드를 누른 때
-                  <button className={"pill" + (sure === "del" ? " gd-sure" : "")} disabled={busy} onClick={() => twice("del", () => void act(() => deleteParty(p.id)))}>
+                  <button
+                    className={"pill" + (sure === "del" ? " gd-sure" : "")}
+                    disabled={busy}
+                    onClick={() =>
+                      twice("del", () => void act(() => deleteParty(p.id)))
+                    }
+                  >
                     {sure === "del" ? "정말 파티 지우기" : "파티 지우기"}
                   </button>
                 )}
@@ -241,7 +379,16 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
           <small>모두 확정</small>
           {!past && (
             <div className="gd-btns">
-              <button className={"pill gd-no" + (sure === "no" ? " gd-sure" : "")} disabled={busy} onClick={() => twice("no", () => void run(() => answerGd(p.confirmed!, "no")))}>
+              <button
+                className={"pill gd-no" + (sure === "no" ? " gd-sure" : "")}
+                disabled={busy}
+                onClick={() =>
+                  twice(
+                    "no",
+                    () => void run(() => answerGd(p.confirmed!, "no")),
+                  )
+                }
+              >
                 {sure === "no" ? "정말 불참" : "불참"}
               </button>
             </div>
@@ -256,16 +403,31 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
             {p.yes.length > 0 && ` · ${p.yes.join(", ")}`}
           </small>
           <div className="pill-row gd-btns">
-            <button className={"pill gd-yes" + (p.yes.includes(me.id) ? " pill-on" : "")} disabled={busy || p.yes.includes(me.id)} onClick={() => void run(() => answerGd(p.current!, "yes"))}>
+            <button
+              className={
+                "pill gd-yes" + (p.yes.includes(me.id) ? " pill-on" : "")
+              }
+              disabled={busy || p.yes.includes(me.id)}
+              onClick={() => void run(() => answerGd(p.current!, "yes"))}
+            >
               {p.yes.includes(me.id) ? "확정함" : "확정"}
             </button>
-            <button className={"pill gd-no" + (sure === "no" ? " gd-sure" : "")} disabled={busy} onClick={() => twice("no", () => void run(() => answerGd(p.current!, "no")))}>
+            <button
+              className={"pill gd-no" + (sure === "no" ? " gd-sure" : "")}
+              disabled={busy}
+              onClick={() =>
+                twice("no", () => void run(() => answerGd(p.current!, "no")))
+              }
+            >
               {sure === "no" ? "정말 불참" : "불참"}
             </button>
           </div>
           {next.length > 0 && (
             <p className="gd-next">
-              다음 {next.map((s) => `${candidateNo(p, s)}번 ${slotShort(week, s)}`).join(" · ")}
+              다음{" "}
+              {next
+                .map((s) => `${candidateNo(p, s)}번 ${slotShort(week, s)}`)
+                .join(" · ")}
             </p>
           )}
         </div>
@@ -286,7 +448,11 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
               </s>
               <small> {r.by.join(", ")} 불참</small>
               {myNo(r.slot) && (
-                <button className="bd-mini" disabled={busy} onClick={() => void run(() => undoAnswer(r.slot))}>
+                <button
+                  className="bd-mini"
+                  disabled={busy}
+                  onClick={() => void run(() => undoAnswer(r.slot))}
+                >
                   되돌리기
                 </button>
               )}
@@ -294,13 +460,22 @@ function PartyPanel({ me, data, party: p, onParty, onReload, onError }: {
           ))}
         </ul>
       )}
-
     </section>
   );
 }
 
 /** 파티가 없을 때: 파티 만들기 (만든 사람이 파티장, 나 빼고 3명까지, 이름은 'OO 팀') */
-function NewParty({ me, data, onDone, onError }: { me: Me; data: GdData; onDone: () => void; onError: (e: string) => void }) {
+function NewParty({
+  me,
+  data,
+  onDone,
+  onError,
+}: {
+  me: Me;
+  data: GdData;
+  onDone: () => void;
+  onError: (e: string) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   return (
@@ -340,21 +515,41 @@ function NewParty({ me, data, onDone, onError }: { me: Me; data: GdData; onDone:
 }
 
 /** 1군에서 사람 고르기 (닉네임 찾기, 다른 파티에 없는 사람만) */
-function PeoplePicker({ people, exclude, max, busy, action, allowEmpty = false, onPick }: {
-  people: GdPerson[]; exclude: string[]; max: number; busy: boolean; action: string; allowEmpty?: boolean; onPick: (ids: string[]) => void;
+function PeoplePicker({
+  people,
+  exclude,
+  max,
+  busy,
+  action,
+  allowEmpty = false,
+  onPick,
+}: {
+  people: GdPerson[];
+  exclude: string[];
+  max: number;
+  busy: boolean;
+  action: string;
+  allowEmpty?: boolean;
+  onPick: (ids: string[]) => void;
 }) {
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
   const list = people
     .filter((x) => !exclude.includes(x.id) && !picked.includes(x.id))
-    .filter((x) => !q.trim() || x.id.toLowerCase().includes(q.trim().toLowerCase()))
+    .filter(
+      (x) => !q.trim() || x.id.toLowerCase().includes(q.trim().toLowerCase()),
+    )
     .slice(0, 12);
   return (
     <div className="gd-picker">
       {picked.length > 0 && (
         <p className="gd-picked">
           {picked.map((id) => (
-            <button key={id} className="pill pill-on" onClick={() => setPicked(picked.filter((x) => x !== id))}>
+            <button
+              key={id}
+              className="pill pill-on"
+              onClick={() => setPicked(picked.filter((x) => x !== id))}
+            >
               {id} ✕
             </button>
           ))}
@@ -362,23 +557,42 @@ function PeoplePicker({ people, exclude, max, busy, action, allowEmpty = false, 
       )}
       {picked.length < max && (
         <>
-          <input className="mk-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="닉네임 찾기 (1군)" aria-label="닉네임 찾기" />
+          <input
+            className="mk-input"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="닉네임 찾기 (1군)"
+            aria-label="닉네임 찾기"
+          />
           <ul className="gd-people">
             {list.map((x) => (
               <li key={x.id}>
-                <button onClick={() => (setPicked([...picked, x.id]), setQ(""))}>
+                <button
+                  onClick={() => (setPicked([...picked, x.id]), setQ(""))}
+                >
                   <b>
                     <Nick name={x.id} />
                   </b>
-                  {x.level !== null && <small>Lv.{x.level}{x.job ? ` ${JOB_NAME[x.job as Job] ?? ""}` : ""}</small>}
+                  {x.level !== null && (
+                    <small>
+                      Lv.{x.level}
+                      {x.job ? ` ${JOB_NAME[x.job as Job] ?? ""}` : ""}
+                    </small>
+                  )}
                 </button>
               </li>
             ))}
-            {!list.length && <li className="gd-people-none">고를 사람이 없어요</li>}
+            {!list.length && (
+              <li className="gd-people-none">고를 사람이 없어요</li>
+            )}
           </ul>
         </>
       )}
-      <button className="pill gd-make" disabled={busy || (!allowEmpty && !picked.length)} onClick={() => onPick(picked)}>
+      <button
+        className="pill gd-make"
+        disabled={busy || (!allowEmpty && !picked.length)}
+        onClick={() => onPick(picked)}
+      >
         {action}
         {picked.length > 0 && ` (${picked.length}명)`}
       </button>
@@ -394,7 +608,13 @@ function Head({ week }: { week: number }) {
       {Array.from({ length: COLS }, (_, c) => {
         const h = colHead(week, c);
         return (
-          <span key={c} className={"gd-head" + (h.day === "토" || h.day === "일" ? " gd-weekend" : "")}>
+          <span
+            key={c}
+            className={
+              "gd-head" +
+              (h.day === "토" || h.day === "일" ? " gd-weekend" : "")
+            }
+          >
             <b>{h.day}</b>
             <small>{h.date}</small>
           </span>
@@ -405,7 +625,17 @@ function Head({ week }: { week: number }) {
 }
 
 /** 내 시간표: 칸을 누르고 끌어서 칠한다. 손을 떼면 저장 */
-function MyTimes({ me, data, onSaved, onError }: { me: string; data: GdData; onSaved: (p: PartyState | null | undefined) => void; onError: (e: string) => void }) {
+function MyTimes({
+  me,
+  data,
+  onSaved,
+  onError,
+}: {
+  me: string;
+  data: GdData;
+  onSaved: (p: PartyState | null | undefined) => void;
+  onError: (e: string) => void;
+}) {
   const [bits, setBits] = useState(data.mine ?? EMPTY);
   const [state, setState] = useState<"" | "saving" | "saved">("");
   const bitsRef = useRef(bits);
@@ -447,7 +677,10 @@ function MyTimes({ me, data, onSaved, onError }: { me: string; data: GdData; onS
   }
   const setCell = (i: number, val: boolean) => {
     if (locked(i) || (bitsRef.current[i] === "1") === val) return;
-    const b = bitsRef.current.slice(0, i) + (val ? "1" : "0") + bitsRef.current.slice(i + 1);
+    const b =
+      bitsRef.current.slice(0, i) +
+      (val ? "1" : "0") +
+      bitsRef.current.slice(i + 1);
     bitsRef.current = b;
     setBits(b);
     if (drag.current) drag.current.changed = true;
@@ -479,16 +712,27 @@ function MyTimes({ me, data, onSaved, onError }: { me: string; data: GdData; onS
   /** 전주 복사: 칸 자리가 요일·시각마다 같아서 지난주 시간표를 그대로 옮긴다 (목 10시에 새 주가 되면 시간표는 빈다) */
   const fill = (from: string) => {
     let b = "";
-    for (let i = 0; i < from.length; i++) b += locked(i) ? bitsRef.current[i] : from[i] === "1" && validSlot(i) ? "1" : "0";
+    for (let i = 0; i < from.length; i++)
+      b += locked(i)
+        ? bitsRef.current[i]
+        : from[i] === "1" && validSlot(i)
+          ? "1"
+          : "0";
     setBits(b);
     void save(b);
   };
-  const count = useMemo(() => [...bits].filter((c, i) => c === "1" && validSlot(i)).length, [bits]);
+  const count = useMemo(
+    () => [...bits].filter((c, i) => c === "1" && validSlot(i)).length,
+    [bits],
+  );
   // 파티원이 모두 되는 칸 (내 칸은 지금 칠한 대로, 다른 사람은 받은 시간표로. 모두 칠했을 때만)
   const party = data.party;
   const others = party ? party.members.filter((m) => m.id !== me) : [];
   const ready = !!party && party.members.every((m) => m.filled || m.id === me);
-  const allAt = (i: number) => ready && bits[i] === "1" && others.every((m) => party!.avail[m.id]?.[i] === "1");
+  const allAt = (i: number) =>
+    ready &&
+    bits[i] === "1" &&
+    others.every((m) => party!.avail[m.id]?.[i] === "1");
 
   return (
     <section className="panel gd-times">
@@ -497,7 +741,13 @@ function MyTimes({ me, data, onSaved, onError }: { me: string; data: GdData; onS
         <b>내 시간표</b>
         <small>
           {count ? `${count / 2}시간` : "칠한 때 없음"}
-          {lock ? " · 확정" : state === "saving" ? " · 저장 중" : state === "saved" ? " · 저장됨" : ""}
+          {lock
+            ? " · 확정"
+            : state === "saving"
+              ? " · 저장 중"
+              : state === "saved"
+                ? " · 저장됨"
+                : ""}
         </small>
         <span className="gd-tools">
           {!lock && data.prev && data.prev !== bits && (
@@ -510,7 +760,10 @@ function MyTimes({ me, data, onSaved, onError }: { me: string; data: GdData; onS
               모두 지우기
             </button>
           )}
-          <button className={"pill gd-lock" + (lock ? "" : " pill-on")} onClick={() => setLock(!lock)}>
+          <button
+            className={"pill gd-lock" + (lock ? "" : " pill-on")}
+            onClick={() => setLock(!lock)}
+          >
             {lock ? "수정" : "확정"}
           </button>
         </span>
@@ -528,7 +781,17 @@ function MyTimes({ me, data, onSaved, onError }: { me: string; data: GdData; onS
           <Row key={r} row={r}>
             {(i) => {
               const m = candMark(party, i);
-              const cls = "gd-cell" + hourLine(i) + (locked(i) ? " gd-off" : allAt(i) ? " gd-all" : bits[i] === "1" ? " gd-on" : "") + m.cls;
+              const cls =
+                "gd-cell" +
+                hourLine(i) +
+                (locked(i)
+                  ? " gd-off"
+                  : allAt(i)
+                    ? " gd-all"
+                    : bits[i] === "1"
+                      ? " gd-on"
+                      : "") +
+                m.cls;
               return (
                 <span key={i} data-slot={i} className={cls}>
                   {m.no > 0 && <b>{m.no}</b>}
@@ -547,10 +810,20 @@ function MyTimes({ me, data, onSaved, onError }: { me: string; data: GdData; onS
  * 후보 칸 표시 (내 시간표와 교집합에 똑같이, 제작자 요청 2026-11-02): 지금 후보는 초록 테두리, 확정은 흰 테두리와 빛, 무산은 붉은 빗금,
  * 그리고 칸 안에 후보 번호 (빠른 순 1부터)
  */
-function candMark(p: PartyState | null, i: number): { cls: string; no: number } {
+function candMark(
+  p: PartyState | null,
+  i: number,
+): { cls: string; no: number } {
   if (!p) return { cls: "", no: 0 };
   const no = p.candidates.indexOf(i) + 1;
-  const cls = i === p.confirmed ? " gd-is-confirmed" : i === p.current ? " gd-is-current" : p.rejected.some((r) => r.slot === i) ? " gd-is-rejected" : "";
+  const cls =
+    i === p.confirmed
+      ? " gd-is-confirmed"
+      : i === p.current
+        ? " gd-is-current"
+        : p.rejected.some((r) => r.slot === i)
+          ? " gd-is-rejected"
+          : "";
   return { cls, no };
 }
 
@@ -563,8 +836,11 @@ function Legend({ mine = false }: { mine?: boolean }) {
           <i className="gd-cell gd-on" /> 내 시간{" "}
         </>
       )}
-      <i className="gd-cell gd-all" /> 모두 됨 <i className="gd-cell gd-is-current" /> 지금 후보 <i className="gd-cell gd-is-confirmed" /> 확정{" "}
-      <i className="gd-cell gd-is-rejected" /> 무산 <span className="gd-legend-no">1</span> 후보 번호
+      <i className="gd-cell gd-all" /> 모두 됨{" "}
+      <i className="gd-cell gd-is-current" /> 지금 후보{" "}
+      <i className="gd-cell gd-is-confirmed" /> 확정{" "}
+      <i className="gd-cell gd-is-rejected" /> 무산{" "}
+      <span className="gd-legend-no">1</span> 후보 번호
     </p>
   );
 }
@@ -576,10 +852,18 @@ const hourLine = (i: number) => {
 };
 
 /** 한 줄: 왼쪽 시간 이름과 7칸 */
-function Row({ row, children }: { row: number; children: (i: number) => JSX.Element }) {
+function Row({
+  row,
+  children,
+}: {
+  row: number;
+  children: (i: number) => JSX.Element;
+}) {
   return (
     <>
-      <span className={"gd-time" + (row % 2 ? "" : " gd-hour")}>{rowLabel(row)}</span>
+      <span className={"gd-time" + (row % 2 ? "" : " gd-hour")}>
+        {rowLabel(row)}
+      </span>
       {Array.from({ length: COLS }, (_, c) => children(slotOf(c, row)))}
     </>
   );
@@ -590,7 +874,8 @@ function HeatTimes({ data, party: p }: { data: GdData; party: PartyState }) {
   const [pick, setPick] = useState<number | null>(null);
   const ids = p.members.map((m) => m.id);
   const total = ids.length;
-  const countAt = (i: number) => ids.filter((id) => p.avail[id]?.[i] === "1").length;
+  const countAt = (i: number) =>
+    ids.filter((id) => p.avail[id]?.[i] === "1").length;
   const off = (i: number) => !validSlot(i);
   return (
     <section className="panel gd-times">
@@ -610,11 +895,22 @@ function HeatTimes({ data, party: p }: { data: GdData; party: PartyState }) {
               const cls =
                 "gd-cell" +
                 hourLine(i) +
-                (off(i) ? " gd-off" : n === total && total > 0 ? " gd-all" : n > 0 ? ` gd-h${Math.min(3, Math.ceil((n / total) * 3))}` : "") +
+                (off(i)
+                  ? " gd-off"
+                  : n === total && total > 0
+                    ? " gd-all"
+                    : n > 0
+                      ? ` gd-h${Math.min(3, Math.ceil((n / total) * 3))}`
+                      : "") +
                 m.cls +
                 (pick === i ? " gd-picked" : "");
               return (
-                <span key={i} data-slot={i} className={cls} onClick={() => !off(i) && setPick(pick === i ? null : i)}>
+                <span
+                  key={i}
+                  data-slot={i}
+                  className={cls}
+                  onClick={() => !off(i) && setPick(pick === i ? null : i)}
+                >
                   {m.no > 0 && <b>{m.no}</b>}
                 </span>
               );
@@ -625,8 +921,19 @@ function HeatTimes({ data, party: p }: { data: GdData; party: PartyState }) {
       {pick !== null && (
         <p className="gd-who">
           <b>{slotText(data.week, pick)}</b>
-          <span> 됨 {ids.filter((id) => p.avail[id]?.[pick] === "1").join(", ") || "없음"}</span>
-          {ids.some((id) => p.avail[id]?.[pick] !== "1") && <span className="gd-who-no"> · 안 됨 {ids.filter((id) => p.avail[id]?.[pick] !== "1").join(", ")}</span>}
+          <span>
+            {" "}
+            됨{" "}
+            {ids.filter((id) => p.avail[id]?.[pick] === "1").join(", ") ||
+              "없음"}
+          </span>
+          {ids.some((id) => p.avail[id]?.[pick] !== "1") && (
+            <span className="gd-who-no">
+              {" "}
+              · 안 됨{" "}
+              {ids.filter((id) => p.avail[id]?.[pick] !== "1").join(", ")}
+            </span>
+          )}
         </p>
       )}
       <Legend />
@@ -646,7 +953,13 @@ function AllParties({ data }: { data: GdData }) {
           <li key={p.id}>
             <div className="gd-all-head">
               <b>{p.name}</b>
-              <small>{p.confirmed !== null ? `${slotShort(data.week, p.confirmed)} 확정` : p.current !== null ? "정하는 중" : "모으는 중"}</small>
+              <small>
+                {p.confirmed !== null
+                  ? `${slotShort(data.week, p.confirmed)} 확정`
+                  : p.current !== null
+                    ? "정하는 중"
+                    : "모으는 중"}
+              </small>
             </div>
             <p className="gd-all-members">
               {p.members.map((id) => (

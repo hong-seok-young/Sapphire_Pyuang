@@ -17,42 +17,30 @@
 //   폰의 뒤로 가기나 '그만'으로 꺼진다 (제작자 요청 2026-11-02): 열 때 방문 기록을 하나 넣어 두고(사진 크게 보기와 같은 방법) 뒤로 가기가 그 기록을 빼면 닫는다.
 //   그만·끝으로 닫을 때는 넣어 둔 기록을 뺀다 (안 빼면 다음 뒤로 가기가 한 번 헛돈다). 튜토리얼이 다른 주소로 옮긴 채 끝나면 그 기록을 그 주소로 남긴다
 //   (뒤로 가기가 시작한 화면으로 가게). 눌러 보기로 사용자가 새 화면에 들어가 기록이 그 뒤에 쌓이면, 나중에 뒤로 가다 그 기록에 닿을 때 한 번 더 뒤로 가 건너뛴다 (skipStale).
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { Me } from "./auth";
 import { GUIDES, canSee, guideByTitle } from "./guides";
 import { go as goRoute } from "./router";
+import {
+  startTutorial,
+  stopTutorial,
+  tutorialOpen,
+  useTutorial,
+} from "./tutorialState";
 import type { Guide, GuideStep } from "./guides";
 import { WeatherFx } from "./pages/Weather";
 
-// ---------- 열기 (작은 바깥 저장소: TopBar 는 me 를 모른다) ----------
-let openKey: string | null = null;
-let openSeq = 0;
-const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((l) => l());
+// ---------- 열기 (작은 바깥 저장소 src/tutorialState.ts: TopBar 는 me 를 모르고, 화면들은 useSample 로 예시 자료를 보인다) ----------
 /** 제목으로 튜토리얼 시작 (설명이 없는 제목이면 아무 일도 없다. 도는 중에 다시 누르면 처음부터) */
 export function openGuide(title: string) {
   const g = guideByTitle(title);
   if (!g) return;
-  openKey = g.key;
-  openSeq++;
-  emit();
+  startTutorial(g.key);
 }
 export const hasGuide = (title: string) => !!guideByTitle(title);
-function useOpen() {
-  return useSyncExternalStore(
-    (l) => {
-      listeners.add(l);
-      return () => listeners.delete(l);
-    },
-    () => (openKey === null ? "" : `${openSeq}:${openKey}`),
-  );
-}
-const close = () => {
-  openKey = null;
-  emit();
-};
+const close = () => stopTutorial();
 /** 넣어 둔 튜토리얼 기록이 시작한 화면과 같은 주소 그대로인지 (튜토리얼이 go 로 옮긴 채 끝났으면 다른 주소라 진짜 화면 하나로 남긴다) */
 const dupEntry = () =>
   !!history.state?.tut &&
@@ -60,12 +48,12 @@ const dupEntry = () =>
 const norm = (h: string) => h.replace(/^#\/?/, "");
 // 튜토리얼이 닫힌 뒤 남은 '튜토리얼 기록'(state.tut, 같은 주소)에 뒤로 가기로 닿으면 한 번 더 뒤로 가서 건너뛴다 (화면이 안 바뀌는 헛도는 뒤로 가기를 없앤다)
 window.addEventListener("popstate", () => {
-  if (openKey === null && dupEntry()) history.back();
+  if (!tutorialOpen() && dupEntry()) history.back();
 });
 
 /** App 이 한 번 그린다: 진행 중인 튜토리얼 */
 export function GuideHost({ me }: { me: Me }) {
-  const open = useOpen();
+  const open = useTutorial();
   if (!open) return null;
   const key = open.slice(open.indexOf(":") + 1);
   const guide = GUIDES.find((g) => g.key === key);
@@ -152,6 +140,16 @@ function alreadyDone(el: HTMLElement | null, step: GuideStep): boolean {
  * 이전으로 눌러 보기 단계에 돌아올 때 열어 둔 것을 닫는다 (제작자 요청 2026-11-02 '이전으로 화면까지 다 돌아오는지'): 닫는 단추가 있으면(data-tut-dismiss:
  * 장비대여 정보창의 바깥, 배치 편집의 완료) 그것을, 없으면 그 자리를 한 번 더 눌러 접는다 (토글). 탭(undo: false)은 그대로 둔다. 닫았으면 true
  */
+/** React 가 관리하는 입력 칸에 글을 넣는다 (native setter + input 이벤트) */
+function setInputValue(el: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    "value",
+  )?.set;
+  if (setter) setter.call(el, value);
+  else el.value = value;
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
 function undoTap(el: HTMLElement | null, step: GuideStep): boolean {
   if (!step.tap || step.fx || step.undo === false || !alreadyDone(el, step))
     return false;
@@ -189,6 +187,18 @@ function Tutorial({
   const going = useRef(false);
   /** 이 단계에서 눌러 이미 넘어가는 중 (두 번 눌러 두 단계 건너뛰지 않게) */
   const fired = useRef(false);
+  /** 튜토리얼이 대신 눌러 연 단계들: 끝날 때 닫는다 (제작자 2026-11-03 '튜토리얼이 끝나면 튜토리얼 때문에 열린 것도 닫아야지') */
+  const tapped = useRef(new Set<number>());
+  /** 튜토리얼이 입력 칸에 적어 둔 예시 글: 그 단계를 떠나거나 끝날 때 원래대로 */
+  const typed = useRef(
+    new Map<number, { el: HTMLInputElement; prev: string }>(),
+  );
+  const untype = (k: number) => {
+    const t = typed.current.get(k);
+    if (!t) return;
+    typed.current.delete(k);
+    if (t.el.isConnected) setInputValue(t.el, t.prev);
+  };
   /** 눌러 준 뒤 잠깐 기다렸다 넘어가는 타이머: 단계가 바뀌면 지운다 (제작자 2026-11-03: 이전을 눌렀는데 전으로 갔다가 다시 돌아왔다 = 남아 있던 타이머) */
   const timer = useRef(0);
   const later = (fn: () => void, ms: number) => {
@@ -199,8 +209,19 @@ function Tutorial({
   const shownAddr = useRef<Record<number, string>>({});
   const sameAddr = (a: string, b: string) => norm(a) === norm(b);
   const pushed = useRef(false);
-  /** 그만·끝·다른 메뉴로 닫기: 넣어 둔 기록이 시작한 화면과 같은 주소 그대로면 빼고, 다른 주소로 옮겨 있으면 그 화면으로 남긴다 */
+  /** 튜토리얼이 열어 둔 것을 모두 닫고 적은 글을 되돌린다 (뒤에 연 것부터) */
+  const closeAll = () => {
+    for (const k of typed.current.keys()) untype(k);
+    for (const k of [...tapped.current].sort((a, b) => b - a)) {
+      const s = steps[k];
+      if (!s?.sel) continue;
+      undoTap(find(s.sel), s);
+    }
+    tapped.current.clear();
+  };
+  /** 그만·끝·다른 메뉴로 닫기: 열어 둔 것을 닫고, 넣어 둔 기록이 시작한 화면과 같은 주소 그대로면 빼고, 다른 주소로 옮겨 있으면 그 화면으로 남긴다 */
   const finish = () => {
+    closeAll();
     if (pushed.current) {
       pushed.current = false;
       if (dupEntry()) history.back();
@@ -211,6 +232,8 @@ function Tutorial({
   };
   const finishRef = useRef(finish);
   finishRef.current = finish;
+  const closeAllRef = useRef(closeAll);
+  closeAllRef.current = closeAll;
 
   // 단계가 바뀌면: 이동(go) -> 자리 찾기(1.5초까지) -> 보이게 스크롤. 못 찾으면 건너뛴다
   useEffect(() => {
@@ -232,6 +255,16 @@ function Tutorial({
         await raf();
         going.current = false;
       }
+      // 예시 글 적기 (팔기의 아이템 이름에 위키에 없는 이름을 적어 '스샷 올리기'가 나오게. 떠나면 원래대로)
+      if (step.type) {
+        const inp = find(step.type.sel) as HTMLInputElement | null;
+        if (inp && inp.value !== step.type.value) {
+          typed.current.set(i, { el: inp, prev: inp.value });
+          setInputValue(inp, step.type.value);
+          await raf(2);
+          if (!alive) return;
+        }
+      }
       let el: HTMLElement | null = null;
       if (step.sel) {
         // 이전으로 돌아올 때, 연 것이 무엇인지(opens·closes) 아는 눌러 보기 단계는 자리를 찾기 전에 먼저 닫는다
@@ -240,8 +273,10 @@ function Tutorial({
           dir.current < 0 &&
           (step.opens || step.closes) &&
           undoTap(null, step)
-        )
+        ) {
+          tapped.current.delete(i);
           await raf(2);
+        }
         el = await poll(() => find(step.sel as string), move ? 1500 : 800);
         if (!alive) return;
         // 이전으로 돌아왔는데 자리가 없으면(완료 단추는 편집 중에만 있다) 앞 단계가 열었던 것을 다시 열어 본다
@@ -253,6 +288,7 @@ function Tutorial({
             const e = s.sel ? find(s.sel) : null;
             if (!e) continue;
             e.click();
+            tapped.current.add(k);
             await raf(2);
             if (!alive) return;
             el = await poll(() => find(step.sel as string), 600);
@@ -274,6 +310,7 @@ function Tutorial({
           !step.closes &&
           undoTap(el, step)
         ) {
+          tapped.current.delete(i);
           await raf(2);
           if (!alive) return;
         }
@@ -292,6 +329,7 @@ function Tutorial({
     })();
     return () => {
       alive = false;
+      untype(i);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i]);
@@ -305,6 +343,7 @@ function Tutorial({
     pushed.current = true;
     const onPop = () => {
       pushed.current = false;
+      closeAllRef.current();
       onEnd();
       // 눌러 보기로 들어간 화면에서 뒤로 와 넣어 둔 기록(같은 주소)에 닿은 것이면 한 번 더 뒤로 (시작한 화면으로)
       if (dupEntry()) history.back();
@@ -361,6 +400,7 @@ function Tutorial({
     if (step.tap && !step.fx && el && !alreadyDone(el, step)) {
       fired.current = true;
       el.click();
+      if (step.undo !== false) tapped.current.add(i);
       // 눌러서 열린 것이 그려지면 다음 단계가 자리를 찾는다 (다음 단계가 40ms 마다 찾으니 길게 기다리지 않는다)
       later(() => setI(i + 1), 40);
     } else setI(i + 1);

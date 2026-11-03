@@ -2,6 +2,8 @@
 // -> '설명서 필요 없고 바로 튜토리얼 시작하게' -> '홈 화면 설명은 길드마크 누르면. 패치나 배치도, 날씨도 비·눈·함박눈·빈 곳 누르기도 샘플로. 모든 메뉴 적용, 설명 다 빼').
 // -> 같은 날 '직관적으로 한 번에 알 수 있는 설명은 다 빼': 단추 이름·탭처럼 보면 아는 것은 적지 않고, 숨은 동작(꾹 누르기, 끌기, 줄 누르면 열림)과 규칙(보증금, 초기화 때, 선착순)만.
 // 제목(위 줄 배너, 홈은 길드마크)을 누르면 src/tutorial.tsx 의 Tutorial 이 화면의 그 자리를 하나씩 비춘다. 단계마다 head(무엇인지) 한 줄과 text(보면 모르는 것) 한두 문장.
+// 자료가 있어야 보이는 줄(물건, 의뢰, 무기, 파티, 모르는 질문, 이벤트 할 일)은 튜토리얼 동안 예시 자료(src/sample.ts, '예시' 표)를 끼워 넣어 늘 보인다
+// (제작자 2026-11-03: 내 물건으로 설명하다 지우면? 의뢰소는 '설명할 게 없다'고 떴다). 선택자는 '[data-tut-sample] …' 을 먼저 둔다.
 // 숨은 것이 없는 메뉴(정보, 공식 확률)는 튜토리얼이 없다 (제목을 눌러도 아무 일 없음). 첫 화면만이 아니라 안의 칸(팔기·내 판매·골드, 운영의 장비반납·물건 추가, 상점의 정산·예산,
 // 내 정보의 줄들)도 들어가 보며 거기에 설명할 것이 있을 때만 (제작자 2026-11-02 '버튼 하나하나 들어가면서 거기서 설명할 게 있으면. 설명할 게 없으면 안 해도 돼').
 // 단계는 그 사람의 권한(who)에 맞는 것만 돌고, 자리를 못 찾으면(자료가 없어서) 건너뛴다. 새 메뉴를 만들거나 단추를 바꾸면 여기도 같이 고친다. 이모지는 쓰지 않는다.
@@ -27,6 +29,8 @@ export interface GuideStep {
   closes?: string;
   /** false 면 이전으로 돌아와도 되돌리지 않는다 (탭 바꾸기: 그 탭이 보이는 채로 설명한다) */
   undo?: false;
+  /** 이 단계 동안 입력 칸(sel)에 적어 둘 예시 글 (팔기의 아이템 이름). 떠나면 원래대로 */
+  type?: { sel: string; value: string };
   /** 이 단계 전에 이동할 주소 */
   go?: string;
   /** 날씨 샘플: 이 단계 동안 그 날씨 효과를 화면에 그린다 (홈, 제작자 요청 2026-11-02) */
@@ -99,13 +103,14 @@ export const GUIDES: Guide[] = [
     key: "market",
     title: "사파이어 중개인",
     tutorial: [
-      { sel: ".mk-list .mk-row", head: "물건 줄", text: "살래요에 흥정 가격을 붙일 수 있어요. 누가 눌렀는지와 흥정 가격은 판 사람만 봐요.", tap: true, opens: ".mk-open .mk-detail" },
+      { sel: "[data-tut-sample] .mk-row, .mk-list .mk-row", head: "물건 줄", text: "살래요에 흥정 가격을 붙일 수 있어요. 누가 눌렀는지와 흥정 가격은 판 사람만 봐요.", tap: true, opens: ".mk-open .mk-detail" },
       { sel: ".mk-open .mk-detail", head: "정보창", text: "살래요가 2명 넘으면 경매로 바꿀 수 있어요. 올릴 때 미리 정해 두면 저절로 경매가 돼요." },
       { sel: "[role=tab]:has-text('팔기')", head: "팔기", text: "예약 판매는 언제 팔지 조건(날짜, 레벨, 다음 무기 구하면)을 적어 미리 올려요.", tap: true, opens: ".mk-form", undo: false },
       {
-        sel: ".mk-form",
+        sel: ".mk-shot-btn",
+        type: { sel: ".mk-form .mk-input", value: "길잡이의 검" },
         head: "스샷 올리기",
-        text: "위키에 없는 이름을 적으면 스샷 올리기가 나와요. AI 가 이름, 종류, 강화를 읽어 채워요.\n가격은 현금으로 적어도 돼요. 시세로 골드를 계산해 올라가요.",
+        text: "위키에 없는 이름을 적으면 이 단추가 나와요. 스샷을 고르면 AI 가 이름, 종류, 강화를 읽어 채워요.\n가격은 현금으로 적어도 돼요. 시세로 골드를 계산해 올라가요.",
       },
       {
         sel: "[role=tab]:has-text('내 판매')",
@@ -121,7 +126,7 @@ export const GUIDES: Guide[] = [
     key: "requests",
     title: "길드원 의뢰소",
     tutorial: [
-      { sel: ".mk-list .mk-row", head: "수락", text: "선착순이에요. 수락하고 이틀 안에 못 끝내면 다시 모집 중이 돼요. 실제 거래는 게임 안에서 해요." },
+      { sel: "[data-tut-sample] .mk-row, .mk-list .mk-row", head: "수락", text: "선착순이에요. 수락하고 이틀 안에 못 끝내면 다시 모집 중이 돼요. 실제 거래는 게임 안에서 해요." },
     ],
   },
   {
@@ -132,12 +137,19 @@ export const GUIDES: Guide[] = [
       {
         sel: ".main-tabs *:has-text('아이모 소식')",
         head: "아이모 소식",
-        text: "컴투스 공식 공지, 점검, 이벤트가 여기 들어와요. 새 글이 오면 알림이 가요.",
+        text: "컴투스 공식 공지, 점검, 이벤트를 30분마다 모아 와요 (점검 글은 2분마다 확인). 새 글이 오면 알림이 가요.",
         tap: true,
         opens: ".main-tab-on:has-text('아이모 소식')",
         undo: false,
       },
-      { go: "#/board?cat=imo", sel: ".off-row", head: "공식 글", text: "누르면 앱 안에서 읽어요. 위에 AI 핵심 요약이 붙고, 패치노트면 내 직업 변경점도 나와요.", tap: true },
+      {
+        go: "#/board?cat=notice",
+        sel: ".bd-write",
+        head: "공지 글쓰기",
+        text: "공지와 길드 이벤트에는 AI로 다듬기가 있어요. 쓴 사실은 그대로 두고 공지 모양으로 다듬은 글을 먼저 보여 주고, 적용을 눌러야 바뀌어요.",
+        who: "officer",
+      },
+      { go: "#/board?cat=imo", sel: ".off-row", head: "공식 글", text: "누르면 앱 안에서 읽어요. 처음 여는 사람 때 AI 가 핵심 요약을 만들고, 패치노트면 내 직업 변경점도 나와요.", tap: true },
     ],
   },
   {
@@ -169,7 +181,7 @@ export const GUIDES: Guide[] = [
     key: "rent",
     title: "장비대여",
     tutorial: [
-      { sel: ".rent-main", head: "무기 줄", text: "왼쪽 네모는 신청 담기예요. 여러 개 담아 아래 대여 신청으로 한 번에 보내요.", tap: true, opens: ".rent-pop" },
+      { sel: "[data-tut-sample] .rent-main, .rent-main", head: "무기 줄", text: "왼쪽 네모는 신청 담기예요. 여러 개 담아 아래 대여 신청으로 한 번에 보내요.", tap: true, opens: ".rent-pop" },
       { sel: ".rent-pop", head: "보증금", text: "다이아 가격은 보증금이에요. 1다이아 = 10만 골드. 반납하면 마일리지와 골드를 돌려받아요." },
       { go: "#/rent?v=apps", sel: "main", head: "신청함", text: "쓰는 무기 줄에서 반납 신청과 대화를 해요. 기부한 장비의 마일리지도 여기 보여요." },
       {
@@ -217,7 +229,12 @@ export const GUIDES: Guide[] = [
     key: "todo",
     title: "To do",
     tutorial: [
-      { sel: ".todo-row .todo-hit", head: "할 일 이름", text: "누르면 할 것과 손해 주의가 펼쳐져요.", tap: true, opens: ".todo-detail, .todo-acts" },
+      {
+        sel: ".todo-head:has-text('이벤트')",
+        head: "이벤트 할 일",
+        text: "AI 가 컴투스 공식 글을 읽고 기간 안에 챙길 일만 뽑아요. 공식 글은 30분마다 모으고, 이 화면을 열 때도 아직 안 읽은 글을 정리해요.",
+      },
+      { sel: "[data-tut-sample] .todo-hit, .todo-row .todo-hit", head: "할 일 이름", text: "누르면 AI 가 요약한 할 것과 손해 주의가 펼쳐져요.", tap: true, opens: ".todo-detail, .todo-acts" },
       { sel: ".todo-detail, .todo-acts", head: "함께", text: "고른 사람의 To do 에도 같은 줄이 생겨요. 수정과 숨김은 나에게만 적용돼요." },
     ],
   },
@@ -245,7 +262,7 @@ export const GUIDES: Guide[] = [
   {
     key: "alerts",
     title: "알림",
-    tutorial: [{ sel: ".alert-prefs", head: "알림 설정", text: "종류마다 끄고, 옆의 폰 표시로 폰 알림만 따로 끌 수 있어요." }],
+    tutorial: [{ sel: ".alert-prefs", head: "알림 설정", text: "종류마다 끄고, 옆의 폰 표시로 폰 알림만 따로 끌 수 있어요. 새 알림은 1분마다, 홈의 새 글 숫자는 2분마다 다시 세요." }],
   },
   {
     key: "search",
@@ -262,7 +279,7 @@ export const GUIDES: Guide[] = [
       {
         sel: ".chat-compose",
         head: "질문 칸",
-        text: "내 레벨과 직업, 길드 앱 자료까지 알아요. '내가 지금 할 것'처럼 물어보세요.\n사진을 올리면 직업과 레벨을 읽어 맞는 공략을 찾아요.",
+        text: "내 레벨과 직업, 길드 앱 자료까지 알아요. '내가 지금 할 것'처럼 물어보세요. 위키에 없으면 웹을 찾아 출처를 달아요.\n사진을 올리면 직업과 레벨을 읽어 맞는 공략을 찾아요. 답이 별로면 별로를 눌러요. 고치면 알림이 와요.",
       },
       { sel: ".topbar-action:has-text('목록')", head: "목록", text: "대화는 계정에 남아서 다른 폰에서도 이어서 물어요." },
     ],
@@ -299,7 +316,7 @@ export const GUIDES: Guide[] = [
     title: "챗봇 개선",
     tutorial: [
       {
-        sel: ".gap-card",
+        sel: "[data-tut-sample], .gap-card",
         head: "모르는 질문",
         text: "목록 복사로 Claude 에게 넘겨 고친 뒤 개선 완료를 누르면, 물은 사람에게 알림이 가고 같은 질문을 다시 물어요.",
       },

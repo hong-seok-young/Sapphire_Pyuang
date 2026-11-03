@@ -54,6 +54,9 @@ export function Nick({ name }: { name: string | null | undefined }) {
       <span className="hs-g" aria-hidden="true">
         {name}
       </span>
+      <span className="hs-s" aria-hidden="true">
+        {name}
+      </span>
     </span>
   );
 }
