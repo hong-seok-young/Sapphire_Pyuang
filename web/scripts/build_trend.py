@@ -500,8 +500,8 @@ def group_sort_key(kind: str, g: dict) -> tuple:
         if m:
             stat = m.group(1) or m.group(3)
             val = int(m.group(2) or m.group(4))
-            return (0, -val, ("힘", "민첩", "지능", "체력", "마나").index(stat))
-        return (1, 0, 0)
+            return (0 if stat in MAIN_STATS else 1, -val, ("힘", "민첩", "지능", "체력", "마나").index(stat))
+        return (2, 0, 0)
     return (0, -g["n"])
 
 

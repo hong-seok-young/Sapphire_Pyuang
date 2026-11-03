@@ -2668,3 +2668,82 @@ button.gd-member-row { cursor: pointer; }
 .trend-dex-table th { text-align: left; font-weight: 400; color: var(--muted); padding: 2px 4px; border-bottom: var(--px) solid var(--edge); }
 .trend-dex-table td { padding: 3px 4px; border-bottom: var(--px) dashed var(--edge); }
 .trend-dex-table td:last-child, .trend-dex-table th:last-child { text-align: right; color: var(--sapphire-light, #8fb4ff); white-space: nowrap; }
+
+/* ---- 시세 동향 콤팩트 (제작자 요청 2026-11-03: 조잡하지 않고 한눈에 더 많이) ---- */
+.trend-stats { gap: 4px; margin-bottom: 8px; }
+.trend-stat { padding: 6px 4px; gap: 1px; font-size: 10px; }
+.trend-stat b { font-size: 16px; }
+.trend-chart svg { max-height: 150px; }
+.trend-note { margin: 4px 0 8px; }
+.trend-list { gap: 4px; }
+.trend-item { border: var(--px) solid var(--edge); background: var(--night-2); }
+.trend-item.mk-open { outline: 2px solid var(--sapphire); outline-offset: -2px; }
+.trend-itemrow { display: flex; align-items: flex-start; gap: 8px; width: 100%; padding: 6px 8px; background: none; border: 0; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.trend-itemrow .trend-slot { width: 32px; height: 32px; margin-top: 2px; }
+.trend-itemmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.trend-itemtitle { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.trend-itemtitle .row-title { font-size: 14px; white-space: nowrap; overflow: hidden; }
+.trend-itemtitle .trend-who { margin-left: auto; font-size: 11px; white-space: nowrap; }
+.trend-itemprice { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: none; }
+.trend-itemprice b { color: var(--gold); font-weight: 400; font-size: 14px; white-space: nowrap; }
+.trend-spark { width: 56px; height: 20px; }
+.trend-spark polyline { fill: none; stroke: var(--sapphire); stroke-width: 1.5; stroke-linejoin: round; }
+.trend-spark circle { fill: var(--sapphire); }
+.trend-groupchips { display: flex; flex-wrap: wrap; gap: 3px 4px; }
+.trend-gchip { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; font-size: 11px; background: rgba(7, 6, 15, 0.45); border: 1px solid rgba(169, 162, 207, 0.25); white-space: nowrap; }
+.trend-gchip em { font-style: normal; color: #ffb35c; }
+.trend-gchip-skill { color: #c9b8ff; }
+.trend-gchip-pvp { color: var(--red); }
+.trend-change-c { font-size: 10px; margin-left: 1px; }
+.trend-sub { font-size: 11px; line-height: 1.3; }
+.trend-itembody { padding: 4px 8px 8px; border-top: var(--px) dashed var(--edge); }
+.trend-item-chart { margin-bottom: 6px; }
+.trend-item-chart svg { max-height: 130px; }
+.trend-item-chart .trend-legend { font-size: 10px; gap: 3px 8px; margin-bottom: 4px; }
+.trend-pick { min-height: 0; margin-top: 4px; font-size: 11px; }
+.trend-tablebox { margin-top: 8px; }
+.trend-tablehead { font-size: 12px; margin-bottom: 4px; }
+.trend-tablehead b { color: var(--text); font-weight: 400; }
+.trend-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.trend-table th { text-align: left; font-weight: 400; color: var(--muted); font-size: 10px; padding: 2px 4px; border-bottom: var(--px) solid var(--edge); }
+.trend-table td { padding: 4px 4px; border-bottom: 1px solid rgba(169, 162, 207, 0.15); vertical-align: top; }
+.trend-table .trend-num { text-align: right; white-space: nowrap; }
+.trend-table td b { color: var(--gold); font-weight: 400; }
+.trend-good { color: #3fe0a0; }
+.trend-bad { color: var(--red); }
+.trend-linkbtn { display: block; margin: 4px 0 0 auto; padding: 2px 6px; background: none; border: 0; color: var(--muted); font: inherit; font-size: 11px; cursor: pointer; text-decoration: underline; }
+.trend-grouptable { margin-top: 2px; }
+.trend-grouprow { cursor: pointer; }
+.trend-grouprow-open td { background: rgba(169, 162, 207, 0.08); }
+.trend-glabel { color: #ffb35c; white-space: nowrap; }
+.trend-groupdetail td { padding: 6px 4px 8px; background: rgba(7, 6, 15, 0.25); }
+.trend-detailtitle { font-size: 10px; margin: 4px 0 3px; }
+.trend-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.trend-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px; font-size: 11px; background: var(--night-2); border: 1px solid rgba(169, 162, 207, 0.3); }
+.trend-chip b { color: var(--gold); font-weight: 400; }
+.trend-chip em { font-style: normal; color: #ffb35c; }
+.trend-chip small { font-size: 10px; }
+.trend-chip-cheap { border-color: #3fe0a0; }
+.trend-chip-cheap b { color: #3fe0a0; }
+.trend-chip-dear { border-color: var(--red); }
+.trend-chip-dear b { color: var(--red); }
+.trend-chip-more { color: var(--muted); font: inherit; font-size: 11px; cursor: pointer; }
+.trend-who { color: #c9b8ff; font-size: 12px; white-space: nowrap; }
+.trend-tel { margin-left: 3px; font-size: 9px; color: #3fe0a0; }
+.trend-tel-none { color: var(--muted); }
+.trend-sample-list li { font-size: 11px; line-height: 1.35; }
+.trend-sample-list b { color: var(--gold); font-weight: 400; }
+.trend-filter { gap: 4px; margin-bottom: 6px; }
+.trend-filter .pill { padding: 4px 9px; font-size: 12px; }
+.trend-filter-gap { flex-basis: 100%; height: 0; }
+.trend-sort:not(.pill-on) { opacity: 0.85; }
+.trend-bands { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 8px; font-size: 11px; }
+.trend-lv { width: 40px; height: 36px; margin-top: 1px; }
+.trend-lv small { font-size: 8px; }
+.trend-lv b { font-size: 15px; }
+.trend-charbody .trend-raw { margin-bottom: 4px; }
+.trend-dexgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 10px; margin: 6px 0 0; font-size: 11px; }
+.trend-dexgrid div { display: flex; justify-content: space-between; gap: 6px; padding: 1px 0; border-bottom: 1px dashed rgba(169, 162, 207, 0.2); }
+.trend-dexgrid dt { white-space: nowrap; }
+.trend-dexgrid dd { margin: 0; color: #8fb4ff; text-align: right; white-space: nowrap; }
+.trend-src { margin-top: 6px; font-size: 10px; }

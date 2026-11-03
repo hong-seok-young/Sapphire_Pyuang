@@ -4,9 +4,9 @@
 import { useCallback, useMemo, useState } from "react";
 import type { PointerEvent } from "react";
 import { loadTrend, useAsync } from "../data";
-import type { GoldDay, Trend, TrendChar, TrendGroup, TrendItem, TrendPerson, TrendVariant } from "../data";
+import type { GoldDay, Trend, TrendChar, TrendGroup, TrendItem, TrendPerson } from "../data";
 import { MARKET_PIC, goldWords, wonText } from "../market";
-import { FitLine, Loading, Panel, PicImg, TopBar } from "../ui";
+import { Loading, Panel, PicImg, TopBar } from "../ui";
 import type { Wiki } from "../types";
 
 /** 가격은 만 원 단위 (17 = 17만 원, 0.5 = 5000원) */
@@ -24,11 +24,15 @@ function median(xs: number[]): number | null {
 }
 
 /** 오르고 내린 표: 10% 넘게 달라졌을 때만 (게임처럼 오르면 빨강, 내리면 파랑) */
-function Change({ from, to }: { from: number | null; to: number | null }) {
+function Change({ from, to, compact = false }: { from: number | null; to: number | null; compact?: boolean }) {
   if (from === null || to === null || !from) return null;
   const pct = Math.round(((to - from) / from) * 100);
-  if (Math.abs(pct) < 10) return <span className="trend-flat">보합</span>;
-  return <span className={pct > 0 ? "trend-up" : "trend-down"}>{pct > 0 ? "▲" : "▼"} {Math.abs(pct)}%</span>;
+  if (Math.abs(pct) < 10) return compact ? null : <span className="trend-flat">보합</span>;
+  return (
+    <span className={(pct > 0 ? "trend-up" : "trend-down") + (compact ? " trend-change-c" : "")}>
+      {pct > 0 ? "▲" : "▼"}{compact ? "" : " "}{Math.abs(pct)}%
+    </span>
+  );
 }
 
 /** 날짜별 골드 시세 그림: 팝니다 중간값(파랑, 최소~최대 띠), 삽니다 중간값(금색). 날을 누르면 아래에 그날 값 */
@@ -105,90 +109,151 @@ function GoldChart({ days }: { days: GoldDay[] }) {
 }
 
 /** 최근 7일과 그 전 7일의 중간값 */
-/** 닉네임과 휴대폰 뒷자리 (있으면 인증, 없으면 미인증. 제작자 설명) */
+/** 가격 짧게 (칩, 표): 33만, 1.5만, 6700원 */
+const shortWon = (manwon: number) =>
+  manwon >= 10 ? `${Math.round(manwon)}만` : manwon >= 1 ? `${Math.round(manwon * 10) / 10}만` : `${Math.round(manwon * 10_000).toLocaleString("ko-KR")}원`;
+
+/** 닉네임과 휴대폰 뒷자리 (있으면 초록 숫자 = 인증, 없으면 회색 '미인증'. 제작자 설명) */
 function Who({ who, tel }: { who: string; tel: string }) {
   return (
-    <span className="trend-people-who">
+    <span className="trend-who">
       {who}
-      <small className={tel ? "trend-tel" : "trend-tel trend-tel-none"}>{tel ? `${tel} 인증` : "미인증"}</small>
+      <small className={tel ? "trend-tel" : "trend-tel trend-tel-none"}>{tel || "미인증"}</small>
     </span>
   );
 }
 
-/** 올린 사람 목록: 닉네임, 값, 글 수, 마지막 날. recent 면 최신순 (제작자 요청: 골드는 최신순), 아니면 싼 쪽부터.
- *  값이 가장 싼 사람과 가장 비싼 사람에게 표시 */
-function PeopleList({ title, people, value, recent = false }: { title: string; people: TrendPerson[]; value: (v: number) => string; recent?: boolean }) {
-  const [open, setOpen] = useState(false);
+/** 올린 사람을 한 줄 칩들로 (싼 쪽부터, 가장 싼 사람 초록·가장 비싼 사람 빨강). recent 면 최신순 */
+function PeopleChips({ people, value, recent = false, max = 12 }: { people: TrendPerson[]; value: (v: number) => string; recent?: boolean; max?: number }) {
+  const [all, setAll] = useState(false);
   if (!people.length) return null;
   const list = recent ? [...people].sort((a, b) => (a.last < b.last ? 1 : a.last > b.last ? -1 : b.n - a.n)) : people;
   const meds = people.map((p) => p.med);
   const cheap = Math.min(...meds), dear = Math.max(...meds);
-  const mark = (p: TrendPerson) => (cheap === dear ? "" : p.med === cheap ? "trend-cheap" : p.med === dear ? "trend-dear" : "");
+  const shown = all ? list : list.slice(0, max);
   return (
-    <div className="trend-people">
-      <button type="button" className={"pill" + (open ? " pill-on" : "")} onClick={() => setOpen(!open)}>
-        {title} ({people.length})
-      </button>
-      {open && (
-        <ul>
-          {list.map((p) => (
-            <li key={p.who + p.tel} className={mark(p)}>
-              <Who who={p.who} tel={p.tel} />
-              <span className="trend-sub muted">글 {p.n}개 · {md(p.last)}</span>
-              <b>{value(p.med)}</b>
-              {p.min !== p.max && <small className="muted">{value(p.min)} ~ {value(p.max)}</small>}
-            </li>
-          ))}
-        </ul>
+    <div className="trend-chips">
+      {shown.map((p) => (
+        <span key={p.who + p.tel} className={"trend-chip" + (cheap !== dear && p.med === cheap ? " trend-chip-cheap" : cheap !== dear && p.med === dear ? " trend-chip-dear" : "")}>
+          <Who who={p.who} tel={p.tel} />
+          <b>{value(p.med)}</b>
+          <small className="muted">{p.n > 1 ? `${p.n}건 · ` : ""}{md(p.last)}</small>
+        </span>
+      ))}
+      {list.length > max && (
+        <button type="button" className="trend-chip trend-chip-more" onClick={() => setAll(!all)}>
+          {all ? "접기" : `+${list.length - max}명`}
+        </button>
       )}
     </div>
   );
 }
 
+/** 작은 추세선 (날짜별 중간값). 줄 오른쪽에 들어간다 */
+function Spark({ days, cls = "" }: { days: [string, number][]; cls?: string }) {
+  if (days.length < 2) return null;
+  const W = 56, H = 20;
+  const vs = days.map((d) => d[1]);
+  const lo = Math.min(...vs), hi = Math.max(...vs);
+  const x = (i: number) => 2 + (i * (W - 4)) / (days.length - 1);
+  const y = (v: number) => (hi === lo ? H / 2 : 2 + ((hi - v) * (H - 4)) / (hi - lo));
+  const pts = days.map((d, i) => `${x(i).toFixed(1)},${y(d[1]).toFixed(1)}`).join(" ");
+  const last = days[days.length - 1][1];
+  return (
+    <svg className={"trend-spark " + cls} viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
+      <polyline points={pts} />
+      <circle cx={x(days.length - 1)} cy={y(last)} r={2} />
+    </svg>
+  );
+}
+
+/** 최근 7일과 그 전 7일의 중간값 */
 function weekMedians(days: GoldDay[], side: "sell" | "buy", lastWeek: string) {
   const recent = days.filter((d) => d.date >= lastWeek).map((d) => d[side]?.med).filter((v): v is number => v != null);
   const before = days.filter((d) => d.date < lastWeek).slice(-7).map((d) => d[side]?.med).filter((v): v is number => v != null);
   return { recent: median(recent), before: median(before) };
 }
 
+/** 골드: 요약 줄, 날짜 그림, 파는 사람·사는 사람 표 (최신순, 제작자 요청) */
 function GoldPanel({ t }: { t: Trend }) {
   const sell = weekMedians(t.gold, "sell", t.lastWeek);
   const buy = weekMedians(t.gold, "buy", t.lastWeek);
   const posts = t.gold.reduce((s, d) => s + d.posts.sell + d.posts.buy, 0);
+  const today = t.gold[t.gold.length - 1];
   return (
     <Panel title="골드 시세 (1만 원에 몇 만 골드)">
       <div className="trend-stats">
         <div className="trend-stat">
-          <span className="muted">팝니다 (7일)</span>
+          <span className="muted">팝니다 7일</span>
           <b>{sell.recent ?? "–"}:1</b>
           <Change from={sell.before} to={sell.recent} />
         </div>
         <div className="trend-stat">
-          <span className="muted">삽니다 (7일)</span>
+          <span className="muted">삽니다 7일</span>
           <b>{buy.recent ?? "–"}:1</b>
           <Change from={buy.before} to={buy.recent} />
         </div>
         <div className="trend-stat">
-          <span className="muted">골드 글</span>
-          <b>{posts}개</b>
-          <span className="muted">하루 {Math.round(posts / t.gold.length)}개</span>
+          <span className="muted">{md(today.date)} 글</span>
+          <b>{today.posts.sell + today.posts.buy}개</b>
+          <span className="muted">전체 {posts} · 하루 {Math.round(posts / t.gold.length)}</span>
         </div>
       </div>
       <GoldChart days={t.gold} />
       <p className="trend-note muted">숫자가 작을수록 비싼 골드 (70:1 = 1만 원에 70만 골드)</p>
-      <PeopleList title="골드 파는 사람 (최신순)" people={t.goldPeople.sell} value={(v) => `${v}:1`} recent />
-      <PeopleList title="골드 사는 사람 (최신순)" people={t.goldPeople.buy} value={(v) => `${v}:1`} recent />
+      <GoldPeople title="파는 사람" people={t.goldPeople.sell} />
+      <GoldPeople title="사는 사람" people={t.goldPeople.buy} />
     </Panel>
+  );
+}
+
+/** 골드 올린 사람 표: 닉 · 시세 · 글 · 마지막 날, 최신순. 가장 싼 값 초록, 가장 비싼 값 빨강 */
+function GoldPeople({ title, people }: { title: string; people: TrendPerson[] }) {
+  const [all, setAll] = useState(false);
+  if (!people.length) return null;
+  const list = [...people].sort((a, b) => (a.last < b.last ? 1 : a.last > b.last ? -1 : b.n - a.n));
+  const meds = people.map((p) => p.med);
+  const hiRate = Math.max(...meds), loRate = Math.min(...meds);
+  const shown = all ? list : list.slice(0, 8);
+  return (
+    <div className="trend-tablebox">
+      <div className="trend-tablehead">
+        <b>{title}</b> <span className="muted">{people.length}명 · 최신순</span>
+      </div>
+      <table className="trend-table">
+        <tbody>
+          {shown.map((p) => (
+            <tr key={p.who + p.tel}>
+              <td><Who who={p.who} tel={p.tel} /></td>
+              <td className={"trend-num" + (hiRate !== loRate && p.med === hiRate ? " trend-good" : hiRate !== loRate && p.med === loRate ? " trend-bad" : "")}>
+                {p.med}:1{p.min !== p.max && <small className="muted"> {p.min}~{p.max}</small>}
+              </td>
+              <td className="trend-num muted">{p.n}</td>
+              <td className="trend-num muted">{md(p.last)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {list.length > 8 && (
+        <button type="button" className="trend-linkbtn" onClick={() => setAll(!all)}>{all ? "접기" : `더 보기 (${list.length - 8})`}</button>
+      )}
+    </div>
   );
 }
 
 type Filter = "all" | "many" | "recent" | "wiki" | "unknown";
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "전체" },
-  { key: "many", label: "여러 명이 올림" },
+  { key: "many", label: "여러 명" },
   { key: "recent", label: "최근 7일" },
   { key: "wiki", label: "위키 아이템" },
   { key: "unknown", label: "모르는 줄임말" },
+];
+type Sort = "posts" | "price" | "recent";
+const SORTS: { key: Sort; label: string }[] = [
+  { key: "posts", label: "글 많은 순" },
+  { key: "price", label: "비싼 순" },
+  { key: "recent", label: "최근 순" },
 ];
 const PAGE = 30;
 
@@ -276,106 +341,116 @@ function ItemChart({ it }: { it: TrendItem }) {
   );
 }
 
-/** 물건 한 줄: 위키 이름(그림)과 톡방 줄임말, 가격 범위. 누르면 강화·옵션 묶음마다 가격, 묶음을 누르면 원글 한 줄 */
+
+/** 물건 한 줄 (접힌 채로도 묶음별 가격이 보인다): 그림, 이름·줄임말, 묶음 칩(속성·강화마다 가격과 오르내림), 글·사람·기간, 가격, 추세선.
+ *  펼치면 묶음별 날짜 그림과 표 */
 function ItemRow({ it, t, wiki, open, onToggle }: { it: TrendItem; t: Trend; wiki: Wiki; open: boolean; onToggle: () => void }) {
   const pic = (wiki.items[it.name] ?? wiki.items[it.name.replace(/\s/g, "")])?.icon;
-  const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const chips = it.groups.slice(0, 6);
   return (
-    <li className={open ? "mk-open" : ""}>
-      <button type="button" className="mk-row trend-row" onClick={onToggle}>
+    <li className={"trend-item" + (open ? " mk-open" : "")}>
+      <button type="button" className="trend-itemrow" onClick={onToggle}>
         <span className="mk-slot trend-slot">{pic ? <PicImg pic={pic} max={30} /> : <img className="mk-coin" src={MARKET_PIC + "coin.png"} alt="" />}</span>
-        <span className="row-main">
-          <span className="row-title">
-            {it.name}
-            {it.abbr.length > 0 && <small className="trend-abbr muted"> {it.abbr.join(", ")}</small>}
+        <span className="trend-itemmain">
+          <span className="trend-itemtitle">
+            <span className="row-title">{it.name}</span>
+            <span className="trend-itemprice"><b>{priceText(it.med)}</b><Spark days={it.days} /></span>
+          </span>
+          <span className="trend-groupchips">
+            {chips.map((g) => (
+              <span key={g.label} className="trend-gchip">
+                <em>{g.label}</em> {shortWon(g.med)}
+                <Change from={g.before} to={g.recent} compact />
+              </span>
+            ))}
+            {it.groups.length > chips.length && <span className="trend-gchip muted">+{it.groups.length - chips.length}</span>}
           </span>
           <span className="trend-sub muted">
-            글 {it.n}개 · {it.sellers}명 · {it.kind === "enchant" ? "속성" : it.kind === "enhance" ? "강화" : "묶음"} {it.groups.length}개 · {md(it.first)}{it.first !== it.last && `~${md(it.last)}`}
+            글 {it.n} · {it.sellers}명 · {md(it.first)}{it.first !== it.last && `~${md(it.last)}`} · {shortWon(it.min)}~{shortWon(it.max)}
+            {it.abbr.length > 0 && <span className="trend-abbr"> · 톡방 {it.abbr.slice(0, 3).join(", ")}</span>}
           </span>
         </span>
-        <span className="trend-price">
-          <b>{priceText(it.med)}</b>
-          <small className="muted">{it.min === it.max ? goldText(it.med, t.source.rate) : `${priceText(it.min)} ~ ${priceText(it.max)}`}</small>
-          {it.groups.length === 1 && <Change from={it.before} to={it.recent} />}
-        </span>
       </button>
       {open && (
-        <ul className="trend-vars">
-          <li className="trend-vars-chart"><ItemChart it={it} /></li>
-          {it.groups.map((g) => (
-            <GroupRow key={g.label} g={g} t={t} open={openGroup === g.label} onToggle={() => setOpenGroup(openGroup === g.label ? null : g.label)} />
-          ))}
-        </ul>
-      )}
-    </li>
-  );
-}
-
-/** 묶음 한 줄 (속성부여 템은 '지능3', 강화 템은 '+8', 제작자 요청): 가격, 글 수, 오르내림. 누르면 올린 사람과 안의 옵션 묶음들 */
-function GroupRow({ g, t, open, onToggle }: { g: TrendGroup; t: Trend; open: boolean; onToggle: () => void }) {
-  const [openVar, setOpenVar] = useState<string | null>(null);
-  return (
-    <li>
-      <button type="button" className={"trend-var trend-group" + (open ? " trend-var-open" : "")} onClick={onToggle}>
-        <span className="trend-var-label">{g.label}</span>
-        <span className="trend-sub muted">글 {g.n}개 · {g.sellers}명{g.variants.length > 1 && ` · 옵션 ${g.variants.length}개`}</span>
-        <span className="trend-price">
-          <b>{priceText(g.med)}</b>
-          <small className="muted">{g.min === g.max ? goldText(g.med, t.source.rate) : `${priceText(g.min)} ~ ${priceText(g.max)}`}</small>
-          <Change from={g.before} to={g.recent} />
-        </span>
-      </button>
-      {open && (
-        <div className="trend-group-body">
-          <PeopleList title="올린 사람 (싼 사람부터)" people={g.people} value={priceText} />
-          <ul className="trend-vars trend-vars-in">
-            {g.variants.map((v) => (
-              <VariantRow key={v.label} v={v} t={t} open={openVar === v.label} onToggle={() => setOpenVar(openVar === v.label ? null : v.label)} />
-            ))}
-          </ul>
+        <div className="trend-itembody">
+          <ItemChart it={it} />
+          <GroupTable it={it} t={t} />
         </div>
       )}
     </li>
   );
 }
 
-/** 강화·옵션 묶음 한 줄 ('+8 지능3'): 가격, 글 수, 오르내림. 누르면 원글 한 줄들 */
-function VariantRow({ v, t, open, onToggle }: { v: TrendVariant; t: Trend; open: boolean; onToggle: () => void }) {
+/** 묶음 표: 묶음 | 중간값 | 범위 | 글/명 | 7일. 줄을 누르면 올린 사람 칩, 옵션 묶음, 원글 */
+function GroupTable({ it, t }: { it: TrendItem; t: Trend }) {
+  const [open, setOpen] = useState<string | null>(it.groups.length === 1 ? it.groups[0].label : null);
+  const head = it.kind === "enchant" ? "속성" : it.kind === "enhance" ? "강화" : "묶음";
   return (
-    <li>
-      <button type="button" className={"trend-var" + (open ? " trend-var-open" : "")} onClick={onToggle}>
-        <span className="trend-var-label">{v.label || "노작 · 노강"}</span>
-        <span className="trend-sub muted">글 {v.n}개 · {v.sellers}명</span>
-        <span className="trend-price">
-          <b>{priceText(v.med)}</b>
-          <small className="muted">{v.min === v.max ? goldText(v.med, t.source.rate) : `${priceText(v.min)} ~ ${priceText(v.max)}`}</small>
-          <Change from={v.before} to={v.recent} />
-        </span>
-      </button>
+    <table className="trend-table trend-grouptable">
+      <thead>
+        <tr><th>{head}</th><th className="trend-num">중간값</th><th className="trend-num">범위</th><th className="trend-num">글/명</th><th className="trend-num">7일</th></tr>
+      </thead>
+      <tbody>
+        {it.groups.map((g) => (
+          <GroupRows key={g.label} g={g} t={t} open={open === g.label} onToggle={() => setOpen(open === g.label ? null : g.label)} />
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function GroupRows({ g, t, open, onToggle }: { g: TrendGroup; t: Trend; open: boolean; onToggle: () => void }) {
+  return (
+    <>
+      <tr className={"trend-grouprow" + (open ? " trend-grouprow-open" : "")} onClick={onToggle}>
+        <td className="trend-glabel">{open ? "▾" : "▸"} {g.label}</td>
+        <td className="trend-num"><b>{shortWon(g.med)}</b></td>
+        <td className="trend-num muted">{g.min === g.max ? "–" : `${shortWon(g.min)}~${shortWon(g.max)}`}</td>
+        <td className="trend-num muted">{g.n}/{g.sellers}</td>
+        <td className="trend-num"><Change from={g.before} to={g.recent} compact /></td>
+      </tr>
       {open && (
-        <div className="trend-samples trend-dexbox">
-          <ul className="trend-sample-list">
-            {v.samples.map((s, i) => (
-              <li key={i}>
-                <span className="muted">{md(s.date)}</span> <b>{priceText(s.price)}</b> <Who who={s.who} tel={s.tel} />{" "}
-                <span className="trend-raw muted">{s.raw}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <tr className="trend-groupdetail">
+          <td colSpan={5}>
+            <div className="trend-detailtitle muted">올린 사람 · 싼 사람부터 · {goldText(g.med, t.source.rate)}</div>
+            <PeopleChips people={g.people} value={shortWon} />
+            {g.variants.length > 1 && (
+              <>
+                <div className="trend-detailtitle muted">옵션 묶음</div>
+                <div className="trend-chips">
+                  {g.variants.map((v) => (
+                    <span key={v.label} className="trend-chip">
+                      <em>{v.label || "노작"}</em> <b>{shortWon(v.med)}</b>
+                      <small className="muted">{v.n}건</small>
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+            <div className="trend-detailtitle muted">원글</div>
+            <ul className="trend-sample-list">
+              {g.samples.map((s, i) => (
+                <li key={i}>
+                  <span className="muted">{md(s.date)}</span> <b>{shortWon(s.price)}</b> <Who who={s.who} tel={s.tel} /> <span className="trend-raw muted">{s.raw}</span>
+                </li>
+              ))}
+            </ul>
+          </td>
+        </tr>
       )}
-    </li>
+    </>
   );
 }
 
 function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [sort, setSort] = useState<Sort>("posts");
   const [shown, setShown] = useState(PAGE);
   const [open, setOpen] = useState<string | null>(null);
   const list = useMemo(() => {
     const needle = q.trim().replace(/\s/g, "").toLowerCase();
-    return t.items.filter(
+    const xs = t.items.filter(
       (it) =>
         (filter !== "many" || it.sellers >= 2) &&
         (filter !== "recent" || it.last >= t.lastWeek) &&
@@ -383,20 +458,29 @@ function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
         (filter !== "unknown" || !it.wiki) &&
         (!needle || it.name.replace(/\s/g, "").toLowerCase().includes(needle) || it.abbr.some((a) => a.toLowerCase().includes(needle))),
     );
-  }, [t, q, filter]);
+    if (sort === "price") xs.sort((a, b) => b.med - a.med);
+    else if (sort === "recent") xs.sort((a, b) => (a.last < b.last ? 1 : a.last > b.last ? -1 : b.n - a.n));
+    return xs;
+  }, [t, q, filter, sort]);
   return (
     <Panel title={`물건 시세 (${list.length})`}>
       <div className="search-box">
         <input value={q} onChange={(e) => { setQ(e.target.value); setShown(PAGE); }} placeholder="물건 이름 또는 톡방 줄임말" aria-label="물건 찾기" />
       </div>
-      <div className="filter">
+      <div className="filter trend-filter">
         {FILTERS.map((f) => (
           <button key={f.key} type="button" className={"pill" + (filter === f.key ? " pill-on" : "")} onClick={() => { setFilter(f.key); setShown(PAGE); }}>
             {f.label}
           </button>
         ))}
+        <span className="trend-filter-gap" />
+        {SORTS.map((f) => (
+          <button key={f.key} type="button" className={"pill trend-sort" + (sort === f.key ? " pill-on" : "")} onClick={() => { setSort(f.key); setShown(PAGE); }}>
+            {f.label}
+          </button>
+        ))}
       </div>
-      <ul className="mk-list">
+      <ul className="mk-list trend-list">
         {list.slice(0, shown).map((it) => (
           <ItemRow key={it.name} it={it} t={t} wiki={wiki} open={open === it.name} onToggle={() => setOpen(open === it.name ? null : it.name)} />
         ))}
@@ -415,11 +499,11 @@ const CHAR_FILTERS: { key: CharFilter; label: string }[] = [
   { key: "all", label: "전체" },
   { key: "sell", label: "팝니다" },
   { key: "buy", label: "삽니다" },
-  { key: "char", label: "캘 (캐릭터만)" },
+  { key: "char", label: "캘" },
   { key: "bundle", label: "템통" },
 ];
 
-/** 캐릭터 시세: 레벨대별 중간값과 글 한 줄씩 (서버, 레벨, 직업, 올마, 도감, 보석, 쟁캐, 캘/템통, 가격) */
+/** 캐릭터 시세: 레벨대별 한 줄 요약과 캐릭터 줄 (레벨, 서버·직업·캘/템통, 닉, 스킬·보석·쟁·도감 칩, 도감 요약, 가격) */
 function CharsPanel({ t }: { t: Trend }) {
   const [filter, setFilter] = useState<CharFilter>("all");
   const [shown, setShown] = useState(PAGE);
@@ -433,14 +517,13 @@ function CharsPanel({ t }: { t: Trend }) {
   return (
     <Panel title={`캐릭터 시세 (${rows.length})`}>
       {t.chars.bands.length > 0 && (
-        <div className="trend-stats trend-bands">
+        <div className="trend-bands">
           {t.chars.bands.map((b) => (
-            <div key={b.band} className="trend-stat">
-              <span className="muted">{b.band} 팝니다</span>
-              <b>{priceText(b.med)}</b>
-              <span className="muted">{b.n}개 · {priceText(b.min)} ~ {priceText(b.max)}</span>
-            </div>
+            <span key={b.band} className="trend-gchip">
+              <em>{b.band}</em> {shortWon(b.med)} <small className="muted">{b.n}개 · {shortWon(b.min)}~{shortWon(b.max)}</small>
+            </span>
           ))}
+          <small className="muted">팝니다 중간값 (템통 제외)</small>
         </div>
       )}
       <div className="filter">
@@ -450,7 +533,7 @@ function CharsPanel({ t }: { t: Trend }) {
           </button>
         ))}
       </div>
-      <ul className="mk-list">
+      <ul className="mk-list trend-list">
         {rows.slice(0, shown).map((r, i) => <CharRow key={i} r={r} />)}
       </ul>
       {shown < rows.length && (
@@ -464,46 +547,51 @@ function CharsPanel({ t }: { t: Trend }) {
 
 function CharRow({ r }: { r: TrendChar }) {
   const [open, setOpen] = useState(false);
-  const tags = [r.skills, r.gems && `보석 ${r.gems}`, r.pvp && "쟁캐"].filter(Boolean) as string[];
+  const skills = r.skills.split(" · ").filter(Boolean);
+  const dexShort = r.dex.replace(/^도감 효과 · /, "").replace(/^도감 효과$/, "");
   return (
-    <li className={open ? "mk-open" : ""}>
-      <button type="button" className="mk-row trend-row" onClick={() => setOpen(!open)}>
+    <li className={"trend-item" + (open ? " mk-open" : "")}>
+      <button type="button" className="trend-itemrow" onClick={() => setOpen(!open)}>
         <span className={"trend-lv" + (r.side === "buy" ? " trend-lv-buy" : "")}>
           <small>{r.side === "buy" ? "삽니다" : "팝니다"}</small>
           <b>{r.level}</b>
         </span>
-        <span className="row-main">
-          <span className="row-title">
-            <FitLine wrap={false} text={[r.server, r.job ?? "직업 모름", r.scope].filter(Boolean).join(" · ")} />
+        <span className="trend-itemmain">
+          <span className="trend-itemtitle">
+            <span className="row-title">{[r.server, r.job ?? "직업 모름", r.scope].filter(Boolean).join(" · ")}</span>
+            <Who who={r.who} tel={r.tel} />
+            <span className="trend-itemprice"><b>{priceText(r.price)}</b></span>
           </span>
-          <span className="trend-sub"><Who who={r.who} tel={r.tel} /></span>
-          <span className="trend-sub muted">{tags.length ? tags.join(" · ") : r.dex ? "" : "상세 없음"}{r.n > 1 && `${tags.length || !r.dex ? " · " : ""}${r.n}번 올림`}</span>
-          {r.dex && <span className="trend-sub trend-dex">{r.dex}</span>}
-        </span>
-        <span className="trend-price">
-          <b>{priceText(r.price)}</b>
-          <small className="muted">{md(r.first)}{r.first !== r.last && `~${md(r.last)}`}</small>
+          <span className="trend-groupchips">
+            {skills.map((s) => <span key={s} className="trend-gchip trend-gchip-skill">{s}</span>)}
+            {r.gems && <span className="trend-gchip">보석 <em>{r.gems}</em></span>}
+            {r.pvp && <span className="trend-gchip trend-gchip-pvp">쟁캐</span>}
+            {(r.dex === "노도감" || r.dex === "저도감") && <span className="trend-gchip muted">{r.dex}</span>}
+            {"일반" in r.collect && <span className="trend-gchip">도감 <em>{r.collect["일반"]}%</em></span>}
+            {!skills.length && !r.gems && !r.pvp && !r.dex && <span className="trend-gchip muted">상세 없음</span>}
+          </span>
+          <span className="trend-sub">
+            {dexShort && r.dex !== "노도감" && r.dex !== "저도감" && <span className="trend-dex">{dexShort}</span>}
+            <span className="muted"> {md(r.first)}{r.first !== r.last && `~${md(r.last)}`}{r.n > 1 && ` · ${r.n}번`}</span>
+          </span>
         </span>
       </button>
       {open && (
-        <div className="trend-samples trend-dexbox">
+        <div className="trend-itembody trend-charbody">
           <div className="trend-raw muted">{r.raw}</div>
           {Object.keys(r.collect).length > 0 && (
-            <div className="trend-collect">
+            <div className="trend-chips">
               {["일반", "코스튬", "라이딩"].filter((k) => k in r.collect).map((k) => (
-                <span key={k}><span className="muted">{k}</span> <b>{r.collect[k]}%</b></span>
+                <span key={k} className="trend-gchip">{k} <em>{r.collect[k]}%</em></span>
               ))}
             </div>
           )}
           {r.dexTable.length > 0 && (
-            <table className="trend-dex-table">
-              <thead><tr><th>도감 수집</th><th>값</th></tr></thead>
-              <tbody>
-                {r.dexTable.map(([k, v]) => (
-                  <tr key={k}><td>{k}</td><td>{v}</td></tr>
-                ))}
-              </tbody>
-            </table>
+            <dl className="trend-dexgrid">
+              {r.dexTable.map(([k, v]) => (
+                <div key={k}><dt className="muted">{k}</dt><dd>{v}</dd></div>
+              ))}
+            </dl>
           )}
         </div>
       )}
