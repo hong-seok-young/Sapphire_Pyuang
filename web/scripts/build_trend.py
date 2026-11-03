@@ -687,6 +687,11 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
     if hit:
         name, abbr, enh = hit
         wiki = True
+        sm = re.fullmatch(r"(.+?)(\d)", name)
+        if sm and sm.group(1) in SKILLS:  # 위키 아이템 '텔레포트2' = 스킬북 -> '텔레포트 2단' (스킬 아이콘)
+            sk = SKILLS[sm.group(1)]
+            name = f"{sk['name']} {sm.group(2)}단"
+            SKILL_ICONS[name] = sk["icon"]
     else:
         # 위키에 없는 물건: 줄임말 그대로 (강화 숫자는 떼어 둔다)
         m = ENHANCE_RE.match(joined)
@@ -783,6 +788,28 @@ def item_kind(name: str, xs: list[dict], kinds: dict[str, str]) -> str:
     if any(ENCHANT_RE.match(o) for x in xs for o in x["opts"]):
         return "enchant"
     return "none"
+
+
+EQUIP_WORD = re.compile(r"신발|장화|부츠|단화|덧신|발걸음|갑옷|경갑|장갑|손껍질|투구|모자|무기|검|소드|보우|활|지팡이|스태프|완드|방패|쉴드|회색바위 세트")
+ACC_WORD = re.compile(r"벨트|망토|목걸이|반지|귀걸이|팔찌")
+
+
+def item_cat(name: str, xs: list[dict], kind: str, kinds: dict[str, str]) -> str:
+    """화면의 칸 (제작자 2026-11-04 '전체 장비 장신구 스킬북 코스튬 기타 이렇게 나누자'): 위키 장비는 부위로(강화 부위 = 장비, 속성부여 부위 = 장신구),
+    스킬북, 코스튬은 이름으로, 위키에 없는 것은 강화 숫자나 이름의 부위 말로 짐작하고 나머지(보석, 재료, 마법서, 펫, 주화 …)는 기타"""
+    if name in SKILL_ICONS or name.endswith("스킬북"):
+        return "스킬북"
+    if ("코스튬" in name or "코튬" in name) and "코인" not in name:
+        return "코스튬"
+    if name in kinds:
+        return "장신구" if kinds[name] == "enchant" else "장비"
+    if name == "펫" or "보석" in name or "마법서" in name:
+        return "기타"
+    if ACC_WORD.search(name):
+        return "장신구"
+    if EQUIP_WORD.search(name) or any(x["enh"] for x in xs):
+        return "장비"
+    return "기타"
 
 
 def group_label(kind: str, x: dict) -> str:
@@ -922,6 +949,7 @@ def item_prices(msgs: list[dict], last_week: str, rs: Resolver, side: str = "sel
             elif x["abbr"] != name.replace(" ", ""):
                 abbrs[x["abbr"]] += 1
         out.append({"name": name, "wiki": xs[0]["wiki"], "unknown": all(x.get("unknown") for x in xs), "kind": kind,
+                    "cat": item_cat(name, xs, kind, kinds),
                     "abbr": [a for a, _ in sorted(abbrs.items(), key=lambda kv: -kv[1])[:4]],
                     **summary(xs), "groups": groups, "variants": variants})
     out.sort(key=lambda it: (-it["sellers"], -it["n"], it["name"]))

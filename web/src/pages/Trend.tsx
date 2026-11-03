@@ -4,7 +4,7 @@
 import { useCallback, useMemo, useState } from "react";
 import type { PointerEvent } from "react";
 import { loadTrend, useAsync } from "../data";
-import type { GoldDay, Trend, TrendChar, TrendGroup, TrendItem, TrendPerson } from "../data";
+import type { GoldDay, Trend, TrendCat, TrendChar, TrendGroup, TrendItem, TrendPerson } from "../data";
 import { MARKET_PIC, goldWords, wonText } from "../market";
 import { Loading, Panel, PicImg, TopBar } from "../ui";
 import type { Wiki } from "../types";
@@ -247,14 +247,14 @@ function GoldPeople({ people }: { people: TrendPerson[] }) {
   );
 }
 
-type Filter = "all" | "many" | "recent" | "wiki" | "unknown";
+/** 칸 (제작자 2026-11-04 '전체 장비 장신구 스킬북 코스튬 기타 이렇게 나누자, 여러 명·최근·위키 다 없애'), 끝에 아무 정보도 없는 것 */
+type Filter = "all" | TrendCat | "unknown";
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "전체" },
-  { key: "many", label: "여러 명" },
-  { key: "recent", label: "최근 7일" },
-  { key: "wiki", label: "위키 아이템" },
-  { key: "unknown", label: "정보 없음" },  // 예전 이름 '모르는 줄임말' (제작자 2026-11-04 '정보없음 ㅇㅇ, 모르는 줄임말 ㄴㄴ': 데블랑사탕처럼 줄임말이 아닌 이름도 있다)
+  ...(["장비", "장신구", "스킬북", "코스튬", "기타"] as const).map((c) => ({ key: c, label: c })),
+  { key: "unknown", label: "정보없음" },
 ];
+const inFilter = (it: TrendItem, f: Filter) => (f === "all" ? true : f === "unknown" ? !!it.unknown : it.cat === f);
 type Sort = "posts" | "price" | "recent";
 const SORTS: { key: Sort; label: string }[] = [
   { key: "posts", label: "글 많은 순" },
@@ -479,23 +479,14 @@ function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
     const needle = q.trim().replace(/\s/g, "").toLowerCase();
     const xs = source.filter(
       (it) =>
-        (filter !== "many" || it.sellers >= 2) &&
-        (filter !== "recent" || it.last >= t.lastWeek) &&
-        (filter !== "wiki" || it.wiki) &&
-        (filter !== "unknown" || it.unknown) &&
+        inFilter(it, filter) &&
         (!needle || it.name.replace(/\s/g, "").toLowerCase().includes(needle) || it.abbr.some((a) => a.toLowerCase().includes(needle))),
     );
     if (sort === "price") xs.sort((a, b) => b.med - a.med);
     else if (sort === "recent") xs.sort((a, b) => (a.last < b.last ? 1 : a.last > b.last ? -1 : b.n - a.n));
     return xs;
-  }, [source, t.lastWeek, q, filter, sort]);
-  const counts: Record<Filter, number> = {
-    all: source.length,
-    many: source.filter((it) => it.sellers >= 2).length,
-    recent: source.filter((it) => it.last >= t.lastWeek).length,
-    wiki: source.filter((it) => it.wiki).length,
-    unknown: source.filter((it) => it.unknown).length,
-  };
+  }, [source, q, filter, sort]);
+  const count = (f: Filter) => source.filter((it) => inFilter(it, f)).length;
   return (
     <Panel title={`물건 시세 (${list.length})`}>
       <div className="search-box">
@@ -513,7 +504,7 @@ function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
         <div className="mk-cats">
           {FILTERS.map((f) => (
             <button key={f.key} type="button" className={"sub-tab" + (filter === f.key ? " sub-tab-on" : "")} onClick={() => { setFilter(f.key); setShown(PAGE); }}>
-              {f.label} <small>{counts[f.key]}</small>
+              {f.label} <small>{count(f.key)}</small>
             </button>
           ))}
         </div>
@@ -683,9 +674,6 @@ export function TrendPage({ wiki }: { wiki: Wiki }) {
           {tab === "gold" && <GoldPanel t={t} />}
           {tab === "item" && <ItemsPanel t={t} wiki={wiki} />}
           {tab === "char" && <CharsPanel t={t} />}
-          <p className="trend-src muted">
-            시리온 거래 톡방 {t.source.rooms.length}곳 · {md(t.source.from)} ~ {md(t.source.to)} · 글 {t.source.messages.toLocaleString("ko-KR")}개 · 1장 = 1만 원 · 골드 {t.source.rate}:1
-          </p>
         </>
       )}
     </>

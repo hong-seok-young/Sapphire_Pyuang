@@ -2659,7 +2659,6 @@ button.gd-member-row { cursor: pointer; }
 .trend-samples b { color: var(--gold); font-weight: 400; }
 .trend-raw { font-size: 11px; }
 .trend-more { display: block; margin: 4px auto 0; }
-.trend-src { margin: 4px 0 0; font-size: 11px; }
 .trend-abbr { font-size: 11px; font-weight: 400; }
 .trend-vars { list-style: none; margin: 0 0 4px; padding: 0; border: var(--px) solid var(--edge); border-top: 0; background: var(--night-2); }
 .trend-vars > li + li { border-top: var(--px) solid var(--edge); }
@@ -2772,7 +2771,6 @@ button.gd-member-row { cursor: pointer; }
 .trend-dexgrid div { display: flex; justify-content: space-between; gap: 6px; padding: 1px 0; border-bottom: 1px dashed rgba(169, 162, 207, 0.2); }
 .trend-dexgrid dt { white-space: nowrap; }
 .trend-dexgrid dd { margin: 0; color: #8fb4ff; text-align: right; white-space: nowrap; }
-.trend-src { margin-top: 6px; font-size: 10px; }
 .trend-other { color: var(--gold); }
 
 /* 시세 동향: 도감 스샷에서 자른 그림 (위키에 없는 물건) */

@@ -72,11 +72,14 @@ export interface TrendVariant {
 }
 /** 묶음: 속성부여 템은 주 스탯(지능2 = '지능2', '지능2 체력30' 둘 다), 강화 템은 강화 단계(+8, 노강), 나머지는 '전체'. 안에 옵션 묶음들 */
 export interface TrendGroup extends TrendVariant { variants: TrendVariant[] }
+/** 시세 동향 물건 칸 (build_trend.py item_cat) */
+export type TrendCat = "장비" | "장신구" | "스킬북" | "코스튬" | "기타";
 export interface TrendItem extends TrendVariant {
   /** 위키 아이템 이름 (wiki 가 true) 또는 톡방 줄임말 그대로 */
   name: string; wiki: boolean; abbr: string[];
   /** 아무도 풀지 못한 줄임말 (위키에도, 알려 준 이름 표에도 없다) */
   unknown?: boolean;
+  cat: TrendCat;
   /** 위키에 없는 물건의 그림 주소 (/data/trend/…png 제작자 도감 스샷에서 자른 것, 스킬북은 /img/… 위키 직업별 스킬의 아이콘) */
   icon?: string;
   /** enchant = 속성부여 부위 (벨트, 망토, 목걸이, 반지), enhance = 강화 부위, none = 그 밖 */
