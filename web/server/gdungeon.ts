@@ -1,5 +1,6 @@
 // 길드 던전 (제작자 요청 2026-11-02): 4인 파티(예: 유어아너, 폰, 후꾹, 퓨앙)가 한 주에 한 번 함께 갈 때를 정한다. 1군 전용.
-//  - 한 주는 목요일 10시부터 다음 주 목요일 10시까지 (server/week.ts weekStart, 다른 주간 기능과 같다).
+//  - 한 주는 목요일 10시 30분부터 다음 주 목요일 10시 30분까지 (server/week.ts gdWeekStart. 게임의 길드 던전 입장 횟수가 목 10:30 에 초기화되고
+//    목 9:20~10:30 은 입장 불가라서, 다른 주간 기능의 목 10시와 다르다. 제작자 2026-11-03 게임 스샷).
 //  - 각자 이번 주 가능한 때를 시간표(하루 09:00 ~ 다음 날 02:00, 30분 칸)에 칠한다 (gd_avail, 사람마다 한 주 한 줄).
 //  - 파티원이 모두 칠하면 모두 되는 30분 칸이 후보가 된다. 가장 빠른 때부터 1번, 2번 … 후보.
 //  - 지금 후보(가장 빠른, 무산되지 않은)에 각자 '확정'이나 '불참'을 누른다. 모두 확정하면 그때로 정해지고 알림이 간다.
@@ -9,10 +10,10 @@
 import type { Env, User } from "./auth";
 import { RANK, TEST_IDS } from "./auth";
 import { notify } from "./alerts";
-import { WEEK, weekStart } from "./week";
+import { WEEK, gdWeekStart } from "./week";
 
 export const SLOT_MS = 30 * 60_000;
-/** 한 주의 30분 칸 수 (목 10:00 부터) */
+/** 한 주의 30분 칸 수 (목 10:30 부터) */
 export const SLOTS = 336;
 /** 하루 칸 수: 09:00 ~ 다음 날 02:00 */
 export const ROWS = 34;
@@ -20,8 +21,8 @@ export const MAX_MEMBERS = 4;
 const DAY = 86_400_000;
 const KST = 9 * 3_600_000;
 
-/** 시간표에 있는 칸인지: 하루는 09:00(주 시작 10:00 보다 2칸 앞)부터 34칸 */
-export const validSlot = (i: number) => Number.isInteger(i) && i >= 0 && i < SLOTS && (i + 2) % 48 < ROWS && Math.floor((i + 2) / 48) < 7;
+/** 시간표에 있는 칸인지: 하루는 09:00(주 시작 10:30 보다 3칸 앞)부터 34칸 (첫 목요일 09:00~10:30 은 지난주라 없다) */
+export const validSlot = (i: number) => Number.isInteger(i) && i >= 0 && i < SLOTS && (i + 3) % 48 < ROWS && Math.floor((i + 3) / 48) < 7;
 
 /** '0'/'1' 336자 (시간표에 없는 칸은 0) */
 export function cleanBits(v: unknown): string | null {
@@ -198,6 +199,6 @@ export const candidateNo = (p: PartyState, slot: number) => p.candidates.indexOf
 
 /** 이번 주와 지난주 */
 export function weeks(now = Date.now()) {
-  const week = weekStart(now);
+  const week = gdWeekStart(now);
   return { week, prev: week - WEEK, end: week + WEEK, day: DAY };
 }

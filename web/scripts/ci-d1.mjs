@@ -193,6 +193,12 @@ runSql([
 // 직접 만들게 하자, 깔끔하게'): 11/3 에 세팅 스크립트(gd-seed.mjs, 지금은 없음)로 만든 것을 포함해 **파티를 모두** 지우고(파티·파티원·대답), 길드 던전 알림도 모두 지운다
 // (파티가 없어졌으니 '팀에 들어왔어요', '명단이 열렸어요' 같은 알림은 모두 지난 것). 시간표(gd_avail)는 각자 것이라 그대로. 공지 전 숨김 스위치('gd_parties_open')와 세팅 표시도 뺀다.
 // setup 'gd_reset_20261103' 로 한 번만 돈다 (그 뒤 길드원이 직접 만든 파티는 건드리지 않는다)
+// 길드 던전의 한 주를 목 10:00 에서 목 10:30 으로 옮겼다 (제작자 2026-11-03 게임 스샷: 입장 횟수 초기화 목 10:30). 이미 칠한 시간표의 주 키(week)를 30분 뒤로 옮기고
+// 칸도 한 칸 당긴다 (같은 절대 시각을 가리키게: 새 0번 칸 = 옛 1번 칸). 한 번만 (setup 'gd_week_1030')
+runSql([
+  "UPDATE gd_avail SET week = week + 1800000, slots = substr(slots, 2) || '0' WHERE NOT EXISTS (SELECT 1 FROM setup WHERE key = 'gd_week_1030');",
+  `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('gd_week_1030', ${Date.now()});`,
+]);
 const GD_RESET = "gd_reset_20261103";
 runSql([
   `DELETE FROM gd_answers WHERE NOT EXISTS (SELECT 1 FROM setup WHERE key = '${GD_RESET}');`,

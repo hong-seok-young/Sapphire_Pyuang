@@ -9,3 +9,10 @@ const THURSDAY_10_KST = 3_600_000;
 export function weekStart(now = Date.now()): number {
   return now - ((((now - THURSDAY_10_KST) % WEEK) + WEEK) % WEEK);
 }
+/** 길드 던전의 한 주 (제작자 2026-11-03 게임 스샷: 길드 던전 입장 횟수는 매주 목요일 오전 10시 30분(한국 시간)에 초기화, 목 9:20~10:30 은 입장 불가):
+ *  다른 주간 기능의 목 10시가 아니라 목 10시 30분에 시작한다 (지금이 목 10:00~10:30 이면 아직 지난주) */
+export const GD_WEEK_OFFSET = 30 * 60_000;
+export function gdWeekStart(now = Date.now()): number {
+  return weekStart(now - GD_WEEK_OFFSET) + GD_WEEK_OFFSET;
+}
+

@@ -741,7 +741,7 @@ function MyTimes({
     drag.current = null;
     if (d?.changed) void save(bitsRef.current);
   };
-  /** 전주 복사: 칸 자리가 요일·시각마다 같아서 지난주 시간표를 그대로 옮긴다 (목 10시에 새 주가 되면 시간표는 빈다) */
+  /** 전주 복사: 칸 자리가 요일·시각마다 같아서 지난주 시간표를 그대로 옮긴다 (목 10:30 에 새 주가 되면 시간표는 빈다) */
   const fill = (from: string) => {
     let b = "";
     for (let i = 0; i < from.length; i++)
@@ -879,7 +879,7 @@ function Legend({ mine = false }: { mine?: boolean }) {
 
 /** 정각(09:00, 10:00 …)에 시작하는 칸: 위에 가로 구분선 (제작자 요청 2026-11-02 '정각마다 가로 구분선, 헷갈림') */
 const hourLine = (i: number) => {
-  const row = (((i + 2) % 48) + 48) % 48;
+  const row = (((i + 3) % 48) + 48) % 48;
   return row > 0 && row % 2 === 0 ? " gd-hourline" : "";
 };
 

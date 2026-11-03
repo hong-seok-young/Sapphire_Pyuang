@@ -160,7 +160,7 @@ export async function mineExtras(
     const { week } = weeks(now);
     const parties = await allParties(env, week, now);
     const mine = parties.find((p) => p.members.some((m) => m.id === me.id));
-    const lines: string[] = [`이번 주: ${slotText(week, 0)} ~ ${slotText(week, 336)} (목 10시에 새 주)`];
+    const lines: string[] = [`이번 주: ${slotText(week, 0)} ~ ${slotText(week, 336)} (길드 던전 초기화인 목 10:30 에 새 주)`];
     if (mine) {
       const waiting = mine.members.filter((m) => !m.filled).map((m) => m.id);
       lines.push(
