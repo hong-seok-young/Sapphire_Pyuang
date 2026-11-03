@@ -1,13 +1,34 @@
-import { useCallback, useEffect, useState } from "react";
-import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import type {
+  CSSProperties,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+} from "react";
 import { NEED_LOGIN, loadWiki, useAsync } from "./data";
 import { go, useRoute } from "./router";
-import { goCharacter, justSwitched, onRefreshMe, personOf, setMyCharacters } from "./characters";
+import {
+  goCharacter,
+  justSwitched,
+  onRefreshMe,
+  personOf,
+  setMyCharacters,
+} from "./characters";
 import { resetFavorites } from "./favorites";
 import { DevSoon, FitLine, PixelIcon, Loading, NotFound } from "./ui";
 import { Home, HomeCorner, InfoPage, TileIcon } from "./pages/Home";
 import { HomeWeather } from "./pages/Weather";
-import { canPreview, canSee, clickItem, isLocked, isUpdated, itemOf, loadLayout, pressItem, setEditing, useLauncher } from "./launcher";
+import {
+  canPreview,
+  canSee,
+  clickItem,
+  isLocked,
+  isUpdated,
+  itemOf,
+  loadLayout,
+  pressItem,
+  setEditing,
+  useLauncher,
+} from "./launcher";
 import type { LaunchItem } from "./launcher";
 import { markNewsSeen, newsFor, refreshNews, startNews, useNews } from "./news";
 import { Search } from "./pages/Search";
@@ -16,42 +37,112 @@ import { ItemPage, MonsterPage } from "./pages/Detail";
 import { EquipSlot, EquipSlots } from "./pages/Equip";
 import { PostPage } from "./pages/Posts";
 import { MenuPage } from "./pages/Menus";
-import { ChatPage } from "./pages/Chat";
 import { AppPage } from "./pages/AppPage";
-import { AppClosedPage, IconChangedPage, InstallGuide, iconNoticeNeeded } from "./pages/InstallGuide";
-import { APP_OPEN, ICON_CHANGED_AT, inApp, isAndroid, isIOS, standalone } from "./platform";
+import {
+  AppClosedPage,
+  IconChangedPage,
+  InstallGuide,
+  iconNoticeNeeded,
+} from "./pages/InstallGuide";
+import {
+  APP_OPEN,
+  ICON_CHANGED_AT,
+  inApp,
+  isAndroid,
+  isIOS,
+  standalone,
+} from "./platform";
 import { LoginPage, PasswordPage } from "./pages/Login";
-import { AdminPage } from "./pages/Admin";
-import { MePage, ProfileSetupPage } from "./pages/Profile";
-import { RankingPage } from "./pages/Ranking";
-import { MarketPage } from "./pages/Market";
-import { RequestsPage } from "./pages/Requests";
-import { ActivityLogPage } from "./pages/ActivityLog";
-import { AlertsPage } from "./pages/Alerts";
-import { ChatGapsPage } from "./pages/ChatGaps";
-import { PlatShopPage } from "./pages/PlatShop";
-import { BoardPage } from "./pages/Board";
-import { OfficialPostPage } from "./pages/Official";
-import { PatchNotesPage } from "./pages/PatchNotes";
-import { OddsPage, OddsTablePage } from "./pages/Odds";
-import { TodoPage } from "./pages/Todo";
-import { RentalPage } from "./pages/Rental";
-import { GuildDungeonPage } from "./pages/GuildDungeon";
 import { GuideHost } from "./tutorial";
 import { Opening, shouldCelebrate } from "./pages/Opening";
 import { reportOpen, reportView } from "./activity";
 import { markMenuVisit } from "./updates";
 import { ensurePush, reportPush } from "./push";
-import { ApiError, JOB_NAME, RANK, TEST_IDS, errorText, fetchMe, switchAccount } from "./auth";
+import {
+  ApiError,
+  JOB_NAME,
+  RANK,
+  TEST_IDS,
+  errorText,
+  fetchMe,
+  switchAccount,
+} from "./auth";
 import { appMenu } from "./platform";
 import type { Me } from "./auth";
+
+// 자주 안 쓰는 화면은 따로 떼어 처음엔 받지 않는다 (2026-11-03 렉 검토: 코드 한 덩어리 558KB 를 폰이 다 읽고서야 홈이 떴다).
+// 홈·정보·위키 화면·로그인·오픈 축하·튜토리얼은 그대로 한 덩어리. 떼어 둔 화면은 처음 들어갈 때 한 번 받고(잠깐 '불러오는 중'), 배포 뒤 옛 조각을 못 찾으면
+// index.html 의 vite:preloadError 가 새로 불러온다
+const ChatPage = lazy(() =>
+  import("./pages/Chat").then((m) => ({ default: m.ChatPage })),
+);
+const AdminPage = lazy(() =>
+  import("./pages/Admin").then((m) => ({ default: m.AdminPage })),
+);
+const MePage = lazy(() =>
+  import("./pages/Profile").then((m) => ({ default: m.MePage })),
+);
+const ProfileSetupPage = lazy(() =>
+  import("./pages/Profile").then((m) => ({ default: m.ProfileSetupPage })),
+);
+const RankingPage = lazy(() =>
+  import("./pages/Ranking").then((m) => ({ default: m.RankingPage })),
+);
+const MarketPage = lazy(() =>
+  import("./pages/Market").then((m) => ({ default: m.MarketPage })),
+);
+const RequestsPage = lazy(() =>
+  import("./pages/Requests").then((m) => ({ default: m.RequestsPage })),
+);
+const ActivityLogPage = lazy(() =>
+  import("./pages/ActivityLog").then((m) => ({ default: m.ActivityLogPage })),
+);
+const AlertsPage = lazy(() =>
+  import("./pages/Alerts").then((m) => ({ default: m.AlertsPage })),
+);
+const ChatGapsPage = lazy(() =>
+  import("./pages/ChatGaps").then((m) => ({ default: m.ChatGapsPage })),
+);
+const PlatShopPage = lazy(() =>
+  import("./pages/PlatShop").then((m) => ({ default: m.PlatShopPage })),
+);
+const BoardPage = lazy(() =>
+  import("./pages/Board").then((m) => ({ default: m.BoardPage })),
+);
+const OfficialPostPage = lazy(() =>
+  import("./pages/Official").then((m) => ({ default: m.OfficialPostPage })),
+);
+const PatchNotesPage = lazy(() =>
+  import("./pages/PatchNotes").then((m) => ({ default: m.PatchNotesPage })),
+);
+const OddsPage = lazy(() =>
+  import("./pages/Odds").then((m) => ({ default: m.OddsPage })),
+);
+const OddsTablePage = lazy(() =>
+  import("./pages/Odds").then((m) => ({ default: m.OddsTablePage })),
+);
+const TodoPage = lazy(() =>
+  import("./pages/Todo").then((m) => ({ default: m.TodoPage })),
+);
+const RentalPage = lazy(() =>
+  import("./pages/Rental").then((m) => ({ default: m.RentalPage })),
+);
+const GuildDungeonPage = lazy(() =>
+  import("./pages/GuildDungeon").then((m) => ({ default: m.GuildDungeonPage })),
+);
 
 /**
  * 아래 탭은 사람마다 배치가 다르다 (src/launcher.ts, 제작자 요청 2026-11-01: 폰 홈 화면처럼 홈 칸과 아래 탭을 오가며 옮기기).
  * 처음에는 홈 · 게시판 · 검색 · 정보 · 챗봇. 아이콘은 아이모 그림과 어울리는 픽셀 그림 (public/icons), 없으면 칸 그림.
  * 안드로이드 앱 안에서만 보이는 '앱' 탭(시계 설정, 게임 위에 띄우기)은 배치와 상관없이 맨 끝 (게임 위 위키 창 안에서는 숨김).
  */
-const APP_TAB: LaunchItem = { key: "apptab", title: "앱", to: "#/app", icon: "⏰", match: ["app"] };
+const APP_TAB: LaunchItem = {
+  key: "apptab",
+  title: "앱",
+  to: "#/app",
+  icon: "⏰",
+  match: ["app"],
+};
 
 /**
  * 위키는 길드원만 본다. 로그인 전에는 로그인 화면, 임시 비밀번호로 들어오면 비밀번호 바꾸기 화면만 보인다.
@@ -150,29 +241,66 @@ export function App() {
   // 아이콘 다시 설치 안내 (제작자 요청 2026-11-01: 새 아이콘인 사람에게는 절대 안 뜨게, 로그인한 뒤 판을 보고).
   // 홈 화면 웹앱이 시작 주소에 지금 아이콘 판(?icon=) 없이 열렸고(iconNoticeNeeded: 재설치 완료나 새 판으로 연 적이 있으면 빠짐),
   // 아이콘을 바꾸기 전부터 있던 계정일 때만. 그 뒤 만든 계정은 새 아이콘으로 깔았다. 앱개발자는 이미 새 아이콘이라 뺀다
-  if (iconNotice && me && me.role !== "developer" && (me.createdAt ?? 0) < ICON_CHANGED_AT) {
+  if (
+    iconNotice &&
+    me &&
+    me.role !== "developer" &&
+    (me.createdAt ?? 0) < ICON_CHANGED_AT
+  ) {
     return <IconChangedPage onDone={() => setIconNotice(false)} />;
   }
   // 안드로이드 앱은 검토 후 오픈: 이미 깐 앱 안에서는 웹으로 안내만 한다. 앱개발자(퓨앙)는 그대로 쓴다 (제작자 요청)
   if (inApp && !APP_OPEN && me?.role !== "developer") {
     if (me === null && appLogin) return <LoginPage onLogin={setMe} />;
-    return <AppClosedPage onLogin={me === null ? () => setAppLogin(true) : undefined} />;
+    return (
+      <AppClosedPage
+        onLogin={me === null ? () => setAppLogin(true) : undefined}
+      />
+    );
   }
   if (me === null) return <LoginPage onLogin={setMe} />;
   if (me.mustChange) {
-    return <PasswordPage forced onDone={() => setMe({ ...me, mustChange: false })} onBack={() => setMe(null)} />;
+    return (
+      <PasswordPage
+        forced
+        onDone={() => setMe({ ...me, mustChange: false })}
+        onBack={() => setMe(null)}
+      />
+    );
   }
   if (!me.job || !me.level || !me.guild) {
-    return <ProfileSetupPage me={me} onDone={(p) => setMe({ ...me, ...p })} onBack={() => setMe(null)} />;
+    return (
+      <ProfileSetupPage
+        me={me}
+        onDone={(p) => setMe({ ...me, ...p })}
+        onBack={() => setMe(null)}
+      />
+    );
   }
-  return <Wiki me={me} onMe={(p) => setMe({ ...me, ...p })} onLogout={() => setMe(null)} />;
+  return (
+    <Wiki
+      me={me}
+      onMe={(p) => setMe({ ...me, ...p })}
+      onLogout={() => setMe(null)}
+    />
+  );
 }
 
-function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; onLogout: () => void }) {
+function Wiki({
+  me,
+  onMe,
+  onLogout,
+}: {
+  me: Me;
+  onMe: (p: Partial<Me>) => void;
+  onLogout: () => void;
+}) {
   const route = useRoute();
   // 위키 자료 (못 받으면 '다시 시도', 다시 연결되거나 앱으로 돌아올 때도 다시 받는다: 한 번 실패하면 앱을 껐다 켜야 했다)
   const [wikiTry, setWikiTry] = useState(0);
-  const { data: wiki, error } = useAsync(useCallback(() => loadWiki(), [wikiTry]));
+  const { data: wiki, error } = useAsync(
+    useCallback(() => loadWiki(), [wikiTry]),
+  );
   useEffect(() => {
     if (!error || error.includes(NEED_LOGIN)) return;
     const retry = () => setWikiTry((n) => n + 1);
@@ -195,7 +323,10 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   useEffect(() => reportView(location.hash), [route]);
   // 폰이 이미 알림을 허락했으면 폰 알림을 저절로 켠다 (제작자 요청: 기본은 허용)
   // 그 뒤 이 폰의 알림 허용 상태를 알린다 ('길드원 관리'에 보인다)
-  useEffect(() => void ensurePush(me.id).then(() => reportPush(me.id)), [me.id]);
+  useEffect(
+    () => void ensurePush(me.id).then(() => reportPush(me.id)),
+    [me.id],
+  );
   // 업데이트된 메뉴에 처음 들어간 때 (홈 칸의 'UPDATE' 가 그때 사라진다)
   useEffect(() => markMenuVisit(me.id, location.hash), [route, me.id]);
   // 홈 칸과 아래 탭 배치 (계정마다). 홈을 떠나면 배치 편집은 끝낸다
@@ -203,7 +334,9 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   const launcher = useLauncher();
   // 정식 오픈 축하 (폭죽과 길드마스터의 오픈 글, 오픈 뒤 2주 동안 이 기기에서 한 번. pages/Opening.tsx)
   // '더 이상 보지 않기'는 사람마다 (부캐로 바꿔도 같다), 캐릭터를 바꿔 새로 연 것은 들어온 것으로 치지 않는다
-  const [celebrate, setCelebrate] = useState(() => !justSwitched() && shouldCelebrate(personOf(me)));
+  const [celebrate, setCelebrate] = useState(
+    () => !justSwitched() && shouldCelebrate(personOf(me)),
+  );
   // 새 글·새 물건 숫자 배지 (news.ts): 그 메뉴를 열면 지우고, 홈으로 올 때 다시 묻는다
   useEffect(() => startNews(me.id), [me.id]);
   useEffect(() => {
@@ -216,7 +349,9 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
     if (page !== "" && launcher.editing) setEditing(false);
   }, [page, launcher.editing]);
   const layout = launcher.preview ?? launcher.layout;
-  const dock = layout.dock.map(itemOf).filter((t): t is LaunchItem => !!t && canSee(t, me));
+  const dock = layout.dock
+    .map(itemOf)
+    .filter((t): t is LaunchItem => !!t && canSee(t, me));
   const tabs = appMenu ? [...dock, APP_TAB] : dock;
   const chatAt = tabs.findIndex((t) => t.key === "chat");
   const editable = page === "";
@@ -230,50 +365,123 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
   }, [loggedOut, onLogout]);
 
   let body;
-  if (page === "password") body = <PasswordPage onDone={() => (location.hash = "#/")} />;
-  else if (page === "admin") body = RANK[me.role] >= 1 ? <AdminPage me={me} /> : <NotFound what="페이지" />;
-  else if (page === "me") body = <MePage me={me} onMe={onMe} onLogout={onLogout} />;
-  else if (page === "as") body = <SwitchTo me={me} who={arg} to={route.query.get("to") ?? ""} />;
+  if (page === "password")
+    body = <PasswordPage onDone={() => (location.hash = "#/")} />;
+  else if (page === "admin")
+    body =
+      RANK[me.role] >= 1 ? <AdminPage me={me} /> : <NotFound what="페이지" />;
+  else if (page === "me")
+    body = <MePage me={me} onMe={onMe} onLogout={onLogout} />;
+  else if (page === "as")
+    body = <SwitchTo me={me} who={arg} to={route.query.get("to") ?? ""} />;
   else if (page === "ranking") body = <RankingPage me={me} onMe={onMe} />;
   else if (page === "requests") body = <RequestsPage me={me} />;
-  else if (page === "alerts") body = <AlertsPage developer={me.role === "developer"} preview={canPreview(me)} />;
+  else if (page === "alerts")
+    body = (
+      <AlertsPage
+        developer={me.role === "developer"}
+        preview={canPreview(me)}
+      />
+    );
   else if (page === "shop") body = <PlatShopPage />;
   else if (page === "patch") body = <PatchNotesPage />;
   // 아이모 소식 글 읽기 (#/official/번호). 예전 목록 주소(#/official)는 게시판 '아이모 소식'으로
-  else if (page === "official") body = Number(arg) ? <OfficialPostPage id={Number(arg)} job={me.job ? JOB_NAME[me.job] : null} /> : <GoTo to="#/board?cat=imo" />;
-  else if (page === "odds") body = arg ? <OddsTablePage id={arg} q={route.query.get("q") ?? ""} /> : <OddsPage q={route.query.get("q") ?? ""} cat={route.query.get("c") ?? ""} />;
-  else if (page === "board") body = <BoardPage me={me} arg={arg} sub={route.parts[2] ?? ""} query={route.query} />;
+  else if (page === "official")
+    body = Number(arg) ? (
+      <OfficialPostPage
+        id={Number(arg)}
+        job={me.job ? JOB_NAME[me.job] : null}
+      />
+    ) : (
+      <GoTo to="#/board?cat=imo" />
+    );
+  else if (page === "odds")
+    body = arg ? (
+      <OddsTablePage id={arg} q={route.query.get("q") ?? ""} />
+    ) : (
+      <OddsPage
+        q={route.query.get("q") ?? ""}
+        cat={route.query.get("c") ?? ""}
+      />
+    );
+  else if (page === "board")
+    body = (
+      <BoardPage
+        me={me}
+        arg={arg}
+        sub={route.parts[2] ?? ""}
+        query={route.query}
+      />
+    );
   else if (page === "") body = <Home me={me} />;
   else if (page === "info") body = <InfoPage me={me} />;
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
   else if (page === "app" || page === "timer") body = <AppPage />;
   // 사용 기록, 챗봇 개선: 길드마스터와 앱개발자 (제작자 요청 2026-11-02)
-  else if (page === "gaps") body = RANK[me.role] >= 2 ? <ChatGapsPage role={me.role} /> : <NotFound what="페이지" />;
+  else if (page === "gaps")
+    body =
+      RANK[me.role] >= 2 ? (
+        <ChatGapsPage role={me.role} />
+      ) : (
+        <NotFound what="페이지" />
+      );
   // 길드 던전은 1군 전용 (제작자 요청 2026-11-02): 2군은 들어와도 안내만 (앱개발자는 길드와 상관없이 본다)
-  else if (page === "match") body = me.guild !== "main" && me.role !== "developer" ? <DevSoon title="길드 던전" text="1군 전용이에요" /> : <GuildDungeonPage me={me} />;
-  else if (!wiki) body = <Loading error={loggedOut ? undefined : error} onRetry={() => setWikiTry((n) => n + 1)} />;
-  else if (page === "search") body = <Search wiki={wiki} q={route.query.get("q") ?? ""} />;
-  else if (page === "places") body = <Places wiki={wiki} region={route.query.get("r") ?? ""} />;
+  else if (page === "match")
+    body =
+      me.guild !== "main" && me.role !== "developer" ? (
+        <DevSoon title="길드 던전" text="1군 전용이에요" />
+      ) : (
+        <GuildDungeonPage me={me} />
+      );
+  else if (!wiki)
+    body = (
+      <Loading
+        error={loggedOut ? undefined : error}
+        onRetry={() => setWikiTry((n) => n + 1)}
+      />
+    );
+  else if (page === "search")
+    body = <Search wiki={wiki} q={route.query.get("q") ?? ""} />;
+  else if (page === "places")
+    body = <Places wiki={wiki} region={route.query.get("r") ?? ""} />;
   else if (page === "place") body = <PlacePage wiki={wiki} id={arg} />;
   else if (page === "monster") body = <MonsterPage wiki={wiki} name={arg} />;
   else if (page === "item") body = <ItemPage wiki={wiki} name={arg} />;
-  else if (page === "equip") body = arg ? <EquipSlot wiki={wiki} slot={arg} /> : <EquipSlots wiki={wiki} />;
+  else if (page === "equip")
+    body = arg ? (
+      <EquipSlot wiki={wiki} slot={arg} />
+    ) : (
+      <EquipSlots wiki={wiki} />
+    );
   else if (page === "menu") body = <MenuPage wiki={wiki} title={arg} me={me} />;
   else if (page === "post") body = <PostPage wiki={wiki} id={arg} />;
-  else if (page === "chat") body = <ChatPage wiki={wiki} arg={arg} query={route.query} me={me} />;
+  else if (page === "chat")
+    body = <ChatPage wiki={wiki} arg={arg} query={route.query} me={me} />;
   else if (page === "market") body = <MarketPage wiki={wiki} me={me} />;
   // To do: 오늘·이번 주·이벤트 할 일 (제작자 요청 2026-11-01). 인던 목록이 위키 자료라서 위키를 기다린다
   else if (page === "todo") body = <TodoPage wiki={wiki} me={me} />;
   // 장비대여: 대여 무기 목록, 신청, 마일리지 (제작자 요청 2026-11-01, 개발 중이라 앱개발자만). 무기 그림과 레벨이 위키 자료라서 위키를 기다린다
-  else if (page === "rent") body = <RentalPage wiki={wiki} me={me} view={route.query.get("v") ?? ""} />;
-  else if (page === "log") body = RANK[me.role] >= 2 ? <ActivityLogPage wiki={wiki} role={me.role} /> : <NotFound what="페이지" />;
+  else if (page === "rent")
+    body = <RentalPage wiki={wiki} me={me} view={route.query.get("v") ?? ""} />;
+  else if (page === "log")
+    body =
+      RANK[me.role] >= 2 ? (
+        <ActivityLogPage wiki={wiki} role={me.role} />
+      ) : (
+        <NotFound what="페이지" />
+      );
   else body = <Home me={me} />;
 
   return (
     <div
       className="app"
       // 홈의 버전 글씨를 챗봇 탭(없으면 마지막 탭) 바로 위에 두려고 탭 수와 그 자리를 알린다 (styles.css .home-version)
-      style={{ "--tabs": tabs.length, "--chat-at": chatAt >= 0 ? chatAt : tabs.length - 1 } as CSSProperties}
+      style={
+        {
+          "--tabs": tabs.length,
+          "--chat-at": chatAt >= 0 ? chatAt : tabs.length - 1,
+        } as CSSProperties
+      }
     >
       {/* 테스트 계정으로 보는 중이면 맨 위에 '내 계정' (앱개발자로 돌아가기) */}
       {TEST_IDS.includes(me.id) && (
@@ -292,27 +500,52 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
       )}
       {/* 화면이 바뀔 때 0.16초 안에 살짝 떠오른다 (주소의 ? 뒤만 바뀌면 그대로) */}
       {/* 챗봇은 새 대화가 #/chat -> #/chat/번호 로 바뀌어도, 목록을 다녀와도 받던 답이 이어지게 한 화면으로 둔다 */}
-      <main className="page" key={page === "chat" ? "chat" : route.parts.join("/")}>
-        {body}
+      <main
+        className="page"
+        key={page === "chat" ? "chat" : route.parts.join("/")}
+      >
+        <Suspense fallback={<Loading />}>{body}</Suspense>
       </main>
       {body.type === Home && <HomeCorner />}
       {/* 내 지역 날씨로 비·눈 (초안, 앱개발자만. pages/Weather.tsx) */}
       {body.type === Home && <HomeWeather me={me} />}
       {/* 메뉴 설명 칸과 튜토리얼 (제목을 누르면, src/tutorial.tsx) */}
       <GuideHost me={me} />
-      <nav className={"tabbar" + (launcher.editing && editable ? " launch-editing" : "")} data-zone="dock">
+      <nav
+        className={
+          "tabbar" + (launcher.editing && editable ? " launch-editing" : "")
+        }
+        data-zone="dock"
+      >
         {tabs.map((t) => {
           // 아래 탭도 고친 메뉴면 'UPDATE' (제작자 요청 2026-11-01, 홈 칸과 같은 updates.ts)
           const updated = t !== APP_TAB && isUpdated(me.id, t);
           const className =
-            "tab" + (t.match.includes(page) ? " tab-on" : "") + (isLocked(t, me) ? " tab-locked" : "") + (dragKey === t.key ? " launch-drag-src" : "");
+            "tab" +
+            (t.match.includes(page) ? " tab-on" : "") +
+            (isLocked(t, me) ? " tab-locked" : "") +
+            (dragKey === t.key ? " launch-drag-src" : "");
           const fresh = newsFor(news, t.key);
           const inside = (
             <>
               {updated && <span className="tab-up">UPDATE</span>}
-              {fresh > 0 && <span className="news-badge tab-news">{fresh > 99 ? "99+" : fresh}</span>}
-              <span className="tab-icon">{t.pic ? <PixelIcon name={t.pic} size={32} /> : <TileIcon t={t} />}</span>
-              <FitLine className="tab-label" text={t.short ?? t.title} wrap={false} />
+              {fresh > 0 && (
+                <span className="news-badge tab-news">
+                  {fresh > 99 ? "99+" : fresh}
+                </span>
+              )}
+              <span className="tab-icon">
+                {t.pic ? (
+                  <PixelIcon name={t.pic} size={32} />
+                ) : (
+                  <TileIcon t={t} />
+                )}
+              </span>
+              <FitLine
+                className="tab-label"
+                text={t.short ?? t.title}
+                wrap={false}
+              />
             </>
           );
           const handlers =
@@ -321,25 +554,44 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
               : {
                   "data-slot": t.key,
                   "data-zone": "dock",
-                  onPointerDown: (e: ReactPointerEvent<HTMLElement>) => pressItem(e, t.key, editable),
+                  onPointerDown: (e: ReactPointerEvent<HTMLElement>) =>
+                    pressItem(e, t.key, editable),
                   onClick: clickItem,
-                  onContextMenu: (e: ReactMouseEvent) => editable && e.preventDefault(),
+                  onContextMenu: (e: ReactMouseEvent) =>
+                    editable && e.preventDefault(),
                 };
           return isLocked(t, me) ? (
-            <span key={t.key} className={className} aria-disabled="true" {...handlers}>
+            <span
+              key={t.key}
+              className={className}
+              aria-disabled="true"
+              {...handlers}
+            >
               {inside}
             </span>
           ) : (
-            <a key={t.key} href={t.to} className={className} draggable={false} {...handlers}>
+            <a
+              key={t.key}
+              href={t.to}
+              className={className}
+              draggable={false}
+              {...handlers}
+            >
               {inside}
             </a>
           );
         })}
       </nav>
-      {celebrate && <Opening user={personOf(me)} onClose={() => setCelebrate(false)} />}
+      {celebrate && (
+        <Opening user={personOf(me)} onClose={() => setCelebrate(false)} />
+      )}
       {/* 끌고 있는 칸 (손가락을 따라온다) */}
       {dragItem && launcher.drag && (
-        <div className="launch-ghost" style={{ left: launcher.drag.x, top: launcher.drag.y }} aria-hidden>
+        <div
+          className="launch-ghost"
+          style={{ left: launcher.drag.x, top: launcher.drag.y }}
+          aria-hidden
+        >
           <span className="tile-icon">
             <TileIcon t={dragItem} />
           </span>
@@ -354,7 +606,8 @@ function Wiki({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; 
 function SwitchTo({ me, who, to }: { me: Me; who: string; to: string }) {
   const [error, setError] = useState("");
   useEffect(() => {
-    const next = to.startsWith("#/") && !to.startsWith("#/as/") ? to : "#/alerts";
+    const next =
+      to.startsWith("#/") && !to.startsWith("#/as/") ? to : "#/alerts";
     if (who === me.id) go(next, true);
     else goCharacter(who, next).catch((x) => setError(errorText(x)));
   }, [me.id, who, to]);
