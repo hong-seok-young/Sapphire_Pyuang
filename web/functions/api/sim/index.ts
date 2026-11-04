@@ -4,10 +4,9 @@
 // POST /api/sim { game, cat, label, score, tries, luck } -> 내 기록보다 좋을 때만 바꾼다 (화면이 셈한 값이라 재미로만, 값의 범위만 본다)
 // 미리 보는 사람(운영진, 앱개발자, 테스트 계정)만. 테스트 계정은 순위에 안 나온다
 import { FORBIDDEN, NEED_LOGIN, RANK, TEST_IDS, currentUser, json, readJson } from "../../../server/auth";
-import type { Env, User } from "../../../server/auth";
+import type { Env } from "../../../server/auth";
+import { canSim } from "../../../server/simcoin";
 
-/** 앱개발자(와 그 테스트 계정)만 (제작자 2026-11-04 '개발 중으로 나만 보게') */
-const canSim = (me: User) => me.role === "developer" || TEST_IDS.includes(me.id);
 const CATS = ["enhance", "grow", "option", "gem", "box"];
 const NOT_TEST = `user_id NOT IN (${TEST_IDS.map((t) => `'${t}'`).join(", ")})`;
 const ORDER = "score DESC, tries ASC, at ASC";

@@ -1,7 +1,13 @@
 // 시뮬레이터 행운 코인 (개발중, 제작자 요청 2026-11-04 '시도 횟수는 웹에서 유의미한 움직임과 행동을 할 때마다 재화를 주고 그걸로 트라이, 그럼 활성화될 듯').
 // 버는 곳: API 미들웨어가 성공한 요청마다 EARN 에서 찾아 넣고(functions/api/_middleware.ts, 답을 돌려준 뒤), 하루 첫 접속은 /api/activity 가 넣는다.
 // 쓰는 곳: 시뮬레이터 화면이 시도마다 줄이고 모아서 보낸다 (/api/sim/wallet). D1 sim_wallet, sim_earn (하루 횟수). 기록은 지우지 않는다
-import type { Env } from "./auth";
+import { RANK, TEST_IDS } from "./auth";
+import type { Env, User } from "./auth";
+
+/** 시뮬레이터를 쓰는 사람 (제작자 2026-11-04 '길드마스터랑 오피서들 보게, 달팽이랑 간다이도'): 운영진·앱개발자·테스트 계정과 이 사람들(묶은 캐릭터 중 하나라도).
+ *  닉네임으로 정하므로 닉네임을 바꾸면 고친다. 화면은 src/launcher.ts canSim (같은 목록) */
+export const SIM_PEOPLE = ["달팽이", "간다이"];
+export const canSim = (me: User) => RANK[me.role] >= 1 || TEST_IDS.includes(me.id) || [me.id, ...(me.chars ?? [])].some((c) => SIM_PEOPLE.includes(c));
 
 /** 한국 날짜 (하루 한도를 0시에 새로) */
 export const kstDate = (ms: number) => new Date(ms + 9 * 3_600_000).toISOString().slice(0, 10);

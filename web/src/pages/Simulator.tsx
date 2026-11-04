@@ -9,7 +9,7 @@ import { useEntryState } from "../router";
 import { BOX_CATS, GEM_NAMES, atLeast, boxFor, boxOf, boxesOf, expectedTo, gemSynth, optionFor, optionSources, pick, repairItems, scrollsOf, stepsExpected, stepsOf, tierOf } from "../sim";
 import type { Box, Dist, OptItem, OptSource, Part, Scroll, Steps } from "../sim";
 import { Loading, PicImg, TopBar } from "../ui";
-import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, gearOf, gearPower, gearStat, loadCleared, loadHeld, saveCleared, saveHeld } from "../simGear";
+import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, gearOf, gearPower, gearStat, loadCleared, loadHeld, saveCleared, saveHeld, unlockCost } from "../simGear";
 import type { ArmorSlot, Gear, GearJob, Held } from "../simGear";
 import type { Wiki } from "../types";
 import { JOB_NAME } from "../auth";
@@ -583,6 +583,38 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
   const [goal, setGoal] = useState(part === "무기" ? 8 : 6);
   const [auto, setAuto] = useState(false);
   const coins = useCoins();
+  // 장비마다 해금 (코인): 자동 강화, 자동 구매(자동 강화 중에 부서지면 같은 장비를 다시 사서 목표까지 이어 간다)
+  // 자동 구매 켬/끔은 이 기기에 둔다 (캐릭터마다)
+  const autoBuyKey = `sapphire.sim.autobuy.${me.id}`;
+  const [autoBuy, setAutoBuyState] = useState(() => {
+    try {
+      return localStorage.getItem(autoBuyKey) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setAutoBuy = (v: boolean) => {
+    setAutoBuyState(v);
+    try {
+      localStorage.setItem(autoBuyKey, v ? "1" : "0");
+    } catch {
+      /* 저장이 안 되면 이번에 연 동안만 */
+    }
+  };
+  const autoKey = held ? `auto:${held.name}` : "";
+  const buyKey = held ? `buy:${held.name}` : "";
+  const autoOn = !!held && coins.unlocks.has(autoKey);
+  const buyOn = !!held && coins.unlocks.has(buyKey);
+  const rebuyOn = autoOn && buyOn && autoBuy;
+  const rebuyRef = useRef(rebuyOn);
+  rebuyRef.current = rebuyOn;
+  const brokeAt = useRef(0);
+  const [unlocking, setUnlocking] = useState(false);
+  const doUnlock = async (key: string, cost: number) => {
+    setUnlocking(true);
+    await coins.unlock(key, cost);
+    setUnlocking(false);
+  };
   // 순위: 무기·갑옷과 마법서(이벤트 확률은 따로)마다. 산 장비로 몇 번 만에 몇 강, 점수는 강화한 장비의 세기(무기 평균 데미지, 방어구 방어도)라서 강한 장비일수록 위
   const game = `enh:${part}:${scroll.name}${ev && scroll.event ? ":ev" : ""}`;
   const rec = useRecord(game);
@@ -605,6 +637,17 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
     setStats((s) => ({ ...s, coins: s.coins + g.price }));
     setShop(false);
     setFx((f) => ({ kind: "buy", n: (f?.n ?? 0) + 1 }));
+  };
+  // 자동 구매: 자동 강화를 멈추지 않고 같은 장비를 다시 산다 (코인이 모자라거나 살 수 없으면 false)
+  const rebuy = (g: Gear) => {
+    if (!buyable(g) || !coins.has(g.price) || coins.take(g.price) < g.price) return false;
+    setHeld({ name: g.name, lv: 0, broken: false, tries: 0, tainted: false });
+    setStats((s) => ({ ...s, coins: s.coins + g.price }));
+    comboRef.current = 0;
+    setCombo(0);
+    setGain(null);
+    setFx((f) => ({ kind: "buy", n: (f?.n ?? 0) + 1 }));
+    return true;
   };
   const choose = (s: Scroll) => {
     setName(s.name);
@@ -658,6 +701,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
         setHeld({ ...h, tries }, scroll.part);
         setFx((f) => ({ kind: "keep", n: (f?.n ?? 0) + 1 }));
       } else {
+        brokeAt.current = Date.now();
         setHeld({ ...h, tries, broken: true }, scroll.part);
         setFx((f) => ({ kind: "break", n: (f?.n ?? 0) + 1 }));
         setGain(null);
@@ -690,18 +734,25 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
     if (c) tryOnce(c.ok);
   }, [tryOnce]);
 
-  // 목표까지 자동: 0.18초마다 한 번, 목표에 닿거나 부서지면 멈춘다
+  // 목표까지 자동: 0.18초마다 한 번, 목표에 닿으면 멈춘다. 부서지면 멈추고, 자동 구매를 켰으면 부서지는 모습을 보인 뒤 다시 사서 이어 간다 (코인이 떨어질 때까지)
   useEffect(() => {
     if (!auto) return;
     const t = window.setInterval(() => {
       const h = heldRef.current;
-      if (!h || h.lv >= goal || h.broken || !(rates[h.lv + 1] > 0)) {
+      if (h?.broken) {
+        const g = gears.find((x) => x.part === scroll.part && x.name === h.name);
+        if (!rebuyRef.current || !g) setAuto(false);
+        else if (Date.now() - brokeAt.current >= 700 && !rebuy(g)) setAuto(false);
+        return;
+      }
+      if (!h || h.lv >= goal || !(rates[h.lv + 1] > 0)) {
         setAuto(false);
         return;
       }
       tryOnce();
     }, 180);
     return () => window.clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auto, goal, rates, tryOnce]);
 
   const switchPart = (x: Part) => {
@@ -866,7 +917,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
             )}
           </section>
 
-          {broken ? (
+          {broken && !auto ? (
             <div className="sim-actions sim-actions-2">
               <button type="button" className="btn sim-go" disabled={!buyable(gear!) || coins.coins === null || coins.coins < gear!.price} onClick={() => buy(gear!)}>
                 다시 사기 <small>{gear!.price}코인</small>
@@ -880,6 +931,16 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
               <button type="button" className="btn sim-go" disabled={!(p > 0) || auto || !!charge || coins.coins === 0} onClick={press}>
                 강화
               </button>
+              {!autoOn ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost sim-unlock"
+                  disabled={unlocking || coins.coins === null || coins.coins < unlockCost(gear!, "auto")}
+                  onClick={() => doUnlock(autoKey, unlockCost(gear!, "auto"))}
+                >
+                  자동 강화 해금 <small>{unlockCost(gear!, "auto")}코인</small>
+                </button>
+              ) : (
               <span className="sim-goal">
                 <button type="button" className="pill" onClick={() => setGoal(Math.max(lv + 1, goal - 1))} aria-label="목표 내리기">
                   −
@@ -891,6 +952,25 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
                   +
                 </button>
               </span>
+              )}
+            </div>
+          )}
+          {autoOn && (
+            <div className="sim-autobuy">
+              {buyOn ? (
+                <button type="button" aria-pressed={autoBuy} className={"sub-tab" + (autoBuy ? " sub-tab-on" : "")} onClick={() => setAutoBuy(!autoBuy)}>
+                  자동 구매 {autoBuy ? "켬" : "끔"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-ghost sim-unlock"
+                  disabled={unlocking || coins.coins === null || coins.coins < unlockCost(gear!, "buy")}
+                  onClick={() => doUnlock(buyKey, unlockCost(gear!, "buy"))}
+                >
+                  자동 구매 해금 <small>{unlockCost(gear!, "buy")}코인</small>
+                </button>
+              )}
             </div>
           )}
         </>

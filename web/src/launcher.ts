@@ -48,6 +48,8 @@ export interface LaunchItem {
   developer?: boolean;
   /** 길드마스터와 앱개발자만 (사용 기록, 챗봇 개선: 제작자 요청 2026-11-02 '길드마스터도 보이게') */
   masters?: boolean;
+  /** 확률 시뮬레이터를 쓰는 사람만 (canSim) */
+  sim?: boolean;
 }
 
 export const ITEMS: LaunchItem[] = [
@@ -70,7 +72,7 @@ export const ITEMS: LaunchItem[] = [
   { key: "enhance", title: "강화 비교", short: "강화", to: "#/enhance", icon: "⚒️", soon: true, badge: "개발중", match: ["enhance"] },
   // 확률 시뮬레이터 (개발중, 제작자 요청 2026-11-04): 공식 확률 표로 강화·스탯 부여·옵션·상자를 해 본다
   // 확률 시뮬레이터는 앱개발자만 (제작자 2026-11-04 '개발 중으로 나만 보게')
-  { key: "sim", title: "확률 시뮬레이터", short: "확률", to: "#/sim", icon: "🎰", soon: true, badge: "개발중", developer: true, match: ["sim"] },
+  { key: "sim", title: "확률 시뮬레이터", short: "확률", to: "#/sim", icon: "🎰", soon: true, badge: "개발중", sim: true, match: ["sim"] },
   { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
   // 장비대여 (2026-11-02 제작자 요청으로 열었다), 길드던전과 인던 같이 갈 사람 찾기 (칸만 먼저 두고 개발 중으로 막는다)
   // 오른쪽 위에 담당자 (제작자 요청 2026-11-03 '장비대여 담당자는 멍멍, 버튼 우측 상단에 텍스트로만 관리자 줄바꿈 멍멍'. 담당이 바뀌면 server/rental.ts RENT_STAFF 와 같이 고친다)
@@ -109,12 +111,16 @@ export const INFO_TILES: LaunchItem[] = [
  * 테스트 계정도 (앱개발자가 To do '함께' 같은 상대방 쪽을 시험하려고). 서버는 server/rental.ts canEnter, server/todo.ts shareablePeople
  */
 export const canPreview = (me: Me) => RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
+/** 확률 시뮬레이터를 쓰는 사람 (제작자 2026-11-04 '길드마스터랑 오피서들 보게, 달팽이랑 간다이도'): 미리 보는 사람과 이 사람들(묶은 캐릭터 중 하나라도).
+ *  닉네임으로 정하므로 닉네임을 바꾸면 고친다. 서버는 server/simcoin.ts canSim (같은 목록) */
+export const SIM_PEOPLE = ["달팽이", "간다이"];
+export const canSim = (me: Me) => canPreview(me) || [me.id, ...(me.characters ?? []).map((c) => c.id)].some((c) => SIM_PEOPLE.includes(c));
 /** 눌러도 안 열리는 칸인지: 개발 중인 칸은 길드원에게만 막는다 */
 export const isLocked = (item: LaunchItem, me: Me) => !!item.locked && !canPreview(me);
 
 /** 이 사람에게 보이는 칸인지 */
 export const canSee = (item: LaunchItem, me: Me) =>
-  (!item.androidOnly || (isAndroid && !inApp)) && (!item.managers || RANK[me.role] >= 1) && (!item.developer || me.role === "developer") && (!item.masters || RANK[me.role] >= 2);
+  (!item.androidOnly || (isAndroid && !inApp)) && (!item.managers || RANK[me.role] >= 1) && (!item.developer || me.role === "developer") && (!item.masters || RANK[me.role] >= 2) && (!item.sim || canSim(me));
 
 /** 'UPDATE' 를 달지 (updates.ts). '정보'는 안의 칸이 고쳐졌을 때도 */
 export const isUpdated = (user: string, item: LaunchItem) =>

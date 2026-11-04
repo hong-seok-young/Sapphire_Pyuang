@@ -32,6 +32,8 @@ export interface Wallet {
   total: number;
   /** 앱개발자: floor 아래로 내려가면 add 를 채운다 (서버 server/simcoin.ts 와 같은 규칙) */
   refill: { floor: number; add: number } | null;
+  /** 해금한 것 ('auto:장비', 'buy:장비') */
+  unlocks?: string[];
 }
 export interface King {
   user_id: string;
@@ -98,12 +100,19 @@ export interface Coins {
   coins: number | null;
   /** n 개를 쓴다: 실제로 쓴 수 (모자라면 있는 만큼) */
   take: (n: number) => number;
+  /** 지금 n 개가 있는지 (자동 구매처럼 한꺼번에 내야 할 때) */
+  has: (n: number) => boolean;
+  /** 해금한 것 ('auto:장비 이름' 자동 강화, 'buy:장비 이름' 자동 구매) */
+  unlocks: Set<string>;
+  /** cost 코인으로 해금 (서버에 바로, 모아 둔 시도도 같이 보낸다). 됐으면 true */
+  unlock: (key: string, cost: number) => Promise<boolean>;
 }
-export const CoinCtx = createContext<Coins>({ coins: null, take: () => 0 });
+export const CoinCtx = createContext<Coins>({ coins: null, take: () => 0, has: () => false, unlocks: new Set(), unlock: async () => false });
 export const useCoins = () => useContext(CoinCtx);
 
 export function useCoinState(): Coins & { wallet: Wallet | null; reload: () => void } {
   const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [unlocks, setUnlocks] = useState<Set<string>>(() => new Set());
   const [coins, setCoins] = useState<number | null>(null);
   const left = useRef<number | null>(null);
   const refill = useRef<Wallet["refill"]>(null);
@@ -121,6 +130,7 @@ export function useCoinState(): Coins & { wallet: Wallet | null; reload: () => v
     fetchWallet().then(
       (w) => {
         setWallet(w);
+        setUnlocks(new Set(w.unlocks ?? []));
         refill.current = w.refill ?? null;
         left.current = w.coins - pending.current;
         setCoins(left.current);
@@ -152,7 +162,31 @@ export function useCoinState(): Coins & { wallet: Wallet | null; reload: () => v
     },
     [flush],
   );
-  return { coins, take, wallet, reload };
+  const has = useCallback((n: number) => left.current !== null && left.current >= n, []);
+  const unlock = useCallback(
+    async (key: string, cost: number) => {
+      if (left.current === null || left.current < cost) return false;
+      window.clearTimeout(timer.current);
+      timer.current = 0;
+      const spend = pending.current;
+      pending.current = 0;
+      try {
+        const r = await fetch("/api/sim/wallet", { method: "POST", credentials: "same-origin", headers: apiHeaders(true), body: JSON.stringify({ spend: spend || undefined, unlock: key, cost }) });
+        const j = (await r.json()) as { coins?: number; unlocks?: string[] };
+        if (typeof j.coins === "number") {
+          left.current = j.coins - pending.current;
+          setCoins(left.current);
+        }
+        if (j.unlocks) setUnlocks(new Set(j.unlocks));
+        return r.ok;
+      } catch {
+        pending.current += spend;
+        return false;
+      }
+    },
+    [],
+  );
+  return { coins, take, has, unlocks, unlock, wallet, reload };
 }
 
 // ---------------------------------------------------------------- 순위

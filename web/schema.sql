@@ -730,3 +730,11 @@ CREATE TABLE IF NOT EXISTS sim_feed (
   at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS sim_feed_at ON sim_feed (at);
+-- 시뮬레이터 해금 (제작자 2026-11-04 '자동 강화도 무기별로 각각 다 해금하게, 해금 비용은 코인으로', '자동 구매도'): 'auto:장비 이름', 'buy:장비 이름'
+CREATE TABLE IF NOT EXISTS sim_unlocks (
+  user_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  cost INTEGER NOT NULL,
+  at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, key)
+);
