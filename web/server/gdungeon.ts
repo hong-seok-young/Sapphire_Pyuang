@@ -71,6 +71,8 @@ export interface PartyState {
   members: { id: string; filled: boolean; confirmed: boolean }[];
   /** 파티원의 이번 주 가능한 때 ('0'/'1' 336자, 안 칠한 사람은 없다) */
   avail: Record<string, string>;
+  /** 다음 주 것 (화면은 오늘부터 7일을 월~일로 보여서 지난 요일 자리에 다음 주 날짜가 들어간다, 제작자 2026-11-04). 후보는 이번 주만 */
+  availNext: Record<string, string>;
   /** 모두 되는 칸 (지난 칸은 정해진 것만), 빠른 순 */
   candidates: number[];
   /** 무산된 후보와 불참한 사람 */
@@ -92,6 +94,7 @@ export function partyState(
   week: number,
   now: number,
   confirmedIds: Set<string> = new Set(),
+  nextRows: Map<string, string> = new Map(),
 ): PartyState {
   const members = memberIds.map((id) => ({
     id,
@@ -100,6 +103,8 @@ export function partyState(
   }));
   const avail: Record<string, string> = {};
   for (const m of members) if (availRows.has(m.id)) avail[m.id] = availRows.get(m.id)!;
+  const availNext: Record<string, string> = {};
+  for (const m of members) if (nextRows.has(m.id)) availNext[m.id] = nextRows.get(m.id)!;
   const all = members.length > 0 && members.every((m) => m.filled);
   const mine = answers.filter((a) => a.answer && memberIds.includes(a.user));
   const noBy = new Map<number, string[]>();
@@ -131,6 +136,7 @@ export function partyState(
     stage: p.stage ?? null,
     members,
     avail,
+    availNext,
     candidates,
     rejected: candidates.filter((s) => noBy.has(s)).map((slot) => ({ slot, by: noBy.get(slot)! })),
     current,
@@ -144,20 +150,22 @@ export async function allParties(env: Env, week: number, now = Date.now()): Prom
   const [parties, members, avail, answers] = await env.DB.batch([
     env.DB.prepare("SELECT id, name, leader, stage FROM gd_parties ORDER BY id"),
     env.DB.prepare("SELECT party_id, user_id FROM gd_members ORDER BY joined_at, user_id"),
-    env.DB.prepare("SELECT user_id, slots, confirmed_at FROM gd_avail WHERE week = ?").bind(week),
+    env.DB.prepare("SELECT user_id, week, slots, confirmed_at FROM gd_avail WHERE week IN (?, ?)").bind(week, week + WEEK),
     env.DB.prepare("SELECT party_id, slot, user_id AS user, answer FROM gd_answers WHERE week = ?").bind(week),
   ]);
   const byParty = new Map<number, string[]>();
   for (const m of members.results as { party_id: number; user_id: string }[]) byParty.set(m.party_id, [...(byParty.get(m.party_id) ?? []), m.user_id]);
-  const rows = avail.results as { user_id: string; slots: string; confirmed_at: number | null }[];
+  const all = avail.results as { user_id: string; week: number; slots: string; confirmed_at: number | null }[];
+  const rows = all.filter((r) => r.week === week);
   const availOf = new Map(rows.map((r) => [r.user_id, r.slots]));
+  const nextOf = new Map(all.filter((r) => r.week === week + WEEK).map((r) => [r.user_id, r.slots]));
   const confirmedIds = new Set(rows.filter((r) => r.confirmed_at).map((r) => r.user_id));
   const ans = answers.results as (Answer & { party_id: number })[];
   return (parties.results as { id: number; name: string; leader: string; stage: number | null }[]).map((p) => {
     // 파티장이 맨 앞
     const ids = byParty.get(p.id) ?? [];
     const ordered = [p.leader, ...ids.filter((id) => id !== p.leader)].filter((id) => ids.includes(id));
-    return partyState(p, ordered, availOf, ans.filter((a) => a.party_id === p.id), week, now, confirmedIds);
+    return partyState(p, ordered, availOf, ans.filter((a) => a.party_id === p.id), week, now, confirmedIds, nextOf);
   });
 }
 

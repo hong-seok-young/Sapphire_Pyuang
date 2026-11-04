@@ -15,11 +15,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const { week, prev, end } = weeks(now);
   const [parties, mineR, people] = await Promise.all([
     allParties(env, week, now),
-    env.DB.prepare("SELECT week, slots, confirmed_at FROM gd_avail WHERE user_id = ? AND week IN (?, ?)").bind(me.id, week, prev).all<{ week: number; slots: string; confirmed_at: number | null }>(),
+    env.DB.prepare("SELECT week, slots, confirmed_at FROM gd_avail WHERE user_id = ? AND week IN (?, ?, ?)").bind(me.id, week, prev, end).all<{ week: number; slots: string; confirmed_at: number | null }>(),
     gdPeople(env, me),
   ]);
   const mineRow = mineR.results.find((r) => r.week === week);
   const mine = mineRow?.slots ?? null;
+  const nextRow = mineR.results.find((r) => r.week === end);
   const prevMine = mineR.results.find((r) => r.week === prev)?.slots ?? null;
   const myParty = parties.find((p) => p.members.some((m) => m.id === me.id)) ?? null;
   return json(
@@ -29,7 +30,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       now,
       party: myParty,
       mine,
-      mineConfirmed: !!mineRow?.confirmed_at && !!mine?.includes("1"),
+      mineConfirmed: (!!mineRow?.confirmed_at && !!mine?.includes("1")) || (!!nextRow?.confirmed_at && nextRow.slots.includes("1")),
+      // 다음 주 내 시간표 (오늘부터 7일 칸의 지난 요일 자리)
+      mineNext: nextRow?.slots ?? null,
       prev: prevMine,
       // 다른 파티는 이름, 파티원, 정한 때만
       parties: parties.map((p) => ({ id: p.id, name: p.name, leader: p.leader, stage: p.stage, members: p.members.map((m) => m.id), confirmed: p.confirmed, current: p.current })),

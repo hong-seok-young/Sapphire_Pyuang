@@ -2523,6 +2523,24 @@ button.gd-member-row { cursor: pointer; }
 .gd-head b { font-size: 12px; font-weight: 400; }
 .gd-head small { font-size: 9px; color: var(--muted); }
 .gd-weekend b { color: #ffb38a; }
+/* 오늘부터 7일 (제작자 2026-11-04): 머리 위 띠 '다음 주'(오늘 왼쪽) · '이번 주'(오늘부터 오른쪽), 오늘 열은 금빛 '오늘', 다음 주 열은 옅게 */
+.gd-band { display: block; margin-bottom: 2px; padding: 1px 0; font-size: 9px; line-height: 1.3; text-align: center; color: var(--muted); border-bottom: 1px solid rgba(255, 255, 255, 0.18); }
+.gd-band-this { color: var(--gold); border-bottom-color: var(--gold); }
+.gd-band-next { color: #b9a6ff; border-bottom: 1px dashed rgba(185, 166, 255, 0.7); }
+.gd-head.gd-today { background: var(--gold); color: #1a1430; }
+.gd-head.gd-today b { color: #1a1430; font-size: 11px; }
+.gd-head.gd-today small { color: #3a2f10; }
+.gd-head.gd-head-next b, .gd-head.gd-head-next small { opacity: 0.6; }
+.gd-cell.gd-c-today { border-left-color: rgba(255, 210, 110, 0.55); border-right-color: rgba(255, 210, 110, 0.55); }
+.gd-cell.gd-c-today:not(.gd-on):not(.gd-all):not(.gd-off):not(.gd-h1):not(.gd-h2):not(.gd-h3):not(.gd-me-only) { background: rgba(255, 210, 110, 0.1); }
+.gd-cell.gd-c-next:not(.gd-on):not(.gd-all):not(.gd-off):not(.gd-h1):not(.gd-h2):not(.gd-h3):not(.gd-me-only) { background: rgba(185, 166, 255, 0.07); }
+/* 시간표가 바뀌었다는 안내 (한 번만) */
+.gd-notice { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(5, 4, 15, 0.72); }
+.gd-notice-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; width: min(100%, 320px); padding: 16px 14px 14px; text-align: center; background: var(--panel); border: 2px solid var(--gold); }
+.gd-notice-card > b { font-size: 16px; color: var(--gold); font-weight: 400; }
+.gd-notice-card p { margin: 0; font-size: 13px; line-height: 1.5; }
+.gd-notice-card em { font-style: normal; color: var(--gold); }
+.gd-notice-card .pill { justify-self: center; margin-top: 6px; min-width: 96px; }
 .gd-time { position: relative; font-size: 9px; line-height: 1; color: var(--muted); touch-action: pan-y; }
 .gd-hour { transform: translateY(-5px); }
 .gd-cell { position: relative; display: block; height: 13px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.04); }

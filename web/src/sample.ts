@@ -123,6 +123,8 @@ export function sampleParty(me: string): PartyState {
     stage: 2,
     members: members.map((id) => ({ id, filled: true, confirmed: true })),
     avail,
+    // 시간표는 오늘부터 7일(월 ~ 일)이라 이번 주 칸이 지났어도 보이게 다음 주에도 같은 칸
+    availNext: avail,
     candidates: cands,
     rejected: [],
     current: cands[0],

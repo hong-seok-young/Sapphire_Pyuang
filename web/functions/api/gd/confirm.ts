@@ -13,12 +13,17 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!me) return NEED_LOGIN();
   if (!(await canUseGd(env, me))) return FORBIDDEN();
   const now = Date.now();
-  const { week } = weeks(now);
-  const row = await env.DB.prepare("SELECT slots, confirmed_at FROM gd_avail WHERE user_id = ? AND week = ?")
-    .bind(me.id, week)
-    .first<{ slots: string; confirmed_at: number | null }>();
-  if (!row || !row.slots.includes("1")) return json({ error: "시간표를 먼저 칠해 주세요" }, 400);
-  if (!row.confirmed_at) await env.DB.prepare("UPDATE gd_avail SET confirmed_at = ? WHERE user_id = ? AND week = ?").bind(now, me.id, week).run();
+  const { week, end } = weeks(now);
+  const found = await env.DB.prepare("SELECT week, slots, confirmed_at FROM gd_avail WHERE user_id = ? AND week IN (?, ?)")
+    .bind(me.id, week, end)
+    .all<{ week: number; slots: string; confirmed_at: number | null }>();
+  const painted = found.results.filter((r) => r.slots.includes("1"));
+  if (!painted.length) return json({ error: "시간표를 먼저 칠해 주세요" }, 400);
+  // 화면은 오늘부터 7일(이번 주 남은 날 + 다음 주)을 한 장으로 칠하므로 확정도 칠한 두 주 모두에
+  await env.DB.prepare("UPDATE gd_avail SET confirmed_at = ? WHERE user_id = ? AND week IN (?, ?) AND confirmed_at IS NULL AND instr(slots, '1') > 0")
+    .bind(now, me.id, week, end)
+    .run();
+  const row = found.results.find((r) => r.week === week) ?? { slots: "", confirmed_at: null };
   const partyId = await partyIdOf(env, me.id);
   const p = partyId ? await oneParty(env, partyId, week, now) : null;
   const waiting = p ? p.members.filter((m) => !m.filled && m.id !== me.id).map((m) => m.id) : [];
@@ -39,8 +44,8 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env }) => {
   if (!me) return NEED_LOGIN();
   if (!(await canUseGd(env, me))) return FORBIDDEN();
   const now = Date.now();
-  const { week } = weeks(now);
-  await env.DB.prepare("UPDATE gd_avail SET confirmed_at = NULL WHERE user_id = ? AND week = ?").bind(me.id, week).run();
+  const { week, end } = weeks(now);
+  await env.DB.prepare("UPDATE gd_avail SET confirmed_at = NULL WHERE user_id = ? AND week IN (?, ?)").bind(me.id, week, end).run();
   const partyId = await partyIdOf(env, me.id);
   return json({ ok: true, party: partyId ? await oneParty(env, partyId, week, now) : null });
 };
