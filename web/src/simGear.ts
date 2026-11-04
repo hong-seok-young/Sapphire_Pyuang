@@ -1,5 +1,5 @@
 // 확률 시뮬레이터의 실제 장비 (제작자 요청 2026-11-04 '강화 대상 장비도 강한 순서가 있으니 그 재화로 노작을 사서 강화', '실제 장비들 넣어서').
-// 장비: 위키 장비 표(equipment.json)의 무기(직업마다)와 방어구(갑옷·투구·장갑·신발). '+7로크의검[40~49LV]' 처럼 이미 강화된 이벤트 장비와 거래불가 시작 장비는 뺀다.
+// 장비: 위키 장비 표(equipment.json)의 무기(직업마다)와 방어구(갑옷·투구·장갑·신발). '+7로크의검[40~49LV]' 처럼 이미 강화된 이벤트 장비, 거래불가 시작 장비, 상인이 파는 장비는 뺀다.
 // 강화 수치: 공식 확률 표의 강화 효과 (120600 전사·레인저·무도가 무기 가산값, 120700 마법사 무기마다, 120900 방어구 기본 방어도마다).
 // 마법사 무기는 120700 에 있는 것만 (가산값을 모르면 강화한 데미지를 셀 수 없다).
 // 값: 레벨이 높을수록 비싸다 (강한 장비일수록 부서지면 아프다). 장비 값은 행운 코인으로 낸다.
@@ -29,9 +29,6 @@ export interface Gear {
   price: number;
 }
 
-/** 상점에서 뺀 장비 (제작자 2026-11-04 '철검 회색레이피어 빼') */
-const HIDDEN = new Set(["철검", "회색레이피어"]);
-
 const num = (s: string | undefined) => {
   const v = Number(String(s ?? "").replace(/[^\d.]/g, ""));
   return Number.isFinite(v) ? v : NaN;
@@ -60,8 +57,10 @@ export function gearOf(wiki: Wiki, odds: Odds): Gear[] {
       const h = row.h ?? head;
       const cell = (name: string) => row.cells[h.indexOf(name)];
       const name = row.name.trim();
-      if (!name || /^\+|\[/.test(name) || seen.has(name) || HIDDEN.has(name)) continue;
+      if (!name || /^\+|\[/.test(name) || seen.has(name)) continue;
       if ((cell("옵션") ?? "").includes("거래불가")) continue;
+      // 상인이 파는 장비는 뺀다 (제작자 2026-11-04 '철검 회색레이피어 빼', '이런 상인이 파는 건가? 이런 거 좀 다 빼': 획득처가 '무기상인 NPC')
+      if ((cell("획득처") ?? "").includes("상인")) continue;
       const lv = num(cell("레벨제한"));
       if (!Number.isFinite(lv) || lv < 5) continue;
       if (weaponJob) {
