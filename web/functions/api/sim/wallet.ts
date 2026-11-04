@@ -2,14 +2,19 @@
 // GET  /api/sim/wallet -> { coins, earned, spent, rules: [{ key, label, coin, cap, n(오늘 받은 횟수) }] }
 // POST /api/sim/wallet { spend } -> 시도에 쓴 코인을 줄인다 (있는 만큼까지) -> { coins }
 // POST /api/sim/wallet { quest: 0|1|2 } -> 오늘의 도전을 깼다 (하루 한 번씩 QUEST_COIN) -> { coins, got }
+// POST /api/sim/wallet { unlock: 'auto:장비' | 'buy:장비', cost, spend? } -> 장비마다 자동 강화·자동 구매 해금 (제작자 2026-11-04 '자동 강화도 무기별로 각각 해금, 해금 비용은 코인').
+//      값은 화면이 장비 값으로 셈한다 (재미로만, 범위만 본다). 코인이 모자라면 409, 이미 해금했으면 그대로 -> { coins, unlocks }
 import { FORBIDDEN, NEED_LOGIN, RANK, TEST_IDS, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { DEV_FLOOR, DEV_REFILL, EARN, QUEST_COIN, QUEST_KEYS, earn, ensureWallet, kstDate, refillSql, refillable } from "../../../server/simcoin";
+import { DEV_FLOOR, DEV_REFILL, EARN, QUEST_COIN, QUEST_KEYS, canSim, earn, ensureWallet, kstDate, refillSql, refillable } from "../../../server/simcoin";
+
+const unlocksOf = async (env: Env, id: string) =>
+  ((await env.DB.prepare("SELECT key FROM sim_unlocks WHERE user_id = ?").bind(id).all<{ key: string }>()).results ?? []).map((r) => r.key);
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  if (!(me.role === "developer" || TEST_IDS.includes(me.id))) return FORBIDDEN();
+  if (!canSim(me)) return FORBIDDEN();
   await ensureWallet(env, me.id);
   const refill = refillable(me);
   if (refill) await refillSql(env, me.id).run();
@@ -33,6 +38,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       total: (total.results[0] as { total: number } | undefined)?.total ?? 0,
       // 앱개발자는 100 아래로 내려가면 1000 을 채운다 (화면도 같은 규칙)
       refill: refill ? { floor: DEV_FLOOR, add: DEV_REFILL } : null,
+      unlocks: await unlocksOf(env, me.id),
     },
     200,
     { "cache-control": "no-store" },
@@ -42,8 +48,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  if (!(me.role === "developer" || TEST_IDS.includes(me.id))) return FORBIDDEN();
-  const body = await readJson<{ spend: unknown; quest: unknown }>(request);
+  if (!canSim(me)) return FORBIDDEN();
+  const body = await readJson<{ spend: unknown; quest: unknown; unlock: unknown; cost: unknown }>(request);
   await ensureWallet(env, me.id);
   if (body.quest !== undefined) {
     const i = Number(body.quest);
@@ -52,11 +58,31 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const w = await env.DB.prepare("SELECT coins FROM sim_wallet WHERE user_id = ?").bind(me.id).first<{ coins: number }>();
     return json({ coins: w?.coins ?? 0, got });
   }
-  const n = Math.round(Number(body.spend));
-  if (!(n >= 1 && n <= 1_000_000)) return json({ error: "코인 수가 맞지 않아요" }, 400);
-  await env.DB.prepare("UPDATE sim_wallet SET spent = spent + MIN(coins, ?2), coins = coins - MIN(coins, ?2), updated_at = ?3 WHERE user_id = ?1")
-    .bind(me.id, n, Date.now())
-    .run();
+  const n = Math.round(Number(body.spend ?? 0));
+  if (body.unlock === undefined && !(n >= 1 && n <= 1_000_000)) return json({ error: "코인 수가 맞지 않아요" }, 400);
+  if (n >= 1 && n <= 1_000_000)
+    await env.DB.prepare("UPDATE sim_wallet SET spent = spent + MIN(coins, ?2), coins = coins - MIN(coins, ?2), updated_at = ?3 WHERE user_id = ?1")
+      .bind(me.id, n, Date.now())
+      .run();
+  if (body.unlock !== undefined) {
+    const key = String(body.unlock);
+    const cost = Math.round(Number(body.cost));
+    if (!/^(auto|buy):.{1,60}$/.test(key) || !(cost >= 1 && cost <= 100_000)) return json({ error: "해금이 맞지 않아요" }, 400);
+    const have = await env.DB.prepare("SELECT 1 AS one FROM sim_unlocks WHERE user_id = ? AND key = ?").bind(me.id, key).first();
+    if (!have) {
+      const r = await env.DB.prepare("UPDATE sim_wallet SET coins = coins - ?2, spent = spent + ?2, updated_at = ?3 WHERE user_id = ?1 AND coins >= ?2")
+        .bind(me.id, cost, Date.now())
+        .run();
+      if (!r.meta.changes) {
+        const w = await env.DB.prepare("SELECT coins FROM sim_wallet WHERE user_id = ?").bind(me.id).first<{ coins: number }>();
+        return json({ error: "코인이 모자라요", coins: w?.coins ?? 0, unlocks: await unlocksOf(env, me.id) }, 409);
+      }
+      await env.DB.prepare("INSERT OR IGNORE INTO sim_unlocks (user_id, key, cost, at) VALUES (?, ?, ?, ?)").bind(me.id, key, cost, Date.now()).run();
+    }
+    if (refillable(me)) await refillSql(env, me.id).run();
+    const w = await env.DB.prepare("SELECT coins FROM sim_wallet WHERE user_id = ?").bind(me.id).first<{ coins: number }>();
+    return json({ coins: w?.coins ?? 0, unlocks: await unlocksOf(env, me.id) });
+  }
   if (refillable(me)) await refillSql(env, me.id).run();
   const r = await env.DB.prepare("SELECT coins FROM sim_wallet WHERE user_id = ?").bind(me.id).first<{ coins: number }>();
   return json({ coins: r?.coins ?? 0 });

@@ -84,6 +84,9 @@ export function gearOf(wiki: Wiki, odds: Odds): Gear[] {
   return out.sort((a, b) => a.lv - b.lv || a.name.localeCompare(b.name, "ko"));
 }
 
+/** 장비마다 해금 값 (제작자 2026-11-04 '자동 강화도 무기별로 각각 다 해금하게, 해금 비용은 코인으로'): 자동 강화는 장비 값의 5배, 자동 구매는 10배 */
+export const unlockCost = (g: Gear, kind: "auto" | "buy") => g.price * (kind === "auto" ? 5 : 10);
+
 /** 강화도 k 의 수치 글: 무기 '8.4~58.8', 방어구 '방어 13' */
 export function gearStat(g: Gear, k: number): string {
   if (g.part === "무기") {

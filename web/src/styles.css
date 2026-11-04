@@ -3237,3 +3237,8 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .sim-chest-t.sim-chest-pic { display: grid; grid-template-columns: auto auto; gap: 8px; align-items: center; justify-content: center; min-width: 110px; }
 .sim-chest-t.sim-chest-pic > span:empty { display: none; }
 .sim-chest-pic .sim-pic { width: 40px; height: 40px; }
+
+/* 확률 시뮬레이터 장비마다 해금 (자동 강화, 자동 구매) */
+.sim-unlock { white-space: nowrap; }
+.sim-unlock small { margin-left: 4px; color: var(--gold); font-size: 11px; }
+.sim-autobuy { display: flex; justify-content: flex-end; margin-top: 6px; }

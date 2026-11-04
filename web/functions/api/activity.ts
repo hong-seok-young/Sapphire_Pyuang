@@ -8,10 +8,10 @@
 //      같은 때(10분 안) 다른 기기가 다른 도시에서 쓴 번 수(together). user 로 고르면 그 사람의 기기 목록(devices, 60일)과
 //      그 겹친 때의 목록(overlaps, 60일: 언제, 어느 기기가 어느 도시에서 ↔ 어느 기기가 어느 도시에서. 제작자 2026-11-03: 붉은 표만으로는 뭔지 몰랐다).
 //      기기는 화면이 보내는 기기 표(activity.dev)로 가린다. 기기 표가 없던 예전 기록은 기기 글(device)로 묶어 목록에만 보인다
-import { FORBIDDEN, NEED_LOGIN, RANK, TEST_IDS, currentUser, json, readJson } from "../../server/auth";
+import { FORBIDDEN, NEED_LOGIN, RANK, currentUser, json, readJson } from "../../server/auth";
 import type { Env } from "../../server/auth";
 import { record, whereOf } from "../../server/activity";
-import { earn } from "../../server/simcoin";
+import { canSim, earn } from "../../server/simcoin";
 import { LOG_FULL, LOG_NUMS, covering, fromLogs, logBinding, logDbs, newestLogs } from "../../server/logdb";
 import type { LogDb } from "../../server/logdb";
 
@@ -123,7 +123,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (open === true) {
     await record(env, me.id, "visit", "open", null, whereOf(request));
     // 하루 첫 접속 코인 (시뮬레이터, server/simcoin.ts)
-    if (me.role === "developer" || TEST_IDS.includes(me.id)) await earn(env, me.id, "visit");
+    if (canSim(me)) await earn(env, me.id, "visit");
     return json({ ok: true });
   }
   if (typeof path !== "string" || !path.startsWith("#/") || path.length > 200) return json({ error: "화면 주소가 맞지 않아요" }, 400);

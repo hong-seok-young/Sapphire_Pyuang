@@ -84,6 +84,7 @@ export async function deleteAccountData(env: Env, user: { id: string; main_id: s
     env.DB.prepare("DELETE FROM sim_wallet WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM sim_earn WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM sim_feed WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM sim_unlocks WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM users WHERE id = ?").bind(user.id),
   ]);
   // 사용 기록 DB 2~10 의 그 사람 기록 (server/logdb.ts)
