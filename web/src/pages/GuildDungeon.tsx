@@ -54,10 +54,11 @@ export function GuildDungeonPage({ me }: { me: Me }) {
   }, []);
   useEffect(() => {
     load();
-    // 파티원이 확정·불참을 누르면 바로 보이게: 화면을 보는 동안 30초마다, 앱으로 돌아올 때
+    // 파티원이 칠한 시간표·확정·불참이 바로 보이게: 화면을 보는 동안 15초마다, 앱으로 돌아올 때, 파티원·교집합 칸으로 바꿀 때
+    // (제작자 2026-11-04 '시간표 누르면 실시간으로 공유가 되는 거지'. 칠한 칸은 손을 뗄 때 저장된다)
     const t = window.setInterval(
       () => document.visibilityState === "visible" && load(),
-      30_000,
+      15_000,
     );
     const v = () => document.visibilityState === "visible" && load();
     document.addEventListener("visibilitychange", v);
@@ -107,14 +108,14 @@ export function GuildDungeonPage({ me }: { me: Me }) {
           {mates.length > 0 && (
             <button
               className={"pill" + (tab === "member" ? " pill-on" : "")}
-              onClick={() => setTab("member")}
+              onClick={() => (setTab("member"), load())}
             >
               파티원
             </button>
           )}
           <button
             className={"pill" + (tab === "heat" ? " pill-on" : "")}
-            onClick={() => setTab("heat")}
+            onClick={() => (setTab("heat"), load())}
           >
             교집합
           </button>
@@ -139,7 +140,7 @@ export function GuildDungeonPage({ me }: { me: Me }) {
       ) : (
         <HeatTimes data={data} party={party} />
       )}
-      <AllParties data={data} />
+      <AllParties data={data} me={me.id} />
     </>
   );
 }
@@ -164,6 +165,8 @@ function PartyPanel({
   const [sure, setSure] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  // 후보 확정을 못 한 까닭 ('별빛하늘 님이 시간표를 확정해야 확정할 수 있어요 · 별빛하늘 님에게 재촉 알림을 보냈어요'), 후보 칸 안에
+  const [hint, setHint] = useState("");
   const { high } = useKakao();
   const week = data.week;
   const leader = p.leader === me.id;
@@ -188,6 +191,21 @@ function PartyPanel({
     } finally {
       setBusy(false);
       setSure(null);
+    }
+  }
+  /** 후보에 확정: 파티원 모두 시간표를 확정해야 된다 (제작자 2026-11-04). 서버가 막으면 까닭을 후보 칸에, 아직인 사람에게는 서버가 재촉 알림 */
+  async function sayYes(slot: number) {
+    setBusy(true);
+    setHint("");
+    onError("");
+    try {
+      const r = await answerGd(slot, "yes");
+      onParty(r.party);
+    } catch (e) {
+      setHint(errorText(e));
+      onReload();
+    } finally {
+      setBusy(false);
     }
   }
   const twice = (key: string, fn: () => void) =>
@@ -455,7 +473,7 @@ function PartyPanel({
                 "pill gd-yes" + (p.yes.includes(me.id) ? " pill-on" : "")
               }
               disabled={busy || p.yes.includes(me.id)}
-              onClick={() => void run(() => answerGd(p.current!, "yes"))}
+              onClick={() => void sayYes(p.current!)}
             >
               {p.yes.includes(me.id) ? "확정함" : "확정"}
             </button>
@@ -469,6 +487,7 @@ function PartyPanel({
               {sure === "no" ? "정말 불참" : "불참"}
             </button>
           </div>
+          {hint && <p className="gd-hint">{hint}</p>}
           {next.length > 0 && (
             <p className="gd-next">
               다음{" "}
@@ -931,12 +950,15 @@ function MateTimes({
   me,
   who,
   onWho,
+  strip = true,
 }: {
   data: GdData;
   party: PartyState;
   me: string;
   who: string;
   onWho: (id: string) => void;
+  /** false 면 파티원 고르는 띠를 그리지 않는다 (다른 파티 구경이 따로 그린다) */
+  strip?: boolean;
 }) {
   const mates = p.members.filter((m) => m.id !== me);
   const mate = mates.find((m) => m.id === who) ?? mates[0];
@@ -952,6 +974,7 @@ function MateTimes({
   }
   return (
     <section className="panel gd-times">
+      {strip && (
       <div className="mk-sub gd-mates" role="tablist">
         {mates.map((m) => (
           <button
@@ -965,6 +988,7 @@ function MateTimes({
           </button>
         ))}
       </div>
+      )}
       <div className="gd-times-head">
         <b>{mate.id}</b>
         <small>
@@ -1087,39 +1111,123 @@ function HeatTimes({ data, party: p }: { data: GdData; party: PartyState }) {
   );
 }
 
-/** 모든 파티: 이름, 파티원, 이번 주 정한 때 */
-function AllParties({ data }: { data: GdData }) {
+/** 모든 파티: 이름, 파티원, 이번 주 정한 때. 누르면 그 자리에 펼쳐 구경한다 (제작자 2026-11-04 '다른 파티도 들어가서 구경할 수 있게') */
+function AllParties({ data, me }: { data: GdData; me: string }) {
+  const [open, setOpen] = useEntryState<number>("gd.peek", 0);
   const others = data.parties.filter((p) => p.id !== data.party?.id);
   if (!others.length) return null;
   return (
     <section className="panel">
       <h2 className="panel-title">다른 파티 {others.length}</h2>
       <ul className="gd-all-list">
-        {others.map((p) => (
-          <li key={p.id}>
-            <div className="gd-all-head">
-              <b>
-                {p.stage !== null && <i className="gd-stage-tag">{p.stage}단계</i>}
-                {p.name}
-              </b>
-              <small>
-                {p.confirmed !== null
-                  ? `${slotShort(data.week, p.confirmed)} 확정`
-                  : p.current !== null
-                    ? "정하는 중"
-                    : "모으는 중"}
-              </small>
+        {others.map((p) => {
+          const full = data.others?.find((x) => x.id === p.id);
+          const head = (
+            <>
+              <div className="gd-all-head">
+                <b>
+                  {p.stage !== null && <i className="gd-stage-tag">{p.stage}단계</i>}
+                  {p.name}
+                </b>
+                <small>
+                  {p.confirmed !== null
+                    ? `${slotShort(data.week, p.confirmed)} 확정`
+                    : p.current !== null
+                      ? "정하는 중"
+                      : "모으는 중"}
+                  {full && <span className="gd-peek-chev">{open === p.id ? " ▴" : " ▾"}</span>}
+                </small>
+              </div>
+              {open !== p.id && (
+                <p className="gd-all-members">
+                  {p.members.map((id) => (
+                    <span key={id}>
+                      <Nick name={id} /> <KakaoButton name={id} icon nested={!!full} />
+                    </span>
+                  ))}
+                </p>
+              )}
+            </>
+          );
+          return (
+            <li key={p.id} className={open === p.id ? "gd-peek-open" : undefined}>
+              {full ? (
+                <button className="gd-peek-btn" onClick={() => setOpen(open === p.id ? 0 : p.id)} aria-expanded={open === p.id}>
+                  {head}
+                </button>
+              ) : (
+                head
+              )}
+              {full && open === p.id && <PeekParty data={data} party={full} me={me} />}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/** 다른 파티 구경: 파티원 카드(상태만), 지금 상태, 교집합 · 파티원마다 시간표 (나와 겹치는 칸은 금색). 누르는 단추는 없다 */
+function PeekParty({ data, party: p, me }: { data: GdData; party: PartyState; me: string }) {
+  const [who, setWho] = useState("");
+  const { high } = useKakao();
+  const week = data.week;
+  const all = p.members.every((m) => m.filled);
+  const filled = p.members.filter((m) => m.filled).length;
+  const pick = p.members.some((m) => m.id === who) ? who : "";
+  return (
+    <div className="gd-peek">
+      <ul className="gd-members">
+        {p.members.map((m) => (
+          <li key={m.id} className={m.confirmed ? undefined : "gd-member-wait"}>
+            <div className="gd-member-row">
+              <FitLine className="gd-member-name" text={m.id} wrap={false} hs={high.includes(m.id)} />
+              <KakaoButton name={m.id} icon />
+              {m.id === p.leader && <i className="gd-leader">파티장</i>}
+              <small className={m.confirmed ? "gd-st-yes" : undefined}>{m.confirmed ? "확정" : "입력 전"}</small>
             </div>
-            <p className="gd-all-members">
-              {p.members.map((id) => (
-                <span key={id}>
-                  <Nick name={id} /> <KakaoButton name={id} icon />
-                </span>
-              ))}
-            </p>
           </li>
         ))}
       </ul>
-    </section>
+      <p className="gd-state">
+        {p.confirmed !== null ? (
+          <>
+            이번 주는 <b>{slotText(week, p.confirmed)}</b> <small>· 모두 확정</small>
+          </>
+        ) : p.current !== null ? (
+          <>
+            {candidateNo(p, p.current)}번 후보 <b>{slotText(week, p.current)}</b>
+            <small> · 확정 {p.yes.length}/{p.members.length}</small>
+          </>
+        ) : !all ? (
+          <>
+            시간표 {filled}/{p.members.length}
+          </>
+        ) : (
+          <>교집합이 없어요</>
+        )}
+      </p>
+      <div className="mk-sub gd-mates" role="tablist">
+        <button role="tab" aria-selected={pick === ""} className={"sub-tab" + (pick === "" ? " sub-tab-on" : "")} onClick={() => setWho("")}>
+          교집합
+        </button>
+        {p.members.map((m) => (
+          <button
+            key={m.id}
+            role="tab"
+            aria-selected={pick === m.id}
+            className={"sub-tab" + (pick === m.id ? " sub-tab-on" : "")}
+            onClick={() => setWho(m.id)}
+          >
+            <FitLine text={m.id} wrap={false} />
+          </button>
+        ))}
+      </div>
+      {pick === "" ? (
+        <HeatTimes data={data} party={p} />
+      ) : (
+        <MateTimes data={data} party={p} me={me} who={pick} onWho={setWho} strip={false} />
+      )}
+    </div>
   );
 }

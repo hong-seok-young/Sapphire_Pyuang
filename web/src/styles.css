@@ -2536,6 +2536,16 @@ button.gd-member-row { cursor: pointer; }
 .gd-cell.gd-h3 { background: rgba(111, 182, 255, 0.7); }
 .gd-cell.gd-all { background: var(--gold); border-color: #fff3b0; }
 /* 파티원 칸: 나만 되는 칸은 옅은 파랑 테두리 (그 사람 칸 파랑, 둘 다 되는 칸 금색과 구분) */
+/* 후보 확정을 못 한 까닭 (파티원 모두 시간표를 확정해야), 후보 칸 안 */
+.gd-hint { margin: 4px 0 0; font-size: 12px; line-height: 1.45; color: #ffb35c; }
+/* 다른 파티 구경: 줄 전체가 단추, 펼치면 카드·상태·띠·시간표 (안의 시간표는 테두리 없이) */
+.gd-peek-btn { display: block; width: 100%; min-width: 0; padding: 0; color: inherit; font: inherit; text-align: left; background: none; border: 0; cursor: pointer; }
+.gd-peek-chev { color: var(--muted); }
+.gd-all-list li.gd-peek-open { border-color: var(--gold); }
+.gd-peek { margin-top: 6px; }
+.gd-peek .gd-state { font-size: 12px; }
+.gd-peek .gd-state b { font-weight: 400; color: var(--gold); }
+.gd-peek .panel.gd-times { margin: 0; padding: 0; background: none; border: 0; box-shadow: none; }
 .gd-cell.gd-me-only { background: rgba(111, 182, 255, 0.12); border: 1px dashed rgba(143, 194, 255, 0.75); }
 /* 파티원 고르기: 중개인 팝니다·삽니다와 같은 어두운 띠, 같은 폭 */
 .gd-mates { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; margin: 0 0 8px; padding: 5px; }

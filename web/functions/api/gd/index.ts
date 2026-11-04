@@ -1,5 +1,6 @@
 // 길드 던전 (server/gdungeon.ts, 제작자 요청 2026-11-02, 1군 전용)
-// GET  /api/gd -> { week, end, now, party(내 파티 상태), mine(내 이번 주 가능한 때), mineConfirmed(내 시간표를 확정했는지), prev(지난주 것), parties(모든 파티 요약), people(넣을 수 있는 1군), staff }
+// GET  /api/gd -> { week, end, now, party(내 파티 상태), mine(내 이번 주 가능한 때), mineConfirmed(내 시간표를 확정했는지), prev(지난주 것), parties(모든 파티 요약),
+//                   others(다른 파티의 전체 상태, 구경용), people(넣을 수 있는 1군), staff }
 // POST /api/gd { members } -> 파티 만들기 (만든 사람이 파티장, 나 빼고 3명까지. 이름은 파티장 닉네임으로 'OO 팀')
 import { FORBIDDEN, NEED_LOGIN, RANK, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
@@ -32,6 +33,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       prev: prevMine,
       // 다른 파티는 이름, 파티원, 정한 때만
       parties: parties.map((p) => ({ id: p.id, name: p.name, leader: p.leader, stage: p.stage, members: p.members.map((m) => m.id), confirmed: p.confirmed, current: p.current })),
+      // 다른 파티 구경 (제작자 2026-11-04 '다른 파티도 들어가서 구경할 수 있게'): 파티원 카드, 후보, 시간표까지 그대로 (보기만)
+      others: parties.filter((p) => p !== myParty),
       people,
       staff: RANK[me.role] >= 1,
     },

@@ -59,6 +59,8 @@ export interface GdData {
   mineConfirmed?: boolean;
   prev: string | null;
   parties: PartySummary[];
+  /** 다른 파티의 전체 상태 (구경용: 카드, 후보, 시간표). 예전 서버면 없다 */
+  others?: PartyState[];
   people: GdPerson[];
   staff: boolean;
 }
