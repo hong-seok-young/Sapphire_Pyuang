@@ -68,9 +68,6 @@ export const ITEMS: LaunchItem[] = [
   { key: "requests", title: "길드원 의뢰소", short: "의뢰소", to: "#/requests", icon: "📋", match: ["requests"] },
   // 시세 동향 (개발중, 제작자 요청 2026-11-03): 거래 톡방 대화에서 모은 골드·물건·캐릭터 시세. 아이콘은 거래소 동전. 개발 중 묶음 (운영진만)
   { key: "enhance", title: "강화 비교", short: "강화", to: "#/enhance", icon: "⚒️", soon: true, badge: "개발중", match: ["enhance"] },
-  // 확률 시뮬레이터 (개발중, 제작자 요청 2026-11-04): 공식 확률 표로 강화·스탯 부여·옵션·상자를 해 본다
-  // 확률 시뮬레이터는 앱개발자만 (제작자 2026-11-04 '개발 중으로 나만 보게')
-  { key: "sim", title: "확률 시뮬레이터", short: "확률", to: "#/sim", icon: "🎰", soon: true, badge: "개발중", developer: true, match: ["sim"] },
   { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
   // 장비대여 (2026-11-02 제작자 요청으로 열었다), 길드던전과 인던 같이 갈 사람 찾기 (칸만 먼저 두고 개발 중으로 막는다)
   // 오른쪽 위에 담당자 (제작자 요청 2026-11-03 '장비대여 담당자는 멍멍, 버튼 우측 상단에 텍스트로만 관리자 줄바꿈 멍멍'. 담당이 바뀌면 server/rental.ts RENT_STAFF 와 같이 고친다)
@@ -156,7 +153,7 @@ function build(dock: string[], slots: string[], search: boolean): Layout {
 /** 처음 배치 (제작자 요청 2026-11-02: 제작자 폰의 배치 그대로 '이걸 기본 배치로') */
 export const DEFAULT_LAYOUT: Layout = {
   dock: ["home", "board", "info", "search", "chat"],
-  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "trend", "enhance", "sim", "app"],
+  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "trend", "enhance", "app"],
 };
 
 /**
