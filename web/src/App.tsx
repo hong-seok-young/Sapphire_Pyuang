@@ -83,6 +83,7 @@ const CHUNKS = {
   Market: () => import("./pages/Market"),
   Requests: () => import("./pages/Requests"),
   Enhance: () => import("./pages/Enhance"),
+  Simulator: () => import("./pages/Simulator"),
   Trend: () => import("./pages/Trend"),
   ActivityLog: () => import("./pages/ActivityLog"),
   Alerts: () => import("./pages/Alerts"),
@@ -104,6 +105,7 @@ const RankingPage = lazy(() => CHUNKS.Ranking().then((m) => ({ default: m.Rankin
 const MarketPage = lazy(() => CHUNKS.Market().then((m) => ({ default: m.MarketPage })));
 const RequestsPage = lazy(() => CHUNKS.Requests().then((m) => ({ default: m.RequestsPage })));
 const EnhancePage = lazy(() => CHUNKS.Enhance().then((m) => ({ default: m.EnhancePage })));
+const SimulatorPage = lazy(() => CHUNKS.Simulator().then((m) => ({ default: m.SimulatorPage })));
 const TrendPage = lazy(() => CHUNKS.Trend().then((m) => ({ default: m.TrendPage })));
 const ActivityLogPage = lazy(() => CHUNKS.ActivityLog().then((m) => ({ default: m.ActivityLogPage })));
 const AlertsPage = lazy(() => CHUNKS.Alerts().then((m) => ({ default: m.AlertsPage })));
@@ -495,6 +497,8 @@ function Wiki({
   else if (page === "trend") body = canPreview(me) ? <TrendPage wiki={wiki} /> : <DevSoon title="시세 동향" />;
   // 강화 비교 (개발중, 제작자 요청 2026-11-04): 두 무기(+강)의 데미지와 몇 % 강해지는지
   else if (page === "enhance") body = canPreview(me) ? <EnhancePage wiki={wiki} query={route.query} me={me} /> : <DevSoon title="강화 비교" />;
+  // 확률 시뮬레이터는 앱개발자(와 그 테스트 계정)만 (제작자 2026-11-04 '개발 중으로 나만 보게')
+  else if (page === "sim") body = me.role === "developer" || TEST_IDS.includes(me.id) ? <SimulatorPage wiki={wiki} me={me} /> : <DevSoon title="확률 시뮬레이터" />;
   else if (page === "log")
     body =
       RANK[me.role] >= 2 ? (

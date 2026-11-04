@@ -22,7 +22,6 @@ export interface Wallet {
   coins: number;
   earned: number;
   spent: number;
-  rules: { key: string; label: string; coin: number; cap: number; n: number }[];
   /** 오늘의 도전 셋을 깼는지 */
   quests: boolean[];
   questCoin: number;
