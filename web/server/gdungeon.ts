@@ -146,7 +146,29 @@ export function partyState(
 }
 
 /** 이번 주 모든 파티의 상태 (파티는 많아야 수십 개라 한꺼번에 읽어 계산한다) */
+/**
+ * 시간표는 요일 루틴 (제작자 2026-11-04 '비면 안 되지, 그냥 설정해 둔 대로 냅둬, 시간은 루틴한 거니까'): 이번 주·다음 주 줄이 없는 사람은
+ * 가장 최근 줄을 그대로 이어 적는다 (칸 번호가 같으면 같은 요일·시각, 확정도 이어 감). 그래서 날짜가 넘어가 다음 주 칸이 보여도 비지 않는다.
+ * 한 주에 한 번 (setup 'gd_carry_<다음 주>'), 평소에는 setup 읽기 하나
+ */
+export async function carryWeeks(env: Env, now = Date.now()): Promise<void> {
+  const week = gdWeekStart(now);
+  const next = week + WEEK;
+  const key = `gd_carry_${next}`;
+  if (await env.DB.prepare("SELECT 1 AS x FROM setup WHERE key = ?").bind(key).first()) return;
+  const copy =
+    "INSERT OR IGNORE INTO gd_avail (user_id, week, slots, updated_at, confirmed_at) " +
+    "SELECT a.user_id, ?1, a.slots, ?2, a.confirmed_at FROM gd_avail a " +
+    "WHERE a.week = (SELECT MAX(b.week) FROM gd_avail b WHERE b.user_id = a.user_id AND b.week < ?1)";
+  await env.DB.batch([
+    env.DB.prepare(copy).bind(week, now),
+    env.DB.prepare(copy).bind(next, now),
+    env.DB.prepare("INSERT OR IGNORE INTO setup (key, done_at) VALUES (?, ?)").bind(key, now),
+  ]);
+}
+
 export async function allParties(env: Env, week: number, now = Date.now()): Promise<PartyState[]> {
+  await carryWeeks(env, now);
   const [parties, members, avail, answers] = await env.DB.batch([
     env.DB.prepare("SELECT id, name, leader, stage FROM gd_parties ORDER BY id"),
     env.DB.prepare("SELECT party_id, user_id FROM gd_members ORDER BY joined_at, user_id"),

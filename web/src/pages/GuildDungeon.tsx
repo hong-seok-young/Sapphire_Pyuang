@@ -824,9 +824,17 @@ function MyTimes({
       onError(errorText(e));
     }
   }
+  /** 칸을 바꾸면 같은 요일·시각의 다음 주 칸도 같이 (시간표는 요일 루틴, 제작자 2026-11-04 '시간은 루틴한 거니까'). 보이는 다음 주 칸의 7일 전은 다 지난 때라 그대로 둔다 */
+  const put = (a: string[], k: number, v: string) => {
+    a[k] = v;
+    if (k < SLOTS) a[k + SLOTS] = v;
+  };
   const setCell = (k: number, val: boolean) => {
-    if (k < 0 || (bitsRef.current[k] === "1") === val) return;
-    const b = bitsRef.current.slice(0, k) + (val ? "1" : "0") + bitsRef.current.slice(k + 1);
+    const v = val ? "1" : "0";
+    if (k < 0 || (bitsRef.current[k] === v && (k >= SLOTS || bitsRef.current[k + SLOTS] === v))) return;
+    const a = bitsRef.current.split("");
+    put(a, k, v);
+    const b = a.join("");
     bitsRef.current = b;
     setBits(b);
     if (drag.current) drag.current.changed = true;
@@ -855,17 +863,15 @@ function MyTimes({
     drag.current = null;
     if (d?.changed) void save(bitsRef.current);
   };
-  /** 보이는 칸만 바꾼다: 전주 복사는 칸마다 7일 앞 같은 때(다음 주 칸은 이번 주, 이번 주 칸은 지난주 시간표), 모두 지우기는 0 */
-  const fill = (pick: (k: number) => string) => {
+  /** 모두 지우기: 보이는 칸과 그 다음 주 칸. 루틴이라 새 주에도 그대로 이어져서 '전주 복사'는 뺐다 (제작자 2026-11-04) */
+  const clearAll = () => {
     const a = bitsRef.current.split("");
-    for (const k of keys) a[k] = pick(k);
+    for (const k of keys) put(a, k, "0");
     const b = a.join("");
     bitsRef.current = b;
     setBits(b);
     void save(b);
   };
-  const prevOf = (k: number) => (k >= SLOTS ? bitsRef.current[k - SLOTS] : data.prev?.[k] ?? "0") === "1" ? "1" : "0";
-  const canCopy = keys.some((k) => prevOf(k) === "1") && keys.some((k) => prevOf(k) !== bits[k]);
   const count = keys.filter((k) => bits[k] === "1").length;
   // 파티원이 모두 되는 칸 (내 칸은 지금 칠한 대로, 다른 사람은 받은 시간표로)
   const party = data.party;
@@ -874,7 +880,7 @@ function MyTimes({
 
   return (
     <section className="panel gd-times">
-      {/* 한 줄: 내 시간표 · 시간 · (전주 복사 · 모두 지우기) · 확정/수정 (제작자 요청 2026-11-02) */}
+      {/* 한 줄: 내 시간표 · 시간 · (모두 지우기) · 확정/수정 (제작자 요청 2026-11-02) */}
       <div className="gd-times-head gd-mine-head">
         <b>내 시간표</b>
         <small>
@@ -882,13 +888,8 @@ function MyTimes({
           {lock ? " · 확정" : state === "saving" ? " · 저장 중" : state === "saved" ? " · 저장됨" : ""}
         </small>
         <span className="gd-tools">
-          {!lock && canCopy && (
-            <button className="bd-mini" onClick={() => fill(prevOf)}>
-              전주 복사
-            </button>
-          )}
           {!lock && count > 0 && (
-            <button className="bd-mini" onClick={() => fill(() => "0")}>
+            <button className="bd-mini" onClick={clearAll}>
               모두 지우기
             </button>
           )}

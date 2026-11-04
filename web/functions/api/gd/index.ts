@@ -4,7 +4,7 @@
 // POST /api/gd { members } -> 파티 만들기 (만든 사람이 파티장, 나 빼고 3명까지. 이름은 파티장 닉네임으로 'OO 팀')
 import { FORBIDDEN, NEED_LOGIN, RANK, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { MAX_MEMBERS, allParties, canUseGd, gdPeople, memberProblem, partyIdOf, teamName, weeks } from "../../../server/gdungeon";
+import { MAX_MEMBERS, allParties, canUseGd, carryWeeks, gdPeople, memberProblem, partyIdOf, teamName, weeks } from "../../../server/gdungeon";
 import { notify } from "../../../server/alerts";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
@@ -13,6 +13,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (!(await canUseGd(env, me))) return json({ error: "1군 전용이에요" }, 403);
   const now = Date.now();
   const { week, prev, end } = weeks(now);
+  await carryWeeks(env, now);
   const [parties, mineR, people] = await Promise.all([
     allParties(env, week, now),
     env.DB.prepare("SELECT week, slots, confirmed_at FROM gd_avail WHERE user_id = ? AND week IN (?, ?, ?)").bind(me.id, week, prev, end).all<{ week: number; slots: string; confirmed_at: number | null }>(),
