@@ -127,3 +127,26 @@ export function saveHeld(id: string, part: Part, h: Held | null) {
     /* 저장이 안 되면 이번에 연 동안만 */
   }
 }
+
+/** 다음 장비를 사려면 앞 장비를 이만큼 올려야 한다 (제작자 2026-11-04 '직전 무기 8강 찍어야 다음 장비 구매 가능하게').
+ *  방어구는 무기 +8 과 같은 어려움(성공 확률 30% · 10% 를 지나는 곳)인 +6 */
+export const CLEAR_LV: Record<Part, number> = { 무기: 8, 갑옷: 6 };
+/** 그 강화도까지 올린 장비 이름 (캐릭터마다 이 기기에) */
+const clearKey = (id: string) => `sapphire.sim.cleared.${id}`;
+export function loadCleared(id: string): Set<string> {
+  try {
+    const v = JSON.parse(localStorage.getItem(clearKey(id)) ?? "[]");
+    return new Set(Array.isArray(v) ? v.filter((x) => typeof x === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+export function saveCleared(id: string, s: Set<string>) {
+  try {
+    localStorage.setItem(clearKey(id), JSON.stringify([...s]));
+  } catch {
+    /* 저장이 안 되면 이번에 연 동안만 */
+  }
+}
+/** 목록(레벨 순)에서 살 수 있는가: 맨 앞이거나, 바로 앞 장비를 올렸거나, 이미 올린 장비 */
+export const canBuy = (list: Gear[], i: number, cleared: Set<string>) => i === 0 || cleared.has(list[i].name) || cleared.has(list[i - 1].name);

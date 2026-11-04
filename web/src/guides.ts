@@ -227,7 +227,7 @@ export const GUIDES: Guide[] = [
     title: "확률 시뮬레이터",
     tutorial: [
       { sel: ".sim-coins", head: "행운 코인", text: "강화나 뽑기를 한 번 할 때마다 1개씩 써요.\n게시판 글쓰기, 시간표 확정, 챗봇 질문 같은 걸 하면 쌓여요." },
-      { sel: ".sim-shop, .sim-change", head: "장비 상점", text: "강화할 장비는 코인으로 노작을 사요.\n레벨이 높은 장비일수록 비싸고, 부서지면 다시 사야 해요." },
+      { sel: ".sim-shop, .sim-change", head: "장비 상점", text: "강화할 장비는 코인으로 노작을 사요.\n앞 장비를 +8(방어구 +6)까지 올려야 다음 장비를 살 수 있어요. 부서지면 다시 사야 해요." },
       { sel: ".sim-rank", head: "순위", text: "강화한 장비의 세기(평균 데미지, 방어도)로 줄을 세워요.\n같으면 적게 눌러서 한 사람이 위예요. 중간에 마법서를 바꾼 장비는 기록하지 않아요." },
       { sel: ".sim-tabs .pill:has-text('순위')", head: "도박의 신", text: "칸마다 가장 드문 기록을 점수로 더해요.\n1/10 이면 1점, 1/1000 이면 3점이에요.", tap: true, undo: false },
     ],

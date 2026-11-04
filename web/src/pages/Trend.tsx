@@ -64,13 +64,14 @@ function GoldChart({ days }: { days: GoldDay[] }) {
     },
     [days.length], // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const picked = pick === null ? null : days[pick];
   const last = days[days.length - 1];
+  // 누르기 전에는 마지막 날 값
+  const picked = pick === null ? last : days[pick];
 
   return (
     <div className="trend-chart">
       <div className="trend-legend">
-        <span><i className="trend-dot trend-dot-sell" /> 팝니다 (띠는 가운데 절반)</span>
+        <span><i className="trend-dot trend-dot-sell" /> 팝니다</span>
         <span><i className="trend-dot trend-dot-buy" /> 삽니다</span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="날짜별 골드 시세" onPointerDown={onPointer} onPointerMove={(e) => e.buttons && onPointer(e)}>
@@ -93,16 +94,10 @@ function GoldChart({ days }: { days: GoldDay[] }) {
         {last.buy && <circle cx={x(days.length - 1)} cy={y(last.buy.med)} r={3.5} className="trend-end trend-end-buy" />}
       </svg>
       <div className="trend-pick muted">
-        {picked ? (
-          <>
-            <b>{md(picked.date)}</b>
-            {picked.sell && <> · 팝니다 <b>{picked.sell.med}:1</b> ({picked.sell.min}~{picked.sell.max}, {picked.sell.n}건)</>}
-            {picked.buy && <> · 삽니다 <b>{picked.buy.med}:1</b> ({picked.buy.n}건)</>}
-            {!picked.sell && !picked.buy && " · 시세 글 없음"}
-          </>
-        ) : (
-          "그림을 누르면 그날 값이 보여요"
-        )}
+        <b>{md(picked.date)}</b>
+        {picked.sell && <> · 팝니다 <b>{picked.sell.med}:1</b> ({picked.sell.min}~{picked.sell.max}, {picked.sell.n}건)</>}
+        {picked.buy && <> · 삽니다 <b>{picked.buy.med}:1</b> ({picked.buy.n}건)</>}
+        {!picked.sell && !picked.buy && " · 시세 글 없음"}
       </div>
     </div>
   );
@@ -182,7 +177,7 @@ function GoldPanel({ t }: { t: Trend }) {
   const today = t.gold[t.gold.length - 1];
   const [who, setWho] = useState<"sell" | "buy">("sell");
   return (
-    <Panel title="골드 시세 (1만 원에 몇 만 골드)">
+    <Panel title="골드 시세">
       <div className="trend-stats">
         <div className="trend-stat">
           <span className="muted">팝니다 7일</span>
@@ -201,7 +196,7 @@ function GoldPanel({ t }: { t: Trend }) {
         </div>
       </div>
       <GoldChart days={t.gold} />
-      <p className="trend-note muted">숫자가 작을수록 비싼 골드 (70:1 = 1만 원에 70만 골드)</p>
+      <GoldBook t={t} now={sell.recent} />
       <div className="mk-sub trend-strip">
         <div className="mk-side" role="tablist">
           {(["sell", "buy"] as const).map((x) => (
@@ -213,6 +208,69 @@ function GoldPanel({ t }: { t: Trend }) {
       </div>
       <GoldPeople key={who} people={t.goldPeople[who]} />
     </Panel>
+  );
+}
+
+/** 골드 호가창 (제작자 2026-11-04 시세 동향 초안 C 에서 '저 골드 호가창만 추가, 아이디어 굳'): 시세(N:1)마다 파는 사람 수(왼쪽 파랑)와 사는 사람 수(오른쪽 빨강).
+ *  지금 시세(팝니다 7일 중간값) 줄은 금색. 줄을 누르면 그 시세로 올린 사람 */
+function GoldBook({ t, now }: { t: Trend; now: number | null }) {
+  const [open, setOpen] = useState<number | null>(null);
+  const rows = useMemo(() => {
+    const m = new Map<number, { s: TrendPerson[]; b: TrendPerson[] }>();
+    const add = (p: TrendPerson, k: "s" | "b") => {
+      const r = Math.round(p.med);
+      if (r < 60 || r > 90) return;
+      const e = m.get(r) ?? { s: [], b: [] };
+      e[k].push(p);
+      m.set(r, e);
+    };
+    t.goldPeople.sell.forEach((p) => add(p, "s"));
+    t.goldPeople.buy.forEach((p) => add(p, "b"));
+    return [...m.entries()].sort((a, b) => b[0] - a[0]);
+  }, [t.goldPeople]);
+  if (!rows.length) return null;
+  const max = Math.max(...rows.map(([, e]) => Math.max(e.s.length, e.b.length)), 1);
+  const cur = now === null ? null : Math.round(now);
+  return (
+    <div className="trend-book">
+      <div className="trend-book-h"><span>파는 사람</span><span>N:1</span><span>사는 사람</span></div>
+      {rows.map(([rate, e], i) => (
+        <div key={rate} className="trend-book-item">
+          <button
+            type="button"
+            className={"trend-book-row" + (rate === cur ? " trend-book-now" : "") + (open === rate ? " trend-book-open" : "")}
+            style={{ animationDelay: `${Math.min(i, 14) * 30}ms` }}
+            onClick={() => setOpen(open === rate ? null : rate)}
+          >
+            <span className="trend-book-l">
+              <small>{e.s.length || ""}</small>
+              <i style={{ width: `calc((100% - 24px) * ${e.s.length / max})` }} />
+            </span>
+            <b>{rate}</b>
+            <span className="trend-book-r">
+              <i style={{ width: `calc((100% - 24px) * ${e.b.length / max})` }} />
+              <small>{e.b.length || ""}</small>
+            </span>
+          </button>
+          {open === rate && (
+            <div className="trend-book-who">
+              {e.s.length > 0 && (
+                <>
+                  <small className="trend-book-side trend-book-side-s">파는 사람 {e.s.length}</small>
+                  <PeopleChips people={e.s} value={(v) => `${v}:1`} recent />
+                </>
+              )}
+              {e.b.length > 0 && (
+                <>
+                  <small className="trend-book-side trend-book-side-b">사는 사람 {e.b.length}</small>
+                  <PeopleChips people={e.b} value={(v) => `${v}:1`} recent />
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -317,7 +375,6 @@ function ItemChart({ it }: { it: TrendItem }) {
         {series.map((s, k) => (
           <span key={s.label}><i className={`trend-dot trend-s${k}`} /> {s.label || "노작 · 노강"}</span>
         ))}
-        {it.groups.length > SERIES_MAX && <span className="muted">(앞의 {SERIES_MAX}묶음만)</span>}
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${it.name} 날짜별 가격`} onPointerDown={onPointer} onPointerMove={(e) => e.buttons && onPointer(e)}>
         {ticks.map((t) => (
@@ -344,17 +401,12 @@ function ItemChart({ it }: { it: TrendItem }) {
         ))}
       </svg>
       <div className="trend-pick muted">
-        {pick !== null ? (
-          <>
-            <b>{md(dates[pick])}</b>
-            {series.map((s) => {
-              const d = s.days.find((p) => p[0] === dates[pick]);
-              return d ? <span key={s.label}> · {s.label || "노작"} <b>{priceText(d[1])}</b></span> : null;
-            })}
-          </>
-        ) : (
-          "그림을 누르면 그날 값이 보여요 (세로는 만 원)"
-        )}
+        {/* 누르기 전에는 마지막 날 값 */}
+        <b>{md(dates[pick ?? dates.length - 1])}</b>
+        {series.map((s) => {
+          const d = s.days.find((p) => p[0] === dates[pick ?? dates.length - 1]);
+          return d ? <span key={s.label}> · {s.label || "노작"} <b>{priceText(d[1])}</b></span> : null;
+        })}
       </div>
     </div>
   );
@@ -436,7 +488,7 @@ function GroupRows({ g, t, open, onToggle }: { g: TrendGroup; t: Trend; open: bo
       {open && (
         <tr className="trend-groupdetail">
           <td colSpan={5}>
-            <div className="trend-detailtitle muted">올린 사람 · 싼 사람부터 · {goldText(g.med, t.source.rate)}</div>
+            <div className="trend-detailtitle muted">올린 사람 · {goldText(g.med, t.source.rate)}</div>
             <PeopleChips people={g.people} value={shortWon} />
             {g.variants.length > 1 && (
               <>
