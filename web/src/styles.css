@@ -2858,3 +2858,475 @@ button.gd-member-row { cursor: pointer; }
 .enh-table tbody th { font-weight: 500; color: var(--muted); }
 .enh-table tr.enh-on { background: rgba(255, 196, 92, 0.1); }
 .enh-table tr.enh-cross td, .enh-table tr.enh-cross th { border-top: 2px solid var(--gold); }
+
+/* ---------------------------------------------------------------- 확률 시뮬레이터 (개발중, pages/Simulator.tsx)
+   결과마다 한 번만 도는 움직임 (transform · opacity). 성공은 금빛 고리와 튀는 조각, 실패(그대로)는 흔들림과 파란 막, 파괴는 둘로 갈라져 떨어진다 */
+.sim { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.sim-strip { margin: 0; }
+.sim-strip .mk-cats { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
+.sim-ev { margin-left: auto; color: var(--gold); }
+.sim-anvil { position: relative; display: grid; justify-items: center; gap: 8px; padding: 18px 12px 14px; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 30%, rgba(111, 143, 255, 0.18), transparent 60%), var(--panel); }
+.sim-item { position: relative; display: grid; justify-items: center; gap: 4px; min-height: 120px; }
+/* 그림 대신 글자 (제작자 2026-11-04: 강화 장면 이미지·영상을 받으면 이 자리를 바꾼다) */
+.sim-icon { position: relative; display: grid; place-items: center; min-width: 96px; height: 64px; padding: 0 14px; font-size: 26px; line-height: 1;
+  color: var(--text); background: rgba(11, 10, 26, 0.55); border: var(--px) solid var(--hi); }
+.sim-half { grid-area: 1 / 1; display: block; }
+.sim-half-b { opacity: 0; }
+.sim-glow-0 { filter: none; }
+.sim-glow-1 { filter: drop-shadow(0 0 6px rgba(111, 143, 255, 0.7)); }
+.sim-glow-2 { filter: drop-shadow(0 0 8px rgba(180, 120, 255, 0.85)); }
+.sim-glow-3 { filter: drop-shadow(0 0 10px rgba(255, 195, 92, 0.9)); }
+.sim-glow-4 { filter: drop-shadow(0 0 12px rgba(255, 120, 90, 0.95)); }
+.sim-lv { font-size: 30px; color: var(--gold); text-shadow: 2px 2px 0 var(--edge); letter-spacing: 1px; }
+.sim-lv-sm { font-size: 22px; }
+.sim-ring { position: absolute; top: 32px; left: 50%; width: 70px; height: 70px; margin: -35px 0 0 -35px; border: 3px solid var(--gold); opacity: 0; pointer-events: none; }
+.sim-next { display: grid; justify-items: center; gap: 2px; text-align: center; }
+.sim-next small, .sim-muted { color: var(--muted); font-size: 12px; }
+.sim-good { color: #7ee2a8; }
+.sim-warn { color: var(--gold); }
+.sim-gold { color: var(--gold); }
+.sim-bad { color: var(--red); }
+.sim-broken .sim-icon { opacity: 0.55; }
+
+.sim-fx-ok .sim-icon { animation: sim-pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1); }
+.sim-fx-ok .sim-ring, .sim-fx-plus2 .sim-ring { animation: sim-ring 0.6s ease-out; }
+.sim-fx-ok .sim-lv, .sim-fx-plus2 .sim-lv { animation: sim-lvup 0.5s ease-out; }
+.sim-fx-plus2 .sim-icon { animation: sim-pop 0.7s cubic-bezier(0.2, 1.8, 0.4, 1); }
+.sim-fx-plus2 .sim-ring { border-color: #fff3c4; }
+.sim-fx-keep .sim-icon { animation: sim-shake 0.42s ease-in-out; }
+.sim-fx-keep .sim-ring { border-color: var(--sapphire); border-radius: 50%; animation: sim-ring 0.5s ease-out; }
+.sim-fx-break .sim-icon { animation: sim-shake 0.3s ease-in-out; }
+.sim-fx-break .sim-half-a { animation: sim-split-a 0.9s 0.25s ease-in forwards; }
+.sim-fx-break .sim-half-b { opacity: 1; clip-path: inset(0 0 0 50%); animation: sim-split-b 0.9s 0.25s ease-in forwards; }
+.sim-fx-break .sim-half-a { clip-path: inset(0 50% 0 0); }
+.sim-fx-break .sim-lv { animation: sim-drop 0.5s 0.3s ease-out both; color: var(--red); }
+@keyframes sim-pop { 0% { transform: scale(1); } 35% { transform: scale(1.28) rotate(-6deg); } 100% { transform: scale(1); } }
+@keyframes sim-ring { 0% { transform: scale(0.4) rotate(45deg); opacity: 0.95; } 100% { transform: scale(1.9) rotate(45deg); opacity: 0; } }
+@keyframes sim-lvup { 0% { transform: translateY(10px) scale(0.6); opacity: 0; } 60% { transform: translateY(-4px) scale(1.15); opacity: 1; } 100% { transform: none; } }
+@keyframes sim-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-7px) rotate(-4deg); } 40% { transform: translateX(6px) rotate(3deg); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
+@keyframes sim-split-a { to { transform: translate(-22px, 36px) rotate(-38deg); opacity: 0.25; } }
+@keyframes sim-split-b { to { transform: translate(22px, 40px) rotate(42deg); opacity: 0.25; } }
+@keyframes sim-drop { from { transform: translateY(-12px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* 튀는 조각: 가운데에서 --dx --dy 로 */
+.sim-sparks { position: absolute; top: 32px; left: 50%; width: 0; height: 0; pointer-events: none; }
+.sim-sparks i { position: absolute; width: 5px; height: 5px; margin: -2px; background: var(--gold); opacity: 0; animation: sim-spark 0.7s ease-out forwards; }
+.sim-sparks-plus2 i, .sim-sparks-box-sr i { background: #fff3c4; width: 6px; height: 6px; }
+.sim-sparks-break i { background: #b9b2d9; animation-duration: 0.9s; animation-delay: 0.25s !important; }
+.sim-sparks-box-r i { background: #c79bff; }
+.sim-sparks-box-u i { background: var(--sapphire); }
+.sim-sparks-box-n i { background: var(--muted); }
+@keyframes sim-spark { 0% { transform: translate(0, 0) scale(1); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(0.4); opacity: 0; } }
+
+.sim-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; align-items: center; }
+.sim-actions-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+.sim-actions .btn { min-width: 0; padding-left: 6px; padding-right: 6px; }
+.sim-go { background: var(--sunset); color: var(--edge); font-weight: 700; }
+.sim-go:active { transform: translateY(1px); }
+.sim-goal { display: flex; align-items: center; gap: 3px; }
+.sim-goal .btn { white-space: nowrap; }
+.sim-goal .pill { padding: 6px 8px; }
+.sim-running { animation: sim-blink 0.8s ease-in-out infinite; }
+@keyframes sim-blink { 50% { opacity: 0.55; } }
+
+.sim-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.sim-stats > span { display: grid; justify-items: center; padding: 6px 4px; background: rgba(11, 10, 26, 0.5); }
+.sim-stats small { color: var(--muted); font-size: 11px; }
+.sim-stats b { font-size: 17px; }
+.sim-log { display: flex; flex-wrap: wrap; gap: 3px; }
+.sim-log i { width: 8px; height: 8px; background: #7ee2a8; animation: sim-drop 0.25s ease-out; }
+.sim-log i.bad { background: var(--red); }
+.sim-log i.keep { background: var(--sapphire); }
+.sim-steps { display: flex; gap: 6px; }
+.sim-steps i { width: 22px; height: 6px; background: rgba(11, 10, 26, 0.6); border: 1px solid var(--hi); }
+.sim-steps i.on { background: var(--gold); border-color: var(--gold); }
+.sim-expect { margin: 0; text-align: center; color: var(--muted); font-size: 13px; }
+.sim-expect b { color: var(--text); }
+
+.sim-table, .sim-tally { display: grid; grid-template-columns: minmax(0, 1fr); padding: 8px 10px; gap: 2px; }
+.sim-th, .sim-tr { display: grid; grid-template-columns: 52px repeat(3, minmax(0, 1fr)); gap: 6px; align-items: center; font-size: 13px; }
+.sim-tr-3, .sim-th:has(+ .sim-tr-3) { grid-template-columns: 52px repeat(2, minmax(0, 1fr)); }
+.sim-th { color: var(--muted); font-size: 11px; padding-bottom: 4px; border-bottom: 1px solid var(--hi); }
+.sim-th > :not(:first-child), .sim-tr > :not(:first-child) { text-align: right; }
+.sim-tr { padding: 4px 0; border-bottom: 1px solid rgba(74, 63, 134, 0.35); }
+.sim-t-sr { color: var(--gold); }
+.sim-t-r { color: #c79bff; }
+.sim-t-u { color: #8fb0ff; }
+.sim-t-n { color: var(--text); }
+
+.sim-thousand { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 10px; }
+.sim-thousand-res { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; animation: sim-drop 0.35s ease-out; }
+.sim-thousand-res > span { display: grid; justify-items: center; }
+.sim-thousand-res small { color: var(--muted); font-size: 11px; }
+.sim-breakbars { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; margin-top: 4px; }
+.sim-breakbars span { display: grid; grid-template-columns: 30px minmax(0, 1fr) 42px; gap: 6px; align-items: center; font-size: 12px; }
+.sim-breakbars i { display: block; height: 8px; width: var(--w); background: var(--red); transform-origin: left; animation: sim-bar 0.6s ease-out; }
+.sim-breakbars small { text-align: right; color: var(--muted); }
+@keyframes sim-bar { from { transform: scaleX(0); } }
+
+.sim-search { width: 100%; }
+.sim-items { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.sim-pick { display: block; padding: 7px 10px; text-align: left; background: var(--panel); border: var(--px) solid var(--edge); color: var(--text); cursor: pointer; }
+.sim-pick-t { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; }
+.sim-pick small { color: var(--muted); font-size: 11px; }
+.sim-pick:active { transform: translateY(1px); }
+
+.sim-opt, .sim-box { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 10px; }
+.sim-opt-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sim-opt-head b { min-width: 0; color: var(--gold); }
+.sim-opt-head small { margin-left: auto; color: var(--muted); white-space: nowrap; }
+.sim-opt-head .pill { padding: 4px 8px; }
+.sim-oline { display: grid; grid-template-columns: minmax(0, 1fr) 44px minmax(60px, 1.2fr) 70px; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid rgba(74, 63, 134, 0.35); }
+.sim-oname { font-size: 13px; }
+.sim-oval { font-size: 20px; text-align: right; font-variant-numeric: tabular-nums; animation: sim-settle 0.35s ease-out both; }
+.sim-oval.sim-t-sr { text-shadow: 0 0 8px rgba(255, 195, 92, 0.7); }
+@keyframes sim-settle { 0% { transform: scale(1); } 40% { transform: scale(1.25); } 100% { transform: scale(1); } }
+.sim-dist { display: flex; align-items: flex-end; gap: 1px; height: 26px; }
+.sim-dist i { flex: 1 1 0; min-width: 2px; background: rgba(169, 162, 207, 0.35); }
+.sim-dist i.on { background: var(--gold); }
+.sim-oline > small { text-align: right; font-size: 11px; }
+.sim-aim { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 10px; }
+.sim-aim .mk-cats { display: flex; flex-wrap: wrap; gap: 4px; }
+.sim-aim-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; text-align: center; font-size: 13px; }
+.sim-hunt { margin: 0; text-align: center; animation: sim-drop 0.35s ease-out; }
+.sim-hunt small { color: var(--muted); }
+
+.sim-secs { display: flex; flex-wrap: wrap; gap: 4px; }
+.sim-chest { position: relative; justify-self: center; margin: 10px 0 4px; }
+.sim-chest-t { display: grid; place-items: center; min-width: 110px; height: 56px; padding: 0 14px; font-size: 22px; color: var(--gold);
+  background: rgba(11, 10, 26, 0.55); border: 3px solid var(--edge); box-shadow: inset 0 0 0 2px #a8662b; }
+.sim-chest-open .sim-chest-t { animation: sim-pop 0.5s 0.15s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+.sim-chest-sr .sim-chest-t { color: #fff3c4; box-shadow: inset 0 0 0 2px var(--gold); }
+.sim-chest-r .sim-chest-t { color: #d9bcff; box-shadow: inset 0 0 0 2px #a877ff; }
+.sim-chest .sim-sparks { top: 24px; }
+.sim-chest-open { animation: sim-shake 0.35s ease-in-out; }
+.sim-chest-open .sim-sparks i { animation-delay: 0.3s !important; }
+.sim-pulls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+.sim-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; padding: 6px 8px; font-size: 12px; text-align: left; color: var(--text); font-family: inherit;
+  background: rgba(11, 10, 26, 0.55); border: 2px solid var(--hi); opacity: 0; animation: sim-card 0.4s ease-out forwards; }
+button.sim-card { cursor: pointer; }
+.sim-card-on { outline: 2px solid var(--gold); outline-offset: 1px; }
+.sim-card small { color: var(--muted); font-size: 10px; }
+.sim-card.sim-t-sr { border-color: var(--gold); }
+.sim-card.sim-t-r { border-color: #a877ff; }
+.sim-card.sim-t-u { border-color: var(--sapphire); }
+@keyframes sim-card { 0% { opacity: 0; transform: translateY(10px) rotateX(70deg); } 100% { opacity: 1; transform: none; } }
+.sim-tally-row { grid-template-columns: minmax(0, 1fr) 62px 52px 62px; }
+button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: inherit; font-size: 13px; text-align: left; background: none; border: 0; border-bottom: 1px solid rgba(74, 63, 134, 0.35); cursor: pointer; }
+.sim-target { background: rgba(255, 195, 92, 0.14) !important; box-shadow: inset 3px 0 0 var(--gold); }
+.sim-until { width: 100%; }
+.sim-until small { color: var(--muted); font-size: 11px; }
+.sim-gems { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 10px; }
+.sim-gem { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-rows: auto auto; column-gap: 8px; align-items: center; padding: 6px 8px; background: rgba(11, 10, 26, 0.45); border-left: 4px solid var(--hi); }
+.sim-gem b span { color: var(--muted); font-weight: 400; font-size: 12px; }
+.sim-gem-1 { border-left-color: #6a6188; }
+.sim-gem-2 { border-left-color: #a877ff; }
+.sim-gem-3 { border-left-color: #4f7dff; }
+.sim-gem-4 { border-left-color: #5fe0e6; }
+.sim-gem-n { font-size: 18px; text-align: right; font-variant-numeric: tabular-nums; }
+.sim-gem-hit .sim-gem-n { animation: sim-settle 0.4s ease-out; color: var(--gold); }
+.sim-gem .pill { padding: 4px 8px; font-size: 12px; }
+.sim-gem-odds { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
+.sim-gem-msg { margin: 0; text-align: center; animation: sim-drop 0.3s ease-out; }
+.sim-tname { min-width: 0; text-align: left !important; }
+.sim-got { background: rgba(255, 195, 92, 0.06); }
+.sim-clear { margin-top: 6px; }
+@media (prefers-reduced-motion: reduce) {
+  .sim *, .sim-chest * { animation: none !important; }
+  .sim-card { opacity: 1; }
+}
+
+/* 확률 시뮬레이터: 맨 위 여섯 칸, 행운 코인, 순위 */
+.sim-tabs > .pill { padding-left: 2px; padding-right: 2px; font-size: 12px; }
+.sim-coins { display: flex; align-items: baseline; gap: 8px; width: 100%; margin: 0 0 10px; padding: 6px 10px; color: var(--text); font: inherit; text-align: left;
+  background: linear-gradient(90deg, rgba(255, 195, 92, 0.16), rgba(11, 10, 26, 0.5)); border: 1px solid rgba(255, 195, 92, 0.35); cursor: pointer; }
+.sim-coins span { font-size: 12px; color: var(--muted); }
+.sim-coins b { font-size: 18px; color: var(--gold); animation: sim-settle 0.3s ease-out; }
+.sim-coins small { margin-left: auto; font-size: 11px; color: #7ee2a8; }
+.sim-coins-empty { border-color: rgba(255, 107, 107, 0.5); }
+.sim-coins-empty b, .sim-coins-empty small { color: var(--red); }
+.sim-rank, .sim-king { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 8px 10px; }
+.sim-rank-head { display: flex; align-items: baseline; gap: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--hi); min-width: 0; }
+.sim-rank-head b { color: var(--gold); white-space: nowrap; }
+.sim-rank-head small { color: var(--muted); font-size: 11px; min-width: 0; }
+.sim-rank-row { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid rgba(74, 63, 134, 0.35); font-size: 13px; }
+.sim-rank-row em, .sim-king-row em { grid-row: 1 / 3; font-style: normal; text-align: center; color: var(--muted); }
+.sim-rank-row > small { grid-column: 2 / 4; color: var(--muted); font-size: 11px; }
+.sim-rank-row > b { text-align: right; }
+.sim-rank-who { min-width: 0; }
+.sim-rank-1 em { color: var(--gold); }
+.sim-rank-2 em { color: #d8dbe8; }
+.sim-rank-3 em { color: #e0a070; }
+.sim-rank-mine { background: rgba(111, 143, 255, 0.1); }
+.sim-rank-none { margin: 6px 0; font-size: 12px; text-align: center; }
+.sim-king-row { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid rgba(74, 63, 134, 0.35); }
+.sim-king-row > b { color: var(--gold); text-align: right; }
+.sim-king-parts { grid-column: 2 / 4; display: flex; flex-wrap: wrap; gap: 4px; }
+.sim-king-parts i { font-style: normal; font-size: 10px; padding: 1px 4px; color: var(--muted); background: rgba(11, 10, 26, 0.5); }
+.sim-king .sim-rank-1 { background: rgba(255, 195, 92, 0.08); }
+.sim-first-row { display: grid; grid-template-columns: minmax(0, 1fr); padding: 4px 0; border-bottom: 1px solid rgba(74, 63, 134, 0.35); font-size: 13px; }
+.sim-first-row small { color: var(--muted); font-size: 11px; }
+.sim-first-row em { font-style: normal; color: var(--muted); font-size: 12px; }
+
+/* 시뮬레이터 미니게임 (두근두근, 콤보, 오늘의 도전, 전광판, 칭호) */
+.sim-title { font-style: normal; font-size: 11px; color: #c79bff; padding: 1px 5px; border: 1px solid rgba(199, 155, 255, 0.5); }
+.sim-charging .sim-icon, .sim-charging.sim-chest .sim-chest-t { animation: sim-doki 0.35s ease-in-out infinite; }
+.sim-charging .sim-lv { opacity: 0.7; }
+@keyframes sim-doki { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.08) translateX(-2px); } 60% { transform: scale(0.98) translateX(2px); } }
+.sim-doki { color: var(--gold); letter-spacing: 1px; animation: sim-blink 0.35s ease-in-out infinite; }
+.sim-combo { position: absolute; top: 8px; right: 10px; padding: 2px 8px; font-size: 13px; color: var(--edge); background: var(--gold); transform-origin: 100% 0;
+  animation: sim-combo 0.45s cubic-bezier(0.2, 1.8, 0.4, 1); }
+@keyframes sim-combo { 0% { transform: scale(0.4) rotate(-12deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.sim-quests { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: -4px 0 10px; font-size: 12px; }
+.sim-quests > b { color: var(--muted); font-size: 11px; font-weight: 400; margin-right: 2px; }
+.sim-quests > span { padding: 2px 6px; background: rgba(11, 10, 26, 0.5); border: 1px solid var(--hi); }
+.sim-quests small { color: var(--gold); }
+.sim-q-done { color: #7ee2a8; border-color: rgba(126, 226, 168, 0.5) !important; text-decoration: line-through; text-decoration-color: rgba(126, 226, 168, 0.6); }
+.sim-cheer { position: fixed; left: 50%; bottom: calc(var(--tab-h) + 24px + env(safe-area-inset-bottom)); z-index: 60; display: grid; justify-items: center; gap: 2px;
+  min-width: 200px; margin-left: -100px; padding: 10px 14px; text-align: center; background: var(--night-2); border: 3px solid var(--gold); box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
+  animation: sim-cheer 2.6s ease-out forwards; pointer-events: none; }
+.sim-cheer b { color: var(--gold); }
+.sim-cheer small { color: #7ee2a8; }
+@keyframes sim-cheer { 0% { transform: translateY(20px) scale(0.8); opacity: 0; } 12% { transform: translateY(0) scale(1.05); opacity: 1; } 20% { transform: none; } 85% { opacity: 1; } 100% { transform: translateY(-10px); opacity: 0; } }
+.sim-ticker { overflow: hidden; margin: -4px 0 8px; padding: 3px 0; background: rgba(255, 195, 92, 0.08); border-top: 1px solid rgba(255, 195, 92, 0.3); border-bottom: 1px solid rgba(255, 195, 92, 0.3); }
+.sim-ticker-run { display: flex; width: max-content; gap: 24px; animation: sim-tick linear infinite; }
+.sim-tick { white-space: nowrap; font-size: 12px; }
+.sim-tick b { color: var(--gold); }
+.sim-tick small { color: #c79bff; }
+@keyframes sim-tick { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .sim-ticker-run, .sim-cheer, .sim-combo, .sim-charging * { animation: none !important; } }
+
+/* ---------------------------------------------------------------- 확률 시뮬레이터: 실제 장비 강화 (제작자 2026-11-04 '노작을 사서 강화, 실제 장비, 애니메이션 더 잘')
+   망치 세 번 · 확률 게이지 바늘 · 위험하면 어두워지며 심장 소리처럼 · 드문 성공은 금빛 폭발과 '+9 성공!' · 파괴는 금이 가고 '파괴' 도장 · 강화도마다 테두리 빛이 돈다 */
+.sim-actions-enh { grid-template-columns: minmax(0, 1fr) auto; }
+.sim-actions-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sim-actions .btn small { margin-left: 4px; font-size: 11px; opacity: 0.8; }
+.sim-gearline { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; font-size: 11px; color: var(--muted); position: relative; z-index: 2; }
+.sim-change { padding: 2px 8px; font-size: 11px; color: var(--text); background: rgba(7, 6, 15, 0.45); border: 1px solid rgba(169, 162, 207, 0.35); }
+.sim-change:disabled { opacity: 0.4; }
+.sim-frame { position: relative; display: grid; padding: 3px; overflow: hidden; }
+.sim-frame > .sim-icon { position: relative; z-index: 1; background: #100e24; }
+.sim-aura { position: absolute; left: -50%; top: -150%; width: 200%; height: 400%; opacity: 0; pointer-events: none; }
+.sim-aura-1 .sim-aura, .sim-aura-2 .sim-aura, .sim-aura-3 .sim-aura, .sim-aura-4 .sim-aura { opacity: 1; animation: sim-spin 3.2s linear infinite; }
+.sim-aura-1 .sim-aura { background: conic-gradient(from 0deg, transparent 0 55%, #6f8fff 75%, transparent 90%); }
+.sim-aura-2 .sim-aura { background: conic-gradient(from 0deg, transparent 0 45%, #b478ff 70%, #f0d8ff 78%, transparent 92%); animation-duration: 2.6s; }
+.sim-aura-3 .sim-aura { background: conic-gradient(from 0deg, transparent 0 35%, #ffb24a 60%, #fff3c4 72%, transparent 86%, #ffb24a 96%); animation-duration: 2s; }
+.sim-aura-4 .sim-aura { background: conic-gradient(#ff6b6b, #ffc35c, #7ee2a8, #6f8fff, #c79bff, #ff6b6b); animation-duration: 1.6s; }
+@keyframes sim-spin { to { transform: rotate(360deg); } }
+.sim-icon-long { font-size: 17px; min-width: 150px; max-width: 220px; padding: 0 10px; line-height: 1.2; text-align: center; }
+.sim-crack { position: absolute; inset: 0; pointer-events: none; z-index: 2;
+  background: linear-gradient(115deg, transparent 47%, rgba(255, 107, 107, 0.9) 48%, rgba(255, 107, 107, 0.9) 50%, transparent 51%),
+    linear-gradient(60deg, transparent 58%, rgba(255, 107, 107, 0.7) 59%, rgba(255, 107, 107, 0.7) 60.5%, transparent 61.5%); }
+/* 망치 세 번 (두근두근 동안): 위로 들렸다 내려치며 찌그러진다 */
+.sim-anvil.sim-charging .sim-icon { animation: sim-hammer var(--hit, 400ms) cubic-bezier(0.3, 0, 0.2, 1) 3; }
+@keyframes sim-hammer { 0% { transform: none; } 55% { transform: translateY(-6px) scale(1.04); } 70% { transform: translateY(3px) scale(1.08, 0.9); } 85% { transform: translateY(0) scale(0.98, 1.03); } 100% { transform: none; } }
+.sim-tang { position: absolute; right: -6px; top: -12px; z-index: 3; font-size: 15px; color: #fff3c4; text-shadow: 2px 2px 0 var(--edge); opacity: 0; pointer-events: none; animation: sim-tang var(--hit, 400ms) ease-out 3; }
+@keyframes sim-tang { 0%, 60% { opacity: 0; transform: scale(0.5) rotate(-10deg); } 72% { opacity: 1; transform: scale(1.25) rotate(6deg); } 100% { opacity: 0; transform: translateY(-8px) scale(1); } }
+/* 위험한 강화(20% 아래): 둘레가 어두워졌다 풀렸다 */
+.sim-vignette { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at 50% 40%, transparent 35%, rgba(0, 0, 0, 0.75) 100%); }
+.sim-risky .sim-vignette { animation: sim-heart 0.9s ease-in-out infinite; }
+@keyframes sim-heart { 0%, 100% { opacity: 0.55; } 15% { opacity: 1; } 30% { opacity: 0.7; } 45% { opacity: 0.95; } }
+/* 확률 게이지 */
+.sim-gauge { display: grid; gap: 3px; width: min(260px, 100%); animation: sim-drop 0.25s ease-out both; }
+.sim-gauge-bar { position: relative; display: flex; height: 16px; border: var(--px) solid var(--edge); background: var(--edge); }
+.sim-gauge-ok { flex: none; height: 100%; background: linear-gradient(180deg, #a8f5c8, #3fbf7a); }
+.sim-gauge-no { flex: 1; height: 100%; background: repeating-linear-gradient(135deg, #8f2e3a 0 6px, #a8394a 6px 12px); }
+.sim-gauge-keep { background: repeating-linear-gradient(135deg, #2c3566 0 6px, #343f78 6px 12px); }
+.sim-gauge-track { position: absolute; inset: -5px 0; pointer-events: none; }
+.sim-needle { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; will-change: transform; }
+.sim-needle::before { content: ""; position: absolute; left: -2px; top: 0; bottom: 0; width: 4px; background: #fff; box-shadow: 0 0 0 1px var(--edge), 0 0 6px rgba(255, 255, 255, 0.9); }
+.sim-gauge-lab { display: flex; justify-content: space-between; font-size: 11px; }
+/* 드문 성공: 금빛 빛살이 돌며 퍼지고 '+9 성공!' */
+.sim-anvil-big { animation: sim-quake 0.45s ease-out; }
+.sim-anvil-break { animation: sim-quake 0.5s 0.15s ease-out; }
+@keyframes sim-quake { 0%, 100% { transform: none; } 15% { transform: translate(-5px, 2px); } 30% { transform: translate(5px, -3px); } 45% { transform: translate(-4px, 1px); } 60% { transform: translate(3px, 2px); } 80% { transform: translate(-1px, -1px); } }
+.sim-burst { position: absolute; left: 50%; top: 92px; width: 0; height: 0; pointer-events: none; z-index: 0; }
+.sim-burst i { position: absolute; left: -170px; top: -170px; width: 340px; height: 340px; border-radius: 50%;
+  background: repeating-conic-gradient(rgba(255, 220, 140, 0.55) 0 8deg, transparent 8deg 22deg);
+  -webkit-mask: radial-gradient(circle, #000 18%, transparent 68%); mask: radial-gradient(circle, #000 18%, transparent 68%);
+  animation: sim-burst 1.5s ease-out forwards; }
+@keyframes sim-burst { 0% { transform: scale(0.2) rotate(0deg); opacity: 0; } 15% { opacity: 1; } 100% { transform: scale(1.15) rotate(70deg); opacity: 0; } }
+.sim-win { position: absolute; left: 50%; top: 26px; z-index: 4; white-space: nowrap; font-size: 28px; color: #fff3c4; text-shadow: 3px 3px 0 var(--edge), 0 0 12px rgba(255, 195, 92, 0.9);
+  pointer-events: none; animation: sim-win 1.6s cubic-bezier(0.2, 1.4, 0.4, 1) forwards; }
+@keyframes sim-win { 0% { transform: translateX(-50%) scale(2.6); opacity: 0; } 18% { transform: translateX(-50%) scale(0.92); opacity: 1; } 28% { transform: translateX(-50%) scale(1.05); } 75% { transform: translateX(-50%) scale(1); opacity: 1; } 100% { transform: translateX(-50%) translateY(-14px); opacity: 0; } }
+.sim-stamp { position: absolute; left: 50%; top: 18px; z-index: 4; padding: 2px 14px; font-size: 26px; color: var(--red); border: 3px solid var(--red); background: rgba(20, 6, 12, 0.6);
+  pointer-events: none; animation: sim-stamp 0.5s 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+.sim-stamp-keep { font-size: 18px; color: #b9b2d9; border-color: #b9b2d9; animation-delay: 0s; animation-name: sim-stamp-keep; animation-duration: 1.2s; }
+@keyframes sim-stamp { 0% { transform: translateX(-50%) scale(3) rotate(-14deg); opacity: 0; } 100% { transform: translateX(-50%) scale(1) rotate(-12deg); opacity: 1; } }
+@keyframes sim-stamp-keep { 0% { transform: translateX(-50%) scale(1.8) rotate(8deg); opacity: 0; } 25% { transform: translateX(-50%) scale(1) rotate(6deg); opacity: 1; } 80% { opacity: 1; } 100% { transform: translateX(-50%) scale(1) rotate(6deg); opacity: 0; } }
+/* 새로 산 장비: 위에서 떨어져 쿵 */
+.sim-fx-buy .sim-frame { animation: sim-buy 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+.sim-fx-buy .sim-lv { animation: sim-drop 0.4s 0.3s ease-out both; }
+@keyframes sim-buy { 0% { transform: translateY(-60px) scale(0.7); opacity: 0; } 60% { transform: translateY(4px) scale(1.04, 0.94); opacity: 1; } 100% { transform: none; } }
+.sim-gain { color: var(--muted); animation: sim-drop 0.4s ease-out both; }
+.sim-gain b { color: var(--text); font-weight: normal; }
+.sim-gain em { font-style: normal; color: #7ee2a8; margin-left: 2px; }
+.sim-anvil .sim-lv { animation: sim-lvup 0.45s ease-out; }
+.sim-broken .sim-lv { animation: sim-drop 0.5s 0.3s ease-out both; }
+/* 장비 상점 */
+.sim-shop { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 12px; animation: sim-drop 0.3s ease-out both; }
+.sim-shop-head { display: flex; align-items: baseline; gap: 8px; }
+.sim-shop-head b { color: var(--gold); }
+.sim-shop-head small { color: var(--muted); font-size: 11px; }
+.sim-shop-x { margin-left: auto; padding: 2px 8px; font-size: 11px; background: transparent; border: 1px solid rgba(169, 162, 207, 0.35); color: var(--text); }
+.sim-shop-filter { margin: 0; }
+.sim-shop-filter .mk-cats { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
+.sim-shop-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; }
+.sim-shop-list > li { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 5px 6px; background: rgba(11, 10, 26, 0.45); animation: sim-drop 0.3s ease-out both; }
+.sim-shop-pic { flex: none; display: grid; place-items: center; width: 34px; height: 34px; background: rgba(7, 6, 15, 0.55); border: 1px solid rgba(169, 162, 207, 0.2); }
+.sim-shop-name { flex: 1; display: grid; min-width: 0; }
+.sim-shop-name b { font-weight: normal; font-size: 13px; }
+.sim-shop-name small { color: var(--muted); font-size: 11px; }
+.sim-buy { flex: none; min-width: 64px; padding: 5px 8px; background: var(--sunset); color: var(--edge); font-weight: 700; }
+.sim-buy small { margin-left: 2px; font-size: 10px; font-weight: normal; }
+.sim-buy:disabled { background: rgba(169, 162, 207, 0.2); color: var(--muted); }
+@media (prefers-reduced-motion: reduce) {
+  .sim-aura, .sim-anvil, .sim-anvil *, .sim-shop, .sim-shop * { animation: none !important; }
+  .sim-win, .sim-burst, .sim-tang { display: none; }
+}
+.sim-gearline .sim-combo { position: static; margin: 0 auto; }
+.sim-lv-dead { color: #8d86b3 !important; text-decoration: line-through; text-decoration-thickness: 3px; }
+.sim-stamp { top: 26px; white-space: nowrap; }
+.sim-win { top: 36px; padding: 3px 16px; font-size: 24px; color: var(--edge); text-shadow: none; background: linear-gradient(180deg, #fff1b8, #f2a93b);
+  border: var(--px) solid var(--edge); box-shadow: 0 0 0 2px rgba(255, 243, 196, 0.5), 0 0 18px rgba(255, 195, 92, 0.85); }
+
+/* 시세 동향 골드 호가창 (제작자 2026-11-04 초안 C 에서 이것만): 시세마다 파는 사람 수(왼쪽 파랑)·사는 사람 수(오른쪽 빨강), 지금 시세 줄 금색, 줄을 누르면 그 시세의 사람 */
+.trend-book { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; margin: 8px 0 10px; }
+.trend-book-h { display: grid; grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); font-size: 10px; color: var(--muted); text-align: center; margin-bottom: 2px; }
+.trend-book-item { display: grid; grid-template-columns: minmax(0, 1fr); }
+.trend-book-row { display: grid; grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); align-items: center; width: 100%; height: 20px; padding: 0; background: transparent; border: 0;
+  animation: trend-book-in 0.4s ease-out both; }
+.trend-book-row > b { text-align: center; font-size: 12px; font-weight: normal; }
+.trend-book-now { background: rgba(255, 195, 92, 0.1); }
+.trend-book-now > b { color: var(--gold); }
+.trend-book-open { background: rgba(255, 255, 255, 0.06); }
+.trend-book-l, .trend-book-r { display: flex; align-items: center; gap: 4px; height: 12px; min-width: 0; }
+.trend-book-l { justify-content: flex-end; }
+.trend-book-l small { order: 2; }
+.trend-book-l i { order: 1; }
+.trend-book-row small { flex: none; width: 20px; font-size: 10px; color: var(--muted); }
+.trend-book-l small { text-align: right; }
+.trend-book-row i { display: block; height: 100%; animation: trend-book-grow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.trend-book-l i { background: linear-gradient(270deg, #5d9bff, rgba(93, 155, 255, 0.25)); transform-origin: right; }
+.trend-book-r i { background: linear-gradient(90deg, #ff6464, rgba(255, 100, 100, 0.25)); transform-origin: left; }
+.trend-book-who { display: grid; gap: 4px; padding: 4px 0 6px; animation: trend-book-in 0.3s ease-out both; }
+@keyframes trend-book-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes trend-book-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { .trend-book-row, .trend-book-row i, .trend-book-who { animation: none; } }
+.sim-shop-locked { opacity: 0.45; }
+.sim-buy-lock { display: grid; place-items: center; background: rgba(169, 162, 207, 0.15); color: var(--muted); font-weight: normal; font-size: 12px; border: var(--px) solid var(--edge); }
+.sim-shop-clear { flex: none; font-size: 11px; color: var(--gold); }
+.trend-book-side { font-size: 11px; }
+.trend-book-side-s { color: #8fb4ff; }
+.trend-book-side-b { color: #ff8a8a; }
+
+/* ---------------------------------------------------------------- 확률 시뮬레이터 던전 (제작자 2026-11-04 '내가 강화한 거 입히는 거임', 우리 디자인으로, '그림이 허접하다')
+   뒷배경·용사·불꽃·베기 빛은 pixelArt.ts 가 도트로 그려 2배로 키운다. 움직임은 transform·opacity 만 */
+.dun-scene { position: relative; height: 250px; padding: 0; overflow: hidden; background: #0d0b1e; }
+.dun-bg { position: absolute; inset: 0; pointer-events: none; }
+.dun-bgimg { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.dun-torch { position: absolute; top: 66px; width: 16px; height: 24px; margin-left: -8px; }
+.dun-torch-glow { position: absolute; left: -26px; top: -24px; width: 68px; height: 68px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 170, 70, 0.32), transparent 70%); animation: dun-glow-pulse 1.8s ease-in-out infinite; }
+.dun-boss .dun-torch-glow { background: radial-gradient(circle, rgba(255, 80, 80, 0.36), transparent 70%); }
+@keyframes dun-glow-pulse { 50% { opacity: 0.7; transform: scale(0.92); } }
+.dun-flame { position: absolute; inset: 0; width: 16px; height: 24px; image-rendering: pixelated; opacity: 0; animation: dun-flame 0.45s steps(1) infinite; }
+.dun-flame-1 { animation-delay: 0.15s; }
+.dun-flame-2 { animation-delay: 0.3s; }
+@keyframes dun-flame { 0% { opacity: 1; } 33.4% { opacity: 0; } }
+.dun-dust i { position: absolute; bottom: 60px; width: 2px; height: 2px; background: rgba(200, 190, 255, 0.5); animation: dun-dust 4s linear infinite; }
+@keyframes dun-dust { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(14px, -130px); opacity: 0; } }
+.dun-hud { position: absolute; left: 8px; right: 8px; top: 8px; z-index: 3; display: flex; align-items: center; gap: 8px; }
+.dun-floor { font-size: 18px; color: var(--gold); text-shadow: 2px 2px 0 var(--edge), -1px -1px 0 var(--edge); white-space: nowrap; }
+.dun-floor i { font-style: normal; color: var(--sapphire); margin-right: 4px; font-size: 12px; }
+.dun-pips { display: flex; gap: 3px; flex: 1; min-width: 0; }
+.dun-pips i { flex: 1; height: 6px; max-width: 18px; background: rgba(7, 6, 15, 0.7); border: 1px solid #4a3f86; }
+.dun-pips i.done { background: var(--sapphire); }
+.dun-pips i.now { background: var(--gold); animation: sim-blink 0.8s ease-in-out infinite; }
+.dun-pips i.boss { border-color: var(--red); }
+.dun-speed { display: flex; gap: 2px; }
+.dun-speed button { padding: 1px 6px; font-size: 11px; color: var(--muted); background: rgba(7, 6, 15, 0.65); border: 1px solid #4a3f86; }
+.dun-speed button.on { color: var(--edge); background: var(--gold); border-color: var(--edge); }
+.dun-bossbar { position: absolute; left: 50%; top: 34px; z-index: 3; padding: 1px 14px; font-size: 14px; letter-spacing: 3px; color: #fff; background: var(--red);
+  border: var(--px) solid var(--edge); animation: dun-boss-in 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+@keyframes dun-boss-in { 0% { transform: translateX(-50%) scale(2.2); opacity: 0; } 100% { transform: translateX(-50%); opacity: 1; } }
+.dun-stage { position: absolute; left: 0; right: 0; bottom: 4px; height: 190px; }
+.dun-shadow { position: absolute; left: 50%; bottom: -4px; width: 52px; height: 10px; margin-left: -26px; border-radius: 50%; background: rgba(4, 3, 12, 0.55); }
+.dun-hero { position: absolute; left: 12%; bottom: 22px; display: grid; justify-items: center; gap: 3px; }
+.dun-hero > .dun-shadow { bottom: 26px; }
+.dun-hero-body { position: relative; animation: dun-bob 1.4s ease-in-out infinite; }
+.dun-hurt { animation: dun-hurt 0.3s ease-out, dun-bob 1.4s 0.3s ease-in-out infinite; }
+@keyframes dun-bob { 50% { transform: translateY(-2px); } }
+@keyframes dun-hurt { 0%, 100% { transform: none; opacity: 1; } 25% { transform: translateX(-5px); opacity: 0.45; } 60% { transform: translateX(3px); opacity: 1; } }
+.dun-lunge { position: relative; }
+.dun-swing { animation: dun-lunge 0.24s ease-out; }
+@keyframes dun-lunge { 35% { transform: translateX(18px); } 100% { transform: none; } }
+.dun-sprite { position: relative; display: block; width: 64px; height: 80px; }
+.dun-sprite img { position: absolute; inset: 0; width: 64px; height: 80px; image-rendering: pixelated; }
+.dun-breath { opacity: 0; animation: dun-breath 1.4s steps(1) infinite; }
+@keyframes dun-breath { 50% { opacity: 1; } }
+.dun-photo { display: block; max-height: 96px; max-width: 80px; image-rendering: pixelated; filter: drop-shadow(0 0 0 transparent); }
+.dun-weapon { position: absolute; right: -14px; top: 38px; display: grid; place-items: center; width: 32px; height: 32px; transform: rotate(-35deg); transform-origin: 25% 80%; }
+.dun-weapon-photo { top: 42px; right: -18px; }
+.dun-swing .dun-weapon { animation: dun-slash 0.24s ease-out; }
+@keyframes dun-slash { 0% { transform: rotate(-90deg); } 45% { transform: rotate(40deg); } 100% { transform: rotate(-35deg); } }
+.dun-weapon img { position: relative; z-index: 1; image-rendering: pixelated; transform: scale(1.3); }
+.dun-weapon-glow { position: absolute; inset: -8px; border-radius: 50%; opacity: 0; }
+.dun-aura-1 .dun-weapon-glow { opacity: 1; background: radial-gradient(circle, rgba(111, 143, 255, 0.75), transparent 65%); animation: dun-glow 1.6s ease-in-out infinite; }
+.dun-aura-2 .dun-weapon-glow { opacity: 1; background: radial-gradient(circle, rgba(180, 120, 255, 0.85), transparent 65%); animation: dun-glow 1.3s ease-in-out infinite; }
+.dun-aura-3 .dun-weapon-glow { opacity: 1; background: radial-gradient(circle, rgba(255, 195, 92, 0.95), transparent 65%); animation: dun-glow 1s ease-in-out infinite; }
+.dun-aura-4 .dun-weapon-glow { opacity: 1; background: conic-gradient(#ff6b6b, #ffc35c, #7ee2a8, #6f8fff, #c79bff, #ff6b6b); -webkit-mask: radial-gradient(circle, #000 25%, transparent 68%); mask: radial-gradient(circle, #000 25%, transparent 68%); animation: sim-spin 1.4s linear infinite; }
+@keyframes dun-glow { 50% { transform: scale(1.25); opacity: 0.6; } }
+.dun-name { font-size: 10px; color: var(--text); text-shadow: 1px 1px 0 var(--edge), -1px -1px 0 var(--edge); white-space: nowrap; }
+.dun-name em { font-style: normal; color: var(--muted); }
+.dun-hpbar { position: relative; width: 60px; height: 6px; background: rgba(7, 6, 15, 0.8); border: 1px solid var(--edge); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08); }
+.dun-hpbar i { position: absolute; inset: 0; transform-origin: left; transition: transform 0.15s ease-out; }
+.dun-hpbar-hero i { background: linear-gradient(180deg, #8af0b0 0 40%, #3fbf7a 40%); }
+.dun-hpbar-hero i.mid { background: linear-gradient(180deg, #ffe08a 0 40%, #e0a830 40%); }
+.dun-hpbar-hero i.low { background: linear-gradient(180deg, #ff9a9a 0 40%, #d84a4a 40%); }
+.dun-hpbar-mon { width: 76px; }
+.dun-hpbar-mon i { background: linear-gradient(180deg, #ff8a96 0 40%, #c83a4c 40%); }
+.dun-hpbar-mon small { position: absolute; left: 0; right: 0; top: -13px; font-size: 9px; text-align: center; color: var(--text); text-shadow: 1px 1px 0 var(--edge); }
+.dun-mon { position: absolute; right: 10%; bottom: 22px; display: grid; justify-items: center; gap: 5px; animation: dun-mon-in 0.35s ease-out both; }
+@keyframes dun-mon-in { from { transform: translateX(36px); opacity: 0; } to { transform: none; opacity: 1; } }
+.dun-mon-wrap { position: relative; display: grid; place-items: end center; min-height: 64px; }
+.dun-mon-wrap > .dun-shadow { bottom: -3px; }
+.dun-mon-body { position: relative; display: grid; place-items: end center; }
+.dun-mon-body img { image-rendering: pixelated; }
+.dun-flash { animation: dun-flash 0.2s ease-out; }
+@keyframes dun-flash { 0% { opacity: 1; transform: none; } 30% { opacity: 0.4; transform: translateX(5px); } 100% { opacity: 1; transform: none; } }
+.dun-dead .dun-mon-body { animation: dun-die 0.5s ease-in forwards; }
+@keyframes dun-die { 0% { opacity: 1; transform: none; } 30% { transform: translateY(-8px) rotate(-6deg); } 100% { opacity: 0; transform: translateY(14px) rotate(14deg) scale(0.8); } }
+.dun-hitfx { position: absolute; left: 50%; bottom: 30%; width: 0; height: 0; pointer-events: none; z-index: 2; }
+.dun-slash { position: absolute; left: -36px; top: -32px; width: 64px; height: 64px; image-rendering: pixelated; animation: dun-slash-fx 0.28s ease-out forwards; }
+@keyframes dun-slash-fx { 0% { transform: scale(0.4) rotate(-30deg); opacity: 0; } 30% { opacity: 1; } 100% { transform: scale(1.15) rotate(15deg); opacity: 0; } }
+.dun-hitfx i { position: absolute; width: 4px; height: 4px; margin: -2px; background: #fff3c4; box-shadow: 0 0 0 1px rgba(255, 178, 74, 0.8); animation: dun-spark 0.4s ease-out forwards; }
+@keyframes dun-spark { 0% { transform: rotate(var(--a)) translateX(0); opacity: 1; } 100% { transform: rotate(var(--a)) translateX(26px); opacity: 0; } }
+.dun-noimg { font-size: 30px; color: var(--muted); }
+.dun-pop { position: absolute; bottom: 110px; z-index: 4; font-size: 15px; color: #fff; pointer-events: none; white-space: nowrap;
+  text-shadow: 2px 0 0 var(--edge), -2px 0 0 var(--edge), 0 2px 0 var(--edge), 0 -2px 0 var(--edge); animation: dun-pop 0.9s ease-out forwards; }
+.dun-pop-mon { right: calc(10% + 22px); }
+.dun-pop-hero { left: calc(12% + 14px); }
+.dun-pop-crit { font-size: 22px; color: var(--gold); }
+.dun-pop-hurt { color: #ff8a8a; font-size: 12px; }
+.dun-pop-heal { color: #7ee2a8; font-size: 12px; }
+@keyframes dun-pop { 0% { transform: translate(var(--dx), 6px) scale(0.6); opacity: 0; } 15% { transform: translate(var(--dx), -4px) scale(1.15); opacity: 1; } 100% { transform: translate(var(--dx), -34px) scale(1); opacity: 0; } }
+.dun-pop-crit { animation-name: dun-crit; }
+@keyframes dun-crit { 0% { transform: translate(var(--dx), 6px) scale(2); opacity: 0; } 15% { transform: translate(var(--dx), -6px) scale(1.1); opacity: 1; } 100% { transform: translate(var(--dx), -40px) scale(1); opacity: 0; } }
+.dun-overlay { position: absolute; inset: 0; z-index: 5; display: grid; place-content: center; justify-items: center; gap: 6px; background: rgba(10, 9, 24, 0.62); animation: sim-drop 0.3s ease-out both; }
+.dun-result { font-size: 30px; color: var(--gold); text-shadow: 3px 3px 0 var(--edge); }
+.dun-result-sm { font-size: 20px; }
+.dun-overlay small { font-size: 12px; color: var(--muted); }
+.dun-overlay .btn { min-width: 140px; }
+.dun-overlay .btn small { color: inherit; }
+.dun-stop { flex: none; padding: 1px 6px; font-size: 11px; color: var(--muted); background: rgba(7, 6, 15, 0.7); border: 1px solid #4a3f86; }
+.dun-gear { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.dun-slot { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 6px; text-align: left; background: var(--panel); border: var(--px) solid var(--edge); }
+.dun-slot-empty { opacity: 0.7; }
+.dun-slot-pic { flex: none; display: grid; place-items: center; width: 34px; height: 34px; background: rgba(7, 6, 15, 0.55); border: 1px solid rgba(169, 162, 207, 0.2); }
+.dun-slot-txt { flex: 1; display: grid; min-width: 0; }
+.dun-slot-txt small { font-size: 10px; color: var(--muted); }
+.dun-slot-txt b { font-size: 12px; font-weight: normal; }
+.dun-slot-txt em { font-style: normal; font-size: 10px; color: var(--gold); }
+.dun-slot-go { flex: none; font-size: 10px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .dun-scene *, .dun-scene *::after { animation: none !important; } }

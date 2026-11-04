@@ -94,7 +94,7 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const coin = useCoinState();
   // 던전 칸의 '강화 ›' 로 강화 칸의 그 부위를 연다
   const [, setPartEntry] = useEntryState<Part>("sim.part", "무기");
-  const today = (coin.wallet?.rules.reduce((t, r) => t + r.n * r.coin, 0) ?? 0) + (coin.wallet?.quests.filter(Boolean).length ?? 0) * (coin.wallet?.questCoin ?? 0);
+  const today = (coin.wallet?.quests.filter(Boolean).length ?? 0) * (coin.wallet?.questCoin ?? 0);
   // 오늘의 도전 (src/simQuest.ts): 결과마다 알리면 맞는 도전을 깨고 코인을 받는다
   const quests = useMemo(() => todayQuests(), []);
   const [done, setDone] = useState<boolean[]>([false, false, false]);
@@ -139,12 +139,12 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
           </button>
         ))}
       </div>
-      {/* 행운 코인: 시도마다 하나 (웹에서 글쓰기·시간표 확정·챗봇 같은 일을 하면 쌓인다) */}
+      {/* 행운 코인: 시도마다 하나 (오늘의 도전으로 쌓인다, 앱개발자는 100 아래면 1000 을 채운다) */}
       <button type="button" className={"sim-coins" + (coin.coins === 0 ? " sim-coins-empty" : "")} onClick={() => setTab("rank")}>
         <span>행운 코인</span>
         <b key={coin.coins ?? -1}>{coin.coins === null ? "…" : coin.coins.toLocaleString()}</b>
         <em className="sim-title">{coin.wallet ? titleOf(coin.wallet.total) : ""}</em>
-        <small>{coin.coins === 0 ? "버는 법 ›" : today ? `오늘 +${today}` : "버는 법 ›"}</small>
+        {today > 0 && <small>오늘 +{today}</small>}
       </button>
       {coin.wallet && coin.wallet.feed.length > 0 && <Ticker feed={coin.wallet.feed} />}
       <div className="sim-quests" aria-label="오늘의 도전">
@@ -275,7 +275,7 @@ function gameNamer(odds: Odds) {
   };
 }
 
-/** 순위 칸: 도박의 신(묶음마다 가장 드문 기록의 운을 더한 것), 시뮬레이터마다 1위, 코인 버는 법 */
+/** 순위 칸: 도박의 신(묶음마다 가장 드문 기록의 운을 더한 것), 시뮬레이터마다 1위 */
 function RankTab({ odds }: { odds: Odds }) {
   const coin = useCoins() as ReturnType<typeof useCoinState>;
   const [data, setData] = useState<{ king: King[]; firsts: SimRec[]; mine: SimRec[] } | null>(null);
@@ -332,23 +332,6 @@ function RankTab({ odds }: { odds: Odds }) {
               <span>
                 <Nick name={r.user_id} /> <b>{r.label}</b> <em>{/^(enh|stat):/.test(r.game ?? "") ? `${r.tries.toLocaleString()}번 만에` : luckText(r.luck)}</em>
               </span>
-            </div>
-          ))}
-        </section>
-      )}
-      {coin.wallet && (
-        <section className="panel sim-earn">
-          <div className="sim-rank-head">
-            <b>행운 코인 버는 법</b>
-            <small>하루마다 새로</small>
-          </div>
-          {coin.wallet.rules.map((r) => (
-            <div key={r.key} className={"sim-earn-row" + (r.n >= r.cap ? " sim-earn-done" : "")}>
-              <span>{r.label}</span>
-              <b>+{r.coin}</b>
-              <small>
-                {r.n}/{r.cap}
-              </small>
             </div>
           ))}
         </section>
