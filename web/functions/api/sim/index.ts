@@ -43,7 +43,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         `(SELECT user_id, cat, MAX(luck) AS best FROM sim_records WHERE ${NOT_TEST} GROUP BY user_id, cat) GROUP BY user_id ORDER BY total DESC LIMIT 20`,
     ),
     env.DB.prepare(
-      `SELECT game, user_id, label, score, tries, luck FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY game ORDER BY ${ORDER}) AS rn FROM sim_records WHERE ${NOT_TEST}) WHERE rn = 1 ORDER BY luck DESC`,
+      `SELECT game, user_id, label, score, tries, luck FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY game ORDER BY ${ORDER}) AS rn FROM sim_records WHERE ${NOT_TEST} AND game <> 'dun') WHERE rn = 1 ORDER BY luck DESC`,
     ),
     env.DB.prepare("SELECT game, cat, label, score, tries, luck, at FROM sim_records WHERE user_id = ?").bind(me.id),
   ]);
