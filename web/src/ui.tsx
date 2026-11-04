@@ -85,7 +85,6 @@ export const TITLE_EN: Record<string, string> = {
   게시판: "NOTICE BOARD",
   "강화 비교": "WEAPON COMPARE",
   "확률 시뮬레이터": "LUCK SIMULATOR",
-  "시뮬레이터 테스트": "SIMULATOR TEST",
   장비대여: "EQUIPMENT RENTAL",
   "길드 랭킹": "RANKING",
   "플래티넘 할인 상점": "PLATINUM SHOP",

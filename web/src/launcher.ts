@@ -72,7 +72,8 @@ export const ITEMS: LaunchItem[] = [
   // 확률 시뮬레이터는 앱개발자만 (제작자 2026-11-04 '개발 중으로 나만 보게')
   { key: "sim", title: "확률 시뮬레이터", short: "확률", to: "#/sim", icon: "🎰", soon: true, badge: "개발중", match: ["sim"] },
   // 확률 시뮬레이터 테스트판 (제작자 2026-11-04 '내가 테스트하는 공간을 따로 도플갱어로, 나만 보이는 테스트 버튼'): 같은 화면, 자료만 따로 (?space=test, 표 sim_t_*)
-  { key: "simtest", title: "시뮬레이터 테스트", short: "테스트", to: "#/simtest", icon: "🧪", developer: true, ribbon: "테스트", ring: "purple", match: ["simtest"] },
+  // 홈에서는 '개발 중' 묶음 안에 확률 시뮬레이터와 똑같은 칸, 오른쪽 위 표만 '테스트' (제작자 2026-11-04 '개발 중으로 넣고 이름이랑 아이콘 다 똑같이, 오른쪽 위에 테스트라고만')
+  { key: "simtest", title: "확률 시뮬레이터", short: "확률", to: "#/simtest", icon: "🎰", developer: true, soon: true, badge: "테스트", match: ["simtest"] },
   { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
   // 장비대여 (2026-11-02 제작자 요청으로 열었다), 길드던전과 인던 같이 갈 사람 찾기 (칸만 먼저 두고 개발 중으로 막는다)
   // 오른쪽 위에 담당자 (제작자 요청 2026-11-03 '장비대여 담당자는 멍멍, 버튼 우측 상단에 텍스트로만 관리자 줄바꿈 멍멍'. 담당이 바뀌면 server/rental.ts RENT_STAFF 와 같이 고친다)
@@ -162,7 +163,7 @@ function build(dock: string[], slots: string[], search: boolean): Layout {
 /** 처음 배치 (제작자 요청 2026-11-02: 제작자 폰의 배치 그대로 '이걸 기본 배치로') */
 export const DEFAULT_LAYOUT: Layout = {
   dock: ["home", "board", "info", "search", "chat"],
-  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "simtest", "trend", "enhance", "sim", "app"],
+  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "trend", "enhance", "sim", "simtest", "app"],
 };
 
 /**

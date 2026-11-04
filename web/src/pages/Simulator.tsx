@@ -163,7 +163,7 @@ export function SimulatorPage({ wiki, me, space }: { wiki: Wiki; me: Me; space: 
     <CoinCtx.Provider value={coin}>
       <QuestCtx.Provider value={emit}>
       <IconCtx.Provider value={iconOf}>
-      <TopBar title={space === "test" ? "시뮬레이터 테스트" : "확률 시뮬레이터"} />
+      <TopBar title="확률 시뮬레이터" />
       <div className="pill-row sim-tabs" role="tablist">
         {TABS.map((t) => (
           <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} className={"pill" + (tab === t.key ? " pill-on" : "")} onClick={() => setTab(t.key)}>
