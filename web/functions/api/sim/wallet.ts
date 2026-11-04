@@ -9,7 +9,7 @@ import { EARN, QUEST_COIN, QUEST_KEYS, earn, ensureWallet, kstDate } from "../..
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  if (!(RANK[me.role] >= 1 || TEST_IDS.includes(me.id))) return FORBIDDEN();
+  if (!(me.role === "developer" || TEST_IDS.includes(me.id))) return FORBIDDEN();
   await ensureWallet(env, me.id);
   const now = Date.now();
   const [w, today, feed, total] = await env.DB.batch([
@@ -38,7 +38,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  if (!(RANK[me.role] >= 1 || TEST_IDS.includes(me.id))) return FORBIDDEN();
+  if (!(me.role === "developer" || TEST_IDS.includes(me.id))) return FORBIDDEN();
   const body = await readJson<{ spend: unknown; quest: unknown }>(request);
   await ensureWallet(env, me.id);
   if (body.quest !== undefined) {

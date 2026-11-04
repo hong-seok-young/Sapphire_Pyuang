@@ -15,6 +15,9 @@ import type { Part } from "../sim";
 import { useCoins, useRecord } from "../simRank";
 import { useQuest } from "../simQuest";
 import { RankBox } from "./Simulator";
+import { backdrop, flames, heroFrames, slashArc } from "../pixelArt";
+import type { Job as PixelJob } from "../pixelArt";
+import { avatarUrl } from "../auth";
 import { BOSS_EVERY, HERO_GAP, HERO_HP, MON_GAP, bandsOf, foeFor, heroHit, refsOf, regenAfter } from "../simDungeon";
 import type { DunGear, Foe, Hero } from "../simDungeon";
 
@@ -26,46 +29,22 @@ function dunGear(g: Gear, k: number): DunGear {
 }
 const short = (n: number) => (n >= 1e8 ? `${(n / 1e8).toFixed(1)}억` : n >= 1e4 ? `${(n / 1e4).toFixed(n >= 1e5 ? 0 : 1)}만` : Math.round(n).toLocaleString());
 const num1 = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+/** 몬스터 그림은 2배 (큰 그림은 화면에 맞게, 보스는 조금 더) */
+const monScale = (h: number, boss: boolean) => Math.min(boss ? 2.4 : 2, (boss ? 120 : 96) / Math.max(1, h));
 
-// ---------------------------------------------------------------- 도트 용사 (이 앱이 그린 것, 직업마다 색)
+// ---------------------------------------------------------------- 용사: 캐릭터 사진(아이모 캐릭터)을 올렸으면 그 사진, 없으면 이 앱이 그린 도트 (pixelArt.ts)
 
-const HERO_MAP = [
-  "....HHHH....",
-  "...HHHHHH...",
-  "..HHHHHHHH..",
-  "..KKKKKKKK..",
-  "..KSSSSSSK..",
-  "..SSESSESS..",
-  "..SSSSSSSS..",
-  "...SSSSSS...",
-  ".CAAAAAAAAC.",
-  "CCAAAAAAAACC",
-  "CCAAGAAGAACC",
-  "CSAAAAAAAASC",
-  ".CAAAAAAAAC.",
-  "..BBB..BBB..",
-  "..BBB..BBB..",
-  ".BBBB..BBBB.",
-];
-const JOB_COLOR: Record<GearJob, { h: string; c: string }> = {
-  전사: { h: "#c94f4f", c: "#8f2e3a" },
-  레인저: { h: "#3f9e6a", c: "#2b6b4a" },
-  마법사: { h: "#7b5bd6", c: "#4a3590" },
-  무도가: { h: "#e08a3c", c: "#9c5a22" },
-};
-/** 방어구 강화도마다 몸통 색 (없으면 천옷) */
-const armorColor = (k: number | null) => (k === null ? "#7a6a58" : k >= 9 ? "#f2b84b" : k >= 6 ? "#a77bff" : k >= 4 ? "#6f8fff" : "#9aa3b8");
+/** 방어구 강화도마다 몸통 색 단계 (없으면 null = 천옷) */
+const armorTier = (k: number | null) => (k === null ? null : k >= 11 ? 4 : k >= 9 ? 3 : k >= 7 ? 2 : k >= 4 ? 1 : 0);
 
-function HeroSprite({ job, armorLv }: { job: GearJob; armorLv: number | null }) {
-  const col = JOB_COLOR[job];
-  const fill: Record<string, string> = { H: col.h, K: "#2a2140", S: "#f3cfa7", E: "#1a1426", C: col.c, A: armorColor(armorLv), G: "#ffffff", B: "#3a2f4f" };
-  const px = 5;
+function HeroSprite({ job, armorLv, photo }: { job: GearJob; armorLv: number | null; photo: string | null }) {
+  const frames = useMemo(() => heroFrames(job as PixelJob, armorTier(armorLv)), [job, armorLv]);
+  if (photo) return <img className="dun-photo" src={photo} alt="" />;
   return (
-    <svg className="dun-sprite" viewBox={`0 0 ${12 * px} ${16 * px}`} width={12 * px} height={16 * px} shapeRendering="crispEdges" aria-hidden>
-      {HERO_MAP.flatMap((row, y) =>
-        [...row].map((ch, x) => (ch === "." ? null : <rect key={`${x}-${y}`} x={x * px} y={y * px} width={px} height={px} fill={fill[ch]} opacity={ch === "G" ? 0.55 : 1} />)),
-      )}
-    </svg>
+    <span className="dun-sprite">
+      <img src={frames[0]} alt="" />
+      <img src={frames[1]} alt="" className="dun-breath" />
+    </span>
   );
 }
 
@@ -220,6 +199,19 @@ export function DungeonTab({ odds, wiki, me, goEnhance }: { odds: Odds; wiki: Wi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 뒷배경은 장면 폭의 반(2배로 키운다)만큼 도트로 그린다
+  const sceneRef = useRef<HTMLElement>(null);
+  const [bgW, setBgW] = useState(0);
+  useEffect(() => {
+    const el = sceneRef.current;
+    if (!el) return;
+    const fit = () => setBgW(Math.max(80, Math.round(el.clientWidth / 2)));
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const photo = me.avatar ? avatarUrl(me.id, me.avatar) : null;
   const foe = run?.foe;
   const boss = !!foe?.boss;
   const aura = wGear ? (held.w!.lv >= 11 ? 4 : held.w!.lv >= 9 ? 3 : held.w!.lv >= 7 ? 2 : held.w!.lv >= 4 ? 1 : 0) : 0;
@@ -228,12 +220,21 @@ export function DungeonTab({ odds, wiki, me, goEnhance }: { odds: Odds; wiki: Wi
 
   return (
     <div className="sim dun">
-      <section className={`panel dun-scene${boss ? " dun-boss" : ""}${run?.over ? " dun-over" : ""}`}>
+      <section ref={sceneRef} className={`panel dun-scene${boss ? " dun-boss" : ""}${run?.over ? " dun-over" : ""}`}>
         <div className="dun-bg" aria-hidden>
-          <i className="dun-torch dun-torch-l" />
-          <i className="dun-torch dun-torch-r" />
-          <div key={run?.floor ?? 0} className="dun-ground">
-            <span />
+          {bgW > 0 && <img className="dun-bgimg" src={backdrop(bgW, 125, boss)} alt="" />}
+          {[14, 86].map((x) => (
+            <span key={x} className="dun-torch" style={{ left: `${x}%` }}>
+              <i className="dun-torch-glow" />
+              {flames().map((f, i) => (
+                <img key={i} src={f} alt="" className={`dun-flame dun-flame-${i}`} />
+              ))}
+            </span>
+          ))}
+          <div key={run?.floor ?? 0} className="dun-dust">
+            {[12, 30, 47, 63, 81].map((x, i) => (
+              <i key={x} style={{ left: `${x}%`, animationDelay: `${i * 0.7}s` }} />
+            ))}
           </div>
         </div>
         <div className="dun-hud">
@@ -253,6 +254,11 @@ export function DungeonTab({ odds, wiki, me, goEnhance }: { odds: Odds; wiki: Wi
               </button>
             ))}
           </span>
+          {run && !run.over && (
+            <button type="button" className="dun-stop" onClick={stop}>
+              그만
+            </button>
+          )}
         </div>
         {boss && run && !run.over && (
           <b key={run.floor} className="dun-bossbar">
@@ -263,11 +269,12 @@ export function DungeonTab({ odds, wiki, me, goEnhance }: { odds: Odds; wiki: Wi
         <div className="dun-stage">
           {/* 용사 */}
           <div className="dun-hero">
+            <i className="dun-shadow" aria-hidden />
             <div key={`h${hitKey.hero}`} className={"dun-hero-body" + (hitKey.hero ? " dun-hurt" : "")}>
               <div key={`s${hitKey.swing}`} className={"dun-lunge" + (hitKey.swing ? " dun-swing" : "")}>
-                <HeroSprite job={job} armorLv={aGear ? held.a!.lv : null} />
+                <HeroSprite job={job} armorLv={aGear ? held.a!.lv : null} photo={photo} />
                 {wGear?.icon && (
-                  <span className={`dun-weapon dun-aura-${aura}`}>
+                  <span className={`dun-weapon dun-aura-${aura}${photo ? " dun-weapon-photo" : ""}`}>
                     <i className="dun-weapon-glow" aria-hidden />
                     <PicImg pic={wGear.icon} max={26} />
                   </span>
@@ -289,8 +296,19 @@ export function DungeonTab({ odds, wiki, me, goEnhance }: { odds: Odds; wiki: Wi
                 <i style={{ transform: `scaleX(${Math.max(0, run!.mhp / foe.hp)})` }} />
                 <small>{short(Math.max(0, run!.mhp))}</small>
               </div>
-              <div key={`f${hitKey.mon}`} className={"dun-mon-body" + (hitKey.mon ? " dun-flash" : "")}>
-                {foe.img ? <PicImg pic={foe.img} max={boss ? 72 : 52} /> : <b className="dun-noimg">?</b>}
+              <div className="dun-mon-wrap">
+                <i className="dun-shadow" aria-hidden />
+                <div key={`f${hitKey.mon}`} className={"dun-mon-body" + (hitKey.mon ? " dun-flash" : "")}>
+                  {foe.img ? <PicImg pic={foe.img} scale={monScale(foe.img.h, boss)} /> : <b className="dun-noimg">?</b>}
+                </div>
+                {hitKey.swing > 0 && !run!.dying && (
+                  <span key={`x${hitKey.swing}`} className="dun-hitfx" aria-hidden>
+                    <img src={slashArc()} alt="" className="dun-slash" />
+                    {[0, 1, 2, 3, 4, 5].map((i) => (
+                      <i key={i} style={{ ["--a" as string]: `${i * 60 + 15}deg` }} />
+                    ))}
+                  </span>
+                )}
               </div>
               <small className="dun-name">
                 {foe.name} <em>Lv.{foe.level}</em>
@@ -324,11 +342,6 @@ export function DungeonTab({ odds, wiki, me, goEnhance }: { odds: Odds; wiki: Wi
               {run?.over ? "다시 도전" : "도전"} <small>1코인</small>
             </button>
           </div>
-        )}
-        {run && !run.over && (
-          <button type="button" className="dun-stop" onClick={stop}>
-            그만
-          </button>
         )}
       </section>
 
