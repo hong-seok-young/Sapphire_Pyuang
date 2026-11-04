@@ -3354,3 +3354,33 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .sim-stamp { top: 26px; white-space: nowrap; }
 .sim-win { top: 36px; padding: 3px 16px; font-size: 24px; color: var(--edge); text-shadow: none; background: linear-gradient(180deg, #fff1b8, #f2a93b);
   border: var(--px) solid var(--edge); box-shadow: 0 0 0 2px rgba(255, 243, 196, 0.5), 0 0 18px rgba(255, 195, 92, 0.85); }
+
+/* 시세 동향 골드 호가창 (제작자 2026-11-04 초안 C 에서 이것만): 시세마다 파는 사람 수(왼쪽 파랑)·사는 사람 수(오른쪽 빨강), 지금 시세 줄 금색, 줄을 누르면 그 시세의 사람 */
+.trend-book { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; margin: 8px 0 10px; }
+.trend-book-h { display: grid; grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); font-size: 10px; color: var(--muted); text-align: center; margin-bottom: 2px; }
+.trend-book-item { display: grid; grid-template-columns: minmax(0, 1fr); }
+.trend-book-row { display: grid; grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); align-items: center; width: 100%; height: 20px; padding: 0; background: transparent; border: 0;
+  animation: trend-book-in 0.4s ease-out both; }
+.trend-book-row > b { text-align: center; font-size: 12px; font-weight: normal; }
+.trend-book-now { background: rgba(255, 195, 92, 0.1); }
+.trend-book-now > b { color: var(--gold); }
+.trend-book-open { background: rgba(255, 255, 255, 0.06); }
+.trend-book-l, .trend-book-r { display: flex; align-items: center; gap: 4px; height: 12px; min-width: 0; }
+.trend-book-l { justify-content: flex-end; }
+.trend-book-l small { order: 2; }
+.trend-book-l i { order: 1; }
+.trend-book-row small { flex: none; width: 20px; font-size: 10px; color: var(--muted); }
+.trend-book-l small { text-align: right; }
+.trend-book-row i { display: block; height: 100%; animation: trend-book-grow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.trend-book-l i { background: linear-gradient(270deg, #5d9bff, rgba(93, 155, 255, 0.25)); transform-origin: right; }
+.trend-book-r i { background: linear-gradient(90deg, #ff6464, rgba(255, 100, 100, 0.25)); transform-origin: left; }
+.trend-book-who { display: grid; gap: 4px; padding: 4px 0 6px; animation: trend-book-in 0.3s ease-out both; }
+@keyframes trend-book-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes trend-book-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { .trend-book-row, .trend-book-row i, .trend-book-who { animation: none; } }
+.sim-shop-locked { opacity: 0.45; }
+.sim-buy-lock { display: grid; place-items: center; background: rgba(169, 162, 207, 0.15); color: var(--muted); font-weight: normal; font-size: 12px; border: var(--px) solid var(--edge); }
+.sim-shop-clear { flex: none; font-size: 11px; color: var(--gold); }
+.trend-book-side { font-size: 11px; }
+.trend-book-side-s { color: #8fb4ff; }
+.trend-book-side-b { color: #ff8a8a; }

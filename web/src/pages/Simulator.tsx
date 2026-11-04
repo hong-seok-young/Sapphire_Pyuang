@@ -9,7 +9,7 @@ import { useEntryState } from "../router";
 import { BOX_CATS, GEM_NAMES, atLeast, boxFor, boxOf, boxesOf, expectedTo, gemSynth, optionFor, optionSources, pick, repairItems, scrollsOf, stepsExpected, stepsOf, tierOf } from "../sim";
 import type { Box, Dist, OptItem, OptSource, Part, Scroll, Steps } from "../sim";
 import { Loading, PicImg, TopBar } from "../ui";
-import { ARMOR_SLOTS, GEAR_JOBS, gearOf, gearPower, gearStat, loadHeld, saveHeld } from "../simGear";
+import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, gearOf, gearPower, gearStat, loadCleared, loadHeld, saveCleared, saveHeld } from "../simGear";
 import type { ArmorSlot, Gear, GearJob, Held } from "../simGear";
 import type { Wiki } from "../types";
 import { JOB_NAME } from "../auth";
@@ -452,8 +452,9 @@ function Gauge({ c, keep, onDone }: { c: Charge; keep: boolean; onDone: () => vo
 }
 
 /** 장비 상점: 실제 장비를 +0(노작)으로 산다. 레벨이 높을수록 비싸다 (src/simGear.ts) */
-function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClose }: {
+function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClose, cleared }: {
   gears: Gear[];
+  cleared: Set<string>;
   part: Part;
   job: GearJob;
   setJob: (j: GearJob) => void;
@@ -494,8 +495,10 @@ function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClo
         )}
       </div>
       <ul className="sim-shop-list">
-        {list.map((g, i) => (
-          <li key={g.name} style={{ animationDelay: `${Math.min(i, 14) * 25}ms` }}>
+        {list.map((g, i) => {
+          const open = canBuy(list, i, cleared);
+          return (
+          <li key={g.name} className={open ? "" : "sim-shop-locked"} style={{ animationDelay: `${Math.min(i, 14) * 25}ms` }}>
             <span className="sim-shop-pic">{g.icon ? <PicImg pic={g.icon} max={28} /> : null}</span>
             <span className="sim-shop-name">
               <b>{g.name}</b>
@@ -503,12 +506,18 @@ function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClo
                 Lv.{g.lv} · {part === "무기" ? `공격 ${gearStat(g, 0)}` : gearStat(g, 0)}
               </small>
             </span>
-            <button type="button" className="btn sim-buy" disabled={coins === null || coins < g.price} onClick={() => onBuy(g)}>
-              {g.price}
-              <small>코인</small>
-            </button>
+            {cleared.has(g.name) && <span className="sim-shop-clear">+{CLEAR_LV[part]}</span>}
+            {open ? (
+              <button type="button" className="btn sim-buy" disabled={coins === null || coins < g.price} onClick={() => onBuy(g)}>
+                {g.price}
+                <small>코인</small>
+              </button>
+            ) : (
+              <span className="sim-buy sim-buy-lock">잠김</span>
+            )}
           </li>
-        ))}
+          );
+        })}
         {!list.length && <li className="sim-muted">이 칸에 강화할 수 있는 장비가 없어요</li>}
       </ul>
     </section>
@@ -536,6 +545,14 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
     saveHeld(me.id, of, h);
   };
   const gear = held ? gears.find((g) => g.part === part && g.name === held.name) : undefined;
+  // 앞 장비를 +8(방어구 +6)까지 올려야 다음 장비를 산다 (simGear.ts CLEAR_LV)
+  const [cleared, setCleared] = useState<Set<string>>(() => loadCleared(me.id));
+  const shopList = (g: Gear) => gears.filter((x) => x.part === g.part && (g.part === "무기" ? x.kind === g.kind : x.kind === g.kind && x.jobs.includes(job)));
+  const buyable = (g: Gear) => {
+    const list = shopList(g);
+    const i = list.findIndex((x) => x.name === g.name);
+    return i >= 0 && canBuy(list, i, cleared);
+  };
   const [shop, setShop] = useState(false);
   const lv = held?.lv ?? 0;
   const broken = held?.broken ?? false;
@@ -562,7 +579,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
     setCombo(0);
   };
   const buy = (g: Gear) => {
-    if (coins.coins === null || coins.coins < g.price || coins.take(g.price) < g.price) return;
+    if (!buyable(g) || coins.coins === null || coins.coins < g.price || coins.take(g.price) < g.price) return;
     clearFx();
     setHeld({ name: g.name, lv: 0, broken: false, tries: 0, tainted: false });
     setStats((s) => ({ ...s, coins: s.coins + g.price }));
@@ -603,6 +620,13 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
       if (ok && !h.tainted) emit({ kind: "enh", part: scroll.part, scroll: scroll.name, level: cur + 1, combo: comboRef.current });
       setStats((s) => ({ ...s, tries: s.tries + 1, coins: s.coins + 1, broke: s.broke + (!ok && !scroll.keep && p < 1 ? 1 : 0), best: Math.max(s.best, ok ? cur + 1 : cur) }));
       setLog((l) => [...l.slice(-39), { to: cur + 1, ok, broke: !ok && !scroll.keep }]);
+      if (ok && cur + 1 >= CLEAR_LV[scroll.part])
+        setCleared((c) => {
+          if (c.has(g.name)) return c;
+          const n = new Set(c).add(g.name);
+          saveCleared(me.id, n);
+          return n;
+        });
       if (ok) {
         heldRef.current = { ...h, lv: cur + 1, tries };
         setHeld(heldRef.current, scroll.part);
@@ -726,6 +750,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
           onBuy={buy}
           coins={coins.coins}
           onClose={gear ? () => setShop(false) : undefined}
+          cleared={cleared}
         />
       ) : (
         <>
@@ -821,7 +846,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
 
           {broken ? (
             <div className="sim-actions sim-actions-2">
-              <button type="button" className="btn sim-go" disabled={coins.coins === null || coins.coins < gear!.price} onClick={() => buy(gear!)}>
+              <button type="button" className="btn sim-go" disabled={!buyable(gear!) || coins.coins === null || coins.coins < gear!.price} onClick={() => buy(gear!)}>
                 다시 사기 <small>{gear!.price}코인</small>
               </button>
               <button type="button" className="btn btn-ghost" onClick={() => setShop(true)}>
