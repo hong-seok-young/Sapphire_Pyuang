@@ -3225,94 +3225,105 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .trend-book-side-s { color: #8fb4ff; }
 .trend-book-side-b { color: #ff8a8a; }
 
-/* ---------------------------------------------------------------- 확률 시뮬레이터 던전 (제작자 2026-11-04 '내가 강화한 거 입히는 거임', 우리 디자인으로)
-   밤하늘 남색 벽, 돌바닥, 횃불, 금색 층 표시. 움직임은 transform·opacity 만 */
-.dun-scene { position: relative; height: 250px; padding: 0; overflow: hidden; background: linear-gradient(180deg, #121633 0%, #1c1d4e 55%, #2b205b 100%); }
-.dun-boss { background: linear-gradient(180deg, #2a1024 0%, #3a1630 55%, #4a1b2e 100%); }
+/* ---------------------------------------------------------------- 확률 시뮬레이터 던전 (제작자 2026-11-04 '내가 강화한 거 입히는 거임', 우리 디자인으로, '그림이 허접하다')
+   뒷배경·용사·불꽃·베기 빛은 pixelArt.ts 가 도트로 그려 2배로 키운다. 움직임은 transform·opacity 만 */
+.dun-scene { position: relative; height: 250px; padding: 0; overflow: hidden; background: #0d0b1e; }
 .dun-bg { position: absolute; inset: 0; pointer-events: none; }
-.dun-bg::before { content: ""; position: absolute; inset: 0 0 46px; opacity: 0.35;
-  background: repeating-linear-gradient(90deg, transparent 0 46px, rgba(7, 6, 15, 0.55) 46px 50px), repeating-linear-gradient(0deg, transparent 0 22px, rgba(111, 143, 255, 0.08) 22px 24px); }
-.dun-ground { position: absolute; left: 0; right: 0; bottom: 0; height: 46px; overflow: hidden; border-top: var(--px) solid #4a3f86; }
-.dun-ground span { position: absolute; inset: 0 -50% 0 0; background: repeating-linear-gradient(90deg, #2b2450 0 30px, #251f47 30px 32px), #2b2450;
-  animation: dun-walk 0.5s ease-out; }
-.dun-ground::after { content: ""; position: absolute; inset: 22px 0 0; background: repeating-linear-gradient(90deg, #211b3e 0 18px, #1b1634 18px 20px); }
-@keyframes dun-walk { from { transform: translateX(-30%); } to { transform: none; } }
-.dun-torch { position: absolute; top: 58px; width: 8px; height: 14px; background: #ffb24a; box-shadow: 0 0 0 2px #7a3b12; animation: dun-flame 0.6s steps(2) infinite; }
-.dun-torch::after { content: ""; position: absolute; left: -10px; top: -10px; width: 28px; height: 28px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 178, 74, 0.35), transparent 70%); }
-.dun-torch-l { left: 14px; }
-.dun-torch-r { right: 14px; animation-delay: 0.3s; }
-@keyframes dun-flame { 0% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(0.8) translateY(2px); opacity: 0.8; } }
+.dun-bgimg { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.dun-torch { position: absolute; top: 66px; width: 16px; height: 24px; margin-left: -8px; }
+.dun-torch-glow { position: absolute; left: -26px; top: -24px; width: 68px; height: 68px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 170, 70, 0.32), transparent 70%); animation: dun-glow-pulse 1.8s ease-in-out infinite; }
+.dun-boss .dun-torch-glow { background: radial-gradient(circle, rgba(255, 80, 80, 0.36), transparent 70%); }
+@keyframes dun-glow-pulse { 50% { opacity: 0.7; transform: scale(0.92); } }
+.dun-flame { position: absolute; inset: 0; width: 16px; height: 24px; image-rendering: pixelated; opacity: 0; animation: dun-flame 0.45s steps(1) infinite; }
+.dun-flame-1 { animation-delay: 0.15s; }
+.dun-flame-2 { animation-delay: 0.3s; }
+@keyframes dun-flame { 0% { opacity: 1; } 33.4% { opacity: 0; } }
+.dun-dust i { position: absolute; bottom: 60px; width: 2px; height: 2px; background: rgba(200, 190, 255, 0.5); animation: dun-dust 4s linear infinite; }
+@keyframes dun-dust { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(14px, -130px); opacity: 0; } }
 .dun-hud { position: absolute; left: 8px; right: 8px; top: 8px; z-index: 3; display: flex; align-items: center; gap: 8px; }
-.dun-floor { font-size: 18px; color: var(--gold); text-shadow: 2px 2px 0 var(--edge); white-space: nowrap; }
+.dun-floor { font-size: 18px; color: var(--gold); text-shadow: 2px 2px 0 var(--edge), -1px -1px 0 var(--edge); white-space: nowrap; }
 .dun-floor i { font-style: normal; color: var(--sapphire); margin-right: 4px; font-size: 12px; }
 .dun-pips { display: flex; gap: 3px; flex: 1; min-width: 0; }
-.dun-pips i { flex: 1; height: 6px; max-width: 18px; background: rgba(7, 6, 15, 0.6); border: 1px solid #4a3f86; }
+.dun-pips i { flex: 1; height: 6px; max-width: 18px; background: rgba(7, 6, 15, 0.7); border: 1px solid #4a3f86; }
 .dun-pips i.done { background: var(--sapphire); }
 .dun-pips i.now { background: var(--gold); animation: sim-blink 0.8s ease-in-out infinite; }
 .dun-pips i.boss { border-color: var(--red); }
 .dun-speed { display: flex; gap: 2px; }
-.dun-speed button { padding: 1px 6px; font-size: 11px; color: var(--muted); background: rgba(7, 6, 15, 0.55); border: 1px solid #4a3f86; }
+.dun-speed button { padding: 1px 6px; font-size: 11px; color: var(--muted); background: rgba(7, 6, 15, 0.65); border: 1px solid #4a3f86; }
 .dun-speed button.on { color: var(--edge); background: var(--gold); border-color: var(--edge); }
 .dun-bossbar { position: absolute; left: 50%; top: 34px; z-index: 3; padding: 1px 14px; font-size: 14px; letter-spacing: 3px; color: #fff; background: var(--red);
   border: var(--px) solid var(--edge); animation: dun-boss-in 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
 @keyframes dun-boss-in { 0% { transform: translateX(-50%) scale(2.2); opacity: 0; } 100% { transform: translateX(-50%); opacity: 1; } }
-.dun-stage { position: absolute; left: 0; right: 0; bottom: 40px; height: 150px; }
-.dun-hero { position: absolute; left: 14%; bottom: 0; display: grid; justify-items: center; gap: 3px; }
-.dun-hero-body { animation: dun-bob 1.2s ease-in-out infinite; }
-.dun-hurt { animation: dun-hurt 0.3s ease-out, dun-bob 1.2s 0.3s ease-in-out infinite; }
-@keyframes dun-bob { 50% { transform: translateY(-3px); } }
-@keyframes dun-hurt { 0%, 100% { transform: none; opacity: 1; } 25% { transform: translateX(-5px); opacity: 0.5; } 60% { transform: translateX(3px); opacity: 1; } }
+.dun-stage { position: absolute; left: 0; right: 0; bottom: 4px; height: 190px; }
+.dun-shadow { position: absolute; left: 50%; bottom: -4px; width: 52px; height: 10px; margin-left: -26px; border-radius: 50%; background: rgba(4, 3, 12, 0.55); }
+.dun-hero { position: absolute; left: 12%; bottom: 22px; display: grid; justify-items: center; gap: 3px; }
+.dun-hero > .dun-shadow { bottom: 26px; }
+.dun-hero-body { position: relative; animation: dun-bob 1.4s ease-in-out infinite; }
+.dun-hurt { animation: dun-hurt 0.3s ease-out, dun-bob 1.4s 0.3s ease-in-out infinite; }
+@keyframes dun-bob { 50% { transform: translateY(-2px); } }
+@keyframes dun-hurt { 0%, 100% { transform: none; opacity: 1; } 25% { transform: translateX(-5px); opacity: 0.45; } 60% { transform: translateX(3px); opacity: 1; } }
 .dun-lunge { position: relative; }
-.dun-swing { animation: dun-lunge 0.22s ease-out; }
-@keyframes dun-lunge { 40% { transform: translateX(16px); } 100% { transform: none; } }
-.dun-sprite { display: block; image-rendering: pixelated; }
-.dun-weapon { position: absolute; right: -18px; top: 30px; display: grid; place-items: center; width: 30px; height: 30px; transform: rotate(-35deg); transform-origin: 20% 80%; }
-.dun-swing .dun-weapon { animation: dun-slash 0.22s ease-out; }
-@keyframes dun-slash { 0% { transform: rotate(-80deg); } 50% { transform: rotate(30deg); } 100% { transform: rotate(-35deg); } }
-.dun-weapon img { position: relative; z-index: 1; image-rendering: pixelated; }
-.dun-weapon-glow { position: absolute; inset: -6px; border-radius: 50%; opacity: 0; }
-.dun-aura-1 .dun-weapon-glow { opacity: 1; background: radial-gradient(circle, rgba(111, 143, 255, 0.7), transparent 65%); animation: dun-glow 1.6s ease-in-out infinite; }
-.dun-aura-2 .dun-weapon-glow { opacity: 1; background: radial-gradient(circle, rgba(180, 120, 255, 0.8), transparent 65%); animation: dun-glow 1.3s ease-in-out infinite; }
-.dun-aura-3 .dun-weapon-glow { opacity: 1; background: radial-gradient(circle, rgba(255, 195, 92, 0.9), transparent 65%); animation: dun-glow 1s ease-in-out infinite; }
+.dun-swing { animation: dun-lunge 0.24s ease-out; }
+@keyframes dun-lunge { 35% { transform: translateX(18px); } 100% { transform: none; } }
+.dun-sprite { position: relative; display: block; width: 64px; height: 80px; }
+.dun-sprite img { position: absolute; inset: 0; width: 64px; height: 80px; image-rendering: pixelated; }
+.dun-breath { opacity: 0; animation: dun-breath 1.4s steps(1) infinite; }
+@keyframes dun-breath { 50% { opacity: 1; } }
+.dun-photo { display: block; max-height: 96px; max-width: 80px; image-rendering: pixelated; filter: drop-shadow(0 0 0 transparent); }
+.dun-weapon { position: absolute; right: -14px; top: 38px; display: grid; place-items: center; width: 32px; height: 32px; transform: rotate(-35deg); transform-origin: 25% 80%; }
+.dun-weapon-photo { top: 42px; right: -18px; }
+.dun-swing .dun-weapon { animation: dun-slash 0.24s ease-out; }
+@keyframes dun-slash { 0% { transform: rotate(-90deg); } 45% { transform: rotate(40deg); } 100% { transform: rotate(-35deg); } }
+.dun-weapon img { position: relative; z-index: 1; image-rendering: pixelated; transform: scale(1.3); }
+.dun-weapon-glow { position: absolute; inset: -8px; border-radius: 50%; opacity: 0; }
+.dun-aura-1 .dun-weapon-glow { opacity: 1; background: radial-gradient(circle, rgba(111, 143, 255, 0.75), transparent 65%); animation: dun-glow 1.6s ease-in-out infinite; }
+.dun-aura-2 .dun-weapon-glow { opacity: 1; background: radial-gradient(circle, rgba(180, 120, 255, 0.85), transparent 65%); animation: dun-glow 1.3s ease-in-out infinite; }
+.dun-aura-3 .dun-weapon-glow { opacity: 1; background: radial-gradient(circle, rgba(255, 195, 92, 0.95), transparent 65%); animation: dun-glow 1s ease-in-out infinite; }
 .dun-aura-4 .dun-weapon-glow { opacity: 1; background: conic-gradient(#ff6b6b, #ffc35c, #7ee2a8, #6f8fff, #c79bff, #ff6b6b); -webkit-mask: radial-gradient(circle, #000 25%, transparent 68%); mask: radial-gradient(circle, #000 25%, transparent 68%); animation: sim-spin 1.4s linear infinite; }
 @keyframes dun-glow { 50% { transform: scale(1.25); opacity: 0.6; } }
-.dun-name { font-size: 10px; color: var(--text); text-shadow: 1px 1px 0 var(--edge); white-space: nowrap; }
+.dun-name { font-size: 10px; color: var(--text); text-shadow: 1px 1px 0 var(--edge), -1px -1px 0 var(--edge); white-space: nowrap; }
 .dun-name em { font-style: normal; color: var(--muted); }
-.dun-hpbar { position: relative; width: 56px; height: 6px; background: rgba(7, 6, 15, 0.7); border: 1px solid var(--edge); }
+.dun-hpbar { position: relative; width: 60px; height: 6px; background: rgba(7, 6, 15, 0.8); border: 1px solid var(--edge); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08); }
 .dun-hpbar i { position: absolute; inset: 0; transform-origin: left; transition: transform 0.15s ease-out; }
-.dun-hpbar-hero i { background: #5fd38a; }
-.dun-hpbar-hero i.mid { background: var(--gold); }
-.dun-hpbar-hero i.low { background: var(--red); }
-.dun-hpbar-mon { width: 72px; }
-.dun-hpbar-mon i { background: #e05a6a; }
-.dun-hpbar-mon small { position: absolute; left: 0; right: 0; top: -13px; font-size: 9px; text-align: center; color: var(--muted); }
-.dun-mon { position: absolute; right: 12%; bottom: 0; display: grid; justify-items: center; gap: 4px; animation: dun-mon-in 0.35s ease-out both; }
-@keyframes dun-mon-in { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
-.dun-mon-body { display: grid; place-items: center; min-height: 56px; transform-origin: bottom; }
-.dun-mon-body img { image-rendering: pixelated; transform: scale(1.5); transform-origin: bottom; }
-.dun-mon-boss .dun-mon-body img { transform: scale(1.9); }
+.dun-hpbar-hero i { background: linear-gradient(180deg, #8af0b0 0 40%, #3fbf7a 40%); }
+.dun-hpbar-hero i.mid { background: linear-gradient(180deg, #ffe08a 0 40%, #e0a830 40%); }
+.dun-hpbar-hero i.low { background: linear-gradient(180deg, #ff9a9a 0 40%, #d84a4a 40%); }
+.dun-hpbar-mon { width: 76px; }
+.dun-hpbar-mon i { background: linear-gradient(180deg, #ff8a96 0 40%, #c83a4c 40%); }
+.dun-hpbar-mon small { position: absolute; left: 0; right: 0; top: -13px; font-size: 9px; text-align: center; color: var(--text); text-shadow: 1px 1px 0 var(--edge); }
+.dun-mon { position: absolute; right: 10%; bottom: 22px; display: grid; justify-items: center; gap: 5px; animation: dun-mon-in 0.35s ease-out both; }
+@keyframes dun-mon-in { from { transform: translateX(36px); opacity: 0; } to { transform: none; opacity: 1; } }
+.dun-mon-wrap { position: relative; display: grid; place-items: end center; min-height: 64px; }
+.dun-mon-wrap > .dun-shadow { bottom: -3px; }
+.dun-mon-body { position: relative; display: grid; place-items: end center; }
+.dun-mon-body img { image-rendering: pixelated; }
 .dun-flash { animation: dun-flash 0.2s ease-out; }
-@keyframes dun-flash { 0% { opacity: 1; transform: none; } 30% { opacity: 0.35; transform: translateX(4px); } 100% { opacity: 1; transform: none; } }
+@keyframes dun-flash { 0% { opacity: 1; transform: none; } 30% { opacity: 0.4; transform: translateX(5px); } 100% { opacity: 1; transform: none; } }
 .dun-dead .dun-mon-body { animation: dun-die 0.5s ease-in forwards; }
-@keyframes dun-die { 0% { opacity: 1; transform: none; } 30% { transform: translateY(-6px) rotate(-6deg); } 100% { opacity: 0; transform: translateY(14px) rotate(12deg) scale(0.8); } }
+@keyframes dun-die { 0% { opacity: 1; transform: none; } 30% { transform: translateY(-8px) rotate(-6deg); } 100% { opacity: 0; transform: translateY(14px) rotate(14deg) scale(0.8); } }
+.dun-hitfx { position: absolute; left: 50%; bottom: 30%; width: 0; height: 0; pointer-events: none; z-index: 2; }
+.dun-slash { position: absolute; left: -36px; top: -32px; width: 64px; height: 64px; image-rendering: pixelated; animation: dun-slash-fx 0.28s ease-out forwards; }
+@keyframes dun-slash-fx { 0% { transform: scale(0.4) rotate(-30deg); opacity: 0; } 30% { opacity: 1; } 100% { transform: scale(1.15) rotate(15deg); opacity: 0; } }
+.dun-hitfx i { position: absolute; width: 4px; height: 4px; margin: -2px; background: #fff3c4; box-shadow: 0 0 0 1px rgba(255, 178, 74, 0.8); animation: dun-spark 0.4s ease-out forwards; }
+@keyframes dun-spark { 0% { transform: rotate(var(--a)) translateX(0); opacity: 1; } 100% { transform: rotate(var(--a)) translateX(26px); opacity: 0; } }
 .dun-noimg { font-size: 30px; color: var(--muted); }
-.dun-pop { position: absolute; bottom: 92px; z-index: 4; font-size: 14px; color: #fff; text-shadow: 2px 2px 0 var(--edge); pointer-events: none; white-space: nowrap;
-  animation: dun-pop 0.9s ease-out forwards; }
-.dun-pop-mon { right: calc(12% + 18px); }
-.dun-pop-hero { left: calc(14% + 8px); }
-.dun-pop-crit { font-size: 20px; color: var(--gold); }
+.dun-pop { position: absolute; bottom: 110px; z-index: 4; font-size: 15px; color: #fff; pointer-events: none; white-space: nowrap;
+  text-shadow: 2px 0 0 var(--edge), -2px 0 0 var(--edge), 0 2px 0 var(--edge), 0 -2px 0 var(--edge); animation: dun-pop 0.9s ease-out forwards; }
+.dun-pop-mon { right: calc(10% + 22px); }
+.dun-pop-hero { left: calc(12% + 14px); }
+.dun-pop-crit { font-size: 22px; color: var(--gold); }
 .dun-pop-hurt { color: #ff8a8a; font-size: 12px; }
 .dun-pop-heal { color: #7ee2a8; font-size: 12px; }
 @keyframes dun-pop { 0% { transform: translate(var(--dx), 6px) scale(0.6); opacity: 0; } 15% { transform: translate(var(--dx), -4px) scale(1.15); opacity: 1; } 100% { transform: translate(var(--dx), -34px) scale(1); opacity: 0; } }
 .dun-pop-crit { animation-name: dun-crit; }
-@keyframes dun-crit { 0% { transform: translate(var(--dx), 6px) scale(2); opacity: 0; } 15% { transform: translate(var(--dx), -6px) scale(1.1); opacity: 1; } 100% { transform: translate(var(--dx), -38px) scale(1); opacity: 0; } }
+@keyframes dun-crit { 0% { transform: translate(var(--dx), 6px) scale(2); opacity: 0; } 15% { transform: translate(var(--dx), -6px) scale(1.1); opacity: 1; } 100% { transform: translate(var(--dx), -40px) scale(1); opacity: 0; } }
 .dun-overlay { position: absolute; inset: 0; z-index: 5; display: grid; place-content: center; justify-items: center; gap: 6px; background: rgba(10, 9, 24, 0.62); animation: sim-drop 0.3s ease-out both; }
 .dun-result { font-size: 30px; color: var(--gold); text-shadow: 3px 3px 0 var(--edge); }
 .dun-result-sm { font-size: 20px; }
 .dun-overlay small { font-size: 12px; color: var(--muted); }
 .dun-overlay .btn { min-width: 140px; }
 .dun-overlay .btn small { color: inherit; }
-.dun-stop { position: absolute; right: 8px; bottom: 8px; z-index: 4; padding: 2px 8px; font-size: 11px; color: var(--muted); background: rgba(7, 6, 15, 0.6); border: 1px solid #4a3f86; }
+.dun-stop { flex: none; padding: 1px 6px; font-size: 11px; color: var(--muted); background: rgba(7, 6, 15, 0.7); border: 1px solid #4a3f86; }
 .dun-gear { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .dun-slot { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 6px; text-align: left; background: var(--panel); border: var(--px) solid var(--edge); }
 .dun-slot-empty { opacity: 0.7; }
