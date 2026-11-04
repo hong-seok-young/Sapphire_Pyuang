@@ -1,5 +1,5 @@
 // 강화 비교 (개발중, 제작자 요청 2026-11-04: '8윙의날개와 8헌터보우 입력하면 이제 몇 퍼센트가 강해지는지', 같은 날 '콤팩트하게, 고도화').
-// 자료는 data/enhance.json (scripts/build_enhance.py: 카페 글 331665 첨부 '무기 강화수치 26.10' + 위키 장비 표).
+// 자료는 data/enhance.json (scripts/build_enhance.py: 카페 글 331665 첨부 '무기 강화수치 26.10' 의 무기 42개만, 제작자 2026-11-04 '내가 준 강화 데이터에 있는 무기들만').
 // 강화 데미지 = 기본 데미지 x (1 + 가산값 / 100): 전사·레인저·무도가는 공통 가산치, 마법사는 무기마다 다른 가산치.
 // 화면: 무기마다 한 줄(그림 · 이름 칸 · − +N +), 결과(평균 % 차이, 최소·최대, 같은 데미지가 되는 강화), 톡방 시세(시세 동향 자료),
 // 바꿀 무기 강화별 표(+N 마다 지금 무기 대비 %, 같은 강화끼리는 견주지 않는다: 제작자 2026-11-04 '그래프는 뭐고 같은 강화끼리 비교하면 뭐해').
@@ -21,13 +21,22 @@ const JOBS = ["전사", "레인저", "마법사", "무도가"] as const;
 const jobWeapons = (d: Enhance, job: string) =>
   d.weapons.filter((w) => w.job === job).sort((a, b) => (a.lv ?? 0) - (b.lv ?? 0) || Number(!a.bonus) - Number(!b.bonus) || a.name.localeCompare(b.name));
 
-/** '8윙의날개', '+8 윙의날개', '8강 윙의날개', '팔헌보' -> 강화와 이름 */
-function parse(text: string): { plus: number | null; name: string } {
-  const m = text.trim().match(/^\+?\s*(\d{1,2}|[일이삼사오육칠팔구십](?=\s*강|[^\s]))?\s*강?\s*(.*)$/);
+/** '8윙의날개', '+8 윙의날개', '8강 윙의날개', '팔헌보' -> 강화와 이름. korean 이면 앞의 한글 숫자(팔 = 8)도 강화로 읽는다 */
+function parse(text: string, korean = true): { plus: number | null; name: string } {
+  const re = korean ? /^\+?\s*(\d{1,2}|[일이삼사오육칠팔구십](?=\s*강|[^\s]))?\s*강?\s*(.*)$/ : /^\+?\s*(\d{1,2})?\s*강?\s*(.*)$/;
+  const m = text.trim().match(re);
   if (!m) return { plus: null, name: text.trim() };
   const raw = m[1];
   const plus = raw === undefined ? null : raw in KNUM ? KNUM[raw] : Number(raw);
   return { plus, name: m[2].trim() };
+}
+
+/** 두 가지로 읽어 본다: 한글 숫자를 강화로 안 읽은 것('오염된 순수', '이터니티'), 읽은 것('팔헌보'). 이름이 딱 맞는 쪽, 없으면 앞의 것 */
+function readText(d: Enhance, text: string): { plus: number | null; name: string; w: EnhanceWeapon | null; qs: string[] } {
+  const reads = [parse(text, false), parse(text, true)];
+  const found = reads.map((r) => d.weapons.find((x) => key(x.name) === squeeze(key(r.name))) ?? null);
+  const i = found[0] ? 0 : found[1] ? 1 : 0;
+  return { ...reads[i], w: found[i], qs: [...new Set(reads.map((r) => squeeze(key(r.name))).filter(Boolean))] };
 }
 
 /** 이름 찾기: 같음 > 앞이 같음 > 들어 있음 > 글자가 차례로 들어 있음 (헌보 = 헌터보우) */
@@ -79,9 +88,7 @@ interface Pick {
 function initial(d: Enhance | undefined, text: string | null): Pick {
   const p: Pick = { q: text ?? "", w: null, plus: 0 };
   if (!d || !text) return p;
-  const { plus, name } = parse(text);
-  const k = squeeze(key(name));
-  const w = d.weapons.find((x) => key(x.name) === k) ?? null;
+  const { plus, w } = readText(d, text);
   return { q: text, w, plus: w ? Math.min(plus ?? 0, maxPlus(d, w)) : plus ?? 0 };
 }
 
@@ -90,26 +97,26 @@ function WeaponRow({ d, wiki, side, hint, pick, onPick, job, list, onFocus }: {
   d: Enhance; wiki: Wiki; side: "a" | "b"; hint: string; pick: Pick; onPick: (p: Pick) => void;
   job: string; list: boolean; onFocus: () => void;
 }) {
-  const { name } = parse(pick.q);
-  const q = squeeze(key(name));
-  const typing = !!q && !(pick.w && key(pick.w.name) === q);
+  const read = readText(d, pick.q);
+  const qs = read.qs;
+  const typing = qs.length > 0 && !(pick.w && read.w === pick.w);
+  const qk = qs.join("|");
   const hits = useMemo(
     () =>
       typing
         ? d.weapons
-            .map((w) => ({ w, s: score(q, w.name) }))
+            .map((w) => ({ w, s: Math.max(...qk.split("|").map((q) => score(q, w.name))) }))
             .filter((x) => x.s > 0)
             .sort((a, b) => b.s - a.s || (a.w.lv ?? 0) - (b.w.lv ?? 0))
             .slice(0, 6)
             .map((x) => x.w)
         : [],
-    [d, q, typing],
+    [d, qk, typing],
   );
   const all = useMemo(() => jobWeapons(d, job), [d, job]);
   const type = (text: string) => {
-    const r = parse(text);
-    const k = squeeze(key(r.name));
-    const w = d.weapons.find((x) => key(x.name) === k) ?? null;
+    const r = readText(d, text);
+    const w = r.w;
     const plus = r.plus ?? pick.plus;
     onPick({ q: text, w, plus: w ? Math.min(plus, maxPlus(d, w)) : plus });
   };
@@ -121,7 +128,8 @@ function WeaponRow({ d, wiki, side, hint, pick, onPick, job, list, onFocus }: {
   const at = pick.w ? mine.findIndex((w) => w.name === pick.w!.name) : -1;
   const prev = at > 0 ? mine[at - 1] : null;
   const next = at >= 0 && at < mine.length - 1 ? mine[at + 1] : null;
-  const pic = pick.w ? wiki.items[pick.w.name]?.icon : null;
+  // 엑셀 이름은 띄어 쓴 것이 있다 ('오염된 순수'): 위키 그림은 띄어쓰기를 뺀 이름으로도 찾는다
+  const pic = pick.w ? (wiki.items[pick.w.name] ?? wiki.items[key(pick.w.name)])?.icon : null;
   const top = pick.w ? maxPlus(d, pick.w) : 0;
   const cur = pick.w ? damage(d, pick.w, pick.plus) : null;
   const up = pick.w && pick.plus < top ? pct(cur!.avg, damage(d, pick.w, pick.plus + 1).avg) : null;
