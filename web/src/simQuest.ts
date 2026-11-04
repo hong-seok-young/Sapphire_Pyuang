@@ -43,9 +43,9 @@ export function todayQuests(day = kstDay()): Quest[] {
   return out;
 }
 
-/** 도박왕 점수로 칭호 */
+/** 도박의 신 점수로 칭호 (제작자 2026-11-04: 통합 순위 이름 도박왕 -> 도박의 신) */
 export function titleOf(total: number): string {
-  if (total >= 12) return "도박왕";
+  if (total >= 12) return "도박의 신";
   if (total >= 8) return "강화의 신";
   if (total >= 5) return "행운의 손";
   if (total >= 2) return "운 좋은 길드원";

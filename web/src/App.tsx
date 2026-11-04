@@ -497,7 +497,7 @@ function Wiki({
   else if (page === "trend") body = canPreview(me) ? <TrendPage wiki={wiki} /> : <DevSoon title="시세 동향" />;
   // 강화 비교 (개발중, 제작자 요청 2026-11-04): 두 무기(+강)의 데미지와 몇 % 강해지는지
   else if (page === "enhance") body = canPreview(me) ? <EnhancePage wiki={wiki} query={route.query} me={me} /> : <DevSoon title="강화 비교" />;
-  else if (page === "sim") body = canPreview(me) ? <SimulatorPage /> : <DevSoon title="확률 시뮬레이터" />;
+  else if (page === "sim") body = canPreview(me) ? <SimulatorPage wiki={wiki} me={me} /> : <DevSoon title="확률 시뮬레이터" />;
   else if (page === "log")
     body =
       RANK[me.role] >= 2 ? (
