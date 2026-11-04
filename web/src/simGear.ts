@@ -29,6 +29,9 @@ export interface Gear {
   price: number;
 }
 
+/** 상점에서 뺀 장비 (제작자 2026-11-04 '철검 회색레이피어 빼') */
+const HIDDEN = new Set(["철검", "회색레이피어"]);
+
 const num = (s: string | undefined) => {
   const v = Number(String(s ?? "").replace(/[^\d.]/g, ""));
   return Number.isFinite(v) ? v : NaN;
@@ -57,7 +60,7 @@ export function gearOf(wiki: Wiki, odds: Odds): Gear[] {
       const h = row.h ?? head;
       const cell = (name: string) => row.cells[h.indexOf(name)];
       const name = row.name.trim();
-      if (!name || /^\+|\[/.test(name) || seen.has(name)) continue;
+      if (!name || /^\+|\[/.test(name) || seen.has(name) || HIDDEN.has(name)) continue;
       if ((cell("옵션") ?? "").includes("거래불가")) continue;
       const lv = num(cell("레벨제한"));
       if (!Number.isFinite(lv) || lv < 5) continue;
