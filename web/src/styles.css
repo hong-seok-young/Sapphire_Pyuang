@@ -3242,3 +3242,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .sim-unlock { white-space: nowrap; }
 .sim-unlock small { margin-left: 4px; color: var(--gold); font-size: 11px; }
 .sim-autobuy { display: flex; justify-content: flex-end; margin-top: 6px; }
+/* 시뮬레이터 내 장비 (보관함) */
+.sim-bag-head { display: flex; align-items: baseline; gap: 6px; margin: 8px 2px 4px; }
+.sim-bag-head b { color: var(--gold); font-size: 13px; }
+.sim-bag-head small { color: var(--muted); font-size: 11px; }

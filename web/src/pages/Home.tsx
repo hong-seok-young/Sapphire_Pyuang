@@ -206,11 +206,9 @@ export function Home({ me }: { me: Me }) {
   // 검색은 아래 탭에 있으면 홈에 검색 칸을 두지 않고, 홈으로 올리면 맨 위에 검색 칸이 생긴다 (제작자 요청 2026-11-01)
   const hasSearch = searchUp(layout);
   // 열린 칸만 홈 격자에 보이고, 개발 중·검토 후 오픈 칸은 그 아래 접힌 '개발 중' 묶음에 (제작자 요청 2026-11-02: 평소에는 접혀서 안 보이게)
-  const allSoon = gridSlots(layout)
+  const soon = gridSlots(layout)
     .map(itemOf)
     .filter((t): t is LaunchItem => !!t && canSee(t, me) && !!t.soon);
-  // 길드원 중 시뮬레이터를 쓰는 사람(launcher.ts canSim)은 그 칸만 보인다 (제작자 2026-11-04 '달팽이랑 간다이도 보게')
-  const soon = canPreview(me) || !allSoon.some((t) => t.sim) ? allSoon : allSoon.filter((t) => t.sim);
   const [showSoon, setShowSoon] = useState(false);
   const foldNews = useNews();
   const dragKey = L.drag?.moved ? L.drag.key : undefined;
@@ -309,7 +307,7 @@ export function Home({ me }: { me: Me }) {
           </button>
           {/* 안의 칸은 운영진(길드마스터, 오피서)과 앱개발자만 (제작자 요청 2026-11-02). 길드원은 단추만 */}
           {showSoon &&
-            (canPreview(me) || soon.some((t) => t.sim) ? (
+            (canPreview(me) ? (
               <Tiles me={me} tiles={soon} />
             ) : (
               <p className="soon-closed">운영진에게만 보여요</p>
