@@ -9,14 +9,16 @@ import { useEntryState } from "../router";
 import { BOX_CATS, GEM_NAMES, atLeast, boxFor, boxOf, boxesOf, expectedTo, gemSynth, optionFor, optionSources, pick, repairItems, scrollsOf, stepsExpected, stepsOf, tierOf } from "../sim";
 import type { Box, Dist, OptItem, OptSource, Part, Scroll, Steps } from "../sim";
 import { Loading, PicImg, TopBar } from "../ui";
-import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, gearOf, gearPower, gearStat, loadCleared, loadHeld, saveCleared, saveHeld, unlockCost } from "../simGear";
+import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, gearOf, gearPower, gearStat, unlockCost } from "../simGear";
 import type { ArmorSlot, Gear, GearJob, Held } from "../simGear";
 import type { Wiki } from "../types";
 import { JOB_NAME } from "../auth";
 import type { Me } from "../auth";
 import { Nick } from "../kakao";
-import { CAT_NAME, CoinCtx, fetchKing, luckOf, reachWithin, stepsWithin, useCoinState, useCoins, useRecord } from "../simRank";
-import type { Cat, King, SimRec } from "../simRank";
+import { CAT_NAME, CoinCtx, SpaceCtx, fetchKing, luckOf, reachWithin, simUrl, stepsWithin, useCoinState, useCoins, useRecord, useSpace } from "../simRank";
+import type { Cat, King, SimRec, Space } from "../simRank";
+import { BAG_MAX, SaveCtx, expOf, legacySave, raiseExp, restoreFromRecords, useSave, useSaveState } from "../simState";
+import type { SimSave } from "../simState";
 import { QuestCtx, titleOf, todayQuests, useQuest } from "../simQuest";
 import type { SimEvent } from "../simQuest";
 import { api } from "../auth";
@@ -94,11 +96,24 @@ function NameIcon({ name, size = 24 }: { name: string; size?: number }) {
   return pic ? <PicImg pic={pic} fit={size} className="sim-pic" /> : null;
 }
 
-export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
+export function SimulatorPage({ wiki, me, space }: { wiki: Wiki; me: Me; space: Space }) {
   const { data: odds, error } = useAsync(useCallback(() => loadOdds(), []), "odds");
   const [tabRaw, setTab] = useEntryState<Tab>("sim.tab", "enhance");
   const tab: Tab = TABS.some((t) => t.key === tabRaw) ? tabRaw : "enhance";
-  const coin = useCoinState();
+  const coin = useCoinState(space);
+  // 진행 상황 (장비, 보관함, 직접 겪은 것): 서버에 (src/simState.ts). 지갑을 받으면 시작
+  const saveState = useSaveState(space, coin.wallet ? ((coin.wallet.state as SimSave | null) ?? null) : undefined);
+  // 테스트판을 처음 열면 예전 폰 자료와 순위 기록의 장비를 한 번 옮긴다 (제작자 2026-11-04 '8강 참나무지팡이 어디 감')
+  const restoring = useRef(false);
+  useEffect(() => {
+    if (!saveState.ready || space !== "test" || saveState.save.restored || restoring.current) return;
+    restoring.current = true;
+    const base: SimSave = Object.keys(saveState.save).length ? saveState.save : legacySave(me.id);
+    fetchKing(space).then(
+      (d) => saveState.set(restoreFromRecords(base, d.mine)),
+      () => saveState.set({ ...base, restored: true }),
+    );
+  }, [saveState, space, me.id]);
   const today = (coin.wallet?.rules.reduce((t, r) => t + r.n * r.coin, 0) ?? 0) + (coin.wallet?.quests.filter(Boolean).length ?? 0) * (coin.wallet?.questCoin ?? 0);
   // 오늘의 도전 (src/simQuest.ts): 결과마다 알리면 맞는 도전을 깨고 코인을 받는다
   const quests = useMemo(() => todayQuests(), []);
@@ -118,10 +133,10 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
         doneRef.current = doneRef.current.map((x, j) => x || j === i);
         setDone(doneRef.current);
         setCheer((c) => ({ text: q.text, n: (c?.n ?? 0) + 1 }));
-        api<{ coins: number; got: boolean }>("/api/sim/wallet", "POST", { quest: i }).then(() => coin.reload(), () => undefined);
+        api<{ coins: number; got: boolean }>(simUrl("/api/sim/wallet", space), "POST", { quest: i }).then(() => coin.reload(), () => undefined);
       });
     },
-    [quests, coin],
+    [quests, coin, space],
   );
   useEffect(() => {
     if (!cheer) return;
@@ -143,10 +158,12 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   }, []);
   const iconOf: IconOf = useMemo(() => iconLookup(wiki, trendPics), [wiki, trendPics]);
   return (
+    <SpaceCtx.Provider value={space}>
+    <SaveCtx.Provider value={saveState}>
     <CoinCtx.Provider value={coin}>
       <QuestCtx.Provider value={emit}>
       <IconCtx.Provider value={iconOf}>
-      <TopBar title="확률 시뮬레이터" />
+      <TopBar title={space === "test" ? "시뮬레이터 테스트" : "확률 시뮬레이터"} />
       <div className="pill-row sim-tabs" role="tablist">
         {TABS.map((t) => (
           <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} className={"pill" + (tab === t.key ? " pill-on" : "")} onClick={() => setTab(t.key)}>
@@ -179,7 +196,7 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
           <small>+{coin.wallet?.questCoin ?? 30} 코인</small>
         </div>
       )}
-      {!odds ? (
+      {!odds || !saveState.ready || (space === "test" && !saveState.save.restored) ? (
         <Loading error={error} />
       ) : tab === "enhance" ? (
         <EnhanceTab odds={odds} wiki={wiki} me={me} />
@@ -197,6 +214,8 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
       </IconCtx.Provider>
       </QuestCtx.Provider>
     </CoinCtx.Provider>
+    </SaveCtx.Provider>
+    </SpaceCtx.Provider>
   );
 }
 
@@ -283,10 +302,11 @@ function gameNamer(odds: Odds) {
 /** 순위 칸: 도박의 신(묶음마다 가장 드문 기록의 운을 더한 것), 시뮬레이터마다 1위, 코인 버는 법 */
 function RankTab({ odds }: { odds: Odds }) {
   const coin = useCoins() as ReturnType<typeof useCoinState>;
+  const space = useSpace();
   const [data, setData] = useState<{ king: King[]; firsts: SimRec[]; mine: SimRec[] } | null>(null);
   const [err, setErr] = useState("");
   useEffect(() => {
-    fetchKing().then(setData, (e) => setErr(String(e)));
+    fetchKing(space).then(setData, (e) => setErr(String(e)));
     coin.reload?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -472,8 +492,11 @@ function Gauge({ c, keep, onDone }: { c: Charge; keep: boolean; onDone: () => vo
 }
 
 /** 장비 상점: 실제 장비를 +0(노작)으로 산다. 레벨이 높을수록 비싸다 (src/simGear.ts) */
-function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClose, cleared }: {
+function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClose, cleared, bag, onTake }: {
   gears: Gear[];
+  /** 내 장비 (보관함): 다른 장비를 사거나 꺼내도 남는다 (src/simState.ts) */
+  bag: Held[];
+  onTake: (i: number) => void;
   cleared: Set<string>;
   part: Part;
   job: GearJob;
@@ -514,6 +537,36 @@ function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClo
           </div>
         )}
       </div>
+      {bag.length > 0 && (
+        <>
+          <div className="sim-bag-head">
+            <b>내 장비</b>
+            <small>{bag.length}</small>
+          </div>
+          <ul className="sim-shop-list sim-bag">
+            {bag.map((h, i) => {
+              const g = gears.find((x) => x.part === part && x.name === h.name);
+              return (
+                <li key={`${h.name}-${i}`}>
+                  <span className="sim-shop-pic">{g?.icon ? <PicImg pic={g.icon} max={28} /> : null}</span>
+                  <span className="sim-shop-name">
+                    <b>
+                      +{h.lv} {h.name}
+                    </b>
+                    <small>{g ? (part === "무기" ? `공격 ${gearStat(g, h.lv)}` : gearStat(g, h.lv)) : ""}</small>
+                  </span>
+                  <button type="button" className="btn btn-ghost sim-buy" onClick={() => onTake(i)}>
+                    꺼내기
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="sim-bag-head">
+            <b>상점</b>
+          </div>
+        </>
+      )}
       <ul className="sim-shop-list">
         {list.map((g, i) => {
           const open = canBuy(list, i, cleared);
@@ -556,17 +609,19 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
   const scroll = all.find((s) => s.part === part && s.name === name) ?? all.find((s) => s.part === part)!;
   const rates = ev && scroll.event ? scroll.event : scroll.rates;
   const rate = (lv: number) => rates[lv] ?? 0;
-  // 들고 있는 장비 (부위마다 이 기기에, 캐릭터마다): 다시 열어도 그 강화도 그대로
-  const [held, setHeldState] = useState<Held | null>(() => loadHeld(me.id, part));
+  // 들고 있는 장비·보관함·+8 기록·직접 겪은 것은 서버에 (src/simState.ts, 테스트판과 개발 중판 따로): 다시 열어도, 다른 폰에서도 그대로
+  const { save, update } = useSave();
+  const [held, setHeldState] = useState<Held | null>(() => save.held?.[part] ?? null);
   const heldRef = useRef(held);
   const setHeld = (h: Held | null, of: Part = part) => {
     heldRef.current = h;
     setHeldState(h);
-    saveHeld(me.id, of, h);
+    update((s) => ({ ...s, held: { ...(s.held ?? {}), [of]: h } }));
   };
   const gear = held ? gears.find((g) => g.part === part && g.name === held.name) : undefined;
+  const bag = save.bag?.[part] ?? [];
   // 앞 장비를 +8(방어구 +6)까지 올려야 다음 장비를 산다 (simGear.ts CLEAR_LV)
-  const [cleared, setCleared] = useState<Set<string>>(() => loadCleared(me.id));
+  const cleared = useMemo(() => new Set(save.cleared ?? []), [save.cleared]);
   const shopList = (g: Gear) => gears.filter((x) => x.part === g.part && (g.part === "무기" ? x.kind === g.kind : x.kind === g.kind && x.jobs.includes(job)));
   const buyable = (g: Gear) => {
     const list = shopList(g);
@@ -581,26 +636,15 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
   const [stats, setStats] = useState({ tries: 0, broke: 0, best: 0, coins: 0 });
   const [log, setLog] = useState<LogDot[]>([]);
   const [goal, setGoal] = useState(part === "무기" ? 8 : 6);
+  // 자동은 직접 강화해 닿아 본 강화도까지만 (제작자 2026-11-04 '자동 강화는 우리가 강화해 본 곳까지만, 내가 수동으로 겪은 것만 자동으로')
+  const expMax = held ? expOf(save, `enh:${held.name}`) : 0;
+  const autoGoal = Math.min(goal, expMax);
   const [auto, setAuto] = useState(false);
   const coins = useCoins();
   // 장비마다 해금 (코인): 자동 강화, 자동 구매(자동 강화 중에 부서지면 같은 장비를 다시 사서 목표까지 이어 간다)
-  // 자동 구매 켬/끔은 이 기기에 둔다 (캐릭터마다)
-  const autoBuyKey = `sapphire.sim.autobuy.${me.id}`;
-  const [autoBuy, setAutoBuyState] = useState(() => {
-    try {
-      return localStorage.getItem(autoBuyKey) === "1";
-    } catch {
-      return false;
-    }
-  });
-  const setAutoBuy = (v: boolean) => {
-    setAutoBuyState(v);
-    try {
-      localStorage.setItem(autoBuyKey, v ? "1" : "0");
-    } catch {
-      /* 저장이 안 되면 이번에 연 동안만 */
-    }
-  };
+  // 자동 구매 켬/끔도 진행 상황에 (캐릭터마다)
+  const autoBuy = !!save.autoBuy;
+  const setAutoBuy = (v: boolean) => update((s) => ({ ...s, autoBuy: v }));
   const autoKey = held ? `auto:${held.name}` : "";
   const buyKey = held ? `buy:${held.name}` : "";
   const autoOn = !!held && coins.unlocks.has(autoKey);
@@ -630,13 +674,34 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
     comboRef.current = 0;
     setCombo(0);
   };
+  // 새로 사면 들고 있던 장비(부서지지 않은 것)는 보관함으로 (제작자 2026-11-04 '8강 참나무지팡이가 장비 바꾸기 누르니까 없어졌네')
   const buy = (g: Gear) => {
     if (!buyable(g) || coins.coins === null || coins.coins < g.price || coins.take(g.price) < g.price) return;
     clearFx();
-    setHeld({ name: g.name, lv: 0, broken: false, tries: 0, tainted: false });
+    const cur = heldRef.current;
+    const item: Held = { name: g.name, lv: 0, broken: false, tries: 0, tainted: false };
+    heldRef.current = item;
+    setHeldState(item);
+    update((s) => {
+      const list = s.bag?.[part] ?? [];
+      return { ...s, held: { ...(s.held ?? {}), [part]: item }, bag: { ...(s.bag ?? {}), [part]: cur && !cur.broken ? [cur, ...list].slice(0, BAG_MAX) : list } };
+    });
     setStats((s) => ({ ...s, coins: s.coins + g.price }));
     setShop(false);
     setFx((f) => ({ kind: "buy", n: (f?.n ?? 0) + 1 }));
+  };
+  // 보관함에서 꺼내기: 들고 있던 것(부서지지 않은 것)은 보관함으로
+  const takeOut = (i: number) => {
+    const list = [...bag];
+    const [item] = list.splice(i, 1);
+    if (!item) return;
+    const cur = heldRef.current;
+    if (cur && !cur.broken) list.unshift(cur);
+    clearFx();
+    heldRef.current = item;
+    setHeldState(item);
+    update((s) => ({ ...s, held: { ...(s.held ?? {}), [part]: item }, bag: { ...(s.bag ?? {}), [part]: list.slice(0, BAG_MAX) } }));
+    setShop(false);
   };
   // 자동 구매: 자동 강화를 멈추지 않고 같은 장비를 다시 산다 (코인이 모자라거나 살 수 없으면 false)
   const rebuy = (g: Gear) => {
@@ -656,7 +721,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
   };
 
   const tryOnce = useCallback(
-    (forced?: boolean): boolean => {
+    (forced?: boolean, manual = false): boolean => {
       const h = heldRef.current;
       const g = h && gears.find((x) => x.part === scroll.part && x.name === h.name);
       if (!h || !g || h.broken) return false;
@@ -683,13 +748,9 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
       if (ok && !h.tainted) emit({ kind: "enh", part: scroll.part, scroll: scroll.name, level: cur + 1, combo: comboRef.current });
       setStats((s) => ({ ...s, tries: s.tries + 1, coins: s.coins + 1, broke: s.broke + (!ok && !scroll.keep && p < 1 ? 1 : 0), best: Math.max(s.best, ok ? cur + 1 : cur) }));
       setLog((l) => [...l.slice(-39), { to: cur + 1, ok, broke: !ok && !scroll.keep }]);
-      if (ok && cur + 1 >= CLEAR_LV[scroll.part])
-        setCleared((c) => {
-          if (c.has(g.name)) return c;
-          const n = new Set(c).add(g.name);
-          saveCleared(me.id, n);
-          return n;
-        });
+      if (ok && cur + 1 >= CLEAR_LV[scroll.part]) update((s) => ((s.cleared ?? []).includes(g.name) ? s : { ...s, cleared: [...(s.cleared ?? []), g.name] }));
+      // 직접 눌러 닿은 강화도: 자동은 여기까지
+      if (ok && manual) update((s) => raiseExp(s, `enh:${g.name}`, cur + 1));
       if (ok) {
         heldRef.current = { ...h, lv: cur + 1, tries };
         setHeld(heldRef.current, scroll.part);
@@ -718,7 +779,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
     const p = rates[h.lv + 1] ?? 0;
     if (!(p > 0)) return;
     if (p >= 1) {
-      tryOnce();
+      tryOnce(undefined, true);
       return;
     }
     const ok = Math.random() < p;
@@ -731,7 +792,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
     const c = chargeRef.current;
     chargeRef.current = null;
     setCharge(null);
-    if (c) tryOnce(c.ok);
+    if (c) tryOnce(c.ok, true);
   }, [tryOnce]);
 
   // 목표까지 자동: 0.18초마다 한 번, 목표에 닿으면 멈춘다. 부서지면 멈추고, 자동 구매를 켰으면 부서지는 모습을 보인 뒤 다시 사서 이어 간다 (코인이 떨어질 때까지)
@@ -745,7 +806,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
         else if (Date.now() - brokeAt.current >= 700 && !rebuy(g)) setAuto(false);
         return;
       }
-      if (!h || h.lv >= goal || !(rates[h.lv + 1] > 0)) {
+      if (!h || h.lv >= autoGoal || !(rates[h.lv + 1] > 0)) {
         setAuto(false);
         return;
       }
@@ -753,14 +814,14 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
     }, 180);
     return () => window.clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auto, goal, rates, tryOnce]);
+  }, [auto, autoGoal, rates, tryOnce]);
 
   const switchPart = (x: Part) => {
     setPart(x);
     setGoal(x === "무기" ? 8 : 6);
     clearFx();
     setCharge(null);
-    const h = loadHeld(me.id, x);
+    const h = save.held?.[x] ?? null;
     heldRef.current = h;
     setHeldState(h);
     setShop(false);
@@ -823,6 +884,8 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
           coins={coins.coins}
           onClose={gear ? () => setShop(false) : undefined}
           cleared={cleared}
+          bag={bag}
+          onTake={takeOut}
         />
       ) : (
         <>
@@ -942,13 +1005,13 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
                 </button>
               ) : (
               <span className="sim-goal">
-                <button type="button" className="pill" onClick={() => setGoal(Math.max(lv + 1, goal - 1))} aria-label="목표 내리기">
+                <button type="button" className="pill" onClick={() => setGoal(Math.max(lv + 1, autoGoal - 1))} aria-label="목표 내리기">
                   −
                 </button>
-                <button type="button" className={"btn btn-ghost" + (auto ? " sim-running" : "")} disabled={!!charge || (!auto && lv >= goal)} onClick={() => setAuto(!auto)}>
-                  {auto ? "멈춤" : `+${goal} 까지 자동`}
+                <button type="button" className={"btn btn-ghost" + (auto ? " sim-running" : "")} disabled={!!charge || (!auto && lv >= autoGoal)} onClick={() => setAuto(!auto)}>
+                  {auto ? "멈춤" : lv >= expMax ? (expMax ? `자동은 +${expMax} 까지` : "직접 강화 먼저") : `+${autoGoal} 까지 자동`}
                 </button>
-                <button type="button" className="pill" onClick={() => setGoal(Math.min(15, goal + 1))} aria-label="목표 올리기">
+                <button type="button" className="pill" onClick={() => setGoal(Math.min(15, expMax, autoGoal + 1))} aria-label="목표 올리기">
                   +
                 </button>
               </span>
@@ -1167,6 +1230,10 @@ function StatInner(p: {
   const rec = useRecord(`stat:${st.key}`);
   const since = useRef(0);
   const emit = useQuest();
+  // 자동은 직접 닿아 본 단계까지만 (제작자 2026-11-04 '내가 수동으로 겪은 것만 자동으로')
+  const { save, update } = useSave();
+  const expStage = expOf(save, `stat:${st.key}`);
+  const cap = Math.min(st.max, expStage);
   const reset = () => {
     setStage(0);
     stageRef.current = 0;
@@ -1175,7 +1242,7 @@ function StatInner(p: {
     setAuto(false);
     since.current = 0;
   };
-  const tryOnce = useCallback(() => {
+  const tryOnce = useCallback((manual = false) => {
     const cur = stageRef.current;
     const s = st.steps[cur];
     if (!s || cur >= st.max) return;
@@ -1191,6 +1258,7 @@ function StatInner(p: {
       const to = Math.min(st.max, cur + up);
       stageRef.current = to;
       setStage(to);
+      if (manual) update((s) => raiseExp(s, `stat:${st.key}`, to));
       if (to >= st.max) {
         const n = since.current;
         rec.submit("grow", { label: `${st.max}단계`, score: st.max, tries: n, luck: luckOf(stepsWithin(st, n)) });
@@ -1199,18 +1267,18 @@ function StatInner(p: {
       if (cur === 0 && st.types) setType(pick(st.types).name);
       setFx((f) => ({ kind: up === 2 ? "plus2" : "ok", n: (f?.n ?? 0) + 1 }));
     } else setFx((f) => ({ kind: "keep", n: (f?.n ?? 0) + 1 }));
-  }, [st, stageRef, setStage, setStats, setType, setFx, coins, rec, setAuto, emit]);
+  }, [st, stageRef, setStage, setStats, setType, setFx, coins, rec, setAuto, emit, update]);
   useEffect(() => {
     if (!auto) return;
     const t = window.setInterval(() => {
-      if (stageRef.current >= st.max) {
+      if (stageRef.current >= cap) {
         setAuto(false);
         return;
       }
       tryOnce();
     }, 120);
     return () => window.clearInterval(t);
-  }, [auto, st.max, stageRef, tryOnce, setAuto]);
+  }, [auto, cap, stageRef, tryOnce, setAuto]);
 
   // 펫 스탯 리셋 (공식 표 40300): 지금 옵션을 뺀 다른 넷 중 하나로, 단계는 그대로
   const resetStat = () => {
@@ -1288,11 +1356,11 @@ function StatInner(p: {
       </section>
 
       <div className="sim-actions">
-        <button type="button" className="btn sim-go" disabled={stage >= st.max || auto || coins.coins === 0} onClick={tryOnce}>
+        <button type="button" className="btn sim-go" disabled={stage >= st.max || auto || coins.coins === 0} onClick={() => tryOnce(true)}>
           {pet ? "강화" : "스탯 부여"}
         </button>
-        <button type="button" className={"btn btn-ghost" + (auto ? " sim-running" : "")} disabled={stage >= st.max && !auto} onClick={() => setAuto(!auto)}>
-          {auto ? "멈춤" : "끝까지 자동"}
+        <button type="button" className={"btn btn-ghost" + (auto ? " sim-running" : "")} disabled={stage >= cap && !auto} onClick={() => setAuto(!auto)}>
+          {auto ? "멈춤" : stage >= cap ? (expStage ? `자동은 ${expStage}단계까지` : "직접 해 본 만큼 자동") : cap >= st.max ? "끝까지 자동" : `${cap}단계까지 자동`}
         </button>
         <button type="button" className="btn btn-ghost" onClick={reset}>
           처음부터
@@ -1419,10 +1487,14 @@ function OptionRoller({ item, onBack, verb, game, cat }: { item: OptItem; onBack
     const label = `${item.name} ${item.opts.map((o, i) => `${o.label} ${got[i].v}`).join(" ")}`.slice(0, 60);
     rec.submit(cat, { label, score: Math.round(luck * 1000) / 1000, tries: rolls.current, luck });
   };
+  // 나올 때까지는 직접 굴려 본 값까지만 (제작자 2026-11-04 '내가 수동으로 겪은 것만 자동으로'): 옵션마다 직접 본 가장 높은 값
+  const { save, update } = useSave();
+  const seenKey = (i: number) => `opt:${item.name}:${i}`;
   const again = () => {
     if (coins.take(1) < 1) return;
     rolls.current++;
     const got = roll();
+    update((s) => got.reduce((acc, v, i) => raiseExp(acc, seenKey(i), v.n), s));
     setVals(got);
     setN((x) => x + 1);
     setHunt(null);
@@ -1457,6 +1529,8 @@ function OptionRoller({ item, onBack, verb, game, cat }: { item: OptItem; onBack
   const d = item.opts[aim.i];
   const nums = [...new Set(d.vals.map((v) => v.n))].sort((a, b) => a - b);
   const P = atLeast(d, aim.min);
+  const seen = expOf(save, seenKey(aim.i));
+  const canHunt = aim.min <= seen;
   return (
     <>
       <section className="panel sim-opt">
@@ -1498,8 +1572,8 @@ function OptionRoller({ item, onBack, verb, game, cat }: { item: OptItem; onBack
             +
           </button>
         </div>
-        <button type="button" className="btn btn-ghost" disabled={!(P > 0) || coins.coins === 0} onClick={huntGoal}>
-          나올 때까지 {verb}
+        <button type="button" className="btn btn-ghost" disabled={!(P > 0) || coins.coins === 0 || !canHunt} onClick={huntGoal}>
+          {canHunt ? `나올 때까지 ${verb}` : seen ? `직접 본 ${seen} 까지만 자동` : "직접 굴려 본 값까지만 자동"}
         </button>
         {hunt && (
           <p key={hunt.k} className="sim-hunt">
@@ -1648,6 +1722,9 @@ function BoxOpener({
   const coins = useCoins();
   const iconOf = useIcon();
   const chestPic = iconOf(box.name);
+  // 나올 때까지는 직접 열어서 나온 것만 (제작자 2026-11-04 '내가 수동으로 겪은 것만 자동으로')
+  const { save, update } = useSave();
+  const gotKey = (name: string) => `box:${box.key}:${si}:${name}`;
   // 순위: 가장 드문 것을 뽑은 사람 (상자마다, 묶음이 여럿이면 묶음마다)
   const rec = useRecord(`box:${box.key}${box.sections.length > 1 ? `:${si}` : ""}`);
   const emit = useQuest();
@@ -1680,6 +1757,7 @@ function BoxOpener({
       const x = pick(sec.items);
       got.push({ name: x.name, p: x.p / total, id: seq.current++ });
     }
+    update((s) => got.reduce((acc, x) => raiseExp(acc, gotKey(x.name), 1), s));
     // 많이 열면 드문 것부터 10개만 카드로
     setPulls(k > 10 ? [...got].sort((a, b) => a.p - b.p).slice(0, 10) : got);
     setHunt(null);
@@ -1759,8 +1837,8 @@ function BoxOpener({
           ))}
         </div>
         {target && (
-          <button type="button" className="btn btn-ghost sim-until" onClick={untilTarget}>
-            {target} 나올 때까지
+          <button type="button" className="btn btn-ghost sim-until" disabled={!expOf(save, gotKey(target))} onClick={untilTarget}>
+            {expOf(save, gotKey(target)) ? `${target} 나올 때까지` : `${target} · 직접 뽑아 본 것만 자동`}
           </button>
         )}
         {hunt && (
@@ -1896,8 +1974,12 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
     const luck = luckOf(Math.max(hit, 0.5) / 400);
     rec.submit("gem", { label: `${stage}단계 · 1단계 ${start}개`, score: stage * 10000 - start, tries: synths, luck });
   };
+  // 모두 합성은 직접 합성해 본 단계만 (제작자 2026-11-04 '내가 수동으로 겪은 것만 자동으로')
+  const { save, update } = useSave();
+  const tried = (st: number) => expOf(save, `gem:${st}`) > 0;
   const once = (st: number) => {
     if (!can(st) || coins.take(1) < 1) return;
+    update((s) => raiseExp(s, `gem:${st}`, 1));
     const r = pick(rules[st]);
     const next = [...inv];
     next[st] -= 3;
@@ -1907,12 +1989,12 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
     setFx((f) => ({ from: st, to: r.to, n: (f?.n ?? 0) + 1 }));
     reached(r.to, runs + 1);
   };
-  function synthAll(v: number[], limit = Infinity) {
+  function synthAll(v: number[], limit = Infinity, only: (st: number) => boolean = () => true) {
     const next = [...v];
     let n = 0;
     let best = 0;
     for (;;) {
-      const st = n < limit ? [1, 2, 3].find((k) => can(k, next)) : undefined;
+      const st = n < limit ? [1, 2, 3].find((k) => only(k) && can(k, next)) : undefined;
       if (!st) break;
       const r = pick(rules[st]);
       next[st] -= 3;
@@ -1923,7 +2005,7 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
     return { next, n, best };
   }
   const all = () => {
-    const { next, n, best: top } = synthAll(inv, coins.coins ?? 0);
+    const { next, n, best: top } = synthAll(inv, coins.coins ?? 0, tried);
     if (!n) return;
     coins.take(n);
     setInv(next);
@@ -1990,8 +2072,8 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
         )}
       </section>
       <div className="sim-actions sim-actions-3">
-        <button type="button" className="btn sim-go" disabled={![1, 2, 3].some((k) => can(k)) || coins.coins === 0} onClick={all}>
-          모두 합성
+        <button type="button" className="btn sim-go" disabled={![1, 2, 3].some((k) => tried(k) && can(k)) || coins.coins === 0} onClick={all}>
+          {[1, 2, 3].some(tried) ? "모두 합성" : "직접 합성 먼저"}
         </button>
         <button type="button" className="btn btn-ghost" onClick={average}>
           1000번 평균

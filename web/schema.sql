@@ -738,3 +738,57 @@ CREATE TABLE IF NOT EXISTS sim_unlocks (
   at INTEGER NOT NULL,
   PRIMARY KEY (user_id, key)
 );
+-- 시뮬레이터 진행 상황 (제작자 2026-11-04 '8강 참나무지팡이가 장비 바꾸기 누르니까 없어졌네'): 들고 있는 장비, 보관함, 직접 겪은 것 (JSON, 화면 src/simState.ts)
+CREATE TABLE IF NOT EXISTS sim_state (
+  user_id TEXT PRIMARY KEY,
+  data TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+-- 앱개발자 테스트판 (제작자 2026-11-04 '내가 테스트하는 공간을 따로 도플갱어로, 개발 중판은 깨끗한 버전으로'): 위 sim_* 와 같은 모양, ?space=test (server/simcoin.ts tbl)
+CREATE TABLE IF NOT EXISTS sim_t_records (
+  user_id TEXT NOT NULL,
+  game TEXT NOT NULL,
+  cat TEXT NOT NULL,
+  label TEXT NOT NULL,
+  score REAL NOT NULL,
+  tries INTEGER NOT NULL,
+  luck REAL NOT NULL,
+  at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, game)
+);
+CREATE INDEX IF NOT EXISTS sim_t_records_game ON sim_t_records (game, score);
+CREATE TABLE IF NOT EXISTS sim_t_wallet (
+  user_id TEXT PRIMARY KEY,
+  coins INTEGER NOT NULL,
+  earned INTEGER NOT NULL,
+  spent INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sim_t_earn (
+  user_id TEXT NOT NULL,
+  day TEXT NOT NULL,
+  key TEXT NOT NULL,
+  n INTEGER NOT NULL,
+  PRIMARY KEY (user_id, day, key)
+);
+CREATE TABLE IF NOT EXISTS sim_t_feed (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  game TEXT NOT NULL,
+  label TEXT NOT NULL,
+  luck REAL NOT NULL,
+  at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sim_t_feed_at ON sim_t_feed (at);
+CREATE TABLE IF NOT EXISTS sim_t_unlocks (
+  user_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  cost INTEGER NOT NULL,
+  at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, key)
+);
+CREATE TABLE IF NOT EXISTS sim_t_state (
+  user_id TEXT PRIMARY KEY,
+  data TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);

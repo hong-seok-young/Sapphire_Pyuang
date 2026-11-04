@@ -42,9 +42,15 @@ export interface King {
   parts: string;
 }
 
-export const fetchWallet = () => api<Wallet>("/api/sim/wallet");
-export const fetchBoard = (game: string) => api<{ board: SimRec[]; mine: SimRec | null }>(`/api/sim?game=${encodeURIComponent(game)}`);
-export const fetchKing = () => api<{ king: King[]; firsts: SimRec[]; mine: SimRec[] }>("/api/sim");
+/** 공간 (제작자 2026-11-04 '내가 테스트하는 공간을 따로 도플갱어로'): 개발 중판(live)과 앱개발자 테스트판(test). 같은 화면, 서버 자료만 따로 (server/simcoin.ts tbl) */
+export type Space = "live" | "test";
+export const SpaceCtx = createContext<Space>("live");
+export const useSpace = () => useContext(SpaceCtx);
+/** '/api/sim/wallet' -> 테스트판이면 '?space=test' 를 붙인다 */
+export const simUrl = (path: string, space: Space) => (space === "test" ? `${path}${path.includes("?") ? "&" : "?"}space=test` : path);
+export const fetchWallet = (space: Space) => api<Wallet & { state?: unknown }>(simUrl("/api/sim/wallet", space));
+export const fetchBoard = (game: string, space: Space) => api<{ board: SimRec[]; mine: SimRec | null }>(simUrl(`/api/sim?game=${encodeURIComponent(game)}`, space));
+export const fetchKing = (space: Space) => api<{ king: King[]; firsts: SimRec[]; mine: SimRec[] }>(simUrl("/api/sim", space));
 
 /** 확률 -> 운 (1/10 이면 1, 1/1000 이면 3) */
 export const luckOf = (p: number) => Math.min(15, Math.max(0, -Math.log10(Math.max(p, 1e-15))));
@@ -110,8 +116,8 @@ export interface Coins {
 export const CoinCtx = createContext<Coins>({ coins: null, take: () => 0, has: () => false, unlocks: new Set(), unlock: async () => false });
 export const useCoins = () => useContext(CoinCtx);
 
-export function useCoinState(): Coins & { wallet: Wallet | null; reload: () => void } {
-  const [wallet, setWallet] = useState<Wallet | null>(null);
+export function useCoinState(space: Space): Coins & { wallet: (Wallet & { state?: unknown }) | null; reload: () => void } {
+  const [wallet, setWallet] = useState<(Wallet & { state?: unknown }) | null>(null);
   const [unlocks, setUnlocks] = useState<Set<string>>(() => new Set());
   const [coins, setCoins] = useState<number | null>(null);
   const left = useRef<number | null>(null);
@@ -124,10 +130,10 @@ export function useCoinState(): Coins & { wallet: Wallet | null; reload: () => v
     const n = pending.current;
     if (!n) return;
     pending.current = 0;
-    void fetch("/api/sim/wallet", { method: "POST", credentials: "same-origin", headers: apiHeaders(true), body: JSON.stringify({ spend: n }), keepalive: true }).catch(() => undefined);
-  }, []);
+    void fetch(simUrl("/api/sim/wallet", space), { method: "POST", credentials: "same-origin", headers: apiHeaders(true), body: JSON.stringify({ spend: n }), keepalive: true }).catch(() => undefined);
+  }, [space]);
   const reload = useCallback(() => {
-    fetchWallet().then(
+    fetchWallet(space).then(
       (w) => {
         setWallet(w);
         setUnlocks(new Set(w.unlocks ?? []));
@@ -137,7 +143,7 @@ export function useCoinState(): Coins & { wallet: Wallet | null; reload: () => v
       },
       () => undefined,
     );
-  }, []);
+  }, [space]);
   useEffect(() => {
     reload();
     const hide = () => document.visibilityState === "hidden" && flush();
@@ -171,7 +177,7 @@ export function useCoinState(): Coins & { wallet: Wallet | null; reload: () => v
       const spend = pending.current;
       pending.current = 0;
       try {
-        const r = await fetch("/api/sim/wallet", { method: "POST", credentials: "same-origin", headers: apiHeaders(true), body: JSON.stringify({ spend: spend || undefined, unlock: key, cost }) });
+        const r = await fetch(simUrl("/api/sim/wallet", space), { method: "POST", credentials: "same-origin", headers: apiHeaders(true), body: JSON.stringify({ spend: spend || undefined, unlock: key, cost }) });
         const j = (await r.json()) as { coins?: number; unlocks?: string[] };
         if (typeof j.coins === "number") {
           left.current = j.coins - pending.current;
@@ -184,7 +190,7 @@ export function useCoinState(): Coins & { wallet: Wallet | null; reload: () => v
         return false;
       }
     },
-    [],
+    [space],
   );
   return { coins, take, has, unlocks, unlock, wallet, reload };
 }
@@ -193,18 +199,19 @@ export function useCoinState(): Coins & { wallet: Wallet | null; reload: () => v
 
 /** 한 시뮬레이터의 순위와 내 기록. submit 은 내 기록보다 좋을 때만 보낸다 */
 export function useRecord(game: string) {
+  const space = useSpace();
   const [data, setData] = useState<{ board: SimRec[]; mine: SimRec | null } | null>(null);
   const mine = useRef<SimRec | null>(null);
   const load = useCallback(() => {
     if (!game) return;
-    fetchBoard(game).then(
+    fetchBoard(game, space).then(
       (d) => {
         mine.current = d.mine;
         setData(d);
       },
       () => undefined,
     );
-  }, [game]);
+  }, [game, space]);
   useEffect(() => {
     setData(null);
     mine.current = null;
@@ -218,10 +225,10 @@ export function useRecord(game: string) {
       // 내 기록보다 못해도 1/100 보다 드물면 전광판에 남긴다
       if (!better && r.luck < 2) return false;
       if (better) mine.current = { ...r, cat };
-      api<{ ok: boolean }>("/api/sim", "POST", { ...r, cat, game }).then(load, () => undefined);
+      api<{ ok: boolean }>(simUrl("/api/sim", space), "POST", { ...r, cat, game }).then(load, () => undefined);
       return better;
     },
-    [game, load],
+    [game, load, space],
   );
   return { data, submit };
 }

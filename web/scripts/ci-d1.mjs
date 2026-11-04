@@ -366,6 +366,29 @@ if (queryFirst("SELECT 1 AS done FROM setup WHERE key = 'opening_notice'")) {
   }
 }
 
+// 확률 시뮬레이터를 테스트판과 개발 중판으로 나눈다 (제작자 2026-11-04 '지금 시뮬레이터에 있는 거를 나만 보이는 테스트 버튼으로, 똑같은 버튼을 개발 중으로 하나 더,
+// 거기는 내가 플레이한 데이터 다 초기화해서 아무도 안 한 깨끗한 버전으로'): 지금까지의 시뮬레이터 자료(sim_records·wallet·earn·feed·unlocks)를 테스트판 표(sim_t_*)로 옮기고
+// 개발 중판 표는 비운다 (지우지 않고 옮긴다). setup 'sim_split_20261104' 로 한 번만. 실행 기록에는 수만
+if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'")) {
+  const count = (t) => Number(queryFirst(`SELECT COUNT(*) AS n FROM ${t}`)?.n ?? 0);
+  const moved = ["records", "wallet", "earn", "feed", "unlocks"].map((t) => `${t} ${count(`sim_${t}`)}`).join(", ");
+  runSql([
+    "INSERT OR IGNORE INTO sim_t_records SELECT * FROM sim_records;",
+    "INSERT OR IGNORE INTO sim_t_wallet SELECT * FROM sim_wallet;",
+    "INSERT OR IGNORE INTO sim_t_earn SELECT * FROM sim_earn;",
+    "INSERT INTO sim_t_feed (user_id, game, label, luck, at) SELECT user_id, game, label, luck, at FROM sim_feed;",
+    "INSERT OR IGNORE INTO sim_t_unlocks SELECT * FROM sim_unlocks;",
+    "DELETE FROM sim_records;",
+    "DELETE FROM sim_wallet;",
+    "DELETE FROM sim_earn;",
+    "DELETE FROM sim_feed;",
+    "DELETE FROM sim_unlocks;",
+    "DELETE FROM sim_state;",
+    `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('sim_split_20261104', ${Date.now()});`,
+  ]);
+  console.log(`시뮬레이터 자료를 테스트판으로 옮기고 개발 중판을 비웠어요 (${moved})`);
+}
+
 // 개발 중 칸을 누가 열어 봤는지 한 번 살펴 앱개발자에게 알린다 (제작자 2026-11-04 '오피서나 길마가 지금 개발 중인 거 본 사람 있나, 길드원도 들어가길 시도한 사람 있나').
 // 사용 기록(DB 1 의 예전 activity 와 사용 기록 DB 2~10)에서 화면 '#/trend'·'#/enhance'·'#/sim' 을 본 줄을 사람(본캐로 묶음)마다 센다.
 // 볼 수 있는 사람(시세 동향·강화 비교는 길마·오피서, 확률 시뮬레이터는 앱개발자만)과 막힌 화면('개발 중이에요')만 본 사람을 나눈다.
