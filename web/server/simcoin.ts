@@ -71,3 +71,11 @@ export async function earnFor(env: Env, userId: string, method: string, path: st
   const rule = EARN.find((r) => r.method === method && r.re?.test(path));
   if (rule) await earn(env, userId, rule.key);
 }
+
+/** 앱개발자(와 그 테스트 계정)는 써 보느라 코인이 모자라지 않게: 100 아래로 내려가면 1000 을 채운다 (제작자 2026-11-04 '나는 개발자니까 돈 다 쓰면 자동으로 기본 코인 좀 넣어 줘').
+ *  화면(simRank.ts useCoinState)도 같은 규칙으로 바로 채워 보인다 */
+export const DEV_REFILL = 1000;
+export const DEV_FLOOR = 100;
+export const refillable = (me: { id: string; role: string }) => me.role === "developer" || ["테스트1", "테스트2"].includes(me.id);
+export const refillSql = (env: { DB: D1Database }, id: string) =>
+  env.DB.prepare("UPDATE sim_wallet SET coins = coins + ?2, earned = earned + ?2, updated_at = ?4 WHERE user_id = ?1 AND coins < ?3").bind(id, DEV_REFILL, DEV_FLOOR, Date.now());
