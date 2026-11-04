@@ -248,6 +248,39 @@ runSql([
   console.log(`길드 던전 확정 풀기 · 다시 확정 알림 ${n}명`);
 }
 
+// 길드 던전 시간표를 요일대로 다음 주 줄에 옮겨 적는다 (제작자 2026-11-04 '사람들이 입력해 놓은 거 월화수목금토일만 맞춰서 다 다시 적어 놔, 날짜는 신경 쓰지 말고 요일만 맞춰서'):
+// 열을 월 ~ 일, 날짜는 오늘부터 7일로 바꾸자 오늘(수 11/4)을 뺀 요일이 모두 다음 게임 주(목 11/5 10:30 ~) 칸이 되어, 이번 주 줄(목 10/29 10:30 ~)에 칠해 둔 시간이 안 보였다.
+// 이번 주 줄의 칸마다 7일 뒤 같은 요일·시각 칸(같은 칸 번호)에 더한다 (다음 주 줄에 이미 칠한 칸은 그대로 두고 합친다, 확정도 이어 간다). 이번 게임 주 안에서 한 번만,
+// setup 'gd_cols_carry_20261104'. 옮기는 동안 그 사람이 다음 주 칸을 고쳤으면 그 사람은 건너뛴다. 실행 기록에는 개수만
+{
+  const KEY = "gd_cols_carry_20261104";
+  const W = Date.parse("2026-10-29T10:30:00+09:00");
+  const NEXT = W + 7 * 86_400_000;
+  if (Date.now() < NEXT && !queryFirst(`SELECT 1 AS done FROM setup WHERE key = '${KEY}'`)) {
+    const all = (sql) => parseJson(wrangler("d1", "execute", DB, "--remote", "--json", "--command", sql))[0]?.results ?? [];
+    const rows = all(`SELECT user_id, week, slots, confirmed_at FROM gd_avail WHERE week IN (${W}, ${NEXT})`);
+    const next = new Map(rows.filter((r) => r.week === NEXT).map((r) => [r.user_id, r]));
+    const q = (v) => `'${String(v).replaceAll("'", "''")}'`;
+    const now = Date.now();
+    const lines = [];
+    for (const r of rows) {
+      if (r.week !== W || !String(r.slots).includes("1")) continue;
+      const old = next.get(r.user_id);
+      const had = String(old?.slots ?? "").padEnd(336, "0");
+      const merged = Array.from({ length: 336 }, (_, i) => (r.slots[i] === "1" || had[i] === "1" ? "1" : "0")).join("");
+      if (old && merged === old.slots) continue;
+      const confirmed = r.confirmed_at == null ? "NULL" : Number(r.confirmed_at);
+      lines.push(
+        old
+          ? `UPDATE gd_avail SET slots = '${merged}', updated_at = ${now}, confirmed_at = COALESCE(confirmed_at, ${confirmed}) WHERE user_id = ${q(r.user_id)} AND week = ${NEXT} AND slots = '${old.slots}';`
+          : `INSERT OR IGNORE INTO gd_avail (user_id, week, slots, updated_at, confirmed_at) VALUES (${q(r.user_id)}, ${NEXT}, '${merged}', ${now}, ${confirmed});`,
+      );
+    }
+    runSql([...lines, `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`]);
+    console.log(`길드 던전 시간표 요일대로 다음 주 칸에 옮김 ${lines.length}명`);
+  }
+}
+
 // 더한 칸의 색인 (schema.sql 은 칸이 생기기 전에 돌아서 여기서 만든다)
 wrangler("d1", "execute", DB, "--remote", "--yes", "--command", "CREATE INDEX IF NOT EXISTS official_news_added ON official_news (added_at)");
 
