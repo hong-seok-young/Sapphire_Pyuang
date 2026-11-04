@@ -121,7 +121,7 @@ export function sampleParty(me: string): PartyState {
     name: `${SAMPLE_NAME} 팀 (예시)`,
     leader: SAMPLE_NAME,
     stage: 2,
-    members: members.map((id) => ({ id, filled: true })),
+    members: members.map((id) => ({ id, filled: true, confirmed: true })),
     avail,
     candidates: cands,
     rejected: [],

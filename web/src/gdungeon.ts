@@ -25,7 +25,8 @@ export interface PartyState {
   leader: string;
   /** 길드던전 단계 (파티장·운영진이 정한다, 없으면 null) */
   stage: number | null;
-  members: { id: string; filled: boolean }[];
+  /** filled = 시간표를 저장한 적이 있다, confirmed = 칠하고 '확정'을 눌렀다 (카드의 '입력 전 / 확정') */
+  members: { id: string; filled: boolean; confirmed?: boolean }[];
   avail: Record<string, string>;
   candidates: number[];
   rejected: { slot: number; by: string[] }[];
@@ -54,6 +55,8 @@ export interface GdData {
   now: number;
   party: PartyState | null;
   mine: string | null;
+  /** 내 시간표를 확정했는지 (서버 gd_avail.confirmed_at, 칠한 칸이 있을 때만) */
+  mineConfirmed?: boolean;
   prev: string | null;
   parties: PartySummary[];
   people: GdPerson[];
@@ -63,7 +66,9 @@ export interface GdData {
 export const fetchGd = () => api<GdData>("/api/gd");
 export const createParty = (members: string[]) => api<{ id: number }>("/api/gd", "POST", { members });
 /** 내 시간표 '확정': 이번 주 처음이면 아직 안 칠한 파티원에게 알림 (서버 functions/api/gd/confirm.ts) */
-export const confirmAvail = () => api<{ ok: boolean; nudged: number }>("/api/gd/confirm", "POST");
+export const confirmAvail = () => api<{ ok: boolean; nudged: number; party?: PartyState | null }>("/api/gd/confirm", "POST");
+/** '수정': 확정을 풀어 파티원 카드가 다시 '입력 전' */
+export const unconfirmAvail = () => api<{ ok: boolean; party?: PartyState | null }>("/api/gd/confirm", "DELETE");
 export const saveAvail = (slots: string) => api<{ ok: boolean; party?: PartyState | null }>("/api/gd/avail", "PUT", { slots });
 export const answerGd = (slot: number, answer: "yes" | "no") => api<{ ok: boolean; party?: PartyState | null }>("/api/gd/answer", "POST", { slot, answer });
 export const undoAnswer = (slot: number) => api<{ ok: boolean; party?: PartyState | null }>(`/api/gd/answer?slot=${slot}`, "DELETE");

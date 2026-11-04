@@ -1,5 +1,6 @@
 // 길드 던전 화면 #/match (제작자 요청 2026-11-02, 1군 전용, src/gdungeon.ts, 서버 server/gdungeon.ts)
-// 위에서부터 (이번 주 날짜 줄은 뺐다, 제작자 요청 2026-11-02 '다 알아'): 내 파티와 지금 후보(확정·불참), 내 시간표 / 교집합, 모든 파티.
+// 위에서부터 (이번 주 날짜 줄은 뺐다, 제작자 요청 2026-11-02 '다 알아'): 내 파티와 지금 후보(확정·불참), 내 시간표 / 파티원 / 교집합, 모든 파티.
+// 파티원 칸 (제작자 2026-11-04 '다른 파티원의 시간표도, 각각 나와의 교집합이 보이게'): 어두운 띠에서 파티원을 고르면 그 사람 시간표, 나와 겹치는 칸은 금색.
 // 시간표는 칸을 누르고 끌어서 칠한다 (왼쪽 시간 줄을 끌면 화면이 내려간다).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
@@ -23,6 +24,7 @@ import {
   rowLabel,
   saveAvail,
   slotOf,
+  unconfirmAvail,
   slotShort,
   slotText,
   undoAnswer,
@@ -38,7 +40,8 @@ import { FitLine, Loading, TopBar } from "../ui";
 export function GuildDungeonPage({ me }: { me: Me }) {
   const [data, setData] = useState<GdData | null>(null);
   const [error, setError] = useState("");
-  const [tab, setTab] = useEntryState<"mine" | "heat">("gd.tab", "mine");
+  const [tab, setTab] = useEntryState<"mine" | "member" | "heat">("gd.tab", "mine");
+  const [who, setWho] = useEntryState<string>("gd.who", "");
   const sample = useSample();
   const load = useCallback(() => {
     fetchGd().then(
@@ -76,6 +79,7 @@ export function GuildDungeonPage({ me }: { me: Me }) {
   const setParty = (p: PartyState | null | undefined) => {
     if (p !== undefined) setData((d) => (d ? { ...d, party: p } : d));
   };
+  const mates = party ? party.members.filter((m) => m.id !== me.id) : [];
   return (
     <>
       <TopBar title="길드 던전" />
@@ -100,6 +104,14 @@ export function GuildDungeonPage({ me }: { me: Me }) {
           >
             내 시간표
           </button>
+          {mates.length > 0 && (
+            <button
+              className={"pill" + (tab === "member" ? " pill-on" : "")}
+              onClick={() => setTab("member")}
+            >
+              파티원
+            </button>
+          )}
           <button
             className={"pill" + (tab === "heat" ? " pill-on" : "")}
             onClick={() => setTab("heat")}
@@ -108,13 +120,21 @@ export function GuildDungeonPage({ me }: { me: Me }) {
           </button>
         </nav>
       )}
-      {!party || tab === "mine" ? (
+      {!party || tab === "mine" || (tab === "member" && !mates.length) ? (
         <MyTimes
           key={data.week}
           me={me.id}
           data={data}
           onSaved={setParty}
           onError={setError}
+        />
+      ) : tab === "member" ? (
+        <MateTimes
+          data={data}
+          party={party}
+          me={me.id}
+          who={mates.some((m) => m.id === who) ? who : mates[0].id}
+          onWho={setWho}
         />
       ) : (
         <HeatTimes data={data} party={party} />
@@ -242,15 +262,9 @@ function PartyPanel({
           (제작자 요청 2026-11-02: 아래에 닉네임을 늘어놓은 관리 칸 대신 카드를 눌러서) */}
       {(() => {
         const cells = p.members.map((m) => {
-          const said = p.current !== null && p.yes.includes(m.id);
-          // 상태는 짧게 (한 칸에 닉네임 · 카톡 · 파티장 · 상태가 한 줄로 들어가게, 제작자 요청 2026-11-02)
-          const state = !m.filled
-            ? "미입력"
-            : p.confirmed !== null || said
-              ? "확정"
-              : all && p.current !== null
-                ? "대기"
-                : "입력";
+          // 상태는 시간표를 칠하고 '확정'을 눌렀는지만: 입력 전 / 확정 (제작자 2026-11-04: '입력'을 시간표를 다 넣었다는 뜻으로 오해했다.
+          // 후보에 확정한 사람은 아래 후보 칸의 '확정 2/4 · 이름'에). 한 칸에 닉네임 · 카톡 · 파티장 · 상태가 한 줄로 들어가게 짧게
+          const state = m.confirmed ? "확정" : "입력 전";
           const row = (
             <>
               <FitLine
@@ -270,7 +284,7 @@ function PartyPanel({
             <li
               key={m.id}
               className={
-                (m.filled ? "" : "gd-member-wait") +
+                (m.confirmed ? "" : "gd-member-wait") +
                 (open === m.id ? " gd-member-open" : "")
               }
             >
@@ -676,9 +690,11 @@ function MyTimes({
   const drag = useRef<{ val: boolean; changed: boolean } | null>(null);
   const grid = useRef<HTMLDivElement>(null);
   // 확정: 다 칠한 뒤 누르면 시간표가 잠겨 스크롤하다 잘못 눌러도 안 바뀐다. '수정'을 누르면 풀린다
-  // (제작자 요청 2026-11-02 '자꾸 스크롤하다가 막 누르게 된다'). 이 기기에 계정·주마다 기억한다
+  // (제작자 요청 2026-11-02 '자꾸 스크롤하다가 막 누르게 된다'). 서버(gd_avail.confirmed_at)에 적어 파티원 카드에 '확정 / 입력 전'으로 보이고
+  // (제작자 2026-11-04) 다른 기기에서 열어도 그대로. 예전 서버(mineConfirmed 가 없음)면 이 기기에 둔 것으로
   const lockKey = `sapphire.gd.lock.${me}.${data.week}`;
   const [lock, setLockState] = useState<boolean>(() => {
+    if (data.mineConfirmed !== undefined) return data.mineConfirmed;
     try {
       return localStorage.getItem(lockKey) === "1";
     } catch {
@@ -694,7 +710,8 @@ function MyTimes({
       // 저장 못 해도 이번에 연 동안은 잠긴다
     }
     // 확정하면 아직 안 칠한 파티원에게 알림 (제작자 2026-11-03, 서버가 한 주에 한 번만 보낸다). 못 보내도 잠금은 그대로
-    if (v && bitsRef.current.includes("1")) void confirmAvail().catch(() => undefined);
+    if (v && bitsRef.current.includes("1")) void confirmAvail().then((r) => onSaved(r.party), () => undefined);
+    if (!v) void unconfirmAvail().then((r) => onSaved(r.party), () => undefined);
   };
   // 지난 칸도 칠할 수 있다: 매주 같은 루틴을 그대로 적어 두려고 (제작자 요청 2026-11-02 '시간 지났다고 비활성화하지 마'). 후보는 앞으로 올 때만 (서버)
   const locked = (i: number) => !validSlot(i);
@@ -901,6 +918,100 @@ function Row({
       </span>
       {Array.from({ length: COLS }, (_, c) => children(slotOf(c, row)))}
     </>
+  );
+}
+
+/**
+ * 파티원 시간표 (제작자 2026-11-04 '다른 파티원의 시간표도 볼 수 있게, 각각 나와의 교집합이 보이게'):
+ * 어두운 띠에서 파티원을 고르면 그 사람이 되는 칸은 파랑, 나도 되는 칸(나와의 교집합)은 금색, 나만 되는 칸은 옅은 테두리. 후보 표시는 다른 시간표와 같다
+ */
+function MateTimes({
+  data,
+  party: p,
+  me,
+  who,
+  onWho,
+}: {
+  data: GdData;
+  party: PartyState;
+  me: string;
+  who: string;
+  onWho: (id: string) => void;
+}) {
+  const mates = p.members.filter((m) => m.id !== me);
+  const mate = mates.find((m) => m.id === who) ?? mates[0];
+  const theirs = p.avail[mate.id] ?? EMPTY;
+  const mine = p.avail[me] ?? data.mine ?? EMPTY;
+  const off = (i: number) => !validSlot(i);
+  let hours = 0;
+  let both = 0;
+  for (let i = 0; i < theirs.length; i++) {
+    if (off(i) || theirs[i] !== "1") continue;
+    hours++;
+    if (mine[i] === "1") both++;
+  }
+  return (
+    <section className="panel gd-times">
+      <div className="mk-sub gd-mates" role="tablist">
+        {mates.map((m) => (
+          <button
+            key={m.id}
+            role="tab"
+            aria-selected={m.id === mate.id}
+            className={"sub-tab" + (m.id === mate.id ? " sub-tab-on" : "")}
+            onClick={() => onWho(m.id)}
+          >
+            <FitLine text={m.id} wrap={false} />
+          </button>
+        ))}
+      </div>
+      <div className="gd-times-head">
+        <b>{mate.id}</b>
+        <small>
+          {!mate.filled || !hours
+            ? "칠한 때 없음"
+            : `${hours / 2}시간 · 나와 겹침 ${both / 2}시간`}
+          {mate.confirmed ? " · 확정" : " · 입력 전"}
+        </small>
+      </div>
+      <div className="gd-grid">
+        <Head week={data.week} />
+        {Array.from({ length: ROWS }, (_, r) => (
+          <Row key={r} row={r}>
+            {(i) => {
+              const t = theirs[i] === "1";
+              const mm = mine[i] === "1";
+              const m = candMark(p, i);
+              const cls =
+                "gd-cell" +
+                hourLine(i) +
+                (off(i)
+                  ? " gd-off"
+                  : t && mm
+                    ? " gd-all"
+                    : t
+                      ? " gd-on"
+                      : mm
+                        ? " gd-me-only"
+                        : "") +
+                m.cls;
+              return (
+                <span key={i} data-slot={i} className={cls}>
+                  {m.no > 0 && <b>{m.no}</b>}
+                </span>
+              );
+            }}
+          </Row>
+        ))}
+      </div>
+      <p className="gd-legend">
+        <i className="gd-cell gd-on" /> {mate.id}{" "}
+        <i className="gd-cell gd-all" /> 나와 겹침{" "}
+        <i className="gd-cell gd-me-only" /> 나만{" "}
+        <i className="gd-cell gd-is-current" /> 지금 후보{" "}
+        <span className="gd-legend-no">1</span> 후보 번호
+      </p>
+    </section>
   );
 }
 

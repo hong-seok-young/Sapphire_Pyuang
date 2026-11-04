@@ -1,5 +1,5 @@
 // 길드 던전 (server/gdungeon.ts, 제작자 요청 2026-11-02, 1군 전용)
-// GET  /api/gd -> { week, end, now, party(내 파티 상태), mine(내 이번 주 가능한 때), prev(지난주 것), parties(모든 파티 요약), people(넣을 수 있는 1군), staff }
+// GET  /api/gd -> { week, end, now, party(내 파티 상태), mine(내 이번 주 가능한 때), mineConfirmed(내 시간표를 확정했는지), prev(지난주 것), parties(모든 파티 요약), people(넣을 수 있는 1군), staff }
 // POST /api/gd { members } -> 파티 만들기 (만든 사람이 파티장, 나 빼고 3명까지. 이름은 파티장 닉네임으로 'OO 팀')
 import { FORBIDDEN, NEED_LOGIN, RANK, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
@@ -14,10 +14,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const { week, prev, end } = weeks(now);
   const [parties, mineR, people] = await Promise.all([
     allParties(env, week, now),
-    env.DB.prepare("SELECT week, slots FROM gd_avail WHERE user_id = ? AND week IN (?, ?)").bind(me.id, week, prev).all<{ week: number; slots: string }>(),
+    env.DB.prepare("SELECT week, slots, confirmed_at FROM gd_avail WHERE user_id = ? AND week IN (?, ?)").bind(me.id, week, prev).all<{ week: number; slots: string; confirmed_at: number | null }>(),
     gdPeople(env, me),
   ]);
-  const mine = mineR.results.find((r) => r.week === week)?.slots ?? null;
+  const mineRow = mineR.results.find((r) => r.week === week);
+  const mine = mineRow?.slots ?? null;
   const prevMine = mineR.results.find((r) => r.week === prev)?.slots ?? null;
   const myParty = parties.find((p) => p.members.some((m) => m.id === me.id)) ?? null;
   return json(
@@ -27,6 +28,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       now,
       party: myParty,
       mine,
+      mineConfirmed: !!mineRow?.confirmed_at && !!mine?.includes("1"),
       prev: prevMine,
       // 다른 파티는 이름, 파티원, 정한 때만
       parties: parties.map((p) => ({ id: p.id, name: p.name, leader: p.leader, stage: p.stage, members: p.members.map((m) => m.id), confirmed: p.confirmed, current: p.current })),
