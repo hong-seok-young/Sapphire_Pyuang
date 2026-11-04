@@ -233,7 +233,7 @@ export const GUIDES: Guide[] = [
         text: "모두 되는 가장 빠른 때부터 1번 후보예요. 모두 확정하면 정해지고, 한 명이라도 불참이면 다음 후보로 넘어가요.\n후보 확정은 파티원 모두 시간표를 확정해야 돼요.",
       },
       { sel: ".gd-tabs button:has-text('내 시간표')", head: "내 시간표", text: "누르고 끌어서 되는 때를 칠해요. 손을 떼면 저장돼요.", tap: true, undo: false },
-      { sel: ".gd-grid", head: "시간표", text: "지난 칸도 칠할 수 있어요." },
+      { sel: ".gd-grid", head: "시간표", text: "오늘 왼쪽 열은 다음 주 날짜예요.\n다음 주 칸에 칠해 두면 새 주에 그대로 이어져요." },
       { sel: ".gd-tabs button:has-text('파티원')", head: "파티원", text: "파티원마다 시간표를 봐요. 나와 겹치는 때는 금색이에요.", tap: true, undo: false },
       { sel: ".gd-tabs button:has-text('교집합')", head: "교집합", text: "칸을 누르면 누가 되는지 보여요.", tap: true, undo: false },
       { sel: ".gd-peek-btn", head: "다른 파티", text: "누르면 그 파티의 후보와 시간표를 구경해요." },
