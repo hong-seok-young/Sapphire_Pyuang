@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { peekMemo, putMemo } from "./memo";
 import type { Monster, Post, Wiki } from "./types";
 
 const BASE = "data/";
@@ -109,14 +110,28 @@ export interface EnhanceWeapon { name: string; job: string; lv: number | null; m
 export interface Enhance { source: string; common: number[]; mage: Record<string, number[]>; weapons: EnhanceWeapon[] }
 export const loadEnhance = () => getJson<Enhance>("enhance");
 
-export function useAsync<T>(fn: () => Promise<T>): { data?: T; error?: string } {
-  const [state, setState] = useState<{ data?: T; error?: string }>({});
+/** key 를 주면 이번에 연 동안 받은 것을 받는 동안 바로 보인다 (src/memo.ts) */
+export function useAsync<T>(fn: () => Promise<T>, key?: string): { data?: T; error?: string } {
+  const [state, setState] = useState<{ data?: T; error?: string }>(() => {
+    const had = peekMemo<T>(key);
+    return had === undefined ? {} : { data: had };
+  });
   useEffect(() => {
     let alive = true;
-    fn().then((data) => alive && setState({ data }), (e) => alive && setState({ error: String(e) }));
+    const had = peekMemo<T>(key);
+    if (had !== undefined) setState({ data: had });
+    fn().then(
+      (data) => {
+        putMemo(key, data);
+        if (alive) setState({ data });
+      },
+      (e) => alive && setState({ error: String(e) }),
+    );
     return () => {
       alive = false;
     };
+    // key 는 fn 과 같이 바뀐다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fn]);
   return state;
 }

@@ -1,4 +1,5 @@
 // 길드 계정: 로그인, 내 정보, 길드원 관리 (서버는 functions/api, server/auth.ts)
+import { clearMemo } from "./memo";
 
 export type Role = "developer" | "master" | "officer" | "member";
 
@@ -182,7 +183,10 @@ export async function api<T>(path: string, method = "GET", body?: unknown): Prom
 
 export const fetchMe = () => api<Me>("/api/me");
 export const login = (id: string, password: string) => api<Me>("/api/login", "POST", { id, password });
-export const logout = () => api<{ ok: boolean }>("/api/logout", "POST");
+export const logout = () => {
+  clearMemo();
+  return api<{ ok: boolean }>("/api/logout", "POST");
+};
 export const changePassword = (current: string, next: string) =>
   api<{ ok: boolean }>("/api/password", "POST", { current, next });
 

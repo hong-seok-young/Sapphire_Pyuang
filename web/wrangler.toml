@@ -2,6 +2,8 @@
 name = "sapphire-guild"
 pages_build_output_dir = "dist"
 compatibility_date = "2026-10-01"
+# 답을 돌려준 뒤에 폰 알림을 마저 보내려고 요청마다 waitUntil 을 기억한다 (server/background.ts, AsyncLocalStorage 만 켠다)
+compatibility_flags = ["nodejs_als"]
 
 # 길드 계정 DB. 처음 한 번 `npx wrangler d1 create sapphire-accounts` 로 만들고,
 # 거기서 나온 database_id 를 아래에 넣는다. (README 의 '길드 계정 처음 설정' 참고)

@@ -1,3 +1,4 @@
+import { peekMemo, putMemo } from "../memo";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
@@ -96,10 +97,15 @@ function List({ me, cat }: { me: Me; cat: Cat | null }) {
 
   useEffect(() => {
     let alive = true;
-    setPosts(null);
+    // 이번에 연 동안 본 목록은 새로 받는 동안 바로 보인다 (src/memo.ts)
+    const key = `board:${cat}|${q}`;
+    const had = peekMemo<{ posts: PostSummary[]; more: boolean }>(key);
+    setPosts(had?.posts ?? null);
+    setMore(had?.more ?? false);
     setError("");
     fetchPosts({ cat, q }).then(
       (r) => {
+        putMemo(key, { posts: r.posts, more: r.more });
         if (!alive) return;
         setPosts(r.posts);
         setMore(r.more);

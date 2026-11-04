@@ -216,6 +216,32 @@ function PartyPanel({
   const canManage = leader || data.staff;
   const all = p.members.every((m) => m.filled);
   const waiting = p.members.filter((m) => !m.filled).map((m) => m.id);
+  // 단계 − + 는 누르는 대로 바로 바뀌고 저장은 뒤에서 (제작자 2026-11-04 '단계 조종 버튼도 엄청 반응이 늦음': 서버 답을 기다리는 동안 단추가 잠겼다).
+  // 잇달아 누르면 0.4초 뒤 마지막 값만 보낸다. 못 저장하면 서버 값으로 되돌린다
+  const [stage, setStage] = useState(p.stage);
+  const stageSave = useRef<{ timer: number; busy: boolean }>({ timer: 0, busy: false });
+  useEffect(() => {
+    if (!stageSave.current.timer && !stageSave.current.busy) setStage(p.stage);
+  }, [p.stage]);
+  const changeStage = (next: number | null) => {
+    setStage(next);
+    const s = stageSave.current;
+    window.clearTimeout(s.timer);
+    s.timer = window.setTimeout(async () => {
+      s.timer = 0;
+      s.busy = true;
+      try {
+        await editParty(p.id, { stage: next });
+        onParty({ ...p, stage: next });
+      } catch (e) {
+        onError(errorText(e));
+        setStage(p.stage);
+      } finally {
+        s.busy = false;
+      }
+    }, 400);
+  };
+  useEffect(() => () => window.clearTimeout(stageSave.current.timer), []);
   // 두 번 눌러야 하는 단추 (불참, 빼기, 파티 지우기, 나가기): 3초 안에 한 번 더
   useEffect(() => {
     if (!sure) return;
@@ -286,30 +312,24 @@ function PartyPanel({
     <section className="panel gd-party">
       <div className="gd-party-head">
         {/* 길드던전 단계 (제작자 2026-11-03: 파티마다 '4단계', 팀 이름 앞에). 파티장·운영진은 − + 로 바꾼다 (1에서 − 는 없앰) */}
-        {(p.stage !== null || canManage) && (
+        {(stage !== null || canManage) && (
           <span className="gd-stage">
             {canManage && (
               <button
                 className="pill gd-stage-btn"
-                disabled={busy || p.stage === null}
-                onClick={() =>
-                  run(() =>
-                    editParty(p.id, {
-                      stage: p.stage !== null && p.stage > 1 ? p.stage - 1 : null,
-                    }),
-                  )
-                }
+                disabled={stage === null}
+                onClick={() => changeStage(stage !== null && stage > 1 ? stage - 1 : null)}
                 aria-label="단계 내리기"
               >
                 −
               </button>
             )}
-            <i>{p.stage !== null ? `${p.stage}단계` : "단계"}</i>
+            <i>{stage !== null ? `${stage}단계` : "단계"}</i>
             {canManage && (
               <button
                 className="pill gd-stage-btn"
-                disabled={busy || (p.stage ?? 0) >= 9}
-                onClick={() => run(() => editParty(p.id, { stage: (p.stage ?? 0) + 1 }))}
+                disabled={(stage ?? 0) >= 9}
+                onClick={() => changeStage((stage ?? 0) + 1)}
                 aria-label="단계 올리기"
               >
                 +

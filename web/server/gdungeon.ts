@@ -167,8 +167,8 @@ export async function carryWeeks(env: Env, now = Date.now()): Promise<void> {
   ]);
 }
 
-export async function allParties(env: Env, week: number, now = Date.now()): Promise<PartyState[]> {
-  await carryWeeks(env, now);
+export async function allParties(env: Env, week: number, now = Date.now(), carried = false): Promise<PartyState[]> {
+  if (!carried) await carryWeeks(env, now);
   const [parties, members, avail, answers] = await env.DB.batch([
     env.DB.prepare("SELECT id, name, leader, stage FROM gd_parties ORDER BY id"),
     env.DB.prepare("SELECT party_id, user_id FROM gd_members ORDER BY joined_at, user_id"),

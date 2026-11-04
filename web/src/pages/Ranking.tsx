@@ -344,7 +344,7 @@ function periodEnd(period: GrowthPeriod, start: number): number {
  * 1등은 크게, 캐릭터 사진이 있으면 사진으로 보여 준다. 이 화면은 게임 그림 대신 이 앱 디자인으로 그린다.
  */
 function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthPeriod; guild: GuildFilter; onGuild: (g: GuildFilter) => void }) {
-  const { data, error } = useAsync(useCallback(() => fetchGrowth(period), [period]));
+  const { data, error } = useAsync(useCallback(() => fetchGrowth(period), [period]), `growth:${period}`);
   const [openId, setOpenId] = useState<string | null>(null);
   const toggle = (id: string) => setOpenId(openId === id ? null : id);
   if (!data || data.period !== period) return <Loading error={error} />;
@@ -424,7 +424,7 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
  */
 
 export function RankingPage({ me, onMe }: { me: Me; onMe?: (p: Partial<Me>) => void }) {
-  const { data, error } = useAsync(useCallback(() => fetchRanking(), []));
+  const { data, error } = useAsync(useCallback(() => fetchRanking(), []), "ranking");
   const [view, setView] = useEntryState<View>("view", "level");
   const [guild, setGuild] = useEntryState<GuildFilter>("guild", "all");
   return (

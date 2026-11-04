@@ -291,7 +291,7 @@ export function GoldRows({
  */
 export function GoldBoard({ me }: { me: Me }) {
   const [reload, setReload] = useState(0);
-  const { data, error } = useAsync(useCallback(() => fetchGold(), [reload]));
+  const { data, error } = useAsync(useCallback(() => fetchGold(), [reload]), "gold");
   const [offers, setOffers] = useState<GoldOffer[] | null>(null);
   const [side, setSide] = useEntryState<GoldSide>("gside", "sell");
   const [writing, setWriting] = useState(false);

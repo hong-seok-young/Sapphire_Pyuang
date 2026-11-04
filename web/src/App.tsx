@@ -74,69 +74,81 @@ import type { Me } from "./auth";
 // 자주 안 쓰는 화면은 따로 떼어 처음엔 받지 않는다 (2026-11-03 렉 검토: 코드 한 덩어리 558KB 를 폰이 다 읽고서야 홈이 떴다).
 // 홈·정보·위키 화면·로그인·오픈 축하·튜토리얼은 그대로 한 덩어리. 떼어 둔 화면은 처음 들어갈 때 한 번 받고(잠깐 '불러오는 중'), 배포 뒤 옛 조각을 못 찾으면
 // index.html 의 vite:preloadError 가 새로 불러온다
-const ChatPage = lazy(() =>
-  import("./pages/Chat").then((m) => ({ default: m.ChatPage })),
-);
-const AdminPage = lazy(() =>
-  import("./pages/Admin").then((m) => ({ default: m.AdminPage })),
-);
-const MePage = lazy(() =>
-  import("./pages/Profile").then((m) => ({ default: m.MePage })),
-);
-const ProfileSetupPage = lazy(() =>
-  import("./pages/Profile").then((m) => ({ default: m.ProfileSetupPage })),
-);
-const RankingPage = lazy(() =>
-  import("./pages/Ranking").then((m) => ({ default: m.RankingPage })),
-);
-const MarketPage = lazy(() =>
-  import("./pages/Market").then((m) => ({ default: m.MarketPage })),
-);
-const RequestsPage = lazy(() =>
-  import("./pages/Requests").then((m) => ({ default: m.RequestsPage })),
-);
-const EnhancePage = lazy(() =>
-  import("./pages/Enhance").then((m) => ({ default: m.EnhancePage })),
-);
-const TrendPage = lazy(() =>
-  import("./pages/Trend").then((m) => ({ default: m.TrendPage })),
-);
-const ActivityLogPage = lazy(() =>
-  import("./pages/ActivityLog").then((m) => ({ default: m.ActivityLogPage })),
-);
-const AlertsPage = lazy(() =>
-  import("./pages/Alerts").then((m) => ({ default: m.AlertsPage })),
-);
-const ChatGapsPage = lazy(() =>
-  import("./pages/ChatGaps").then((m) => ({ default: m.ChatGapsPage })),
-);
-const PlatShopPage = lazy(() =>
-  import("./pages/PlatShop").then((m) => ({ default: m.PlatShopPage })),
-);
-const BoardPage = lazy(() =>
-  import("./pages/Board").then((m) => ({ default: m.BoardPage })),
-);
-const OfficialPostPage = lazy(() =>
-  import("./pages/Official").then((m) => ({ default: m.OfficialPostPage })),
-);
-const PatchNotesPage = lazy(() =>
-  import("./pages/PatchNotes").then((m) => ({ default: m.PatchNotesPage })),
-);
-const OddsPage = lazy(() =>
-  import("./pages/Odds").then((m) => ({ default: m.OddsPage })),
-);
-const OddsTablePage = lazy(() =>
-  import("./pages/Odds").then((m) => ({ default: m.OddsTablePage })),
-);
-const TodoPage = lazy(() =>
-  import("./pages/Todo").then((m) => ({ default: m.TodoPage })),
-);
-const RentalPage = lazy(() =>
-  import("./pages/Rental").then((m) => ({ default: m.RentalPage })),
-);
-const GuildDungeonPage = lazy(() =>
-  import("./pages/GuildDungeon").then((m) => ({ default: m.GuildDungeonPage })),
-);
+// 화면 조각을 받는 곳 (lazy 와 미리 받기가 같은 것을 쓴다: 한 번 받으면 다시 받지 않는다)
+const CHUNKS = {
+  Chat: () => import("./pages/Chat"),
+  Admin: () => import("./pages/Admin"),
+  Profile: () => import("./pages/Profile"),
+  Ranking: () => import("./pages/Ranking"),
+  Market: () => import("./pages/Market"),
+  Requests: () => import("./pages/Requests"),
+  Enhance: () => import("./pages/Enhance"),
+  Trend: () => import("./pages/Trend"),
+  ActivityLog: () => import("./pages/ActivityLog"),
+  Alerts: () => import("./pages/Alerts"),
+  ChatGaps: () => import("./pages/ChatGaps"),
+  PlatShop: () => import("./pages/PlatShop"),
+  Board: () => import("./pages/Board"),
+  Official: () => import("./pages/Official"),
+  PatchNotes: () => import("./pages/PatchNotes"),
+  Odds: () => import("./pages/Odds"),
+  Todo: () => import("./pages/Todo"),
+  Rental: () => import("./pages/Rental"),
+  GuildDungeon: () => import("./pages/GuildDungeon"),
+};
+const ChatPage = lazy(() => CHUNKS.Chat().then((m) => ({ default: m.ChatPage })));
+const AdminPage = lazy(() => CHUNKS.Admin().then((m) => ({ default: m.AdminPage })));
+const MePage = lazy(() => CHUNKS.Profile().then((m) => ({ default: m.MePage })));
+const ProfileSetupPage = lazy(() => CHUNKS.Profile().then((m) => ({ default: m.ProfileSetupPage })));
+const RankingPage = lazy(() => CHUNKS.Ranking().then((m) => ({ default: m.RankingPage })));
+const MarketPage = lazy(() => CHUNKS.Market().then((m) => ({ default: m.MarketPage })));
+const RequestsPage = lazy(() => CHUNKS.Requests().then((m) => ({ default: m.RequestsPage })));
+const EnhancePage = lazy(() => CHUNKS.Enhance().then((m) => ({ default: m.EnhancePage })));
+const TrendPage = lazy(() => CHUNKS.Trend().then((m) => ({ default: m.TrendPage })));
+const ActivityLogPage = lazy(() => CHUNKS.ActivityLog().then((m) => ({ default: m.ActivityLogPage })));
+const AlertsPage = lazy(() => CHUNKS.Alerts().then((m) => ({ default: m.AlertsPage })));
+const ChatGapsPage = lazy(() => CHUNKS.ChatGaps().then((m) => ({ default: m.ChatGapsPage })));
+const PlatShopPage = lazy(() => CHUNKS.PlatShop().then((m) => ({ default: m.PlatShopPage })));
+const BoardPage = lazy(() => CHUNKS.Board().then((m) => ({ default: m.BoardPage })));
+const OfficialPostPage = lazy(() => CHUNKS.Official().then((m) => ({ default: m.OfficialPostPage })));
+const PatchNotesPage = lazy(() => CHUNKS.PatchNotes().then((m) => ({ default: m.PatchNotesPage })));
+const OddsPage = lazy(() => CHUNKS.Odds().then((m) => ({ default: m.OddsPage })));
+const OddsTablePage = lazy(() => CHUNKS.Odds().then((m) => ({ default: m.OddsTablePage })));
+const TodoPage = lazy(() => CHUNKS.Todo().then((m) => ({ default: m.TodoPage })));
+const RentalPage = lazy(() => CHUNKS.Rental().then((m) => ({ default: m.RentalPage })));
+const GuildDungeonPage = lazy(() => CHUNKS.GuildDungeon().then((m) => ({ default: m.GuildDungeonPage })));
+
+/**
+ * 홈이 뜬 뒤 쉬는 때에 자주 여는 화면의 조각을 하나씩 미리 받아 둔다 (제작자 2026-11-04 '화면 전환이나 버튼 동작별로 반응이 늦거나 렉').
+ * 처음 들어갈 때 '불러오는 중' 없이 바로 열린다. 데이터 아끼기(saveData)나 2G 면 받지 않는다. 운영진 화면은 운영진만
+ */
+function prefetchPages(staff: boolean, master: boolean) {
+  const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+  if (conn?.saveData || /(^|-)2g$/.test(conn?.effectiveType ?? "")) return () => undefined;
+  const list: (keyof typeof CHUNKS)[] = ["Board", "Ranking", "Market", "Todo", "GuildDungeon", "Requests", "Rental", "Chat", "Profile", "Alerts", "PlatShop", "Official"];
+  if (staff) list.push("Admin");
+  if (master) list.push("ActivityLog", "ChatGaps");
+  let stop = false;
+  let timer = 0;
+  const idle = (fn: () => void) => {
+    if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(fn, { timeout: 3000 });
+    else window.setTimeout(fn, 300);
+  };
+  const next = () => {
+    const k = list.shift();
+    if (stop || !k) return;
+    void CHUNKS[k]()
+      .catch(() => undefined)
+      .then(() => {
+        timer = window.setTimeout(() => idle(next), 150);
+      });
+  };
+  timer = window.setTimeout(() => idle(next), 1500);
+  return () => {
+    stop = true;
+    window.clearTimeout(timer);
+  };
+}
 
 /**
  * 아래 탭은 사람마다 배치가 다르다 (src/launcher.ts, 제작자 요청 2026-11-01: 폰 홈 화면처럼 홈 칸과 아래 탭을 오가며 옮기기).
@@ -212,6 +224,12 @@ export function App() {
       stop();
     };
   }, []);
+  // 로그인한 뒤 쉬는 때에 자주 여는 화면 조각을 미리 받아 둔다
+  const loggedRole = me ? me.role : null;
+  useEffect(() => {
+    if (!loggedRole) return;
+    return prefetchPages(RANK[loggedRole] >= 1, RANK[loggedRole] >= 2);
+  }, [loggedRole]);
   // 다시 연결되거나 앱으로 돌아오면 저절로 다시
   useEffect(() => {
     if (!bootError) return;

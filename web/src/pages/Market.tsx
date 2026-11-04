@@ -1553,11 +1553,11 @@ function SellForm({
  */
 export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const [reload, setReload] = useState(0);
-  const { data, error } = useAsync(useCallback(() => fetchMarket(), [reload]));
+  const { data, error } = useAsync(useCallback(() => fetchMarket(), [reload]), "market");
   const [listings, setListings] = useState<Listing[] | null>(null);
   const [rate, setRate] = useState(75);
   // 내 골드 글도 '내 글' 칸에 (제작자 2026-11-03 '골드 메뉴도 통일감 있게'). 골드 칸 자체는 GoldBoard 가 따로 받는다
-  const { data: goldData } = useAsync(useCallback(() => fetchGold(), [reload]));
+  const { data: goldData } = useAsync(useCallback(() => fetchGold(), [reload]), "gold");
   const [gold, setGold] = useState<GoldOffer[]>([]);
   useEffect(() => {
     if (goldData) setGold(goldData);

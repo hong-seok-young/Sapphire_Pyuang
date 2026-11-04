@@ -65,6 +65,10 @@ function groupRows(rows: ActivityRow[]): Item[] {
  * 대신 사람마다 기기 표로 센 기기 수, '새 기기', 붉은 '다른 도시 동시 접속 N번'(10분 안에 다른 기기가 다른 도시에서)을 보인다. 기록에는 그대로 남긴다.
  * 사람을 누르면 그 겹친 때마다 언제, 어느 기기가 어디서 ↔ 어느 기기가 어디서를 보인다 (제작자 2026-11-03: 표만으로는 '뭔 소린지' 몰랐다)
  */
+/** 이번에 연 동안 받은 것: 다시 들어오면 받는 동안 바로 보인다 */
+const rowsCache = new Map<string, { rows: ActivityRow[]; more: boolean }>();
+const summaryCache = new Map<string, Awaited<ReturnType<typeof fetchActivity>>>();
+
 export function ActivityLogPage({ wiki, role }: { wiki: Wiki; role: string }) {
   /** 묶음 요약에 쓰는 짧은 이름 ('게시판: 자유' -> '자유', '게시판 글: 제목' -> '제목') */
   const itemText = (r: ActivityRow) =>
@@ -88,15 +92,41 @@ export function ActivityLogPage({ wiki, role }: { wiki: Wiki; role: string }) {
   /** 펼친 묶음 (그 묶음 맨 위 기록 번호) */
   const [opened, setOpened] = useState<Set<number>>(new Set());
 
+  // 기록과 요약을 따로 동시에 받는다: 기록이 먼저 오면 바로 그리고, 지난번에 본 것은 받는 동안 그대로 보인다 (제작자 2026-11-04 '사용 기록 들어갈 때 로딩이 길어')
   useEffect(() => {
     let alive = true;
-    setRows(null);
+    const key = `${user ?? ""}|${kind ?? ""}`;
+    const had = rowsCache.get(key);
+    setRows(had?.rows ?? null);
+    setMore(had?.more ?? false);
     setError("");
-    fetchActivity({ user, kind }).then(
+    fetchActivity({ user, kind, part: "rows" }).then(
       (r) => {
         if (!alive) return;
+        rowsCache.set(key, { rows: r.rows, more: r.more });
         setRows(r.rows);
         setMore(r.more);
+      },
+      (x) => alive && setError(errorText(x)),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [user, kind]);
+  useEffect(() => {
+    let alive = true;
+    const key = user ?? "";
+    const had = summaryCache.get(key);
+    if (had) {
+      setPeople(had.people ?? []);
+      if (had.storage) setStorage(had.storage);
+    }
+    setDevices(had?.devices ?? null);
+    setOverlaps(had?.overlaps ?? null);
+    fetchActivity({ user, part: "summary" }).then(
+      (r) => {
+        if (!alive) return;
+        summaryCache.set(key, r);
         if (r.people) setPeople(r.people);
         if (r.storage) setStorage(r.storage);
         setDevices(r.devices ?? null);
@@ -107,7 +137,7 @@ export function ActivityLogPage({ wiki, role }: { wiki: Wiki; role: string }) {
     return () => {
       alive = false;
     };
-  }, [user, kind]);
+  }, [user]);
 
   async function loadMore() {
     if (!rows?.length) return;

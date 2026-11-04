@@ -359,10 +359,18 @@ export function readCookie(request: Request, name: string): string | null {
   return null;
 }
 
+/** 한 요청 안에서는 한 번만 찾는다 (API 미들웨어와 처리 함수가 같은 요청으로 두 번 부른다. 2026-11-04 단추 반응 속도) */
+const userOf = new WeakMap<Request, Promise<User | null>>();
+
 /** 로그인한 사람. 로그인 안 했거나 세션이 끝났으면 null */
 export async function currentUser(env: Env, request: Request): Promise<User | null> {
+  const had = userOf.get(request);
+  if (had) return had;
   const token = readCookie(request, COOKIE);
-  return token ? userOfToken(env, token) : null;
+  const found = token ? userOfToken(env, token) : Promise.resolve(null);
+  userOf.set(request, found);
+  found.catch(() => userOf.delete(request));
+  return found;
 }
 
 /** 세션 토큰의 사람 (테스트 계정 전환에서 앱개발자 세션을 되돌릴 때도 쓴다) */

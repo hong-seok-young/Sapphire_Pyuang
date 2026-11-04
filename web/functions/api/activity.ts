@@ -135,28 +135,45 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (RANK[me.role] < 2) return FORBIDDEN();
   const q = new URL(request.url).searchParams;
   if (q.get("usage")) return json(await usage(env));
+  // 화면은 기록(part=rows)과 요약(part=summary)을 따로 동시에 받아 기록부터 그린다 (제작자 2026-11-04 '사용 기록 들어갈 때 로딩이 길어').
+  // part 가 없으면 예전처럼 둘 다 (배포 중 예전 화면)
+  const part = q.get("part");
+  const user = q.get("user");
+  const kind = q.get("kind");
+  const before = Number(q.get("before"));
+  const older = Number.isInteger(before) && before > 0;
+  const dbs = await logDbs(env);
+  const [list, summary] = await Promise.all([
+    part === "summary" ? null : logRows(env, dbs, user, kind, older ? before : 0),
+    part === "rows" || older ? null : summaryOf(env, dbs, user),
+  ]);
+  return json({ ...(list ?? {}), ...(summary ?? {}) });
+};
+
+/** 그 사람의 모든 캐릭터 아이디 (사용 기록 DB 에는 목록으로 넘긴다) */
+async function charIds(env: Env, user: string): Promise<string[]> {
+  const o = "(SELECT COALESCE(main_id, id) FROM users WHERE id = ?1)";
+  const ids = (await env.DB.prepare(`SELECT id FROM users WHERE id = ${o} OR main_id = ${o}`).bind(user).all<{ id: string }>()).results.map((r) => r.id);
+  return ids.length ? ids : [user];
+}
+
+/** 최근 기록 150줄 (before 보다 앞의 것) */
+async function logRows(env: Env, dbs: LogDb[], user: string | null, kind: string | null, before: number) {
   const where: string[] = [];
   const binds: (string | number)[] = [];
-  const user = q.get("user");
   if (user) {
-    // 그 사람의 모든 캐릭터 (아이디는 계정 DB 에서 찾고, 사용 기록 DB 에는 목록으로 넘긴다)
-    const owner = "(SELECT COALESCE(main_id, id) FROM users WHERE id = ?1)";
-    const ids = await env.DB.prepare(`SELECT id FROM users WHERE id = ${owner} OR main_id = ${owner}`).bind(user).all<{ id: string }>();
     where.push("user_id IN (SELECT value FROM json_each(?))");
-    binds.push(JSON.stringify(ids.results.length ? ids.results.map((r) => r.id) : [user]));
+    binds.push(JSON.stringify(await charIds(env, user)));
   }
-  const kind = q.get("kind");
   if (kind === "visit" || kind === "view" || kind === "act") {
     where.push("kind = ?");
     binds.push(kind);
   }
-  const before = Number(q.get("before"));
-  if (Number.isInteger(before) && before > 0) {
+  if (before > 0) {
     where.push("id < ?");
     binds.push(before);
   }
   // 사용 기록 DB 2~10 과 DB 1 의 예전 기록: 새 DB 부터 이어 붙이면 번호 순서 그대로다 (server/logdb.ts)
-  const dbs = await logDbs(env);
   const rows = await newestLogs<Record<string, unknown>>(dbs, PAGE, (db, left) =>
     db
       .prepare(
@@ -165,48 +182,65 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       )
       .bind(...binds),
   );
-  const more = rows.length === PAGE;
-  if (before > 0) return json({ rows, more });
+  return { rows, more: rows.length === PAGE };
+}
+
+/** 사람별 요약, DB 크기, (고른 사람이면) 기기와 겹친 접속. 서로 기다리지 않게 한꺼번에 */
+async function summaryOf(env: Env, dbs: LogDb[], user: string | null) {
+  const now = Date.now();
+  const [logs, legacy, users, devices, overlaps] = await Promise.all([
+    logSizes(env),
+    env.DB.prepare("SELECT MAX(id) AS n FROM activity").all<{ n: number | null }>(),
+    env.DB.prepare("SELECT id, role, main_id FROM users").all<{ id: string; role: string; main_id: string | null }>(),
+    user ? devicesOf(env, dbs, user) : undefined,
+    user ? overlapsOf(env, dbs, user) : undefined,
+  ]);
   // 남은 기록 수(지우지 않아 번호가 곧 수, DB 마다 시작 번호를 빼서 더한다)와 DB 크기
   // (제작자 2026-11-02 '사용 기록 무제한으로 못 쌓아?': 무료 요금제는 DB 하나에 500MB, DB 10개까지라 사용 기록은 DB 2~10 을 차례로 쓴다)
-  const logs = await logSizes(env);
-  const legacy = await env.DB.prepare("SELECT MAX(id) AS n FROM activity").all<{ n: number | null }>();
   const storage = {
     rows: (legacy.results[0]?.n ?? 0) + logs.reduce((t, l) => t + l.rows, 0),
     bytes: (legacy.meta as { size_after?: number } | undefined)?.size_after ?? null,
     logs,
     logFull: LOG_FULL,
   };
-  const devices = user ? await devicesOf(env, dbs, user) : undefined;
-  const overlaps = user ? await overlapsOf(env, dbs, user) : undefined;
-  const now = Date.now();
-  const users = await env.DB.prepare("SELECT id, role, main_id FROM users").all<{ id: string; role: string; main_id: string | null }>();
-  const stats = await fromLogs<Omit<Stat, "role" | "main_id">>(dbs, (db) =>
-    db
-      .prepare(
-        "SELECT j.value AS id, " +
-          "(SELECT COUNT(*) FROM activity a WHERE a.user_id = j.value AND a.kind = 'visit' AND a.at > ?2) AS visits7, " +
-          "(SELECT COUNT(*) FROM activity a WHERE a.user_id = j.value AND a.kind = 'visit' AND a.at > ?3) AS visits30, " +
-          "(SELECT COUNT(*) FROM activity a WHERE a.user_id = j.value AND a.kind = 'view' AND a.at > ?2) AS views7, " +
-          "(SELECT COUNT(*) FROM activity a WHERE a.user_id = j.value AND a.kind = 'act' AND a.at > ?2) AS acts7, " +
-          "(SELECT MAX(a.at) FROM activity a WHERE a.user_id = j.value) AS last, " +
-          "(SELECT a.via FROM activity a WHERE a.user_id = j.value ORDER BY a.at DESC LIMIT 1) AS lastVia " +
-          "FROM json_each(?1) j",
-      )
-      .bind(JSON.stringify(users.results.map((u) => u.id)), now - 7 * DAY, now - 30 * DAY),
-  );
+  const ids = JSON.stringify(users.results.map((u) => u.id));
+  const [counts, lasts, flags] = await Promise.all([
+    // 7일·30일 수는 30일 기록을 한 번만 훑어 사람마다 센다 (예전에는 사람마다 네 번씩 훑었다)
+    fromLogs<{ id: string; visits7: number; visits30: number; views7: number; acts7: number }>(covering(dbs, now - 30 * DAY), (db) =>
+      db
+        .prepare(
+          "SELECT user_id AS id, SUM(kind = 'visit' AND at > ?1) AS visits7, SUM(kind = 'visit') AS visits30, " +
+            "SUM(kind = 'view' AND at > ?1) AS views7, SUM(kind = 'act' AND at > ?1) AS acts7 FROM activity WHERE at > ?2 GROUP BY user_id",
+        )
+        .bind(now - 7 * DAY, now - 30 * DAY),
+    ),
+    // 마지막으로 쓴 때와 곳 (사람마다 색인 한 번)
+    fromLogs<{ id: string; last: number | null; lastVia: string | null }>(dbs, (db) =>
+      db
+        .prepare(
+          "SELECT j.value AS id, (SELECT MAX(a.at) FROM activity a WHERE a.user_id = j.value) AS last, " +
+            "(SELECT a.via FROM activity a WHERE a.user_id = j.value ORDER BY a.at DESC LIMIT 1) AS lastVia FROM json_each(?1) j",
+        )
+        .bind(ids),
+    ),
+    deviceFlags(env, dbs, users.results),
+  ]);
   // DB 마다 센 것을 사람마다 더한다 (마지막으로 쓴 때와 곳은 가장 새것)
   const statOf = new Map<string, Stat>(
     users.results.map((u) => [u.id, { id: u.id, role: u.role, main_id: u.main_id, visits7: 0, visits30: 0, views7: 0, acts7: 0, last: null, lastVia: null }]),
   );
-  for (const s of stats) {
+  for (const s of counts) {
     const o = statOf.get(s.id);
     if (!o) continue;
-    o.visits7 += s.visits7;
-    o.visits30 += s.visits30;
-    o.views7 += s.views7;
-    o.acts7 += s.acts7;
-    if (s.last !== null && (o.last === null || s.last > o.last)) {
+    o.visits7 += s.visits7 ?? 0;
+    o.visits30 += s.visits30 ?? 0;
+    o.views7 += s.views7 ?? 0;
+    o.acts7 += s.acts7 ?? 0;
+  }
+  for (const s of lasts) {
+    const o = statOf.get(s.id);
+    if (!o || s.last === null) continue;
+    if (o.last === null || s.last > o.last) {
       o.last = s.last;
       o.lastVia = s.lastVia;
     }
@@ -232,21 +266,37 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       o.lastVia = p.lastVia;
     }
   }
-  const flags = await deviceFlags(env, dbs, people.results);
   const merged = [...byOwner.values()]
     .map(({ main_id: _m, ...p }) => ({ ...p, ...(flags.get(p.id) ?? { devices7: 0, newDev: false, together: 0 }) }))
     .sort((a, b) => (a.last === null ? 1 : 0) - (b.last === null ? 1 : 0) || (b.last ?? 0) - (a.last ?? 0) || a.id.localeCompare(b.id));
-  return json({ rows, more, people: merged, devices, overlaps, storage });
-};
+  return { people: merged, devices, overlaps, storage };
+}
+
+/**
+ * 기기 표가 있는 기록을 사람·기기·곳·10분 칸마다 처음과 마지막 두 줄로 줄인다 (같은 때 다른 곳을 찾는 데는 그것만 있으면 된다: 10분 안에 다른 기기가 썼는지).
+ * 7일·60일 기록을 다 넘기지 않아 빠르다
+ */
+async function devEvents(dbs: LogDb[], since: number, ids?: string[]) {
+  const rows = await fromLogs<{ user: string; dev: string; device: string | null; place: string | null; a1: number; a2: number }>(covering(dbs, since), (db) =>
+    db
+      .prepare(
+        "SELECT user_id AS user, dev, MAX(device) AS device, place, MIN(at) AS a1, MAX(at) AS a2 FROM activity WHERE at > ?1 AND dev IS NOT NULL" +
+          (ids ? " AND user_id IN (SELECT value FROM json_each(?2))" : "") +
+          ` GROUP BY user_id, dev, place, at / ${TOGETHER_MS}`,
+      )
+      .bind(...(ids ? [since, JSON.stringify(ids)] : [since])),
+  );
+  const ev: { user: string; dev: string; device: string | null; place: string | null; at: number }[] = [];
+  for (const r of rows) {
+    ev.push({ user: r.user, dev: r.dev, device: r.device, place: r.place, at: r.a1 });
+    if (r.a2 !== r.a1) ev.push({ user: r.user, dev: r.dev, device: r.device, place: r.place, at: r.a2 });
+  }
+  return ev.sort((a, b) => a.at - b.at);
+}
 
 /** 기기마다 묶은 기록 (사람의 모든 캐릭터, 최근 60일). 기기 표가 없던 예전 기록은 기기 글로. 여러 DB 에 걸친 것은 합친다 */
 async function deviceRows(env: Env, dbs: LogDb[], since: number, owner?: string): Promise<DevRow[]> {
-  let ids: string[] | null = null;
-  if (owner) {
-    const o = "(SELECT COALESCE(main_id, id) FROM users WHERE id = ?1)";
-    ids = (await env.DB.prepare(`SELECT id FROM users WHERE id = ${o} OR main_id = ${o}`).bind(owner).all<{ id: string }>()).results.map((r) => r.id);
-    if (!ids.length) ids = [owner];
-  }
+  const ids = owner ? await charIds(env, owner) : null;
   const rows = await fromLogs<DevRow>(covering(dbs, since), (db) =>
     db
       .prepare(
@@ -330,18 +380,7 @@ interface Overlap {
  */
 async function overlapsOf(env: Env, dbs: LogDb[], user: string): Promise<Overlap[]> {
   const since = Date.now() - DEVICE_DAYS * DAY;
-  const o = "(SELECT COALESCE(main_id, id) FROM users WHERE id = ?1)";
-  let ids = (await env.DB.prepare(`SELECT id FROM users WHERE id = ${o} OR main_id = ${o}`).bind(user).all<{ id: string }>()).results.map((r) => r.id);
-  if (!ids.length) ids = [user];
-  const ev = (
-    await fromLogs<{ user: string; dev: string; device: string | null; place: string | null; at: number }>(covering(dbs, since), (db) =>
-      db
-        .prepare(
-          "SELECT user_id AS user, dev, device, place, at FROM activity WHERE at > ?1 AND dev IS NOT NULL AND user_id IN (SELECT value FROM json_each(?2)) ORDER BY at",
-        )
-        .bind(since, JSON.stringify(ids)),
-    )
-  ).sort((a, b) => a.at - b.at);
+  const ev = await devEvents(dbs, since, await charIds(env, user));
   const last = new Map<string, { at: number; city: string; name: string | null; char: string }>();
   const out: Overlap[] = [];
   let lastHit = 0;
@@ -368,8 +407,15 @@ async function deviceFlags(env: Env, dbs: LogDb[], users: { id: string; main_id:
   // 기기 수와 새 기기 (기기 표가 있는 기록만: 예전 기록과 섞으면 모두 새 기기로 보인다)
   const firstOf = new Map<string, Map<string, number>>();
   const seen7 = new Map<string, Set<string>>();
-  for (const r of await deviceRows(env, dbs, now - DEVICE_DAYS * DAY)) {
-    if (!r.dev) continue;
+  // 기기마다 처음·마지막으로 쓴 때만 (기기 목록의 도시·이름은 여기서 안 쓴다, 60일 기록을 가볍게 훑는다)
+  const since = now - DEVICE_DAYS * DAY;
+  const [devRows, events] = await Promise.all([
+    fromLogs<{ user: string; dev: string; first: number; last: number }>(covering(dbs, since), (db) =>
+      db.prepare("SELECT user_id AS user, dev, MIN(at) AS first, MAX(at) AS last FROM activity WHERE at > ? AND dev IS NOT NULL GROUP BY user_id, dev").bind(since),
+    ),
+    devEvents(dbs, now - 7 * DAY),
+  ]);
+  for (const r of devRows) {
     const o = ownerOf.get(r.user) ?? r.user;
     const m = firstOf.get(o) ?? (firstOf.set(o, new Map()), firstOf.get(o)!);
     m.set(r.dev, Math.min(m.get(r.dev) ?? Infinity, r.first));
@@ -382,13 +428,7 @@ async function deviceFlags(env: Env, dbs: LogDb[], users: { id: string; main_id:
     if (firsts.some((t) => t > now - 7 * DAY && t > oldest)) get(o).newDev = true;
   }
   // 같은 때 다른 곳: 7일 동안, 서로 다른 기기가 10분 안에 서로 다른 도시에서 (한 번 겹치면 30분은 한 번으로)
-  const ev = {
-    results: (
-      await fromLogs<{ user: string; dev: string; place: string | null; at: number }>(covering(dbs, now - 7 * DAY), (db) =>
-        db.prepare("SELECT user_id AS user, dev, place, at FROM activity WHERE at > ? AND dev IS NOT NULL ORDER BY at").bind(now - 7 * DAY),
-      )
-    ).sort((a, b) => a.at - b.at),
-  };
+  const ev = { results: events };
   const lastBy = new Map<string, Map<string, { at: number; city: string }>>();
   const lastHit = new Map<string, number>();
   for (const e of ev.results) {

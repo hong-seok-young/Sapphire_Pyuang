@@ -30,11 +30,14 @@ async function tidy(env: Env, id: number) {
 export const onRequestPut: PagesFunction<Env> = async ({ request, env, params }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  if (!(await canUseGd(env, me))) return FORBIDDEN();
   const id = Number(params.id);
-  const p = await load(env, id);
+  const [allowed, p, b] = await Promise.all([
+    canUseGd(env, me),
+    load(env, id),
+    readJson<{ add: unknown; remove: unknown; leader: unknown; leave: unknown; stage: unknown }>(request),
+  ]);
+  if (!allowed) return FORBIDDEN();
   if (!p) return json({ error: "없는 파티예요" }, 404);
-  const b = await readJson<{ add: unknown; remove: unknown; leader: unknown; leave: unknown; stage: unknown }>(request);
   const now = Date.now();
 
   if (b.stage !== undefined) {
@@ -42,7 +45,8 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
     const stage = readStage(b.stage);
     if (stage === undefined) return json({ error: `단계는 1 ~ ${MAX_STAGE} 사이예요` }, 400);
     await env.DB.prepare("UPDATE gd_parties SET stage = ? WHERE id = ?").bind(stage, id).run();
-    return json({ ok: true, party: await oneParty(env, id, weeks(now).week, now) });
+    // 화면이 이미 바꿔 그렸다: 모든 파티 상태를 다시 셈하지 않고 바로 답한다 (제작자 2026-11-04 '단계 조종 버튼 반응이 늦음')
+    return json({ ok: true, stage });
   }
 
   if (b.leave === true) {

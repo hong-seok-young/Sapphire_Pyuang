@@ -3,6 +3,7 @@
 // 폰 자체 알림(웹 푸시)도 같이 보낸다 (server/push.ts, 폰에서 켠 사람만). 게임 위에는 아무것도 띄우지 않는다
 import type { Env } from "./auth";
 import { pushNew } from "./push";
+import { later } from "./background";
 
 /** 알림 종류와 처음 켜짐 여부 (화면 web/src/alerts.ts 의 이름과 같다) */
 export const ALERT_KINDS = {
@@ -43,7 +44,8 @@ export async function notify(env: Env, to: string[] | "all", kind: AlertKind, te
     )
       .bind(kind, text.slice(0, 200), link, now, from, kind, ALERT_KINDS[kind] ? 1 : 0, ...(to === "all" ? [] : to))
       .run();
-    await pushNew(env, kind, now);
+    // 폰 알림은 답을 돌려준 뒤에 보낸다 (server/background.ts)
+    await later(pushNew(env, kind, now));
   } catch (e) {
     console.error("notify failed", e);
   }

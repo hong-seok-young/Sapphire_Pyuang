@@ -717,7 +717,7 @@ function MsgActions({ text, msg, onAgain }: { text: string; msg?: number; onAgai
 
 /** 새 대화 첫 화면: 예시 질문과 최근 대화 */
 function Intro({ onPick }: { onPick: (q: string) => void }) {
-  const { data } = useAsync(useCallback(() => listThreads(), []));
+  const { data } = useAsync(useCallback(() => listThreads(), []), "threads");
   const recent = (data?.threads ?? []).slice(0, 4);
   return (
     <section className="panel chat-intro">

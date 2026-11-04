@@ -1,3 +1,4 @@
+import { peekMemo, putMemo } from "../memo";
 import { useEffect, useState } from "react";
 import { errorText } from "../auth";
 import { ALERT_GROUPS, clearUnread, fetchAlerts, readAllAlerts, setAlertPref, setPushPref } from "../alerts";
@@ -9,14 +10,17 @@ import { Loading, TopBar } from "../ui";
 
 /** 알림함 (제작자 요청): 나와 관련된 일 목록. 열면 모두 읽음이 된다. 아래에서 메뉴별로 켜고 끈다 */
 export function AlertsPage({ developer = false, preview = false }: { developer?: boolean; preview?: boolean }) {
-  const [alerts, setAlerts] = useState<Alert[] | null>(null);
-  const [prefs, setPrefs] = useState<Record<AlertKind, boolean> | null>(null);
-  const [pushPrefs, setPushPrefs] = useState<Partial<Record<AlertKind, boolean>>>({});
+  // 이번에 연 동안 본 알림은 새로 받는 동안 바로 보인다 (src/memo.ts)
+  const had = peekMemo<Awaited<ReturnType<typeof fetchAlerts>>>("alerts");
+  const [alerts, setAlerts] = useState<Alert[] | null>(had?.alerts ?? null);
+  const [prefs, setPrefs] = useState<Record<AlertKind, boolean> | null>(had?.prefs ?? null);
+  const [pushPrefs, setPushPrefs] = useState<Partial<Record<AlertKind, boolean>>>(had?.pushPrefs ?? {});
   const [error, setError] = useState("");
 
   useEffect(() => {
     fetchAlerts().then(
       (r) => {
+        putMemo("alerts", r);
         setAlerts(r.alerts);
         setPrefs(r.prefs);
         setPushPrefs(r.pushPrefs ?? {});

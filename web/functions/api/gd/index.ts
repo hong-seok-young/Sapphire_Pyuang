@@ -15,7 +15,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const { week, prev, end } = weeks(now);
   await carryWeeks(env, now);
   const [parties, mineR, people] = await Promise.all([
-    allParties(env, week, now),
+    allParties(env, week, now, true),
     env.DB.prepare("SELECT week, slots, confirmed_at FROM gd_avail WHERE user_id = ? AND week IN (?, ?, ?)").bind(me.id, week, prev, end).all<{ week: number; slots: string; confirmed_at: number | null }>(),
     gdPeople(env, me),
   ]);

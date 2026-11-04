@@ -237,7 +237,7 @@ function RequestDetail({ me, r, onChanged, onStale }: { me: Me; r: GuildRequest;
  */
 export function RequestsPage({ me }: { me: Me }) {
   const [reload, setReload] = useState(0);
-  const { data, error } = useAsync(useCallback(() => fetchRequests(), [reload]));
+  const { data, error } = useAsync(useCallback(() => fetchRequests(), [reload]), "requests");
   const [list, setList] = useState<GuildRequest[] | null>(null);
   const [filter, setFilter] = useEntryState<Filter>("filter", "open");
   const [writing, setWriting] = useState(false);

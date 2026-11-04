@@ -124,15 +124,17 @@ export async function advanceLog(env: Env, cur: LogDb, alarm: (text: string) => 
 
 /** 여러 DB 에 같은 물음을 하고 줄을 모은다 (새 DB 것부터) */
 export async function fromLogs<T>(list: LogDb[], make: (db: D1Database) => D1PreparedStatement): Promise<T[]> {
-  const out: T[] = [];
-  for (const d of list) {
-    try {
-      out.push(...(await make(d.db).all<T>()).results);
-    } catch {
-      // 표가 아직 없는 DB (막 만든 DB)
-    }
-  }
-  return out;
+  // DB 마다 따로라 한꺼번에 묻는다 (차례로 기다리지 않게, 2026-11-04 사용 기록이 느려서)
+  const parts = await Promise.all(
+    list.map(async (d) => {
+      try {
+        return (await make(d.db).all<T>()).results;
+      } catch {
+        return [] as T[]; // 표가 아직 없는 DB (막 만든 DB)
+      }
+    }),
+  );
+  return parts.flat();
 }
 
 /** 새것부터 limit 줄까지 (번호가 DB 순서대로 이어져서 이어 붙이면 그대로 새것부터다) */

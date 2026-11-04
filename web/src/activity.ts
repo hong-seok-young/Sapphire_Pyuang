@@ -96,8 +96,10 @@ export interface Storage {
   logFull?: number;
 }
 
-export function fetchActivity(q: { user?: string | null; kind?: Kind | null; before?: number }) {
+/** part: 'rows' 는 기록만, 'summary' 는 사람별 요약·DB 크기·기기만 (둘을 동시에 받아 기록부터 그린다) */
+export function fetchActivity(q: { user?: string | null; kind?: Kind | null; before?: number; part?: "rows" | "summary" }) {
   const p = new URLSearchParams();
+  if (q.part) p.set("part", q.part);
   if (q.user) p.set("user", q.user);
   if (q.kind) p.set("kind", q.kind);
   if (q.before) p.set("before", String(q.before));
