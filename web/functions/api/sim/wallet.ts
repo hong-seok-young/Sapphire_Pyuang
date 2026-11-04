@@ -4,13 +4,15 @@
 // POST /api/sim/wallet { quest: 0|1|2 } -> 오늘의 도전을 깼다 (하루 한 번씩 QUEST_COIN) -> { coins, got }
 import { FORBIDDEN, NEED_LOGIN, RANK, TEST_IDS, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { EARN, QUEST_COIN, QUEST_KEYS, earn, ensureWallet, kstDate } from "../../../server/simcoin";
+import { DEV_FLOOR, DEV_REFILL, EARN, QUEST_COIN, QUEST_KEYS, earn, ensureWallet, kstDate, refillSql, refillable } from "../../../server/simcoin";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!(me.role === "developer" || TEST_IDS.includes(me.id))) return FORBIDDEN();
   await ensureWallet(env, me.id);
+  const refill = refillable(me);
+  if (refill) await refillSql(env, me.id).run();
   const now = Date.now();
   const [w, today, feed, total] = await env.DB.batch([
     env.DB.prepare("SELECT coins, earned, spent FROM sim_wallet WHERE user_id = ?").bind(me.id),
@@ -29,6 +31,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       questCoin: QUEST_COIN,
       feed: feed.results,
       total: (total.results[0] as { total: number } | undefined)?.total ?? 0,
+      // 앱개발자는 100 아래로 내려가면 1000 을 채운다 (화면도 같은 규칙)
+      refill: refill ? { floor: DEV_FLOOR, add: DEV_REFILL } : null,
     },
     200,
     { "cache-control": "no-store" },
@@ -50,10 +54,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
   const n = Math.round(Number(body.spend));
   if (!(n >= 1 && n <= 1_000_000)) return json({ error: "코인 수가 맞지 않아요" }, 400);
-  const r = await env.DB.prepare(
-    "UPDATE sim_wallet SET spent = spent + MIN(coins, ?2), coins = coins - MIN(coins, ?2), updated_at = ?3 WHERE user_id = ?1 RETURNING coins",
-  )
+  await env.DB.prepare("UPDATE sim_wallet SET spent = spent + MIN(coins, ?2), coins = coins - MIN(coins, ?2), updated_at = ?3 WHERE user_id = ?1")
     .bind(me.id, n, Date.now())
-    .first<{ coins: number }>();
+    .run();
+  if (refillable(me)) await refillSql(env, me.id).run();
+  const r = await env.DB.prepare("SELECT coins FROM sim_wallet WHERE user_id = ?").bind(me.id).first<{ coins: number }>();
   return json({ coins: r?.coins ?? 0 });
 };

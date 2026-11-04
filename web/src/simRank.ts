@@ -30,6 +30,8 @@ export interface Wallet {
   feed: { user_id: string; game: string; label: string; luck: number; at: number }[];
   /** 내 도박왕 점수 */
   total: number;
+  /** 앱개발자: floor 아래로 내려가면 add 를 채운다 (서버 server/simcoin.ts 와 같은 규칙) */
+  refill: { floor: number; add: number } | null;
 }
 export interface King {
   user_id: string;
@@ -104,6 +106,7 @@ export function useCoinState(): Coins & { wallet: Wallet | null; reload: () => v
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [coins, setCoins] = useState<number | null>(null);
   const left = useRef<number | null>(null);
+  const refill = useRef<Wallet["refill"]>(null);
   const pending = useRef(0);
   const timer = useRef(0);
   const flush = useCallback(() => {
@@ -118,6 +121,7 @@ export function useCoinState(): Coins & { wallet: Wallet | null; reload: () => v
     fetchWallet().then(
       (w) => {
         setWallet(w);
+        refill.current = w.refill ?? null;
         left.current = w.coins - pending.current;
         setCoins(left.current);
       },
@@ -140,6 +144,8 @@ export function useCoinState(): Coins & { wallet: Wallet | null; reload: () => v
       if (!k) return 0;
       left.current -= k;
       pending.current += k;
+      const r = refill.current;
+      if (r && left.current < r.floor) left.current += r.add;
       setCoins(left.current);
       if (!timer.current) timer.current = window.setTimeout(flush, 1500);
       return k;
