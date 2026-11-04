@@ -8,8 +8,7 @@ export type SimEvent =
   | { kind: "opt"; luck: number }
   | { kind: "gem"; stage: number }
   | { kind: "box"; p: number }
-  | { kind: "repair"; level: number }
-  | { kind: "dun"; floor: number };
+  | { kind: "repair"; level: number };
 
 export interface Quest {
   id: string;
@@ -30,7 +29,6 @@ const POOL: Quest[] = [
   { id: "g3", text: "보석 3단계 만들기", done: (e) => e.kind === "gem" && e.stage >= 3 },
   { id: "g4", text: "보석 4단계 만들기", done: (e) => e.kind === "gem" && e.stage >= 4 },
   { id: "r5", text: "장비 수리로 +5 이상", done: (e) => e.kind === "repair" && e.level >= 5 },
-  { id: "d20", text: "던전 20층", done: (e) => e.kind === "dun" && e.floor >= 20 },
 ];
 
 const kstDay = () => new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);

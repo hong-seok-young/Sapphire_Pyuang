@@ -1,10 +1,11 @@
 // 사용 기록 (server/activity.ts): API 로 한 일을 앱개발자만 보는 '사용 기록'에 남긴다.
 // 화면 보기와 접속은 /api/activity 가 따로 받는다. GET 은 남기지 않는다.
 // 기록이 안 돼도 하던 일은 그대로 끝난다.
-import { currentUser } from "../../server/auth";
+import { TEST_IDS, currentUser } from "../../server/auth";
 import type { Env } from "../../server/auth";
 import { detailOf, record, subjectOf, whereOf } from "../../server/activity";
 import { withBackground } from "../../server/background";
+import { earnFor } from "../../server/simcoin";
 
 /** 본문이 JSON 이 아닌 곳: 캐릭터 사진, AI 지우기(그림 파일)는 크기만 적는다 */
 const BINARY = /^\/api\/(avatar(\/cutout)?|board\/\d+\/files)$/;
@@ -60,6 +61,8 @@ const handle: PagesFunction<Env> = async (context) => {
         if (typeof id === "string" && id) await record(env, id.slice(0, 40), "act", "POST /api/login", detail, where);
       } else if (me) {
         await record(env, me.id, "act", `${method} ${decodeURIComponent(path)}`, detailOf(body, subject), where);
+        // 시뮬레이터 행운 코인: 유의미한 일이면 (server/simcoin.ts)
+        if (me.role === "developer" || TEST_IDS.includes(me.id)) await earnFor(env, me.id, method, path);
       }
     } catch {
       // 기록 실패는 무시한다

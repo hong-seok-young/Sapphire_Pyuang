@@ -20,16 +20,14 @@ import type { Cat, King, SimRec } from "../simRank";
 import { QuestCtx, titleOf, todayQuests, useQuest } from "../simQuest";
 import type { SimEvent } from "../simQuest";
 import { api } from "../auth";
-import { DungeonTab } from "./SimDungeon";
 
-type Tab = "enhance" | "grow" | "option" | "gem" | "box" | "dun" | "rank";
+type Tab = "enhance" | "grow" | "option" | "gem" | "box" | "rank";
 const TABS: { key: Tab; label: string }[] = [
   { key: "enhance", label: "강화" },
   { key: "grow", label: "성장" },
   { key: "option", label: "옵션" },
   { key: "gem", label: "보석" },
   { key: "box", label: "뽑기" },
-  { key: "dun", label: "던전" },
   { key: "rank", label: "순위" },
 ];
 
@@ -92,9 +90,7 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const [tabRaw, setTab] = useEntryState<Tab>("sim.tab", "enhance");
   const tab: Tab = TABS.some((t) => t.key === tabRaw) ? tabRaw : "enhance";
   const coin = useCoinState();
-  // 던전 칸의 '강화 ›' 로 강화 칸의 그 부위를 연다
-  const [, setPartEntry] = useEntryState<Part>("sim.part", "무기");
-  const today = (coin.wallet?.quests.filter(Boolean).length ?? 0) * (coin.wallet?.questCoin ?? 0);
+  const today = (coin.wallet?.rules.reduce((t, r) => t + r.n * r.coin, 0) ?? 0) + (coin.wallet?.quests.filter(Boolean).length ?? 0) * (coin.wallet?.questCoin ?? 0);
   // 오늘의 도전 (src/simQuest.ts): 결과마다 알리면 맞는 도전을 깨고 코인을 받는다
   const quests = useMemo(() => todayQuests(), []);
   const [done, setDone] = useState<boolean[]>([false, false, false]);
@@ -139,12 +135,12 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
           </button>
         ))}
       </div>
-      {/* 행운 코인: 시도마다 하나 (오늘의 도전으로 쌓인다, 앱개발자는 100 아래면 1000 을 채운다) */}
+      {/* 행운 코인: 시도마다 하나 (웹에서 글쓰기·시간표 확정·챗봇 같은 일을 하면 쌓인다) */}
       <button type="button" className={"sim-coins" + (coin.coins === 0 ? " sim-coins-empty" : "")} onClick={() => setTab("rank")}>
         <span>행운 코인</span>
         <b key={coin.coins ?? -1}>{coin.coins === null ? "…" : coin.coins.toLocaleString()}</b>
         <em className="sim-title">{coin.wallet ? titleOf(coin.wallet.total) : ""}</em>
-        {today > 0 && <small>오늘 +{today}</small>}
+        <small>{coin.coins === 0 ? "버는 법 ›" : today ? `오늘 +${today}` : "버는 법 ›"}</small>
       </button>
       {coin.wallet && coin.wallet.feed.length > 0 && <Ticker feed={coin.wallet.feed} />}
       <div className="sim-quests" aria-label="오늘의 도전">
@@ -176,16 +172,6 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
         <GemTab odds={odds} />
       ) : tab === "box" ? (
         <BoxSim odds={odds} />
-      ) : tab === "dun" ? (
-        <DungeonTab
-          odds={odds}
-          wiki={wiki}
-          me={me}
-          goEnhance={(p) => {
-            setPartEntry(p);
-            setTab("enhance");
-          }}
-        />
       ) : (
         <RankTab odds={odds} />
       )}
@@ -214,12 +200,12 @@ function Ticker({ feed }: { feed: { user_id: string; label: string; luck: number
 const luckText = (luck: number) => `1/${n0(Math.pow(10, luck))}`;
 
 /** 시뮬레이터 하나의 순위 (5위까지와 내 기록). luck 이면 드문 정도로, 아니면 몇 번 만에 */
-export function RankBox({ rec, title, luck = false, unit }: { rec: ReturnType<typeof useRecord>; title: string; luck?: boolean; unit?: "sec" }) {
+export function RankBox({ rec, title, luck = false }: { rec: ReturnType<typeof useRecord>; title: string; luck?: boolean }) {
   const d = rec.data;
   if (!d) return null;
   const top = d.board.slice(0, 5);
   const mine = d.mine;
-  const line = (r: SimRec) => (unit === "sec" ? `${r.tries.toLocaleString()}초` : luck ? `${luckText(r.luck)} · ${r.tries.toLocaleString()}번째` : `${r.tries.toLocaleString()}번 만에`);
+  const line = (r: SimRec) => (luck ? `${luckText(r.luck)} · ${r.tries.toLocaleString()}번째` : `${r.tries.toLocaleString()}번 만에`);
   return (
     <section className="panel sim-rank">
       <div className="sim-rank-head">
@@ -266,7 +252,6 @@ function gameNamer(odds: Odds) {
     if (k === "repair") return a;
     if (k === "opt") return `${srcs.get(a) ?? "옵션"} · ${b}`;
     if (k === "gem") return "보석 합성";
-    if (k === "dun") return "던전";
     if (k === "box") {
       const box = boxes.get(a);
       return box ? `${box.name}${b !== undefined && box.sections[Number(b)] ? ` · ${box.sections[Number(b)].title}` : ""}` : "상자";
@@ -275,7 +260,7 @@ function gameNamer(odds: Odds) {
   };
 }
 
-/** 순위 칸: 도박의 신(묶음마다 가장 드문 기록의 운을 더한 것), 시뮬레이터마다 1위 */
+/** 순위 칸: 도박의 신(묶음마다 가장 드문 기록의 운을 더한 것), 시뮬레이터마다 1위, 코인 버는 법 */
 function RankTab({ odds }: { odds: Odds }) {
   const coin = useCoins() as ReturnType<typeof useCoinState>;
   const [data, setData] = useState<{ king: King[]; firsts: SimRec[]; mine: SimRec[] } | null>(null);
@@ -332,6 +317,23 @@ function RankTab({ odds }: { odds: Odds }) {
               <span>
                 <Nick name={r.user_id} /> <b>{r.label}</b> <em>{/^(enh|stat):/.test(r.game ?? "") ? `${r.tries.toLocaleString()}번 만에` : luckText(r.luck)}</em>
               </span>
+            </div>
+          ))}
+        </section>
+      )}
+      {coin.wallet && (
+        <section className="panel sim-earn">
+          <div className="sim-rank-head">
+            <b>행운 코인 버는 법</b>
+            <small>하루마다 새로</small>
+          </div>
+          {coin.wallet.rules.map((r) => (
+            <div key={r.key} className={"sim-earn-row" + (r.n >= r.cap ? " sim-earn-done" : "")}>
+              <span>{r.label}</span>
+              <b>+{r.coin}</b>
+              <small>
+                {r.n}/{r.cap}
+              </small>
             </div>
           ))}
         </section>

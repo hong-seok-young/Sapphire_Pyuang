@@ -1,10 +1,10 @@
 // 시뮬레이터 행운 코인 (server/simcoin.ts)
-// GET  /api/sim/wallet -> { coins, earned, spent, quests(오늘 깬 도전), questCoin, feed, total, refill }
+// GET  /api/sim/wallet -> { coins, earned, spent, rules: [{ key, label, coin, cap, n(오늘 받은 횟수) }] }
 // POST /api/sim/wallet { spend } -> 시도에 쓴 코인을 줄인다 (있는 만큼까지) -> { coins }
 // POST /api/sim/wallet { quest: 0|1|2 } -> 오늘의 도전을 깼다 (하루 한 번씩 QUEST_COIN) -> { coins, got }
 import { FORBIDDEN, NEED_LOGIN, RANK, TEST_IDS, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { DEV_FLOOR, DEV_REFILL, QUEST_COIN, QUEST_KEYS, earn, ensureWallet, kstDate, refillSql, refillable } from "../../../server/simcoin";
+import { DEV_FLOOR, DEV_REFILL, EARN, QUEST_COIN, QUEST_KEYS, earn, ensureWallet, kstDate, refillSql, refillable } from "../../../server/simcoin";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
@@ -26,6 +26,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   return json(
     {
       ...(w.results[0] as object),
+      rules: EARN.map((r) => ({ key: r.key, label: r.label, coin: r.coin, cap: r.cap, n: n.get(r.key) ?? 0 })),
       quests: QUEST_KEYS.map((k) => (n.get(k) ?? 0) > 0),
       questCoin: QUEST_COIN,
       feed: feed.results,

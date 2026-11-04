@@ -1,5 +1,5 @@
 // 시뮬레이터 행운 코인 (개발중, 제작자 요청 2026-11-04 '시도 횟수는 웹에서 유의미한 움직임과 행동을 할 때마다 재화를 주고 그걸로 트라이, 그럼 활성화될 듯').
-// 버는 곳: 오늘의 도전만 (제작자 2026-11-04 '운영에는 게임 다 빼 줘, 코인이니 뭐네': 게시판 글·챗봇 같은 앱의 일로 코인을 주던 것(EARN, 미들웨어 earnFor)은 뺐다).
+// 버는 곳: API 미들웨어가 성공한 요청마다 EARN 에서 찾아 넣고(functions/api/_middleware.ts, 답을 돌려준 뒤), 하루 첫 접속은 /api/activity 가 넣는다.
 // 쓰는 곳: 시뮬레이터 화면이 시도마다 줄이고 모아서 보낸다 (/api/sim/wallet). D1 sim_wallet, sim_earn (하루 횟수). 기록은 지우지 않는다
 import type { Env } from "./auth";
 
@@ -7,6 +7,33 @@ import type { Env } from "./auth";
 export const kstDate = (ms: number) => new Date(ms + 9 * 3_600_000).toISOString().slice(0, 10);
 
 export const WELCOME = 100;
+export interface EarnRule {
+  key: string;
+  label: string;
+  coin: number;
+  /** 하루에 받는 횟수 */
+  cap: number;
+  method?: string;
+  re?: RegExp;
+}
+export const EARN: EarnRule[] = [
+  { key: "visit", label: "하루 첫 접속", coin: 20, cap: 1 },
+  { key: "board", label: "게시판 글쓰기", coin: 30, cap: 3, method: "POST", re: /^\/api\/board$/ },
+  { key: "comment", label: "게시판 댓글", coin: 5, cap: 10, method: "POST", re: /^\/api\/board\/\d+\/comments$/ },
+  { key: "like", label: "게시판 좋아요", coin: 1, cap: 10, method: "PUT", re: /^\/api\/board\/\d+\/like$/ },
+  { key: "gd", label: "길드 던전 시간표 확정", coin: 20, cap: 1, method: "POST", re: /^\/api\/gd\/confirm$/ },
+  { key: "gdpaint", label: "길드 던전 시간표 칠하기", coin: 2, cap: 5, method: "PUT", re: /^\/api\/gd\/avail$/ },
+  { key: "chat", label: "챗봇 질문", coin: 3, cap: 20, method: "POST", re: /^\/api\/chat$/ },
+  { key: "market", label: "중개인 물건 올리기", coin: 10, cap: 3, method: "POST", re: /^\/api\/market$/ },
+  { key: "want", label: "중개인 살래요 · 팔래요", coin: 3, cap: 5, method: "PUT", re: /^\/api\/market\/\d+\/want$/ },
+  { key: "talk", label: "중개인 토론방", coin: 2, cap: 10, method: "POST", re: /^\/api\/market\/\d+\/talk$/ },
+  { key: "gold", label: "골드 글", coin: 10, cap: 2, method: "POST", re: /^\/api\/gold$/ },
+  { key: "request", label: "의뢰 올리기", coin: 10, cap: 3, method: "POST", re: /^\/api\/requests$/ },
+  { key: "accept", label: "의뢰 수락 · 완료", coin: 5, cap: 5, method: "PATCH", re: /^\/api\/requests\/\d+$/ },
+  { key: "profile", label: "레벨 · 경험치 기록", coin: 5, cap: 2, method: "PUT", re: /^\/api\/profile$/ },
+  { key: "todo", label: "To do 체크", coin: 1, cap: 15, method: "PUT", re: /^\/api\/todo$/ },
+  { key: "rent", label: "장비대여 신청", coin: 5, cap: 2, method: "POST", re: /^\/api\/rent\/apply$/ },
+];
 
 /** 지갑이 없으면 처음 코인으로 만든다 */
 export const ensureWallet = (env: Env, userId: string) =>
@@ -18,7 +45,7 @@ export const QUEST_KEYS = ["quest0", "quest1", "quest2"];
 
 /** 그 일로 코인을 준다 (오늘 한도 안이면). 실패해도 하던 일은 그대로. 받았으면 true */
 export async function earn(env: Env, userId: string, key: string): Promise<boolean> {
-  const rule = QUEST_KEYS.includes(key) ? { key, coin: QUEST_COIN, cap: 1 } : null;
+  const rule = EARN.find((r) => r.key === key) ?? (QUEST_KEYS.includes(key) ? { key, label: "오늘의 도전", coin: QUEST_COIN, cap: 1 } : null);
   if (!rule) return false;
   try {
     const now = Date.now();
@@ -37,6 +64,12 @@ export async function earn(env: Env, userId: string, key: string): Promise<boole
     console.error("sim coin", e instanceof Error ? e.message : e);
     return false;
   }
+}
+
+/** 미들웨어: 성공한 요청이 버는 일이면 */
+export async function earnFor(env: Env, userId: string, method: string, path: string): Promise<void> {
+  const rule = EARN.find((r) => r.method === method && r.re?.test(path));
+  if (rule) await earn(env, userId, rule.key);
 }
 
 /** 앱개발자(와 그 테스트 계정)는 써 보느라 코인이 모자라지 않게: 100 아래로 내려가면 1000 을 채운다 (제작자 2026-11-04 '나는 개발자니까 돈 다 쓰면 자동으로 기본 코인 좀 넣어 줘').
