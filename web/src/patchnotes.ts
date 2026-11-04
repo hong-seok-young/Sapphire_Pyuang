@@ -12,6 +12,14 @@ export interface Patch {
 
 export const PATCHES: Patch[] = [
   {
+    version: "1.2",
+    date: "11.04",
+    items: [
+      "길드 던전: '파티원' 칸에서 파티원마다 시간표를 보고, 나와 겹치는 때는 금색으로",
+      "길드 던전: 파티원 카드에 시간표를 확정했는지 '입력 전 / 확정' (확정은 다른 폰에서도 그대로, 한 번 모두 풀었어요)",
+    ],
+  },
+  {
     version: "1.1",
     date: "11.03",
     items: [

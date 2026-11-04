@@ -226,7 +226,7 @@ export const GUIDES: Guide[] = [
     key: "match",
     title: "길드 던전",
     tutorial: [
-      { sel: ".gd-members", head: "파티원 카드", text: "누르면 파티장 지정, 빼기, 파티 나가기가 나와요." },
+      { sel: ".gd-members", head: "파티원 카드", text: "오른쪽은 시간표를 확정했는지예요.\n누르면 파티장 지정, 빼기, 파티 나가기가 나와요." },
       {
         sel: ".gd-cand, .gd-confirm, .gd-state",
         head: "후보",
@@ -234,6 +234,7 @@ export const GUIDES: Guide[] = [
       },
       { sel: ".gd-tabs button:has-text('내 시간표')", head: "내 시간표", text: "누르고 끌어서 되는 때를 칠해요. 손을 떼면 저장돼요.", tap: true, undo: false },
       { sel: ".gd-grid", head: "시간표", text: "지난 칸도 칠할 수 있어요." },
+      { sel: ".gd-tabs button:has-text('파티원')", head: "파티원", text: "파티원마다 시간표를 봐요. 나와 겹치는 때는 금색이에요.", tap: true, undo: false },
       { sel: ".gd-tabs button:has-text('교집합')", head: "교집합", text: "칸을 누르면 누가 되는지 보여요.", tap: true, undo: false },
     ],
   },
