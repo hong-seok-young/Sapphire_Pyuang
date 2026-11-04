@@ -223,6 +223,15 @@ export const GUIDES: Guide[] = [
     ],
   },
   {
+    key: "sim",
+    title: "확률 시뮬레이터",
+    tutorial: [
+      { sel: ".sim-coins", head: "행운 코인", text: "강화나 뽑기를 한 번 할 때마다 1개씩 써요.\n게시판 글쓰기, 시간표 확정, 챗봇 질문 같은 걸 하면 쌓여요." },
+      { sel: ".sim-rank", head: "순위", text: "새 장비로 시작해서 몇 번 만에 몇 강을 했는지가 순위에 올라가요.\n중간에 마법서를 바꾼 장비는 기록하지 않아요." },
+      { sel: ".sim-tabs .pill:has-text('순위')", head: "도박왕", text: "칸마다 가장 드문 기록을 점수로 더해요.\n1/10 이면 1점, 1/1000 이면 3점이에요.", tap: true, undo: false },
+    ],
+  },
+  {
     key: "match",
     title: "길드 던전",
     tutorial: [

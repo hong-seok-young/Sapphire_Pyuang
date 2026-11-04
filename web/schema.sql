@@ -689,3 +689,34 @@ CREATE TABLE IF NOT EXISTS gd_answers (
   PRIMARY KEY (party_id, week, slot, user_id)
 );
 CREATE INDEX IF NOT EXISTS gd_answers_week ON gd_answers (week);
+
+-- 확률 시뮬레이터 순위 (개발중, 제작자 요청 2026-11-04 '시뮬레이터별로 몇 번 만에 몇 강을 했는지 순위, 도박왕 통합 랭킹, 재미로'):
+-- 사람마다 시뮬레이터(game)마다 가장 좋은 기록 하나. score 가 높을수록, 같으면 tries 가 적을수록 위. luck = log10(1/그만큼 나올 확률), 도박왕은 묶음(cat)마다 가장 큰 luck 의 합
+CREATE TABLE IF NOT EXISTS sim_records (
+  user_id TEXT NOT NULL,
+  game TEXT NOT NULL,                     -- enh:무기:일반, stat:50100, repair:무기 수리, opt:130101, gem:synth, box:20101 …
+  cat TEXT NOT NULL,                      -- enhance | grow | option | gem | box
+  label TEXT NOT NULL,                    -- '+9', '3단계', '헌터보우 명중 11', '베루아'
+  score REAL NOT NULL,
+  tries INTEGER NOT NULL,
+  luck REAL NOT NULL,
+  at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, game)
+);
+CREATE INDEX IF NOT EXISTS sim_records_game ON sim_records (game, score);
+-- 시뮬레이터 행운 코인 (제작자 요청 2026-11-04 '시도 횟수는 게시판 글쓰기나 길드던전 시간표 확정, 챗봇 활용 등 웹에서 유의미한 행동을 할 때마다 재화를 주고 그걸로 트라이'):
+-- 캐릭터마다 지갑 하나 (처음 100), 버는 일은 하루 횟수 한도 (server/simcoin.ts EARN)
+CREATE TABLE IF NOT EXISTS sim_wallet (
+  user_id TEXT PRIMARY KEY,
+  coins INTEGER NOT NULL,
+  earned INTEGER NOT NULL,
+  spent INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sim_earn (
+  user_id TEXT NOT NULL,
+  day TEXT NOT NULL,                      -- 한국 날짜 2026-11-04
+  key TEXT NOT NULL,                      -- board, chat, gd …
+  n INTEGER NOT NULL,
+  PRIMARY KEY (user_id, day, key)
+);

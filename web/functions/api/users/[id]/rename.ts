@@ -8,7 +8,7 @@ import { eachLog } from "../../../../server/logdb";
 
 /** 닉네임이 들어 있는 칸 (표, 칸) */
 const ID_COLUMNS: [string, string][] = [
-  ["delete_requests", "user_id"],
+  ["delete_requests", "user_id"], ["sim_records", "user_id"], ["sim_wallet", "user_id"], ["sim_earn", "user_id"],
   ["users", "created_by"], ["sessions", "user_id"], ["chat_usage", "user_id"], ["ai_usage", "user_id"], ["profiles", "user_id"], ["profiles", "updated_by"],
   ["level_log", "user_id"], ["level_log_archive", "user_id"], ["avatars", "user_id"], ["avatars", "updated_by"], ["listings", "seller"], ["listing_wants", "user_id"],
   ["listing_bids", "user_id"], ["gold_offers", "owner"], ["gold_wants", "user_id"], ["requests", "owner"], ["requests", "accepter"], ["request_offers", "user_id"],

@@ -5,6 +5,7 @@ import { currentUser } from "../../server/auth";
 import type { Env } from "../../server/auth";
 import { detailOf, record, subjectOf, whereOf } from "../../server/activity";
 import { withBackground } from "../../server/background";
+import { earnFor } from "../../server/simcoin";
 
 /** 본문이 JSON 이 아닌 곳: 캐릭터 사진, AI 지우기(그림 파일)는 크기만 적는다 */
 const BINARY = /^\/api\/(avatar(\/cutout)?|board\/\d+\/files)$/;
@@ -32,7 +33,7 @@ const handle: PagesFunction<Env> = async (context) => {
   const path = new URL(request.url).pathname;
   const method = request.method;
   // 사진 질문의 사진 먼저 읽기(/api/chat/peek)는 바로 뒤의 챗봇 질문이 남으므로 따로 남기지 않는다 (사진 본문을 두 번 풀지 않게)
-  if (method === "GET" || method === "HEAD" || method === "OPTIONS" || path === "/api/activity" || path === "/api/chat/peek" || path === "/api/push" || path === "/api/todo/digest" || path.startsWith("/api/alerts")) return context.next();
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS" || path === "/api/activity" || path === "/api/chat/peek" || path === "/api/push" || path === "/api/todo/digest" || path.startsWith("/api/alerts") || path.startsWith("/api/sim")) return context.next();
 
   let me: { id: string } | null = null;
   let body: unknown = null;
@@ -60,6 +61,8 @@ const handle: PagesFunction<Env> = async (context) => {
         if (typeof id === "string" && id) await record(env, id.slice(0, 40), "act", "POST /api/login", detail, where);
       } else if (me) {
         await record(env, me.id, "act", `${method} ${decodeURIComponent(path)}`, detailOf(body, subject), where);
+        // 시뮬레이터 행운 코인: 유의미한 일이면 (server/simcoin.ts)
+        await earnFor(env, me.id, method, path);
       }
     } catch {
       // 기록 실패는 무시한다
