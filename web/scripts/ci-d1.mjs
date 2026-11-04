@@ -365,3 +365,74 @@ if (queryFirst("SELECT 1 AS done FROM setup WHERE key = 'opening_notice'")) {
     console.log(`오픈 공지 내용을 ${rev}판으로 고쳤어요`);
   }
 }
+
+// 개발 중 칸을 누가 열어 봤는지 한 번 살펴 앱개발자에게 알린다 (제작자 2026-11-04 '오피서나 길마가 지금 개발 중인 거 본 사람 있나, 길드원도 들어가길 시도한 사람 있나').
+// 사용 기록(DB 1 의 예전 activity 와 사용 기록 DB 2~10)에서 화면 '#/trend'·'#/enhance'·'#/sim' 을 본 줄을 사람(본캐로 묶음)마다 센다.
+// 볼 수 있는 사람(시세 동향·강화 비교는 길마·오피서, 확률 시뮬레이터는 앱개발자만)과 막힌 화면('개발 중이에요')만 본 사람을 나눈다.
+// 앱개발자와 테스트 계정은 뺀다. 공개 실행 기록에는 수만 찍고 닉네임은 앱개발자 알림으로. setup 'devpeek_20261104' 로 한 번만
+{
+  const KEY = "devpeek_20261104";
+  if (!queryFirst(`SELECT 1 AS done FROM setup WHERE key = '${KEY}'`)) {
+    const all = (db, sql) => {
+      try {
+        return parseJson(wrangler("d1", "execute", db, "--remote", "--json", "--command", sql))[0]?.results ?? [];
+      } catch {
+        return [];
+      }
+    };
+    const SQL =
+      "SELECT user_id, CASE WHEN what LIKE '#/trend%' THEN 'trend' WHEN what LIKE '#/enhance%' THEN 'enhance' ELSE 'sim' END AS page, " +
+      "COUNT(*) AS n, MIN(at) AS first, MAX(at) AS last FROM activity WHERE kind = 'view' AND (what LIKE '#/trend%' OR what LIKE '#/enhance%' OR what LIKE '#/sim%') " +
+      "GROUP BY user_id, page";
+    const rows = [DB, ...[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => `sapphire-log-${n}`)].flatMap((db) => all(db, SQL));
+    const users = new Map(all(DB, "SELECT id, role, main_id FROM users").map((u) => [u.id, u]));
+    const RANK = { member: 0, officer: 1, master: 2, developer: 3 };
+    const ownerOf = (id) => users.get(id)?.main_id || id;
+    const topRole = new Map();
+    for (const u of users.values()) {
+      const o = ownerOf(u.id);
+      if ((RANK[u.role] ?? 0) >= (RANK[topRole.get(o)] ?? -1)) topRole.set(o, u.role);
+    }
+    const NAME = { trend: "시세 동향", enhance: "강화 비교", sim: "확률 시뮬레이터" };
+    const kst = (ms) => {
+      const d = new Date(Number(ms) + 9 * 3_600_000);
+      return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+    };
+    // 사람·화면마다 합친다 (같은 사람의 캐릭터와 여러 DB 의 줄)
+    const by = new Map();
+    for (const r of rows) {
+      const o = ownerOf(r.user_id);
+      const role = topRole.get(o) ?? users.get(r.user_id)?.role;
+      if (role === "developer" || ["테스트1", "테스트2"].includes(r.user_id) || !users.has(r.user_id)) continue;
+      const k = `${o}\t${r.page}`;
+      const g = by.get(k) ?? { who: o, page: r.page, role, n: 0, first: Infinity, last: 0, chars: new Set() };
+      g.n += Number(r.n);
+      g.first = Math.min(g.first, Number(r.first));
+      g.last = Math.max(g.last, Number(r.last));
+      if (r.user_id !== o) g.chars.add(r.user_id);
+      by.set(k, g);
+    }
+    const allowed = (g) => g.page !== "sim" && (RANK[g.role] ?? 0) >= 1;
+    const line = (g) => `${g.who}${g.chars.size ? `(${[...g.chars].join("·")})` : ""} ${NAME[g.page]} ${g.n}번 (${kst(g.first)}${g.n > 1 ? ` ~ ${kst(g.last)}` : ""})`;
+    const list = [...by.values()].sort((a, b) => a.first - b.first);
+    const saw = list.filter(allowed);
+    const blocked = list.filter((g) => !allowed(g));
+    const text =
+      "개발 중 칸 열어 본 사람 · " +
+      (saw.length ? `본 운영진: ${saw.map(line).join(", ")}` : "본 운영진 없음") +
+      " · " +
+      (blocked.length ? `막힌 화면('개발 중이에요')을 본 사람: ${blocked.map((g) => `${line(g)}${g.role === "member" ? "" : " [운영진]"}`).join(", ")}` : "막힌 화면을 본 사람 없음");
+    const q = (v) => `'${String(v).replaceAll("'", "''")}'`;
+    const devs = [...users.values()].filter((u) => u.role === "developer").map((u) => u.id);
+    const now = Date.now();
+    runSql([
+      ...devs.map((id) => `INSERT INTO alerts (user_id, kind, text, link, created_at) VALUES (${q(id)}, 'account', ${q(text)}, '#/log', ${now});`),
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+    ]);
+    const people = (xs) => new Set(xs.map((g) => g.who)).size;
+    console.log(
+      `개발 중 칸: 본 운영진 ${people(saw)}명 (${saw.map((g) => `${NAME[g.page]} ${g.n}번`).join(", ") || "-"}), ` +
+        `막힌 화면을 본 길드원 ${people(blocked.filter((g) => g.role === "member"))}명, 운영진 ${people(blocked.filter((g) => g.role !== "member"))}명 (${blocked.map((g) => NAME[g.page]).join(", ") || "-"}). 닉네임은 앱개발자 알림으로`,
+    );
+  }
+}
