@@ -3072,3 +3072,31 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .sim-earn-row b { color: var(--gold); text-align: right; }
 .sim-earn-row small { color: var(--muted); text-align: right; font-size: 11px; }
 .sim-earn-done { opacity: 0.5; }
+
+/* 시뮬레이터 미니게임 (두근두근, 콤보, 오늘의 도전, 전광판, 칭호) */
+.sim-title { font-style: normal; font-size: 11px; color: #c79bff; padding: 1px 5px; border: 1px solid rgba(199, 155, 255, 0.5); }
+.sim-charging .sim-icon, .sim-charging.sim-chest .sim-chest-t { animation: sim-doki 0.35s ease-in-out infinite; }
+.sim-charging .sim-lv { opacity: 0.7; }
+@keyframes sim-doki { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.08) translateX(-2px); } 60% { transform: scale(0.98) translateX(2px); } }
+.sim-doki { color: var(--gold); letter-spacing: 1px; animation: sim-blink 0.35s ease-in-out infinite; }
+.sim-combo { position: absolute; top: 8px; right: 10px; padding: 2px 8px; font-size: 13px; color: var(--edge); background: var(--gold); transform-origin: 100% 0;
+  animation: sim-combo 0.45s cubic-bezier(0.2, 1.8, 0.4, 1); }
+@keyframes sim-combo { 0% { transform: scale(0.4) rotate(-12deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.sim-quests { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: -4px 0 10px; font-size: 12px; }
+.sim-quests > b { color: var(--muted); font-size: 11px; font-weight: 400; margin-right: 2px; }
+.sim-quests > span { padding: 2px 6px; background: rgba(11, 10, 26, 0.5); border: 1px solid var(--hi); }
+.sim-quests small { color: var(--gold); }
+.sim-q-done { color: #7ee2a8; border-color: rgba(126, 226, 168, 0.5) !important; text-decoration: line-through; text-decoration-color: rgba(126, 226, 168, 0.6); }
+.sim-cheer { position: fixed; left: 50%; bottom: calc(var(--tab-h) + 24px + env(safe-area-inset-bottom)); z-index: 60; display: grid; justify-items: center; gap: 2px;
+  min-width: 200px; margin-left: -100px; padding: 10px 14px; text-align: center; background: var(--night-2); border: 3px solid var(--gold); box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
+  animation: sim-cheer 2.6s ease-out forwards; pointer-events: none; }
+.sim-cheer b { color: var(--gold); }
+.sim-cheer small { color: #7ee2a8; }
+@keyframes sim-cheer { 0% { transform: translateY(20px) scale(0.8); opacity: 0; } 12% { transform: translateY(0) scale(1.05); opacity: 1; } 20% { transform: none; } 85% { opacity: 1; } 100% { transform: translateY(-10px); opacity: 0; } }
+.sim-ticker { overflow: hidden; margin: -4px 0 8px; padding: 3px 0; background: rgba(255, 195, 92, 0.08); border-top: 1px solid rgba(255, 195, 92, 0.3); border-bottom: 1px solid rgba(255, 195, 92, 0.3); }
+.sim-ticker-run { display: flex; width: max-content; gap: 24px; animation: sim-tick linear infinite; }
+.sim-tick { white-space: nowrap; font-size: 12px; }
+.sim-tick b { color: var(--gold); }
+.sim-tick small { color: #c79bff; }
+@keyframes sim-tick { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .sim-ticker-run, .sim-cheer, .sim-combo, .sim-charging * { animation: none !important; } }

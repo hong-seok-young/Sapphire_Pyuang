@@ -720,3 +720,13 @@ CREATE TABLE IF NOT EXISTS sim_earn (
   n INTEGER NOT NULL,
   PRIMARY KEY (user_id, day, key)
 );
+-- 시뮬레이터 전광판 (제작자 요청 2026-11-04 '조금 재밌는 미니게임처럼'): 1/100 보다 드문 결과를 낸 때. 화면 맨 위에 흘러간다
+CREATE TABLE IF NOT EXISTS sim_feed (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  game TEXT NOT NULL,
+  label TEXT NOT NULL,
+  luck REAL NOT NULL,
+  at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sim_feed_at ON sim_feed (at);

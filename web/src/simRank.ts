@@ -23,6 +23,13 @@ export interface Wallet {
   earned: number;
   spent: number;
   rules: { key: string; label: string; coin: number; cap: number; n: number }[];
+  /** 오늘의 도전 셋을 깼는지 */
+  quests: boolean[];
+  questCoin: number;
+  /** 전광판: 사흘 안에 1/100 보다 드문 결과 */
+  feed: { user_id: string; game: string; label: string; luck: number; at: number }[];
+  /** 내 도박왕 점수 */
+  total: number;
 }
 export interface King {
   user_id: string;
@@ -167,10 +174,12 @@ export function useRecord(game: string) {
     (cat: Cat, r: { label: string; score: number; tries: number; luck: number }) => {
       const m = mine.current;
       if (!game) return false;
-      if (m && !(r.score > m.score || (r.score === m.score && r.tries < m.tries))) return false;
-      mine.current = { ...r, cat };
+      const better = !m || r.score > m.score || (r.score === m.score && r.tries < m.tries);
+      // 내 기록보다 못해도 1/100 보다 드물면 전광판에 남긴다
+      if (!better && r.luck < 2) return false;
+      if (better) mine.current = { ...r, cat };
       api<{ ok: boolean }>("/api/sim", "POST", { ...r, cat, game }).then(load, () => undefined);
-      return true;
+      return better;
     },
     [game, load],
   );

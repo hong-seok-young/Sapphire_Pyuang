@@ -68,5 +68,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   )
     .bind(me.id, game, b.cat, label, score, tries, luck, Date.now())
     .run();
+  // 전광판: 1/100 보다 드문 결과는 기록이 아니어도 남긴다 (같은 사람은 10초에 한 번)
+  if (luck >= 2 && !TEST_IDS.includes(me.id))
+    await env.DB.prepare("INSERT INTO sim_feed (user_id, game, label, luck, at) SELECT ?1, ?2, ?3, ?4, ?5 WHERE NOT EXISTS (SELECT 1 FROM sim_feed WHERE user_id = ?1 AND at > ?5 - 10000)")
+      .bind(me.id, game, label, luck, Date.now())
+      .run();
   return json({ ok: true, better: (r.meta.changes ?? 0) > 0 });
 };

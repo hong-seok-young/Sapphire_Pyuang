@@ -12,6 +12,9 @@ import { Loading, TopBar } from "../ui";
 import { Nick } from "../kakao";
 import { CAT_NAME, CoinCtx, fetchKing, luckOf, reachWithin, stepsWithin, useCoinState, useCoins, useRecord } from "../simRank";
 import type { Cat, King, SimRec } from "../simRank";
+import { QuestCtx, titleOf, todayQuests, useQuest } from "../simQuest";
+import type { SimEvent } from "../simQuest";
+import { api } from "../auth";
 
 type Tab = "enhance" | "grow" | "option" | "gem" | "box" | "rank";
 const TABS: { key: Tab; label: string }[] = [
@@ -82,9 +85,43 @@ export function SimulatorPage() {
   const [tabRaw, setTab] = useEntryState<Tab>("sim.tab", "enhance");
   const tab: Tab = TABS.some((t) => t.key === tabRaw) ? tabRaw : "enhance";
   const coin = useCoinState();
-  const today = coin.wallet?.rules.reduce((t, r) => t + r.n * r.coin, 0) ?? 0;
+  const today = (coin.wallet?.rules.reduce((t, r) => t + r.n * r.coin, 0) ?? 0) + (coin.wallet?.quests.filter(Boolean).length ?? 0) * (coin.wallet?.questCoin ?? 0);
+  // 오늘의 도전 (src/simQuest.ts): 결과마다 알리면 맞는 도전을 깨고 코인을 받는다
+  const quests = useMemo(() => todayQuests(), []);
+  const [done, setDone] = useState<boolean[]>([false, false, false]);
+  const doneRef = useRef(done);
+  useEffect(() => {
+    if (coin.wallet) {
+      doneRef.current = coin.wallet.quests;
+      setDone(coin.wallet.quests);
+    }
+  }, [coin.wallet]);
+  const [cheer, setCheer] = useState<{ text: string; n: number } | null>(null);
+  const emit = useCallback(
+    (e: SimEvent) => {
+      quests.forEach((q, i) => {
+        if (doneRef.current[i] || !q.done(e)) return;
+        doneRef.current = doneRef.current.map((x, j) => x || j === i);
+        setDone(doneRef.current);
+        setCheer((c) => ({ text: q.text, n: (c?.n ?? 0) + 1 }));
+        api<{ coins: number; got: boolean }>("/api/sim/wallet", "POST", { quest: i }).then(() => coin.reload(), () => undefined);
+      });
+    },
+    [quests, coin],
+  );
+  useEffect(() => {
+    if (!cheer) return;
+    const t = window.setTimeout(() => setCheer(null), 2600);
+    return () => window.clearTimeout(t);
+  }, [cheer]);
+  // 전광판은 30초마다 다시
+  useEffect(() => {
+    const t = window.setInterval(() => document.visibilityState === "visible" && coin.reload(), 30_000);
+    return () => window.clearInterval(t);
+  }, [coin]);
   return (
     <CoinCtx.Provider value={coin}>
+      <QuestCtx.Provider value={emit}>
       <TopBar title="확률 시뮬레이터" />
       <div className="pill-row sim-tabs" role="tablist">
         {TABS.map((t) => (
@@ -97,8 +134,27 @@ export function SimulatorPage() {
       <button type="button" className={"sim-coins" + (coin.coins === 0 ? " sim-coins-empty" : "")} onClick={() => setTab("rank")}>
         <span>행운 코인</span>
         <b key={coin.coins ?? -1}>{coin.coins === null ? "…" : coin.coins.toLocaleString()}</b>
+        <em className="sim-title">{coin.wallet ? titleOf(coin.wallet.total) : ""}</em>
         <small>{coin.coins === 0 ? "버는 법 ›" : today ? `오늘 +${today}` : "버는 법 ›"}</small>
       </button>
+      {coin.wallet && coin.wallet.feed.length > 0 && <Ticker feed={coin.wallet.feed} />}
+      <div className="sim-quests" aria-label="오늘의 도전">
+        <b>오늘의 도전</b>
+        {quests.map((q, i) => (
+          <span key={q.id} className={done[i] ? "sim-q-done" : ""}>
+            {done[i] ? "✓ " : ""}
+            {q.text}
+            {!done[i] && <small> +{coin.wallet?.questCoin ?? 30}</small>}
+          </span>
+        ))}
+      </div>
+      {cheer && (
+        <div key={cheer.n} className="sim-cheer" role="status">
+          <b>도전 완료</b>
+          <span>{cheer.text}</span>
+          <small>+{coin.wallet?.questCoin ?? 30} 코인</small>
+        </div>
+      )}
       {!odds ? (
         <Loading error={error} />
       ) : tab === "enhance" ? (
@@ -114,7 +170,25 @@ export function SimulatorPage() {
       ) : (
         <RankTab odds={odds} />
       )}
+      </QuestCtx.Provider>
     </CoinCtx.Provider>
+  );
+}
+
+/** 전광판: 길드원들의 1/100 보다 드문 결과가 오른쪽에서 왼쪽으로 흐른다 */
+function Ticker({ feed }: { feed: { user_id: string; label: string; luck: number; at: number }[] }) {
+  const items = feed.map((f, i) => (
+    <span key={i} className="sim-tick">
+      <Nick name={f.user_id} /> <b>{f.label}</b> <small>{luckText(f.luck)}</small>
+    </span>
+  ));
+  return (
+    <div className="sim-ticker" aria-label="전광판">
+      <div className="sim-ticker-run" style={{ animationDuration: `${Math.max(12, feed.length * 5)}s` }}>
+        {items}
+        {items}
+      </div>
+    </div>
   );
 }
 
@@ -340,6 +414,12 @@ function EnhanceSim({ odds, head }: { odds: Odds; head: React.ReactNode }) {
   const rec = useRecord(game);
   const itemTries = useRef(0);
   const tainted = useRef(false);
+  const emit = useQuest();
+  // 위험한 강화(성공 확률이 100% 가 아닌 것)를 잇달아 성공한 수
+  const [combo, setCombo] = useState(0);
+  const comboRef = useRef(0);
+  // 두근두근: 직접 누르면 0.7초 뜸을 들인 뒤 결과 (자동은 바로)
+  const [charging, setCharging] = useState(false);
 
   const reset = () => {
     setLv(0);
@@ -348,6 +428,8 @@ function EnhanceSim({ odds, head }: { odds: Odds; head: React.ReactNode }) {
     setAuto(false);
     itemTries.current = 0;
     tainted.current = false;
+    comboRef.current = 0;
+    setCombo(0);
   };
   // 보호 마법서는 정해진 강화도만 (무기 +8·+9, 갑옷 +6·+7): 고르면 그 앞 강화도에서 시작
   const choose = (s: Scroll) => {
@@ -372,10 +454,15 @@ function EnhanceSim({ odds, head }: { odds: Odds; head: React.ReactNode }) {
     }
     itemTries.current++;
     const ok = Math.random() < p;
+    if (p < 1) {
+      comboRef.current = ok ? comboRef.current + 1 : 0;
+      setCombo(comboRef.current);
+    }
     if (ok && p < 1 && !tainted.current) {
       const n = itemTries.current;
       rec.submit("enhance", { label: `+${cur + 1}`, score: cur + 1, tries: n, luck: luckOf(reachWithin((k) => rates[k] ?? 0, scroll.keep, cur + 1, n)) });
     }
+    if (ok && !tainted.current) emit({ kind: "enh", part: scroll.part, scroll: scroll.name, level: cur + 1, combo: comboRef.current });
     setStats((s) => ({ tries: s.tries + 1, broke: s.broke + (!ok && !scroll.keep && p < 1 ? 1 : 0), best: Math.max(s.best, ok ? cur + 1 : cur) }));
     setLog((l) => [...l.slice(-39), { to: cur + 1, ok, broke: !ok && !scroll.keep }]);
     if (ok) {
@@ -389,7 +476,15 @@ function EnhanceSim({ odds, head }: { odds: Odds; head: React.ReactNode }) {
       setFx((f) => ({ kind: "break", n: (f?.n ?? 0) + 1 }));
     }
     return ok || scroll.keep;
-  }, [rates, scroll.keep, coins, rec]);
+  }, [rates, scroll.keep, scroll.part, scroll.name, coins, rec, emit]);
+  const press = () => {
+    if (charging) return;
+    setCharging(true);
+    window.setTimeout(() => {
+      setCharging(false);
+      tryOnce();
+    }, 700);
+  };
 
   // 목표까지 자동: 0.18초마다 한 번, 목표에 닿거나 부서지면 멈춘다
   useEffect(() => {
@@ -456,7 +551,12 @@ function EnhanceSim({ odds, head }: { odds: Odds; head: React.ReactNode }) {
         </div>
       </div>
 
-      <section className={`panel sim-anvil${broken ? " sim-broken" : ""}`}>
+      <section className={`panel sim-anvil${broken ? " sim-broken" : ""}${charging ? " sim-charging" : ""}`}>
+        {combo >= 2 && (
+          <span key={combo} className="sim-combo">
+            콤보 x{combo}
+          </span>
+        )}
         <div key={fx?.n ?? 0} className={`sim-item${fx ? ` sim-fx-${fx.kind}` : ""}`}>
           {fx && fx.kind !== "keep" && <Sparks kind={fx.kind} n={fx.kind === "break" ? 14 : 10} />}
           <span className="sim-ring" aria-hidden />
@@ -467,7 +567,9 @@ function EnhanceSim({ odds, head }: { odds: Odds; head: React.ReactNode }) {
           <b className="sim-lv">{broken ? "파괴" : `+${lv}`}</b>
         </div>
         <div className="sim-next">
-          {broken ? (
+          {charging ? (
+            <span className="sim-doki">두근… 두근…</span>
+          ) : broken ? (
             <span className="sim-bad">장비가 부서졌어요</span>
           ) : p > 0 ? (
             <>
@@ -484,7 +586,7 @@ function EnhanceSim({ odds, head }: { odds: Odds; head: React.ReactNode }) {
       </section>
 
       <div className="sim-actions">
-        <button type="button" className="btn sim-go" disabled={broken || !(p > 0) || auto || coins.coins === 0} onClick={() => tryOnce()}>
+        <button type="button" className="btn sim-go" disabled={broken || !(p > 0) || auto || charging || coins.coins === 0} onClick={() => (p >= 1 ? tryOnce() : press())}>
           강화
         </button>
         <span className="sim-goal">
@@ -691,6 +793,7 @@ function StatInner(p: {
   // 순위: 처음부터 몇 번 만에 끝 단계
   const rec = useRecord(`stat:${st.key}`);
   const since = useRef(0);
+  const emit = useQuest();
   const reset = () => {
     setStage(0);
     stageRef.current = 0;
@@ -719,10 +822,11 @@ function StatInner(p: {
         const n = since.current;
         rec.submit("grow", { label: `${st.max}단계`, score: st.max, tries: n, luck: luckOf(stepsWithin(st, n)) });
       }
+      emit({ kind: "stat", key: st.key, stage: to, max: st.max });
       if (cur === 0 && st.types) setType(pick(st.types).name);
       setFx((f) => ({ kind: up === 2 ? "plus2" : "ok", n: (f?.n ?? 0) + 1 }));
     } else setFx((f) => ({ kind: "keep", n: (f?.n ?? 0) + 1 }));
-  }, [st, stageRef, setStage, setStats, setType, setFx, coins, rec, setAuto]);
+  }, [st, stageRef, setStage, setStats, setType, setFx, coins, rec, setAuto, emit]);
   useEffect(() => {
     if (!auto) return;
     const t = window.setInterval(() => {
@@ -932,9 +1036,12 @@ function OptionRoller({ item, onBack, verb, game, cat }: { item: OptItem; onBack
   // 순위: 가장 드문 옵션 (처음 연 한 번은 공짜라 세지 않는다)
   const rec = useRecord(game ?? "");
   const rolls = useRef(0);
+  const emit = useQuest();
   const report = (got: Dist["vals"][number][]) => {
     if (!game || !cat) return;
     const luck = luckOf(jointP(item, got));
+    if (game.startsWith("repair:")) emit({ kind: "repair", level: got[0]?.n ?? 0 });
+    else emit({ kind: "opt", luck });
     if (luck < 0.3) return;
     const label = `${item.name} ${item.opts.map((o, i) => `${o.label} ${got[i].v}`).join(" ")}`.slice(0, 60);
     rec.submit(cat, { label, score: Math.round(luck * 1000) / 1000, tries: rolls.current, luck });
@@ -1167,6 +1274,18 @@ function BoxOpener({
   const coins = useCoins();
   // 순위: 가장 드문 것을 뽑은 사람 (상자마다, 묶음이 여럿이면 묶음마다)
   const rec = useRecord(`box:${box.key}${box.sections.length > 1 ? `:${si}` : ""}`);
+  const emit = useQuest();
+  // 두근두근: 1·10회는 상자가 0.6초 흔들린 뒤 열린다
+  const [charging, setCharging] = useState(false);
+  const openFx = (k: number) => {
+    if (charging) return;
+    if (k > 10) return open(k);
+    setCharging(true);
+    window.setTimeout(() => {
+      setCharging(false);
+      open(k);
+    }, 600);
+  };
   const record = (got: Pull[], k: number) => {
     const t = new Map(tally);
     for (const x of got) t.set(x.name, (t.get(x.name) ?? 0) + 1);
@@ -1174,6 +1293,7 @@ function BoxOpener({
     setOpened(opened + k);
     setShake((s) => s + 1);
     const rare = got.reduce<Pull | null>((m, x) => (!m || x.p < m.p ? x : m), null);
+    if (rare && cat === "box") emit({ kind: "box", p: rare.p });
     if (rare && rare.p < 0.5) rec.submit(cat, { label: rare.name.slice(0, 60), score: Math.round(luckOf(rare.p) * 1000) / 1000, tries: opened + k, luck: luckOf(rare.p) });
   };
   const open = (want: number) => {
@@ -1247,13 +1367,13 @@ function BoxOpener({
             ))}
           </div>
         )}
-        <div key={shake} className={`sim-chest${shake ? ` sim-chest-open sim-chest-${tierOf(best)}` : ""}`} aria-hidden>
-          <span className="sim-chest-t">{shake ? (tierOf(best) === "sr" ? "대박" : tierOf(best) === "r" ? "희귀" : "열림") : "상자"}</span>
+        <div key={charging ? "c" : shake} className={`sim-chest${charging ? " sim-charging" : shake ? ` sim-chest-open sim-chest-${tierOf(best)}` : ""}`} aria-hidden>
+          <span className="sim-chest-t">{charging ? "두근…" : shake ? (tierOf(best) === "sr" ? "대박" : tierOf(best) === "r" ? "희귀" : "열림") : "상자"}</span>
           {shake > 0 && <Sparks kind={`box-${tierOf(best)}`} n={tierOf(best) === "sr" ? 18 : 10} />}
         </div>
         <div className="sim-actions sim-actions-3">
           {[1, 10, 100].map((k) => (
-            <button key={k} type="button" className={"btn" + (k === 1 ? " sim-go" : " btn-ghost")} disabled={coins.coins === 0} onClick={() => open(k)}>
+            <button key={k} type="button" className={"btn" + (k === 1 ? " sim-go" : " btn-ghost")} disabled={coins.coins === 0 || charging} onClick={() => openFx(k)}>
               {k}회
             </button>
           ))}
@@ -1378,7 +1498,9 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
   const rec = useRecord("gem:synth");
   const best = useRef(1);
   const can = (st: number, v = inv) => v[st] >= 3 && !!rules[st];
+  const emit = useQuest();
   const reached = (stage: number, synths: number) => {
+    emit({ kind: "gem", stage });
     if (stage <= best.current || stage < 2) return;
     best.current = stage;
     // 이 수로 이 단계까지 갈 확률 (400번 해 본다)

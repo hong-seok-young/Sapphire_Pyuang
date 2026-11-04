@@ -39,24 +39,30 @@ export const EARN: EarnRule[] = [
 export const ensureWallet = (env: Env, userId: string) =>
   env.DB.prepare("INSERT OR IGNORE INTO sim_wallet (user_id, coins, earned, spent, updated_at) VALUES (?, ?, 0, 0, ?)").bind(userId, WELCOME, Date.now()).run();
 
-/** 그 일로 코인을 준다 (오늘 한도 안이면). 실패해도 하던 일은 그대로 */
-export async function earn(env: Env, userId: string, key: string): Promise<void> {
-  const rule = EARN.find((r) => r.key === key);
-  if (!rule) return;
+/** 오늘의 도전 (화면 src/simQuest.ts 가 날마다 셋을 고른다): 하나 깰 때마다 */
+export const QUEST_COIN = 30;
+export const QUEST_KEYS = ["quest0", "quest1", "quest2"];
+
+/** 그 일로 코인을 준다 (오늘 한도 안이면). 실패해도 하던 일은 그대로. 받았으면 true */
+export async function earn(env: Env, userId: string, key: string): Promise<boolean> {
+  const rule = EARN.find((r) => r.key === key) ?? (QUEST_KEYS.includes(key) ? { key, label: "오늘의 도전", coin: QUEST_COIN, cap: 1 } : null);
+  if (!rule) return false;
   try {
     const now = Date.now();
     const r = await env.DB.prepare("INSERT INTO sim_earn (user_id, day, key, n) VALUES (?1, ?2, ?3, 1) ON CONFLICT(user_id, day, key) DO UPDATE SET n = n + 1 WHERE n < ?4")
       .bind(userId, kstDate(now), key, rule.cap)
       .run();
-    if (!r.meta.changes) return;
+    if (!r.meta.changes) return false;
     await env.DB.prepare(
       "INSERT INTO sim_wallet (user_id, coins, earned, spent, updated_at) VALUES (?1, ?2 + ?4, ?2, 0, ?3) " +
         "ON CONFLICT(user_id) DO UPDATE SET coins = coins + ?2, earned = earned + ?2, updated_at = ?3",
     )
       .bind(userId, rule.coin, now, WELCOME)
       .run();
+    return true;
   } catch (e) {
     console.error("sim coin", e instanceof Error ? e.message : e);
+    return false;
   }
 }
 
