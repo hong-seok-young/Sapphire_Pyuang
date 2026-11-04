@@ -8,6 +8,8 @@ import type { GoldDay, Trend, TrendCat, TrendChar, TrendGroup, TrendItem, TrendP
 import { MARKET_PIC, goldWords, wonText } from "../market";
 import { Loading, Panel, PicImg, TopBar } from "../ui";
 import type { Wiki } from "../types";
+import { TrendDraft, draftOf } from "./TrendDraft";
+import type { Draft } from "./TrendDraft";
 
 /** 가격은 만 원 단위 (17 = 17만 원, 0.5 = 5000원) */
 const priceText = (manwon: number) => wonText(Math.round(manwon * 10_000));
@@ -652,6 +654,12 @@ function tabFromHash(): Tab {
 export function TrendPage({ wiki }: { wiki: Wiki }) {
   const { data: t, error } = useAsync(useCallback(() => loadTrend(), []));
   const [tab, setTab] = useState<Tab>(tabFromHash);
+  // 디자인 초안 (feature 브랜치 전용, #/trend?draft=a)
+  const [draft, setDraft] = useState<Draft | null>(draftOf);
+  const pickDraft = (d: Draft) => {
+    setDraft(d);
+    window.history.replaceState(window.history.state, "", `${window.location.hash.split("?")[0] || "#/trend"}?draft=${d}`);
+  };
   const pick = (k: Tab) => {
     setTab(k);
     const base = window.location.hash.split("?")[0] || "#/trend";
@@ -662,6 +670,8 @@ export function TrendPage({ wiki }: { wiki: Wiki }) {
       <TopBar title="시세 동향" right={<span className="pill trend-dev">개발중</span>} />
       {!t ? (
         <Loading error={error?.includes("404") ? "시세 자료가 아직 없어요" : error} />
+      ) : draft ? (
+        <TrendDraft t={t} wiki={wiki} draft={draft} onDraft={pickDraft} />
       ) : (
         <>
           <nav className="pill-row trend-tabs" role="tablist">
