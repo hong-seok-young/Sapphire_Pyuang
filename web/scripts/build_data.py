@@ -971,6 +971,13 @@ def copy_rank_pictures():
         items = SRC / "이미지" / src / "items.json"
         if items.exists():
             shutil.copy2(items, out / "items.json")
+        # 시세동향 그림 목록 (이름 -> [가로, 세로]): 확률 시뮬레이터가 위키에 없는 물건(코스튬 등) 그림을 찾는다
+        if dst == "trend":
+            sizes = {}
+            for f in pics:
+                with Image.open(f) as im:
+                    sizes[f.stem] = list(im.size)
+            (out / "index.json").write_text(json.dumps(sizes, ensure_ascii=False), encoding="utf-8")
         print(f"{src} 그림", len(pics))
 
 
