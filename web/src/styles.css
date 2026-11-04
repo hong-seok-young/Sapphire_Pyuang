@@ -3224,3 +3224,16 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .trend-book-side { font-size: 11px; }
 .trend-book-side-s { color: #8fb4ff; }
 .trend-book-side-b { color: #ff8a8a; }
+
+/* 확률 시뮬레이터의 아이템 그림 (src/simIcons.ts, 제작자 2026-11-04 '텍스트 말고 우리 가지고 있는 이미지 써'): 도트 그림이 뭉개지지 않게 */
+.sim-pic { image-rendering: pixelated; flex: none; object-fit: contain; }
+.sim-icon.sim-icon-pic { min-width: 0; width: 84px; height: 84px; padding: 0; }
+.sim-icon-pic .sim-half { display: grid; place-items: center; }
+.sim-icon-pic .sim-pic { width: 64px; height: 64px; }
+.sim-name { max-width: 100%; font-size: 13px; color: var(--text); text-align: center; }
+.sim-card-name { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.sim-tname { display: flex; align-items: center; gap: 5px; }
+.sim-opt-head .sim-pic { flex: none; }
+.sim-chest-t.sim-chest-pic { display: grid; grid-template-columns: auto auto; gap: 8px; align-items: center; justify-content: center; min-width: 110px; }
+.sim-chest-t.sim-chest-pic > span:empty { display: none; }
+.sim-chest-pic .sim-pic { width: 40px; height: 40px; }

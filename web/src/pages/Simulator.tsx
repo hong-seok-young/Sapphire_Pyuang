@@ -1,6 +1,6 @@
 // 확률 시뮬레이터 (개발중, 제작자 요청 2026-11-04). 자료와 규칙은 src/sim.ts (컴투스 공식 확률 표 106개).
 // 맨 위 같은 폭 단추 강화 · 성장 · 옵션 · 보석 · 뽑기, 그 아래 어두운 띠에서 고르고, 해 보면서 확률을 몸으로 느끼게 결과마다 짧은 움직임(transform·opacity 만)을 준다.
-// 그림은 아직 쓰지 않고 글자로만 그린다 (제작자 2026-11-04 '이미지 보여주는 건 텍스트로 대체, 나중에 강화하는 이미지나 동영상 주면 그대로'): 받으면 sim-item 자리를 그 모양으로 바꾼다.
+// 아이템은 우리가 가진 그림으로 그린다 (제작자 2026-11-04 '텍스트 말고 우리 가지고 있는 이미지 써', src/simIcons.ts). 그림이 없는 것만 글자. 강화 장면 이미지·동영상을 받으면 sim-item 자리를 그 모양으로 바꾼다.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAsync } from "../data";
 import { loadOdds } from "../odds";
@@ -20,6 +20,9 @@ import type { Cat, King, SimRec } from "../simRank";
 import { QuestCtx, titleOf, todayQuests, useQuest } from "../simQuest";
 import type { SimEvent } from "../simQuest";
 import { api } from "../auth";
+import { IconCtx, iconLookup, useIcon } from "../simIcons";
+import type { IconOf } from "../simIcons";
+import type { Pic } from "../types";
 
 type Tab = "enhance" | "grow" | "option" | "gem" | "box" | "rank";
 const TABS: { key: Tab; label: string }[] = [
@@ -85,6 +88,12 @@ function Sparks({ n = 10, kind }: { n?: number; kind: string }) {
   );
 }
 
+/** 이름으로 찾은 우리 그림 (없으면 아무것도 안 그린다) */
+function NameIcon({ name, size = 24 }: { name: string; size?: number }) {
+  const pic: Pic | null = useIcon()(name);
+  return pic ? <PicImg pic={pic} fit={size} className="sim-pic" /> : null;
+}
+
 export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const { data: odds, error } = useAsync(useCallback(() => loadOdds(), []), "odds");
   const [tabRaw, setTab] = useEntryState<Tab>("sim.tab", "enhance");
@@ -124,9 +133,19 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
     const t = window.setInterval(() => document.visibilityState === "visible" && coin.reload(), 30_000);
     return () => window.clearInterval(t);
   }, [coin]);
+  // 위키에 없는 물건(코스튬 등)의 그림 목록 (시세 동향 그림, 없으면 위키 그림만)
+  const [trendPics, setTrendPics] = useState<Record<string, [number, number]> | null>(null);
+  useEffect(() => {
+    fetch("/data/trend/index.json")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((v) => v && typeof v === "object" && setTrendPics(v))
+      .catch(() => {});
+  }, []);
+  const iconOf: IconOf = useMemo(() => iconLookup(wiki, trendPics), [wiki, trendPics]);
   return (
     <CoinCtx.Provider value={coin}>
       <QuestCtx.Provider value={emit}>
+      <IconCtx.Provider value={iconOf}>
       <TopBar title="확률 시뮬레이터" />
       <div className="pill-row sim-tabs" role="tablist">
         {TABS.map((t) => (
@@ -175,6 +194,7 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
       ) : (
         <RankTab odds={odds} />
       )}
+      </IconCtx.Provider>
       </QuestCtx.Provider>
     </CoinCtx.Provider>
   );
@@ -701,7 +721,8 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
   const ladder = Array.from({ length: 15 }, (_, i) => i + 1).filter((k) => rate(k) > 0);
   const showShop = !gear || shop;
   const label = gear?.name ?? part;
-  const nameSize = label.length > 7 ? " sim-icon-long" : "";
+  const pic = gear?.icon ?? null;
+  const nameSize = pic ? " sim-icon-pic" : label.length > 7 ? " sim-icon-long" : "";
 
   return (
     <div className="sim">
@@ -783,8 +804,8 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
               <span className={`sim-frame sim-aura-${broken ? 0 : auraOf(lv)}`}>
                 <i className="sim-aura" aria-hidden />
                 <span key={charge ? `c${charge.n}` : "i"} className={`sim-icon${nameSize}`} style={charge ? { ["--hit" as string]: `${Math.round(charge.dur / 3)}ms` } : undefined} aria-hidden>
-                  <span className="sim-half sim-half-a">{label}</span>
-                  <span className="sim-half sim-half-b">{label}</span>
+                  <span className="sim-half sim-half-a">{pic ? <PicImg pic={pic} fit={64} className="sim-pic" /> : label}</span>
+                  <span className="sim-half sim-half-b">{pic ? <PicImg pic={pic} fit={64} className="sim-pic" /> : label}</span>
                   {broken && <i className="sim-crack" />}
                 </span>
                 {charge && (
@@ -793,6 +814,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
                   </b>
                 )}
               </span>
+              {pic && <span className="sim-name">{label}</span>}
               <b key={`l${lv}${broken}`} className={"sim-lv" + (broken ? " sim-lv-dead" : "")}>
                 +{lv}
               </b>
@@ -1364,6 +1386,7 @@ function OptionRoller({ item, onBack, verb, game, cat }: { item: OptItem; onBack
               ◀
             </button>
           )}
+          <NameIcon name={item.name} />
           <b>{item.name}</b>
           <small>{n}번째</small>
         </div>
@@ -1543,6 +1566,8 @@ function BoxOpener({
   const seq = useRef(0);
   const prefix = sec.title.match(/^(Lv\.\S+)/)?.[1] ?? "";
   const coins = useCoins();
+  const iconOf = useIcon();
+  const chestPic = iconOf(box.name);
   // 순위: 가장 드문 것을 뽑은 사람 (상자마다, 묶음이 여럿이면 묶음마다)
   const rec = useRecord(`box:${box.key}${box.sections.length > 1 ? `:${si}` : ""}`);
   const emit = useQuest();
@@ -1617,6 +1642,7 @@ function BoxOpener({
               ◀
             </button>
           )}
+          <NameIcon name={box.name} />
           <b>{box.name}</b>
           <small>{opened ? `${opened.toLocaleString()}번 열었어요` : ""}</small>
         </div>
@@ -1639,7 +1665,10 @@ function BoxOpener({
           </div>
         )}
         <div key={charging ? "c" : shake} className={`sim-chest${charging ? " sim-charging" : shake ? ` sim-chest-open sim-chest-${tierOf(best)}` : ""}`} aria-hidden>
-          <span className="sim-chest-t">{charging ? "두근…" : shake ? (tierOf(best) === "sr" ? "대박" : tierOf(best) === "r" ? "희귀" : "열림") : "상자"}</span>
+          <span className={"sim-chest-t" + (chestPic ? " sim-chest-pic" : "")}>
+            {chestPic && <PicImg pic={chestPic} fit={40} className="sim-pic" />}
+            <span>{charging ? "두근…" : shake ? (tierOf(best) === "sr" ? "대박" : tierOf(best) === "r" ? "희귀" : "열림") : chestPic ? "" : "상자"}</span>
+          </span>
           {shake > 0 && <Sparks kind={`box-${tierOf(best)}`} n={tierOf(best) === "sr" ? 18 : 10} />}
         </div>
         <div className="sim-actions sim-actions-3">
@@ -1667,9 +1696,13 @@ function BoxOpener({
             {pulls.map((x, i) => {
               const next = boxes ? boxFor(boxes, x.name, box.key) : null;
               const opt = !next && sources ? optionFor(sources, x.name, prefix) : null;
+              const xp = iconOf(x.name);
               const body = (
                 <>
-                  <span>{x.name}</span>
+                  <span className="sim-card-name">
+                    {xp && <PicImg pic={xp} fit={22} className="sim-pic" />}
+                    {x.name}
+                  </span>
                   <small>
                     {pctText(x.p)}
                     {next ? " · 열기 ›" : opt ? " · 옵션 ›" : ""}
@@ -1710,7 +1743,10 @@ function BoxOpener({
               className={"sim-tr sim-tally-row" + (got ? " sim-got" : "") + (target === x.name ? " sim-target" : "")}
               onClick={() => setTarget(target === x.name ? null : x.name)}
             >
-              <span className={`sim-tname sim-t-${tierOf(x.p / total)}`}>{x.name}</span>
+              <span className={`sim-tname sim-t-${tierOf(x.p / total)}`}>
+                <NameIcon name={x.name} size={16} />
+                {x.name}
+              </span>
               <span>{pctText(x.p / total)}</span>
               <span>{got ? got.toLocaleString() : "-"}</span>
               <span>{opened && got ? pctText(got / opened) : "-"}</span>
