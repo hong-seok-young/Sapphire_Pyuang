@@ -277,6 +277,23 @@ runSql([
   console.log(fresh ? "개발 요청 예시 3개 넣음" : "개발 요청 예시는 이미 넣었어요");
 }
 
+// 확률 시뮬레이터 개발 중판(sim_wallet, 테스트판 sim_t_wallet 아님)에 유어아너만 행운 코인 10000 을 더한다 (제작자 2026-11-05 '유어아너만 10000 코인 넣어줘 개발중에').
+// 지갑이 아직 없으면 처음 코인(100)에 더해 만든다. 계정이 있을 때만, 알림은 보내지 않는다. setup 'sim_gift_youarehonor_20261105' 로 한 번만
+{
+  const KEY = "sim_gift_youarehonor_20261105";
+  const WHO = "유어아너";
+  const now = Date.now();
+  const NOT_DONE = `NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}')`;
+  const has = queryFirst(`SELECT COUNT(*) AS n FROM users WHERE id = '${WHO}' AND ${NOT_DONE}`)?.n ?? 0;
+  runSql([
+    `INSERT INTO sim_wallet (user_id, coins, earned, spent, updated_at) SELECT '${WHO}', 100 + 10000, 10000, 0, ${now} ` +
+      `WHERE EXISTS (SELECT 1 FROM users WHERE id = '${WHO}') AND ${NOT_DONE} ` +
+      `ON CONFLICT(user_id) DO UPDATE SET coins = coins + 10000, earned = earned + 10000, updated_at = ${now};`,
+    `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+  ]);
+  console.log(`시뮬레이터 코인 10000 넣음 ${has}명`);
+}
+
 // 길드 던전 시간표 '확정'을 모두 푼다 (제작자 2026-11-04 '확정이 다 풀리게 해 주고 다시 확정하라고 안내'): 파티원 카드가 '입력 전 / 확정'으로 바뀌면서
 // 확정을 서버(gd_avail.confirmed_at)에 적게 됐는데, 그전에 누른 확정은 폰에만 남아 있었다. 파티에 든 사람에게 다시 확정하라는 알림(gdungeon, 끈 사람 빼고).
 // 폰 알림(푸시)은 서버가 아니라서 안 간다. setup 'gd_confirm_reset_20261104' 로 한 번만, 실행 기록에는 개수만
