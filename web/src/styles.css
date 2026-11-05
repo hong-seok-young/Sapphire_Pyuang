@@ -3487,6 +3487,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .dr-cell-label { width: 100%; font-size: 9px; text-align: center; border-bottom: 1px solid var(--paper-line); white-space: nowrap; overflow: hidden; }
 .dr-cell-box { display: grid; place-items: center; width: 100%; }
 .dr-cell-who { min-height: 11px; width: 100%; min-width: 0; font-size: 9px; text-align: center; }
+.dr-cell-pre { opacity: 0.45; }
 .dr-cell-wait::after { content: ""; position: absolute; inset: -3px; border: 2px dashed var(--gold); pointer-events: none; animation: dr-breathe 0.7s ease-in-out infinite alternate; }
 .dr-wait { font-size: 10px; color: #9b7a32; animation: dr-blink 0.9s ease-in-out infinite alternate; }
 .dr-link { align-self: center; height: 2px; background: #3a3366; overflow: hidden; position: relative; }
