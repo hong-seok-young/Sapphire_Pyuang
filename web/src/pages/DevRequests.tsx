@@ -203,6 +203,8 @@ function RequestForm({
           </button>
         ))}
       </div>
+      {/* 제작자 2026-11-05 '정말 개인 용도도 가능, 그 버튼이 나한테만 뜨게 할 수도 있음' (누가 보는지는 안내에 넣지 않는다, 요청은 모두가 본다) */}
+      <p className="dr-scope-tip">개인 용도도 가능해요 · 예: 그 버튼이 나에게만 보이게</p>
       {scope === "some" && <PeoplePick value={people} onChange={setPeople} />}
       {err && <p className="dr-err">{err}</p>}
       <div className="dr-form-btns">
