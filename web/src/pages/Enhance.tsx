@@ -416,7 +416,10 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
   d: Enhance; wiki: Wiki; job: string; a: Pick; b: Pick; onPick: (w: EnhanceWeapon, plus: number) => void; onBase: (w: EnhanceWeapon, plus: number) => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
-  const drag = useRef<{ x0: number; moved: boolean } | null>(null);
+  // 끌기는 옆으로 8px 넘게 (위아래보다 많이) 움직였을 때만. 톡 누름은 브라우저의 click 으로 받는다
+  // (제작자 2026-11-05 '네모 버튼 클릭이 한 번에 딱딱 안 눌려': 손가락이 조금만 움직여도 끌기로 보거나, 위아래로 흔들리면 스크롤로 넘어가 누름이 사라졌다)
+  const drag = useRef<{ x0: number; y0: number; moved: boolean; id: number } | null>(null);
+  const dragged = useRef(false);
   const [dragging, setDragging] = useState(false);
   // 그래프 칸의 실제 폭: 점이 붙어 겹치는 줄은 점을 좁히고 숫자를 뺀다 (낮은 레벨 무기는 +6 ~ +10 이 몇 px 안에 모인다)
   const box = useRef<HTMLDivElement>(null);
@@ -493,17 +496,17 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
           const li = base === null ? -1 : r.vals.map((v) => v < base - 1e-9).lastIndexOf(true);
           const ri = base === null ? -1 : r.vals.findIndex((v) => v > base + 1e-9);
           // % 는 그 % 에 해당하는 점 바로 위에 (제작자 2026-11-05 '수직선 좌우 퍼센트를 그 수치에 해당하는 무기 행의 버튼에'): 두 글자가 겹치면 사이에서 비켜 선다
-          const labs = (base === null ? [] : [li, ri].filter((i) => i >= 0)).map((i) => {
+          // 바꿀 무기 점(금색 테두리)에도 지금 무기 대비 % 를 금색으로 (제작자 2026-11-05 '주황색 버튼도 써 주면')
+          const bi = isB && base !== null ? CHART_PLUS.indexOf(b.plus) : -1;
+          const labs = (base === null ? [] : [...new Set([li, ri, bi])].filter((i) => i >= 0).sort((m, n) => m - n)).map((i) => {
             const p = pct(base as number, r.vals[i]);
             const w = pctText(p).length * 5 + 6;
-            return { i, p, w, left: (x(r.vals[i]) / 100) * tw - w / 2 };
+            return { i, p, w, gold: i === bi, left: (x(r.vals[i]) / 100) * tw - w / 2 };
           });
-          if (labs.length === 2 && labs[0].left + labs[0].w + 1 > labs[1].left) {
-            const mid = (labs[0].left + labs[0].w / 2 + labs[1].left + labs[1].w / 2) / 2;
-            labs[0].left = mid - labs[0].w - 1;
-            labs[1].left = mid + 1;
-          }
-          for (const l of labs) l.left = Math.max(0, Math.min(tw - l.w, l.left));
+          // 겹치면 차례로 밀어 내고, 칸 끝을 넘으면 거꾸로 당긴다
+          for (let k = 1; k < labs.length; k++) labs[k].left = Math.max(labs[k].left, labs[k - 1].left + labs[k - 1].w + 1);
+          for (let k = labs.length - 1; k >= 0; k--) labs[k].left = Math.min(labs[k].left, (k === labs.length - 1 ? tw : labs[k + 1].left - 1) - labs[k].w);
+          for (const l of labs) l.left = Math.max(0, l.left);
           const edge = (i: number) => (i === li && li >= 0 ? " enh-ch-dot-lo" : i === ri && ri >= 0 ? " enh-ch-dot-hi" : "");
           return (
             <Fragment key={r.w.name}>
@@ -521,30 +524,40 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
                 <div
                   className="enh-ch-track"
                   onPointerDown={(e) => {
-                    drag.current = { x0: e.clientX, moved: false };
-                    e.currentTarget.setPointerCapture?.(e.pointerId);
+                    drag.current = { x0: e.clientX, y0: e.clientY, moved: false, id: e.pointerId };
+                    dragged.current = false;
                   }}
                   onPointerMove={(e) => {
                     const g = drag.current;
-                    if (!g) return;
-                    if (!g.moved && Math.abs(e.clientX - g.x0) < 6) return;
-                    if (!g.moved) setDragging(true);
-                    g.moved = true;
+                    if (!g || g.id !== e.pointerId) return;
+                    if (!g.moved) {
+                      const dx = Math.abs(e.clientX - g.x0);
+                      if (dx < 8 || dx < Math.abs(e.clientY - g.y0)) return;
+                      g.moved = true;
+                      setDragging(true);
+                      e.currentTarget.setPointerCapture?.(e.pointerId);
+                    }
                     const pt = snap(valueAt(e.currentTarget, e.clientX));
                     if (nowLabel !== pt.label) onBase(pt.w, pt.plus);
                   }}
-                  onPointerUp={(e) => {
-                    const g = drag.current;
+                  onPointerUp={() => {
+                    if (drag.current?.moved) dragged.current = true;
                     drag.current = null;
                     setDragging(false);
-                    if (!g || g.moved) return;
-                    // 톡 누름: 이 줄에서 가장 가까운 강화 점에 기준선
-                    const i = nearest(r.vals, valueAt(e.currentTarget, e.clientX));
-                    if (nowLabel !== `+${CHART_PLUS[i]} ${r.w.name}`) onBase(r.w, CHART_PLUS[i]);
                   }}
                   onPointerCancel={() => {
                     drag.current = null;
                     setDragging(false);
+                  }}
+                  onClick={(e) => {
+                    // 끌기 끝에 따라오는 click 은 넘긴다
+                    if (dragged.current) {
+                      dragged.current = false;
+                      return;
+                    }
+                    // 톡 누름: 이 줄에서 가장 가까운 강화 점에 기준선
+                    const i = nearest(r.vals, valueAt(e.currentTarget, e.clientX));
+                    if (nowLabel !== `+${CHART_PLUS[i]} ${r.w.name}`) onBase(r.w, CHART_PLUS[i]);
                   }}
                 >
                   {ticks.map((t) => (
@@ -579,7 +592,7 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
                   {base !== null && (
                     <span className="enh-ch-labs">
                       {labs.map((l) => (
-                        <span key={l.i} className={"enh-ch-lab" + tone(l.p)} style={tw ? { left: `${l.left}px`, width: `${l.w}px` } : { left: `${x(r.vals[l.i])}%`, transform: "translateX(-50%)" }}>
+                        <span key={l.i} className={"enh-ch-lab" + (l.gold ? " enh-ch-lab-b" : tone(l.p))} style={tw ? { left: `${l.left}px`, width: `${l.w}px` } : { left: `${x(r.vals[l.i])}%`, transform: "translateX(-50%)" }}>
                           <Pop value={pctText(l.p)} off={dragging}>
                             {pctText(l.p)}
                           </Pop>
