@@ -18,6 +18,7 @@ import { loadEnhance, useAsync } from "../data";
 import type { Enhance, EnhanceWeapon } from "../data";
 import type { Wiki } from "../types";
 import { FitLine, FlowLine, Loading, PicImg, TopBar } from "../ui";
+import { useSample } from "../tutorialState";
 
 const KNUM: Record<string, number> = { 일: 1, 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 칠: 7, 팔: 8, 구: 9, 십: 10 };
 const key = (s: string) => s.replace(/\s+/g, "");
@@ -26,6 +27,9 @@ const squeeze = (s: string) => s.replace(/닼/g, "다크").replace(/롭/g, "로�
 const JOB_OF: Record<string, string> = { warrior: "전사", ranger: "레인저", mage: "마법사", monk: "무도가" };
 const JOBS = ["전사", "레인저", "마법사", "무도가"] as const;
 /** 그 직업 무기, 레벨 순 (같은 레벨은 강화 수치가 있는 것 먼저) */
+/** 그래프 끌기 안내를 본 기기 (한 번 끌면 적는다) */
+const DRAG_HINT = "sapphire.enh.dragHint";
+
 const jobWeapons = (d: Enhance, job: string) =>
   d.weapons.filter((w) => w.job === job).sort((a, b) => (a.lv ?? 0) - (b.lv ?? 0) || Number(!a.bonus) - Number(!b.bonus) || a.name.localeCompare(b.name));
 
@@ -420,6 +424,25 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
   const drag = useRef<{ x0: number; y0: number; moved: boolean; id: number } | null>(null);
   const dragged = useRef(false);
   const [dragging, setDragging] = useState(false);
+  // 처음 한 번 '좌우로 끌어 보세요' (제작자 2026-11-05 '그래프 좌우로 드래그 기능 모르는 거 같아, 처음 들어오면 드래그 해 보라고 유도, 한 번만'):
+  // 이 기기에서 그래프를 한 번 끌면 다시 안 보인다. 튜토리얼 동안은 숨긴다
+  const sample = useSample();
+  const [hint, setHint] = useState(() => {
+    try {
+      return !localStorage.getItem(DRAG_HINT);
+    } catch {
+      return false;
+    }
+  });
+  const hinted = () => {
+    if (!hint) return;
+    setHint(false);
+    try {
+      localStorage.setItem(DRAG_HINT, "1");
+    } catch {
+      // 저장 못 해도 이번엔 닫힌다
+    }
+  };
   // 그래프 칸의 실제 폭: 점이 붙어 겹치는 줄은 점을 좁히고 숫자를 뺀다 (낮은 레벨 무기는 +6 ~ +10 이 몇 px 안에 모인다)
   const box = useRef<HTMLDivElement>(null);
   const [tw, setTw] = useState(0);
@@ -499,6 +522,16 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
         )}
       </div>
       <div ref={box} className={"enh-ch" + (dragging ? " enh-ch-dragging" : "")}>
+        {hint && !sample && (
+          <div className="enh-ch-hint" aria-hidden>
+            <span className="enh-ch-hint-sweep">
+              <i />
+            </span>
+            <span className="enh-ch-hint-tag">
+              <b>◀</b> 좌우로 끌어 보세요 <b>▶</b>
+            </span>
+          </div>
+        )}
         {rows.map((r) => {
           const isA = a.w?.name === r.w.name;
           const isB = b.w?.name === r.w.name;
@@ -547,6 +580,7 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
                       if (dx < 8 || dx < Math.abs(e.clientY - g.y0)) return;
                       g.moved = true;
                       setDragging(true);
+                      hinted();
                       e.currentTarget.setPointerCapture?.(e.pointerId);
                     }
                     const pt = snap(valueAt(e.currentTarget, e.clientX));
@@ -663,12 +697,18 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
   const { data: d, error } = useAsync(useCallback(() => loadEnhance(), []));
   const [a, setA] = useState<Pick | null>(null);
   const [b, setB] = useState<Pick | null>(null);
-  const pa = a ?? initial(d, query.get("a"));
+  const pa0 = a ?? initial(d, query.get("a"));
   // 다른 직업끼리는 견주지 않는다 (제작자 2026-11-05 '타 직업군끼리 ㄴㄴ, 직업 넘어가면 무기 입력한 거 초기화'): 주소의 두 무기 직업이 다르면 바꿀 무기는 비운다
-  const pb0 = b ?? initial(d, query.get("b"));
-  const pb = pa.w && pb0.w && pa.w.job !== pb0.w.job ? EMPTY : pb0;
+  const pb1 = b ?? initial(d, query.get("b"));
+  const pb0 = pa0.w && pb1.w && pa0.w.job !== pb1.w.job ? EMPTY : pb1;
   const [jobPick, setJob] = useState<string | null>(null);
-  const job = jobPick ?? pa.w?.job ?? (me.job ? JOB_OF[me.job] : null) ?? "전사";
+  const job = jobPick ?? pa0.w?.job ?? (me.job ? JOB_OF[me.job] : null) ?? "전사";
+  // 튜토리얼 동안 무기를 안 골랐으면 예시 두 무기로 결과·비슷한 무기·기준선을 보인다 (고른 것과 주소는 그대로, src/tutorialState.ts)
+  const sample = useSample();
+  const sw = d && sample && (!pa0.w || !pb0.w) ? jobWeapons(d, job) : [];
+  const mid = Math.max(1, Math.floor(sw.length / 2));
+  const pa = !pa0.w && sw[mid - 1] ? { q: sw[mid - 1].name, w: sw[mid - 1], plus: 7 } : pa0;
+  const pb = !pb0.w && sw[mid] && sw[mid] !== pa.w && (!pa.w || pa.w.job === sw[mid].job) ? { q: sw[mid].name, w: sw[mid], plus: 8 } : pb0;
   // 목록을 펼칠 줄: 처음은 비어 있는 첫 줄, 줄을 누르면 그 줄, 고르면 다음 빈 줄 (둘 다 차면 닫힘)
   const [listAt, setListAt] = useState<"a" | "b" | null | undefined>(undefined);
   const firstEmpty = !pa.w ? "a" : !pb.w ? "b" : null;
