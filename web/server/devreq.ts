@@ -14,7 +14,8 @@ export const canUseDevReq = (me: User) => DEVREQ_OPEN || canSim(me);
 
 export type Scope = "me" | "some" | "all";
 export type Status = "review" | "agree" | "dev" | "done" | "rejected";
-export type StepKind = "submit" | "resubmit" | "feasible" | "agree" | "approve" | "reject" | "done";
+/** skip = 길마가 오피서 합의 없이 결재, force = 길마가 반려된 요청을 강제 결재 */
+export type StepKind = "submit" | "resubmit" | "feasible" | "agree" | "approve" | "skip" | "force" | "reject" | "done";
 
 export const MAX_BODY = 1000;
 export const MAX_NOTE = 300;

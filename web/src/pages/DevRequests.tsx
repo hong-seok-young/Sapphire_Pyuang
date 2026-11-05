@@ -9,7 +9,7 @@ import { ago } from "../market";
 import { useEntryState } from "../router";
 import { FitLine, FlowLine, Loading, TopBar } from "../ui";
 import { SCOPE_NAME, STATUS_NAME, actDevReq, addDevReq, addDevTalk, delDevReq, editDevReq, loadDevReqs, loadDevTalk, loadPeople, myTurn, roundSteps } from "../devreq";
-import type { DevReq, DevRole, DevStep, DevTalk, Scope, Status } from "../devreq";
+import type { DevAct, DevReq, DevRole, DevStep, DevTalk, Scope, Status } from "../devreq";
 
 /** 앱개발자 (결재란의 개발자 검토·개발 착수 칸에 미리 적는다) */
 /** 상태 거르기 칸의 짧은 이름 (제작자 2026-11-05 '모두부터 반려까지 버튼 한 행에': 두 글자로 6칸 한 줄) */
@@ -286,7 +286,7 @@ function PeoplePick({ me, value, onChange }: { me: string; value: string[]; onCh
   );
 }
 
-const STAMP_TEXT: Record<string, string> = { submit: "신청", resubmit: "신청", feasible: "가능", agree: "합의", approve: "결재", done: "완료", reject: "반려" };
+const STAMP_TEXT: Record<string, string> = { submit: "신청", resubmit: "신청", feasible: "가능", agree: "합의", approve: "결재", skip: "결재", force: "강제", done: "완료", reject: "반려" };
 
 /** 결재란: 신청 · 개발자 검토 · 오피서 합의 · 길마 결재 · 개발 착수 (칸마다 도장, 제작자 2026-11-05 '개발 검토 말고 개발자 검토로') */
 function ApprovalLine({ r }: { r: DevReq }) {
@@ -298,16 +298,22 @@ function ApprovalLine({ r }: { r: DevReq }) {
   // 칸: 이름, 찍힌 단계(도장 글), 지금 기다리는 칸인지, 미리 적어 둔 사람 (제작자 2026-11-05 '개발 검토는 퓨앙이니까 이름은 미리 아래에',
   // '합의는 오피서 합의로', '마지막은 개발 착수로': 길마 결재가 나면 착수 도장, 개발 완료면 완료 도장)
   const approve = by("approve")[0];
+  // 길마가 합의 없이 결재(skip)하면 오피서 합의 칸에 회색 '생략', 반려된 요청을 강제 결재(force)하면 길마 결재 칸에 '강제' (제작자 2026-11-05)
+  const skip = by("skip")[0];
+  const force = by("force")[0];
+  const go = approve ?? skip ?? force;
   const done = by("done")[0];
-  const cells: { key: string; label: string; step?: DevStep; stamp?: string; count?: number; wait: boolean; rejected?: boolean; pre?: string }[] = [
+  const cells: { key: string; label: string; step?: DevStep; stamp?: string; count?: number; wait: boolean; rejected?: boolean; grey?: boolean; pre?: string }[] = [
     { key: "sub", label: "신청", step: sub, wait: false },
     { key: "feas", label: "개발자 검토", step: by("feasible")[0], wait: r.status === "review", pre: DEVELOPER },
-    { key: "agree", label: "오피서 합의", step: agrees[agrees.length - 1], count: agrees.length, wait: r.status === "agree" && agrees.length === 0 },
-    { key: "appr", label: "길마 결재", step: approve, wait: r.status === "agree" && agrees.length > 0, pre: GUILD_MASTER },
+    skip && !agrees.length
+      ? { key: "agree", label: "오피서 합의", step: skip, stamp: "생략", grey: true, wait: false }
+      : { key: "agree", label: "오피서 합의", step: agrees[agrees.length - 1], count: agrees.length, wait: r.status === "agree" && agrees.length === 0 },
+    { key: "appr", label: "길마 결재", step: go, wait: r.status === "agree" && agrees.length > 0, pre: GUILD_MASTER },
     {
       key: "start",
       label: "개발 착수",
-      step: done ?? (approve && r.status === "dev" ? { ...approve, user_id: DEVELOPER } : undefined),
+      step: done ?? (go && r.status === "dev" ? { ...go, user_id: DEVELOPER } : undefined),
       stamp: done ? "완료" : "착수",
       wait: false,
       pre: DEVELOPER,
@@ -336,6 +342,7 @@ function ApprovalLine({ r }: { r: DevReq }) {
                   id={`${r.id}:${r.round}:${c.key}:${c.step.kind}:${c.count ?? 0}`}
                   text={c.rejected ? "반려" : c.stamp ?? (c.key === "agree" && (c.count ?? 0) > 1 ? `합의${c.count}` : STAMP_TEXT[c.step.kind])}
                   red={!!c.rejected}
+                  grey={!!c.grey}
                 />
               ) : c.wait && r.status !== "rejected" ? (
                 <span className="dr-wait">대기</span>
@@ -352,12 +359,12 @@ function ApprovalLine({ r }: { r: DevReq }) {
 }
 
 /** 도장: 새로 찍힌 것만 쾅 */
-function Stamp({ id, text, red }: { id: string; text: string; red: boolean }) {
+function Stamp({ id, text, red, grey }: { id: string; text: string; red: boolean; grey?: boolean }) {
   const pop = useRef(primed && !seenStamps.has(id)).current;
   useEffect(() => {
     seenStamps.add(id);
   }, [id]);
-  return <span className={"dr-stamp" + (red ? " dr-stamp-red" : "") + (pop ? " dr-stamp-pop" : "")}>{text}</span>;
+  return <span className={"dr-stamp" + (red ? " dr-stamp-red" : "") + (grey ? " dr-stamp-grey" : "") + (pop ? " dr-stamp-pop" : "")}>{text}</span>;
 }
 
 const KIND_LINE: Record<string, string> = {
@@ -366,6 +373,8 @@ const KIND_LINE: Record<string, string> = {
   feasible: "개발 가능",
   agree: "합의",
   approve: "최종 결재",
+  skip: "합의 생략 · 최종 결재",
+  force: "강제 결재",
   reject: "반려",
   done: "개발 완료",
 };
@@ -513,8 +522,11 @@ function ActPanel({ r, role, me, mine, onDone }: { r: DevReq; role: DevRole; me:
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const agrees = roundSteps(r).filter((s) => s.kind === "agree");
-  type Act = "feasible" | "agree" | "approve" | "reject" | "done";
+  // 강제 결재는 두 번 눌러야 (처음 누르면 단추가 빨갛게 깜박, 글자는 그대로. 제작자 2026-11-05 '정말 강제 결재에서 정말은 빼')
+  const [armed, setArmed] = useState(false);
+  const st = roundSteps(r);
+  const agrees = st.filter((s) => s.kind === "agree");
+  type Act = DevAct;
   let acts: [Act, string][] = [];
   let hint = "";
   let ph = "결재 의견 (선택)";
@@ -532,15 +544,17 @@ function ActPanel({ r, role, me, mine, onDone }: { r: DevReq; role: DevRole; me:
       ];
       ph = "개발자에게 제안 (예: 이 화면에 이렇게 넣어 주세요)";
     } else if (role.approve) {
-      acts = agrees.length
-        ? [
-            ["approve", "최종 결재"],
-            ["reject", "반려"],
-          ]
-        : [["reject", "반려"]];
-      if (!agrees.length) hint = "합의가 한 명 이상 있어야 결재할 수 있어요";
+      // 합의가 없으면 길마 권한으로 오피서 합의를 건너뛰고 결재 (제작자 2026-11-05)
+      acts = [
+        agrees.length ? ["approve", "최종 결재"] : ["skip", "합의 생략 결재"],
+        ["reject", "반려"],
+      ];
       ph = "개발자에게 제안 (예: 이렇게 만들어 주세요)";
     }
+  } else if (r.status === "rejected" && role.approve && st.some((s) => s.kind === "feasible")) {
+    // 개발자 검토를 지나 오피서(나 길마)가 반려한 요청은 길마가 강제 결재 (제작자 2026-11-05 '오피서가 반려해도 강제 결재')
+    acts = [["force", "강제 결재"]];
+    ph = "개발자에게 제안 (예: 이렇게 만들어 주세요)";
   } else if (r.status === "dev" && role.dev) {
     acts = [["done", "개발 완료"]];
     ph = "한마디 (선택)";
@@ -548,6 +562,7 @@ function ActPanel({ r, role, me, mine, onDone }: { r: DevReq; role: DevRole; me:
   if (!acts.length) return null;
   const go = async (act: Act) => {
     if (act === "reject" && !note.trim()) return setErr("반려 의견을 적어 주세요");
+    if (act === "force" && !armed) return setArmed(true);
     setBusy(true);
     setErr("");
     try {
@@ -568,7 +583,13 @@ function ActPanel({ r, role, me, mine, onDone }: { r: DevReq; role: DevRole; me:
       {err && <p className="dr-err">{err}</p>}
       <div className="dr-act-btns">
         {acts.map(([a, name]) => (
-          <button key={a} type="button" className={"btn dr-btn " + (a === "reject" ? "dr-btn-no" : "dr-btn-go")} disabled={busy} onClick={() => void go(a)}>
+          <button
+            key={a}
+            type="button"
+            className={"btn dr-btn " + (a === "reject" ? "dr-btn-no" : a === "force" ? "dr-btn-force" + (armed ? " dr-btn-danger" : "") : "dr-btn-go")}
+            disabled={busy}
+            onClick={() => void go(a)}
+          >
             {a !== "reject" && <span className="dr-btn-shine" aria-hidden />}
             {name}
           </button>

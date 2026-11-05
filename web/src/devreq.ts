@@ -3,7 +3,7 @@ import { api } from "./auth";
 
 export type Scope = "me" | "some" | "all";
 export type Status = "review" | "agree" | "dev" | "done" | "rejected";
-export type StepKind = "submit" | "resubmit" | "feasible" | "agree" | "approve" | "reject" | "done";
+export type StepKind = "submit" | "resubmit" | "feasible" | "agree" | "approve" | "skip" | "force" | "reject" | "done";
 
 export interface DevStep {
   req_id: number;
@@ -42,7 +42,8 @@ export const loadDevReqs = () => api<{ list: DevReq[]; role: DevRole }>("/api/de
 export const addDevReq = (b: { body: string; scope: Scope; people: string[] }) => api<{ id: number }>("/api/devreq", "POST", b);
 export const editDevReq = (id: number, b: { body: string; scope: Scope; people: string[] }) => api<{ ok: true; resubmitted?: boolean }>(`/api/devreq/${id}`, "PUT", b);
 export const delDevReq = (id: number) => api<{ ok: true }>(`/api/devreq/${id}`, "DELETE");
-export const actDevReq = (id: number, act: "feasible" | "agree" | "approve" | "reject" | "done", note: string) =>
+export type DevAct = "feasible" | "agree" | "approve" | "skip" | "force" | "reject" | "done";
+export const actDevReq = (id: number, act: DevAct, note: string) =>
   api<{ ok: true; status: Status }>(`/api/devreq/${id}/act`, "POST", { act, note });
 export const loadDevTalk = (id: number) => api<{ talk: DevTalk[] }>(`/api/devreq/${id}/talk`);
 export const addDevTalk = (id: number, text: string) => api<{ id: number }>(`/api/devreq/${id}/talk`, "POST", { text });

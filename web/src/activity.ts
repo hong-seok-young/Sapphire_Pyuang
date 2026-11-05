@@ -280,7 +280,7 @@ const ACTIONS: [RegExp, (d: Rec, m: RegExpMatchArray, at: number) => string][] =
     /^POST \/api\/devreq\/(\d+)\/act$/,
     (d, m) =>
       join(
-        `개발 요청 #${m[1]} ${({ feasible: "개발 가능", agree: "합의", approve: "최종 결재", reject: "반려", done: "개발 완료" } as Record<string, string>)[String(d.act)] ?? "결재"}`,
+        `개발 요청 #${m[1]} ${({ feasible: "개발 가능", agree: "합의", approve: "최종 결재", skip: "합의 생략 결재", force: "강제 결재", reject: "반려", done: "개발 완료" } as Record<string, string>)[String(d.act)] ?? "결재"}`,
         quote(d.note, 60),
       ),
   ],
