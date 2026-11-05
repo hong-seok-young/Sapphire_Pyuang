@@ -26,6 +26,7 @@ const KIND_TITLE = {
   todo: "✅ To do · 함께",
   gdungeon: "⚔️ 길드 던전",
   app_news: "✨ 새 기능",
+  devreq: "📮 개발 요청",
 };
 
 self.addEventListener("install", () => self.skipWaiting());

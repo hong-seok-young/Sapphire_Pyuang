@@ -242,6 +242,19 @@ export const GUIDES: Guide[] = [
     ],
   },
   {
+    key: "devreq",
+    title: "개발 요청",
+    tutorial: [
+      { sel: ".dr-new", head: "개발 요청하기", text: "누구를 위한 기능인지(나, 특정 인원, 길드 전체) 고르고 자유롭게 적으면 앱개발자에게 바로 가요." },
+      {
+        sel: ".dr-line",
+        head: "결재란",
+        text: "앱개발자가 개발 가능을 누르면 오피서 합의가 1명 이상 나야 길드마스터가 최종 결재해요. 결재가 나면 개발이 시작돼요.\n합의·결재 때 적은 의견은 개발자에게 가는 제안이에요.",
+      },
+      { sel: ".dr-tabs .pill:has-text('내 차례')", head: "내 차례", text: "내가 결재할 요청과 반려된 내 요청만 모아요.\n반려되면 반려 의견을 보고 고쳐서 다시 신청해요. 결재는 처음부터 다시 받아요.", tap: true, undo: false },
+    ],
+  },
+  {
     key: "sim",
     title: "확률 시뮬레이터",
     tutorial: [

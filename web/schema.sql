@@ -792,3 +792,37 @@ CREATE TABLE IF NOT EXISTS sim_t_state (
   data TEXT NOT NULL,
   updated_at INTEGER NOT NULL
 );
+-- 개발 요청 (개발중, 제작자 요청 2026-11-05 '개발자한테 자유롭게 신청, 범위는 나·특정 인원·길드 전체, 개발 가능 → 합의 1명 이상 → 길마 최종 결재 → 개발, 반려되면 고쳐서 다시 신청')
+-- status: review(개발 검토) | agree(합의·결재 대기) | dev(개발 중) | done(완료) | rejected(반려). round 는 다시 신청할 때마다 1씩 (server/devreq.ts)
+CREATE TABLE IF NOT EXISTS dev_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  body TEXT NOT NULL,
+  scope TEXT NOT NULL DEFAULT 'me',
+  people TEXT,
+  status TEXT NOT NULL DEFAULT 'review',
+  round INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS dev_requests_updated ON dev_requests (updated_at);
+-- 결재 이력: submit | resubmit | feasible(개발 가능) | agree(합의) | approve(길마 결재) | reject(반려) | done(개발 완료). note 는 결재 의견 (지우지 않는다)
+CREATE TABLE IF NOT EXISTS dev_request_steps (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  req_id INTEGER NOT NULL,
+  round INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  note TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS dev_request_steps_req ON dev_request_steps (req_id, round);
+-- 요청마다 대화 (개발자와 신청한 사람이 개발할 수 있는지 이야기한다)
+CREATE TABLE IF NOT EXISTS dev_request_talk (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  req_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS dev_request_talk_req ON dev_request_talk (req_id, id);

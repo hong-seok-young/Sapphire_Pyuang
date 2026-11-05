@@ -21,6 +21,7 @@ const ID_COLUMNS: [string, string][] = [
   ["todo_checks", "user_id"], ["todo_custom", "user_id"], ["todo_edits", "user_id"], ["todo_shares", "owner"], ["todo_share_members", "user_id"],
   ["rental_items", "donor"], ["rental_items", "renter"], ["rental_items", "updated_by"], ["rental_requests", "user_id"], ["rental_requests", "done_by"],
   ["rental_mileage", "who"], ["rental_mileage", "by_user"], ["rental_apps", "user_id"], ["rental_talk", "user_id"],
+  ["dev_requests", "user_id"], ["dev_request_steps", "user_id"], ["dev_request_talk", "user_id"],
 ];
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
@@ -45,6 +46,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   const stmts = [
     env.DB.prepare("UPDATE users SET id = ? WHERE id = ?").bind(newId, user.id),
     ...ID_COLUMNS.map(([table, col]) => env.DB.prepare(`UPDATE ${table} SET ${col} = ? WHERE ${col} = ?`).bind(newId, user.id)),
+    // 개발 요청의 특정 인원 (JSON 글 안의 닉네임)
+    env.DB.prepare("UPDATE dev_requests SET people = REPLACE(people, ?, ?) WHERE people LIKE ?").bind(
+      JSON.stringify(user.id),
+      JSON.stringify(newId),
+      `%${JSON.stringify(user.id)}%`,
+    ),
   ];
   if (profile) {
     const now = Date.now();

@@ -40,6 +40,10 @@ export async function deleteAccountData(env: Env, user: { id: string; main_id: s
     // 장비대여: 기다리는 신청과 대화창의 그 사람 글만 지운다 (대여 기록과 마일리지 장부는 길드 장부라 남긴다, 같은 닉네임으로 다시 오면 이어진다)
     env.DB.prepare("DELETE FROM rental_requests WHERE user_id = ? AND status IN ('wait', 'ok')").bind(user.id),
     env.DB.prepare("DELETE FROM rental_talk WHERE user_id = ?").bind(user.id),
+    // 개발 요청: 그 사람의 요청(결재 이력, 대화까지)과 다른 요청에 쓴 대화. 남의 요청에 남긴 결재 이력은 남긴다
+    env.DB.prepare("DELETE FROM dev_request_steps WHERE req_id IN (SELECT id FROM dev_requests WHERE user_id = ?)").bind(user.id),
+    env.DB.prepare("DELETE FROM dev_request_talk WHERE user_id = ? OR req_id IN (SELECT id FROM dev_requests WHERE user_id = ?)").bind(user.id, user.id),
+    env.DB.prepare("DELETE FROM dev_requests WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM chat_msgs WHERE thread_id IN (SELECT id FROM chat_threads WHERE user_id = ?)").bind(user.id),
     env.DB.prepare("DELETE FROM chat_threads WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM chat_gaps WHERE user_id = ?").bind(user.id),

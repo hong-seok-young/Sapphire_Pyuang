@@ -29,6 +29,8 @@ export const ALERT_KINDS = {
   gdungeon: true,
   // 새 기능 알림 (server/appNews.ts, 제작자 요청 2026-11-05)
   app_news: true,
+  // 개발 요청 결재선 (server/devreq.ts, 개발중)
+  devreq: true,
 } as const;
 export type AlertKind = keyof typeof ALERT_KINDS;
 export const isAlertKind = (k: unknown): k is AlertKind => typeof k === "string" && k in ALERT_KINDS;
