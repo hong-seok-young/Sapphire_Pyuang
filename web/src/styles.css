@@ -2818,11 +2818,12 @@ button.gd-member-row { cursor: pointer; }
 .enh-jobs .sub-tab { padding: 5px 2px; font-size: 13px; }
 /* 지금 무기 · 바꿀 무기 좌우로 나란히 (제작자 2026-11-05 '좌우로 배치', '좀 더 콤팩트하게') */
 .enh-duo { display: grid; grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr); gap: 4px; align-items: stretch; }
-.enh-pick { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 2px; min-width: 0; padding: 3px 3px 3px 4px; border-left: 3px solid var(--sapphire); background: var(--lo); }
+.enh-pick { display: grid; grid-template-columns: 14px minmax(0, 1fr) 14px; align-items: stretch; gap: 2px; min-width: 0; padding: 2px; border-left: 3px solid var(--sapphire); background: var(--lo); }
+.enh-mid { display: grid; grid-template-columns: minmax(0, 1fr); align-content: center; gap: 2px; min-width: 0; }
 .enh-pick.enh-b { border-left-color: var(--gold); }
 .enh-pick-on { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
 .enh-row { display: flex; align-items: center; gap: 2px; min-width: 0; height: 24px; }
-.enh-nav { flex: none; width: 18px; height: 22px; padding: 0; font-size: 9px; }
+.enh-nav { width: 14px; height: auto; min-height: 24px; padding: 0; font-size: 9px; }
 .enh-nav:disabled { opacity: 0.3; }
 .enh-name { flex: 1 1 auto; min-width: 0; height: 22px; padding: 0 3px; font-size: 13px; text-align: center; background: none; border: 0; box-shadow: none; color: inherit; }
 .enh-name:active { transform: none; }
@@ -2831,11 +2832,11 @@ button.gd-member-row { cursor: pointer; }
 .enh-input { flex: 1 1 auto; min-width: 0; width: 100%; height: 24px; font-size: 16px; padding: 0 6px; }
 .enh-ctl { display: flex; align-items: center; justify-content: space-between; gap: 3px; min-width: 0; height: 22px; }
 .enh-slot { position: relative; }
-.enh-lvtag { position: absolute; left: -3px; bottom: -4px; padding: 0 1px; font-size: 8px; line-height: 9px; color: var(--muted); background: var(--edge); white-space: nowrap; pointer-events: none; }
-.enh-slot { flex: none; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; }
-.enh-step { flex: none; display: flex; align-items: center; gap: 2px; }
-.enh-step b { min-width: 26px; text-align: center; font-size: 13px; }
-.enh-step .pill { width: 22px; height: 22px; padding: 0; }
+.enh-lvtag { position: absolute; left: -1px; bottom: -3px; padding: 0 1px; font-size: 8px; line-height: 9px; color: var(--muted); background: var(--edge); white-space: nowrap; pointer-events: none; }
+.enh-slot { flex: none; width: 20px; height: 22px; display: flex; align-items: center; justify-content: center; }
+.enh-step { flex: none; display: flex; align-items: center; gap: 1px; }
+.enh-step b { min-width: 24px; text-align: center; font-size: 13px; }
+.enh-step .pill { width: 19px; height: 20px; padding: 0; }
 .enh-hits { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding-left: 5px; border-left: 3px solid var(--sapphire); }
 .enh-list-b { border-left-color: var(--gold); }
 .enh-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
