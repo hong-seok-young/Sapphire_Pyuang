@@ -49,7 +49,7 @@ export const addDevTalk = (id: number, text: string) => api<{ id: number }>(`/ap
 export const loadPeople = () => api<{ people: { id: string; job: string | null; level: number | null; guild: string | null }[] }>("/api/todo/people");
 
 export const STATUS_NAME: Record<Status, string> = {
-  review: "개발 검토",
+  review: "개발자 검토",
   agree: "합의·결재",
   dev: "개발 중",
   done: "완료",

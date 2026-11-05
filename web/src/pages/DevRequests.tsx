@@ -1,4 +1,4 @@
-// 개발 요청 (개발중, 제작자 요청 2026-11-05 '개발자한테 아주 자유롭게 신청, 범위는 개인·특정 인원·길드원 전체, 맨 위 전광판에 이 개발자는 무료로 해 줍니다,
+// 개발 요청 (제작자 요청 2026-11-05, 같은 날 길드원 전체에 열었다 '개발자한테 아주 자유롭게 신청, 범위는 개인·특정 인원·길드원 전체, 맨 위 전광판에 이 개발자는 무료로 해 줍니다,
 // 개발 가능 -> 합의 1명 이상 -> 길마 최종 결재 -> 개발, 결재 의견, 반려되면 고쳐서 다시 신청, 버튼·테두리 반짝 애니메이션 잔뜩').
 // 서버 server/devreq.ts. 결재란은 회사 결재 서류처럼 칸마다 도장 (새로 찍힌 도장만 쾅 찍힌다: 화면을 열 때는 움직이지 않는다)
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
@@ -11,7 +11,7 @@ import { FitLine, FlowLine, Loading, TopBar } from "../ui";
 import { SCOPE_NAME, STATUS_NAME, actDevReq, addDevReq, addDevTalk, delDevReq, editDevReq, loadDevReqs, loadDevTalk, loadPeople, myTurn, roundSteps } from "../devreq";
 import type { DevReq, DevRole, DevStep, DevTalk, Scope, Status } from "../devreq";
 
-/** 앱개발자 (결재란의 개발 검토·개발 착수 칸에 미리 적는다) */
+/** 앱개발자 (결재란의 개발자 검토·개발 착수 칸에 미리 적는다) */
 const DEVELOPER = "퓨앙";
 
 const BOARD = "이 개발자는 무료로 해 줍니다 ★ 필요한 기능을 자유롭게 신청하세요 ★ 개발 가능 → 합의 → 길마 결재 → 개발 ★ 반려돼도 고쳐서 다시 신청할 수 있어요";
@@ -263,7 +263,7 @@ function PeoplePick({ value, onChange }: { value: string[]; onChange: (v: string
 
 const STAMP_TEXT: Record<string, string> = { submit: "신청", resubmit: "신청", feasible: "가능", agree: "합의", approve: "결재", done: "완료", reject: "반려" };
 
-/** 결재란: 신청 · 개발 검토 · 합의 · 길마 결재 · 개발 (칸마다 도장) */
+/** 결재란: 신청 · 개발자 검토 · 오피서 합의 · 길마 결재 · 개발 착수 (칸마다 도장, 제작자 2026-11-05 '개발 검토 말고 개발자 검토로') */
 function ApprovalLine({ r }: { r: DevReq }) {
   const st = roundSteps(r);
   const by = (k: string) => st.filter((s) => s.kind === k);
@@ -276,7 +276,7 @@ function ApprovalLine({ r }: { r: DevReq }) {
   const done = by("done")[0];
   const cells: { key: string; label: string; step?: DevStep; stamp?: string; count?: number; wait: boolean; rejected?: boolean; pre?: string }[] = [
     { key: "sub", label: "신청", step: sub, wait: false },
-    { key: "feas", label: "개발 검토", step: by("feasible")[0], wait: r.status === "review", pre: DEVELOPER },
+    { key: "feas", label: "개발자 검토", step: by("feasible")[0], wait: r.status === "review", pre: DEVELOPER },
     { key: "agree", label: "오피서 합의", step: agrees[agrees.length - 1], count: agrees.length, wait: r.status === "agree" && agrees.length === 0 },
     { key: "appr", label: "길마 결재", step: approve, wait: r.status === "agree" && agrees.length > 0 },
     {
