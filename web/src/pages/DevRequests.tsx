@@ -12,6 +12,8 @@ import { SCOPE_NAME, STATUS_NAME, actDevReq, addDevReq, addDevTalk, delDevReq, e
 import type { DevReq, DevRole, DevStep, DevTalk, Scope, Status } from "../devreq";
 
 /** 앱개발자 (결재란의 개발자 검토·개발 착수 칸에 미리 적는다) */
+/** 상태 거르기 칸의 짧은 이름 (제작자 2026-11-05 '모두부터 반려까지 버튼 한 행에': 두 글자로 6칸 한 줄) */
+const FILTER_NAME: Record<string, string> = { any: "모두", review: "검토", agree: "결재", dev: "개발", done: "완료", rejected: "반려" };
 const DEVELOPER = "퓨앙";
 /** 길마 결재 칸 아래 미리 적는 이름 (제작자 2026-11-05 '길마 결재 아래에는 마을모금함 닉네임'). 길드마스터가 바뀌면 고친다 */
 const GUILD_MASTER = "마을모금함";
@@ -122,7 +124,7 @@ export function DevRequestsPage({ me, query }: { me: Me; query: URLSearchParams 
               const n = f === "any" ? list.length : list.filter((r) => r.status === f).length;
               return (
                 <button key={f} type="button" role="tab" aria-selected={filter === f} className={"sub-tab" + (filter === f ? " sub-tab-on" : "")} onClick={() => setFilter(f)}>
-                  {f === "any" ? "모두" : STATUS_NAME[f]} {n}
+                  {FILTER_NAME[f]} <small>{n}</small>
                 </button>
               );
             })}

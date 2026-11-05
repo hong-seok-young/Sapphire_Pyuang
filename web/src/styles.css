@@ -3432,7 +3432,8 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 /* 탭과 거르기 */
 .dr-tabs { margin-bottom: 0; }
 .dr-tab-hot:not(.pill-on) { color: var(--gold); animation: dr-blink 0.9s ease-in-out infinite alternate; }
-.dr-filter { display: flex; flex-wrap: wrap; gap: 2px; margin: 0; padding: 4px; }
+.dr-filter { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; margin: 0; padding: 4px; }
+.dr-filter .sub-tab { padding: 3px 0; text-align: center; }
 .dr-empty { margin: 16px 0; text-align: center; font-size: 13px; color: var(--muted); }
 .dr-err { margin: 2px 0; font-size: 12px; color: var(--red); }
 .dr-hint { margin: 0; font-size: 11px; color: var(--muted); }
