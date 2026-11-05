@@ -6,6 +6,7 @@
 // 움직임 줄이기를 켠 기기는 폭죽 없이 글만.
 import { useEffect, useRef, useState } from "react";
 import opening from "../opening.json";
+import { useBackClose } from "../backClose";
 
 const DAY = 86_400_000;
 /** '더 이상 보지 않기'를 누른 계정 (처음 판의 '확인' 기록과 다른 이름이라 그때 닫은 사람에게도 다시 뜬다) */
@@ -114,6 +115,8 @@ function fireworks(canvas: HTMLCanvasElement): () => void {
 
 /** 오픈 축하: 폭죽과 길드마스터의 오픈 글. '확인'은 이번만 닫고, '더 이상 보지 않기'는 이 기기에서 다시 안 뜨게 */
 export function Opening({ user, onClose }: { user: string; onClose: () => void }) {
+  // 폰 뒤로 가기로 이번만 닫기 (backClose.ts)
+  useBackClose(true, onClose);
   const sky = useRef<HTMLCanvasElement>(null);
   const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const [card, setCard] = useState(calm);

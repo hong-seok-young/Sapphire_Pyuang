@@ -17,6 +17,7 @@ import { PREVIEW, SKY_NAME, WxError, disableWeather, enableWeather, isDenied, lo
 import type { Sky } from "../weather";
 import type { Weather } from "../weather";
 import { goCharacter, refreshMe } from "../characters";
+import { useBackClose } from "../backClose";
 
 /** "12.345" -> 12345, 비었으면 null, 틀렸으면 undefined */
 function parseExp(text: string): number | null | undefined {
@@ -500,6 +501,7 @@ function KakaoWhere({ me, link }: { me: Me; link: boolean }) {
 /** 날씨 반영 켜기·끄기: 켜면 폰이 위치 허락을 묻고, 우리 동네 날씨가 홈 화면에 반영된다 (pages/Weather.tsx, src/weather.ts) */
 function WeatherBody({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
   const [preview, setPreview] = useState<Sky | null>(null);
+  useBackClose(!!preview, () => setPreview(null));
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState<Weather | null>(null);
   const [note, setNote] = useState("");

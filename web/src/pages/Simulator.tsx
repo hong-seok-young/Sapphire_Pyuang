@@ -25,6 +25,7 @@ import { api } from "../auth";
 import { IconCtx, iconLookup, useIcon } from "../simIcons";
 import type { IconOf } from "../simIcons";
 import type { Pic } from "../types";
+import { useBackClose } from "../backClose";
 
 type Tab = "enhance" | "grow" | "option" | "gem" | "box" | "rank";
 const TABS: { key: Tab; label: string }[] = [
@@ -832,6 +833,8 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
   const failText = p >= 1 ? "반드시 성공" : scroll.keep ? "실패해도 그대로" : "실패하면 파괴";
   const ladder = Array.from({ length: 15 }, (_, i) => i + 1).filter((k) => rate(k) > 0);
   const showShop = !gear || shop;
+  // 장비 바꾸기 칸은 폰 뒤로 가기로 닫는다 (들고 있는 장비가 있을 때만 닫을 수 있다, backClose.ts)
+  useBackClose(!!gear && shop, () => setShop(false));
   const label = gear?.name ?? part;
   const pic = gear?.icon ?? null;
   const nameSize = pic ? " sim-icon-pic" : label.length > 7 ? " sim-icon-long" : "";

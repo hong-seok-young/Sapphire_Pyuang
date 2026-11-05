@@ -18,6 +18,7 @@ import type { NewsKey } from "../news";
 import { OfficialList } from "./Official";
 import { KakaoButton, Nick } from "../kakao";
 import { isOfficialTab } from "../official";
+import { useBackClose } from "../backClose";
 
 /** 공지사항과 이벤트는 오피서 이상만 쓴다 (서버 server/board.ts canWrite 와 같다) */
 const canWrite = (me: Me, cat: Cat) => cat === "free" || cat === "suggest" || RANK[me.role] >= 1;
@@ -719,19 +720,17 @@ function PhotoViewer({ photos, start, onClose }: { photos: BoardFile[]; start: n
   close.current = onClose;
   const count = photos.length;
 
+  // 폰 뒤로 가기로 사진 보기만 닫는다 (backClose.ts, 예전에는 여기서 따로 기록을 넣었다)
+  useBackClose(true, () => close.current());
   useEffect(() => {
-    history.pushState({ photo: true }, "");
-    const onPop = () => close.current();
-    window.addEventListener("popstate", onPop);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") history.back();
+      if (e.key === "Escape") close.current();
       if (e.key === "ArrowRight") setI((n) => Math.min(count - 1, n + 1));
       if (e.key === "ArrowLeft") setI((n) => Math.max(0, n - 1));
     };
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
     return () => {
-      window.removeEventListener("popstate", onPop);
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
     };

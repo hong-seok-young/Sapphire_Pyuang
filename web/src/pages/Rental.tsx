@@ -73,6 +73,7 @@ import type {
 import { MARKET_PIC, itemFacts, rollHint } from "../market";
 import { readShot, shrinkShot } from "../shot";
 import { KakaoButton, useKakao, Nick } from "../kakao";
+import { useBackClose } from "../backClose";
 
 const REASON: Record<LedgerLine["reason"], string> = {
   donate: "기부",
@@ -529,6 +530,9 @@ function ItemPopup({
   onDone: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  // 폰 뒤로 가기로 정보창만 닫는다 (안의 '정보 수정' 칸이 열려 있으면 그것부터, backClose.ts)
+  useBackClose(true, onClose);
+  useBackClose(editing, () => setEditing(false));
   const it = weaponOf(wiki, item.weapon);
   const facts = itemFacts(it);
   const values = optionFull(item.options);
@@ -843,6 +847,7 @@ function AppCard({
 }) {
   // 대화창은 접어 두고 '대화'로 연다. 상대가 마지막으로 썼으면 '대화'를 금색으로 (운영진에게는 신청한 사람의 글, 신청한 사람에게는 운영진의 글)
   const [talkOpen, setTalkOpen] = useState(false);
+  useBackClose(talkOpen, () => setTalkOpen(false));
   const last = app.talk[app.talk.length - 1];
   const fresh =
     !!last &&
@@ -1931,6 +1936,7 @@ function HeldLine({
   const [asking, setAsking] = useState(false);
   const [when, setWhen] = useState("");
   const [talkOpen, setTalkOpen] = useState(false);
+  useBackClose(talkOpen, () => setTalkOpen(false));
   const app = i.returnAppId
     ? apps.find((a) => a.id === i.returnAppId)
     : undefined;
@@ -2060,6 +2066,7 @@ function ReturnRow({
   const [sure, setSure] = useState(false);
   // 반납 날짜를 정하는 대화창 (빌린 사람이 반납 신청하면 생긴다)
   const [talkOpen, setTalkOpen] = useState(false);
+  useBackClose(talkOpen, () => setTalkOpen(false));
   const app = item.returnAppId
     ? apps.find((a) => a.id === item.returnAppId)
     : undefined;
@@ -2190,6 +2197,7 @@ function DonationPanel({
   const [form, setForm] = useState<{ who: string; mode: DonationMode } | null>(
     null,
   );
+  useBackClose(!!form, () => setForm(null));
   const [error, setError] = useState("");
   const donors = data.balances ?? [];
   const show = async (name: string) => {

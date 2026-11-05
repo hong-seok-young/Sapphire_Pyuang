@@ -76,6 +76,7 @@ import { timeLeft } from "../requests";
 import { GoldBoard, GoldRows } from "./GoldBoard";
 import { fetchGold } from "../gold";
 import type { GoldOffer } from "../gold";
+import { useBackClose } from "../backClose";
 
 /** 맨 위 같은 폭 단추 넷 (제작자 2026-11-03 '이모지 다 빼', '버튼 상하위 개념': 그림 없이 글자만, 그 아래 팝니다·삽니다와 종류는 어두운 띠 안에) */
 type Tab = "list" | "mine" | "post" | "gold";
@@ -160,6 +161,7 @@ function Detail({
   const [convHours, setConvHours] = useState(24);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [talkOpen, setTalkOpen] = useState(false);
+  useBackClose(talkOpen, () => setTalkOpen(false));
   const [talkCount, setTalkCount] = useState(l.talkCount);
   // 종목 토론방 단추: 할 일 단추와 같은 줄 오른쪽 끝에 작은 말풍선으로 (제작자 요청: 줄을 따로 만들지 않게)
   const talkButton = (
@@ -820,6 +822,8 @@ function Rows({
   empty: ReactNode;
 }) {
   const [open, setOpen] = useState<number | null>(null);
+  // 폰 뒤로 가기로 펼친 정보창을 닫는다 (backClose.ts)
+  useBackClose(open !== null, () => setOpen(null));
   // 가격(경매는 최고가)이 바뀐 줄만 숫자를 한 번 반짝인다
   const seen = useRef(new Map<number, number>());
   useEffect(() => {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { closeLayersThen } from "./backClose";
 
 /** '#/item/현인의장갑?x=1' -> { parts: ['item', '현인의장갑'], query } (해시 주소라 어디에 올려도 새로고침이 된다) */
 export interface Route {
@@ -92,10 +93,12 @@ function restoreScroll(y: number) {
   requestAnimationFrame(step);
 }
 
-/** 위 줄 ◀: 앱 안의 앞 화면으로, 없으면 홈 */
+/** 위 줄 ◀: 열린 창(backClose.ts)이 있으면 닫고, 앱 안의 앞 화면으로, 없으면 홈 */
 export function goBack() {
-  if (depth > 0) history.back();
-  else go("#/", true);
+  closeLayersThen(() => {
+    if (depth > 0) history.back();
+    else go("#/", true);
+  });
 }
 
 export function useRoute(): Route {

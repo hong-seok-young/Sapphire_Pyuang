@@ -10,6 +10,7 @@ import { goCharacter, refreshMe, useMyCharacters } from "./characters";
 import { goBack } from "./router";
 import { ClickTag, hasGuide, openGuide, useClickHint } from "./tutorial";
 import type { Pic } from "./types";
+import { useBackClose } from "./backClose";
 
 /**
  * 픽셀 그림. 작은 아이콘은 scale 배로 키워도 흐려지지 않게 그린다.
@@ -217,6 +218,8 @@ function CharacterMenu({
   onClose: () => void;
 }) {
   const { current, list } = useMyCharacters();
+  // 폰 뒤로 가기로 목록만 닫는다 (backClose.ts)
+  useBackClose(true, onClose);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   async function pick(id: string) {
