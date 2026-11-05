@@ -2895,9 +2895,15 @@ button.gd-member-row { cursor: pointer; }
 .enh-sim-me .enh-sim-pct { color: var(--sapphire); font-weight: 700; }
 .enh-ch { display: grid; grid-template-columns: minmax(0, 1fr); }
 /* 기준선 줄: 기준이 무엇인지와 값, 옮겼으면 '지금으로' */
-.enh-ch-base { display: flex; align-items: center; gap: 4px; min-height: 22px; margin: 0 0 3px; font-size: 11px; color: var(--muted); }
+.enh-ch-base { display: flex; align-items: center; gap: 4px; min-height: 22px; margin: 0 0 4px; font-size: 11px; color: var(--muted); }
 .enh-ch-base b { color: var(--text); }
-.enh-ch-basetext { flex: 1 1 auto; min-width: 0; text-align: center; }
+.enh-ch-title { flex: none; margin-right: 4px; font-size: 13px; white-space: nowrap; }
+.enh-ch-basetext { flex: 1 1 auto; min-width: 0; text-align: center; line-height: 1.25; }
+@media (max-width: 380px) {
+  .enh-ch-base { gap: 3px; }
+  .enh-ch-title { margin-right: 2px; font-size: 12px; }
+  .enh-ch-basetext { font-size: 10px; letter-spacing: -0.3px; }
+}
 .enh-ch-base .enh-nav { height: 20px; }
 .enh-ch-base i { display: inline-block; width: 2px; height: 11px; margin-right: 5px; vertical-align: -1px; }
 .enh-ch-key-now { background: var(--text); }

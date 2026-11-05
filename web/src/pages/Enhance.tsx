@@ -465,23 +465,24 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
   const lastRef = here >= 0 ? here === pts.length - 1 : base !== null && !pts.some((p) => p.v > base + 1e-9);
   return (
     <section className="enh-card enh-chart">
-      <div className="enh-sim-head">
-        <b>{job} 무기</b>
+      {/* 제목과 기준 줄을 한 줄에 (제작자 2026-11-05 '이것도 한 행으로') */}
+      <div className="enh-ch-base">
+        <b className="enh-ch-title">{job} 무기</b>
+        {base !== null && (
+          <>
+            <button type="button" className="pill enh-nav" onClick={() => stepRef(-1)} disabled={firstRef} aria-label="기준선 한 칸 왼쪽">
+              ◀
+            </button>
+            <span className="enh-ch-basetext">
+              <i className="enh-ch-key-now" />
+              기준 {nowLabel} <b>{fmt(base)}</b>
+            </span>
+            <button type="button" className="pill enh-nav" onClick={() => stepRef(1)} disabled={lastRef} aria-label="기준선 한 칸 오른쪽">
+              ▶
+            </button>
+          </>
+        )}
       </div>
-      {base !== null && (
-        <div className="enh-ch-base">
-          <button type="button" className="pill enh-nav" onClick={() => stepRef(-1)} disabled={firstRef} aria-label="기준선 한 칸 왼쪽">
-            ◀
-          </button>
-          <span className="enh-ch-basetext">
-            <i className="enh-ch-key-now" />
-            기준 {nowLabel} <b>{fmt(base)}</b>
-          </span>
-          <button type="button" className="pill enh-nav" onClick={() => stepRef(1)} disabled={lastRef} aria-label="기준선 한 칸 오른쪽">
-            ▶
-          </button>
-        </div>
-      )}
       <div ref={box} className={"enh-ch" + (dragging ? " enh-ch-dragging" : "")}>
         {rows.map((r) => {
           const isA = a.w?.name === r.w.name;
