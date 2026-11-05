@@ -4,8 +4,8 @@
 // 화면: 무기마다 한 줄(그림 · 이름 칸 · − +N +), 결과(평균 % 차이, 최소·최대, 같은 데미지가 되는 강화), 톡방 시세(시세 동향 자료),
 // 바꿀 무기 강화별 표(+N 마다 지금 무기 대비 %, 같은 강화끼리는 견주지 않는다: 제작자 2026-11-04 '그래프는 뭐고 같은 강화끼리 비교하면 뭐해').
 // 맨 위 직업 칸을 고르면 그 직업 무기 목록(레벨 순)이 비어 있는 줄 아래에 뜨고, 무기를 고르면 ◀ ▶ 로 그 직업의 이전·다음 무기 (제작자 2026-11-04).
-// 비슷한 무기 (제작자 2026-11-05 '보통 무기를 7·8강 쓰거든, 해당 무기와 파워가 비슷한 무기 리스트들도 알아서 뽑아줘' -> '7 8 9 10 으로'): 지금 무기와 평균 데미지가 가까운
-// 같은 직업 다른 무기의 +7 ~ +10 을 8개, 약한 것부터 지금 무기와 함께 한 줄씩. 누르면 바꿀 무기로.
+// 비슷한 무기 (제작자 2026-11-05 '보통 무기를 7·8강 쓰거든, 해당 무기와 파워가 비슷한 무기 리스트들도 알아서 뽑아줘' -> '7 8 9 10 으로' -> '6강부터', '항상 약한 것도', '행 높이 줄이기'): 지금 무기와 평균 데미지가 가까운
+// 같은 직업 무기의 +6 ~ +10 (지금 무기의 다른 강화도) 중 약한 쪽 넷·센 쪽 넷, 약한 것부터 지금 무기와 함께 한 줄씩. 누르면 바꿀 무기로.
 // 직업 무기 그래프 (제작자 2026-11-05 '직업별 모든 무기 6강부터 10강을 차트 그래프로 한방 정리'): 맨 위 직업 칸의 무기 전부, 무기마다 한 줄(+8 이 약한 것부터),
 // 가로는 평균 데미지, 네모 점은 +6 → +10 (한 색의 진하기: 강할수록 밝게, 색은 dataviz 검사기로 이 앱 판 바탕 #262150 에서 통과), 지금 무기는 흰 세로선.
 // 줄을 누르면 그 아래 강화마다 평균과 지금 대비 %, 누르면 바꿀 무기로.
@@ -14,7 +14,7 @@ import type { Me } from "../auth";
 import { loadEnhance, loadTrend, useAsync } from "../data";
 import type { Enhance, EnhanceWeapon, Trend } from "../data";
 import type { Wiki } from "../types";
-import { Loading, PicImg, TopBar } from "../ui";
+import { FitLine, Loading, PicImg, TopBar } from "../ui";
 
 const KNUM: Record<string, number> = { 일: 1, 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 칠: 7, 팔: 8, 구: 9, 십: 10 };
 const key = (s: string) => s.replace(/\s+/g, "");
@@ -287,28 +287,33 @@ function Result({ d, t, a, b }: { d: Enhance; t?: Trend; a: Pick; b: Pick }) {
   );
 }
 
-/** 사람들이 보통 쓰는 강화 (비슷한 무기 목록은 이 강화만) */
-const USUAL = [7, 8, 9, 10];
+/** 사람들이 보통 쓰는 강화 (비슷한 무기 목록은 이 강화만, 제작자 2026-11-05 '6강부터 보여줘도 될 듯') */
+const USUAL = [6, 7, 8, 9, 10];
 const SIMILAR_N = 8;
 
-/** 지금 무기와 평균 데미지가 가까운 같은 직업 다른 무기의 +7 ~ +10, 약한 것부터 (지금 무기도 그 자리에) */
+/** 지금 무기와 평균 데미지가 가까운 같은 직업 무기의 +6 ~ +10 (지금 무기의 다른 강화도), 약한 쪽 넷·센 쪽 넷을 약한 것부터 (지금 무기도 그 자리에).
+ *  한쪽이 모자라면 다른 쪽으로 채운다 (제작자 2026-11-05 '8헌 넣었을 때 그 아래로는 안 뜨는데 항상 약한 것도 같이') */
 function Similar({ d, wiki, a, b, onPick }: { d: Enhance; wiki: Wiki; a: Pick; b: Pick; onPick: (w: EnhanceWeapon, plus: number) => void }) {
   if (!a.w) return null;
   const A = a.w;
   const base = damage(d, A, a.plus).avg;
   if (!(base > 0)) return null;
-  const near = jobWeapons(d, A.job)
-    .filter((w) => w.name !== A.name)
-    .flatMap((w) => USUAL.filter((p) => p <= maxPlus(d, w)).map((plus) => ({ w, plus, avg: damage(d, w, plus).avg, me: false })))
-    .sort((x, y) => Math.abs(Math.log(x.avg / base)) - Math.abs(Math.log(y.avg / base)))
-    .slice(0, SIMILAR_N);
+  const dist = (x: { avg: number }) => Math.abs(Math.log(x.avg / base));
+  const cands = jobWeapons(d, A.job).flatMap((w) =>
+    USUAL.filter((p) => p <= maxPlus(d, w) && !(w.name === A.name && p === a.plus)).map((plus) => ({ w, plus, avg: damage(d, w, plus).avg, me: false })),
+  );
+  const weaker = cands.filter((x) => x.avg < base).sort((x, y) => dist(x) - dist(y));
+  const stronger = cands.filter((x) => x.avg >= base).sort((x, y) => dist(x) - dist(y));
+  const half = SIMILAR_N / 2;
+  const nLo = Math.min(weaker.length, Math.max(half, SIMILAR_N - stronger.length));
+  const near = [...weaker.slice(0, nLo), ...stronger.slice(0, SIMILAR_N - nLo)];
   if (near.length === 0) return null;
   const rows = [...near, { w: A, plus: a.plus, avg: base, me: true }].sort((x, y) => x.avg - y.avg || Number(y.me) - Number(x.me));
   return (
     <section className="enh-card enh-sim">
       <div className="enh-sim-head">
         <b>비슷한 무기</b>
-        <span className="muted">+7 ~ +10</span>
+        <span className="muted">+6 ~ +10</span>
       </div>
       <div className="enh-sim-list">
         {rows.map((r) => {
@@ -323,7 +328,7 @@ function Similar({ d, wiki, a, b, onPick }: { d: Enhance; wiki: Wiki; a: Pick; b
               disabled={r.me}
               onClick={() => onPick(r.w, r.plus)}
             >
-              <span className="enh-sim-pic">{pic ? <PicImg pic={pic} max={22} /> : null}</span>
+              <span className="enh-sim-pic">{pic ? <PicImg pic={pic} max={18} /> : null}</span>
               <span className="enh-sim-name">
                 +{r.plus} {r.w.name} <small>Lv.{r.w.lv ?? "?"}</small>
               </span>
@@ -398,12 +403,9 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
                 onClick={() => setOpen(shut ? r.w.name : null)}
                 aria-expanded={!shut}
               >
-                <span className="enh-ch-name">
+                <span className="enh-ch-name" title={`Lv.${r.w.lv ?? "?"} ${r.w.name}`}>
                   <span className="enh-ch-pic">{pic ? <PicImg pic={pic} max={16} /> : null}</span>
-                  <span>
-                    {r.w.name}
-                    <small>Lv.{r.w.lv ?? "?"}</small>
-                  </span>
+                  <FitLine text={r.w.name} wrap={false} />
                 </span>
                 <span className="enh-ch-track">
                   {ticks.map((t) => (
@@ -420,6 +422,7 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
               </button>
               {!shut && (
                 <div className="enh-ch-detail">
+                  <span className="enh-ch-lv">Lv.{r.w.lv ?? "?"}</span>
                   {r.vals.map((v, i) => {
                     const p = CHART_PLUS[i];
                     const me = isA && a.plus === p;
