@@ -2894,19 +2894,23 @@ button.gd-member-row { cursor: pointer; }
 .enh-sim-pct { font-size: 12px; text-align: right; white-space: nowrap; }
 .enh-sim-me .enh-sim-pct { color: var(--sapphire); font-weight: 700; }
 .enh-ch { display: grid; grid-template-columns: minmax(0, 1fr); }
-/* 기준선 줄: 기준이 무엇인지와 값, 옮겼으면 '지금으로' */
-.enh-ch-base { display: flex; align-items: center; gap: 4px; min-height: 22px; margin: 0 0 4px; font-size: 11px; color: var(--muted); }
-.enh-ch-base b { color: var(--text); }
-.enh-ch-title { flex: none; margin-right: 4px; font-size: 13px; white-space: nowrap; }
-.enh-ch-basetext { flex: 1 1 auto; min-width: 0; text-align: center; line-height: 1.25; }
+/* 제목과 기준 칸 한 줄: 기준 칸은 흰 테두리(그래프의 흰 기준선과 같은 색)로 눈에 띄게 */
+.enh-ch-base { display: flex; align-items: center; gap: 6px; margin: 0 0 5px; font-size: 11px; color: var(--muted); }
+.enh-ch-title { flex: none; font-size: 13px; color: var(--text); white-space: nowrap; }
+.enh-ch-ref { flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: 16px minmax(0, 1fr) 16px; align-items: stretch; gap: 3px; }
+.enh-ch-ref .enh-nav { width: 16px; height: auto; }
+.enh-ch-refbox { display: grid; grid-template-columns: minmax(0, 1fr); align-content: center; gap: 1px; min-width: 0; padding: 2px 6px; border: 2px solid var(--text); background: rgba(255, 255, 255, 0.07); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35); }
+.enh-ch-refname { display: flex; align-items: center; gap: 4px; min-width: 0; height: 17px; font-size: 12px; font-weight: 700; color: var(--text); }
+.enh-ch-refname img { flex: none; }
+.enh-ch-refwhat { flex: 1 1 auto; min-width: 0; display: block; }
+.enh-ch-reftag { flex: none; padding: 0 3px; font-size: 10px; line-height: 13px; font-weight: 700; color: #10163a; background: var(--text); }
+.enh-ch-refval { font-size: 10px; line-height: 13px; white-space: nowrap; }
+.enh-ch-refval b { font-size: 12px; color: var(--text); }
 @media (max-width: 380px) {
-  .enh-ch-base { gap: 3px; }
-  .enh-ch-title { margin-right: 2px; font-size: 12px; }
-  .enh-ch-basetext { font-size: 10px; letter-spacing: -0.3px; }
+  .enh-ch-base { gap: 4px; }
+  .enh-ch-title { font-size: 12px; }
+  .enh-ch-refbox { padding: 2px 4px; }
 }
-.enh-ch-base .enh-nav { height: 20px; }
-.enh-ch-base i { display: inline-block; width: 2px; height: 11px; margin-right: 5px; vertical-align: -1px; }
-.enh-ch-key-now { background: var(--text); }
 .enh-ch-row { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: stretch; min-height: 27px; padding: 0 0 0 4px; border-left: 3px solid transparent; }
 .enh-ch-a { border-left-color: var(--sapphire); background: rgba(111, 143, 255, 0.1); }
 .enh-ch-b { border-left-color: var(--gold); background: rgba(255, 196, 92, 0.08); }
