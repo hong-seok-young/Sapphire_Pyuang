@@ -3525,3 +3525,13 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
   .dr-bulbs, .dr-board-tag, .dr-new::after, .dr-new-shine, .dr-btn-shine, .dr-tab-hot, .dr-turn-glow, .dr-badge-run, .dr-turn-tag, .dr-cell-wait::after, .dr-wait, .dr-stamp-pop, .dr-act::before, .dr-btn-danger { animation: none; }
   .dr-new-shine, .dr-btn-shine, .dr-badge-run { display: none; }
 }
+
+/* 챗봇이 답하는 동안 한 줄 (제작자 2026-11-05 '클로드처럼 모래시계, 깜박이며 텍스트만 바뀌게'): 모래시계가 뒤집히고 글이 깜박인다. 글이 바뀌면 살짝 떠오른다 */
+.chat-live { display: flex; align-items: center; gap: 6px; margin: 4px 0 2px; font-size: 13px; color: var(--muted); }
+.chat-live-glass { display: inline-block; font-size: 14px; animation: chat-glass 1.6s steps(1) infinite; }
+.chat-live-text { animation: chat-live-in 0.25s ease-out, chat-live-blink 1.2s ease-in-out 0.25s infinite alternate; }
+.chat-live-note { margin: 2px 0 0; font-size: 11px; color: var(--sapphire); }
+@keyframes chat-glass { 0% { transform: rotate(0deg); } 50% { transform: rotate(180deg); } }
+@keyframes chat-live-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@keyframes chat-live-blink { from { opacity: 1; } to { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .chat-live-glass, .chat-live-text { animation: none; } }

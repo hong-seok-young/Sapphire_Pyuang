@@ -66,6 +66,10 @@ interface Shown {
   found?: string[];
   /** 답 아래 작은 안내 (중지, 끊김, 길이) */
   note?: string;
+  /** 답하는 동안 한 줄로 깜박이는 지금 하는 일 ('생각하는 중', '웹에서 찾는 중' …). 기록으로 쌓지 않는다 */
+  phase?: string;
+  /** 서버의 답 받기 일꾼이 받는 답 (앱을 꺼도 끝까지, 다 되면 알림) */
+  durable?: boolean;
   /** 챗봇이 개선돼서 다시 물은 질문 (개선 내용) */
   redo?: string;
   streaming?: boolean;
@@ -141,7 +145,6 @@ const whenVisible = () =>
     document.addEventListener("visibilitychange", on);
   });
 
-const secs = (ms: number | null | undefined) => Math.max(1, Math.round((ms ?? 0) / 1000));
 
 export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; query: URLSearchParams; me?: Me }) {
   const { data: posts, error: postsError } = useAsync(useCallback(() => loadPosts(), []));
@@ -164,8 +167,6 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
   /** 다시 열었을 때 답이 없는 질문이 있으면 서버가 받던 답을 기다린다 */
   const [resume, setResume] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [thinkStart, setThinkStart] = useState<number | null>(null);
-  const [, tick] = useState(0);
   const [left, setLeft] = useState<number | null>(null);
   const threadRef = useRef<number | null>(null);
   const runRef = useRef(0);
@@ -190,7 +191,6 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
     setTitle("");
     setLoadError("");
     setBusy(false);
-    setThinkStart(null);
     stickRef.current = true;
     if (wanted === null) return;
     let alive = true;
@@ -240,7 +240,7 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
       });
       if (got === "done" || runRef.current !== run0) return;
       let tries = 0;
-      setTurns([...base, { role: "assistant", text: "", streaming: true, resuming: true }]);
+      setTurns([...base, { role: "assistant", text: "", streaming: true, resuming: true, phase: "답을 이어 받는 중" }]);
       setBusy(true);
       const poll = async () => {
         tries++;
@@ -273,12 +273,6 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
     [],
   );
 
-  // 생각하는 동안 초를 센다
-  useEffect(() => {
-    if (thinkStart === null) return;
-    const t = setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(t);
-  }, [thinkStart]);
 
   // 입력칸은 화면 맨 아래에 고정 (제작자 요청). 그 높이만큼 대화 아래를 비운다
   useLayoutEffect(() => {
@@ -330,7 +324,7 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
     // 사진 질문은 사진 속 직업, 레벨, 보이는 이름을 먼저 읽고 그 값으로 자료를 고른다 (챗봇 개선 2026-11-01, chat.ts Seen)
     let seen: Seen | null = null;
     // 자료를 고르는 동안에도 바로 답 자리와 '답하는 중'을 보인다 (그사이 두 번 눌러 같은 질문을 두 번 묻지 않게, 2026-11-01 검토)
-    setTurns([...base, { role: "assistant", text: "", thinking: "", found: [lastUser?.images?.length ? "📷 사진 읽는 중" : "📚 자료 찾는 중"], streaming: true }]);
+    setTurns([...base, { role: "assistant", text: "", thinking: "", phase: lastUser?.images?.length ? "사진 읽는 중" : "자료 찾는 중", streaming: true }]);
     setBusy(true);
     if (lastUser?.images?.length) {
       seen = await peekPhotos(lastUser.images);
@@ -369,13 +363,13 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
     const sources: ChatSource[] = [];
     let thread = threadRef.current;
 
-    setTurns([...base, { role: "assistant", text: "", thinking: "", found: found.length ? found : undefined, streaming: true }]);
+    setTurns([...base, { role: "assistant", text: "", thinking: "", found: found.length ? found : undefined, streaming: true, phase: "생각하는 중" }]);
     setBusy(true);
-    setThinkStart(startedAt);
     stickRef.current = true;
     const update = (fn: (last: Shown) => Shown) => live() && setTurns((t) => [...t.slice(0, -1), fn(t[t.length - 1])]);
     const events: AskEvents = {
       onStart: (info) => {
+        if (info.durable) update((last) => ({ ...last, durable: true }));
         if (info.thread !== null && thread === null) {
           thread = info.thread;
           if (live()) {
@@ -390,22 +384,22 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
       },
       onThinking: (piece) => {
         thinking += piece;
-        update((last) => ({ ...last, thinking }));
+        update((last) => ({ ...last, thinking, phase: "생각하는 중" }));
       },
       onText: (piece) => {
         if (firstText === null && piece.trim()) {
           firstText = Date.now();
-          if (live()) setThinkStart(null);
         }
         text += piece;
-        update((last) => ({ ...last, text, thinkMs: (firstText ?? Date.now()) - startedAt }));
+        update((last) => ({ ...last, text, phase: "답 쓰는 중", thinkMs: (firstText ?? Date.now()) - startedAt }));
       },
       onStep: (step) => {
         // 웹 찾기 결과 수는 앞 검색 줄에 붙인다
         const prev = steps[steps.length - 1];
         if (step.kind === "search" && step.text.startsWith("결과 ") && prev?.kind === "search") prev.text += ` · ${step.text}`;
         else steps.push(step);
-        update((last) => ({ ...last, steps: [...steps] }));
+        const phase = phaseOf(step);
+        update((last) => ({ ...last, steps: [...steps], ...(phase ? { phase } : {}) }));
       },
       onSource: (src) => {
         if (sources.some((s) => s.url === src.url)) return;
@@ -419,7 +413,7 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
       thinking = "";
       steps.length = 0;
       sources.length = 0;
-      update((last) => ({ ...last, text: "", thinking: "", steps: [], sources: [], streaming: true }));
+      update((last) => ({ ...last, text: "", thinking: "", steps: [], sources: [], streaming: true, phase: "답을 이어 받는 중" }));
     };
     const ctrl = new AbortController();
     ctrlRef.current = ctrl;
@@ -478,8 +472,7 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
     } finally {
       if (live()) {
         setBusy(false);
-        setThinkStart(null);
-      }
+          }
       if (ctrlRef.current === ctrl) ctrlRef.current = null;
     }
     return "done";
@@ -666,7 +659,6 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
               <>
                 {/* 답은 게임의 NPC 대화창처럼 (제작자 요청) */}
                 <div className="npc-name">🧙 사파이어 길잡이</div>
-                <Steps t={t} thinkingSecs={t.streaming && !t.text && thinkStart !== null ? secs(Date.now() - thinkStart) : null} />
               </>
             )}
             {t.redo && <div className="chat-redo">🔄 챗봇이 개선돼서 다시 물어봤어요{t.redo !== "개선됨" ? ` · ${t.redo}` : ""}</div>}
@@ -685,6 +677,7 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
               )
             ) : null}
             {t.streaming && t.text && <span className="chat-caret" />}
+            {t.streaming && <LiveStatus t={t} />}
             {t.sources && t.sources.length > 0 && (
               <div className="chat-sources">
                 <div className="chat-sources-h">🔗 출처</div>
@@ -729,36 +722,36 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
   );
 }
 
-/** 답하기 전 한 일: 위키에서 찾은 것, 생각 (클로드처럼 생각하는 동안 펼쳐 보이고, 다 하면 접는다) */
-function Steps({ t, thinkingSecs }: { t: Shown; thinkingSecs: number | null }) {
-  const [open, setOpen] = useState(false);
-  const thinkingNow = thinkingSecs !== null;
-  const showThought = thinkingNow || open;
+/**
+ * 답하는 동안 지금 하는 일 한 줄 (제작자 2026-11-05 '책 모양 쓰고 뭐 하는 중 뭐 하는 중 기록으로 쌓지 말고, 클로드처럼 모래시계와 깜박이며 텍스트만 바뀌게'):
+ * 자료 찾는 중 -> 생각하는 중 -> 웹에서 찾는 중 -> 답 쓰는 중. 답 글이 나오는 동안은 글 끝의 깜박이는 막대로 충분해서 숨긴다.
+ * 다 끝나면 사라지고 기록에는 답과 출처만 남는다. 서버의 답 받기 일꾼이 받는 답이면 앱을 꺼도 된다고 알린다
+ */
+function LiveStatus({ t }: { t: Shown }) {
+  const phase = t.phase ?? "생각하는 중";
+  const show = !(t.text && phase === "답 쓰는 중");
   return (
-    <div className="chat-steps">
-      {t.resuming && <div className="chat-step chat-think-live">⏳ 답을 마저 받는 중…</div>}
-      {t.found !== undefined && (
-        <div className="chat-step">📚 {t.found.length ? `아이모 자료 둘러봄: ${t.found.slice(0, 6).join(" · ")}` : "아이모 자료 둘러봄"}</div>
-      )}
-      {t.steps?.map((st, i) => (
-        <div key={i} className="chat-step">
-          {st.kind === "search" ? "🔎 웹 찾기" : st.kind === "fetch" ? "📄 읽음" : "🧮"} {st.text}
-        </div>
-      ))}
-      {(thinkingNow || t.thinking || t.thinkMs) && (
-        <button type="button" className={"chat-step chat-think" + (thinkingNow ? " chat-think-live" : "")} onClick={() => setOpen(!open)} disabled={thinkingNow}>
-          💭 {thinkingNow ? `생각하는 중… ${thinkingSecs}초` : `${secs(t.thinkMs)}초 동안 생각함`}
-          {!thinkingNow && t.thinking ? <span className="chat-think-arrow">{open ? "▴" : "▾"}</span> : null}
-        </button>
-      )}
-      {/* 생각하는 동안은 새 글이 보이게 아래에 붙여 둔다 */}
-      {showThought && t.thinking && (
-        <div className={"chat-thought" + (thinkingNow ? " chat-thought-live" : "")}>
-          <div>{t.thinking}</div>
+    <>
+      {show && (
+        <div className="chat-live" role="status">
+          <span className="chat-live-glass" aria-hidden>
+            ⏳
+          </span>
+          <span key={phase} className="chat-live-text">
+            {phase}
+          </span>
         </div>
       )}
-    </div>
+      {t.durable && <div className="chat-live-note">웹을 꺼도 돌아오면 답변을 볼 수 있어요 · 답변이 완료되면 알림을 드릴게요</div>}
+    </>
   );
+}
+
+/** 웹 찾기·글 읽기를 지금 하는 일 글로 */
+function phaseOf(step: ChatStep): string | null {
+  if (step.kind === "search") return step.text.startsWith("결과 ") || step.text.startsWith("꺼짐") ? null : "웹에서 찾는 중";
+  if (step.kind === "fetch") return "글 읽는 중";
+  return "찾은 것 정리하는 중";
 }
 
 function MsgActions({ text, msg, onAgain }: { text: string; msg?: number; onAgain?: () => void }) {

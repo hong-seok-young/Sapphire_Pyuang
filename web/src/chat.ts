@@ -477,7 +477,8 @@ export interface ChatResult {
 
 export interface AskEvents {
   /** 서버가 답을 보내기 시작할 때: 대화 번호(새 대화면 새 번호)와 넣은 질문 번호 */
-  onStart(info: { thread: number | null; msg: number | null }): void;
+  /** durable: 서버의 답 받기 일꾼이 받는 답 (앱을 꺼도 끝까지 받아 넣고 알림) */
+  onStart(info: { thread: number | null; msg: number | null; durable: boolean }): void;
   /** 생각(요약) 글 조각 */
   onThinking(piece: string): void;
   /** 답 글 조각 */
@@ -559,7 +560,7 @@ export async function askChat(
   const header = (h: string) => (res.headers.get(h) === null ? null : Number(res.headers.get(h)));
   result.left = header("x-chat-left");
   result.durable = res.headers.get("x-chat-run") === "1";
-  on.onStart({ thread: header("x-chat-thread"), msg: header("x-chat-msg") });
+  on.onStart({ thread: header("x-chat-thread"), msg: header("x-chat-msg"), durable: result.durable });
   // 이 계정에서 웹 찾기를 쓸 수 없으면 (콘솔에서 꺼 둔 경우) 숨기지 않고 알린다
   if (res.headers.get("x-chat-web") === "off") on.onStep({ kind: "search", text: "꺼짐 (위키 자료로만 답해요)" });
   return readAnswer(res.body, on, signal, result);
@@ -591,6 +592,7 @@ export async function watchChat(thread: number, on: AskEvents, signal: AbortSign
   }
   const durable = res.headers.get("x-chat-run") === "1";
   if (res.status !== 200 || !res.body) return { none: true, durable };
+  on.onStart({ thread: null, msg: null, durable: true });
   return readAnswer(res.body, on, signal, { ...emptyResult(), durable: true });
 }
 
