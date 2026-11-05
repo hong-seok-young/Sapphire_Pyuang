@@ -115,8 +115,9 @@ function searching(d: Enhance, pick: Pick): string[] {
 
 /** 무기 칸 하나 (지금 무기 왼쪽, 바꿀 무기 오른쪽에 나란히. 제작자 2026-11-05 '무기 고르는 거를 좌우로 배치', '좀 더 콤팩트하게' -> '행 높이 더 압축'):
  *  두 줄: ◀ 이름 ▶ (이름을 누르면 적는 칸과 그 직업 무기 목록), 그림(아래 구석에 작은 레벨)과 − +N + (데미지는 결과 칸에) */
-function WeaponCard({ d, wiki, side, hint, pick, onPick, open, onOpen }: {
+function WeaponCard({ d, wiki, side, hint, pick, onPick, open, onOpen, scale }: {
   d: Enhance; wiki: Wiki; side: "a" | "b"; hint: string; pick: Pick; onPick: (p: Pick) => void; open: boolean; onOpen: () => void;
+  scale?: { lo: number; hi: number } | null;
 }) {
   const [edit, setEdit] = useState(false);
   const type = (text: string) => {
@@ -193,8 +194,52 @@ function WeaponCard({ d, wiki, side, hint, pick, onPick, open, onOpen }: {
               </button>
             </span>
           </div>
+          {scale && (
+            <div className={"enh-cbar enh-rbar-" + side}>
+              <span className="enh-rbar-n">{fmt(cur.min)}</span>
+              <span className="enh-rbar-track">
+                <i className="enh-rbar-fill" style={{ left: `${atScale(scale, cur.min)}%`, width: `${atScale(scale, cur.max) - atScale(scale, cur.min)}%` }} />
+                <i className="enh-rbar-avg" style={{ left: `${atScale(scale, cur.avg)}%` }} />
+              </span>
+              <span className="enh-rbar-n">{fmt(cur.max)}</span>
+            </div>
+          )}
         </>
       )}
+    </div>
+  );
+}
+
+const atScale = (sc: { lo: number; hi: number }, v: number) => ((v - sc.lo) / (sc.hi - sc.lo || 1)) * 100;
+
+/** 두 무기의 데미지를 같은 눈금에 (고른 무기만) */
+function scaleOf(d: Enhance, a: Pick, b: Pick) {
+  const ds = [a, b].flatMap((p) => (p.w ? [damage(d, p.w, p.plus)] : []));
+  if (ds.length === 0) return null;
+  return { lo: Math.min(...ds.map((x) => x.min)), hi: Math.max(...ds.map((x) => x.max)) };
+}
+
+/** 초안 1: 무기 칸 아래 한 줄 결과 (큰 % · 평균 · 최소·최대) */
+function ResultLine({ d, a, b }: { d: Enhance; a: Pick; b: Pick }) {
+  if (!a.w || !b.w) return null;
+  const x = damage(d, a.w, a.plus);
+  const y = damage(d, b.w, b.plus);
+  const p = pct(x.avg, y.avg);
+  const pMin = pct(x.min, y.min);
+  const pMax = pct(x.max, y.max);
+  return (
+    <div className="enh-mres">
+      <div className={"enh-big" + tone(p)}>
+        <Pop value={pctText(p)}>{pctText(p)}</Pop>
+      </div>
+      <div className="enh-mres-side">
+        <div>
+          평균 {fmt(x.avg)} → <Pop value={fmt(y.avg)}><b>{fmt(y.avg)}</b></Pop>
+        </div>
+        <div>
+          최소 <b className={tone(pMin)}>{pctText(pMin)}</b> · 최대 <b className={tone(pMax)}>{pctText(pMax)}</b>
+        </div>
+      </div>
     </div>
   );
 }
@@ -241,7 +286,7 @@ function WeaponList({ d, side, pick, job, open, onPick }: { d: Enhance; side: "a
 
 /** 결과 (제작자 2026-11-05 '+32.2 라인까지는 괜찮은데' -> '평균은 초록 퍼센트 아래로, 최소·최대는 텍스트로만 하지 말고 꾸며 봐, 대신 콤팩트하게'):
  *  왼쪽 큰 % 와 그 아래 평균, 오른쪽은 두 무기의 데미지 범위 막대(지금 파랑, 바꿀 금색, 흰 눈금이 평균)와 최소·최대가 몇 % 바뀌는지 */
-function Result({ d, a, b }: { d: Enhance; a: Pick; b: Pick }) {
+function Result({ d, a, b, bare = false }: { d: Enhance; a: Pick; b: Pick; bare?: boolean }) {
   if (!a.w || !b.w) return null;
   const x = damage(d, a.w, a.plus);
   const y = damage(d, b.w, b.plus);
@@ -251,9 +296,8 @@ function Result({ d, a, b }: { d: Enhance; a: Pick; b: Pick }) {
   const at = (v: number) => ((v - lo) / (hi - lo || 1)) * 100;
   const pMin = pct(x.min, y.min);
   const pMax = pct(x.max, y.max);
-  return (
-    <section className="enh-card enh-result">
-      <div className="enh-res">
+  const body = (
+      <div className={"enh-res" + (bare ? " enh-res-in" : "")}>
         <div className="enh-res-main">
           <div className={"enh-big" + tone(p)}>
             <Pop value={pctText(p)}>{pctText(p)}</Pop>
@@ -286,8 +330,8 @@ function Result({ d, a, b }: { d: Enhance; a: Pick; b: Pick }) {
           </div>
         </div>
       </div>
-    </section>
   );
+  return bare ? body : <section className="enh-card enh-result">{body}</section>;
 }
 
 /** 사람들이 보통 쓰는 강화 (비슷한 무기 목록은 이 강화만, 제작자 2026-11-05 '6강부터 보여줘도 될 듯') */
@@ -603,6 +647,7 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
   // 다른 직업끼리는 견주지 않는다 (제작자 2026-11-05 '타 직업군끼리 ㄴㄴ, 직업 넘어가면 무기 입력한 거 초기화'): 주소의 두 무기 직업이 다르면 바꿀 무기는 비운다
   const pb0 = b ?? initial(d, query.get("b"));
   const pb = pa.w && pb0.w && pa.w.job !== pb0.w.job ? EMPTY : pb0;
+  const [draft] = useState(() => query.get("draft"));
   const [jobPick, setJob] = useState<string | null>(null);
   const job = jobPick ?? pa.w?.job ?? (me.job ? JOB_OF[me.job] : null) ?? "전사";
   // 목록을 펼칠 줄: 처음은 비어 있는 첫 줄, 줄을 누르면 그 줄, 고르면 다음 빈 줄 (둘 다 차면 닫힘)
@@ -662,7 +707,7 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
         <Loading error={error?.includes("404") ? "강화 자료가 아직 없어요" : error} />
       ) : (
         <div className="enh">
-          <section className="enh-card enh-picks">
+          <section className={"enh-card enh-picks" + (draft ? " enh-result enh-merged" : "")}>
             <div className="mk-sub enh-jobs" role="tablist">
               {JOBS.map((j) => (
                 <button key={j} type="button" role="tab" aria-selected={job === j} className={"sub-tab" + (job === j ? " sub-tab-on" : "")} onClick={() => pickJob(j)}>
@@ -671,16 +716,18 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
               ))}
             </div>
             <div className="enh-duo">
-              <WeaponCard d={d} wiki={wiki} side="a" hint="지금 무기" pick={pa} onPick={pickA} open={list === "a"} onOpen={() => setListAt("a")} />
+              <WeaponCard d={d} wiki={wiki} side="a" hint="지금 무기" pick={pa} onPick={pickA} open={list === "a"} onOpen={() => setListAt("a")} scale={draft === "1" ? scaleOf(d, pa, pb) : null} />
               <button key={spin} type="button" className={"enh-swap" + (spin ? " enh-swap-spin" : "")} onClick={swap} aria-label="좌우 바꾸기">
                 ⇄
               </button>
-              <WeaponCard d={d} wiki={wiki} side="b" hint="바꿀 무기" pick={pb} onPick={pickB} open={list === "b"} onOpen={() => setListAt("b")} />
+              <WeaponCard d={d} wiki={wiki} side="b" hint="바꿀 무기" pick={pb} onPick={pickB} open={list === "b"} onOpen={() => setListAt("b")} scale={draft === "1" ? scaleOf(d, pa, pb) : null} />
             </div>
             <WeaponList d={d} side="a" pick={pa} job={job} open={list === "a"} onPick={pickA} />
             <WeaponList d={d} side="b" pick={pb} job={job} open={list === "b"} onPick={pickB} />
+            {draft === "1" && <ResultLine d={d} a={pa} b={pb} />}
+            {draft === "2" && <Result d={d} a={pa} b={pb} bare />}
           </section>
-          <Result d={d} a={pa} b={pb} />
+          {!draft && <Result d={d} a={pa} b={pb} />}
           <Similar d={d} wiki={wiki} a={pa} b={pb} onPick={pickSimilar} />
           <PowerChart key={job} d={d} wiki={wiki} job={job} a={pa} b={pb} onPick={pickSimilar} />
         </div>
