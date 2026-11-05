@@ -2,7 +2,8 @@
 # PC 에서 wrangler 로그인을 하지 않아도 되고, 폰으로 말만 해도 푸시하면 배포된다. Actions 탭에서 직접 다시 돌릴 수도 있다.
 #
 # 저장소 비밀값 (Settings > Secrets and variables > Actions)
-#   CLOUDFLARE_API_TOKEN   Cloudflare API 토큰 (권한: Account > Cloudflare Pages > Edit, Account > D1 > Edit)
+#   CLOUDFLARE_API_TOKEN   Cloudflare API 토큰 (권한: Account > Cloudflare Pages > Edit, Account > D1 > Edit,
+#                          Account > Workers Scripts > Edit (챗봇 답 받기 일꾼 web/runner))
 #   CLOUDFLARE_ACCOUNT_ID  Cloudflare 계정 ID
 #   DATA_REPO_TOKEN        비공개 자료 저장소(sapphire-imo-data)를 읽기만 하는 GitHub 토큰
 #                          (fine-grained, 그 저장소만, Contents: Read-only). 대신 읽기 전용 배포 키 DATA_DEPLOY_KEY 도 된다
@@ -132,9 +133,36 @@ jobs:
             echo "챗봇 워크스페이스 ID를 넣었어요"
           fi
 
+      # 챗봇 답 받기 일꾼 (web/runner, server/chatRun.ts): 앱을 닫아도 답을 끝까지 받아 대화에 넣는 Durable Object (Cloudflare 무료 요금제).
+      # 사이트는 Durable Object 를 직접 만들 수 없어서 따로 올리고, 됐으면 사이트 wrangler.toml 에 CHATRUN 바인딩을 붙인다.
+      # 못 올리면(토큰에 Workers Scripts 권한이 없는 등) 바인딩 없이 예전처럼 배포한다 (챗봇은 화면이 끊긴 뒤 30초까지만 받는다)
+      - name: Chat runner
+        continue-on-error: true
+        working-directory: web
+        run: |
+          DBID=$(node -e "const t=require('fs').readFileSync('wrangler.toml','utf8');const m=t.match(/binding = \"DB\"\n(?:[^\n]*\n)*?database_id = \"([^\"]+)\"/);process.stdout.write(m?m[1]:'')")
+          if [ -z "$DBID" ]; then echo "::warning::계정 DB id 를 못 찾아서 답 받기 일꾼을 건너뜀"; exit 1; fi
+          sed -i "s/00000000-0000-0000-0000-000000000000/$DBID/" runner/wrangler.toml
+          if ! npx wrangler deploy --config runner/wrangler.toml > runner-deploy.log 2>&1; then
+            grep -iE "error|permission|auth|code" runner-deploy.log | head -n 12
+            echo "::warning::챗봇 답 받기 일꾼을 올리지 못했어요 (Cloudflare API 토큰에 Account > Workers Scripts > Edit 권한이 필요해요)"
+            exit 1
+          fi
+          printf '\n[[durable_objects.bindings]]\nname = "CHATRUN"\nclass_name = "ChatRun"\nscript_name = "sapphire-chat-runner"\n' >> wrangler.toml
+          echo "챗봇 답 받기 일꾼을 올렸어요"
+
       - name: Deploy to Cloudflare Pages
         working-directory: web
-        run: npm run deploy
+        run: |
+          if npm run deploy; then exit 0; fi
+          # 일꾼 바인딩 때문에 실패했으면 빼고 한 번 더
+          if grep -q 'name = "CHATRUN"' wrangler.toml; then
+            echo "::warning::답 받기 일꾼 바인딩을 빼고 다시 배포해요"
+            sed -i '/^\[\[durable_objects.bindings\]\]$/,$d' wrangler.toml
+            npm run deploy
+          else
+            exit 1
+          fi
 
       # To do 의 이벤트 할 일: 아직 정리 안 된 공식 글을 Claude 로 정리한다 (scripts/digest-official.mjs, 4분까지. 남은 것은 30분마다 도는 공식 소식 작업이 한다).
       # 사이트 배포가 끝난 뒤에 해서 배포를 늦추지 않고, 실패해도 배포는 성공으로 둔다

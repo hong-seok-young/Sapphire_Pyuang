@@ -4,6 +4,9 @@
 import type { Env } from "./auth";
 import { notify } from "./alerts";
 
+/** 그 대화의 답 받기 일꾼 (server/chatRun.ts, 대화마다 하나) */
+export const runStub = (ns: DurableObjectNamespace, threadId: number) => ns.get(ns.idFromName(`thread:${threadId}`));
+
 /** 한 사람이 둘 수 있는 대화 수. 넘으면 고정하지 않은 가장 오래된 대화부터 지운다 */
 export const MAX_THREADS = 300;
 export const MAX_ANSWER = 16000;

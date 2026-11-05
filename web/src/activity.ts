@@ -271,6 +271,8 @@ const ACTIONS: [RegExp, (d: Rec, m: RegExpMatchArray, at: number) => string][] =
   [/^DELETE \/api\/chat\/threads\/\d+$/, () => "챗봇 대화 지움"],
   [/^POST \/api\/chat\/threads\/\d+\/msgs$/, () => "챗봇 답 받음"],
   [/^POST \/api\/chat\/gaps$/, () => "챗봇 답에 '별로'"],
+  [/^POST \/api\/chat\/stop$/, () => "챗봇 답 중지"],
+  [/^POST \/api\/chat\/stop$/, () => "챗봇 답 중지"],
   [/^\w+ \/api\/chat\/gaps\/\d+$/, () => "챗봇 개선 완료"],
   // 길드원 관리
   [/^POST \/api\/users$/, (d) => join("계정 만듦", str(d.id))],
