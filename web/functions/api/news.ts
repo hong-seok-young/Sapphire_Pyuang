@@ -15,6 +15,7 @@ import { NEW_OFFICIAL_SQL, announceOfficial } from "../../server/officialAlert";
 import type { NewOfficial } from "../../server/officialAlert";
 import { canEnter, isManager } from "../../server/rental";
 import { remindIfDue } from "../../server/gdungeon";
+import { announceApp } from "../../server/appNews";
 
 const IMO: Record<string, string> = { "imo.notice": "type IN ('N', 'I', 'D')", "imo.maint": "type = 'C'", "imo.event": "type = 'E'" };
 /** 아이모 소식은 올린 날이 이 날수 안인 것만 센다 (늦게 들어온 예전 글은 새 글이 아니다) */
@@ -128,6 +129,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
   if (job) waitUntil(job.catch((e) => console.error("official refresh", e instanceof Error ? e.message : e)));
   // 길드 던전 새 주 알림 보충 (목 10:30 예약이 늦거나 안 돌았을 때, server/gdungeon.ts remindIfDue: 주 시작 하루 안에만 읽기 하나)
   waitUntil(remindIfDue(env, now).catch((e) => console.error("gd remind", e instanceof Error ? e.message : e)));
+  // 새 기능 알림 (server/appNews.ts): 알릴 때부터 이틀 안에, 모두에게 한 번 (먼저 setup 을 적은 한 곳만)
+  waitUntil(announceApp(env, now).catch((e) => console.error("app news", e instanceof Error ? e.message : e)));
   return json(
     {
       counts,

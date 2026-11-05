@@ -25,6 +25,7 @@ const KIND_TITLE = {
   rent: "🤝 장비대여",
   todo: "✅ To do · 함께",
   gdungeon: "⚔️ 길드 던전",
+  app_news: "✨ 새 기능",
 };
 
 self.addEventListener("install", () => self.skipWaiting());

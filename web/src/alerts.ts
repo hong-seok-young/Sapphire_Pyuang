@@ -4,7 +4,7 @@ import { api } from "./auth";
 
 export type AlertKind =
   | "market_want" | "market_bid" | "market_outbid" | "market_auction" | "market_new" | "gold_want" | "request" | "request_new" | "talk" | "account" | "shop"
-  | "board" | "board_notice" | "imo_news" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo" | "gdungeon";
+  | "board" | "board_notice" | "imo_news" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo" | "gdungeon" | "app_news";
 
 export interface Alert {
   id: number;
@@ -43,6 +43,8 @@ export const ALERT_GROUPS: { menu: string; kinds: { kind: AlertKind; name: strin
   { menu: "To do", kinds: [{ kind: "todo", name: "함께" }] },
   // 길드 던전 (1군 전용, 제작자 요청 2026-11-02): 파티 들어옴, 가능한 때가 다 모임, 확정, 불참
   { menu: "길드 던전", kinds: [{ kind: "gdungeon", name: "파티·시간" }] },
+  // 새 기능 (server/appNews.ts, 제작자 요청 2026-11-05 '새로운 기능 생겼다고 알림도'): 메뉴를 새로 열면 모두에게 한 번
+  { menu: "앱", kinds: [{ kind: "app_news", name: "새 기능" }] },
 ];
 
 export const fetchAlerts = () =>
