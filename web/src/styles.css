@@ -2846,11 +2846,21 @@ button.gd-member-row { cursor: pointer; }
 .enh-hit { display: inline-flex; align-items: baseline; gap: 4px; padding: 4px 8px; font-size: 13px; min-width: 0; }
 .enh-hit small { font-size: 11px; opacity: 0.7; }
 .enh-swap { align-self: center; width: 16px; height: 40px; padding: 0; font-size: 12px; line-height: 1; background: var(--lo); border: 2px solid var(--edge); color: var(--muted); }
-.enh-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.enh-res { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; }
+.enh-res-main { display: grid; justify-items: start; gap: 1px; }
+.enh-res-main .enh-big { font-size: 26px; line-height: 1.05; }
+.enh-res-avg { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.enh-res-avg b { color: var(--text); }
+.enh-res-bars { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; min-width: 0; }
+.enh-rbar { display: grid; grid-template-columns: 30px minmax(0, 1fr) 34px; align-items: center; gap: 4px; font-size: 10px; color: var(--muted); }
+.enh-rbar .enh-rbar-n:first-child { text-align: right; }
+.enh-rbar-track { position: relative; height: 8px; background: rgba(255, 255, 255, 0.06); }
+.enh-rbar-fill { position: absolute; top: 0; bottom: 0; background: var(--sapphire); transition: left 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.enh-rbar-b .enh-rbar-fill { background: var(--gold); }
+.enh-rbar-avg { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: var(--text); transition: left 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.enh-res-delta { display: flex; justify-content: space-between; gap: 6px; font-size: 10px; color: var(--muted); padding: 0 0 0 4px; white-space: nowrap; }
+.enh-res-delta b { font-weight: normal; }
 .enh-big { flex: none; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
-.enh-headside { flex: 1 1 auto; min-width: 0; font-size: 12px; line-height: 1.5; }
-.enh-headside > div { white-space: nowrap; }
-.enh-headside > div:first-child { font-size: 13px; }
 .enh-up { color: #3fe0a0; }
 .enh-down { color: var(--red); }
 .enh-sim-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 13px; margin-bottom: 4px; }
@@ -2867,10 +2877,6 @@ button.gd-member-row { cursor: pointer; }
 .enh-sim-avg { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .enh-sim-pct { font-size: 12px; text-align: right; white-space: nowrap; }
 .enh-sim-me .enh-sim-pct { color: var(--sapphire); font-weight: 700; }
-.enh-legend { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 7px; font-size: 11px; color: var(--muted); }
-.enh-legend > span { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
-.enh-legend i { display: inline-block; width: 8px; height: 8px; }
-.enh-legend i.enh-legend-now { width: 2px; height: 11px; background: var(--text); }
 .enh-ch { display: grid; grid-template-columns: minmax(0, 1fr); }
 /* 기준선 줄: 기준이 무엇인지와 값, 옮겼으면 '지금으로' */
 .enh-ch-base { display: flex; align-items: center; gap: 4px; min-height: 22px; margin: 0 0 3px; font-size: 11px; color: var(--muted); }
@@ -2881,7 +2887,7 @@ button.gd-member-row { cursor: pointer; }
 .enh-ch-key-now { background: var(--text); }
 .enh-ch-key-ref { background: var(--gold); }
 .enh-ch-reset { flex: none; padding: 1px 8px; font-size: 11px; }
-.enh-ch-row { display: grid; grid-template-columns: 96px minmax(0, 1fr) 54px; align-items: stretch; min-height: 22px; padding: 0 0 0 4px; border-left: 3px solid transparent; }
+.enh-ch-row { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: stretch; min-height: 27px; padding: 0 0 0 4px; border-left: 3px solid transparent; }
 .enh-ch-a { border-left-color: var(--sapphire); background: rgba(111, 143, 255, 0.1); }
 .enh-ch-b { border-left-color: var(--gold); background: rgba(255, 196, 92, 0.08); }
 .enh-ch-name { display: flex; align-items: center; gap: 3px; min-width: 0; font-size: 11px; line-height: 1.2; padding: 1px 0; text-align: left; background: none; border: 0; box-shadow: none; color: inherit; }
@@ -2894,14 +2900,17 @@ button.gd-member-row { cursor: pointer; }
 .enh-ch-now { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--text); opacity: 0.75; }
 .enh-ch-now-dim { opacity: 0.25; }
 .enh-ch-ref { position: absolute; z-index: 3; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--gold); pointer-events: none; }
-.enh-ch-bar { position: absolute; top: 50%; height: 2px; margin-top: -1px; background: rgba(255, 255, 255, 0.22); }
-.enh-ch-dot { position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; box-shadow: 0 0 0 2px var(--panel); }
-.enh-ch-a .enh-ch-dot, .enh-ch-b .enh-ch-dot { box-shadow: 0 0 0 2px #2b2a58; }
-.enh-ch-dot.enh-ch-dot-near { z-index: 2; transform: scale(1.35); }
-.enh-ch-dot.enh-ch-dot-a { z-index: 2; box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--text); }
-.enh-ch-dot.enh-ch-dot-b { z-index: 2; box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--gold); }
-.enh-ch-pct { align-self: center; font-size: 11px; text-align: right; white-space: nowrap; padding-right: 3px; }
-.enh-ch-pct small { font-size: 9px; color: var(--muted); margin-right: 3px; }
+.enh-ch-bar { position: absolute; top: 66%; height: 2px; margin-top: -1px; background: rgba(255, 255, 255, 0.22); }
+/* 점마다 강화 숫자 (제작자 2026-11-05 '범례 쓰지 말고 버튼마다 그냥 강화 숫자'): 진한 두 단계는 흰 글자, 밝은 셋은 어두운 글자 */
+.enh-ch-dot { position: absolute; top: 66%; width: 14px; height: 14px; margin: -7px 0 0 -7px; font-size: 9px; line-height: 14px; font-style: normal; text-align: center; letter-spacing: -0.5px; color: #fff; box-shadow: 0 0 0 1px var(--panel); }
+.enh-ch-dot-ink { color: #11203f; }
+.enh-ch-a .enh-ch-dot, .enh-ch-b .enh-ch-dot { box-shadow: 0 0 0 1px #2b2a58; }
+.enh-ch-dot.enh-ch-dot-a { z-index: 2; box-shadow: 0 0 0 1px var(--panel), 0 0 0 3px var(--text); }
+.enh-ch-dot.enh-ch-dot-b { z-index: 2; box-shadow: 0 0 0 1px var(--panel), 0 0 0 3px var(--gold); }
+/* 기준선 양옆 % (오른쪽 칸 대신, 제작자 2026-11-05): 줄 위쪽 띠에, 왼쪽 점은 선 왼쪽에 −, 오른쪽 점은 선 오른쪽에 + */
+.enh-ch-labs { position: absolute; inset: 0 0 auto 0; height: 11px; overflow: hidden; pointer-events: none; z-index: 4; }
+.enh-ch-lab { position: absolute; top: 0; padding: 0 3px; font-size: 9px; line-height: 11px; white-space: nowrap; transition: left 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), right 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.enh-ch-dragging .enh-ch-lab { transition-duration: 0.12s; }
 /* 강화 비교 움직임 (제작자 2026-11-05 '버튼이 깜빡인다거나, 계속 보고 있거나 클릭했을 때, 차트가 어디가 움직인다거나'). 화면이 뜰 때 움직임은 없다 (Pop 은 처음 그릴 때 안 튄다).
    끝없이 도는 것은 transform·opacity 만 */
 .enh-pop { display: inline-block; animation: enh-pop 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.4); }
@@ -2932,7 +2941,7 @@ button.gd-member-row { cursor: pointer; }
 .enh-ch-chip:disabled { opacity: 1; }
 .enh-ch-chip-a { outline: 2px solid var(--text); outline-offset: -2px; }
 .enh-ch-chip-b { outline: 2px solid var(--gold); outline-offset: -2px; }
-.enh-ch-axis { display: grid; grid-template-columns: 96px minmax(0, 1fr) 54px; padding-left: 7px; margin-top: 2px; font-size: 10px; }
+.enh-ch-axis { display: grid; grid-template-columns: 96px minmax(0, 1fr); padding-left: 7px; margin-top: 2px; font-size: 10px; }
 .enh-ch-axis > .muted { font-size: 10px; align-self: center; }
 .enh-ch-ticks { position: relative; height: 14px; margin: 0 7px 0 8px; color: var(--muted); }
 .enh-ch-ticks > span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }

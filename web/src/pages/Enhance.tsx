@@ -239,27 +239,50 @@ function WeaponList({ d, side, pick, job, open, onPick }: { d: Enhance; side: "a
   );
 }
 
-/** 결과: 평균 데미지 % 차이와 평균·최소·최대 (제작자 2026-11-05 '중복된 거 빼자, +32.2 라인까지는 괜찮은데': 같은 데미지가 되는 강화, 톡방 시세, 강화별 표는 뺐다) */
+/** 결과 (제작자 2026-11-05 '+32.2 라인까지는 괜찮은데' -> '평균은 초록 퍼센트 아래로, 최소·최대는 텍스트로만 하지 말고 꾸며 봐, 대신 콤팩트하게'):
+ *  왼쪽 큰 % 와 그 아래 평균, 오른쪽은 두 무기의 데미지 범위 막대(지금 파랑, 바꿀 금색, 흰 눈금이 평균)와 최소·최대가 몇 % 바뀌는지 */
 function Result({ d, a, b }: { d: Enhance; a: Pick; b: Pick }) {
   if (!a.w || !b.w) return null;
   const x = damage(d, a.w, a.plus);
   const y = damage(d, b.w, b.plus);
   const p = pct(x.avg, y.avg);
+  const lo = Math.min(x.min, y.min);
+  const hi = Math.max(x.max, y.max);
+  const at = (v: number) => ((v - lo) / (hi - lo || 1)) * 100;
+  const pMin = pct(x.min, y.min);
+  const pMax = pct(x.max, y.max);
   return (
     <section className="enh-card enh-result">
-      <div className="enh-head">
-        <div className={"enh-big" + tone(p)}>
-          <Pop value={pctText(p)}>{pctText(p)}</Pop>
-        </div>
-        <div className="enh-headside">
-          <div>
+      <div className="enh-res">
+        <div className="enh-res-main">
+          <div className={"enh-big" + tone(p)}>
+            <Pop value={pctText(p)}>{pctText(p)}</Pop>
+          </div>
+          <div className="enh-res-avg">
             평균 {fmt(x.avg)} → <Pop value={fmt(y.avg)}><b>{fmt(y.avg)}</b></Pop>
           </div>
-          <div className="muted">
-            최소 {fmt(x.min)} → {fmt(y.min)} <span className={tone(pct(x.min, y.min))}>{pctText(pct(x.min, y.min))}</span>
-          </div>
-          <div className="muted">
-            최대 {fmt(x.max)} → {fmt(y.max)} <span className={tone(pct(x.max, y.max))}>{pctText(pct(x.max, y.max))}</span>
+        </div>
+        <div className="enh-res-bars">
+          {[
+            { s: x, side: "a" },
+            { s: y, side: "b" },
+          ].map(({ s, side }) => (
+            <div key={side} className={"enh-rbar enh-rbar-" + side}>
+              <span className="enh-rbar-n">{fmt(s.min)}</span>
+              <span className="enh-rbar-track">
+                <i className="enh-rbar-fill" style={{ left: `${at(s.min)}%`, width: `${at(s.max) - at(s.min)}%` }} />
+                <i className="enh-rbar-avg" style={{ left: `${at(s.avg)}%` }} />
+              </span>
+              <span className="enh-rbar-n">{fmt(s.max)}</span>
+            </div>
+          ))}
+          <div className="enh-res-delta">
+            <span>
+              최소 <b className={tone(pMin)}>{pctText(pMin)}</b>
+            </span>
+            <span>
+              최대 <b className={tone(pMax)}>{pctText(pMax)}</b>
+            </span>
           </div>
         </div>
       </div>
@@ -349,11 +372,28 @@ const nearest = (vals: number[], v: number) => vals.reduce((k, x, i) => (Math.ab
  *  기준선 (제작자 2026-11-05 '선 하나를 좌우로 움직이면서 혹은 칸 하나를 선택하면 세로선이 생겨서 다른 인접한 것들이랑 퍼센트 차이'):
  *  처음은 지금 무기(흰 선), 그래프를 좌우로 끌면 금색 기준선이 따라오고, 줄을 톡 누르면 그 줄에서 가장 가까운 강화 점에 기준선을 둔다.
  *  줄마다 오른쪽에 기준선에 가장 가까운 강화와 기준 대비 % (그 점은 조금 크게) */
+/** 그래프 점 크기 (styles.css .enh-ch-dot 과 같게) */
+const DOT = 14;
+
 function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; job: string; a: Pick; b: Pick; onPick: (w: EnhanceWeapon, plus: number) => void }) {
   const [open, setOpen] = useState<string | null>(null);
   const [ref, setRef] = useState<{ v: number; label: string } | null>(null);
   const drag = useRef<{ x0: number; moved: boolean } | null>(null);
   const [dragging, setDragging] = useState(false);
+  // 그래프 칸의 실제 폭: 점이 붙어 겹치는 줄은 점을 좁히고 숫자를 뺀다 (낮은 레벨 무기는 +6 ~ +10 이 몇 px 안에 모인다)
+  const box = useRef<HTMLDivElement>(null);
+  const [tw, setTw] = useState(0);
+  useLayoutEffect(() => {
+    const el = box.current?.querySelector(".enh-ch-track");
+    if (!el) return;
+    const read = () => setTw(el.clientWidth);
+    read();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(read);
+    ro?.observe(el);
+    return () => {
+      ro?.disconnect();
+    };
+  }, []);
   const rows = jobWeapons(d, job)
     .filter((w) => maxPlus(d, w) >= CHART_PLUS[CHART_PLUS.length - 1])
     .map((w) => ({ w, vals: CHART_PLUS.map((p) => damage(d, w, p).avg) }))
@@ -389,13 +429,6 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
     <section className="enh-card enh-chart">
       <div className="enh-sim-head">
         <b>{job} 무기</b>
-        <span className="enh-legend">
-          {CHART_PLUS.map((p, i) => (
-            <span key={p}>
-              <i style={{ background: PLUS_COLOR[i] }} />+{p}
-            </span>
-          ))}
-        </span>
       </div>
       {base !== null && (
         <div className="enh-ch-base">
@@ -416,16 +449,15 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
           )}
         </div>
       )}
-      <div className={"enh-ch" + (dragging ? " enh-ch-dragging" : "")}>
+      <div ref={box} className={"enh-ch" + (dragging ? " enh-ch-dragging" : "")}>
         {rows.map((r) => {
           const isA = a.w?.name === r.w.name;
           const isB = b.w?.name === r.w.name;
           const shut = open !== r.w.name;
           const pic = (wiki.items[r.w.name] ?? wiki.items[key(r.w.name)])?.icon;
-          const k = base === null ? -1 : nearest(r.vals, base);
-          const kp = k >= 0 ? CHART_PLUS[k] : 0;
-          const diff = k >= 0 && base !== null ? pct(base, r.vals[k]) : 0;
-          const self = k >= 0 && (ref ? ref.label === `+${kp} ${r.w.name}` : isA && a.plus === kp);
+          // 기준선 바로 왼쪽·오른쪽 점 (제작자 2026-11-05 '6 7 사이에 있으면 6은 마이너스 몇 수직선 왼쪽에, 7은 플러스 몇 우측에')
+          const li = base === null ? -1 : r.vals.map((v) => v < base - 1e-9).lastIndexOf(true);
+          const ri = base === null ? -1 : r.vals.findIndex((v) => v > base + 1e-9);
           return (
             <Fragment key={r.w.name}>
               <div className={"enh-ch-row" + (isA ? " enh-ch-a" : isB ? " enh-ch-b" : "")}>
@@ -476,25 +508,47 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
                   <i className="enh-ch-bar" style={{ left: `${x(r.vals[0])}%`, width: `${x(r.vals[4]) - x(r.vals[0])}%` }} />
                   {r.vals.map((v, i) => {
                     const p = CHART_PLUS[i];
+                    const marked = (q: number) => (isA && a.plus === q) || (isB && b.plus === q);
                     const mark = isA && a.plus === p ? " enh-ch-dot-a" : isB && b.plus === p ? " enh-ch-dot-b" : "";
+                    // 옆 점과의 거리(px)만큼만 넓게: 14px 가 안 되면 좁은 막대로, 숫자가 안 들어가면 숫자 없이.
+                    // 고른 점은 그대로 크게(테두리까지 반 폭 10px) 위에 두고, 그 옆 점은 그만큼 비켜 좁힌다
+                    const room1 = (j: number) => {
+                      if (j < 0 || j >= r.vals.length) return Infinity;
+                      const gap = (Math.abs(x(r.vals[j]) - x(v)) * tw) / 100;
+                      return marked(CHART_PLUS[j]) ? 2 * (gap - 10) - 1 : gap - 1;
+                    };
+                    const room = tw > 0 && !mark ? Math.min(DOT, room1(i - 1), room1(i + 1)) : DOT;
+                    const w = Math.max(3, Math.min(DOT, Math.floor(room)));
                     return (
                       <i
                         key={p}
-                        className={"enh-ch-dot" + mark + (i === k ? " enh-ch-dot-near" : "")}
-                        style={{ left: `${x(v)}%`, background: PLUS_COLOR[i] }}
+                        className={"enh-ch-dot" + mark + (i >= 2 ? " enh-ch-dot-ink" : "")}
+                        style={{ left: `${x(v)}%`, background: PLUS_COLOR[i], ...(w < DOT ? { width: w, marginLeft: -w / 2 } : null) }}
                         title={`+${p} ${r.w.name} ${fmt(v)}`}
-                      />
+                      >
+                        {w >= (p < 10 ? 8 : 11) ? p : null}
+                      </i>
                     );
                   })}
-                </div>
-                <span className={"enh-ch-pct" + (self ? "" : tone(diff))}>
-                  {k >= 0 && (
-                    <Pop value={`${kp}${self ? "s" : pctText(diff)}`} off={dragging}>
-                      <small>+{kp}</small>
-                      {self ? (ref ? "기준" : "지금") : pctText(diff)}
-                    </Pop>
+                  {base !== null && (
+                    <span className="enh-ch-labs">
+                      {li >= 0 && (
+                        <span className={"enh-ch-lab enh-ch-lab-l" + tone(pct(base, r.vals[li]))} style={{ right: `${100 - x(base)}%` }}>
+                          <Pop value={pctText(pct(base, r.vals[li]))} off={dragging}>
+                            {pctText(pct(base, r.vals[li]))}
+                          </Pop>
+                        </span>
+                      )}
+                      {ri >= 0 && (
+                        <span className={"enh-ch-lab enh-ch-lab-r" + tone(pct(base, r.vals[ri]))} style={{ left: `${x(base)}%` }}>
+                          <Pop value={pctText(pct(base, r.vals[ri]))} off={dragging}>
+                            {pctText(pct(base, r.vals[ri]))}
+                          </Pop>
+                        </span>
+                      )}
+                    </span>
                   )}
-                </span>
+                </div>
               </div>
               {!shut && (
                 <div className="enh-ch-detail">
@@ -527,7 +581,6 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
                 </span>
               ))}
           </span>
-          <span />
         </div>
       </div>
     </section>
