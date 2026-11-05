@@ -11,6 +11,9 @@ import { FitLine, FlowLine, Loading, TopBar } from "../ui";
 import { SCOPE_NAME, STATUS_NAME, actDevReq, addDevReq, addDevTalk, delDevReq, editDevReq, loadDevReqs, loadDevTalk, loadPeople, myTurn, roundSteps } from "../devreq";
 import type { DevReq, DevRole, DevStep, DevTalk, Scope, Status } from "../devreq";
 
+/** 앱개발자 (결재란의 개발 검토·개발 착수 칸에 미리 적는다) */
+const DEVELOPER = "퓨앙";
+
 const BOARD = "이 개발자는 무료로 해 줍니다 ★ 필요한 기능을 자유롭게 신청하세요 ★ 개발 가능 → 합의 → 길마 결재 → 개발 ★ 반려돼도 고쳐서 다시 신청할 수 있어요";
 
 /** 이미 본 도장 (새로 찍힌 것만 쾅) */
@@ -267,13 +270,23 @@ function ApprovalLine({ r }: { r: DevReq }) {
   const sub = by("resubmit")[0] ?? by("submit")[0];
   const reject = by("reject")[0];
   const agrees = by("agree");
-  // 칸: [이름, 찍힌 단계, 지금 기다리는 칸인지]
-  const cells: { key: string; label: string; step?: DevStep; count?: number; wait: boolean; rejected?: boolean }[] = [
+  // 칸: 이름, 찍힌 단계(도장 글), 지금 기다리는 칸인지, 미리 적어 둔 사람 (제작자 2026-11-05 '개발 검토는 퓨앙이니까 이름은 미리 아래에',
+  // '합의는 오피서 합의로', '마지막은 개발 착수로': 길마 결재가 나면 착수 도장, 개발 완료면 완료 도장)
+  const approve = by("approve")[0];
+  const done = by("done")[0];
+  const cells: { key: string; label: string; step?: DevStep; stamp?: string; count?: number; wait: boolean; rejected?: boolean; pre?: string }[] = [
     { key: "sub", label: "신청", step: sub, wait: false },
-    { key: "feas", label: "개발 검토", step: by("feasible")[0], wait: r.status === "review" },
-    { key: "agree", label: "합의", step: agrees[agrees.length - 1], count: agrees.length, wait: r.status === "agree" && agrees.length === 0 },
-    { key: "appr", label: "길마 결재", step: by("approve")[0], wait: r.status === "agree" && agrees.length > 0 },
-    { key: "done", label: "개발", step: by("done")[0], wait: r.status === "dev" },
+    { key: "feas", label: "개발 검토", step: by("feasible")[0], wait: r.status === "review", pre: DEVELOPER },
+    { key: "agree", label: "오피서 합의", step: agrees[agrees.length - 1], count: agrees.length, wait: r.status === "agree" && agrees.length === 0 },
+    { key: "appr", label: "길마 결재", step: approve, wait: r.status === "agree" && agrees.length > 0 },
+    {
+      key: "start",
+      label: "개발 착수",
+      step: done ?? (approve && r.status === "dev" ? { ...approve, user_id: DEVELOPER } : undefined),
+      stamp: done ? "완료" : "착수",
+      wait: false,
+      pre: DEVELOPER,
+    },
   ];
   // 반려는 도장이 끝난 다음 칸에 빨간 도장 (반려한 사람 이름이 아래에)
   if (reject) {
@@ -289,15 +302,23 @@ function ApprovalLine({ r }: { r: DevReq }) {
         <Fragment key={c.key}>
           {i > 0 && <span className={"dr-link" + (c.step || c.wait ? " dr-link-on" : "")} aria-hidden />}
           <div className={"dr-cell" + (c.wait && r.status !== "rejected" ? " dr-cell-wait" : "") + (c.step ? " dr-cell-done" : "")}>
-            <span className="dr-cell-label">{c.label}</span>
+            <span className="dr-cell-label">
+              <FitLine text={c.label} wrap={false} />
+            </span>
             <span className="dr-cell-box">
               {c.step ? (
-                <Stamp id={`${r.id}:${r.round}:${c.key}:${c.step.kind}:${c.count ?? 0}`} text={c.rejected ? "반려" : c.key === "agree" && (c.count ?? 0) > 1 ? `합의${c.count}` : STAMP_TEXT[c.step.kind]} red={!!c.rejected} />
+                <Stamp
+                  id={`${r.id}:${r.round}:${c.key}:${c.step.kind}:${c.count ?? 0}`}
+                  text={c.rejected ? "반려" : c.stamp ?? (c.key === "agree" && (c.count ?? 0) > 1 ? `합의${c.count}` : STAMP_TEXT[c.step.kind])}
+                  red={!!c.rejected}
+                />
               ) : c.wait && r.status !== "rejected" ? (
                 <span className="dr-wait">대기</span>
               ) : null}
             </span>
-            <span className="dr-cell-who">{c.step ? <FitLine text={c.step.user_id} wrap={false} /> : null}</span>
+            <span className={"dr-cell-who" + (!c.step && c.pre ? " dr-cell-pre" : "")}>
+              {c.step ? <FitLine text={c.step.user_id} wrap={false} /> : c.pre ? <FitLine text={c.pre} wrap={false} /> : null}
+            </span>
           </div>
         </Fragment>
       ))}
