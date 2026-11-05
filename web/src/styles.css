@@ -2847,6 +2847,24 @@ button.gd-member-row { cursor: pointer; }
 .enh-hit { display: inline-flex; align-items: baseline; gap: 4px; padding: 4px 8px; font-size: 13px; min-width: 0; }
 .enh-hit small { font-size: 11px; opacity: 0.7; }
 .enh-swap { align-self: center; width: 16px; height: 40px; padding: 0; font-size: 12px; line-height: 1; background: var(--lo); border: 2px solid var(--edge); color: var(--muted); }
+/* 목록이 채울 칸 (폴더 탭, 제작자 2026-11-05 1안): 채울 칸과 아래 목록을 그 칸 색(기준 파랑, 바꿀 금색) 한 테두리로 묶는다.
+   옮겨 갈 때 칸이 톡 올라서고 목록이 위에서 아래로 펼쳐지며 빛이 한 번 지나가고, 기다리는 동안 테두리 빛이 숨 쉬듯 */
+.enh-picks { --on: var(--sapphire); }
+.enh-picks.enh-on-b { --on: var(--gold); }
+.enh-tab .enh-pick-on { position: relative; z-index: 1; border: 2px solid var(--on); border-bottom: 0; margin-bottom: -8px; padding-bottom: 10px; box-shadow: none; animation: enh-tab-pop 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.enh-tab .enh-pick-on::after { content: ""; position: absolute; inset: -2px -2px 0 -2px; pointer-events: none; box-shadow: 0 0 10px 1px var(--on); clip-path: inset(-14px -14px 8px -14px); opacity: 0.3; animation: enh-tab-breathe 2.2s ease-in-out infinite; }
+.enh-on-a .enh-list-a, .enh-on-b .enh-list-b { position: relative; border: 2px solid var(--on); padding: 6px; background: var(--lo); animation: enh-unfold 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.enh-on-a .enh-list-a::before, .enh-on-b .enh-list-b::before { content: ""; position: absolute; inset: -2px; pointer-events: none; box-shadow: 0 0 10px 1px var(--on); opacity: 0.3; animation: enh-tab-breathe 2.2s ease-in-out infinite; }
+.enh-on-a .enh-list-a::after, .enh-on-b .enh-list-b::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent 38%, rgba(255, 255, 255, 0.16) 50%, transparent 62%) no-repeat; background-size: 250% 100%; animation: enh-shine 0.9s 0.12s ease-out both; }
+@keyframes enh-tab-pop { 0% { transform: translateY(3px) scale(0.98); } 60% { transform: translateY(-1px) scale(1.01); } 100% { transform: none; } }
+@keyframes enh-unfold { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes enh-tab-breathe { 0%, 100% { opacity: 0.22; } 50% { opacity: 0.85; } }
+@keyframes enh-shine { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .enh-tab .enh-pick-on, .enh-on-a .enh-list-a, .enh-on-b .enh-list-b, .enh-tab .enh-pick-on::after, .enh-on-a .enh-list-a::before, .enh-on-b .enh-list-b::before { animation: none; }
+  .enh-on-a .enh-list-a::after, .enh-on-b .enh-list-b::after { display: none; }
+}
 .enh-res { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; }
 .enh-res .enh-big { font-size: 24px; line-height: 1.05; }
 .enh-res-mid { display: grid; justify-items: center; min-width: 0; }

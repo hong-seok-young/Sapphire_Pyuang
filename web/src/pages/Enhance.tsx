@@ -11,7 +11,7 @@
 // 줄을 누르면 그 아래 강화마다 평균과 지금 대비 %, 누르면 바꿀 무기로.
 // 움직임 (제작자 2026-11-05 '계속 보고 있거나 클릭했을 때의 애니메이션, 화면 전환 때 뜨는 건 빠르게 하려고 안 함'): 바뀐 값(%, +N, 평균)은 톡 튀고(`Pop`),
 // ⇄ 는 돌고, 지금 선·'지금' 글자·빈 무기 칸은 숨 쉬듯 깜박이고, 기준선과 지금 선은 새 자리로 미끄러진다(끄는 동안은 손가락을 바로 따라감).
-import { Fragment, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { Me } from "../auth";
 import { loadEnhance, useAsync } from "../data";
@@ -201,23 +201,20 @@ function WeaponCard({ d, wiki, side, hint, pick, onPick, open, onOpen }: {
 }
 
 /** 무기 칸 아래 목록 (두 칸 너비): 적는 중이면 찾은 무기, 아니면 고른 직업의 무기 전부. 그 칸의 색 띠 */
-function WeaponList({ d, side, pick, job, open, onPick }: { d: Enhance; side: "a" | "b"; pick: Pick; job: string; open: boolean; onPick: (p: Pick) => void }) {
+/** 목록에 보일 무기: 적는 중이면 찾은 무기 6개, 아니면 그 칸을 채울 차례일 때 고른 직업의 무기 전부 */
+function listFor(d: Enhance, pick: Pick, job: string, open: boolean): EnhanceWeapon[] {
   const qs = searching(d, pick);
-  const qk = qs.join("|");
-  const hits = useMemo(
-    () =>
-      qk
-        ? d.weapons
-            .map((w) => ({ w, s: Math.max(...qk.split("|").map((q) => score(q, w.name))) }))
-            .filter((x) => x.s > 0)
-            .sort((a, b) => b.s - a.s || (a.w.lv ?? 0) - (b.w.lv ?? 0))
-            .slice(0, 6)
-            .map((x) => x.w)
-        : [],
-    [d, qk],
-  );
-  const all = useMemo(() => jobWeapons(d, job), [d, job]);
-  const shown = qk ? hits : open ? all : [];
+  if (qs.length)
+    return d.weapons
+      .map((w) => ({ w, s: Math.max(...qs.map((q) => score(q, w.name))) }))
+      .filter((x) => x.s > 0)
+      .sort((a, b) => b.s - a.s || (a.w.lv ?? 0) - (b.w.lv ?? 0))
+      .slice(0, 6)
+      .map((x) => x.w);
+  return open ? jobWeapons(d, job) : [];
+}
+
+function WeaponList({ d, side, pick, shown, onPick }: { d: Enhance; side: "a" | "b"; pick: Pick; shown: EnhanceWeapon[]; onPick: (p: Pick) => void }) {
   if (shown.length === 0) return null;
   return (
     <div className={"enh-hits enh-list enh-list-" + side}>
@@ -674,6 +671,10 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
   const [listAt, setListAt] = useState<"a" | "b" | null | undefined>(undefined);
   const firstEmpty = !pa.w ? "a" : !pb.w ? "b" : null;
   const list = listAt === undefined ? firstEmpty : listAt;
+  // 목록이 채울 칸: 그 칸과 목록을 한 테두리로 묶는다 (제작자 2026-11-05 '한 번 누르면 첫째 칸, 두 번째는 둘째 칸에 들어가잖아, 그걸 테두리로 묶어서' -> 초안 5개 중 1안 폴더 탭)
+  const itemsA = d ? listFor(d, pa, job, list === "a") : [];
+  const itemsB = d ? listFor(d, pb, job, list === "b") : [];
+  const tab: "a" | "b" | null = list && (list === "a" ? itemsA : itemsB).length ? list : itemsA.length ? "a" : itemsB.length ? "b" : null;
   const after = (row: "a" | "b", p: Pick, other: Pick) => {
     if (!p.w) return;
     if (!jobPick || p.w.job !== job) setJob(p.w.job);
@@ -733,7 +734,7 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
         <Loading error={error?.includes("404") ? "강화 자료가 아직 없어요" : error} />
       ) : (
         <div className="enh">
-          <section className="enh-card enh-picks">
+          <section className={"enh-card enh-picks" + (tab ? ` enh-tab enh-on-${tab}` : "")}>
             <div className="mk-sub enh-jobs" role="tablist">
               {JOBS.map((j) => (
                 <button key={j} type="button" role="tab" aria-selected={job === j} className={"sub-tab" + (job === j ? " sub-tab-on" : "")} onClick={() => pickJob(j)}>
@@ -742,14 +743,14 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
               ))}
             </div>
             <div className="enh-duo">
-              <WeaponCard d={d} wiki={wiki} side="a" hint="기준 무기" pick={pa} onPick={pickA} open={list === "a"} onOpen={() => setListAt("a")} />
+              <WeaponCard d={d} wiki={wiki} side="a" hint="기준 무기" pick={pa} onPick={pickA} open={tab === "a"} onOpen={() => setListAt("a")} />
               <button key={spin} type="button" className={"enh-swap" + (spin ? " enh-swap-spin" : "")} onClick={swap} aria-label="좌우 바꾸기">
                 ⇄
               </button>
-              <WeaponCard d={d} wiki={wiki} side="b" hint="바꿀 무기" pick={pb} onPick={pickB} open={list === "b"} onOpen={() => setListAt("b")} />
+              <WeaponCard d={d} wiki={wiki} side="b" hint="바꿀 무기" pick={pb} onPick={pickB} open={tab === "b"} onOpen={() => setListAt("b")} />
             </div>
-            <WeaponList d={d} side="a" pick={pa} job={job} open={list === "a"} onPick={pickA} />
-            <WeaponList d={d} side="b" pick={pb} job={job} open={list === "b"} onPick={pickB} />
+            <WeaponList d={d} side="a" pick={pa} shown={itemsA} onPick={pickA} />
+            <WeaponList d={d} side="b" pick={pb} shown={itemsB} onPick={pickB} />
           </section>
           <Result d={d} a={pa} b={pb} />
           <Similar d={d} wiki={wiki} a={pa} b={pb} onPick={pickSimilar} />
