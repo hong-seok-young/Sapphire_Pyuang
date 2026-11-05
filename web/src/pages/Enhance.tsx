@@ -466,24 +466,38 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
   };
   const firstRef = here >= 0 ? here === 0 : base !== null && !pts.some((p) => p.v < base - 1e-9);
   const lastRef = here >= 0 ? here === pts.length - 1 : base !== null && !pts.some((p) => p.v > base + 1e-9);
+  const basePic = a.w ? (wiki.items[a.w.name] ?? wiki.items[key(a.w.name)])?.icon : null;
   return (
     <section className="enh-card enh-chart">
       {/* 제목과 기준 줄을 한 줄에 (제작자 2026-11-05 '이것도 한 행으로') */}
+      {/* 제목 옆 기준 칸 (제작자 2026-11-05 '기준이 어떤 무기인지, 저 숫자가 뭔지 써 주고, 기준은 눈에 띄게'):
+          흰 테두리 칸(그래프의 흰 기준선과 같은 색)에 '기준' 표·무기 그림·+강 이름, 그 아래 '공격력 중앙값 71.1'. 양옆 ◀ ▶ 는 칸 높이 꽉 차게 */}
       <div className="enh-ch-base">
         <b className="enh-ch-title">{job} 무기</b>
         {base !== null && (
-          <>
+          <div className="enh-ch-ref">
             <button type="button" className="pill enh-nav" onClick={() => stepRef(-1)} disabled={firstRef} aria-label="기준선 한 칸 왼쪽">
               ◀
             </button>
-            <span className="enh-ch-basetext">
-              <i className="enh-ch-key-now" />
-              기준 {nowLabel} <b>{fmt(base)}</b>
-            </span>
+            <div className="enh-ch-refbox">
+              <div className="enh-ch-refname">
+                <span className="enh-ch-reftag">기준</span>
+                {basePic ? <PicImg pic={basePic} max={16} /> : null}
+                <Pop value={nowLabel} className="enh-ch-refwhat">
+                  <FitLine text={nowLabel} wrap={false} />
+                </Pop>
+              </div>
+              <div className="enh-ch-refval">
+                공격력 중앙값{" "}
+                <Pop value={fmt(base)}>
+                  <b>{fmt(base)}</b>
+                </Pop>
+              </div>
+            </div>
             <button type="button" className="pill enh-nav" onClick={() => stepRef(1)} disabled={lastRef} aria-label="기준선 한 칸 오른쪽">
               ▶
             </button>
-          </>
+          </div>
         )}
       </div>
       <div ref={box} className={"enh-ch" + (dragging ? " enh-ch-dragging" : "")}>
