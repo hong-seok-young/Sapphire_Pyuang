@@ -31,7 +31,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     kind = "feasible";
     after.push(
       () => tell(env, me, ["owner"], row, `개발 가능 판정 · ${q} · 이제 합의와 길마 결재를 기다려요`),
-      () => tell(env, me, ["officer"], row, `개발 요청 합의 차례예요 · ${row.user_id}: ${q}`),
+      // 오피서는 먼저 본 사람 누구든 의견 달고 합의·반려하면 된다 (제작자 2026-11-05 '먼저 본 오피서가 합의 아무나 의견 달고 하면 돼요, 반려도 마찬가지, 알림 보낼 때 그렇게 띄워 줘')
+      () => tell(env, me, ["officer"], row, `[오피서 합의] 먼저 보신 오피서 누구든 의견 달고 합의하면 돼요 · 반려도 마찬가지예요 · ${row.user_id}: ${q}`),
     );
   } else if (b.act === "agree") {
     if (!role.agree) return FORBIDDEN();
@@ -42,7 +43,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     next = "agree";
     kind = "agree";
     after.push(() => tell(env, me, ["owner"], row, `${me.id} 님이 합의했어요 · ${q}${note ? ` · ${note}` : ""}`));
-    if (!agrees.length) after.push(() => tell(env, me, ["master"], row, `개발 요청 결재 차례예요 · ${row.user_id}: ${q}`));
+    if (!agrees.length)
+      after.push(() =>
+        tell(env, me, ["master"], row, `[길마 결재] ${me.id} 님이 합의했어요 · 의견 달고 최종 결재하거나 반려해 주세요 · ${row.user_id}: ${q}${note ? ` · 합의 의견: ${note}` : ""}`),
+      );
   } else if (b.act === "approve") {
     if (!role.approve) return FORBIDDEN();
     if (row.status !== "agree") return json({ error: "결재할 차례가 아니에요" }, 409);
