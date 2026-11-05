@@ -3444,6 +3444,13 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .dr-scope { margin: 0; }
 .dr-scope-tip { margin: -2px 0 0; font-size: 11px; color: var(--gold); }
 .dr-people { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.dr-pick-row { display: flex; align-items: stretch; gap: 6px; }
+.dr-pick-row .dr-find { flex: 1; }
+.dr-me { display: inline-flex; flex: none; align-items: center; gap: 5px; padding: 0 6px; font: inherit; font-size: 12px; white-space: nowrap; color: var(--muted); background: var(--night-2); border: 2px solid #000; cursor: pointer; }
+.dr-me-box { display: inline-grid; place-items: center; width: 14px; height: 14px; background: var(--lo); border: 2px solid #000; }
+.dr-me-on .dr-me-box::after { content: ""; width: 3px; height: 7px; margin-top: -2px; border: solid #000; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.dr-me-on { color: var(--gold); }
+.dr-me-on .dr-me-box { background: var(--gold); animation: chip-pop 0.18s ease-out; }
 .dr-find { min-width: 0; padding: 5px 6px; font: inherit; font-size: 12px; color: var(--text); background: var(--lo); border: 2px solid #000; }
 .dr-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .dr-chip { padding: 2px 6px; font-size: 12px; color: var(--edge); background: var(--sapphire); border: 2px solid #000; cursor: pointer; }
