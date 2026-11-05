@@ -27,8 +27,9 @@ const squeeze = (s: string) => s.replace(/닼/g, "다크").replace(/롭/g, "로�
 const JOB_OF: Record<string, string> = { warrior: "전사", ranger: "레인저", mage: "마법사", monk: "무도가" };
 const JOBS = ["전사", "레인저", "마법사", "무도가"] as const;
 /** 그 직업 무기, 레벨 순 (같은 레벨은 강화 수치가 있는 것 먼저) */
-/** 그래프 끌기 안내를 본 기기 (그래프에 손을 대면 적는다) */
-const DRAG_HINT = "sapphire.enh.dragHint";
+/** 그래프 끌기 안내를 본 기기 (그래프에 손을 대면 적는다). 안내 모양을 바꿔 다시 한 번 보이려면 이름 끝 판을 올린다
+ * (2: 그래프 전체 반짝임으로 바꾼 판, 제작자 2026-11-05 '전 버전에서 눌러서 이제 안 뜨는데 나한테도 한 번 뜨게') */
+const DRAG_HINT = "sapphire.enh.dragHint2";
 /** 안내 동안 그래프 위에서 반짝이는 별 [가로 %, 세로 %, 늦춤 초] */
 const SPARKS: [number, number, number][] = [
   [6, 8, 0], [34, 4, 0.5], [62, 10, 1.1], [90, 6, 0.3], [18, 26, 0.8], [48, 22, 1.4], [78, 30, 0.2], [10, 48, 1.2],
