@@ -1,0 +1,22 @@
+# 답 받기 일꾼 (server/chatRun.ts, 제작자 2026-11-05 '내가 웹 꺼도 되게 하랬지'). 자동 배포(.github/workflows/deploy-web.yml)가
+# 사이트보다 먼저 `wrangler deploy` 로 올리고, 됐으면 사이트 wrangler.toml 에 CHATRUN 바인딩을 붙인다.
+# Cloudflare 무료 요금제: Durable Object 는 SQLite 저장소만 된다 (new_sqlite_classes).
+name = "sapphire-chat-runner"
+main = "index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_als"]
+workers_dev = false
+
+[[durable_objects.bindings]]
+name = "CHATRUN"
+class_name = "ChatRun"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ChatRun"]
+
+# 답을 넣는 계정 DB (사이트와 같은 DB). 자동 배포가 진짜 database_id 로 바꾼다
+[[d1_databases]]
+binding = "DB"
+database_name = "sapphire-accounts"
+database_id = "00000000-0000-0000-0000-000000000000"

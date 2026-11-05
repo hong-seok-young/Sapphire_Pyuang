@@ -10,14 +10,17 @@
 //   긴 답이 중간에서 끊겼다 (제작자: '주'에서 끊김). 화면이 SSE 를 읽고 생각(요약), 웹 검색, 답을 그린다.
 // - 대화 기록 (server/chatlog.ts): thread 가 없으면 새 대화를 만들고, 질문을 넣는다. again 이면 질문은 이미 있다 (다시 답하기).
 //   대화 번호와 질문 번호는 머리글 x-chat-thread, x-chat-msg 로 알린다. 답은 화면이 다 받은 뒤 넣는다.
-// - 화면을 닫거나 새로 고쳐도 (제작자 요청: 닫아도 계속) 같은 답을 뒤에서 마저 받아 둔다. 다 받은 뒤 화면이 답을 넣지 않았으면
-//   서버가 넣고 '답변 완료' 알림을 보낸다 (finishInBackground). 플랫폼이 끊긴 뒤 30초쯤만 기다려 주므로 더 길면 화면이 다시 묻는다.
+// - 앱을 닫아도 답은 끝까지 (제작자 2026-11-05 '내가 웹 꺼도 되게 하랬지'): 답 받기 일꾼(server/chatRun.ts, Durable Object)이 있으면
+//   질문을 먼저 넣고 일꾼에게 맡긴다. 일꾼이 알람 안에서 15분까지 받아 대화에 넣고, 화면은 일꾼이 흘려 주는 SSE 를 받는다 (끊기면 /api/chat/live 로 다시 붙는다).
+// - 일꾼이 없으면 예전 길: 같은 답을 뒤에서 마저 받아 두고 화면이 넣지 않았으면 서버가 넣는다 (finishInBackground, 화면이 끊긴 뒤 30초까지만).
 import Anthropic from "@anthropic-ai/sdk";
 import { NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { appContext } from "../../../server/chatapp";
 import { officialContext } from "../../../server/official";
-import { addMsg, finishInBackground, newThread, ownThread, titleOf } from "../../../server/chatlog";
+import { addMsg, finishInBackground, newThread, ownThread, runStub, titleOf } from "../../../server/chatlog";
+import { errorCause, errorText, isWebOff } from "../../../server/chatErrors";
+import type { RunStart } from "../../../server/chatRun";
 
 /** 챗봇 모델. 바꾸려면 이 줄만 고친다 (더 싸게: "claude-sonnet-5-5", 가장 싸게: "claude-haiku-5-5") */
 const MODEL = "claude-opus-5-5";
@@ -141,30 +144,12 @@ function toMessages(turns: ChatTurn[], context: string, app: string, official = 
   });
 }
 
-/** 앱개발자에게만 붙이는 실제 오류 (상태 코드와 API 메시지, 키 같은 비밀값은 들어 있지 않다) */
-function errorCause(e: unknown): string {
-  if (e instanceof Anthropic.APIError) return ` [원인 ${e.status ?? "-"}: ${String(e.message).slice(0, 200)}]`;
-  return ` [원인: ${String(e instanceof Error ? e.message : e).slice(0, 200)}]`;
-}
-
-/** 길드원에게 보여 줄 오류 글 */
-function errorText(e: unknown): string {
-  if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) {
-    return "챗봇 API 키에 문제가 있어요. 앱개발자에게 알려 주세요";
-  }
-  if (e instanceof Anthropic.RateLimitError) return "지금 질문이 몰렸어요. 잠시 뒤에 다시 물어봐 주세요";
-  if (e instanceof Anthropic.BadRequestError) return "질문을 처리하지 못했어요. 첨부를 빼거나 질문을 바꿔 다시 해 주세요";
-  if (e instanceof Anthropic.APIConnectionError) return "AI 서버에 연결하지 못했어요. 잠시 뒤에 다시 해 주세요";
-  if (e instanceof Anthropic.APIError) return "AI 서버가 바빠요. 잠시 뒤에 다시 물어봐 주세요";
-  return "답을 받다가 문제가 생겼어요";
-}
-
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUntil }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!env.ANTHROPIC_API_KEY) return json({ error: "챗봇이 아직 준비 중이에요" }, 503);
 
-  const body = await readJson<{ messages: unknown; context: string; thread: unknown; again: unknown }>(request);
+  const body = await readJson<{ messages: unknown; context: string; thread: unknown; again: unknown; found: unknown }>(request);
   const turns = parseTurns(body.messages);
   if (!turns) return json({ error: "질문을 다시 보내 주세요 (사진 4장, 파일 3개까지)" }, 400);
   // 위키 자료는 자르지 않는다 (제작자 2026-11-03 '무조건 다 봐', '없애': 1만 6천 자 한도를 뺐다)
@@ -209,21 +194,81 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
     apiKey: env.ANTHROPIC_API_KEY,
     ...(workspace ? { defaultHeaders: { "anthropic-workspace-id": workspace } } : {}),
   });
+  // Claude API 요청 (웹 찾기를 못 쓰는 계정이면 tools 를 뺀다)
+  const params = (web: boolean): Record<string, unknown> => ({
+    model: MODEL,
+    max_tokens: 32000, // 생각(요약)과 웹 찾기도 여기에 든다 (effort high 라 넉넉히)
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default", // 안전 필터가 거절하면 서버가 알맞은 다른 모델로 이어서 답한다
+    // 생각하는 동안 무엇을 하는지 화면에 보인다 (제작자 요청: 클로드처럼). 요약만 오고 답에는 섞이지 않는다
+    thinking: { type: "adaptive", display: "summarized" },
+    output_config: { effort: "high" }, // 제작자 요청 2026-11-02 '비용 신경 쓰지 말고 무조건 퀄리티' (전에는 medium)
+    system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
+    ...(web ? { tools: WEB_TOOLS } : {}),
+    messages: toMessages(turns, context, app, official),
+  });
+  const last = turns[turns.length - 1];
+
+  // 답 받기 일꾼 (server/chatRun.ts, 제작자 2026-11-05 '내가 웹 꺼도 되게 하랬지'): 화면을 닫아도 15분까지 끝까지 받아 대화에 넣는다.
+  // 일꾼이 없으면(배포 안 됨) 아래의 예전 길로 (화면이 끊긴 뒤 30초까지만)
+  let threadId = thread?.id ?? null;
+  let msgId: number | null = null;
+  let logged = false;
+  if (env.CHATRUN) {
+    logged = true;
+    try {
+      if (threadId === null) threadId = await newThread(env, me.id, titleOf(last.text));
+      if (!again) {
+        const attach = [...(last.images ?? []).map(() => "사진"), ...(last.files ?? []).map((f) => f.name)];
+        msgId = await addMsg(env, threadId, "user", last.text, { photos: last.images?.length ?? 0, attach: attach.length ? attach : null });
+      }
+    } catch (e) {
+      console.error("chat log failed", e);
+    }
+    if (threadId !== null && (again || msgId !== null)) {
+      const start: RunStart = {
+        meta: {
+          userId: me.id,
+          threadId,
+          question: last.text,
+          found: typeof body.found === "string" ? body.found.slice(0, 400) : "",
+          day,
+          developer: me.role === "developer",
+        },
+        params: params(true),
+        key: env.ANTHROPIC_API_KEY,
+        ...(workspace ? { workspace } : {}),
+        ...(env.CHAT_API_BASE ? { baseURL: env.CHAT_API_BASE } : {}),
+      };
+      try {
+        const res = await runStub(env.CHATRUN, threadId).fetch("https://chat-run/start", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(start),
+        });
+        if (res.ok && res.body) {
+          return new Response(res.body, {
+            headers: {
+              "content-type": "text/event-stream; charset=utf-8",
+              "cache-control": "no-store",
+              "x-chat-run": "1",
+              "x-chat-thread": String(threadId),
+              ...(msgId !== null ? { "x-chat-msg": String(msgId) } : {}),
+              ...(DAILY_LIMIT !== null ? { "x-chat-left": String(Math.max(0, DAILY_LIMIT - count)) } : {}),
+            },
+          });
+        }
+        console.error("chat run start failed", res.status);
+      } catch (e) {
+        console.error("chat run start failed", e);
+      }
+    }
+    // 일꾼을 못 부르면 예전 길로 (질문은 이미 넣었다)
+  }
+
   const ask = (web: boolean) =>
     client.beta.messages
-      .create({
-        model: MODEL,
-        max_tokens: 32000, // 생각(요약)과 웹 찾기도 여기에 든다 (effort high 라 넉넉히)
-        betas: ["server-side-fallback-2026-07-01"],
-        fallbacks: "default", // 안전 필터가 거절하면 서버가 알맞은 다른 모델로 이어서 답한다
-        // 생각하는 동안 무엇을 하는지 화면에 보인다 (제작자 요청: 클로드처럼). 요약만 오고 답에는 섞이지 않는다
-        thinking: { type: "adaptive", display: "summarized" },
-        output_config: { effort: "high" }, // 제작자 요청 2026-11-02 '비용 신경 쓰지 말고 무조건 퀄리티' (전에는 medium)
-        system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
-        ...(web ? { tools: WEB_TOOLS as unknown as Anthropic.Beta.BetaToolUnion[] } : {}),
-        messages: toMessages(turns, context, app, official),
-        stream: true,
-      })
+      .create({ ...params(web), stream: true } as unknown as Anthropic.Beta.Messages.MessageCreateParamsStreaming)
       .asResponse(); // 키, 한도 같은 오류는 답을 흘려보내기 전에 알 수 있다
   let upstream: Response;
   let web = true;
@@ -232,8 +277,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
       upstream = await ask(true);
     } catch (e) {
       // 웹 찾기를 쓸 수 없는 계정이면 (콘솔에서 꺼 둔 경우) 웹 없이 답한다
-      if (!(e instanceof Anthropic.BadRequestError || e instanceof Anthropic.PermissionDeniedError) || !/web_(search|fetch)|tool/i.test(String(e.message))) throw e;
-      console.error("chat without web", e.status, String(e.message).slice(0, 200));
+      if (!isWebOff(e)) throw e;
+      console.error("chat without web", String((e as Error).message).slice(0, 200));
       web = false;
       upstream = await ask(false);
     }
@@ -244,17 +289,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
   }
 
   // 대화 기록: 새 대화면 만들고, 질문을 넣는다 (다시 답하기는 질문이 이미 있다). 기록이 안 돼도 답은 간다
-  let threadId = thread?.id ?? null;
-  let msgId: number | null = null;
-  const last = turns[turns.length - 1];
-  try {
-    if (threadId === null) threadId = await newThread(env, me.id, titleOf(last.text));
-    if (!again) {
-      const attach = [...(last.images ?? []).map(() => "사진"), ...(last.files ?? []).map((f) => f.name)];
-      msgId = await addMsg(env, threadId, "user", last.text, { photos: last.images?.length ?? 0, attach: attach.length ? attach : null });
+  if (!logged) {
+    try {
+      if (threadId === null) threadId = await newThread(env, me.id, titleOf(last.text));
+      if (!again) {
+        const attach = [...(last.images ?? []).map(() => "사진"), ...(last.files ?? []).map((f) => f.name)];
+        msgId = await addMsg(env, threadId, "user", last.text, { photos: last.images?.length ?? 0, attach: attach.length ? attach : null });
+      }
+    } catch (e) {
+      console.error("chat log failed", e);
     }
-  } catch (e) {
-    console.error("chat log failed", e);
   }
 
   // 화면으로 하나, 뒤에서 마저 받아 둘 것 하나 (화면을 닫아도 답이 남게)

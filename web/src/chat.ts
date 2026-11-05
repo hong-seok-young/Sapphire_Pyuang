@@ -467,6 +467,12 @@ export interface ChatResult {
   aborted: boolean;
   /** 오늘 남은 질문 수 (서버가 알려 준 것) */
   left: number | null;
+  /** 서버의 답 받기 일꾼이 받는 답이면 true: 화면을 닫아도 일꾼이 끝까지 받아 대화에 넣는다 (화면은 넣지 않는다) */
+  durable: boolean;
+  /** 일꾼이 대화에 넣은 답의 번호 */
+  savedId: number | null;
+  /** 끝 신호(message_stop)까지 받았으면 true */
+  finished: boolean;
 }
 
 export interface AskEvents {
@@ -509,6 +515,10 @@ interface SseEvent {
     citation?: { url?: string; title?: string };
   };
   error?: { type?: string; message?: string };
+  /** 일꾼(server/chatRun.ts)이 만든 오류 줄이면 error.message 를 그대로 보인다 */
+  sapphire?: boolean;
+  /** sapphire_saved: 일꾼이 넣은 답 번호 */
+  id?: number;
 }
 
 const host = (url: string) => {
@@ -524,18 +534,18 @@ const host = (url: string) => {
  * 실패하면 길드원에게 보여 줄 글로 Error 를 던진다. 멈추기(signal)는 받은 데까지로 끝낸다
  */
 export async function askChat(
-  req: { turns: ChatTurn[]; context: string; thread: number | null; again?: boolean },
+  req: { turns: ChatTurn[]; context: string; thread: number | null; again?: boolean; found?: string },
   on: AskEvents,
   signal: AbortSignal,
 ): Promise<ChatResult> {
-  const result: ChatResult = { refused: false, cut: false, broken: false, paused: false, aborted: false, left: null };
+  const result = emptyResult();
   let res: Response;
   try {
     res = await fetch("/api/chat", {
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ messages: req.turns, context: req.context, thread: req.thread, again: req.again === true }),
+      body: JSON.stringify({ messages: req.turns, context: req.context, thread: req.thread, again: req.again === true, found: req.found ?? "" }),
       signal,
     });
   } catch {
@@ -548,11 +558,54 @@ export async function askChat(
   }
   const header = (h: string) => (res.headers.get(h) === null ? null : Number(res.headers.get(h)));
   result.left = header("x-chat-left");
+  result.durable = res.headers.get("x-chat-run") === "1";
   on.onStart({ thread: header("x-chat-thread"), msg: header("x-chat-msg") });
   // 이 계정에서 웹 찾기를 쓸 수 없으면 (콘솔에서 꺼 둔 경우) 숨기지 않고 알린다
   if (res.headers.get("x-chat-web") === "off") on.onStep({ kind: "search", text: "꺼짐 (위키 자료로만 답해요)" });
+  return readAnswer(res.body, on, signal, result);
+}
 
-  const reader = res.body.getReader();
+const emptyResult = (): ChatResult => ({
+  refused: false,
+  cut: false,
+  broken: false,
+  paused: false,
+  aborted: false,
+  left: null,
+  durable: false,
+  savedId: null,
+  finished: false,
+});
+
+/**
+ * 서버의 답 받기 일꾼(server/chatRun.ts)에 다시 붙는다 (화면이 끊겼다 돌아왔을 때, 대화를 다시 열었을 때): 처음부터 다시 받는다.
+ * 일꾼이 받는 답이 없으면 null (durable 이면 일꾼은 있다: 받을 것이 없다는 뜻)
+ */
+export async function watchChat(thread: number, on: AskEvents, signal: AbortSignal): Promise<ChatResult | { none: true; durable: boolean }> {
+  let res: Response;
+  try {
+    res = await fetch(`/api/chat/live?thread=${thread}`, { credentials: "same-origin", signal });
+  } catch {
+    if (signal.aborted) return { ...emptyResult(), aborted: true };
+    return { ...emptyResult(), broken: true, durable: true };
+  }
+  const durable = res.headers.get("x-chat-run") === "1";
+  if (res.status !== 200 || !res.body) return { none: true, durable };
+  return readAnswer(res.body, on, signal, { ...emptyResult(), durable: true });
+}
+
+/** 화면의 '중지': 서버의 일꾼도 받기를 멈춘다 */
+export const stopChat = (thread: number) =>
+  fetch("/api/chat/stop", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ thread }),
+  }).catch(() => null);
+
+/** Claude API 의 SSE (서버가 그대로 넘겨 준 것)를 읽어 생각과 답을 받는 대로 넘긴다 */
+async function readAnswer(body: ReadableStream<Uint8Array>, on: AskEvents, signal: AbortSignal, result: ChatResult): Promise<ChatResult> {
+  const reader = body.getReader();
   const dec = new TextDecoder();
   let buf = "";
   let finished = false;
@@ -618,7 +671,9 @@ export async function askChat(
           result.cut = ev.delta.stop_reason === "max_tokens";
           result.paused = ev.delta.stop_reason === "pause_turn";
         } else if (ev.type === "message_stop") finished = true;
-        else if (ev.type === "error") throw new StreamError(streamError(ev.error?.type));
+        else if (ev.type === "sapphire_saved" && typeof ev.id === "number") result.savedId = ev.id;
+        else if (ev.type === "sapphire_web_off") on.onStep({ kind: "search", text: "꺼짐 (위키 자료로만 답해요)" });
+        else if (ev.type === "error") throw new StreamError(ev.sapphire && ev.error?.message ? ev.error.message : streamError(ev.error?.type));
       }
       if (done) break;
     }
@@ -627,7 +682,7 @@ export async function askChat(
     if (e instanceof StreamError) throw e;
     return { ...result, broken: true };
   }
-  return { ...result, broken: !finished };
+  return { ...result, finished, broken: !finished };
 }
 
 // ---- 대화 기록 (서버 functions/api/chat/threads, 그 길드원만 본다)

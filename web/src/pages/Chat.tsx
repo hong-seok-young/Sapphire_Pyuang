@@ -6,6 +6,8 @@ import { JOB_NAME, errorText } from "../auth";
 import type { Me } from "../auth";
 import {
   askChat,
+  stopChat,
+  watchChat,
   deleteFrom,
   deleteThread,
   listThreads,
@@ -18,7 +20,7 @@ import {
   updateThread,
   wikiContext,
 } from "../chat";
-import type { ChatFile, ChatImage, ChatSource, ChatStep, ChatTurn, SavedMsg, Seen, ThreadSummary } from "../chat";
+import type { AskEvents, ChatFile, ChatImage, ChatResult, ChatSource, ChatStep, ChatTurn, SavedMsg, Seen, ThreadSummary } from "../chat";
 import { loadPosts, useAsync } from "../data";
 import { loadOdds } from "../odds";
 import { inFloat } from "../platform";
@@ -126,6 +128,19 @@ function toHistory(shown: Shown[]): ChatTurn[] {
   return out;
 }
 
+const sleep = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
+/** 화면이 보일 때까지 (다른 앱에 가 있으면 돌아올 때) */
+const whenVisible = () =>
+  new Promise<void>((done) => {
+    if (document.visibilityState === "visible") return done();
+    const on = () => {
+      if (document.visibilityState !== "visible") return;
+      document.removeEventListener("visibilitychange", on);
+      done();
+    };
+    document.addEventListener("visibilitychange", on);
+  });
+
 const secs = (ms: number | null | undefined) => Math.max(1, Math.round((ms ?? 0) / 1000));
 
 export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; query: URLSearchParams; me?: Me }) {
@@ -208,34 +223,46 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [redo, busy, loading, posts, postsError]);
 
-  // 새로 고치거나 닫았다 열면: 서버가 뒤에서 받아 두는 답을 기다리고 (3초마다, 45초까지), 그래도 없으면 다시 묻는다
+  // 새로 고치거나 닫았다 열면: 서버의 답 받기 일꾼이 받는 중이거나 방금 받은 답에 붙는다 (처음부터 다시 받는다).
+  // 일꾼에 받을 것이 없으면 예전처럼 서버가 뒤에서 받아 두는 답을 기다리고 (3초마다, 45초까지), 그래도 없으면 다시 묻는다
   useEffect(() => {
     if (!resume || threadId === null) return;
     setResume(false);
     const id = threadId;
     const run0 = ++runRef.current;
-    let tries = 0;
-    setTurns((t) => [...t, { role: "assistant", text: "", streaming: true, resuming: true }]);
-    setBusy(true);
-    const poll = async () => {
-      tries++;
-      const r = await loadThread(id).catch(() => null);
-      if (runRef.current !== run0) return;
-      const msgs = r?.msgs.map(fromSaved) ?? null;
-      if (msgs && msgs[msgs.length - 1]?.role === "assistant") {
-        setTurns(msgs);
+    const base = turns;
+    void (async () => {
+      let durable = false;
+      const got = await follow(run0, base, [], async (events, signal) => {
+        const w = await watchChat(id, events, signal);
+        if ("none" in w) durable = w.durable;
+        return w;
+      });
+      if (got === "done" || runRef.current !== run0) return;
+      let tries = 0;
+      setTurns([...base, { role: "assistant", text: "", streaming: true, resuming: true }]);
+      setBusy(true);
+      const poll = async () => {
+        tries++;
+        const r = await loadThread(id).catch(() => null);
+        if (runRef.current !== run0) return;
+        const msgs = r?.msgs.map(fromSaved) ?? null;
+        if (msgs && msgs[msgs.length - 1]?.role === "assistant") {
+          setTurns(msgs);
+          setBusy(false);
+          return;
+        }
+        // 일꾼이 있는데 받을 것이 없으면 답이 없는 것이라 바로 다시 묻는다
+        if (!durable && tries < 15) {
+          window.setTimeout(() => void poll(), 3000);
+          return;
+        }
         setBusy(false);
-        return;
-      }
-      if (tries < 15) {
-        window.setTimeout(() => void poll(), 3000);
-        return;
-      }
-      setBusy(false);
-      if (msgs?.length) void run(msgs, msgs[msgs.length - 1].text, true);
-    };
-    // 멈추는 것은 runRef 로 (setResume(false) 로 이 효과가 다시 돌 때 타이머를 지우면 안 된다)
-    window.setTimeout(() => void poll(), 1500);
+        if (msgs?.length) void run(msgs, msgs[msgs.length - 1].text, true);
+      };
+      // 멈추는 것은 runRef 로 (setResume(false) 로 이 효과가 다시 돌 때 타이머를 지우면 안 된다)
+      window.setTimeout(() => void poll(), durable ? 0 : 1500);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resume, threadId]);
   // 화면을 떠나면 기다리던 것과 받던 답을 화면에 넣지 않는다 (서버에는 저장된다)
@@ -316,6 +343,24 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
     const allPosts = posts ?? (await loadPosts().catch(() => undefined));
     if (!live()) return;
     const ctx = wikiContext(wiki, allPosts, question, asker, !!(lastUser?.images?.length || lastUser?.photos), odds, seen ?? undefined);
+    await follow(run, base, ctx.found, (events, signal) =>
+      askChat({ turns: toHistory(base), context: ctx.text, thread: threadRef.current, again: reuse && lastUser.id !== undefined, found: ctx.found.join(" · ") }, events, signal),
+    );
+  }
+
+  /**
+   * 답을 받아 그린다 (새로 묻기, 다시 열었을 때 서버의 일꾼에 다시 붙기).
+   * 서버의 답 받기 일꾼(server/chatRun.ts)이 받는 답이면 화면이 끊겨도(앱을 닫았다 열기, 다른 앱에 갔다 오기) 일꾼은 끝까지 받아 대화에 넣는다:
+   * 화면은 보이게 되면 일꾼에 다시 붙어 처음부터 다시 받는다 (제작자 2026-11-05 '답을 하다 끊냐?', '내가 웹 꺼도 되게 하랬지').
+   * 끊긴 반쪽 답은 대화에 넣지 않는다 (넣으면 다 된 답처럼 보였다). 일꾼에 받을 것이 없으면 'none' 을 돌려준다
+   */
+  async function follow(
+    run: number,
+    base: Shown[],
+    found: string[],
+    first: (events: AskEvents, signal: AbortSignal) => Promise<ChatResult | { none: true; durable: boolean }>,
+  ): Promise<"done" | "none"> {
+    const live = () => runRef.current === run;
     const startedAt = Date.now();
     let firstText: number | null = null;
     let text = "";
@@ -324,56 +369,84 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
     const sources: ChatSource[] = [];
     let thread = threadRef.current;
 
-    setTurns([...base, { role: "assistant", text: "", thinking: "", found: ctx.found, streaming: true }]);
+    setTurns([...base, { role: "assistant", text: "", thinking: "", found: found.length ? found : undefined, streaming: true }]);
     setBusy(true);
     setThinkStart(startedAt);
     stickRef.current = true;
     const update = (fn: (last: Shown) => Shown) => live() && setTurns((t) => [...t.slice(0, -1), fn(t[t.length - 1])]);
+    const events: AskEvents = {
+      onStart: (info) => {
+        if (info.thread !== null && thread === null) {
+          thread = info.thread;
+          if (live()) {
+            threadRef.current = info.thread;
+            setThreadId(info.thread);
+            const q = base[base.length - 1]?.text ?? "";
+            setTitle(q.replace(/\s+/g, " ").slice(0, 40) || "사진 질문");
+            go(`#/chat/${info.thread}`, true);
+          }
+        }
+        if (info.msg !== null && live()) setTurns((t) => t.map((x, i) => (i === t.length - 2 ? { ...x, id: info.msg! } : x)));
+      },
+      onThinking: (piece) => {
+        thinking += piece;
+        update((last) => ({ ...last, thinking }));
+      },
+      onText: (piece) => {
+        if (firstText === null && piece.trim()) {
+          firstText = Date.now();
+          if (live()) setThinkStart(null);
+        }
+        text += piece;
+        update((last) => ({ ...last, text, thinkMs: (firstText ?? Date.now()) - startedAt }));
+      },
+      onStep: (step) => {
+        // 웹 찾기 결과 수는 앞 검색 줄에 붙인다
+        const prev = steps[steps.length - 1];
+        if (step.kind === "search" && step.text.startsWith("결과 ") && prev?.kind === "search") prev.text += ` · ${step.text}`;
+        else steps.push(step);
+        update((last) => ({ ...last, steps: [...steps] }));
+      },
+      onSource: (src) => {
+        if (sources.some((s) => s.url === src.url)) return;
+        sources.push(src);
+        update((last) => ({ ...last, sources: [...sources] }));
+      },
+    };
+    /** 일꾼에 다시 붙으면 처음부터 다시 오므로 받은 것을 비운다 */
+    const reset = () => {
+      text = "";
+      thinking = "";
+      steps.length = 0;
+      sources.length = 0;
+      update((last) => ({ ...last, text: "", thinking: "", steps: [], sources: [], streaming: true }));
+    };
     const ctrl = new AbortController();
     ctrlRef.current = ctrl;
     try {
-      const r = await askChat(
-        { turns: toHistory(base), context: ctx.text, thread, again: reuse && lastUser.id !== undefined },
-        {
-          onStart: (info) => {
-            if (info.thread !== null && thread === null) {
-              thread = info.thread;
-              if (live()) {
-                threadRef.current = info.thread;
-                setThreadId(info.thread);
-                setTitle(question.replace(/\s+/g, " ").slice(0, 40) || "사진 질문");
-                go(`#/chat/${info.thread}`, true);
-              }
-            }
-            if (info.msg !== null && live()) setTurns((t) => t.map((x, i) => (i === t.length - 2 ? { ...x, id: info.msg! } : x)));
-          },
-          onThinking: (piece) => {
-            thinking += piece;
-            update((last) => ({ ...last, thinking }));
-          },
-          onText: (piece) => {
-            if (firstText === null && piece.trim()) {
-              firstText = Date.now();
-              if (live()) setThinkStart(null);
-            }
-            text += piece;
-            update((last) => ({ ...last, text, thinkMs: (firstText ?? Date.now()) - startedAt }));
-          },
-          onStep: (step) => {
-            // 웹 찾기 결과 수는 앞 검색 줄에 붙인다
-            const prev = steps[steps.length - 1];
-            if (step.kind === "search" && step.text.startsWith("결과 ") && prev?.kind === "search") prev.text += ` · ${step.text}`;
-            else steps.push(step);
-            update((last) => ({ ...last, steps: [...steps] }));
-          },
-          onSource: (src) => {
-            if (sources.some((s) => s.url === src.url)) return;
-            sources.push(src);
-            update((last) => ({ ...last, sources: [...sources] }));
-          },
-        },
-        ctrl.signal,
-      );
+      const got = await first(events, ctrl.signal);
+      if ("none" in got) return "none";
+      let r = got;
+      // 일꾼이 받는 답이 끊겼으면: 화면이 보일 때 다시 붙는다 (처음엔 바로, 그 뒤로 조금씩 늦게, 몇 분까지)
+      for (let tries = 0; r.durable && r.broken && !r.aborted && thread !== null && live() && tries < 40; tries++) {
+        await whenVisible();
+        if (tries) await sleep(Math.min(8000, 1000 * tries));
+        if (!live() || ctrl.signal.aborted) break;
+        reset();
+        const w = await watchChat(thread, events, ctrl.signal);
+        if ("none" in w) {
+          // 일꾼에 받을 것이 없다: 일꾼이 이미 넣은 답이 있으면 그것을 보인다
+          const saved = await loadThread(thread).catch(() => null);
+          const msgs = saved?.msgs.map(fromSaved);
+          if (live() && msgs?.length && msgs[msgs.length - 1].role === "assistant") {
+            setTurns(msgs);
+            return "done";
+          }
+          r = { ...r, broken: true, durable: false };
+          break;
+        }
+        r = { ...w, left: r.left };
+      }
       if (r.left !== null) setLeft(r.left);
       const thinkMs = (firstText ?? Date.now()) - startedAt;
       let note: string | undefined;
@@ -385,12 +458,16 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
       else if (r.paused) note = "웹을 오래 찾아서 여기까지 답했어요";
       else if (r.broken) note = "답이 중간에 끊겼어요";
       update((last) => ({ ...last, text, thinkMs, note, streaming: false }));
-      if (thread !== null && text.trim()) {
+      if (r.savedId !== null) {
+        const id = r.savedId;
+        update((last) => ({ ...last, id }));
+      } else if (thread !== null && text.trim() && !r.broken) {
+        // 일꾼 없이 받은 답, 중지한 답(일꾼은 넣지 않는다), 일꾼이 못 넣은 답은 화면이 넣는다. 끊긴 반쪽 답은 넣지 않는다
         const saved = await saveAnswer(thread, {
           text,
           thinking,
           thinkMs,
-          found: ctx.found.join(" · "),
+          found: found.join(" · "),
           steps: steps.length ? JSON.stringify(steps.slice(0, 20)) : "",
           sources: sources.length ? JSON.stringify(sources.slice(0, 20)) : "",
         }).catch(() => null);
@@ -405,6 +482,7 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
       }
       if (ctrlRef.current === ctrl) ctrlRef.current = null;
     }
+    return "done";
   }
 
   // 답 속 추천 질문 단추가 부르는 묻기: 늘 같은 함수라 끝난 답은 다시 그리지 않는다 (ChatAnswer 는 memo)
@@ -453,6 +531,8 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
 
   function stop() {
     if (ctrlRef.current) {
+      // 서버의 답 받기 일꾼도 멈춘다 (멈추지 않으면 끝까지 받아 대화에 넣는다)
+      if (threadRef.current !== null) void stopChat(threadRef.current);
       ctrlRef.current.abort();
       return;
     }

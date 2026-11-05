@@ -1347,9 +1347,21 @@
   웹 없이 답하고 '웹 찾기 꺼짐'을 보인다 (`x-chat-web: off`).
 - 첨부 📎: 사진 4장(줄여서), PDF(3MB), 글 파일(txt, csv, json 등 20만 자) 3개. 내용은 저장하지 않고 이름만 (`chat_msgs.attach`).
   첨부가 큰 질문은 사용 기록에 크기만 적는다 (큰 본문을 두 번 풀면 CPU 한도).
-- 닫거나 새로 고쳐도 (제작자 요청): 서버가 같은 답을 뒤에서 끝까지 받아 두고(`finishInBackground`, SSE 를 tee), 화면이 답을 넣지 못했으면
-  넣고 '답변 완료' 알림(`chat_done`)을 보낸다. 다시 열면 답 없는 최근 질문(15분)은 3초마다 기다리다(45초) 없으면 다시 묻는다.
-  플랫폼이 끊긴 뒤 30초쯤만 기다려 줘서 그보다 긴 답은 다시 묻게 된다.
+- **앱을 꺼도 답은 끝까지** (제작자 2026-11-05 '답을 하다 끊냐?', '내가 웹 꺼도 되게 하랬지'): 답은 화면이 아니라 서버의 **답 받기 일꾼**이 받는다
+  (`server/chatRun.ts` 의 Durable Object `ChatRun`, 따로 배포하는 Worker `web/runner` = `sapphire-chat-runner`, 사이트는 `CHATRUN` 바인딩으로 부른다).
+  Pages Functions 는 화면 연결이 끊기면 30초만 더 일해서, 길게 생각하는 답은 앱을 닫거나 다른 앱(게임)에 가면 사라졌다. 일꾼은 대화마다 하나(`thread:<번호>`),
+  `/start` 가 맡긴 요청을 **알람** 안에서 부른다 (알람은 부른 쪽 연결과 상관없이 15분까지, 무료 요금제 Durable Object 는 SQLite 저장소만, CPU 30초).
+  받은 SSE 를 모아 두고 보고 있는 화면에 흘려보내며, 다 받으면 일꾼이 답을 대화에 넣고(생각, 걸린 시간, 찾은 자료, 웹 찾기, 출처, [[모름]] 기록까지)
+  `sapphire_saved` 줄로 번호를 알린다. 그때 보고 있는 화면이 없으면 '답변 완료' 알림(`chat_done`, 폰 알림까지). 실패하면 '답을 만들다 끊겼어요' 알림.
+  - 화면(`src/chat.ts` `askChat`·`watchChat`, `Chat.tsx` `follow`): 연결이 끊기면(인터넷, 다른 앱) 화면이 보일 때 `/api/chat/live?thread=` 로 일꾼에 다시 붙어
+    처음부터 다시 받는다 (조금씩 늦게 40번까지). 대화를 다시 열 때도(답 없는 최근 질문, 15분) 먼저 일꾼에 붙고, 일꾼에 받을 것이 없으면 바로 다시 묻는다.
+  - 화면의 '중지'는 `/api/chat/stop` 으로 일꾼도 멈춘다 (받은 데까지는 화면이 넣는다). 같은 대화에 새로 물으면 앞의 것을 멈춘다.
+  - **끊긴 반쪽 답은 대화에 넣지 않는다** (예전에는 넣어서 다시 열면 다 된 답처럼 보였다, 제작자 스샷 '…노비스 / 비'에서 끊김).
+  - 일꾼이 없으면(배포 실패) 예전 길: 서버가 같은 답을 뒤에서 받아 두고(`finishInBackground`, SSE 를 tee) 화면이 끊긴 뒤 30초까지만 넣는다.
+  - 자동 배포가 일꾼을 사이트보다 먼저 `wrangler deploy` 하고 됐으면 사이트 wrangler.toml 에 바인딩을 붙인다 (`deploy-web.yml` 'Chat runner').
+    Cloudflare API 토큰에 **Account > Workers Scripts > Edit** 권한이 있어야 한다. 일꾼 코드를 고치면 `server/chatRun.ts` (API 키는 사이트가 요청마다 넘겨서 일꾼에 비밀값이 없다).
+  - 로컬 시험: `scratchpad chatrun/mock.cjs`(가짜 Claude API, SSE 를 20초 동안 천천히) + `runner` 에서 `wrangler dev --port 8790` + `wrangler pages dev ... --do CHATRUN=ChatRun@sapphire-chat-runner
+    --binding ANTHROPIC_API_KEY=test CHAT_API_BASE=http://127.0.0.1:8799` (같은 `--persist-to`), `chatrun/ui.cjs`(인터넷 3초 끊기, 닫고 다시 열기).
 - 챗봇 화면은 `#/chat`, `#/chat/번호`, `#/chat/list` 가 한 화면이다 (`App.tsx` 의 `main` key 가 'chat'). 바꾸면 새 대화가 번호를 받을 때 화면이 지워진다.
 - 모르는 질문 (제작자 요청: 보고 고친 뒤 물은 사람에게 알리기): 길잡이는 짐작했거나 자료가 없으면 답 끝에 `[[모름:무엇이 없는지]]` 를 쓰고
   (화면은 '개발자에게 알렸어요' 한 줄로만), 길드원은 답에 '👎 별로'를 누를 수 있다. 둘 다 D1 `chat_gaps` 에 남고 앱개발자에게 알림
