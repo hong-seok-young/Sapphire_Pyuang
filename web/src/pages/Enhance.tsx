@@ -674,8 +674,6 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
   const [listAt, setListAt] = useState<"a" | "b" | null | undefined>(undefined);
   const firstEmpty = !pa.w ? "a" : !pb.w ? "b" : null;
   const list = listAt === undefined ? firstEmpty : listAt;
-  // 초안: 목록이 어느 칸을 채우는지 보이기 (?g=1~5, 고르면 하나만 남긴다)
-  const [guide] = useState(() => query.get("g"));
   const after = (row: "a" | "b", p: Pick, other: Pick) => {
     if (!p.w) return;
     if (!jobPick || p.w.job !== job) setJob(p.w.job);
@@ -735,7 +733,7 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
         <Loading error={error?.includes("404") ? "강화 자료가 아직 없어요" : error} />
       ) : (
         <div className="enh">
-          <section className={"enh-card enh-picks" + (guide ? ` enh-g${guide}` + (list ? ` enh-on-${list}` : "") : "")}>
+          <section className="enh-card enh-picks">
             <div className="mk-sub enh-jobs" role="tablist">
               {JOBS.map((j) => (
                 <button key={j} type="button" role="tab" aria-selected={job === j} className={"sub-tab" + (job === j ? " sub-tab-on" : "")} onClick={() => pickJob(j)}>
