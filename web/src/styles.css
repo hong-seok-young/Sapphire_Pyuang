@@ -2858,6 +2858,20 @@ button.gd-member-row { cursor: pointer; }
 .enh-table tbody th { font-weight: 500; color: var(--muted); }
 .enh-table tr.enh-on { background: rgba(255, 196, 92, 0.1); }
 .enh-table tr.enh-cross td, .enh-table tr.enh-cross th { border-top: 2px solid var(--gold); }
+.enh-sim-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 13px; margin-bottom: 4px; }
+.enh-sim-head .muted { font-size: 12px; }
+.enh-sim-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; }
+.enh-sim-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto 50px; align-items: center; gap: 6px; padding: 4px 6px; min-height: 32px;
+  text-align: left; font-size: 13px; background: var(--lo); border: 0; border-left: 3px solid transparent; color: inherit; }
+.enh-sim-row:disabled { opacity: 1; cursor: default; }
+.enh-sim-me { border-left-color: var(--sapphire); background: rgba(80, 120, 255, 0.12); }
+.enh-sim-on { border-left-color: var(--gold); background: rgba(255, 196, 92, 0.1); }
+.enh-sim-pic { display: flex; align-items: center; justify-content: center; height: 24px; }
+.enh-sim-name { min-width: 0; line-height: 1.3; }
+.enh-sim-name small { font-size: 11px; color: var(--muted); margin-left: 2px; white-space: nowrap; }
+.enh-sim-avg { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.enh-sim-pct { font-size: 12px; text-align: right; white-space: nowrap; }
+.enh-sim-me .enh-sim-pct { color: var(--sapphire); font-weight: 700; }
 
 /* ---------------------------------------------------------------- 확률 시뮬레이터 (개발중, pages/Simulator.tsx)
    결과마다 한 번만 도는 움직임 (transform · opacity). 성공은 금빛 고리와 튀는 조각, 실패(그대로)는 흔들림과 파란 막, 파괴는 둘로 갈라져 떨어진다 */
