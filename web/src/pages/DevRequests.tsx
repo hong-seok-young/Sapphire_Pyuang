@@ -81,6 +81,7 @@ export function DevRequestsPage({ me, query }: { me: Me; query: URLSearchParams 
 
         {writing ? (
           <RequestForm
+            meId={me.id}
             title="개발 요청하기"
             submit="신청"
             onCancel={() => setWriting(false)}
@@ -155,12 +156,15 @@ export function DevRequestsPage({ me, query }: { me: Me; query: URLSearchParams 
 
 /** 새 요청과 고치기 (반려된 요청은 고쳐서 다시 신청) */
 function RequestForm({
+  meId,
   title,
   submit,
   init,
   onSave,
   onCancel,
 }: {
+  /** 신청한 사람 (특정 인원의 '나도 포함') */
+  meId: string;
   title: string;
   submit: string;
   init?: { body: string; scope: Scope; people: string[] };
@@ -203,9 +207,9 @@ function RequestForm({
           </button>
         ))}
       </div>
-      {/* 제작자 2026-11-05 '정말 개인 용도도 가능, 그 버튼이 나한테만 뜨게 할 수도 있음' (누가 보는지는 안내에 넣지 않는다, 요청은 모두가 본다) */}
-      <p className="dr-scope-tip">개인 용도도 가능해요 · 예: 그 버튼이 나에게만 보이게</p>
-      {scope === "some" && <PeoplePick value={people} onChange={setPeople} />}
+      {/* 제작자 2026-11-05 '정말 개인 용도도 가능, 그 버튼이 나한테만 뜨게 할 수도 있음' -> '나를 선택했을 때만' (누가 보는지는 안내에 넣지 않는다, 요청은 모두가 본다) */}
+      {scope === "me" && <p className="dr-scope-tip">개인 용도도 가능해요 · 예: 그 버튼이 나에게만 보이게</p>}
+      {scope === "some" && <PeoplePick me={meId} value={people} onChange={setPeople} />}
       {err && <p className="dr-err">{err}</p>}
       <div className="dr-form-btns">
         <button type="button" className="btn dr-btn" onClick={onCancel} disabled={busy}>
@@ -221,7 +225,9 @@ function RequestForm({
 }
 
 /** 특정 인원 고르기: 닉네임 찾기 + 고른 사람 칩 */
-function PeoplePick({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+/** 특정 인원 고르기: 한 줄에 '나도 포함' 체크와 닉네임 찾기 (제작자 2026-11-05 '특정 인원 누르면 나도 포함인지 체크하게, 되도록 한 행에').
+ *  나도 포함이면 people 에 신청한 사람 아이디가 들어간다 (고른 사람 칩에는 나를 빼고 보인다) */
+function PeoplePick({ me, value, onChange }: { me: string; value: string[]; onChange: (v: string[]) => void }) {
   const [all, setAll] = useState<string[] | null>(null);
   const [q, setQ] = useState("");
   useEffect(() => {
@@ -229,19 +235,32 @@ function PeoplePick({ value, onChange }: { value: string[]; onChange: (v: string
       .then((r) => setAll(r.people.map((p) => p.id)))
       .catch(() => setAll([]));
   }, []);
-  const hits = q.trim() && all ? all.filter((id) => id.includes(q.trim()) && !value.includes(id)).slice(0, 8) : [];
+  const hits = q.trim() && all ? all.filter((id) => id !== me && id.includes(q.trim()) && !value.includes(id)).slice(0, 8) : [];
+  const withMe = value.includes(me);
+  const others = value.filter((id) => id !== me);
   return (
     <div className="dr-people">
-      {value.length > 0 && (
+      {others.length > 0 && (
         <div className="dr-chips">
-          {value.map((id) => (
+          {others.map((id) => (
             <button key={id} type="button" className="dr-chip dr-pop" onClick={() => onChange(value.filter((x) => x !== id))}>
               {id} ✕
             </button>
           ))}
         </div>
       )}
-      <input className="dr-find" value={q} onChange={(e) => setQ(e.target.value)} placeholder={all ? "닉네임 찾기" : "불러오는 중"} />
+      <div className="dr-pick-row">
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={withMe}
+          className={"dr-me" + (withMe ? " dr-me-on" : "")}
+          onClick={() => onChange(withMe ? others : [me, ...others].slice(0, 30))}
+        >
+          <span className="dr-me-box" />나도 포함
+        </button>
+        <input className="dr-find" value={q} onChange={(e) => setQ(e.target.value)} placeholder={all ? "닉네임 찾기" : "불러오는 중"} />
+      </div>
       {hits.length > 0 && (
         <div className="dr-chips">
           {hits.map((id) => (
@@ -413,6 +432,7 @@ function ReqCard({
 
           {editing ? (
             <RequestForm
+              meId={r.user_id}
               title={r.status === "rejected" ? "고쳐서 다시 신청" : "요청 고치기"}
               submit={r.status === "rejected" ? "다시 신청" : "저장"}
               init={{ body: r.body, scope: r.scope, people: r.people }}
