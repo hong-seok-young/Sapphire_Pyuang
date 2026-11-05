@@ -99,7 +99,9 @@ function NickButton({ open, onToggle, ...nick }: { id: string; high?: boolean; c
   );
 }
 
-function Row({ r, me, now, open, onToggle, onMe }: { r: Ranked; me: Me; now: number; open: boolean; onToggle: () => void; onMe?: (p: Partial<Me>) => void }) {
+function Row({ r, me, now, open, onToggle, onMe, onSaved }: {
+  r: Ranked; me: Me; now: number; open: boolean; onToggle: () => void; onMe?: (p: Partial<Me>) => void; onSaved?: () => void;
+}) {
   const up = recentUp(r, now);
   return (
     <li className={"rank-row" + (r.rank <= 3 ? " rank-top-" + r.rank : "") + (r.id === me.id ? " rank-mine" : "")}>
@@ -112,7 +114,7 @@ function Row({ r, me, now, open, onToggle, onMe }: { r: Ranked; me: Me; now: num
         <FitLine className="rank-sub" text={`${guildText(r.guild)} · ${JOB_NAME[r.job]}`} wrap={false} />
         {/* 닉네임은 10글자까지: 넘치면 글자를 줄여서 한 줄에 다 보인다 (자르지 않는다) */}
         <NickButton className="rank-nick" id={r.id} high={r.highSpec} open={open} onToggle={onToggle} />
-        <ExpBar r={r} mine={r.id === me.id} onMe={onMe} />
+        <ExpBar r={r} mine={r.id === me.id} onMe={onMe} onSaved={onSaved} />
       </span>
       {/* 레벨업 표시 자리는 늘 비워 두어서 표시가 떠도 닉네임이 밀리지 않는다 */}
       <span className="rank-up-slot">
@@ -128,9 +130,10 @@ function Row({ r, me, now, open, onToggle, onMe }: { r: Ranked; me: Me; now: num
 
 /**
  * 닉네임 아래 경험치 막대 (0~100%, 제작자 요청). 안 적었으면 막대 없이 '경험치 입력 안 했어요'.
- * 내 줄이면 눌러서 랭킹 화면에서 바로 적는다 (직업, 레벨, 길드는 그대로 두고 경험치만 저장)
+ * 내 줄이면 눌러서 랭킹 화면에서 바로 적는다 (직업, 레벨, 길드는 그대로 두고 경험치만 저장).
+ * 저장하면 목록을 다시 받는다 (onSaved): 이번 주 '+N%' 는 서버가 셈해서, 안 받으면 저장 전 값이 남았다 (2026-11-05 제작자 '50% 했는데 왜 우측에 안 뜸')
  */
-function ExpBar({ r, mine, onMe }: { r: Ranked; mine: boolean; onMe?: (p: Partial<Me>) => void }) {
+function ExpBar({ r, mine, onMe, onSaved }: { r: Ranked; mine: boolean; onMe?: (p: Partial<Me>) => void; onSaved?: () => void }) {
   const [exp, setExp] = useState<number | null>(r.exp ?? null);
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(r.exp != null ? (r.exp / 1000).toFixed(3) : "");
@@ -155,6 +158,7 @@ function ExpBar({ r, mine, onMe }: { r: Ranked; mine: boolean; onMe?: (p: Partia
       setAsking(false);
       setExp(value);
       setEditing(false);
+      onSaved?.();
     } catch (x) {
       setError(errorText(x));
     } finally {
@@ -209,8 +213,10 @@ function ExpBar({ r, mine, onMe }: { r: Ranked; mine: boolean; onMe?: (p: Partia
 }
 
 /** 레벨 랭킹: 게임의 경험치 랭킹 목록처럼 (메달, 엠블럼, 맨 아래 '내순위'). 길드(통합/1군/2군)와 직업으로 거른다 */
-function LevelRanking({ me, data, guild, onGuild, onMe }: {
+function LevelRanking({ me, data, guild, onGuild, onMe, onSaved, saved }: {
   me: Me; data: RankEntry[]; guild: GuildFilter; onGuild: (g: GuildFilter) => void; onMe?: (p: Partial<Me>) => void;
+  /** 내 경험치를 저장했을 때 (목록 다시 받기), saved 는 저장한 횟수 (펼친 그래프도 다시 받는다) */
+  onSaved?: () => void; saved?: number;
 }) {
   const [filter, setFilter] = useEntryState<Job | "all">("job", "all");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -284,10 +290,10 @@ function LevelRanking({ me, data, guild, onGuild, onMe }: {
         <ul className="rank-list">
           {list.map((r) => (
             <Fragment key={r.id}>
-              <Row r={r} me={me} now={now} open={openId === r.id} onToggle={() => setOpenId(openId === r.id ? null : r.id)} onMe={onMe} />
+              <Row r={r} me={me} now={now} open={openId === r.id} onToggle={() => setOpenId(openId === r.id ? null : r.id)} onMe={onMe} onSaved={onSaved} />
               {openId === r.id && (
                 <li className="rank-chart">
-                  <GrowthChart id={r.id} />
+                  <GrowthChart key={saved} id={r.id} />
                 </li>
               )}
             </Fragment>
@@ -424,7 +430,9 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
  */
 
 export function RankingPage({ me, onMe }: { me: Me; onMe?: (p: Partial<Me>) => void }) {
-  const { data, error } = useAsync(useCallback(() => fetchRanking(), []), "ranking");
+  const [saved, setSaved] = useState(0);
+  // saved 가 바뀌면 다시 받는다 (그동안은 받아 둔 목록 그대로)
+  const { data, error } = useAsync(useCallback(() => fetchRanking(), [saved]), "ranking");
   const [view, setView] = useEntryState<View>("view", "level");
   const [guild, setGuild] = useEntryState<GuildFilter>("guild", "all");
   return (
@@ -446,7 +454,7 @@ export function RankingPage({ me, onMe }: { me: Me; onMe?: (p: Partial<Me>) => v
       {view !== "level" ? (
         <GrowthRanking me={me} period={view} guild={guild} onGuild={setGuild} />
       ) : data ? (
-        <LevelRanking me={me} data={data} guild={guild} onGuild={setGuild} onMe={onMe} />
+        <LevelRanking me={me} data={data} guild={guild} onGuild={setGuild} onMe={onMe} onSaved={() => setSaved((n) => n + 1)} saved={saved} />
       ) : (
         <Loading error={error} />
       )}
