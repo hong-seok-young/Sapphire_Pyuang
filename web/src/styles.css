@@ -2917,16 +2917,27 @@ button.gd-member-row { cursor: pointer; }
 .enh-sim-pct { font-size: 12px; text-align: right; white-space: nowrap; }
 .enh-sim-me .enh-sim-pct { color: var(--sapphire); font-weight: 700; }
 .enh-ch { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); }
-/* 처음 한 번 끌기 안내 (제작자 2026-11-05 '드래그 해 보라고 유도, 한 번만'): 점선 금색 선이 그래프 칸 위를 좌우로 오가고 가운데 '좌우로 끌어 보세요'.
-   누르는 데 걸리지 않는다 (그 아래 그래프를 그대로 끈다). 움직임은 transform 만 */
-.enh-ch-hint { position: absolute; top: 0; bottom: 0; left: 103px; right: 0; z-index: 3; overflow: hidden; pointer-events: none; }
-.enh-ch-hint-sweep { position: absolute; inset: 0; animation: enh-hint-sweep 1.6s ease-in-out infinite alternate; }
+/* 처음 한 번 끌기 안내 (제작자 2026-11-05 '그래프 전체를 반짝반짝, 맨 위에 멘트, 손을 대면 없어지고 다음부터 안 뜨게'):
+   그래프 둘레가 금빛으로 깜박이고, 빛 띠가 지나가고, 별이 여기저기 반짝이고, 점선 금색 선이 좌우로 오간다. 누르는 데 걸리지 않는다. 움직임은 transform·opacity 만 */
+.enh-ch-tip { margin: 0 0 4px; padding: 3px 6px; font-size: 11px; font-weight: 700; color: #1b1530; background: var(--gold); border: 2px solid #000; box-shadow: 2px 2px 0 #000; animation: enh-tip-bob 1.2s ease-in-out infinite alternate; }
+.enh-ch-tip b { display: inline-block; font-size: 9px; animation: enh-tip-arrows 0.8s ease-in-out infinite alternate; }
+.enh-ch-hint { position: absolute; inset: -3px; z-index: 3; overflow: hidden; pointer-events: none; }
+.enh-ch-hint-glow { position: absolute; inset: 0; border: 3px solid var(--gold); box-shadow: inset 0 0 12px rgba(255, 210, 90, 0.55); animation: enh-glow 0.9s ease-in-out infinite alternate; }
+.enh-ch-hint-shine { position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: linear-gradient(100deg, transparent, rgba(255, 230, 150, 0.22), transparent); animation: enh-shine-run 2.2s linear infinite; }
+.enh-ch-hint-sweep { position: absolute; top: 0; bottom: 0; left: 103px; right: 0; animation: enh-hint-sweep 1.6s ease-in-out infinite alternate; }
 .enh-ch-hint-sweep i { position: absolute; top: 0; bottom: 0; left: 0; border-left: 2px dashed var(--gold); }
-.enh-ch-hint-tag { position: absolute; top: 42%; left: 50%; margin-left: -66px; width: 132px; padding: 3px 0; text-align: center; font-size: 11px; font-weight: 700; color: #1b1530; background: var(--gold); border: 2px solid #000; box-shadow: 2px 2px 0 #000; white-space: nowrap; animation: enh-hint-nudge 1.6s ease-in-out infinite alternate; }
-.enh-ch-hint-tag b { font-size: 9px; }
+.enh-ch-spark { position: absolute; width: 4px; height: 4px; margin: -2px 0 0 -2px; background: #fff; box-shadow: 0 -4px 0 #ffe9a0, 0 4px 0 #ffe9a0, -4px 0 0 #ffe9a0, 4px 0 0 #ffe9a0; opacity: 0; animation: enh-twinkle 1.7s ease-in-out infinite; }
 @keyframes enh-hint-sweep { from { transform: translateX(8%); } to { transform: translateX(92%); } }
-@keyframes enh-hint-nudge { from { transform: translateX(-6px); } to { transform: translateX(6px); } }
-@media (prefers-reduced-motion: reduce) { .enh-ch-hint-sweep, .enh-ch-hint-tag { animation: none; } .enh-ch-hint-sweep { transform: translateX(50%); } }
+@keyframes enh-glow { from { opacity: 0.3; } to { opacity: 1; } }
+@keyframes enh-shine-run { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+@keyframes enh-twinkle { 0%, 100% { opacity: 0; transform: scale(0.4); } 45% { opacity: 1; transform: scale(1.1); } 60% { opacity: 0.8; transform: scale(0.9); } }
+@keyframes enh-tip-bob { from { transform: translateY(0); } to { transform: translateY(-2px); } }
+@keyframes enh-tip-arrows { from { transform: scaleX(0.8); } to { transform: scaleX(1.25); } }
+@media (prefers-reduced-motion: reduce) {
+  .enh-ch-tip, .enh-ch-tip b, .enh-ch-hint-glow, .enh-ch-hint-shine, .enh-ch-hint-sweep, .enh-ch-spark { animation: none; }
+  .enh-ch-hint-shine, .enh-ch-spark { display: none; }
+  .enh-ch-hint-sweep { transform: translateX(50%); }
+}
 /* 기준 칸 한 줄: 흰 테두리(그래프의 흰 기준선과 같은 색)로 눈에 띄게, 높이는 단추 한 줄 */
 .enh-ch-base { display: flex; align-items: center; gap: 6px; margin: 0 0 5px; font-size: 11px; color: var(--muted); }
 .enh-ch-title { flex: none; font-size: 13px; color: var(--text); white-space: nowrap; }
