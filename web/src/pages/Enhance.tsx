@@ -242,7 +242,7 @@ function WeaponList({ d, side, pick, job, open, onPick }: { d: Enhance; side: "a
 
 /** 결과 (제작자 2026-11-05 '+32.2 라인까지는 괜찮은데' -> '최소·최대는 텍스트로만 하지 말고 꾸며 봐, 대신 콤팩트하게' ->
  *  '막대 좌우 길이 줄이고 최소 몇 퍼 최대 몇 퍼를 막대 좌우에, 평균도 막대 안으로'):
- *  왼쪽 큰 %, 오른쪽은 [최소 %] 두 무기의 데미지 범위 막대(지금 파랑, 바꿀 금색, 같은 눈금, 막대 안 숫자가 평균) [최대 %] */
+ *  왼쪽 큰 % (공격력 중앙값), 오른쪽은 [최소 %] 두 무기의 데미지 범위 막대(지금 파랑, 바꿀 금색, 같은 눈금, 흰 금과 그 옆 숫자가 중앙값) [최대 %] */
 function Result({ d, a, b }: { d: Enhance; a: Pick; b: Pick }) {
   // 막대 칸의 실제 폭: 채운 칸이 평균 숫자보다 좁으면 숫자를 막대 바깥(끝 옆)에 둔다
   const box = useRef<HTMLDivElement>(null);
@@ -271,8 +271,12 @@ function Result({ d, a, b }: { d: Enhance; a: Pick; b: Pick }) {
   return (
     <section className="enh-card enh-result">
       <div className="enh-res">
-        <div className={"enh-big" + tone(p)}>
-          <Pop value={pctText(p)}>{pctText(p)}</Pop>
+        {/* 큰 % 는 공격력 중앙값(최소와 최대의 가운데)이 몇 % 바뀌는지 (제작자 2026-11-05 '맨 왼쪽 퍼센트가 무엇인지, 공격력 중앙값이라고') */}
+        <div className="enh-res-mid">
+          <small>공격력 중앙값</small>
+          <div className={"enh-big" + tone(p)}>
+            <Pop value={pctText(p)}>{pctText(p)}</Pop>
+          </div>
         </div>
         <div className="enh-res-range">
           <div className="enh-res-end">
@@ -286,25 +290,20 @@ function Result({ d, a, b }: { d: Enhance; a: Pick; b: Pick }) {
               { s: x, side: "a" },
               { s: y, side: "b" },
             ].map(({ s, side }) => {
-              // 평균은 막대 안에 (평균 자리가 가운데). 채운 칸이 숫자보다 좁으면 막대 끝 바로 옆에 밝은 글자로
+              // 중앙값 눈금(흰 금)과 그 옆 숫자 (제작자 2026-11-05 '평균 막대는 넣어 주고 거기에 수치는 적어 주고'):
+              // 숫자는 눈금 바로 오른쪽, 막대 칸 끝을 넘으면 눈금 왼쪽. 채운 칸을 벗어나면 테두리 있는 밝은 글자로
               const text = fmt(s.avg);
-              const need = text.length * 6 + 6;
-              const fillPx = ((at(s.max) - at(s.min)) / 100) * tw;
-              const inside = tw === 0 || fillPx >= need;
-              const roomRight = ((100 - at(s.max)) / 100) * tw >= need;
-              const half = need / 2;
-              const mid = (at(s.avg) / 100) * tw;
-              const center = Math.max((at(s.min) / 100) * tw + half, Math.min((at(s.max) / 100) * tw - half, mid));
-              const style = inside
-                ? { left: tw ? `${center}px` : `${at(s.avg)}%` }
-                : roomRight
-                  ? { left: `calc(${at(s.max)}% + 3px)`, transform: "none" }
-                  : { left: `calc(${at(s.min)}% - 3px)`, transform: "translateX(-100%)" };
+              const need = text.length * 5.5 + 2;
+              const avgPx = (at(s.avg) / 100) * tw;
+              const leftPx = !tw ? 0 : avgPx + 3 + need <= tw ? avgPx + 3 : avgPx - 3 - need >= 0 ? avgPx - 3 - need : Math.max(0, tw - need);
+              const inside = tw === 0 || (leftPx >= (at(s.min) / 100) * tw && leftPx + need <= (at(s.max) / 100) * tw);
+              const style = tw ? { left: `${leftPx}px` } : { left: `calc(${at(s.avg)}% + 3px)` };
               return (
                 <div key={side} className={"enh-rbar enh-rbar-" + side}>
                   <span className="enh-rbar-n">{fmt(s.min)}</span>
                   <span className="enh-rbar-track">
                     <i className="enh-rbar-fill" style={{ left: `${at(s.min)}%`, width: `${at(s.max) - at(s.min)}%` }} />
+                    <i className="enh-rbar-avg" style={{ left: `${at(s.avg)}%` }} />
                     <em className={"enh-rbar-val" + (inside ? "" : " enh-rbar-val-out")} style={style}>
                       <Pop value={text}>{text}</Pop>
                     </em>
@@ -411,9 +410,12 @@ const nearest = (vals: number[], v: number) => vals.reduce((k, x, i) => (Math.ab
 /** 그래프 점 크기 (styles.css .enh-ch-dot 과 같게) */
 const DOT = 14;
 
-function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; job: string; a: Pick; b: Pick; onPick: (w: EnhanceWeapon, plus: number) => void }) {
+/** 기준선 = 지금 무기 (제작자 2026-11-05 '왼쪽 무기를 그래프에서도 기준으로, 수직선을 옮기면 기준도 바뀌게, 맨 위 버튼·비슷한 무기·그래프 3개가 같이 연동'):
+ *  선을 끌거나 ◀ ▶ 로 옮기면 지금 무기(맨 위 왼쪽 칸)가 그 점의 무기·강화로 바뀌고, 비슷한 무기와 결과도 따라 바뀐다 */
+function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
+  d: Enhance; wiki: Wiki; job: string; a: Pick; b: Pick; onPick: (w: EnhanceWeapon, plus: number) => void; onBase: (w: EnhanceWeapon, plus: number) => void;
+}) {
   const [open, setOpen] = useState<string | null>(null);
-  const [ref, setRef] = useState<{ v: number; label: string } | null>(null);
   const drag = useRef<{ x0: number; moved: boolean } | null>(null);
   const [dragging, setDragging] = useState(false);
   // 그래프 칸의 실제 폭: 점이 붙어 겹치는 줄은 점을 좁히고 숫자를 뺀다 (낮은 레벨 무기는 +6 ~ +10 이 몇 px 안에 모인다)
@@ -444,23 +446,23 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
     return lo + Math.max(0, Math.min(1, (clientX - r.left) / (r.width || 1))) * (hi - lo);
   };
   // 기준선은 점(강화마다의 평균) 위로만 (제작자 2026-11-05 '버튼들 기준으로 한 칸씩, 그 버튼들 위로만 움직이게'): 끌면 가장 가까운 점으로, ◀ ▶ 는 한 칸씩
-  const pts = rows.flatMap((r) => r.vals.map((v, i) => ({ v, label: `+${CHART_PLUS[i]} ${r.w.name}` }))).sort((p, q) => p.v - q.v);
+  const pts = rows
+    .flatMap((r) => r.vals.map((v, i) => ({ v, w: r.w, plus: CHART_PLUS[i], label: `+${CHART_PLUS[i]} ${r.w.name}` })))
+    .sort((p, q) => p.v - q.v);
   const snap = (v: number) => pts.reduce((best, p) => (Math.abs(p.v - v) < Math.abs(best.v - v) ? p : best), pts[0]);
-  const base = ref?.v ?? now;
+  const base = now;
+  const nowLabel = a.w ? `+${a.plus} ${a.w.name}` : "";
+  const here = pts.findIndex((p) => p.label === nowLabel);
   const stepRef = (dir: 1 | -1) => {
     let j: number;
-    const at = ref ? pts.findIndex((p) => p.label === ref.label) : -1;
-    if (at >= 0) j = at + dir;
-    else {
-      const v = base ?? pts[0].v;
-      j = dir > 0 ? pts.findIndex((p) => p.v > v + 1e-9) : pts.map((p) => p.v < v - 1e-9).lastIndexOf(true);
-    }
+    if (here >= 0) j = here + dir;
+    else if (base === null) j = dir > 0 ? 0 : pts.length - 1;
+    else j = dir > 0 ? pts.findIndex((p) => p.v > base + 1e-9) : pts.map((p) => p.v < base - 1e-9).lastIndexOf(true);
     if (j < 0 || j >= pts.length) return;
-    setRef({ v: pts[j].v, label: pts[j].label });
+    onBase(pts[j].w, pts[j].plus);
   };
-  const firstRef = ref ? pts.findIndex((p) => p.label === ref.label) === 0 : base !== null && !pts.some((p) => p.v < base - 1e-9);
-  const lastRef = ref ? pts.findIndex((p) => p.label === ref.label) === pts.length - 1 : base !== null && !pts.some((p) => p.v > base + 1e-9);
-  const nowLabel = a.w ? `+${a.plus} ${a.w.name}` : "";
+  const firstRef = here >= 0 ? here === 0 : base !== null && !pts.some((p) => p.v < base - 1e-9);
+  const lastRef = here >= 0 ? here === pts.length - 1 : base !== null && !pts.some((p) => p.v > base + 1e-9);
   return (
     <section className="enh-card enh-chart">
       <div className="enh-sim-head">
@@ -472,17 +474,12 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
             ◀
           </button>
           <span className="enh-ch-basetext">
-            <i className={ref ? "enh-ch-key-ref" : "enh-ch-key-now"} />
-            기준 {ref ? ref.label : `지금 ${nowLabel}`} <b>{fmt(base)}</b>
+            <i className="enh-ch-key-now" />
+            기준 {nowLabel} <b>{fmt(base)}</b>
           </span>
           <button type="button" className="pill enh-nav" onClick={() => stepRef(1)} disabled={lastRef} aria-label="기준선 한 칸 오른쪽">
             ▶
           </button>
-          {ref && (
-            <button type="button" className="pill enh-ch-reset" onClick={() => setRef(null)}>
-              {now !== null ? "지금으로" : "지우기"}
-            </button>
-          )}
         </div>
       )}
       <div ref={box} className={"enh-ch" + (dragging ? " enh-ch-dragging" : "")}>
@@ -520,7 +517,7 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
                     if (!g.moved) setDragging(true);
                     g.moved = true;
                     const pt = snap(valueAt(e.currentTarget, e.clientX));
-                    if (ref?.label !== pt.label) setRef({ v: pt.v, label: pt.label });
+                    if (nowLabel !== pt.label) onBase(pt.w, pt.plus);
                   }}
                   onPointerUp={(e) => {
                     const g = drag.current;
@@ -529,7 +526,7 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
                     if (!g || g.moved) return;
                     // 톡 누름: 이 줄에서 가장 가까운 강화 점에 기준선
                     const i = nearest(r.vals, valueAt(e.currentTarget, e.clientX));
-                    setRef({ v: r.vals[i], label: `+${CHART_PLUS[i]} ${r.w.name}` });
+                    if (nowLabel !== `+${CHART_PLUS[i]} ${r.w.name}`) onBase(r.w, CHART_PLUS[i]);
                   }}
                   onPointerCancel={() => {
                     drag.current = null;
@@ -539,8 +536,7 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
                   {ticks.map((t) => (
                     <i key={t} className="enh-ch-grid" style={{ left: `${x(t)}%` }} />
                   ))}
-                  {now !== null && <i className={"enh-ch-now" + (ref ? " enh-ch-now-dim" : "")} style={{ left: `${x(now)}%` }} />}
-                  {ref && <i className="enh-ch-ref" style={{ left: `${x(ref.v)}%` }} />}
+                  {now !== null && <i className="enh-ch-now" style={{ left: `${x(now)}%` }} />}
                   <i className="enh-ch-bar" style={{ left: `${x(r.vals[0])}%`, width: `${x(r.vals[4]) - x(r.vals[0])}%` }} />
                   {r.vals.map((v, i) => {
                     const p = CHART_PLUS[i];
@@ -672,6 +668,12 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
       document.querySelector(".enh-result")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }, 60);
   };
+  // 그래프 기준선을 옮기면 지금 무기를 그 점으로 (목록을 열거나 직업을 바꾸지 않는다)
+  const setBase = (w: EnhanceWeapon, plus: number) => {
+    const p = { q: w.name, w, plus };
+    setA(p);
+    keepInUrl(p, pb);
+  };
   const [spin, setSpin] = useState(0);
   const swap = () => {
     setSpin((n) => n + 1);
@@ -718,7 +720,7 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
           </section>
           <Result d={d} a={pa} b={pb} />
           <Similar d={d} wiki={wiki} a={pa} b={pb} onPick={pickSimilar} />
-          <PowerChart key={job} d={d} wiki={wiki} job={job} a={pa} b={pb} onPick={pickSimilar} />
+          <PowerChart key={job} d={d} wiki={wiki} job={job} a={pa} b={pb} onPick={pickSimilar} onBase={setBase} />
         </div>
       )}
     </>
