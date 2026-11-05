@@ -9,7 +9,10 @@
 // 직업 무기 그래프 (제작자 2026-11-05 '직업별 모든 무기 6강부터 10강을 차트 그래프로 한방 정리'): 맨 위 직업 칸의 무기 전부, 무기마다 한 줄(+8 이 약한 것부터),
 // 가로는 평균 데미지, 네모 점은 +6 → +10 (한 색의 진하기: 강할수록 밝게, 색은 dataviz 검사기로 이 앱 판 바탕 #262150 에서 통과), 지금 무기는 흰 세로선.
 // 줄을 누르면 그 아래 강화마다 평균과 지금 대비 %, 누르면 바꿀 무기로.
+// 움직임 (제작자 2026-11-05 '계속 보고 있거나 클릭했을 때의 애니메이션, 화면 전환 때 뜨는 건 빠르게 하려고 안 함'): 바뀐 값(%, +N, 평균)은 톡 튀고(`Pop`),
+// ⇄ 는 돌고, 지금 선·'지금' 글자·빈 무기 칸은 숨 쉬듯 깜박이고, 기준선과 지금 선은 새 자리로 미끄러진다(끄는 동안은 손가락을 바로 따라감).
 import { Fragment, useCallback, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import type { Me } from "../auth";
 import { loadEnhance, useAsync } from "../data";
 import type { Enhance, EnhanceWeapon } from "../data";
@@ -80,12 +83,28 @@ interface Pick {
   w: EnhanceWeapon | null;
   plus: number;
 }
+const EMPTY: Pick = { q: "", w: null, plus: 0 };
 
 function initial(d: Enhance | undefined, text: string | null): Pick {
   const p: Pick = { q: text ?? "", w: null, plus: 0 };
   if (!d || !text) return p;
   const { plus, w } = readText(d, text);
   return { q: w ? w.name : text, w, plus: w ? Math.min(plus ?? 0, maxPlus(d, w)) : plus ?? 0 };
+}
+
+/** 값이 바뀌면 톡 튀게 (제작자 2026-11-05 '계속 보고 있거나 클릭했을 때의 애니메이션'). 처음 그릴 때는 그대로 둔다: 화면이 뜰 때 움직임은 없다 */
+function Pop({ value, off = false, className, children }: { value: string | number; off?: boolean; className?: string; children: ReactNode }) {
+  const last = useRef(value);
+  const n = useRef(0);
+  if (last.current !== value) {
+    last.current = value;
+    if (!off) n.current += 1;
+  }
+  return (
+    <span key={n.current} className={(className ?? "") + (n.current > 0 ? " enh-pop" : "")}>
+      {children}
+    </span>
+  );
 }
 
 /** 적은 글로 찾는 중인지 (고른 무기 이름 그대로면 찾는 중이 아니다) */
@@ -163,7 +182,9 @@ function WeaponCard({ d, wiki, side, hint, pick, onPick, open, onOpen }: {
               <button type="button" className="pill" onClick={() => step(-1)} disabled={pick.plus <= 0} aria-label="강화 내리기">
                 −
               </button>
-              <b>+{pick.plus}</b>
+              <b>
+                <Pop value={pick.plus}>+{pick.plus}</Pop>
+              </b>
               <button type="button" className="pill" onClick={() => step(1)} disabled={pick.plus >= top} aria-label="강화 올리기">
                 +
               </button>
@@ -225,10 +246,12 @@ function Result({ d, a, b }: { d: Enhance; a: Pick; b: Pick }) {
   return (
     <section className="enh-card enh-result">
       <div className="enh-head">
-        <div className={"enh-big" + tone(p)}>{pctText(p)}</div>
+        <div className={"enh-big" + tone(p)}>
+          <Pop value={pctText(p)}>{pctText(p)}</Pop>
+        </div>
         <div className="enh-headside">
           <div>
-            평균 {fmt(x.avg)} → <b>{fmt(y.avg)}</b>
+            평균 {fmt(x.avg)} → <Pop value={fmt(y.avg)}><b>{fmt(y.avg)}</b></Pop>
           </div>
           <div className="muted">
             최소 {fmt(x.min)} → {fmt(y.min)} <span className={tone(pct(x.min, y.min))}>{pctText(pct(x.min, y.min))}</span>
@@ -325,6 +348,7 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
   const [open, setOpen] = useState<string | null>(null);
   const [ref, setRef] = useState<{ v: number; label: string | null } | null>(null);
   const drag = useRef<{ x0: number; moved: boolean } | null>(null);
+  const [dragging, setDragging] = useState(false);
   const rows = jobWeapons(d, job)
     .filter((w) => maxPlus(d, w) >= CHART_PLUS[CHART_PLUS.length - 1])
     .map((w) => ({ w, vals: CHART_PLUS.map((p) => damage(d, w, p).avg) }))
@@ -365,7 +389,7 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
           )}
         </div>
       )}
-      <div className="enh-ch">
+      <div className={"enh-ch" + (dragging ? " enh-ch-dragging" : "")}>
         {rows.map((r) => {
           const isA = a.w?.name === r.w.name;
           const isB = b.w?.name === r.w.name;
@@ -398,12 +422,14 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
                     const g = drag.current;
                     if (!g) return;
                     if (!g.moved && Math.abs(e.clientX - g.x0) < 6) return;
+                    if (!g.moved) setDragging(true);
                     g.moved = true;
                     setRef({ v: valueAt(e.currentTarget, e.clientX), label: null });
                   }}
                   onPointerUp={(e) => {
                     const g = drag.current;
                     drag.current = null;
+                    setDragging(false);
                     if (!g || g.moved) return;
                     // 톡 누름: 이 줄에서 가장 가까운 강화 점에 기준선
                     const i = nearest(r.vals, valueAt(e.currentTarget, e.clientX));
@@ -411,6 +437,7 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
                   }}
                   onPointerCancel={() => {
                     drag.current = null;
+                    setDragging(false);
                   }}
                 >
                   {ticks.map((t) => (
@@ -434,10 +461,10 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
                 </div>
                 <span className={"enh-ch-pct" + (self ? "" : tone(diff))}>
                   {k >= 0 && (
-                    <>
+                    <Pop value={`${kp}${self ? "s" : pctText(diff)}`} off={dragging}>
                       <small>+{kp}</small>
                       {self ? (ref ? "기준" : "지금") : pctText(diff)}
-                    </>
+                    </Pop>
                   )}
                 </span>
               </div>
@@ -492,28 +519,34 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
   const [a, setA] = useState<Pick | null>(null);
   const [b, setB] = useState<Pick | null>(null);
   const pa = a ?? initial(d, query.get("a"));
-  const pb = b ?? initial(d, query.get("b"));
+  // 다른 직업끼리는 견주지 않는다 (제작자 2026-11-05 '타 직업군끼리 ㄴㄴ, 직업 넘어가면 무기 입력한 거 초기화'): 주소의 두 무기 직업이 다르면 바꿀 무기는 비운다
+  const pb0 = b ?? initial(d, query.get("b"));
+  const pb = pa.w && pb0.w && pa.w.job !== pb0.w.job ? EMPTY : pb0;
   const [jobPick, setJob] = useState<string | null>(null);
   const job = jobPick ?? pa.w?.job ?? (me.job ? JOB_OF[me.job] : null) ?? "전사";
   // 목록을 펼칠 줄: 처음은 비어 있는 첫 줄, 줄을 누르면 그 줄, 고르면 다음 빈 줄 (둘 다 차면 닫힘)
   const [listAt, setListAt] = useState<"a" | "b" | null | undefined>(undefined);
   const firstEmpty = !pa.w ? "a" : !pb.w ? "b" : null;
   const list = listAt === undefined ? firstEmpty : listAt;
-  const after = (row: "a" | "b", p: Pick) => {
+  const after = (row: "a" | "b", p: Pick, other: Pick) => {
     if (!p.w) return;
     if (!jobPick || p.w.job !== job) setJob(p.w.job);
-    const other = row === "a" ? pb : pa;
     setListAt(other.w ? null : row === "a" ? "b" : "a");
   };
+  // 다른 직업 무기를 고르면 (적어서 찾은 것) 반대쪽 칸을 비운다
   const pickA = (p: Pick) => {
+    const other = p.w && pb.w && p.w.job !== pb.w.job ? EMPTY : pb;
     setA(p);
-    keepInUrl(p, pb);
-    if (p.w && p.w !== pa.w) after("a", p);
+    if (other !== pb) setB(EMPTY);
+    keepInUrl(p, other);
+    if (p.w && p.w !== pa.w) after("a", p, other);
   };
   const pickB = (p: Pick) => {
+    const other = p.w && pa.w && p.w.job !== pa.w.job ? EMPTY : pa;
     setB(p);
-    keepInUrl(pa, p);
-    if (p.w && p.w !== pb.w) after("b", p);
+    if (other !== pa) setA(EMPTY);
+    keepInUrl(other, p);
+    if (p.w && p.w !== pb.w) after("b", p, other);
   };
   // 비슷한 무기를 누르면 바꿀 무기로 넣고 결과 칸을 보인다
   const pickSimilar = (w: EnhanceWeapon, plus: number) => {
@@ -522,14 +555,24 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
       document.querySelector(".enh-result")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }, 60);
   };
+  const [spin, setSpin] = useState(0);
   const swap = () => {
+    setSpin((n) => n + 1);
     setA(pb);
     setB(pa);
     keepInUrl(pb, pa);
   };
+  // 직업을 바꾸면 두 무기 칸을 비우고 지금 무기 칸부터 그 직업 무기 목록
   const pickJob = (j: string) => {
     setJob(j);
-    setListAt(list ?? firstEmpty ?? "a");
+    if (j === job) {
+      setListAt(list ?? firstEmpty ?? "a");
+      return;
+    }
+    setA(EMPTY);
+    setB(EMPTY);
+    keepInUrl(EMPTY, EMPTY);
+    setListAt("a");
   };
   return (
     <>
@@ -548,7 +591,7 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
             </div>
             <div className="enh-duo">
               <WeaponCard d={d} wiki={wiki} side="a" hint="지금 무기" pick={pa} onPick={pickA} open={list === "a"} onOpen={() => setListAt("a")} />
-              <button type="button" className="enh-swap" onClick={swap} aria-label="좌우 바꾸기">
+              <button key={spin} type="button" className={"enh-swap" + (spin ? " enh-swap-spin" : "")} onClick={swap} aria-label="좌우 바꾸기">
                 ⇄
               </button>
               <WeaponCard d={d} wiki={wiki} side="b" hint="바꿀 무기" pick={pb} onPick={pickB} open={list === "b"} onOpen={() => setListAt("b")} />
