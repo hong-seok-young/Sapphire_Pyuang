@@ -4,6 +4,8 @@
 // 화면: 무기마다 한 줄(그림 · 이름 칸 · − +N +), 결과(평균 % 차이, 최소·최대, 같은 데미지가 되는 강화), 톡방 시세(시세 동향 자료),
 // 바꿀 무기 강화별 표(+N 마다 지금 무기 대비 %, 같은 강화끼리는 견주지 않는다: 제작자 2026-11-04 '그래프는 뭐고 같은 강화끼리 비교하면 뭐해').
 // 맨 위 직업 칸을 고르면 그 직업 무기 목록(레벨 순)이 비어 있는 줄 아래에 뜨고, 무기를 고르면 ◀ ▶ 로 그 직업의 이전·다음 무기 (제작자 2026-11-04).
+// 비슷한 무기 (제작자 2026-11-05 '보통 무기를 7·8강 쓰거든, 해당 무기와 파워가 비슷한 무기 리스트들도 알아서 뽑아줘' -> '7 8 9 10 으로'): 지금 무기와 평균 데미지가 가까운
+// 같은 직업 다른 무기의 +7 ~ +10 을 8개, 약한 것부터 지금 무기와 함께 한 줄씩. 누르면 바꿀 무기로.
 import { useCallback, useMemo, useState } from "react";
 import type { Me } from "../auth";
 import { loadEnhance, loadTrend, useAsync } from "../data";
@@ -282,6 +284,56 @@ function Result({ d, t, a, b }: { d: Enhance; t?: Trend; a: Pick; b: Pick }) {
   );
 }
 
+/** 사람들이 보통 쓰는 강화 (비슷한 무기 목록은 이 강화만) */
+const USUAL = [7, 8, 9, 10];
+const SIMILAR_N = 8;
+
+/** 지금 무기와 평균 데미지가 가까운 같은 직업 다른 무기의 +7 ~ +10, 약한 것부터 (지금 무기도 그 자리에) */
+function Similar({ d, wiki, a, b, onPick }: { d: Enhance; wiki: Wiki; a: Pick; b: Pick; onPick: (w: EnhanceWeapon, plus: number) => void }) {
+  if (!a.w) return null;
+  const A = a.w;
+  const base = damage(d, A, a.plus).avg;
+  if (!(base > 0)) return null;
+  const near = jobWeapons(d, A.job)
+    .filter((w) => w.name !== A.name)
+    .flatMap((w) => USUAL.filter((p) => p <= maxPlus(d, w)).map((plus) => ({ w, plus, avg: damage(d, w, plus).avg, me: false })))
+    .sort((x, y) => Math.abs(Math.log(x.avg / base)) - Math.abs(Math.log(y.avg / base)))
+    .slice(0, SIMILAR_N);
+  if (near.length === 0) return null;
+  const rows = [...near, { w: A, plus: a.plus, avg: base, me: true }].sort((x, y) => x.avg - y.avg || Number(y.me) - Number(x.me));
+  return (
+    <section className="enh-card enh-sim">
+      <div className="enh-sim-head">
+        <b>비슷한 무기</b>
+        <span className="muted">+7 ~ +10</span>
+      </div>
+      <div className="enh-sim-list">
+        {rows.map((r) => {
+          const pic = (wiki.items[r.w.name] ?? wiki.items[key(r.w.name)])?.icon;
+          const p = pct(base, r.avg);
+          const on = !r.me && b.w?.name === r.w.name && b.plus === r.plus;
+          return (
+            <button
+              key={r.w.name + r.plus + (r.me ? "-me" : "")}
+              type="button"
+              className={"enh-sim-row" + (r.me ? " enh-sim-me" : "") + (on ? " enh-sim-on" : "")}
+              disabled={r.me}
+              onClick={() => onPick(r.w, r.plus)}
+            >
+              <span className="enh-sim-pic">{pic ? <PicImg pic={pic} max={22} /> : null}</span>
+              <span className="enh-sim-name">
+                +{r.plus} {r.w.name} <small>Lv.{r.w.lv ?? "?"}</small>
+              </span>
+              <span className="enh-sim-avg">{fmt(r.avg)}</span>
+              <span className={"enh-sim-pct" + (r.me ? "" : tone(p))}>{r.me ? "지금" : pctText(p)}</span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 /** 고른 두 무기를 주소에 남겨 링크로 보낼 수 있게 (기록 칸을 늘리지 않는다) */
 function keepInUrl(a: Pick, b: Pick) {
   const enc = (p: Pick) => (p.w ? encodeURIComponent(`${p.plus}${p.w.name}`) : "");
@@ -319,6 +371,13 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
     keepInUrl(pa, p);
     if (p.w && p.w !== pb.w) after("b", p);
   };
+  // 비슷한 무기를 누르면 바꿀 무기로 넣고 결과 칸을 보인다
+  const pickSimilar = (w: EnhanceWeapon, plus: number) => {
+    pickB({ q: `+${plus} ${w.name}`, w, plus });
+    window.setTimeout(() => {
+      document.querySelector(".enh-result")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }, 60);
+  };
   const swap = () => {
     setA(pb);
     setB(pa);
@@ -350,6 +409,7 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
             <WeaponRow d={d} wiki={wiki} side="b" hint="바꿀 무기" pick={pb} onPick={pickB} job={job} list={list === "b"} onFocus={() => setListAt("b")} />
           </section>
           <Result d={d} t={t} a={pa} b={pb} />
+          <Similar d={d} wiki={wiki} a={pa} b={pb} onPick={pickSimilar} />
         </div>
       )}
     </>
