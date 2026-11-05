@@ -75,7 +75,7 @@ export const ITEMS: LaunchItem[] = [
   // 홈에서는 '개발 중' 묶음 안에 확률 시뮬레이터와 똑같은 칸, 오른쪽 위 표만 '테스트' (제작자 2026-11-04 '개발 중으로 넣고 이름이랑 아이콘 다 똑같이, 오른쪽 위에 테스트라고만')
   { key: "simtest", title: "확률 시뮬레이터", short: "확률", to: "#/simtest", icon: "🎰", developer: true, soon: true, badge: "테스트", match: ["simtest"] },
   // 개발 요청 (개발중, 제작자 요청 2026-11-05 '개발 중 버튼 하나 더, 개발자한테 자유롭게 신청, 결재선'): src/pages/DevRequests.tsx
-  { key: "devreq", title: "개발 요청", short: "요청", to: "#/devreq", icon: "📮", match: ["devreq"] },
+  { key: "devreq", title: "개발 요청", short: "요청", to: "#/devreq", icon: "📮", soon: true, badge: "개발중", match: ["devreq"] },
   { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
   // 장비대여 (2026-11-02 제작자 요청으로 열었다), 길드던전과 인던 같이 갈 사람 찾기 (칸만 먼저 두고 개발 중으로 막는다)
   // 오른쪽 위에 담당자 (제작자 요청 2026-11-03 '장비대여 담당자는 멍멍, 버튼 우측 상단에 텍스트로만 관리자 줄바꿈 멍멍'. 담당이 바뀌면 server/rental.ts RENT_STAFF 와 같이 고친다)

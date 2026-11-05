@@ -12,11 +12,6 @@ export interface Patch {
 
 export const PATCHES: Patch[] = [
   {
-    version: "1.4",
-    date: "11.05",
-    items: ["개발 요청 기능 추가"],
-  },
-  {
     version: "1.3",
     date: "11.05",
     items: [
