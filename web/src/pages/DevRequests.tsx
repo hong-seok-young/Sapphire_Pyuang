@@ -13,6 +13,8 @@ import type { DevReq, DevRole, DevStep, DevTalk, Scope, Status } from "../devreq
 
 /** 앱개발자 (결재란의 개발자 검토·개발 착수 칸에 미리 적는다) */
 const DEVELOPER = "퓨앙";
+/** 길마 결재 칸 아래 미리 적는 이름 (제작자 2026-11-05 '길마 결재 아래에는 마을모금함 닉네임'). 길드마스터가 바뀌면 고친다 */
+const GUILD_MASTER = "마을모금함";
 
 const BOARD = "이 개발자는 무료로 해 줍니다 ★ 필요한 기능을 자유롭게 신청하세요 ★ 개발 가능 → 합의 → 길마 결재 → 개발 ★ 반려돼도 고쳐서 다시 신청할 수 있어요";
 
@@ -299,7 +301,7 @@ function ApprovalLine({ r }: { r: DevReq }) {
     { key: "sub", label: "신청", step: sub, wait: false },
     { key: "feas", label: "개발자 검토", step: by("feasible")[0], wait: r.status === "review", pre: DEVELOPER },
     { key: "agree", label: "오피서 합의", step: agrees[agrees.length - 1], count: agrees.length, wait: r.status === "agree" && agrees.length === 0 },
-    { key: "appr", label: "길마 결재", step: approve, wait: r.status === "agree" && agrees.length > 0 },
+    { key: "appr", label: "길마 결재", step: approve, wait: r.status === "agree" && agrees.length > 0, pre: GUILD_MASTER },
     {
       key: "start",
       label: "개발 착수",
