@@ -1,15 +1,15 @@
-// 개발 요청 (제작자 요청 2026-11-05, 같은 날 길드원 전체에게 열었다: 모든 요청과 결재 단계·의견을 모두가 본다): 길드원이 필요한 기능을 앱개발자에게 자유롭게 신청한다 (이 개발자는 무료로 해 준다).
+// 개발 요청 (개발중, 제작자 요청 2026-11-05. 같은 날 열었다가 '아직 개발 중으로 내려'로 다시 닫았다. 열면 모든 요청과 결재 단계·의견을 모두가 본다): 길드원이 필요한 기능을 앱개발자에게 자유롭게 신청한다 (이 개발자는 무료로 해 준다).
 // - 범위: me(나) | some(특정 인원) | all(길드 전체). 내용은 글 하나.
 // - 결재선: 신청 -> 앱개발자 '개발 가능'(review -> agree) -> 오피서 합의 1명 이상 -> 길드마스터 최종 결재(agree -> dev) -> 앱개발자 '개발 완료'(dev -> done).
 //   합의·결재에는 앱개발자에게 '이렇게 만들어 달라'는 결재 의견을 단다. 어느 단계에서든 반려(의견 필수)하면 rejected,
 //   신청한 사람이 반려 의견을 보고 고쳐서 다시 신청하면 review 로 돌아가고 round 가 1 오른다 (앞 차례 이력은 남는다).
 // - 앱개발자는 검토·완료만 한다 (합의·결재는 오피서·길드마스터). 자기 요청에는 합의하지 않는다.
-// - 열기 전에는 미리 보는 사람만이었다 (server/simcoin.ts canSim). DEVREQ_OPEN 을 끄면 다시 그렇게 된다
+// - 열기 전에는 미리 보는 사람만 (server/simcoin.ts canSim: 오피서 이상, 달팽이, 간다이, 테스트 계정)
 import type { Env, User } from "./auth";
 import { notify } from "./alerts";
 import { canSim } from "./simcoin";
 
-export const DEVREQ_OPEN = true;
+export const DEVREQ_OPEN = false;
 export const canUseDevReq = (me: User) => DEVREQ_OPEN || canSim(me);
 
 export type Scope = "me" | "some" | "all";

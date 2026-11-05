@@ -229,6 +229,21 @@ runSql([
   console.log(`챗봇 개선 완료(밀가루 질문) ${n}건`);
 }
 
+// 개발 요청을 열었다가 다시 개발 중으로 내렸다 (제작자 2026-11-05 '아직 개발중으로 내려'): 그때 모두에게 간 새 기능 알림(app_news, #/devreq)을 지운다.
+// 예전 코드가 아직 돌고 있어도 다시 보내지 않게 그 알림의 setup 키(app_news_devreq_20261105)를 먼저 적는다. 폰에 이미 뜬 알림은 거둘 수 없다. 실행 기록에는 개수만
+{
+  const KEY = "app_news_devreq_undo_20261105";
+  const now = Date.now();
+  runSql([`INSERT OR IGNORE INTO setup (key, done_at) VALUES ('app_news_devreq_20261105', ${now});`]);
+  const NOT_DONE = `NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}')`;
+  const n = queryFirst(`SELECT COUNT(*) AS n FROM alerts WHERE kind = 'app_news' AND link = '#/devreq' AND ${NOT_DONE}`)?.n ?? 0;
+  runSql([
+    `DELETE FROM alerts WHERE kind = 'app_news' AND link = '#/devreq' AND ${NOT_DONE};`,
+    `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+  ]);
+  console.log(`개발 요청 새 기능 알림 지움 ${n}건`);
+}
+
 // 길드 던전 시간표 '확정'을 모두 푼다 (제작자 2026-11-04 '확정이 다 풀리게 해 주고 다시 확정하라고 안내'): 파티원 카드가 '입력 전 / 확정'으로 바뀌면서
 // 확정을 서버(gd_avail.confirmed_at)에 적게 됐는데, 그전에 누른 확정은 폰에만 남아 있었다. 파티에 든 사람에게 다시 확정하라는 알림(gdungeon, 끈 사람 빼고).
 // 폰 알림(푸시)은 서버가 아니라서 안 간다. setup 'gd_confirm_reset_20261104' 로 한 번만, 실행 기록에는 개수만
