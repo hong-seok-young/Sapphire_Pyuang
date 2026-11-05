@@ -1169,6 +1169,9 @@ button { font: inherit; color: inherit; }
 }
 @keyframes update-pop { 0%, 70%, 100% { transform: scale(1); } 80% { transform: scale(1.12); } 90% { transform: scale(0.98); } }
 @media (prefers-reduced-motion: reduce) { .tile-update { animation: none; } }
+/* 새로 연 메뉴 (updates.ts MENU_NEW, 제작자 요청 2026-11-05 'new 뱃지 하루 동안'): UPDATE 와 같은 자리에 분홍빛 'NEW', 테두리도 같은 빛 */
+.tile-fresh { border-color: #ff6f91; box-shadow: inset var(--px) var(--px) 0 rgba(255, 111, 145, 0.45), inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--lo), 0 0 6px rgba(255, 111, 145, 0.6); }
+.tile-fresh-tag { color: #fff; background: #ff4f7b; }
 /* narrow phones: the '1군 전용' ribbon and 'UPDATE' share the top of one tile, so both get a little smaller */
 @media (max-width: 350px) {
   .tile-new .tile-ribbon { padding: 0 3px; font-size: 9px; }

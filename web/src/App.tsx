@@ -127,7 +127,7 @@ const GuildDungeonPage = lazy(() => CHUNKS.GuildDungeon().then((m) => ({ default
 function prefetchPages(staff: boolean, master: boolean) {
   const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
   if (conn?.saveData || /(^|-)2g$/.test(conn?.effectiveType ?? "")) return () => undefined;
-  const list: (keyof typeof CHUNKS)[] = ["Board", "Ranking", "Market", "Todo", "GuildDungeon", "Requests", "Rental", "Chat", "Profile", "Alerts", "PlatShop", "Official"];
+  const list: (keyof typeof CHUNKS)[] = ["Board", "Ranking", "Market", "Todo", "GuildDungeon", "Requests", "Rental", "Enhance", "Chat", "Profile", "Alerts", "PlatShop", "Official"];
   if (staff) list.push("Admin");
   if (master) list.push("ActivityLog", "ChatGaps");
   let stop = false;
@@ -495,8 +495,8 @@ function Wiki({
   // 시세 동향 (개발중, 제작자 요청 2026-11-03): 거래 톡방 대화에서 모은 골드·물건·캐릭터 시세
   // 개발 중 칸은 미리 보는 사람(길드마스터, 오피서, 앱개발자, 테스트 계정)만. 길드원은 주소로 들어와도 개발 중 안내 (제작자 요청 2026-11-04)
   else if (page === "trend") body = canPreview(me) ? <TrendPage wiki={wiki} /> : <DevSoon title="시세 동향" />;
-  // 강화 비교 (개발중, 제작자 요청 2026-11-04): 두 무기(+강)의 데미지와 몇 % 강해지는지
-  else if (page === "enhance") body = canPreview(me) ? <EnhancePage wiki={wiki} query={route.query} me={me} /> : <DevSoon title="강화 비교" />;
+  // 강화 비교 (제작자 요청 2026-11-04, 2026-11-05 모두에게 열었다): 두 무기(+강)의 데미지와 몇 % 강해지는지
+  else if (page === "enhance") body = <EnhancePage wiki={wiki} query={route.query} me={me} />;
   // 확률 시뮬레이터 개발 중판은 미리 보는 사람(길드마스터·오피서·달팽이·간다이, launcher.ts canPreview), 테스트판은 앱개발자(와 테스트 계정)만 (제작자 2026-11-04 '도플갱어로')
   else if (page === "sim") body = canPreview(me) ? <SimulatorPage key="live" wiki={wiki} me={me} space="live" /> : <DevSoon title="확률 시뮬레이터" />;
   else if (page === "simtest") body = me.role === "developer" || TEST_IDS.includes(me.id) ? <SimulatorPage key="test" wiki={wiki} me={me} space="test" /> : <DevSoon title="확률 시뮬레이터" />;
