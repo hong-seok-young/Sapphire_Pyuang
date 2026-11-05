@@ -955,8 +955,8 @@ button { font: inherit; color: inherit; }
 /* width: 0 so the input's default width never pushes the item detail wider than the screen */
 .mk-talk-form .mk-input { flex: 1; min-width: 0; width: 0; height: 34px; }
 
-/* more snappy motion: page enter, price flash, auction ending, growth leader shine */
-.page { animation: page-in 0.16s ease-out; }
+/* more snappy motion: price flash, auction ending, growth leader shine.
+   화면이 뜰 때 움직임(.page 의 page-in)은 뺐다 (제작자 2026-11-05 '화면 전환 시 화면이 뜨는 애니메이션은 최대한 빠르게 뜨게 하는 게 좋기 때문에 안 하는 게 나음') */
 @keyframes page-in { from { opacity: 0.35; transform: translateY(4px); } }
 .mk-flash { animation: price-flash 0.6s ease-out; }
 @keyframes price-flash { 0% { color: #fff; text-shadow: 0 0 8px var(--gold); transform: scale(1.12); } }
@@ -2899,6 +2899,28 @@ button.gd-member-row { cursor: pointer; }
 .enh-ch-dot.enh-ch-dot-b { z-index: 2; box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--gold); }
 .enh-ch-pct { align-self: center; font-size: 11px; text-align: right; white-space: nowrap; padding-right: 3px; }
 .enh-ch-pct small { font-size: 9px; color: var(--muted); margin-right: 3px; }
+/* 강화 비교 움직임 (제작자 2026-11-05 '버튼이 깜빡인다거나, 계속 보고 있거나 클릭했을 때, 차트가 어디가 움직인다거나'). 화면이 뜰 때 움직임은 없다 (Pop 은 처음 그릴 때 안 튄다).
+   끝없이 도는 것은 transform·opacity 만 */
+.enh-pop { display: inline-block; animation: enh-pop 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.4); }
+@keyframes enh-pop { 0% { transform: scale(1.22); opacity: 0.55; } 100% { transform: none; opacity: 1; } }
+@keyframes enh-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@keyframes enh-breathe { 0%, 100% { opacity: 0.85; } 50% { opacity: 0.4; } }
+.enh-swap-spin { animation: enh-spin 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes enh-spin { from { transform: rotate(-180deg); } }
+.enh-name-empty { animation: enh-blink 1.6s ease-in-out infinite; }
+.enh-sim-me .enh-sim-pct { animation: enh-blink 2s ease-in-out infinite; }
+.enh-sim-row, .enh-ch-chip, .enh-hit, .enh-name { transition: transform 0.08s; }
+.enh-sim-row:active, .enh-ch-chip:active, .enh-hit:active { transform: scale(0.97); }
+.enh-ch-now { transition: left 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); animation: enh-breathe 2.4s ease-in-out infinite; }
+.enh-ch-now.enh-ch-now-dim { animation: none; opacity: 0.25; }
+.enh-ch-ref { transition: left 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.enh-ch-dragging .enh-ch-ref { transition: none; }
+.enh-ch-dot { transition: transform 0.18s ease-out; }
+.enh-ch-dot-a { animation: enh-blink 2.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .enh-pop, .enh-swap-spin, .enh-name-empty, .enh-sim-me .enh-sim-pct, .enh-ch-now, .enh-ch-dot-a { animation: none; }
+  .enh-ch-now, .enh-ch-ref, .enh-ch-dot { transition: none; }
+}
 .enh-ch-detail { display: grid; grid-template-columns: auto repeat(5, minmax(0, 1fr)); align-items: center; gap: 3px; padding: 3px 0 5px 7px; }
 .enh-ch-lv { font-size: 10px; color: var(--muted); white-space: nowrap; padding-right: 2px; }
 .enh-ch-chip { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 2px; min-width: 0; font-size: 12px; line-height: 1.2; background: var(--lo); border: 0; color: inherit; }
@@ -3253,7 +3275,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .trend-book-h { display: grid; grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); font-size: 10px; color: var(--muted); text-align: center; margin-bottom: 2px; }
 .trend-book-item { display: grid; grid-template-columns: minmax(0, 1fr); }
 .trend-book-row { display: grid; grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); align-items: center; width: 100%; height: 20px; padding: 0; background: transparent; border: 0;
-  animation: trend-book-in 0.4s ease-out both; }
+}
 .trend-book-row > b { text-align: center; font-size: 12px; font-weight: normal; }
 .trend-book-now { background: rgba(255, 195, 92, 0.1); }
 .trend-book-now > b { color: var(--gold); }
@@ -3264,13 +3286,21 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .trend-book-l i { order: 1; }
 .trend-book-row small { flex: none; width: 20px; font-size: 10px; color: var(--muted); }
 .trend-book-l small { text-align: right; }
-.trend-book-row i { display: block; height: 100%; animation: trend-book-grow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.trend-book-row i { display: block; height: 100%; }
 .trend-book-l i { background: linear-gradient(270deg, #5d9bff, rgba(93, 155, 255, 0.25)); transform-origin: right; }
 .trend-book-r i { background: linear-gradient(90deg, #ff6464, rgba(255, 100, 100, 0.25)); transform-origin: left; }
-.trend-book-who { display: grid; gap: 4px; padding: 4px 0 6px; animation: trend-book-in 0.3s ease-out both; }
+.trend-book-who { display: grid; gap: 4px; padding: 4px 0 6px; animation: trend-book-in 0.15s ease-out both; }
 @keyframes trend-book-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-@keyframes trend-book-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-@media (prefers-reduced-motion: reduce) { .trend-book-row, .trend-book-row i, .trend-book-who { animation: none; } }
+/* 화면이 뜰 때 줄이 주르륵 올라오고 막대가 자라던 것은 뺐다 (제작자 2026-11-05 '시세 동향에서도 화면 주르륵 뜨게 하는 건 없애 봐'). 보고 있는 동안의 움직임만:
+   지금 시세 줄의 금색 글자가 숨 쉬듯, 그림 끝 점(오늘 시세)에서 파문이 퍼진다. 누른 줄은 톡 눌린다 */
+.trend-book-now > b { animation: enh-blink 2.4s ease-in-out infinite; }
+.trend-book-row { transition: transform 0.08s; }
+.trend-book-row:active { transform: scale(0.98); }
+.trend-end-ping { fill: none; stroke-width: 1.5; transform-box: fill-box; transform-origin: center; animation: trend-ping 2s ease-out infinite; pointer-events: none; }
+.trend-end-ping.trend-end-sell { stroke: #5d9bff; }
+.trend-end-ping.trend-end-buy { stroke: #ff6464; animation-delay: 1s; }
+@keyframes trend-ping { 0% { transform: scale(1); opacity: 0.9; } 100% { transform: scale(3.2); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .trend-book-who, .trend-book-now > b, .trend-end-ping { animation: none; } .trend-end-ping { display: none; } }
 .sim-shop-locked { opacity: 0.45; }
 .sim-buy-lock { display: grid; place-items: center; background: rgba(169, 162, 207, 0.15); color: var(--muted); font-weight: normal; font-size: 12px; border: var(--px) solid var(--edge); }
 .sim-shop-clear { flex: none; font-size: 11px; color: var(--gold); }

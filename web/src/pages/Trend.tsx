@@ -90,6 +90,9 @@ function GoldChart({ days }: { days: GoldDay[] }) {
         <polyline points={line((d) => d.sell?.med)} className="trend-line trend-line-sell" />
         <polyline points={line((d) => d.buy?.med)} className="trend-line trend-line-buy" />
         {pick !== null && <line x1={x(pick)} x2={x(pick)} y1={T} y2={H - B} className="trend-cursor" />}
+        {/* 오늘 시세 점에서 파문 (보고 있는 동안의 움직임, 제작자 2026-11-05) */}
+        {last.sell && <circle cx={x(days.length - 1)} cy={y(last.sell.med)} r={3.5} className="trend-end-ping trend-end-sell" />}
+        {last.buy && <circle cx={x(days.length - 1)} cy={y(last.buy.med)} r={3.5} className="trend-end-ping trend-end-buy" />}
         {last.sell && <circle cx={x(days.length - 1)} cy={y(last.sell.med)} r={3.5} className="trend-end trend-end-sell" />}
         {last.buy && <circle cx={x(days.length - 1)} cy={y(last.buy.med)} r={3.5} className="trend-end trend-end-buy" />}
       </svg>
@@ -234,12 +237,11 @@ function GoldBook({ t, now }: { t: Trend; now: number | null }) {
   return (
     <div className="trend-book">
       <div className="trend-book-h"><span>파는 사람</span><span>N:1</span><span>사는 사람</span></div>
-      {rows.map(([rate, e], i) => (
+      {rows.map(([rate, e]) => (
         <div key={rate} className="trend-book-item">
           <button
             type="button"
             className={"trend-book-row" + (rate === cur ? " trend-book-now" : "") + (open === rate ? " trend-book-open" : "")}
-            style={{ animationDelay: `${Math.min(i, 14) * 30}ms` }}
             onClick={() => setOpen(open === rate ? null : rate)}
           >
             <span className="trend-book-l">
