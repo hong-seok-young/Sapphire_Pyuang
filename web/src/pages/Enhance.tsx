@@ -240,9 +240,25 @@ function WeaponList({ d, side, pick, job, open, onPick }: { d: Enhance; side: "a
   );
 }
 
-/** 결과 (제작자 2026-11-05 '+32.2 라인까지는 괜찮은데' -> '평균은 초록 퍼센트 아래로, 최소·최대는 텍스트로만 하지 말고 꾸며 봐, 대신 콤팩트하게'):
- *  왼쪽 큰 % 와 그 아래 평균, 오른쪽은 두 무기의 데미지 범위 막대(지금 파랑, 바꿀 금색, 흰 눈금이 평균)와 최소·최대가 몇 % 바뀌는지 */
+/** 결과 (제작자 2026-11-05 '+32.2 라인까지는 괜찮은데' -> '최소·최대는 텍스트로만 하지 말고 꾸며 봐, 대신 콤팩트하게' ->
+ *  '막대 좌우 길이 줄이고 최소 몇 퍼 최대 몇 퍼를 막대 좌우에, 평균도 막대 안으로'):
+ *  왼쪽 큰 %, 오른쪽은 [최소 %] 두 무기의 데미지 범위 막대(지금 파랑, 바꿀 금색, 같은 눈금, 막대 안 숫자가 평균) [최대 %] */
 function Result({ d, a, b }: { d: Enhance; a: Pick; b: Pick }) {
+  // 막대 칸의 실제 폭: 채운 칸이 평균 숫자보다 좁으면 숫자를 막대 바깥(끝 옆)에 둔다
+  const box = useRef<HTMLDivElement>(null);
+  const [tw, setTw] = useState(0);
+  const shown = !!(a.w && b.w);
+  useLayoutEffect(() => {
+    const el = box.current?.querySelector(".enh-rbar-track");
+    if (!el) return;
+    const read = () => setTw(el.clientWidth);
+    read();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(read);
+    ro?.observe(el);
+    return () => {
+      ro?.disconnect();
+    };
+  }, [shown]);
   if (!a.w || !b.w) return null;
   const x = damage(d, a.w, a.plus);
   const y = damage(d, b.w, b.plus);
@@ -255,35 +271,54 @@ function Result({ d, a, b }: { d: Enhance; a: Pick; b: Pick }) {
   return (
     <section className="enh-card enh-result">
       <div className="enh-res">
-        <div className="enh-res-main">
-          <div className={"enh-big" + tone(p)}>
-            <Pop value={pctText(p)}>{pctText(p)}</Pop>
-          </div>
-          <div className="enh-res-avg">
-            평균 {fmt(x.avg)} → <Pop value={fmt(y.avg)}><b>{fmt(y.avg)}</b></Pop>
-          </div>
+        <div className={"enh-big" + tone(p)}>
+          <Pop value={pctText(p)}>{pctText(p)}</Pop>
         </div>
-        <div className="enh-res-bars">
-          {[
-            { s: x, side: "a" },
-            { s: y, side: "b" },
-          ].map(({ s, side }) => (
-            <div key={side} className={"enh-rbar enh-rbar-" + side}>
-              <span className="enh-rbar-n">{fmt(s.min)}</span>
-              <span className="enh-rbar-track">
-                <i className="enh-rbar-fill" style={{ left: `${at(s.min)}%`, width: `${at(s.max) - at(s.min)}%` }} />
-                <i className="enh-rbar-avg" style={{ left: `${at(s.avg)}%` }} />
-              </span>
-              <span className="enh-rbar-n">{fmt(s.max)}</span>
-            </div>
-          ))}
-          <div className="enh-res-delta">
-            <span>
-              최소 <b className={tone(pMin)}>{pctText(pMin)}</b>
-            </span>
-            <span>
-              최대 <b className={tone(pMax)}>{pctText(pMax)}</b>
-            </span>
+        <div className="enh-res-range">
+          <div className="enh-res-end">
+            <small>최소</small>
+            <b className={tone(pMin)}>
+              <Pop value={pctText(pMin)}>{pctText(pMin)}</Pop>
+            </b>
+          </div>
+          <div className="enh-res-bars" ref={box}>
+            {[
+              { s: x, side: "a" },
+              { s: y, side: "b" },
+            ].map(({ s, side }) => {
+              // 평균은 막대 안에 (평균 자리가 가운데). 채운 칸이 숫자보다 좁으면 막대 끝 바로 옆에 밝은 글자로
+              const text = fmt(s.avg);
+              const need = text.length * 6 + 6;
+              const fillPx = ((at(s.max) - at(s.min)) / 100) * tw;
+              const inside = tw === 0 || fillPx >= need;
+              const roomRight = ((100 - at(s.max)) / 100) * tw >= need;
+              const half = need / 2;
+              const mid = (at(s.avg) / 100) * tw;
+              const center = Math.max((at(s.min) / 100) * tw + half, Math.min((at(s.max) / 100) * tw - half, mid));
+              const style = inside
+                ? { left: tw ? `${center}px` : `${at(s.avg)}%` }
+                : roomRight
+                  ? { left: `calc(${at(s.max)}% + 3px)`, transform: "none" }
+                  : { left: `calc(${at(s.min)}% - 3px)`, transform: "translateX(-100%)" };
+              return (
+                <div key={side} className={"enh-rbar enh-rbar-" + side}>
+                  <span className="enh-rbar-n">{fmt(s.min)}</span>
+                  <span className="enh-rbar-track">
+                    <i className="enh-rbar-fill" style={{ left: `${at(s.min)}%`, width: `${at(s.max) - at(s.min)}%` }} />
+                    <em className={"enh-rbar-val" + (inside ? "" : " enh-rbar-val-out")} style={style}>
+                      <Pop value={text}>{text}</Pop>
+                    </em>
+                  </span>
+                  <span className="enh-rbar-n">{fmt(s.max)}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="enh-res-end">
+            <small>최대</small>
+            <b className={tone(pMax)}>
+              <Pop value={pctText(pMax)}>{pctText(pMax)}</Pop>
+            </b>
           </div>
         </div>
       </div>
