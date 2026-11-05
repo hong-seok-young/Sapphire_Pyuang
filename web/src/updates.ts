@@ -13,6 +13,19 @@ export const MENU_UPDATES: Record<string, string> = {
 const DAY = 86_400_000;
 const SHOW_DAYS = 7;
 
+// 새로 연 메뉴 (제작자 요청 2026-11-05 '오픈하자, 버튼 올리고 new 뱃지 하루 동안'): 홈 칸에 'NEW' 를 연 때부터 하루 동안 (들어가 봐도 하루 동안은 그대로).
+// 'UPDATE' 와 같은 자리에 달고, 둘 다면 NEW. 메뉴를 새로 열 때 그 칸의 주소와 연 때(한국 시간)를 더한다
+export const MENU_NEW: Record<string, string> = {
+  // 2026-11-05 v1.3 강화 비교 오픈
+  "#/enhance": "2026-11-05T16:30+09:00",
+};
+
+/** 홈 칸에 'NEW' 를 달지: 연 때(배포)부터 그 시각 + 하루까지 */
+export function showNew(to: string, now = Date.now()): boolean {
+  const stamp = MENU_NEW[to];
+  return !!stamp && now - Date.parse(stamp) < DAY;
+}
+
 interface Seen {
   stamp: string;
   at: number;

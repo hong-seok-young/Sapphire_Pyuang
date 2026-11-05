@@ -38,6 +38,7 @@ import type { LaunchItem, Layout } from "../launcher";
 import { newsFor, useMaint, useNews } from "../news";
 import type { Maint } from "../news";
 import { ClickHint, openGuide } from "../tutorial";
+import { showNew } from "../updates";
 
 /**
  * 칸 그림: 이모지 (상점 칸만 게임 상점 그림). 제작자 요청 2026-10-31: 게임 아이템 그림을 키운 아이콘은 뭉개져서
@@ -70,6 +71,8 @@ function TileCell({
   const news = useNews();
   // 고친 메뉴: 다른 색 테두리와 'UPDATE' (그 메뉴에 처음 들어가면 사라진다, updates.ts). '정보'는 안의 메뉴가 고쳐졌을 때도
   const updated = isUpdated(me.id, t);
+  // 새로 연 메뉴: 하루 동안 'NEW' (updates.ts MENU_NEW, 제작자 요청 2026-11-05)
+  const fresh = !t.soon && !t.locked && showNew(t.to);
   // 개발 중인 칸: 길드원은 못 들어가고 앱개발자는 들어간다 (표시는 같이 보인다)
   const locked = isLocked(t, me);
   const className =
@@ -77,21 +80,21 @@ function TileCell({
     (t.soon ? " tile-soon" : "") +
     (locked ? " tile-locked" : "") +
     (t.ring ? ` tile-ring tile-ring-${t.ring}` : "") +
-    (updated ? " tile-new" : "") +
+    (fresh ? " tile-new tile-fresh" : updated ? " tile-new" : "") +
     (dragKey === t.key ? " launch-drag-src" : "");
   const inside = (
     <>
       {t.ribbon && <span className="tile-ribbon">{t.ribbon}</span>}
       {/* 오른쪽 위 글자만 (장비대여 담당자 '담당자' / '멍멍', 제작자 요청 2026-11-03). UPDATE 표와 자리가 같아 표가 붙어 있는 동안은 숨기고,
           표가 사라지면(한 번 들어가면) 보인다 (제작자: '업데이트는 어차피 한 번 누르면 사라지니까 우측 위로 해도 돼') */}
-      {t.corner && !updated && (
+      {t.corner && !updated && !fresh && (
         <span className="tile-corner">
           {t.corner.map((line) => (
             <span key={line}>{line}</span>
           ))}
         </span>
       )}
-      {updated && <span className="tile-update">UPDATE</span>}
+      {fresh ? <span className="tile-update tile-fresh-tag">NEW</span> : updated && <span className="tile-update">UPDATE</span>}
       {/* 사람들이 새로 올린 글·물건 수 (news.ts, 'UPDATE' 와 따로) */}
       {newsFor(news, t.key) > 0 && (
         <span className="news-badge tile-news">

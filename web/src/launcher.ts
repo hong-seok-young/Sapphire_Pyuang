@@ -67,7 +67,7 @@ export const ITEMS: LaunchItem[] = [
   { key: "market", title: "사파이어 중개인", short: "중개인", to: "#/market", icon: "💰", match: ["market"] },
   { key: "requests", title: "길드원 의뢰소", short: "의뢰소", to: "#/requests", icon: "📋", match: ["requests"] },
   // 시세 동향 (개발중, 제작자 요청 2026-11-03): 거래 톡방 대화에서 모은 골드·물건·캐릭터 시세. 아이콘은 거래소 동전. 개발 중 묶음 (운영진만)
-  { key: "enhance", title: "강화 비교", short: "강화", to: "#/enhance", icon: "⚒️", iconPic: "/icons/enhance.png", soon: true, badge: "개발중", match: ["enhance"] },
+  { key: "enhance", title: "강화 비교", short: "강화", to: "#/enhance", icon: "⚒️", iconPic: "/icons/enhance.png", match: ["enhance"] },
   // 확률 시뮬레이터 (개발중, 제작자 요청 2026-11-04): 공식 확률 표로 강화·스탯 부여·옵션·상자를 해 본다
   // 확률 시뮬레이터는 앱개발자만 (제작자 2026-11-04 '개발 중으로 나만 보게')
   { key: "sim", title: "확률 시뮬레이터", short: "확률", to: "#/sim", icon: "🎰", soon: true, badge: "개발중", match: ["sim"] },
@@ -177,14 +177,18 @@ export function normalize(raw: Partial<Layout> | null | undefined): Layout {
   const rawGrid = Array.isArray(raw?.grid) ? raw.grid : [];
   const search = rawGrid.includes("search") && ok("search");
   let slots = rawGrid.filter((k) => k !== "search").map((k) => (ok(k) ? k : EMPTY));
-  // 빈 자리가 하나도 없는 배치(예전 배치, 기본 배치)는 위부터 채운 것: 안 보이는 칸을 빼고 붙여 그 자리가 빈 칸이 되지 않게 한다
-  if (!slots.includes(EMPTY)) slots = [...slots.filter((k) => !hidden(k)), ...slots.filter(hidden)];
   const put = (k: string) => {
     const i = firstEmpty(slots);
     slots[i] = k;
   };
   while (dock.length > DOCK_MAX) put(dock.pop()!);
   for (const k of [...DEFAULT_LAYOUT.dock, ...DEFAULT_LAYOUT.grid]) if (k !== "home" && !seen.has(k)) slots.push(k);
+  // 마지막 빈 자리 뒤는 위부터 채운 것 (빈 자리가 하나도 없는 예전 배치·기본 배치는 전부): 안 보이는 칸을 빼고 붙여 그 자리가 빈 칸이 되지 않게 한다.
+  // 끝에 붙여 두었던 안 보이던 칸이 새로 열리거나(개발 중이던 칸 오픈) 새 칸이 끝에 붙어도 앞의 안 보이는 칸 자리만큼 띄지 않고 마지막 칸 바로 뒤에 놓인다
+  // (2026-11-05 강화 비교 오픈: 앱 받기·시세 동향 자리만큼 두 칸이 비었다)
+  const lastEmpty = slots.lastIndexOf(EMPTY);
+  const rest = slots.slice(lastEmpty + 1);
+  slots = [...slots.slice(0, lastEmpty + 1), ...rest.filter((k) => !hidden(k)), ...rest.filter(hidden)];
   return build(dock, slots, search);
 }
 
@@ -288,7 +292,8 @@ export function placeItem(base: Layout, key: string, drop: Drop): Layout {
     slots[i] = k;
   };
   if (drop.zone === "grid") {
-    if (key === "search") return build(dock, slots, true);
+    // 안 보이는 칸(tail)도 그대로 끝에 붙여 둔다 (빠뜨리면 다음에 열 때 기본 배치 끝으로 다시 붙어 자리가 바뀐다)
+    if (key === "search") return build(dock, [...slots, ...tail], true);
     const i = Math.min(drop.index ?? firstEmpty(slots), MAX_SLOTS - 1);
     while (slots.length <= i) slots.push(EMPTY);
     const other = slots[i];

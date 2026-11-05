@@ -731,7 +731,7 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
   };
   return (
     <>
-      <TopBar title="강화 비교" right={<span className="pill trend-dev">개발중</span>} />
+      <TopBar title="강화 비교" />
       {!d ? (
         <Loading error={error?.includes("404") ? "강화 자료가 아직 없어요" : error} />
       ) : (
