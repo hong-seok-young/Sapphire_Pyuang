@@ -67,7 +67,7 @@ export const ITEMS: LaunchItem[] = [
   { key: "market", title: "사파이어 중개인", short: "중개인", to: "#/market", icon: "💰", match: ["market"] },
   { key: "requests", title: "길드원 의뢰소", short: "의뢰소", to: "#/requests", icon: "📋", match: ["requests"] },
   // 시세 동향 (개발중, 제작자 요청 2026-11-03): 거래 톡방 대화에서 모은 골드·물건·캐릭터 시세. 아이콘은 거래소 동전. 개발 중 묶음 (운영진만)
-  { key: "enhance", title: "강화 비교", short: "강화", to: "#/enhance", icon: "⚒️", soon: true, badge: "개발중", match: ["enhance"] },
+  { key: "enhance", title: "강화 비교", short: "강화", to: "#/enhance", icon: "⚒️", iconPic: "/icons/enhance.png", soon: true, badge: "개발중", match: ["enhance"] },
   // 확률 시뮬레이터 (개발중, 제작자 요청 2026-11-04): 공식 확률 표로 강화·스탯 부여·옵션·상자를 해 본다
   // 확률 시뮬레이터는 앱개발자만 (제작자 2026-11-04 '개발 중으로 나만 보게')
   { key: "sim", title: "확률 시뮬레이터", short: "확률", to: "#/sim", icon: "🎰", soon: true, badge: "개발중", match: ["sim"] },
