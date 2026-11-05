@@ -1891,6 +1891,8 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 .maint-flow .maint-run { animation: maint-scroll linear infinite; will-change: transform; }
 .maint-flow .maint-run > span { padding-right: 48px; }
 @keyframes maint-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+/* 강화 비교의 마법사 안내 (Enhance.tsx MAGE_NOTE): 같은 띠를 화면 맨 위 좌우 꽉 차게 */
+.enh-note { margin: -4px -12px 0; }
 @media (prefers-reduced-motion: reduce) {
   .maint-flow .maint-run, .maint-on .maint-dot { animation: none; }
   .maint { height: auto; }

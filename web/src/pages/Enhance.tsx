@@ -17,7 +17,7 @@ import type { Me } from "../auth";
 import { loadEnhance, useAsync } from "../data";
 import type { Enhance, EnhanceWeapon } from "../data";
 import type { Wiki } from "../types";
-import { FitLine, Loading, PicImg, TopBar } from "../ui";
+import { FitLine, FlowLine, Loading, PicImg, TopBar } from "../ui";
 
 const KNUM: Record<string, number> = { 일: 1, 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 칠: 7, 팔: 8, 구: 9, 십: 10 };
 const key = (s: string) => s.replace(/\s+/g, "");
@@ -85,6 +85,8 @@ interface Pick {
 }
 /** 무기를 처음 고를 때의 강화 (제작자 2026-11-05 '무기 선택하면 기본을 7강으로'): 강화를 적지 않으면 +7, 그 무기가 +7 까지 안 되면 될 수 있는 만큼 */
 const START_PLUS = 7;
+/** 마법사 칸 맨 위 띠 (홈 점검 띠 모양) */
+const MAGE_NOTE = "마법사 무기는 데미지 계산이 달라 실제와 맞지 않아요 · 재미로만 봐 주세요";
 const EMPTY: Pick = { q: "", w: null, plus: START_PLUS };
 
 function initial(d: Enhance | undefined, text: string | null): Pick {
@@ -734,6 +736,15 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
         <Loading error={error?.includes("404") ? "강화 자료가 아직 없어요" : error} />
       ) : (
         <div className="enh">
+          {/* 마법사는 데미지 계산이 달라 이 수치와 맞지 않는다 (제작자 2026-11-05 '점검할 때 안내 띄우는 것처럼 맨 위에, 그냥 재미로 봐야 함') */}
+          {job === "마법사" && (
+            <div className="maint-wrap enh-note">
+              <div className="maint" role="note">
+                <span className="maint-dot" aria-hidden />
+                <FlowLine text={MAGE_NOTE} />
+              </div>
+            </div>
+          )}
           <section className={"enh-card enh-picks" + (tab ? ` enh-tab enh-on-${tab}` : "")}>
             <div className="mk-sub enh-jobs" role="tablist">
               {JOBS.map((j) => (
