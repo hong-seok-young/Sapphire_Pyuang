@@ -18,6 +18,8 @@ const SHOW_DAYS = 7;
 export const MENU_NEW: Record<string, string> = {
   // 2026-11-05 v1.3 강화 비교 오픈
   "#/enhance": "2026-11-05T16:30+09:00",
+  // 2026-11-05 v1.4 개발 요청 오픈
+  "#/devreq": "2026-11-05T22:10+09:00",
 };
 
 /** 홈 칸에 'NEW' 를 달지: 연 때(배포)부터 그 시각 + 하루까지 */

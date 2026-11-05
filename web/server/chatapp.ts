@@ -21,6 +21,7 @@ import type { Period } from "./growth";
 import { weekStart } from "./week";
 import { TODO_OPEN, doneKeys, eventTasks, todoExtras } from "./todo";
 import { ASK_MORE, mineExtras, newsNow, shopCatalog } from "./chatmine";
+import { canUseDevReq } from "./devreq";
 
 
 /** 길드 앱 자료 전체 글자 수 (내 정보, 아이모 소식, 장비대여를 더해 늘렸다. 2026-11-02) */
@@ -45,6 +46,7 @@ const ASK = {
   logs: /로그|기록|접속|활동|들어(왔|온|와|오)|방문|누가|언제|아이피|\bip\b|어디서|위치|기기|폰|몇 ?번|뭐 ?했|했(어|냐|니|나|는지)|최근|요즘/i,
   gaps: /챗봇|질문|개선|모름|별로/,
   todo: /할 ?일|투두|to ?do|숙제|뭐 ?(해|하|할)|챙겨|인던|던전|길드 ?(출석|임무)|체크|이벤트/i,
+  devreq: /개발 ?요청|기능 ?요청|요청한|결재|합의|반려|착수|만들어 ?(줘|주|달)|개발자/,
 };
 
 interface Person {
@@ -448,6 +450,9 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
     parts.push(`[앱개발자 전용: 오늘 챗봇 질문 수] ${usage || "아직 없음"}`);
   }
 
+  // ---------- 개발 요청: 모든 요청과 결재 단계·의견 (모두가 본다, server/devreq.ts) ----------
+  if (canUseDevReq(me) && ASK.devreq.test(q)) parts.push(await devreqPart(env));
+
   // ---------- 내가 한 것 (늘): 중개인, 골드, 의뢰소, 상점 신청 ----------
   {
     const lines: string[] = [];
@@ -578,4 +583,30 @@ async function activityParts(env: Env, mentioned: string[], now: number, today: 
     );
   });
   return out;
+}
+
+const DEVREQ_STATUS: Record<string, string> = { review: "개발자 검토 중", agree: "오피서 합의·길마 결재 중", dev: "개발 착수", done: "개발 완료", rejected: "반려 (고쳐서 다시 신청할 수 있다)" };
+const DEVREQ_STEP: Record<string, string> = { submit: "신청", resubmit: "다시 신청", feasible: "개발자 검토(개발 가능)", agree: "오피서 합의", approve: "길마 최종 결재", reject: "반려", done: "개발 완료" };
+const DEVREQ_SCOPE: Record<string, string> = { me: "나", some: "특정 인원", all: "길드 전체" };
+
+/** 개발 요청 최근 40개: 상태, 범위, 이번 차례 결재 이력(누가, 의견) */
+async function devreqPart(env: Env): Promise<string> {
+  const [rowsR, stepsR] = await env.DB.batch([
+    env.DB.prepare("SELECT id, user_id, body, scope, people, status, round, updated_at FROM dev_requests ORDER BY updated_at DESC LIMIT 40"),
+    env.DB.prepare(
+      "SELECT req_id, round, user_id, kind, note FROM dev_request_steps WHERE req_id IN (SELECT id FROM dev_requests ORDER BY updated_at DESC LIMIT 40) ORDER BY id",
+    ),
+  ]);
+  type Row = { id: number; user_id: string; body: string; scope: string; people: string | null; status: string; round: number; updated_at: number };
+  type Step = { req_id: number; round: number; user_id: string; kind: string; note: string | null };
+  const steps = stepsR.results as Step[];
+  const lines = (rowsR.results as Row[]).map((r) => {
+    const people = r.people ? (JSON.parse(r.people) as string[]).join(", ") : "";
+    const done = steps
+      .filter((s) => s.req_id === r.id && s.round === r.round)
+      .map((s) => `${DEVREQ_STEP[s.kind] ?? s.kind} ${s.user_id}${s.note ? ` "${oneLine(s.note)}"` : ""}`)
+      .join(" → ");
+    return `#${r.id} ${r.user_id} · ${DEVREQ_SCOPE[r.scope] ?? r.scope}${people ? `(${people})` : ""} · ${DEVREQ_STATUS[r.status] ?? r.status}${r.round > 1 ? ` · ${r.round}차` : ""} · "${oneLine(r.body)}" · 결재: ${done || "없음"} · ${when(r.updated_at)}`;
+  });
+  return section("개발 요청: 최근 요청 (앱개발자에게 무료로 신청, 결재선 개발자 검토 → 오피서 합의 → 길마 결재 → 개발 착수·완료, 모두가 본다)", lines.length ? lines : ["아직 없음"]);
 }
