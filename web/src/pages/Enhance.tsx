@@ -11,7 +11,7 @@
 // 줄을 누르면 그 아래 강화마다 평균과 지금 대비 %, 누르면 바꿀 무기로.
 // 움직임 (제작자 2026-11-05 '계속 보고 있거나 클릭했을 때의 애니메이션, 화면 전환 때 뜨는 건 빠르게 하려고 안 함'): 바뀐 값(%, +N, 평균)은 톡 튀고(`Pop`),
 // ⇄ 는 돌고, 지금 선·'지금' 글자·빈 무기 칸은 숨 쉬듯 깜박이고, 기준선과 지금 선은 새 자리로 미끄러진다(끄는 동안은 손가락을 바로 따라감).
-import { Fragment, useCallback, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { Me } from "../auth";
 import { loadEnhance, useAsync } from "../data";
@@ -113,8 +113,8 @@ function searching(d: Enhance, pick: Pick): string[] {
   return read.qs.length > 0 && !(pick.w && read.w === pick.w) ? read.qs : [];
 }
 
-/** 무기 칸 하나 (지금 무기 왼쪽, 바꿀 무기 오른쪽에 나란히. 제작자 2026-11-05 '무기 고르는 거를 좌우로 배치', '좀 더 콤팩트하게'):
- *  ◀ 이름 ▶ (이름을 누르면 적는 칸과 그 직업 무기 목록), 그 아래 그림과 − +N +, 맨 아래 레벨과 데미지 */
+/** 무기 칸 하나 (지금 무기 왼쪽, 바꿀 무기 오른쪽에 나란히. 제작자 2026-11-05 '무기 고르는 거를 좌우로 배치', '좀 더 콤팩트하게' -> '행 높이 더 압축'):
+ *  두 줄: ◀ 이름 ▶ (이름을 누르면 적는 칸과 그 직업 무기 목록), 그림(아래 구석에 작은 레벨)과 − +N + (데미지는 결과 칸에) */
 function WeaponCard({ d, wiki, side, hint, pick, onPick, open, onOpen }: {
   d: Enhance; wiki: Wiki; side: "a" | "b"; hint: string; pick: Pick; onPick: (p: Pick) => void; open: boolean; onOpen: () => void;
 }) {
@@ -176,8 +176,11 @@ function WeaponCard({ d, wiki, side, hint, pick, onPick, open, onOpen }: {
       </div>
       {pick.w && cur && (
         <>
-          <div className="enh-ctl">
-            <span className="enh-slot">{pic ? <PicImg pic={pic} max={24} /> : null}</span>
+          <div className="enh-ctl" title={`Lv.${pick.w.lv ?? "?"} · ${fmt(cur.min)}~${fmt(cur.max)}`}>
+            <span className="enh-slot">
+              {pic ? <PicImg pic={pic} max={22} /> : null}
+              <small className="enh-lvtag">Lv{pick.w.lv ?? "?"}</small>
+            </span>
             <span className="enh-step">
               <button type="button" className="pill" onClick={() => step(-1)} disabled={pick.plus <= 0} aria-label="강화 내리기">
                 −
@@ -190,7 +193,6 @@ function WeaponCard({ d, wiki, side, hint, pick, onPick, open, onOpen }: {
               </button>
             </span>
           </div>
-          <FitLine className="enh-meta" text={`Lv.${pick.w.lv ?? "?"} · ${fmt(cur.min)}~${fmt(cur.max)}`} wrap={false} />
         </>
       )}
     </div>
@@ -267,33 +269,36 @@ function Result({ d, a, b }: { d: Enhance; a: Pick; b: Pick }) {
 
 /** 사람들이 보통 쓰는 강화 (비슷한 무기 목록은 이 강화만, 제작자 2026-11-05 '6강부터 보여줘도 될 듯') */
 const USUAL = [6, 7, 8, 9, 10];
-const SIMILAR_N = 8;
 
-/** 지금 무기와 평균 데미지가 가까운 같은 직업 무기의 +6 ~ +10 (지금 무기의 다른 강화도), 약한 쪽 넷·센 쪽 넷을 약한 것부터 (지금 무기도 그 자리에).
- *  한쪽이 모자라면 다른 쪽으로 채운다 (제작자 2026-11-05 '8헌 넣었을 때 그 아래로는 안 뜨는데 항상 약한 것도 같이') */
+/** 그 직업 무기 전부의 +6 ~ +10 을 약한 것부터 (지금 무기도 그 자리에), 칸 안에서 위아래로 스크롤하고 열면 지금 무기 줄이 가운데로
+ *  (제작자 2026-11-05 '비슷한 무기는 위아래 스크롤되게 해, 목록은 모든 무기 강화별로 다 뜨게'. 그전에는 가까운 8개만) */
 function Similar({ d, wiki, a, b, onPick }: { d: Enhance; wiki: Wiki; a: Pick; b: Pick; onPick: (w: EnhanceWeapon, plus: number) => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  const meKey = a.w ? `${a.w.name}+${a.plus}` : "";
+  const first = useRef(true);
+  useLayoutEffect(() => {
+    const el = box.current;
+    const me = el?.querySelector<HTMLElement>(".enh-sim-me");
+    if (!el || !me) return;
+    const top = me.offsetTop - el.clientHeight / 2 + me.offsetHeight / 2;
+    el.scrollTo({ top, behavior: first.current ? "auto" : "smooth" });
+    first.current = false;
+  }, [meKey]);
   if (!a.w) return null;
   const A = a.w;
   const base = damage(d, A, a.plus).avg;
   if (!(base > 0)) return null;
-  const dist = (x: { avg: number }) => Math.abs(Math.log(x.avg / base));
-  const cands = jobWeapons(d, A.job).flatMap((w) =>
-    USUAL.filter((p) => p <= maxPlus(d, w) && !(w.name === A.name && p === a.plus)).map((plus) => ({ w, plus, avg: damage(d, w, plus).avg, me: false })),
-  );
-  const weaker = cands.filter((x) => x.avg < base).sort((x, y) => dist(x) - dist(y));
-  const stronger = cands.filter((x) => x.avg >= base).sort((x, y) => dist(x) - dist(y));
-  const half = SIMILAR_N / 2;
-  const nLo = Math.min(weaker.length, Math.max(half, SIMILAR_N - stronger.length));
-  const near = [...weaker.slice(0, nLo), ...stronger.slice(0, SIMILAR_N - nLo)];
-  if (near.length === 0) return null;
-  const rows = [...near, { w: A, plus: a.plus, avg: base, me: true }].sort((x, y) => x.avg - y.avg || Number(y.me) - Number(x.me));
+  const rows = jobWeapons(d, A.job)
+    .flatMap((w) => USUAL.filter((p) => p <= maxPlus(d, w) && !(w.name === A.name && p === a.plus)).map((plus) => ({ w, plus, avg: damage(d, w, plus).avg, me: false })))
+    .concat([{ w: A, plus: a.plus, avg: base, me: true }])
+    .sort((x, y) => x.avg - y.avg || Number(y.me) - Number(x.me));
   return (
     <section className="enh-card enh-sim">
       <div className="enh-sim-head">
         <b>비슷한 무기</b>
         <span className="muted">+6 ~ +10</span>
       </div>
-      <div className="enh-sim-list">
+      <div className="enh-sim-list" ref={box}>
         {rows.map((r) => {
           const pic = (wiki.items[r.w.name] ?? wiki.items[key(r.w.name)])?.icon;
           const p = pct(base, r.avg);
@@ -346,7 +351,7 @@ const nearest = (vals: number[], v: number) => vals.reduce((k, x, i) => (Math.ab
  *  줄마다 오른쪽에 기준선에 가장 가까운 강화와 기준 대비 % (그 점은 조금 크게) */
 function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; job: string; a: Pick; b: Pick; onPick: (w: EnhanceWeapon, plus: number) => void }) {
   const [open, setOpen] = useState<string | null>(null);
-  const [ref, setRef] = useState<{ v: number; label: string | null } | null>(null);
+  const [ref, setRef] = useState<{ v: number; label: string } | null>(null);
   const drag = useRef<{ x0: number; moved: boolean } | null>(null);
   const [dragging, setDragging] = useState(false);
   const rows = jobWeapons(d, job)
@@ -362,7 +367,23 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
     const r = el.getBoundingClientRect();
     return lo + Math.max(0, Math.min(1, (clientX - r.left) / (r.width || 1))) * (hi - lo);
   };
+  // 기준선은 점(강화마다의 평균) 위로만 (제작자 2026-11-05 '버튼들 기준으로 한 칸씩, 그 버튼들 위로만 움직이게'): 끌면 가장 가까운 점으로, ◀ ▶ 는 한 칸씩
+  const pts = rows.flatMap((r) => r.vals.map((v, i) => ({ v, label: `+${CHART_PLUS[i]} ${r.w.name}` }))).sort((p, q) => p.v - q.v);
+  const snap = (v: number) => pts.reduce((best, p) => (Math.abs(p.v - v) < Math.abs(best.v - v) ? p : best), pts[0]);
   const base = ref?.v ?? now;
+  const stepRef = (dir: 1 | -1) => {
+    let j: number;
+    const at = ref ? pts.findIndex((p) => p.label === ref.label) : -1;
+    if (at >= 0) j = at + dir;
+    else {
+      const v = base ?? pts[0].v;
+      j = dir > 0 ? pts.findIndex((p) => p.v > v + 1e-9) : pts.map((p) => p.v < v - 1e-9).lastIndexOf(true);
+    }
+    if (j < 0 || j >= pts.length) return;
+    setRef({ v: pts[j].v, label: pts[j].label });
+  };
+  const firstRef = ref ? pts.findIndex((p) => p.label === ref.label) === 0 : base !== null && !pts.some((p) => p.v < base - 1e-9);
+  const lastRef = ref ? pts.findIndex((p) => p.label === ref.label) === pts.length - 1 : base !== null && !pts.some((p) => p.v > base + 1e-9);
   const nowLabel = a.w ? `+${a.plus} ${a.w.name}` : "";
   return (
     <section className="enh-card enh-chart">
@@ -378,10 +399,16 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
       </div>
       {base !== null && (
         <div className="enh-ch-base">
-          <span>
+          <button type="button" className="pill enh-nav" onClick={() => stepRef(-1)} disabled={firstRef} aria-label="기준선 한 칸 왼쪽">
+            ◀
+          </button>
+          <span className="enh-ch-basetext">
             <i className={ref ? "enh-ch-key-ref" : "enh-ch-key-now"} />
-            기준 {ref ? (ref.label ?? "") : `지금 ${nowLabel}`} <b>{fmt(base)}</b>
+            기준 {ref ? ref.label : `지금 ${nowLabel}`} <b>{fmt(base)}</b>
           </span>
+          <button type="button" className="pill enh-nav" onClick={() => stepRef(1)} disabled={lastRef} aria-label="기준선 한 칸 오른쪽">
+            ▶
+          </button>
           {ref && (
             <button type="button" className="pill enh-ch-reset" onClick={() => setRef(null)}>
               {now !== null ? "지금으로" : "지우기"}
@@ -424,7 +451,8 @@ function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; jo
                     if (!g.moved && Math.abs(e.clientX - g.x0) < 6) return;
                     if (!g.moved) setDragging(true);
                     g.moved = true;
-                    setRef({ v: valueAt(e.currentTarget, e.clientX), label: null });
+                    const pt = snap(valueAt(e.currentTarget, e.clientX));
+                    if (ref?.label !== pt.label) setRef({ v: pt.v, label: pt.label });
                   }}
                   onPointerUp={(e) => {
                     const g = drag.current;
