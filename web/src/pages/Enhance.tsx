@@ -374,7 +374,7 @@ function Similar({ d, wiki, a, b, onPick }: { d: Enhance; wiki: Wiki; a: Pick; b
                 +{r.plus} {r.w.name} <small>Lv.{r.w.lv ?? "?"}</small>
               </span>
               <span className="enh-sim-avg">{fmt(r.avg)}</span>
-              <span className={"enh-sim-pct" + (r.me ? "" : tone(p))}>{r.me ? "지금" : pctText(p)}</span>
+              <span className={"enh-sim-pct" + (r.me ? "" : tone(p))}>{r.me ? "기준" : pctText(p)}</span>
             </button>
           );
         })}
@@ -627,7 +627,7 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
                       <button key={p} type="button" className={"enh-ch-chip" + (me ? " enh-ch-chip-a" : on ? " enh-ch-chip-b" : "")} disabled={me} onClick={() => onPick(r.w, p)}>
                         <b>+{p}</b>
                         <span>{fmt(v)}</span>
-                        {now !== null && <small className={me ? "" : tone(pct(now, v))}>{me ? "지금" : pctText(pct(now, v))}</small>}
+                        {now !== null && <small className={me ? "" : tone(pct(now, v))}>{me ? "기준" : pctText(pct(now, v))}</small>}
                       </button>
                     );
                   })}
@@ -743,7 +743,7 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
               ))}
             </div>
             <div className="enh-duo">
-              <WeaponCard d={d} wiki={wiki} side="a" hint="지금 무기" pick={pa} onPick={pickA} open={list === "a"} onOpen={() => setListAt("a")} />
+              <WeaponCard d={d} wiki={wiki} side="a" hint="기준 무기" pick={pa} onPick={pickA} open={list === "a"} onOpen={() => setListAt("a")} />
               <button key={spin} type="button" className={"enh-swap" + (spin ? " enh-swap-spin" : "")} onClick={swap} aria-label="좌우 바꾸기">
                 ⇄
               </button>
