@@ -244,6 +244,39 @@ runSql([
   console.log(`개발 요청 새 기능 알림 지움 ${n}건`);
 }
 
+// 개발 요청 예시 3개 (제작자 2026-11-05 '길마가 볼 수 있게 오피서 확인 전까지 / 오피서 합의한 거 / 오피서 반려한 거 가상 데이터 넣어 줘'):
+// 길마가 '합의 생략 결재' · '최종 결재' · '강제 결재'를 직접 눌러 볼 수 있게. 신청한 사람은 튜토리얼 예시와 같은 '길잡이', 오피서는 '예시오피서'(실제 계정이 아니다),
+// 글 앞에 [예시]. 개발자 검토는 퓨앙이 '개발 가능'으로. 알림은 보내지 않는다. 앱개발자가 개발 요청 화면에서 지울 수 있다. setup 'devreq_samples_20261105' 로 한 번만
+{
+  const KEY = "devreq_samples_20261105";
+  const NOT_DONE = `NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}')`;
+  const now = Date.now();
+  const H = 3_600_000;
+  const samples = [
+    { body: "[예시] 홈에 오늘 보스 젠 시간 모아 보기", scope: "all", status: "agree", steps: [] },
+    { body: "[예시] 길드 랭킹에 지난주 성장 1등 표시", scope: "all", status: "agree", steps: [["예시오피서", "agree", "랭킹 맨 위에 작게 넣으면 좋겠어요"]] },
+    { body: "[예시] 중개인 물건을 이름순으로 정렬", scope: "me", status: "rejected", steps: [["예시오피서", "reject", "지금 정렬로도 충분해요"]] },
+  ];
+  const q = (v) => (v === null ? "NULL" : `'${String(v).replace(/'/g, "''")}'`);
+  const lines = [];
+  samples.forEach((x, i) => {
+    const t0 = now - (3 - i) * H;
+    const id = `(SELECT id FROM dev_requests WHERE body = ${q(x.body)} ORDER BY id DESC LIMIT 1)`;
+    lines.push(
+      `INSERT INTO dev_requests (user_id, body, scope, people, status, round, created_at, updated_at) SELECT '길잡이', ${q(x.body)}, '${x.scope}', NULL, '${x.status}', 1, ${t0}, ${t0 + 30 * 60_000} WHERE ${NOT_DONE};`,
+      `INSERT INTO dev_request_steps (req_id, round, user_id, kind, note, created_at) SELECT ${id}, 1, '길잡이', 'submit', NULL, ${t0} WHERE ${NOT_DONE};`,
+      `INSERT INTO dev_request_steps (req_id, round, user_id, kind, note, created_at) SELECT ${id}, 1, '퓨앙', 'feasible', '만들 수 있어요', ${t0 + 10 * 60_000} WHERE ${NOT_DONE};`,
+      ...x.steps.map(
+        ([who, kind, note]) =>
+          `INSERT INTO dev_request_steps (req_id, round, user_id, kind, note, created_at) SELECT ${id}, 1, ${q(who)}, '${kind}', ${q(note)}, ${t0 + 30 * 60_000} WHERE ${NOT_DONE};`,
+      ),
+    );
+  });
+  const fresh = !queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`);
+  runSql([...lines, `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`]);
+  console.log(fresh ? "개발 요청 예시 3개 넣음" : "개발 요청 예시는 이미 넣었어요");
+}
+
 // 길드 던전 시간표 '확정'을 모두 푼다 (제작자 2026-11-04 '확정이 다 풀리게 해 주고 다시 확정하라고 안내'): 파티원 카드가 '입력 전 / 확정'으로 바뀌면서
 // 확정을 서버(gd_avail.confirmed_at)에 적게 됐는데, 그전에 누른 확정은 폰에만 남아 있었다. 파티에 든 사람에게 다시 확정하라는 알림(gdungeon, 끈 사람 빼고).
 // 폰 알림(푸시)은 서버가 아니라서 안 간다. setup 'gd_confirm_reset_20261104' 로 한 번만, 실행 기록에는 개수만
