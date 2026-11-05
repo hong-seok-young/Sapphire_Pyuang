@@ -83,13 +83,15 @@ interface Pick {
   w: EnhanceWeapon | null;
   plus: number;
 }
-const EMPTY: Pick = { q: "", w: null, plus: 0 };
+/** 무기를 처음 고를 때의 강화 (제작자 2026-11-05 '무기 선택하면 기본을 7강으로'): 강화를 적지 않으면 +7, 그 무기가 +7 까지 안 되면 될 수 있는 만큼 */
+const START_PLUS = 7;
+const EMPTY: Pick = { q: "", w: null, plus: START_PLUS };
 
 function initial(d: Enhance | undefined, text: string | null): Pick {
-  const p: Pick = { q: text ?? "", w: null, plus: 0 };
+  const p: Pick = { q: text ?? "", w: null, plus: START_PLUS };
   if (!d || !text) return p;
   const { plus, w } = readText(d, text);
-  return { q: w ? w.name : text, w, plus: w ? Math.min(plus ?? 0, maxPlus(d, w)) : plus ?? 0 };
+  return { q: w ? w.name : text, w, plus: w ? Math.min(plus ?? START_PLUS, maxPlus(d, w)) : plus ?? START_PLUS };
 }
 
 /** 값이 바뀌면 톡 튀게 (제작자 2026-11-05 '계속 보고 있거나 클릭했을 때의 애니메이션'). 처음 그릴 때는 그대로 둔다: 화면이 뜰 때 움직임은 없다 */
@@ -138,26 +140,27 @@ function WeaponCard({ d, wiki, side, hint, pick, onPick, open, onOpen }: {
   const cur = pick.w ? damage(d, pick.w, pick.plus) : null;
   return (
     <div className={"enh-pick enh-" + side + (open ? " enh-pick-on" : "")}>
-      <div className="enh-row">
-        {edit ? (
-          <input
-            className="enh-input"
-            value={pick.q}
-            placeholder={hint}
-            autoFocus
-            onChange={(e) => type(e.target.value)}
-            onFocus={(e) => {
-              e.target.select();
-              onOpen();
-            }}
-            onBlur={() => setEdit(false)}
-            enterKeyHint="done"
-          />
-        ) : (
-          <>
-            <button type="button" className="pill enh-nav" onClick={() => prev && choose(prev)} disabled={!prev} aria-label={prev ? `이전 무기 ${prev.name}` : "이전 무기"}>
-              ◀
-            </button>
+      {/* ◀ ▶ 는 칸 양옆에 높이를 꽉 채우고, 이름·그림·강화는 그 안쪽에 (제작자 2026-11-05) */}
+      <button type="button" className="pill enh-nav" onClick={() => prev && choose(prev)} disabled={!prev} aria-label={prev ? `이전 무기 ${prev.name}` : "이전 무기"}>
+        ◀
+      </button>
+      <div className="enh-mid">
+        <div className="enh-row">
+          {edit ? (
+            <input
+              className="enh-input"
+              value={pick.q}
+              placeholder={hint}
+              autoFocus
+              onChange={(e) => type(e.target.value)}
+              onFocus={(e) => {
+                e.target.select();
+                onOpen();
+              }}
+              onBlur={() => setEdit(false)}
+              enterKeyHint="done"
+            />
+          ) : (
             <button
               type="button"
               className={"enh-name" + (pick.w ? "" : " enh-name-empty")}
@@ -168,17 +171,12 @@ function WeaponCard({ d, wiki, side, hint, pick, onPick, open, onOpen }: {
             >
               <FitLine text={pick.w ? pick.w.name : pick.q || hint} wrap={false} />
             </button>
-            <button type="button" className="pill enh-nav" onClick={() => next && choose(next)} disabled={!next} aria-label={next ? `다음 무기 ${next.name}` : "다음 무기"}>
-              ▶
-            </button>
-          </>
-        )}
-      </div>
-      {pick.w && cur && (
-        <>
+          )}
+        </div>
+        {pick.w && cur && (
           <div className="enh-ctl" title={`Lv.${pick.w.lv ?? "?"} · ${fmt(cur.min)}~${fmt(cur.max)}`}>
             <span className="enh-slot">
-              {pic ? <PicImg pic={pic} max={22} /> : null}
+              {pic ? <PicImg pic={pic} max={20} /> : null}
               <small className="enh-lvtag">Lv{pick.w.lv ?? "?"}</small>
             </span>
             <span className="enh-step">
@@ -193,8 +191,11 @@ function WeaponCard({ d, wiki, side, hint, pick, onPick, open, onOpen }: {
               </button>
             </span>
           </div>
-        </>
-      )}
+        )}
+      </div>
+      <button type="button" className="pill enh-nav" onClick={() => next && choose(next)} disabled={!next} aria-label={next ? `다음 무기 ${next.name}` : "다음 무기"}>
+        ▶
+      </button>
     </div>
   );
 }
