@@ -27,8 +27,13 @@ const squeeze = (s: string) => s.replace(/닼/g, "다크").replace(/롭/g, "로�
 const JOB_OF: Record<string, string> = { warrior: "전사", ranger: "레인저", mage: "마법사", monk: "무도가" };
 const JOBS = ["전사", "레인저", "마법사", "무도가"] as const;
 /** 그 직업 무기, 레벨 순 (같은 레벨은 강화 수치가 있는 것 먼저) */
-/** 그래프 끌기 안내를 본 기기 (한 번 끌면 적는다) */
+/** 그래프 끌기 안내를 본 기기 (그래프에 손을 대면 적는다) */
 const DRAG_HINT = "sapphire.enh.dragHint";
+/** 안내 동안 그래프 위에서 반짝이는 별 [가로 %, 세로 %, 늦춤 초] */
+const SPARKS: [number, number, number][] = [
+  [6, 8, 0], [34, 4, 0.5], [62, 10, 1.1], [90, 6, 0.3], [18, 26, 0.8], [48, 22, 1.4], [78, 30, 0.2], [10, 48, 1.2],
+  [40, 44, 0.6], [70, 52, 1.6], [94, 46, 0.9], [24, 68, 0.4], [56, 72, 1.3], [86, 70, 0.7], [8, 88, 1.5], [44, 92, 0.1], [74, 90, 1],
+];
 
 const jobWeapons = (d: Enhance, job: string) =>
   d.weapons.filter((w) => w.job === job).sort((a, b) => (a.lv ?? 0) - (b.lv ?? 0) || Number(!a.bonus) - Number(!b.bonus) || a.name.localeCompare(b.name));
@@ -424,8 +429,9 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
   const drag = useRef<{ x0: number; y0: number; moved: boolean; id: number } | null>(null);
   const dragged = useRef(false);
   const [dragging, setDragging] = useState(false);
-  // 처음 한 번 '좌우로 끌어 보세요' (제작자 2026-11-05 '그래프 좌우로 드래그 기능 모르는 거 같아, 처음 들어오면 드래그 해 보라고 유도, 한 번만'):
-  // 이 기기에서 그래프를 한 번 끌면 다시 안 보인다. 튜토리얼 동안은 숨긴다
+  // 처음 한 번 끌기 안내 (제작자 2026-11-05 '그래프 좌우로 드래그 기능 모르는 거 같아, 처음 들어오면 드래그 해 보라고 유도, 한 번만'
+  // -> '노란 박스만 말고 그래프 전체를 반짝반짝, 맨 위에 좌우로 끌 수 있어요·단추를 누를 수 있어요, 손을 대거나 끌면 없어지고 다음부터 안 뜨게'):
+  // 그래프에 손을 대면(누르기, 끌기) 사라지고 이 기기에서는 다시 안 보인다. 튜토리얼 동안은 숨긴다
   const sample = useSample();
   const [hint, setHint] = useState(() => {
     try {
@@ -521,15 +527,22 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
           </div>
         )}
       </div>
-      <div ref={box} className={"enh-ch" + (dragging ? " enh-ch-dragging" : "")}>
+      {hint && !sample && (
+        <div className="enh-ch-tip" role="note">
+          <b>◀ ▶</b> 이 그래프는 좌우로 끌 수 있어요 · 네모 단추를 눌러도 기준이 바뀌어요
+        </div>
+      )}
+      <div ref={box} className={"enh-ch" + (dragging ? " enh-ch-dragging" : "") + (hint && !sample ? " enh-ch-hinting" : "")} onPointerDownCapture={hinted}>
         {hint && !sample && (
           <div className="enh-ch-hint" aria-hidden>
+            <span className="enh-ch-hint-glow" />
+            <span className="enh-ch-hint-shine" />
             <span className="enh-ch-hint-sweep">
               <i />
             </span>
-            <span className="enh-ch-hint-tag">
-              <b>◀</b> 좌우로 끌어 보세요 <b>▶</b>
-            </span>
+            {SPARKS.map(([x, y, d], i) => (
+              <i key={i} className="enh-ch-spark" style={{ left: `${x}%`, top: `${y}%`, animationDelay: `${d}s` }} />
+            ))}
           </div>
         )}
         {rows.map((r) => {
@@ -580,7 +593,6 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
                       if (dx < 8 || dx < Math.abs(e.clientY - g.y0)) return;
                       g.moved = true;
                       setDragging(true);
-                      hinted();
                       e.currentTarget.setPointerCapture?.(e.pointerId);
                     }
                     const pt = snap(valueAt(e.currentTarget, e.clientX));
