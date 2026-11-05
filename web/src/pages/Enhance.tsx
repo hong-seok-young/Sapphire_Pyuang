@@ -488,9 +488,22 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
           const isB = b.w?.name === r.w.name;
           const shut = open !== r.w.name;
           const pic = (wiki.items[r.w.name] ?? wiki.items[key(r.w.name)])?.icon;
-          // 기준선 바로 왼쪽·오른쪽 점 (제작자 2026-11-05 '6 7 사이에 있으면 6은 마이너스 몇 수직선 왼쪽에, 7은 플러스 몇 우측에')
+          // 기준선 바로 왼쪽·오른쪽 점 (제작자 2026-11-05 '6 7 사이에 있으면 6은 마이너스 몇, 7은 플러스 몇')
           const li = base === null ? -1 : r.vals.map((v) => v < base - 1e-9).lastIndexOf(true);
           const ri = base === null ? -1 : r.vals.findIndex((v) => v > base + 1e-9);
+          // % 는 그 % 에 해당하는 점 바로 위에 (제작자 2026-11-05 '수직선 좌우 퍼센트를 그 수치에 해당하는 무기 행의 버튼에'): 두 글자가 겹치면 사이에서 비켜 선다
+          const labs = (base === null ? [] : [li, ri].filter((i) => i >= 0)).map((i) => {
+            const p = pct(base as number, r.vals[i]);
+            const w = pctText(p).length * 5 + 6;
+            return { i, p, w, left: (x(r.vals[i]) / 100) * tw - w / 2 };
+          });
+          if (labs.length === 2 && labs[0].left + labs[0].w + 1 > labs[1].left) {
+            const mid = (labs[0].left + labs[0].w / 2 + labs[1].left + labs[1].w / 2) / 2;
+            labs[0].left = mid - labs[0].w - 1;
+            labs[1].left = mid + 1;
+          }
+          for (const l of labs) l.left = Math.max(0, Math.min(tw - l.w, l.left));
+          const edge = (i: number) => (i === li && li >= 0 ? " enh-ch-dot-lo" : i === ri && ri >= 0 ? " enh-ch-dot-hi" : "");
           return (
             <Fragment key={r.w.name}>
               <div className={"enh-ch-row" + (isA ? " enh-ch-a" : isB ? " enh-ch-b" : "")}>
@@ -554,7 +567,7 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
                     return (
                       <i
                         key={p}
-                        className={"enh-ch-dot" + mark + (i >= 2 ? " enh-ch-dot-ink" : "")}
+                        className={"enh-ch-dot" + mark + (mark ? "" : edge(i)) + (i >= 2 ? " enh-ch-dot-ink" : "")}
                         style={{ left: `${x(v)}%`, background: PLUS_COLOR[i], ...(w < DOT ? { width: w, marginLeft: -w / 2 } : null) }}
                         title={`+${p} ${r.w.name} ${fmt(v)}`}
                       >
@@ -564,20 +577,13 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
                   })}
                   {base !== null && (
                     <span className="enh-ch-labs">
-                      {li >= 0 && (
-                        <span className={"enh-ch-lab enh-ch-lab-l" + tone(pct(base, r.vals[li]))} style={{ right: `${100 - x(base)}%` }}>
-                          <Pop value={pctText(pct(base, r.vals[li]))} off={dragging}>
-                            {pctText(pct(base, r.vals[li]))}
+                      {labs.map((l) => (
+                        <span key={l.i} className={"enh-ch-lab" + tone(l.p)} style={tw ? { left: `${l.left}px`, width: `${l.w}px` } : { left: `${x(r.vals[l.i])}%`, transform: "translateX(-50%)" }}>
+                          <Pop value={pctText(l.p)} off={dragging}>
+                            {pctText(l.p)}
                           </Pop>
                         </span>
-                      )}
-                      {ri >= 0 && (
-                        <span className={"enh-ch-lab enh-ch-lab-r" + tone(pct(base, r.vals[ri]))} style={{ left: `${x(base)}%` }}>
-                          <Pop value={pctText(pct(base, r.vals[ri]))} off={dragging}>
-                            {pctText(pct(base, r.vals[ri]))}
-                          </Pop>
-                        </span>
-                      )}
+                      ))}
                     </span>
                   )}
                 </div>
