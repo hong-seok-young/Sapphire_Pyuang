@@ -2921,7 +2921,10 @@ button.gd-member-row { cursor: pointer; }
 .enh-ch-dot.enh-ch-dot-b { z-index: 2; box-shadow: 0 0 0 1px var(--panel), 0 0 0 3px var(--gold); }
 /* 기준선 양옆 % (오른쪽 칸 대신, 제작자 2026-11-05): 줄 위쪽 띠에, 왼쪽 점은 선 왼쪽에 −, 오른쪽 점은 선 오른쪽에 + */
 .enh-ch-labs { position: absolute; inset: 0 0 auto 0; height: 11px; overflow: hidden; pointer-events: none; z-index: 4; }
-.enh-ch-lab { position: absolute; top: 0; padding: 0 3px; font-size: 9px; line-height: 11px; white-space: nowrap; transition: left 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), right 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.enh-ch-lab { position: absolute; top: 0; padding: 0; font-size: 9px; line-height: 11px; text-align: center; white-space: nowrap; transition: left 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+/* 기준선 바로 아래·위 점: 그 위 % 와 같은 색 테두리 */
+.enh-ch-dot.enh-ch-dot-lo { z-index: 1; box-shadow: 0 0 0 1px var(--panel), 0 0 0 2px var(--red); }
+.enh-ch-dot.enh-ch-dot-hi { z-index: 1; box-shadow: 0 0 0 1px var(--panel), 0 0 0 2px #3fe0a0; }
 .enh-ch-dragging .enh-ch-lab { transition-duration: 0.12s; }
 /* 강화 비교 움직임 (제작자 2026-11-05 '버튼이 깜빡인다거나, 계속 보고 있거나 클릭했을 때, 차트가 어디가 움직인다거나'). 화면이 뜰 때 움직임은 없다 (Pop 은 처음 그릴 때 안 튄다).
    끝없이 도는 것은 transform·opacity 만 */
