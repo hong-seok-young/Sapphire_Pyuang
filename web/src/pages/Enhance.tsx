@@ -6,7 +6,10 @@
 // 맨 위 직업 칸을 고르면 그 직업 무기 목록(레벨 순)이 비어 있는 줄 아래에 뜨고, 무기를 고르면 ◀ ▶ 로 그 직업의 이전·다음 무기 (제작자 2026-11-04).
 // 비슷한 무기 (제작자 2026-11-05 '보통 무기를 7·8강 쓰거든, 해당 무기와 파워가 비슷한 무기 리스트들도 알아서 뽑아줘' -> '7 8 9 10 으로'): 지금 무기와 평균 데미지가 가까운
 // 같은 직업 다른 무기의 +7 ~ +10 을 8개, 약한 것부터 지금 무기와 함께 한 줄씩. 누르면 바꿀 무기로.
-import { useCallback, useMemo, useState } from "react";
+// 직업 무기 그래프 (제작자 2026-11-05 '직업별 모든 무기 6강부터 10강을 차트 그래프로 한방 정리'): 맨 위 직업 칸의 무기 전부, 무기마다 한 줄(+8 이 약한 것부터),
+// 가로는 평균 데미지, 네모 점은 +6 → +10 (한 색의 진하기: 강할수록 밝게, 색은 dataviz 검사기로 이 앱 판 바탕 #262150 에서 통과), 지금 무기는 흰 세로선.
+// 줄을 누르면 그 아래 강화마다 평균과 지금 대비 %, 누르면 바꿀 무기로.
+import { Fragment, useCallback, useMemo, useState } from "react";
 import type { Me } from "../auth";
 import { loadEnhance, loadTrend, useAsync } from "../data";
 import type { Enhance, EnhanceWeapon, Trend } from "../data";
@@ -334,6 +337,123 @@ function Similar({ d, wiki, a, b, onPick }: { d: Enhance; wiki: Wiki; a: Pick; b
   );
 }
 
+/** 그래프에 그리는 강화와 그 색 (파랑 한 색, +6 진함 -> +10 밝음. 바탕 --panel #262150 에서 dataviz validate_palette --ordinal 통과) */
+const CHART_PLUS = [6, 7, 8, 9, 10];
+const PLUS_COLOR = ["#256abf", "#3987e5", "#6da7ec", "#9ec5f4", "#cde2fb"];
+
+/** 가로 범위는 자료에 딱 맞게 (양끝 3% 여유), 눈금은 그 안의 1·2·2.5·5 x 10^n 간격으로 n 칸쯤 */
+function niceAxis(min: number, max: number, n = 4): { lo: number; hi: number; ticks: number[] } {
+  const pad = (max - min) * 0.03 || 1;
+  const lo = min - pad;
+  const hi = max + pad;
+  const raw = (hi - lo) / n;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((v) => v >= raw) ?? raw;
+  const ticks: number[] = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(Math.round(v * 100) / 100);
+  return { lo, hi, ticks };
+}
+
+/** 그 직업 무기 전부의 +6 ~ +10 평균 데미지를 한 그래프로 */
+function PowerChart({ d, wiki, job, a, b, onPick }: { d: Enhance; wiki: Wiki; job: string; a: Pick; b: Pick; onPick: (w: EnhanceWeapon, plus: number) => void }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const rows = jobWeapons(d, job)
+    .filter((w) => maxPlus(d, w) >= CHART_PLUS[CHART_PLUS.length - 1])
+    .map((w) => ({ w, vals: CHART_PLUS.map((p) => damage(d, w, p).avg) }))
+    .sort((x, y) => x.vals[2] - y.vals[2]);
+  if (rows.length === 0) return null;
+  const now = a.w && a.w.job === job ? damage(d, a.w, a.plus).avg : null;
+  const all = rows.flatMap((r) => r.vals).concat(now === null ? [] : [now]);
+  const { lo, hi, ticks } = niceAxis(Math.min(...all), Math.max(...all));
+  const x = (v: number) => ((v - lo) / (hi - lo || 1)) * 100;
+  return (
+    <section className="enh-card enh-chart">
+      <div className="enh-sim-head">
+        <b>{job} 무기</b>
+        <span className="enh-legend">
+          {CHART_PLUS.map((p, i) => (
+            <span key={p}>
+              <i style={{ background: PLUS_COLOR[i] }} />+{p}
+            </span>
+          ))}
+          {now !== null && (
+            <span>
+              <i className="enh-legend-now" />
+              지금
+            </span>
+          )}
+        </span>
+      </div>
+      <div className="enh-ch">
+        {rows.map((r) => {
+          const isA = a.w?.name === r.w.name;
+          const isB = b.w?.name === r.w.name;
+          const shut = open !== r.w.name;
+          const pic = (wiki.items[r.w.name] ?? wiki.items[key(r.w.name)])?.icon;
+          return (
+            <Fragment key={r.w.name}>
+              <button
+                type="button"
+                className={"enh-ch-row" + (isA ? " enh-ch-a" : isB ? " enh-ch-b" : "")}
+                onClick={() => setOpen(shut ? r.w.name : null)}
+                aria-expanded={!shut}
+              >
+                <span className="enh-ch-name">
+                  <span className="enh-ch-pic">{pic ? <PicImg pic={pic} max={16} /> : null}</span>
+                  <span>
+                    {r.w.name}
+                    <small>Lv.{r.w.lv ?? "?"}</small>
+                  </span>
+                </span>
+                <span className="enh-ch-track">
+                  {ticks.map((t) => (
+                    <i key={t} className="enh-ch-grid" style={{ left: `${x(t)}%` }} />
+                  ))}
+                  {now !== null && <i className="enh-ch-now" style={{ left: `${x(now)}%` }} />}
+                  <i className="enh-ch-bar" style={{ left: `${x(r.vals[0])}%`, width: `${x(r.vals[4]) - x(r.vals[0])}%` }} />
+                  {r.vals.map((v, i) => {
+                    const p = CHART_PLUS[i];
+                    const mark = isA && a.plus === p ? " enh-ch-dot-a" : isB && b.plus === p ? " enh-ch-dot-b" : "";
+                    return <i key={p} className={"enh-ch-dot" + mark} style={{ left: `${x(v)}%`, background: PLUS_COLOR[i] }} title={`+${p} ${r.w.name} ${fmt(v)}`} />;
+                  })}
+                </span>
+              </button>
+              {!shut && (
+                <div className="enh-ch-detail">
+                  {r.vals.map((v, i) => {
+                    const p = CHART_PLUS[i];
+                    const me = isA && a.plus === p;
+                    const on = isB && b.plus === p;
+                    return (
+                      <button key={p} type="button" className={"enh-ch-chip" + (me ? " enh-ch-chip-a" : on ? " enh-ch-chip-b" : "")} disabled={me} onClick={() => onPick(r.w, p)}>
+                        <b>+{p}</b>
+                        <span>{fmt(v)}</span>
+                        {now !== null && <small className={me ? "" : tone(pct(now, v))}>{me ? "지금" : pctText(pct(now, v))}</small>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </Fragment>
+          );
+        })}
+        <div className="enh-ch-axis">
+          <span className="muted">평균 데미지</span>
+          <span className="enh-ch-ticks">
+            {ticks
+              .filter((t) => x(t) > 6 && x(t) < 94)
+              .map((t) => (
+                <span key={t} style={{ left: `${x(t)}%` }}>
+                  {t}
+                </span>
+              ))}
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /** 고른 두 무기를 주소에 남겨 링크로 보낼 수 있게 (기록 칸을 늘리지 않는다) */
 function keepInUrl(a: Pick, b: Pick) {
   const enc = (p: Pick) => (p.w ? encodeURIComponent(`${p.plus}${p.w.name}`) : "");
@@ -410,6 +530,7 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
           </section>
           <Result d={d} t={t} a={pa} b={pb} />
           <Similar d={d} wiki={wiki} a={pa} b={pb} onPick={pickSimilar} />
+          <PowerChart d={d} wiki={wiki} job={job} a={pa} b={pb} onPick={pickSimilar} />
         </div>
       )}
     </>

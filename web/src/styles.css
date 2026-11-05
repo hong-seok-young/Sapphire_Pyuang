@@ -2872,6 +2872,38 @@ button.gd-member-row { cursor: pointer; }
 .enh-sim-avg { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .enh-sim-pct { font-size: 12px; text-align: right; white-space: nowrap; }
 .enh-sim-me .enh-sim-pct { color: var(--sapphire); font-weight: 700; }
+.enh-legend { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 7px; font-size: 11px; color: var(--muted); }
+.enh-legend > span { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.enh-legend i { display: inline-block; width: 8px; height: 8px; }
+.enh-legend i.enh-legend-now { width: 2px; height: 11px; background: var(--text); }
+.enh-ch { display: grid; grid-template-columns: minmax(0, 1fr); }
+.enh-ch-row { display: grid; grid-template-columns: 104px minmax(0, 1fr); align-items: stretch; width: 100%; min-height: 32px; padding: 0 0 0 4px;
+  text-align: left; background: none; border: 0; border-left: 3px solid transparent; color: inherit; box-shadow: none; }
+.enh-ch-row:active { transform: none; }
+.enh-ch-a { border-left-color: var(--sapphire); background: rgba(111, 143, 255, 0.1); }
+.enh-ch-b { border-left-color: var(--gold); background: rgba(255, 196, 92, 0.08); }
+.enh-ch-name { display: flex; align-items: center; gap: 3px; min-width: 0; font-size: 11px; line-height: 1.2; padding: 3px 0; }
+.enh-ch-name small { display: block; font-size: 10px; color: var(--muted); }
+.enh-ch-pic { flex: none; width: 16px; display: flex; justify-content: center; }
+.enh-ch-track { position: relative; margin: 0 7px 0 8px; min-width: 0; }
+.enh-ch-grid { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255, 255, 255, 0.07); }
+.enh-ch-now { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--text); opacity: 0.75; }
+.enh-ch-bar { position: absolute; top: 50%; height: 2px; margin-top: -1px; background: rgba(255, 255, 255, 0.22); }
+.enh-ch-dot { position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; box-shadow: 0 0 0 2px var(--panel); }
+.enh-ch-a .enh-ch-dot, .enh-ch-b .enh-ch-dot { box-shadow: 0 0 0 2px #2b2a58; }
+.enh-ch-dot.enh-ch-dot-a { z-index: 2; box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--text); }
+.enh-ch-dot.enh-ch-dot-b { z-index: 2; box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--gold); }
+.enh-ch-detail { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; padding: 4px 0 6px 7px; }
+.enh-ch-chip { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 2px; min-width: 0; font-size: 12px; line-height: 1.2; background: var(--lo); border: 0; color: inherit; }
+.enh-ch-chip span { font-size: 11px; color: var(--muted); }
+.enh-ch-chip small { font-size: 10px; white-space: nowrap; }
+.enh-ch-chip:disabled { opacity: 1; }
+.enh-ch-chip-a { outline: 2px solid var(--text); outline-offset: -2px; }
+.enh-ch-chip-b { outline: 2px solid var(--gold); outline-offset: -2px; }
+.enh-ch-axis { display: grid; grid-template-columns: 104px minmax(0, 1fr); padding-left: 7px; margin-top: 2px; font-size: 10px; }
+.enh-ch-axis > .muted { font-size: 10px; align-self: center; }
+.enh-ch-ticks { position: relative; height: 14px; margin: 0 7px 0 8px; color: var(--muted); }
+.enh-ch-ticks > span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
 
 /* ---------------------------------------------------------------- 확률 시뮬레이터 (개발중, pages/Simulator.tsx)
    결과마다 한 번만 도는 움직임 (transform · opacity). 성공은 금빛 고리와 튀는 조각, 실패(그대로)는 흔들림과 파란 막, 파괴는 둘로 갈라져 떨어진다 */
