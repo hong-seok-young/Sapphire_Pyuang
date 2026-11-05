@@ -586,7 +586,7 @@ async function activityParts(env: Env, mentioned: string[], now: number, today: 
 }
 
 const DEVREQ_STATUS: Record<string, string> = { review: "개발자 검토 중", agree: "오피서 합의·길마 결재 중", dev: "개발 착수", done: "개발 완료", rejected: "반려 (고쳐서 다시 신청할 수 있다)" };
-const DEVREQ_STEP: Record<string, string> = { submit: "신청", resubmit: "다시 신청", feasible: "개발자 검토(개발 가능)", agree: "오피서 합의", approve: "길마 최종 결재", reject: "반려", done: "개발 완료" };
+const DEVREQ_STEP: Record<string, string> = { submit: "신청", resubmit: "다시 신청", feasible: "개발자 검토(개발 가능)", agree: "오피서 합의", approve: "길마 최종 결재", skip: "길마 결재(오피서 합의 생략)", force: "길마 강제 결재(반려 뒤)", reject: "반려", done: "개발 완료" };
 const DEVREQ_SCOPE: Record<string, string> = { me: "나", some: "특정 인원", all: "길드 전체" };
 
 /** 개발 요청 최근 40개: 상태, 범위, 이번 차례 결재 이력(누가, 의견) */

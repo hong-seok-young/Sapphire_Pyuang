@@ -3461,6 +3461,8 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .dr-btn { position: relative; overflow: hidden; min-width: 0; padding: 7px 6px; font-size: 13px; white-space: nowrap; transition: transform 0.08s; }
 .dr-btn-go { color: var(--edge); background: #6dff9a; text-shadow: none; }
 .dr-btn-no { background: #b8394a; }
+/* 길마 강제 결재: 진한 금색, 한 번 더 누르면 dr-btn-danger 로 깜박 */
+.dr-btn-force { color: #1b1530; background: #e0a12e; text-shadow: none; }
 .dr-btn-danger { background: var(--red); color: var(--edge); text-shadow: none; animation: dr-blink 0.5s ease-in-out infinite alternate; }
 .dr-btn-small { flex: none; padding: 4px 10px; font-size: 12px; }
 /* 카드 */
@@ -3503,6 +3505,8 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .dr-link-on { background: var(--gold); }
 .dr-stamp { display: grid; place-items: center; width: 28px; height: 28px; font-size: 9px; font-weight: 700; color: #d2283b; border: 2px solid #d2283b; border-radius: 50%; transform: rotate(-12deg); box-shadow: inset 0 0 0 1px rgba(210, 40, 59, 0.3); }
 .dr-stamp-red { color: #fff; background: #d2283b; }
+/* 길마가 오피서 합의를 건너뛴 칸: 회색 '생략' 도장 */
+.dr-stamp-grey { color: #6b6f86; border-color: #6b6f86; box-shadow: inset 0 0 0 1px rgba(107, 111, 134, 0.3); }
 .dr-stamp-pop { animation: dr-stamp 0.45s cubic-bezier(0.2, 1.6, 0.4, 1); }
 @keyframes dr-stamp { 0% { transform: rotate(-30deg) scale(2.2); opacity: 0; } 60% { transform: rotate(-8deg) scale(0.9); opacity: 1; } 100% { transform: rotate(-12deg) scale(1); } }
 .dr-line-rej .dr-cell { opacity: 0.85; }

@@ -2,6 +2,8 @@
 //   feasible  앱개발자: 개발 검토(review) -> 합의·결재 대기(agree). 오피서들에게 합의 차례 알림
 //   agree     오피서: 합의 (이번 차례 한 번, 자기 요청은 안 됨). 처음 합의면 길드마스터에게 결재 차례 알림
 //   approve   길드마스터: 합의가 1명 이상이면 최종 결재 -> 개발 중(dev). 앱개발자에게 알림
+//   skip      길드마스터: 오피서 합의 없이 최종 결재 (합의 생략, 제작자 2026-11-05 '길마 권한으로 오피서 합의 건너뛰게') -> dev
+//   force     길드마스터: 개발자 검토 뒤에 반려된 요청을 강제 결재 (제작자 2026-11-05 '오피서가 반려해도 강제 결재') -> dev. 반려한 사람에게도 알림
 //   reject    검토 중엔 앱개발자, 합의·결재 대기엔 오피서·길드마스터: 반려 의견을 꼭 적는다 -> rejected (신청한 사람이 고쳐서 다시 신청)
 //   done      앱개발자: 개발 중 -> 완료. 신청한 사람(과 특정 인원)에게 알림
 // note 는 결재 의견 ('이렇게 만들어 달라', 반려 까닭). 이력은 지우지 않는다
@@ -57,6 +59,32 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
       () => tell(env, me, ["owner"], row, `길드마스터 결재 완료 · 개발을 시작해요 · ${q}`),
       () => tell(env, me, ["developer"], row, `결재 완료 · 개발해 주세요 · ${q}${note ? ` · ${note}` : ""}`),
     );
+  } else if (b.act === "skip") {
+    if (!role.approve) return FORBIDDEN();
+    if (row.status !== "agree") return json({ error: "결재할 차례가 아니에요" }, 409);
+    if ((await agreesOf(env, row)).length) return json({ error: "합의가 이미 있어요. 최종 결재를 눌러 주세요" }, 409);
+    next = "dev";
+    kind = "skip";
+    after.push(
+      () => tell(env, me, ["owner"], row, `길드마스터 결재 완료 (오피서 합의 생략) · 개발을 시작해요 · ${q}`),
+      () => tell(env, me, ["developer"], row, `결재 완료 (오피서 합의 생략) · 개발해 주세요 · ${q}${note ? ` · ${note}` : ""}`),
+    );
+  } else if (b.act === "force") {
+    if (!role.approve) return FORBIDDEN();
+    if (row.status !== "rejected") return json({ error: "반려된 요청이 아니에요" }, 409);
+    // 개발자 검토를 지난 뒤(합의·결재 대기 때) 반려된 것만. 개발자가 '개발 못 함'으로 반려한 것은 넘기지 않는다
+    const st = await env.DB.prepare("SELECT user_id, kind FROM dev_request_steps WHERE req_id = ? AND round = ? ORDER BY id")
+      .bind(row.id, row.round)
+      .all<{ user_id: string; kind: string }>();
+    if (!st.results.some((s) => s.kind === "feasible")) return json({ error: "개발자 검토에서 반려된 요청은 강제 결재할 수 없어요" }, 409);
+    const rejecter = [...st.results].reverse().find((s) => s.kind === "reject")?.user_id;
+    next = "dev";
+    kind = "force";
+    after.push(
+      () => tell(env, me, ["owner"], row, `반려됐던 요청을 길드마스터가 강제 결재했어요 · 개발을 시작해요 · ${q}`),
+      () => tell(env, me, ["developer"], row, `강제 결재 · 개발해 주세요 · ${q}${note ? ` · ${note}` : ""}`),
+    );
+    if (rejecter && rejecter !== row.user_id) after.push(() => tell(env, me, [rejecter], row, `[강제 결재] 반려하신 요청을 길드마스터가 결재했어요 · ${q}${note ? ` · ${note}` : ""}`));
   } else if (b.act === "reject") {
     const may = row.status === "review" ? role.dev : row.status === "agree" ? role.agree || role.approve : false;
     if (!may) return row.status === "review" || row.status === "agree" ? FORBIDDEN() : json({ error: "반려할 수 있는 때가 아니에요" }, 409);
