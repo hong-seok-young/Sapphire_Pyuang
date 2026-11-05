@@ -812,3 +812,38 @@ export function MasterNote({
     </div>
   );
 }
+
+/** 한 줄에 다 안 들어가면 오른쪽에서 왼쪽으로 흐른다 (다 들어가면 그대로). 홈 점검 띠(.maint)와 강화 비교의 마법사 안내 */
+export function FlowLine({ text }: { text: string }) {
+  const box = useRef<HTMLSpanElement>(null);
+  const [flow, setFlow] = useState(false);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const check = () => {
+      const inner = el.firstElementChild as HTMLElement | null;
+      if (inner) setFlow(inner.scrollWidth > el.clientWidth + 1);
+    };
+    setFlow(false);
+    check();
+    const watch = new ResizeObserver(check);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [text]);
+  return (
+    <span className={"maint-sub" + (flow ? " maint-flow" : "")} ref={box}>
+      {/* 흐를 때는 같은 글을 두 번 이어 붙여 끊김 없이 (절반만큼 옮기고 처음으로) */}
+      <span
+        className="maint-run"
+        style={
+          flow
+            ? { animationDuration: `${Math.max(8, text.length * 0.28)}s` }
+            : undefined
+        }
+      >
+        <span>{text}</span>
+        {flow && <span aria-hidden>{text}</span>}
+      </span>
+    </span>
+  );
+}
