@@ -2847,6 +2847,36 @@ button.gd-member-row { cursor: pointer; }
 .enh-hit { display: inline-flex; align-items: baseline; gap: 4px; padding: 4px 8px; font-size: 13px; min-width: 0; }
 .enh-hit small { font-size: 11px; opacity: 0.7; }
 .enh-swap { align-self: center; width: 16px; height: 40px; padding: 0; font-size: 12px; line-height: 1; background: var(--lo); border: 2px solid var(--edge); color: var(--muted); }
+/* ── 초안: 목록이 채울 칸 보이기 (?g=1~5) ── */
+.enh-picks[class*="enh-g"] { --on: var(--sapphire); }
+.enh-picks.enh-on-b { --on: var(--gold); }
+/* 1안 폴더 탭: 채울 칸과 목록을 한 테두리로 묶는다 */
+.enh-g1 .enh-pick-on { position: relative; z-index: 1; border: 2px solid var(--on); border-bottom: 0; margin-bottom: -8px; padding-bottom: 10px; box-shadow: none; }
+.enh-g1 .enh-list { border: 2px solid var(--on); padding: 6px; background: var(--lo); }
+/* 2안 화살표: 칸 테두리 + 아래로 꼭지, 목록 테두리 */
+.enh-g2 .enh-pick-on { position: relative; outline: 2px solid var(--on); outline-offset: -1px; box-shadow: none; }
+.enh-g2 .enh-pick-on::after { content: ""; position: absolute; left: 50%; bottom: -9px; margin-left: -7px; border: 7px solid transparent; border-bottom: 0; border-top-color: var(--on); }
+.enh-g2 .enh-list { border: 2px solid var(--on); padding: 6px; margin-top: 4px; }
+/* 3안 번호: 칸마다 1·2 표, 채울 칸만 밝게, 목록 머리에 같은 번호 */
+.enh-g3 .enh-pick { position: relative; }
+.enh-g3 .enh-pick::before { position: absolute; z-index: 2; top: -6px; left: -6px; width: 14px; height: 14px; font-size: 10px; line-height: 14px; text-align: center; font-weight: 700; color: #10163a; background: var(--muted); }
+.enh-g3 .enh-pick.enh-a::before { content: "1"; }
+.enh-g3 .enh-pick.enh-b::before { content: "2"; }
+.enh-g3.enh-on-a .enh-pick.enh-a::before, .enh-g3.enh-on-b .enh-pick.enh-b::before { background: var(--on); }
+.enh-g3 .enh-pick-on { box-shadow: inset 0 0 0 2px var(--on); }
+.enh-g3 .enh-list { position: relative; padding-top: 20px; }
+.enh-g3.enh-on-a .enh-list::before, .enh-g3.enh-on-b .enh-list::before { position: absolute; top: 0; left: 5px; font-size: 11px; font-weight: 700; color: var(--on); }
+.enh-g3.enh-on-a .enh-list::before { content: "1  기준 무기"; white-space: pre; }
+.enh-g3.enh-on-b .enh-list::before { content: "2  바꿀 무기"; white-space: pre; }
+/* 4안 색 칸: 채울 칸과 목록을 같은 색 바탕으로, 다른 칸은 흐리게 */
+.enh-g4 .enh-pick-on { background: color-mix(in srgb, var(--on) 22%, var(--lo)); box-shadow: none; }
+.enh-g4 .enh-list { background: color-mix(in srgb, var(--on) 22%, var(--lo)); padding: 6px; }
+.enh-g4.enh-on-a .enh-pick.enh-b, .enh-g4.enh-on-b .enh-pick.enh-a { opacity: 0.45; }
+/* 5안 깜박이는 점선: 채울 칸 점선 테두리가 숨 쉬듯, 목록도 같은 점선, 다른 칸은 흐리게 */
+.enh-g5 .enh-pick-on { position: relative; box-shadow: none; }
+.enh-g5 .enh-pick-on::after, .enh-g5 .enh-list::after { content: ""; position: absolute; inset: -2px; border: 2px dashed var(--on); pointer-events: none; animation: enh-breathe 1.6s ease-in-out infinite; }
+.enh-g5 .enh-list { position: relative; padding: 6px; margin-top: 2px; }
+.enh-g5.enh-on-a .enh-pick.enh-b, .enh-g5.enh-on-b .enh-pick.enh-a { opacity: 0.45; }
 .enh-res { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; }
 .enh-res .enh-big { font-size: 24px; line-height: 1.05; }
 .enh-res-mid { display: grid; justify-items: center; min-width: 0; }
