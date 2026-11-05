@@ -12,6 +12,7 @@ import type { GoldOffer, GoldSide } from "../gold";
 import { MARKET_PIC, MAX_NOTE, ago } from "../market";
 import { Loading } from "../ui";
 import { KakaoButton, Nick } from "../kakao";
+import { useBackClose } from "../backClose";
 
 const Coin = () => <img className="mk-coin" src={MARKET_PIC + "coin.png"} alt="" />;
 
@@ -250,6 +251,8 @@ export function GoldRows({
   empty: string;
 }) {
   const [open, setOpen] = useState<number | null>(null);
+  // 폰 뒤로 가기로 펼친 정보창을 닫는다 (backClose.ts)
+  useBackClose(open !== null, () => setOpen(null));
   if (!list.length) return <div className="empty">{empty}</div>;
   return (
     <ul className="mk-list">

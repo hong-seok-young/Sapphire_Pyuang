@@ -11,6 +11,7 @@ import { MARKET_PIC, MAX_PRICE, ago, goldText, goldWords } from "../market";
 import { MAX_DETAIL, MAX_NOTE, MAX_REWARD_TEXT, MAX_TITLE, STATUS_NAME, actOnRequest, createRequest, deleteRequest, fetchRequests, liveOffers } from "../requests";
 import type { GuildRequest, RequestAction } from "../requests";
 import { Loading, TopBar } from "../ui";
+import { useBackClose } from "../backClose";
 
 type Filter = "open" | "done" | "mine";
 const FILTERS: { key: Filter; label: string }[] = [
@@ -242,6 +243,8 @@ export function RequestsPage({ me }: { me: Me }) {
   const [filter, setFilter] = useEntryState<Filter>("filter", "open");
   const [writing, setWriting] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
+  // 폰 뒤로 가기로 펼친 정보창을 닫는다 (backClose.ts)
+  useBackClose(open !== null, () => setOpen(null));
   useEffect(() => {
     if (data) setList(data);
   }, [data]);

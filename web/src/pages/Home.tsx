@@ -39,6 +39,7 @@ import { newsFor, useMaint, useNews } from "../news";
 import type { Maint } from "../news";
 import { ClickHint, openGuide } from "../tutorial";
 import { showNew } from "../updates";
+import { useBackClose } from "../backClose";
 
 /**
  * 칸 그림: 이모지 (상점 칸만 게임 상점 그림). 제작자 요청 2026-10-31: 게임 아이템 그림을 키운 아이콘은 뭉개져서
@@ -206,6 +207,8 @@ export function InfoPage({ me }: { me: Me }) {
 
 export function Home({ me }: { me: Me }) {
   const L = useLauncher();
+  // 배치 편집 중에는 폰 뒤로 가기가 편집만 끝낸다 (backClose.ts)
+  useBackClose(L.editing, () => setEditing(false));
   const layout = L.preview ?? L.layout;
   // 검색은 아래 탭에 있으면 홈에 검색 칸을 두지 않고, 홈으로 올리면 맨 위에 검색 칸이 생긴다 (제작자 요청 2026-11-01)
   const hasSearch = searchUp(layout);

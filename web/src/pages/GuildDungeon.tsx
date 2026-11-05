@@ -38,6 +38,7 @@ import { sampleParty } from "../sample";
 import { useSample } from "../tutorialState";
 import { useEntryState } from "../router";
 import { FitLine, Loading, TopBar } from "../ui";
+import { useBackClose } from "../backClose";
 
 export function GuildDungeonPage({ me }: { me: Me }) {
   const [data, setData] = useState<GdData | null>(null);
@@ -162,7 +163,6 @@ function ColsNotice({ me }: { me: string }) {
       return false;
     }
   });
-  if (!open) return null;
   const close = () => {
     try {
       localStorage.setItem(key, "1");
@@ -171,6 +171,9 @@ function ColsNotice({ me }: { me: string }) {
     }
     setOpen(false);
   };
+  // 폰 뒤로 가기로 안내만 닫는다 (backClose.ts)
+  useBackClose(open, close);
+  if (!open) return null;
   return (
     <div className="gd-notice" role="dialog" aria-modal="true" onClick={close}>
       <div className="gd-notice-card" onClick={(e) => e.stopPropagation()}>
