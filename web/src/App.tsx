@@ -83,6 +83,7 @@ const CHUNKS = {
   Market: () => import("./pages/Market"),
   Requests: () => import("./pages/Requests"),
   Enhance: () => import("./pages/Enhance"),
+  DevRequests: () => import("./pages/DevRequests"),
   Simulator: () => import("./pages/Simulator"),
   Trend: () => import("./pages/Trend"),
   ActivityLog: () => import("./pages/ActivityLog"),
@@ -105,6 +106,7 @@ const RankingPage = lazy(() => CHUNKS.Ranking().then((m) => ({ default: m.Rankin
 const MarketPage = lazy(() => CHUNKS.Market().then((m) => ({ default: m.MarketPage })));
 const RequestsPage = lazy(() => CHUNKS.Requests().then((m) => ({ default: m.RequestsPage })));
 const EnhancePage = lazy(() => CHUNKS.Enhance().then((m) => ({ default: m.EnhancePage })));
+const DevRequestsPage = lazy(() => CHUNKS.DevRequests().then((m) => ({ default: m.DevRequestsPage })));
 const SimulatorPage = lazy(() => CHUNKS.Simulator().then((m) => ({ default: m.SimulatorPage })));
 const TrendPage = lazy(() => CHUNKS.Trend().then((m) => ({ default: m.TrendPage })));
 const ActivityLogPage = lazy(() => CHUNKS.ActivityLog().then((m) => ({ default: m.ActivityLogPage })));
@@ -405,6 +407,8 @@ function Wiki({
     body = <SwitchTo me={me} who={arg} to={route.query.get("to") ?? ""} />;
   else if (page === "ranking") body = <RankingPage me={me} onMe={onMe} />;
   else if (page === "requests") body = <RequestsPage me={me} />;
+  // 개발 요청 (개발중, 제작자 요청 2026-11-05): 미리 보는 사람만 (launcher.ts canPreview, 서버 server/devreq.ts canUseDevReq)
+  else if (page === "devreq") body = canPreview(me) ? <DevRequestsPage me={me} query={route.query} /> : <DevSoon title="개발 요청" />;
   else if (page === "alerts")
     body = (
       <AlertsPage
