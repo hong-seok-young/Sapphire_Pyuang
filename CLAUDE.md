@@ -1176,6 +1176,10 @@
     그냥 grid(칸 `auto`)나 `1fr` 은 안의 가장 긴 줄(줄 바꿈 없는 이름과 단추)만큼 칸이 커져 목록 전체가 화면 밖으로 밀린다 (2026-11-02 장비반납).
   - 이름과 단추 여럿이 한 줄인 flex 줄은 `flex-wrap: wrap` 으로 단추 묶음이 다음 줄 오른쪽으로 내려가게 하고(`.rent-back-side`), 이름 칸은 `min-width: 0`.
   - 입력 칸은 `min-width: 0`(전체 규칙). `white-space: nowrap` 은 짧은 단추 글자에만. 긴 글자는 body 의 `overflow-wrap: anywhere` 로 그 칸 안에서 줄을 바꾼다.
+- 화면 확대는 막는다 (제작자 2026-11-06 '스크롤하면 맨 밑 메뉴까지 없어지면 어케, 맨 밑 5개 버튼은 고정이지': 폰에서 손가락으로 벌리거나 두 번 눌러
+  화면이 조금 커진 채로 있으면 고정된 아래 탭이 화면 밖으로 밀려 안 보였다. 넘치는 칸은 없었다): `index.html` viewport 의 `maximum-scale=1, user-scalable=no`,
+  `styles.css` 의 `html { touch-action: pan-x pan-y }`(브라우저가 확대를 강제로 허용해도 두 손가락 확대·두 번 눌러 확대가 안 되게), 아이폰 사파리는 `main.tsx` 의 gesturestart 막기.
+  게시판 사진 보기는 두 번 눌러 확대(`PhotoViewer` 자체)로 본다. 확대에 기대는 화면을 만들지 않는다.
 - 검사: `web/scripts/check-width.cjs` (Playwright, 로컬 `wrangler pages dev` 에 로그인해서): 모든 화면과 칸 고르기 단추, 줄 펼침·팝업·대화창·폼을 320·360·384·412px 로 열어
   화면 밖, 부모 칸 밖, 글자 넘침을 찾는다. 큰 기능을 고친 뒤와 오픈 전에 돌린다.
 
