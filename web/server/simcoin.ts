@@ -32,7 +32,7 @@ export interface EarnRule {
 export const EARN: EarnRule[] = [
   { key: "visit", label: "하루 첫 접속", coin: 20, cap: 1 },
   { key: "board", label: "게시판 글쓰기", coin: 30, cap: 3, method: "POST", re: /^\/api\/board$/ },
-  { key: "comment", label: "게시판 댓글", coin: 5, cap: 10, method: "POST", re: /^\/api\/board\/\d+\/comments$/ },
+  { key: "comment", label: "게시판 댓글", coin: 5, cap: 10, method: "POST", re: /^\/api\/(board|official)\/\d+\/comments$/ },
   { key: "like", label: "게시판 좋아요", coin: 1, cap: 10, method: "PUT", re: /^\/api\/board\/\d+\/like$/ },
   { key: "gd", label: "길드 던전 시간표 확정", coin: 20, cap: 1, method: "POST", re: /^\/api\/gd\/confirm$/ },
   { key: "gdpaint", label: "길드 던전 시간표 칠하기", coin: 2, cap: 5, method: "PUT", re: /^\/api\/gd\/avail$/ },

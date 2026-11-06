@@ -71,6 +71,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
       floor(...imoKeys),
       imoFrom,
     ),
+    q(
+      `SELECT 'imo:' || c.post_id AS k, CASE WHEN o.type = 'C' THEN 'imo.maint' WHEN o.type = 'E' THEN 'imo.event' ELSE 'imo.notice' END AS c, c.created_at AS t, NULL AS s ` +
+        `FROM official_comments c JOIN official_news o ON o.id = c.post_id WHERE c.created_at > ?1 AND c.user_id NOT IN ${MINE}`,
+      floor(...imoKeys),
+    ),
     q(`SELECT 'item:' || id AS k, 'market.items' AS c, created_at AS t, side AS s FROM listings WHERE created_at > ?1 AND seller NOT IN ${MINE} AND status = 'selling'`, floor("market.items")),
     q(
       `SELECT 'talk:' || t.listing_id AS k, 'market.items' AS c, t.created_at AS t, l.side AS s FROM listing_talk t JOIN listings l ON l.id = t.listing_id ` +

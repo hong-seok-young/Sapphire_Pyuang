@@ -1,6 +1,8 @@
 // 아이모 소식 (제작자 요청 2026-11-01): 아이모 공식 홈페이지(withhive.com)의 공지사항, 점검, 이벤트.
 // 서버가 30분마다 받아 둔 것(functions/api/official.ts)을 게시판의 '아이모 소식'에서 보이고, 누르면 앱 안에서 읽는다 (원문은 링크로)
 import { api } from "./auth";
+import type { Role } from "./auth";
+import type { BoardComment } from "./board";
 
 export type OfficialTab = "all" | "notice" | "maint" | "event";
 
@@ -13,12 +15,20 @@ export interface OfficialItem {
   start: string | null;
   end: string | null;
   image: string | null;
+  /** 본 사람·좋아요·댓글 수 (제작자 2026-11-06 '일반 게시판이랑 똑같이') */
+  views?: number;
+  likes?: number;
+  comments?: number;
 }
 
-export interface OfficialPost extends OfficialItem {
+export interface OfficialPost extends Omit<OfficialItem, "comments"> {
   /** 간단히 한 본문 HTML (문단, 굵게, 표, 목록, 그림, 링크). 너무 크면 null: 글자(body)만 */
   html: string | null;
   body: string;
+  /** 댓글·좋아요·본 사람 (게시판 글과 같은 모양) */
+  comments: BoardComment[];
+  liked: boolean;
+  roles: Record<string, Role>;
 }
 
 /** 게시판 '아이모 소식' 안의 칸 */
@@ -46,6 +56,10 @@ export const fetchOfficial = (tab: OfficialTab, before?: number) =>
   api<{ items: OfficialItem[]; more: boolean; checkedAt: number | null }>(`/api/official?tab=${tab}${before ? `&before=${before}` : ""}`);
 
 export const fetchOfficialPost = (id: number) => api<OfficialPost>(`/api/official/${id}`);
+export const addOfficialComment = (id: number, text: string, parent: number | null) =>
+  api<BoardComment>(`/api/official/${id}/comments`, "POST", { text, parent });
+export const deleteOfficialComment = (cid: number) => api<{ ok: boolean }>(`/api/official/comments/${cid}`, "DELETE");
+export const setOfficialLike = (id: number, on: boolean) => api<{ likes: number; liked: boolean }>(`/api/official/${id}/like`, "PUT", { on });
 /** 글의 핵심 요약과 패치노트 직업별 변경점 (처음 연 사람이면 서버가 만든다, 만드는 중이면 pending) */
 export interface OfficialSummary {
   lines?: string[];

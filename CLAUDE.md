@@ -242,6 +242,12 @@
   누르면 앱 안에서 읽는다 (`#/official/번호`, `OfficialPostPage`, `/api/official/:id`): 맨 위 '📄 컴투스 공식 · 원문 보기 ↗',
   본문은 html 을 화면이 한 번 더 걸러서(정한 태그와 그림 주소, 링크만) 그린다. 다른 공식 글 링크는 앱 안으로. 정보의 '공식 소식' 칸은 게시판으로 옮겼다
   (예전 주소 `#/official` 은 게시판 아이모 소식으로).
+- 조회수·좋아요·댓글 (제작자 2026-11-06 '아이모 소식에서도 조회수 댓글 등등 달게, 일반 게시판이랑 똑같이', '지금까지 조회한 거 기록 있으면 반영'): 게시판 글과 같다.
+  D1 `official_views`·`official_likes`·`official_comments`(글 번호는 공식 글 번호), `GET /api/official/:id` 가 본 사람으로 세고 댓글·좋아요·본 사람 수를 같이 준다,
+  `POST /api/official/:id/comments`(답글 한 단계, 500자, 1분에 10개, 답글이면 원래 댓글 쓴 사람에게 알림), `PUT /api/official/:id/like`, `DELETE /api/official/comments/:cid`(쓴 사람·운영진).
+  댓글 칸은 게시판과 같은 `pages/Comments.tsx`, 목록 줄 날짜 뒤 '· 👁 2 · ♥ 1 · 💬 3'. 새 댓글도 배지가 그 글까지 따라간다 (news.ts 'imo:<글>').
+  본 사람은 처음 배포 때 사용 기록(DB 1 과 사용 기록 DB 2~10)의 '#/official/<글>' 화면 기록으로 글·사람마다 처음 본 때를 채웠다 (`ci-d1.mjs` setup 'official_views_backfill', 테스트 계정 빼고).
+  닉네임 바꾸기·계정 삭제에 따라간다.
 - 핵심 요약 (제작자 요청 2026-11-02: 공식 글이 너무 길다): 글 제목 아래 '핵심 요약' 1~3줄과, 패치노트·업데이트 글이면 '내 직업(마법사) 변경점'
   (`Official.tsx` `SummaryBox`, `/api/official/:id/summary`, `server/officialSummary.ts`). 처음 연 사람 때 Claude(`claude-opus-5-5`, effort high)가 만들어 D1 `official_summary` 에 두고
   원문(src)이 바뀌면 다시 만든다. 여럿이 같이 열면 한 곳만 만들고(claimed_at 90초) 나머지는 '요약하는 중…' 뒤 4초마다 다시 묻는다. 본문이 거의 없는 글과 못 만든 글은 칸을 그리지 않는다.

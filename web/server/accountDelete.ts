@@ -55,6 +55,9 @@ export async function deleteAccountData(env: Env, user: { id: string; main_id: s
     env.DB.prepare("DELETE FROM board_comments WHERE user_id = ? OR post_id IN (SELECT id FROM board_posts WHERE author = ?)").bind(user.id, user.id),
     env.DB.prepare("DELETE FROM board_likes WHERE user_id = ? OR post_id IN (SELECT id FROM board_posts WHERE author = ?)").bind(user.id, user.id),
     env.DB.prepare("DELETE FROM board_views WHERE user_id = ? OR post_id IN (SELECT id FROM board_posts WHERE author = ?)").bind(user.id, user.id),
+    env.DB.prepare("DELETE FROM official_comments WHERE user_id = ? OR parent_id IN (SELECT id FROM official_comments WHERE user_id = ?)").bind(user.id, user.id),
+    env.DB.prepare("DELETE FROM official_likes WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM official_views WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM board_posts WHERE author = ?").bind(user.id),
     env.DB.prepare(
       "DELETE FROM listing_wants WHERE user_id = ? OR listing_id IN (SELECT id FROM listings WHERE seller = ?)",

@@ -22,7 +22,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   }
   const [rows, checked] = await env.DB.batch([
     env.DB.prepare(
-      `SELECT id, kind, type, title, start_date AS start, end_date AS end, image FROM official_news WHERE ${where.join(" AND ")} ORDER BY id DESC LIMIT ${PAGE}`,
+      `SELECT id, kind, type, title, start_date AS start, end_date AS end, image, ` +
+        "(SELECT COUNT(*) FROM official_views v WHERE v.post_id = official_news.id) AS views, " +
+        "(SELECT COUNT(*) FROM official_likes l WHERE l.post_id = official_news.id) AS likes, " +
+        "(SELECT COUNT(*) FROM official_comments c WHERE c.post_id = official_news.id) AS comments " +
+        `FROM official_news WHERE ${where.join(" AND ")} ORDER BY id DESC LIMIT ${PAGE}`,
     ).bind(...binds),
     env.DB.prepare("SELECT done_at FROM setup WHERE key = 'official_checked'"),
   ]);

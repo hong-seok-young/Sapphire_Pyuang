@@ -1,11 +1,15 @@
 import { Fragment, createElement, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { errorText } from "../auth";
-import { OFFICIAL_TABS, TYPE_NAME, fetchOfficial, fetchOfficialPost, fetchOfficialSummary, officialLink, officialUrl } from "../official";
+import type { Me } from "../auth";
+import { Comments } from "./Comments";
+import {
+  OFFICIAL_TABS, TYPE_NAME, addOfficialComment, deleteOfficialComment, fetchOfficial, fetchOfficialPost, fetchOfficialSummary, officialLink, officialUrl, setOfficialLike,
+} from "../official";
 import type { OfficialItem, OfficialPost, OfficialSummary, OfficialTab } from "../official";
 import { go } from "../router";
 import { Loading, NewsDot, ThingDot, TopBar } from "../ui";
-import { markThingSeen, newsSum, useNews } from "../news";
+import { markThingSeen, newsSum, thingSince, useNews } from "../news";
 import type { NewsKey } from "../news";
 
 /** 한국 날짜 'YYYY-MM-DD' (며칠 전) */
@@ -103,7 +107,13 @@ export function OfficialList({ tab }: { tab: OfficialTab }) {
                       {it.title}
                       <ThingDot k={`imo:${it.id}`} />
                     </b>
-                    <small>{dates(it, today)}</small>
+                    <small>
+                      {dates(it, today)}
+                      {/* 게시판 줄처럼 본 사람·좋아요·댓글 수 */}
+                      {` · 👁 ${it.views ?? 0}`}
+                      {(it.likes ?? 0) > 0 && ` · ♥ ${it.likes}`}
+                      {(it.comments ?? 0) > 0 && ` · 💬 ${it.comments}`}
+                    </small>
                   </span>
                 </a>
               </li>
@@ -222,9 +232,12 @@ function SummaryBox({ summary, job }: { summary: OfficialSummary | null; job: st
 }
 
 /** 공식 글 하나를 앱 안에서 읽는다 (그림 포함, 맨 위에 원문 링크) */
-export function OfficialPostPage({ id, job }: { id: number; job: string | null }) {
+export function OfficialPostPage({ me, id, job }: { me: Me; id: number; job: string | null }) {
   const [post, setPost] = useState<OfficialPost | null>(null);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  // 이 글을 마지막으로 본 때 (그 뒤에 남이 단 댓글에 'N', news.ts)
+  const [since] = useState(() => thingSince(`imo:${id}`));
   const summary = useSummary(id);
   useEffect(() => {
     let alive = true;
@@ -280,7 +293,39 @@ export function OfficialPostPage({ id, job }: { id: number; job: string | null }
         <h2 className="off-post-title">{post.title}</h2>
         <SummaryBox summary={summary} job={job} />
         <div className="off-body">{body ?? <p className="off-text">{post.body}</p>}</div>
+        {/* 게시판 글처럼 좋아요와 본 사람 수 (제작자 2026-11-06 '아이모 소식에서도 조회수 댓글 등등, 일반 게시판이랑 똑같이') */}
+        <div className="bd-actions off-actions">
+          <button
+            className={"pill bd-like" + (post.liked ? " pill-on" : "")}
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const r = await setOfficialLike(id, !post.liked);
+                setPost({ ...post, likes: r.likes, liked: r.liked });
+              } catch (x) {
+                setError(errorText(x));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {post.liked ? "♥" : "♡"} {post.likes ?? 0}
+          </button>
+          <small className="off-views">👁 {post.views ?? 0}</small>
+        </div>
+        {error && <p className="form-error">{error}</p>}
       </article>
+      <Comments
+        me={me}
+        id={id}
+        comments={post.comments}
+        roles={post.roles}
+        since={since}
+        onChange={(comments) => setPost({ ...post, comments })}
+        add={addOfficialComment}
+        remove={deleteOfficialComment}
+      />
     </>
   );
 }

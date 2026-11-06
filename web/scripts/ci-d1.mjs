@@ -524,3 +524,41 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
     );
   }
 }
+
+// 아이모 소식 글의 본 사람을 지금까지의 사용 기록으로 채운다 (제작자 2026-11-06 '아이모 소식에서도 조회수 댓글 등등, 혹시 지금까지 조회한 거 기록 있으면 반영해 주고').
+// 사용 기록(DB 1 의 예전 activity 와 사용 기록 DB 2~10)의 화면 '#/official/<글>' 줄을 글·사람마다 처음 본 때로 official_views 에 (이미 있으면 그대로).
+// 테스트 계정은 뺀다. 공개 실행 기록에는 수만. setup 'official_views_backfill' 로 한 번만
+{
+  const KEY = "official_views_backfill";
+  if (!queryFirst(`SELECT 1 AS done FROM setup WHERE key = '${KEY}'`)) {
+    const all = (db, sql) => {
+      try {
+        return parseJson(wrangler("d1", "execute", db, "--remote", "--json", "--command", sql))[0]?.results ?? [];
+      } catch {
+        return [];
+      }
+    };
+    const SQL = "SELECT what, user_id, MIN(at) AS at FROM activity WHERE kind = 'view' AND what LIKE '#/official/%' GROUP BY what, user_id";
+    const rows = [DB, ...[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => `sapphire-log-${n}`)].flatMap((db) => all(db, SQL));
+    const posts = new Set(all(DB, "SELECT id FROM official_news").map((r) => Number(r.id)));
+    const users = new Set(all(DB, "SELECT id FROM users").map((r) => r.id));
+    const first = new Map();
+    for (const r of rows) {
+      const m = /^#\/official\/(\d+)/.exec(String(r.what));
+      if (!m || ["테스트1", "테스트2"].includes(r.user_id) || !users.has(r.user_id)) continue;
+      const id = Number(m[1]);
+      if (!posts.has(id)) continue;
+      const k = `${id}\t${r.user_id}`;
+      first.set(k, Math.min(first.get(k) ?? Infinity, Number(r.at)));
+    }
+    const q = (v) => `'${String(v).replaceAll("'", "''")}'`;
+    const lines = [...first].map(([k, at]) => {
+      const [id, user] = k.split("\t");
+      return `INSERT INTO official_views (post_id, user_id, at) VALUES (${id}, ${q(user)}, ${at}) ON CONFLICT (post_id, user_id) DO NOTHING;`;
+    });
+    const now = Date.now();
+    for (let i = 0; i < lines.length; i += 500) runSql(lines.slice(i, i + 500));
+    runSql([`INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`]);
+    console.log(`아이모 소식 본 사람 채움: ${first.size}줄 (글 ${new Set([...first.keys()].map((k) => k.split("\t")[0])).size}개)`);
+  }
+}
