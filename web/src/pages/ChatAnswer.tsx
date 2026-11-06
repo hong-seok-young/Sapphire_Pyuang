@@ -20,6 +20,7 @@ import { PLAT_PACKS } from "../platshop";
  *   [[탭:이름]] … [[탭끝]] -> 눌러서 바꾸는 탭 (직업별 교환표처럼)
  *   [[확률:제목|이름=98%;이름=1.94%]] -> 확률 막대
  *   [[계산기:대상=덥마북;확률=0.1304%;가격=570;최대=200;플골드=700;원골드=70]] -> 뽑기 계산기 (몇 개 살지 끌면 얻을 확률·플래티넘·현금·골드)
+ *   [[공식글:번호|제목]] -> 게시판 '아이모 소식'의 그 글로 가는 단추 (제작자 요청 2026-11-06: 이벤트를 물으면 그 글로 가서 직접 보게)
  */
 
 type Kind = "아이템" | "몬스터" | "사냥터" | "메뉴" | "화면";
@@ -152,6 +153,7 @@ const IMG_TOKEN = /\[\[그림:([^\]|\n]{1,600})(?:\|([^\]\n]{0,120}))?\]\]/g;
 const ODDS_TOKEN = /^\s*\[\[확률:([^\]\n]{1,800})\]\]\s*$/;
 const CALC_TOKEN = /^\s*\[\[계산기:([^\]\n]{1,400})\]\]\s*$/;
 const TAB_TOKEN = /^\s*\[\[탭:([^\]\n]{1,40})\]\]\s*$/;
+const POST_TOKEN = /\[\[공식글:(\d{1,9})(?:\|([^\]\n]{0,120}))?\]\]/g;
 const TAB_END = /^\s*\[\[탭끝\]\]\s*$/;
 
 /** '0.1304%' -> 0.001304, '1/767' -> 0.0013, '98' -> 0.98 (1보다 크면 % 로 본다) */
@@ -418,6 +420,23 @@ function ChatAnswerView({ wiki, text, done, onAsk }: { wiki: Wiki; text: string;
       if (odds || calc) {
         flush(i);
         blocks.push(odds ? <OddsBars key={`${base}o${i}`} spec={odds[1]} render={render} /> : <GachaCalc key={`${base}k${i}`} spec={calc![1]} />);
+        return;
+      }
+      // 공식 글 단추가 든 줄: 글자는 문단으로, 단추는 그 아래에
+      const posts = [...line.matchAll(POST_TOKEN)];
+      if (posts.length) {
+        flush(i);
+        const rest = line.replace(POST_TOKEN, "").replace(/^\s*[-•]\s*$/, "").trim();
+        if (rest) blocks.push(<p key={`${base}pp${i}`} className="ans-p">{render(rest, `${base}pp${i}`)}</p>);
+        posts.forEach((m, j) =>
+          blocks.push(
+            <a key={`${base}post${i}-${j}`} className="ans-post" href={`#/official/${m[1]}`}>
+              <span className="ans-post-tag">아이모 소식</span>
+              <b>{m[2]?.trim() || "공식 글 보기"}</b>
+              <span className="ans-post-go">글 보기 ›</span>
+            </a>,
+          ),
+        );
         return;
       }
       // 그림 표시가 든 줄: 글자는 문단으로, 그림은 그 아래에 한 장씩
