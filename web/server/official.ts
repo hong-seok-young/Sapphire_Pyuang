@@ -138,7 +138,7 @@ export async function officialContext(env: Env, question: string): Promise<strin
     if (!body) continue;
     const again = p.kind === "event" ? results.filter((r) => r !== p && r.kind === "event" && sameEvent(r.title, p.title)).map((r) => dates(r)).slice(0, 8) : [];
     parts.push(
-      `[공식 글 본문 (그림 속 표·글자 포함): ${p.title} (${TYPE_NAME[p.type] ?? p.type}, ${dates(p)}, ${officialUrl(p.kind, p.id)}${ongoing(p) ? ", 진행 중" : ""})` +
+      `[공식 글 본문 (그림 속 표·글자 포함): ${p.title} (${TYPE_NAME[p.type] ?? p.type}, ${dates(p)}, ${officialUrl(p.kind, p.id)}${ongoing(p) ? ", 진행 중" : ""}, 앱의 아이모 소식 글: [[공식글:${p.id}|${p.title.replace(/[\]|]/g, " ")}]])` +
         (again.length ? ` · 같은 이벤트의 예전 회차: ${again.join(", ")}` : "") +
         `]\n${body}`,
     );
