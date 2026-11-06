@@ -4,8 +4,8 @@ import { errorText } from "../auth";
 import { OFFICIAL_TABS, TYPE_NAME, fetchOfficial, fetchOfficialPost, fetchOfficialSummary, officialLink, officialUrl } from "../official";
 import type { OfficialItem, OfficialPost, OfficialSummary, OfficialTab } from "../official";
 import { go } from "../router";
-import { Loading, NewsDot, TopBar } from "../ui";
-import { markNewsSeen, newsSum, useNews, useNewsSeen } from "../news";
+import { Loading, NewsDot, ThingDot, TopBar } from "../ui";
+import { markThingSeen, newsSum, useNews } from "../news";
 import type { NewsKey } from "../news";
 
 /** 한국 날짜 'YYYY-MM-DD' (며칠 전) */
@@ -23,7 +23,7 @@ const TAB_NEWS: Record<OfficialTab, NewsKey[]> = { all: ["imo.notice", "imo.main
 
 export function OfficialList({ tab }: { tab: OfficialTab }) {
   const news = useNews();
-  useNewsSeen(tab === "all" ? [] : TAB_NEWS[tab]); // '전체'는 지우지 않는다 (어느 칸에 새 글이 있는지 보이게)
+  // 칸을 연다고 지우지 않고 그 글을 열어야 지운다 (news.ts, 제작자 2026-11-06 '끝까지 배지가 추적해서')
   const [items, setItems] = useState<OfficialItem[] | null>(null);
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -78,7 +78,7 @@ export function OfficialList({ tab }: { tab: OfficialTab }) {
             onClick={() => go(`#/board?cat=imo&t=${t.key}`, true)}
           >
             {t.label}
-            {t.key !== "all" && <NewsDot n={newsSum(news, TAB_NEWS[t.key])} />}
+            <NewsDot n={newsSum(news, TAB_NEWS[t.key])} />
           </button>
         ))}
       </nav>
@@ -99,7 +99,10 @@ export function OfficialList({ tab }: { tab: OfficialTab }) {
                       <span className={"off-type off-type-" + it.type}>{TYPE_NAME[it.type] ?? it.type}</span>
                       {!ended && it.start && it.start >= fresh && <span className="off-new">NEW</span>}
                     </span>
-                    <b className="off-title">{it.title}</b>
+                    <b className="off-title">
+                      {it.title}
+                      <ThingDot k={`imo:${it.id}`} />
+                    </b>
                     <small>{dates(it, today)}</small>
                   </span>
                 </a>
@@ -231,8 +234,8 @@ export function OfficialPostPage({ id, job }: { id: number; job: string | null }
       (p) => {
         if (!alive) return;
         setPost(p);
-        // 새 공식 글을 열면 그 종류의 숫자를 지운다
-        markNewsSeen(p.type === "C" ? "imo.maint" : p.type === "E" ? "imo.event" : "imo.notice");
+        // 새 공식 글을 열면 그 글의 배지를 지운다 (위 단추들의 수도 같이 준다)
+        markThingSeen(`imo:${id}`);
       },
       (x) => alive && setError(errorText(x)),
     );

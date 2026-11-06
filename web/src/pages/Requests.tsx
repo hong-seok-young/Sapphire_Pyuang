@@ -10,7 +10,8 @@ import { useSample } from "../tutorialState";
 import { MARKET_PIC, MAX_PRICE, ago, goldText, goldWords } from "../market";
 import { MAX_DETAIL, MAX_NOTE, MAX_REWARD_TEXT, MAX_TITLE, STATUS_NAME, actOnRequest, createRequest, deleteRequest, fetchRequests, liveOffers } from "../requests";
 import type { GuildRequest, RequestAction } from "../requests";
-import { Loading, TopBar } from "../ui";
+import { Loading, NewTag, ThingDot, TopBar } from "../ui";
+import { markThingSeen, thingSince } from "../news";
 import { useBackClose } from "../backClose";
 
 type Filter = "open" | "done" | "mine";
@@ -132,6 +133,11 @@ function RequestDetail({ me, r, onChanged, onStale }: { me: Me; r: GuildRequest;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
+  // 펼치면 이 의뢰의 새 것(새 의뢰, 내 의뢰에 들어온 수락)을 지운다. 마지막으로 본 뒤에 들어온 수락에는 'N' (news.ts, 제작자 2026-11-06 '끝까지 배지가 추적해서')
+  const [since] = useState(() => thingSince(`req:${r.id}`));
+  useEffect(() => {
+    markThingSeen(`req:${r.id}`);
+  }, [r.id, live.length]);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   async function act(action: RequestAction, text?: string | null) {
@@ -173,6 +179,7 @@ function RequestDetail({ me, r, onChanged, onStale }: { me: Me; r: GuildRequest;
         <ul className="rq-offers">
           {live.map((o) => (
             <li key={o.id} className="rq-offer">
+              <NewTag on={o.createdAt > since && o.user !== me.id} />
               <Nick name={o.user} /> <KakaoButton name={o.user} mine={o.user === me.id} />
               {o.note && <span className="rq-offer-note">“{o.note}”</span>}
               <small>{ago(o.createdAt)}</small>
@@ -303,6 +310,7 @@ export function RequestsPage({ me }: { me: Me }) {
                     <b>
                       {r.title}
                       {isSample(r.id) && <i className="sample-tag">예시</i>}
+                      <ThingDot k={`req:${r.id}`} />
                     </b>
                     <small>
                       <Reward r={r} />

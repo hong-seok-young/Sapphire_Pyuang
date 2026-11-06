@@ -10,7 +10,8 @@ import {
 } from "../gold";
 import type { GoldOffer, GoldSide } from "../gold";
 import { MARKET_PIC, MAX_NOTE, ago } from "../market";
-import { Loading } from "../ui";
+import { Loading, NewsDot, ThingDot } from "../ui";
+import { markThingSeen, newsSide, useNews } from "../news";
 import { KakaoButton, Nick } from "../kakao";
 import { useBackClose } from "../backClose";
 
@@ -108,6 +109,10 @@ function GoldDetail({ me, o, onChanged }: { me: Me; o: GoldOffer; onChanged: (ne
   const [rate, setRate] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const want = o.side === "sell" ? "살래요" : "팔래요";
+  // 열면 이 글의 '새 글' 배지를 지운다 (news.ts, 제작자 2026-11-06 '끝까지 배지가 추적해서')
+  useEffect(() => {
+    markThingSeen(`gold:${o.id}`);
+  }, [o.id]);
 
   async function run(fn: () => Promise<void>) {
     setBusy(true);
@@ -263,7 +268,10 @@ export function GoldRows({
               <img src={MARKET_PIC + "coin.png"} alt="" />
             </span>
             <span className="mk-name">
-              <b>{goldAmountText(o.gold)}</b>
+              <b>
+                {goldAmountText(o.gold)}
+                <ThingDot k={`gold:${o.id}`} />
+              </b>
               <small>
                 {o.side === "buy" && <span className="mk-buy-tag">삽니다</span>}
                 {o.wants > 0 && <span className={"mk-wants" + (o.wanted ? " mk-wants-me" : "")}>{o.side === "sell" ? "살래요" : "팔래요"} {o.wants}</span>}
@@ -293,6 +301,7 @@ export function GoldRows({
  * 내 골드 글은 중개인 맨 위 '내 글' 칸에 물건과 같이 보인다 (MarketPage).
  */
 export function GoldBoard({ me }: { me: Me }) {
+  useNews();
   const [reload, setReload] = useState(0);
   const { data, error } = useAsync(useCallback(() => fetchGold(), [reload]), "gold");
   const [offers, setOffers] = useState<GoldOffer[] | null>(null);
@@ -332,6 +341,7 @@ export function GoldBoard({ me }: { me: Me }) {
             return (
               <button key={s} role="tab" aria-selected={side === s} className={"sub-tab" + (side === s ? " sub-tab-on" : "")} onClick={() => setSide(s)}>
                 {SIDE_NAME[s]} <small>{ofSide(s).length}{avg !== null ? ` · ${avg}:1` : ""}</small>
+                <NewsDot n={newsSide("market.gold", (x) => x === s)} />
               </button>
             );
           })}

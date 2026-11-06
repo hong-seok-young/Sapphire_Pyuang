@@ -4,6 +4,10 @@
 // 단추마다 마지막으로 본 때를 이 기기에 계정별로 적어 두고 그 뒤로 다른 사람이 올린 수를 서버에 묻는다 (/api/news).
 // 아이모 소식(imo.*)은 공식 글이 우리 앱에 처음 들어온 때로 센다 (2026-11-02: 글 번호로 세다가 번호가 먼저 매겨진 예약 글을 놓쳤다).
 // 처음 쓰는 기기는 지금부터 센다. 그 단추의 화면을 열면 0 이 된다 (useNewsSeen). 홈으로 올 때, 앱으로 돌아올 때, 2분마다 다시 묻는다.
+// 2026-11-06 제작자 '들어가면 어디에 뭐가 달린지를 모르겠음, 누가 토론방에 글을 쓰면 버튼에만 배지 달게 아니라 끝까지 배지가 추적해서 계속 붙어서
+// 마지막까지 사용자가 들어가서 봐야 배지가 없어지게': 게시판·아이모 소식·중개인·의뢰소·장비대여 목록(THING_KEYS)은 단추를 연다고 지우지 않고,
+// 서버가 주는 글·물건마다의 새 일(things: 새 글, 댓글, 토론방 글, 내 의뢰 수락 …)을 그 글·물건을 열 때 지운다 (markThingSeen, 이 기기에 계정별로).
+// 단추의 수 = 그 안에서 아직 안 본 일의 합, 줄에는 그 줄의 수(ThingDot), 토론방 단추에는 토론방 글 수. 14일 지난 것은 본 것으로 (서버).
 import { useEffect, useSyncExternalStore } from "react";
 import { api } from "./auth";
 
@@ -31,6 +35,28 @@ const POLL_MS = 120_000;
  * (제작자 요청 '아까 안 떴으니 게시판 배지 다시 띄워 줘', 배포가 그 글을 지금 들어온 것으로 적는다, scripts/ci-d1.mjs)
  */
 const IMO_FROM = 1793606400000;
+
+/** 단추를 열어도 지우지 않고 그 안의 글·물건을 열어야 지우는 단추 (위) */
+export const THING_KEYS: NewsKey[] = [
+  "board.notice",
+  "board.event",
+  "board.free",
+  "board.suggest",
+  "imo.notice",
+  "imo.maint",
+  "imo.event",
+  "market.items",
+  "market.gold",
+  "requests",
+  "rent.list",
+];
+const isThingKey = (k: NewsKey) => THING_KEYS.includes(k);
+/** 글·물건 하나의 새 일: 단추, 때, 쪽(물건·골드의 sell|buy, 장비대여의 직업) */
+type Act = { c: NewsKey; t: number; s: string | null };
+let acts = new Map<string, Act[]>();
+/** 글·물건마다 마지막으로 연 때 */
+let thingSeen: Record<string, number> = {};
+const THING_KEEP = 15 * 86_400_000;
 
 type Counts = Record<NewsKey, number>;
 const zero = (): Counts => Object.fromEntries(KEYS.map((k) => [k, 0])) as Counts;
@@ -92,6 +118,74 @@ function save(seen: Record<NewsKey, number>) {
   }
 }
 
+const thingKey = () => "sapphire.newsThing." + user;
+function loadThings() {
+  try {
+    thingSeen = JSON.parse(localStorage.getItem(thingKey()) ?? "{}") as Record<string, number>;
+  } catch {
+    thingSeen = {};
+  }
+}
+function saveThings() {
+  const old = Date.now() - THING_KEEP;
+  for (const k of Object.keys(thingSeen)) if (!(thingSeen[k] > old)) delete thingSeen[k];
+  try {
+    localStorage.setItem(thingKey(), JSON.stringify(thingSeen));
+  } catch {
+    // 못 적으면 배지가 남을 뿐이다
+  }
+}
+/** 이 글·물건에서 이때까지는 본 것 (단추를 처음 본 때와 그 글·물건을 연 때 중 늦은 때) */
+function seenUntil(k: string, c: NewsKey, base: Record<NewsKey, number>) {
+  return Math.max(base[c] ?? 0, thingSeen[k] ?? 0);
+}
+/** 받은 새 일과 본 때로 단추마다 수를 다시 센다 */
+function recount() {
+  const base = seenAll();
+  const next = { ...counts };
+  for (const k of THING_KEYS) next[k] = 0;
+  for (const [k, list] of acts) for (const a of list) if (a.t > seenUntil(k, a.c, base)) next[a.c]++;
+  counts = next;
+}
+
+/** 글·물건 하나(키 'post:12', 'item:3', 'talk:3' …)에서 아직 안 본 새 일의 수 */
+export function thingNew(k: string): number {
+  const list = acts.get(k);
+  if (!list) return 0;
+  const base = seenAll();
+  return list.filter((a) => a.t > seenUntil(k, a.c, base)).length;
+}
+/** 이 글·물건을 마지막으로 본 때 (열었을 때 그 뒤에 달린 댓글·토론방 글에 'N' 을 붙인다) */
+export function thingSince(k: string): number {
+  const list = acts.get(k);
+  const base = seenAll();
+  return Math.max(thingSeen[k] ?? 0, list?.length ? (base[list[0].c] ?? 0) : 0);
+}
+/** 한 단추 안에서 쪽(팝니다·삽니다, 직업)마다의 수 */
+export function newsSide(c: NewsKey, side: (s: string | null) => boolean): number {
+  const base = seenAll();
+  let n = 0;
+  for (const [k, list] of acts) for (const a of list) if (a.c === c && side(a.s) && a.t > seenUntil(k, a.c, base)) n++;
+  return n;
+}
+/** 글·물건을 열었을 때: 지금까지 본 것으로 (위 단추들의 수도 같이 준다) */
+export function markThingSeen(...ks: string[]) {
+  if (!user || !ks.length) return;
+  const had = ks.some((k) => thingNew(k) > 0);
+  const now = Date.now();
+  for (const k of ks) thingSeen[k] = now;
+  saveThings();
+  if (had) {
+    recount();
+    emit();
+  }
+}
+/** 그 글·물건의 새 일 수 (본 것으로 적으면 다시 그린다) */
+export function useThingNew(k: string): number {
+  useNews();
+  return thingNew(k);
+}
+
 let inflight: { q: string; p: Promise<void> } | null = null;
 
 /** 서버에 새 것의 수를 묻는다 (실패하면 그대로). 같은 것을 이미 묻는 중이면 그 답을 같이 쓴다 (앱을 열 때 두 번 물었다) */
@@ -100,11 +194,23 @@ export function refreshNews(): Promise<void> {
   const seen = seenAll();
   const q = KEYS.map((k) => `${k}=${seen[k]}`).join("&");
   if (inflight?.q === q) return inflight.p;
-  const p = api<{ counts?: Partial<Counts>; maint?: Maint[] }>(`/api/news?${q}`)
+  const p = api<{ counts?: Partial<Counts>; things?: [string, NewsKey, number, string | null][]; maint?: Maint[] }>(`/api/news?${q}`)
     .catch(() => null)
     .then((r) => {
       if (r && user) {
         counts = Object.fromEntries(KEYS.map((k) => [k, r.counts?.[k] ?? 0])) as Counts;
+        // 글·물건마다의 새 일 (예전 서버면 없어서 단추 수만 그대로)
+        if (Array.isArray(r.things)) {
+          const next = new Map<string, Act[]>();
+          for (const [k, c, t, s] of r.things) {
+            if (!KEYS.includes(c)) continue;
+            const list = next.get(k) ?? [];
+            list.push({ c, t, s });
+            next.set(k, list);
+          }
+          acts = next;
+          recount();
+        }
         // 점검은 바뀌었을 때만 새로 (전광판이 흐르다가 처음부터 다시 흐르지 않게)
         if (Array.isArray(r.maint) && JSON.stringify(r.maint) !== JSON.stringify(maint)) maint = r.maint;
         emit();
@@ -122,6 +228,8 @@ export function startNews(id: string) {
   if (user === id) return;
   user = id;
   counts = zero();
+  acts = new Map();
+  loadThings();
   maint = [];
   emit();
   void refreshNews();
@@ -135,7 +243,9 @@ export function startNews(id: string) {
 }
 
 /** 단추의 화면을 볼 때: 지금까지 본 것으로 적고 그 배지를 지운다 */
-export function markNewsSeen(...keys: NewsKey[]) {
+export function markNewsSeen(...all: NewsKey[]) {
+  // 글·물건마다 따라가는 단추는 그 글·물건을 열 때 지운다 (markThingSeen)
+  const keys = all.filter((k) => !isThingKey(k));
   if (!user || !keys.length) return;
   const seen = seenAll();
   for (const k of keys) seen[k] = Date.now();

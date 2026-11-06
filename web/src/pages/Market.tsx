@@ -70,8 +70,8 @@ import type {
   TalkLine,
 } from "../market";
 import type { Wiki } from "../types";
-import { Loading, NewsDot, PicImg, TopBar } from "../ui";
-import { useNews, useNewsSeen } from "../news";
+import { Loading, NewTag, NewsDot, PicImg, ThingDot, TopBar } from "../ui";
+import { markThingSeen, newsSide, thingSince, useNews } from "../news";
 import { timeLeft } from "../requests";
 import { GoldBoard, GoldRows } from "./GoldBoard";
 import { fetchGold } from "../gold";
@@ -163,7 +163,11 @@ function Detail({
   const [talkOpen, setTalkOpen] = useState(false);
   useBackClose(talkOpen, () => setTalkOpen(false));
   const [talkCount, setTalkCount] = useState(l.talkCount);
-  // 종목 토론방 단추: 할 일 단추와 같은 줄 오른쪽 끝에 작은 말풍선으로 (제작자 요청: 줄을 따로 만들지 않게)
+  // 정보창을 열면 이 물건의 '새 물건' 배지를 지운다. 토론방 새 글은 토론방을 열어야 (news.ts, 제작자 2026-11-06 '끝까지 배지가 추적해서')
+  useEffect(() => {
+    markThingSeen(`item:${l.id}`);
+  }, [l.id]);
+  // 종목 토론방 단추: 할 일 단추와 같은 줄 오른쪽 끝에 작은 말풍선으로 (제작자 요청: 줄을 따로 만들지 않게). 안 본 새 글이 있으면 빨간 수
   const talkButton = (
     <button
       className={"mk-talk-btn" + (talkOpen ? " mk-talk-on" : "")}
@@ -172,6 +176,7 @@ function Detail({
     >
       토론방
       {talkCount > 0 && <b>{talkCount}</b>}
+      <ThingDot k={`talk:${l.id}`} />
     </button>
   );
 
@@ -674,6 +679,11 @@ function Talk({
   onCount: (n: number) => void;
 }) {
   const [talk, setTalk] = useState<TalkLine[] | null>(null);
+  // 토론방을 마지막으로 본 때 (그 뒤에 남이 쓴 글에 'N'). 열면 이 물건의 토론방 배지를 지운다
+  const [since] = useState(() => thingSince(`talk:${l.id}`));
+  useEffect(() => {
+    markThingSeen(`talk:${l.id}`);
+  }, [l.id, talk?.length]);
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -726,6 +736,7 @@ function Talk({
           (t.user === l.seller ? " mk-talk-seller" : "")
         }
       >
+        <NewTag on={t.at > since && t.user !== me.id} />
         <b>
           <Nick name={t.user} />
         </b>
@@ -862,6 +873,7 @@ function Rows({
                 <b>
                   {listingName(l)}
                   {isSample(l.id) && <i className="sample-tag">예시</i>}
+                  <ThingDot k={[`item:${l.id}`, `talk:${l.id}`]} />
                 </b>
                 <small>
                   {/* 삽니다 글: 하늘색 '삽니다' 표와 조건 (제작자 2026-11-03) */}
@@ -1574,11 +1586,9 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const [tab, setTab] = useEntryState<Tab>("tab", "list");
   /** 목록의 팝니다 | 삽니다 (제작자 2026-11-03) */
   const [side, setSide] = useEntryState<Side>("side", "sell");
-  // 새 물건·새 골드 글 수는 '목록'과 '골드' 단추에 (news.ts, 제작자 요청 2026-11-02). 보고 있는 칸은 본 것으로
+  // 새 물건·토론방 새 글·새 골드 글 수는 '목록'과 '골드' 단추에 (news.ts, 제작자 요청 2026-11-02). 단추를 연다고 지우지 않고 그 물건을 열어야
+  // (제작자 2026-11-06 '끝까지 배지가 추적해서': 목록 -> 팝니다·삽니다 -> 물건 줄 -> 토론방 단추)
   const news = useNews();
-  useNewsSeen(
-    tab === "list" ? ["market.items"] : tab === "gold" ? ["market.gold"] : [],
-  );
   const [query, setQuery] = useEntryState("query", "");
   const [cat, setCat] = useEntryState<Category | "전체">("cat", "전체");
   const [onlyWanted, setOnlyWanted] = useEntryState("onlyWanted", false);
@@ -1682,6 +1692,7 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
                   onClick={() => setSide(s)}
                 >
                   {SIDE_NAME[s]} <small>{countOf(s)}</small>
+                  <NewsDot n={newsSide("market.items", (x) => (x ?? "sell") === s)} />
                 </button>
               ))}
             </div>
