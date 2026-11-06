@@ -16,13 +16,16 @@ export const NO_TEXT = "";
 
 /**
  * 본문 글자 속 그림 자리에 옮긴 글을 넣는다. 글자 없는 그림과 아직 못 옮긴 그림은 자리만 뺀다.
- * 그림 자리 앞뒤로 [그림] … [그림 끝] 을 달아 챗봇이 본문과 그림 속 표를 구분하게 한다
+ * 그림 자리 앞뒤로 [그림 속 글자 · 그림 주소: …] … [그림 끝] 을 달아 챗봇이 본문과 그림 속 표를 구분하고 답에 그 그림을 넣게 한다
  */
 export function withImages(text: string, keys: string[], texts: Map<string, string>): string {
   return text
     .replace(IMG_TOKEN, (_, n: string) => {
-      const t = texts.get(keys[Number(n)] ?? "")?.trim();
-      return t ? `\n[그림 속 글자]\n${t}\n[그림 끝]\n` : "";
+      const key = keys[Number(n)] ?? "";
+      const t = texts.get(key)?.trim();
+      // 그림 주소도 준다: 챗봇이 답에 그 그림을 [[그림:주소|설명]] 으로 넣는다 (본문에 통째로 든 그림(data:)은 주소가 없다)
+      const url = key.startsWith("http") ? ` · 그림 주소: ${key}` : "";
+      return t ? `\n[그림 속 글자${url}]\n${t}\n[그림 끝]\n` : "";
     })
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
