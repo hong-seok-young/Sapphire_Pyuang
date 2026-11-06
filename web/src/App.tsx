@@ -417,7 +417,7 @@ function Wiki({
       />
     );
   else if (page === "shop") body = <PlatShopPage />;
-  else if (page === "patch") body = <PatchNotesPage me={me} />;
+  else if (page === "patch") body = <PatchNotesPage />;
   // 아이모 소식 글 읽기 (#/official/번호). 예전 목록 주소(#/official)는 게시판 '아이모 소식'으로
   else if (page === "official")
     body = Number(arg) ? (
