@@ -103,7 +103,7 @@ export const TITLE_EN: Record<string, string> = {
   "길드원 관리": "MEMBERS",
   "사용 기록": "ACTIVITY LOG",
   "챗봇 개선": "CHATBOT FIXES",
-  "패치 내역": "PATCH NOTES",
+  "업데이트 소식": "UPDATE NEWS",
   "안드로이드 앱": "ANDROID APP",
   "앱 기능": "APP SETTINGS",
   "AI 챗봇": "SAPPHIRE GUIDE",

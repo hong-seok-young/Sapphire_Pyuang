@@ -80,7 +80,7 @@ export const GUIDES: Guide[] = [
       { fx: "snow", head: "눈", text: "아래에 쌓여요. 안 만지고 두면 화면 위까지 차요." },
       { fx: "blizzard", head: "함박눈", text: "큰 송이가 천천히 내려요." },
       { fx: "blizzard", head: "빈 곳 누르기", text: "비나 눈이 올 때 빈 곳을 누르면 그 자리에서 팡 터져요. 눌러 보고 다음을 누르세요.", tap: true },
-      { sel: ".home-version", head: "패치 내역", text: "v1.0 글씨를 누르면 바뀐 것을 볼 수 있어요.", tap: true },
+      { sel: ".home-upd", head: "업데이트 소식", text: "새 소식이 있으면 빨간 점이 떠요. 안에서 새 기능을 누르면 바로 그 메뉴로 가요.", tap: true },
     ],
   },
   {

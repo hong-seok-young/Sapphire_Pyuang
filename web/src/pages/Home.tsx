@@ -10,7 +10,7 @@ import {
   PixelIcon,
   TopBar,
 } from "../ui";
-import { VERSION } from "../patchnotes";
+import { PATCHES, VERSION, itemLink, itemText, patchUnseen } from "../patchnotes";
 import { useEffect, useState } from "react";
 import type {
   MouseEvent as ReactMouseEvent,
@@ -259,6 +259,9 @@ export function Home({ me }: { me: Me }) {
       {/* 아이모 점검 전광판: 공식 점검 글이 뜨면 점검이 끝날 때까지 (제작자 요청 2026-11-01) */}
       <MaintBanner />
 
+      {/* 업데이트 소식 바로가기 (제작자 요청 2026-11-06 '맨 위에 바로 가는 버튼도 직관적으로') */}
+      {!L.editing && <UpdateStrip me={me} />}
+
       {/* 배치 편집 중 (홈 칸을 꾹 누르면): 끌어서 홈 칸끼리, 홈 칸과 아래 탭 사이를 옮긴다 (launcher.ts) */}
       {L.editing && (
         <div className="panel launch-bar">
@@ -345,6 +348,32 @@ export function HomeCorner() {
         v{VERSION}
       </a>
     </>
+  );
+}
+
+/**
+ * 홈 맨 위 '업데이트 소식' 단추: 지금 버전과 새로 생긴 기능 이름, 누르면 #/patch (제작자 요청 2026-11-06).
+ * 이 기기에서 아직 안 열어 본 새 버전이면 빨간 점과 지나가는 빛, 열어 보면 사라진다 (patchnotes.ts patchUnseen)
+ */
+function UpdateStrip({ me }: { me: Me }) {
+  const [unseen] = useState(() => patchUnseen(me.id));
+  const top = PATCHES[0];
+  const news = top.items.filter((i) => itemLink(i));
+  const head = itemText(news[0] ?? top.items[0]);
+  return (
+    <a className={"home-upd" + (unseen ? " home-upd-new" : "")} href="#/patch">
+      <span className="home-upd-tag">
+        업데이트 소식
+        {unseen && <i className="home-upd-dot" aria-label="새 소식" />}
+      </span>
+      <span className="home-upd-text">
+        v{top.version} · {head}
+        {news.length > 1 && ` 외 ${news.length - 1}개`}
+      </span>
+      <span className="home-upd-go" aria-hidden>
+        ›
+      </span>
+    </a>
   );
 }
 
