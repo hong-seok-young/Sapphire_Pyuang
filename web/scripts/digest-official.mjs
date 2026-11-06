@@ -10,7 +10,8 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { DIGEST_TAG, NO_TODO_TITLE, digestClient, digestPost, mergeSignature, mergeTasks, tasksUntil } from "../server/todoDigest.ts";
+import { DIGEST_TAG, NO_TODO_TITLE, digestClient, digestPost, digestStale, mergeSignature, mergeTasks, tasksUntil } from "../server/todoDigest.ts";
+import { RICH_DONE_SQL, richBody } from "../server/officialImages.ts";
 
 const DB = "sapphire-accounts";
 const local = process.argv.includes("--local");
@@ -67,8 +68,10 @@ CREATE INDEX IF NOT EXISTS official_todo_until ON official_todo (until);
 `);
 
 const now = Date.now();
-// 아직 안 했거나, 원문이 바뀌었거나, 예전 지시문으로 정리한 글 (서버가 맡은 지 10분 안의 글은 빼고)
-const stale = `(t.id IS NULL OR t.made_at = 0 OR substr(t.src, 3) IS NOT substr(n.src, 3) OR t.model IS NOT '${DIGEST_TAG}') AND COALESCE(t.claimed_at, 0) < ${now - CLAIM_MS}`;
+// 아직 안 했거나, 원문이 바뀌었거나, 예전 지시문으로 정리했거나, 그림을 다 옮기기 전에 정리했는데 이제 다 옮긴 글 (서버가 맡은 지 10분 안의 글은 빼고).
+// 그림 글자 표가 아직 없으면(배포 전 첫 실행) 예전처럼
+const hasRich = select("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('official_rich', 'official_img')").length === 2;
+const stale = `${digestStale(hasRich ? RICH_DONE_SQL : "0")} AND COALESCE(t.claimed_at, 0) < ${now - CLAIM_MS}`;
 const pending = select(
   `SELECT n.id, n.title FROM official_news n LEFT JOIN official_todo t ON t.id = n.id WHERE n.kind = 'event' AND n.start_date >= '${kstDate(now - 120 * DAY)}' AND ${stale} ` +
     `UNION ALL SELECT n.id, n.title FROM official_news n LEFT JOIN official_todo t ON t.id = n.id WHERE n.kind = 'notice' AND n.type IN ('N', 'I') ` +
@@ -83,7 +86,7 @@ const save = (rows) =>
     rows
       .map(
         (r) =>
-          `INSERT INTO official_todo (id, src, tasks, until, made_at, claimed_at, model) VALUES (${r.id}, ${q(r.src)}, ${q(JSON.stringify(r.tasks))}, ${tasksUntil(r.tasks, r.start_date)}, ${r.at}, ${r.at}, ${q(DIGEST_TAG)}) ` +
+          `INSERT INTO official_todo (id, src, tasks, until, made_at, claimed_at, model) VALUES (${r.id}, ${q(r.src)}, ${q(JSON.stringify(r.tasks))}, ${tasksUntil(r.tasks, r.start_date)}, ${r.at}, ${r.at}, ${q(r.complete === false ? DIGEST_TAG + "p" : DIGEST_TAG)}) ` +
           "ON CONFLICT (id) DO UPDATE SET src = excluded.src, tasks = excluded.tasks, until = excluded.until, made_at = excluded.made_at, claimed_at = excluded.claimed_at, model = excluded.model;",
       )
       .join("\n") + "\n",
@@ -98,13 +101,22 @@ for (let i = 0; i < pending.length; i += PARALLEL) {
     break;
   }
   const ids = pending.slice(i, i + PARALLEL).map((p) => p.id);
-  // 본문은 맡을 때 읽는다 (한꺼번에 읽으면 너무 크다)
-  const posts = select(`SELECT id, kind, type, title, start_date, src, substr(body, 1, 20000) AS body, html FROM official_news WHERE id IN (${ids.join(", ")})`);
+  // 본문은 맡을 때 읽는다 (한꺼번에 읽으면 너무 크다). 그림 속 글자를 본문 그 자리에 넣는다 (제작자 2026-11-06 '시너지 다 하자':
+  // 기간·교환 마감·퀘스트 순서가 그림에만 있는 글이 많다). 그림을 다 옮기기 전이면 판 끝에 p 를 달아 다 옮겨진 뒤 다시 정리한다
+  const posts = select(`SELECT id, kind, type, title, start_date, src, body, html FROM official_news WHERE id IN (${ids.join(", ")})`);
+  const rich = new Map(hasRich ? select(`SELECT id, text, keys FROM official_rich WHERE id IN (${ids.join(", ")})`).map((r) => [r.id, r]) : []);
+  const imgs = hasRich
+    ? select(
+        `SELECT r.id, g.key, COALESCE(g.text, '') AS text FROM official_rich r, json_each(r.keys) k JOIN official_img g ON g.key = k.value WHERE r.id IN (${ids.join(", ")})`,
+      )
+    : [];
   const results = await Promise.all(
     posts.map(async (p) => {
       try {
-        const tasks = NO_TODO_TITLE.test(p.title) ? [] : await digestPost(client, p);
-        return { ...p, tasks, at: Date.now() };
+        const texts = new Map(imgs.filter((g) => g.id === p.id).map((g) => [g.key, g.text]));
+        const full = richBody(p.body ?? "", rich.get(p.id), texts);
+        const tasks = NO_TODO_TITLE.test(p.title) ? [] : await digestPost(client, { ...p, body: full.body });
+        return { ...p, tasks, complete: full.complete, at: Date.now() };
       } catch (e) {
         failed++;
         console.log(`글 하나를 정리하지 못했어요 (${e?.status ?? ""} ${String(e?.message ?? e).slice(0, 120)})`);

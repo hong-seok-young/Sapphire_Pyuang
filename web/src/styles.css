@@ -1246,6 +1246,8 @@ button { font: inherit; color: inherit; }
 .search-recent .panel-title, .search-recent + section .panel-title { display: flex; align-items: center; justify-content: space-between; }
 .search-recent .panel-title .pill { padding: 3px 8px; font-size: 11px; }
 .search-recent { margin-bottom: 12px; }
+.search-off { margin-top: 14px; }
+.search-off .row .off-type { flex: none; }
 .recent-chip { display: inline-flex; align-items: stretch; }
 .recent-chip .pill { border-right: none; }
 .recent-x { padding: 0 7px; font-size: 11px; color: var(--muted); cursor: pointer; background: var(--night-2); border: var(--px) solid var(--edge); }
@@ -1918,6 +1920,39 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 .off-body table { border-collapse: collapse; font-size: 12px; min-width: 100%; }
 .off-body td, .off-body th { border: 1px solid var(--hi); padding: 4px 6px; }
 .off-text { white-space: pre-line; }
+/* 공식 글 그림 (제작자 2026-11-06 '시너지 다 하자', Official.tsx OffImage): 누르면 크게 보기, 옮긴 글자가 있으면 아래 '글자로 보기'로 표를 펼친다 (ImageText.tsx) */
+.off-img { display: block; margin: 6px 0; }
+.off-img-btn { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.off-body .off-img-btn img { margin: 0; }
+.off-img-text { display: block; margin: 4px 0 0 auto; padding: 3px 10px; font-size: 12px; line-height: 1.4; color: #8cc4ff; background: rgba(111, 182, 255, 0.08); border: 1px solid rgba(111, 182, 255, 0.35); cursor: pointer; }
+.off-img-text.on { color: var(--gold); background: rgba(255, 200, 80, 0.06); border-color: rgba(255, 200, 80, 0.45); }
+.off-img-text:active { transform: scale(0.96); }
+.it { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 6px 0 10px; padding: 8px; font-size: 13px; line-height: 1.5; background: rgba(0, 0, 0, 0.2); border-left: 3px solid #6fb6ff; }
+.it-p { margin: 0; }
+.off-body .it-p { min-height: 0; }
+.it-h { color: var(--gold); font-weight: 400; }
+.it-list { margin: 0; padding-left: 18px; }
+.off-body .it-list { margin: 0; padding-left: 18px; }
+.it-red { color: #ff8a8a; }
+.it-mine { display: block; font-size: 9px; color: var(--gold); opacity: 0.85; }
+.off-body .it table { font-size: 12.5px; }
+.off-body .it td, .off-body .it th { border: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 5px 7px; }
+/* 위키 아이템 화면의 공식 이벤트·소식 (Detail.tsx ItemEvents): 글마다 머리(종류, 제목 ›), 기간, 그 아이템이 든 표 줄 */
+.ie-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.ie { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.ie:last-child { padding-bottom: 0; border-bottom: 0; }
+.ie-head { display: flex; align-items: center; gap: 6px; min-width: 0; color: inherit; text-decoration: none; }
+.ie-head:active { transform: scale(0.98); }
+.ie-title { flex: 1 1 auto; min-width: 0; font-size: 13.5px; font-weight: 400; }
+.ie-go { color: var(--muted); }
+.ie-sub { font-size: 11px; color: var(--muted); }
+.ie-live { margin-right: 6px; color: #7ee2a8; }
+.ie .it { margin: 2px 0 0; }
+.ie-head .off-type { flex: none; white-space: nowrap; }
+/* 그림 글자 표: 첫 칸(교환 재료 '전설의전리품 I x1')은 낱말 사이에서 줄을 바꾼다 (한 줄로 두면 옆 칸 위로 넘쳤다), 찾은 아이템 칸은 금색 */
+.ans-table.it-table td:first-child { white-space: normal; min-width: 5.5em; max-width: 8.5em; }
+.ans-table.it-table td.it-mark { color: var(--gold); background-color: rgba(255, 200, 80, 0.12); }
+.ans-table.it-table tbody tr td.it-mark:first-child { background: #3a3020; }
 
 /* 아이모 점검 띠 (Home.tsx MaintBanner, 제작자 요청 2026-11-02: 위아래로 아주 얇게, 반투명, 테두리 없는 띠, 작은 글씨로 인상만):
    좌우를 꽉 채운 얇은 공사 띠(옅은 사선 줄무늬) 한 줄, 글씨가 길면 오른쪽에서 왼쪽으로 흐른다. 점검 중이면 붉은 띠와 깜박이는 점 */
@@ -3180,6 +3215,8 @@ button.gd-member-row { cursor: pointer; }
 .sim-opt-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .sim-opt-head b { min-width: 0; color: var(--gold); }
 .sim-opt-head small { margin-left: auto; color: var(--muted); white-space: nowrap; }
+.sim-opt-head .sim-post { flex: none; font-size: 11px; color: #8cc4ff; text-decoration: none; white-space: nowrap; }
+.sim-opt-head .sim-post:active { transform: scale(0.95); }
 .sim-opt-head .pill { padding: 4px 8px; }
 .sim-oline { display: grid; grid-template-columns: minmax(0, 1fr) 44px minmax(60px, 1.2fr) 70px; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid rgba(74, 63, 134, 0.35); }
 .sim-oname { font-size: 13px; }
@@ -3197,6 +3234,7 @@ button.gd-member-row { cursor: pointer; }
 .sim-hunt small { color: var(--muted); }
 
 .sim-secs { display: flex; flex-wrap: wrap; gap: 4px; }
+.sim-secs .sub-tab { max-width: 100%; white-space: normal; text-align: left; }
 .sim-chest { position: relative; justify-self: center; margin: 10px 0 4px; }
 .sim-chest-t { display: grid; place-items: center; min-width: 110px; height: 56px; padding: 0 14px; font-size: 22px; color: var(--gold);
   background: rgba(11, 10, 26, 0.55); border: 3px solid var(--edge); box-shadow: inset 0 0 0 2px #a8662b; }

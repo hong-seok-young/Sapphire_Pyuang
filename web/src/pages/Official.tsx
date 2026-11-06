@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { errorText } from "../auth";
 import type { Me } from "../auth";
 import { Comments } from "./Comments";
+import { ImageText } from "./ImageText";
+import { ImageViewer } from "./ImageViewer";
 import {
   OFFICIAL_TABS, TYPE_NAME, addOfficialComment, deleteOfficialComment, fetchOfficial, fetchOfficialPost, fetchOfficialSummary, fetchOfficialTitles, officialLink, officialUrl,
   setOfficialLike,
@@ -196,35 +198,80 @@ const TAGS: Record<string, string> = {
   TR: "tr", TD: "td", TH: "th", HR: "hr", BLOCKQUOTE: "blockquote", IMG: "img", A: "a",
 };
 
-function renderNode(node: Node, key: number): ReactNode {
+/** 그림 주소를 그림 글자 표의 열쇠와 같은 모양으로 (scripts/read-official-images.mjs keyOf) */
+const normUrl = (src: string) => {
+  try {
+    return new URL(src.startsWith("//") ? "https:" + src : src).href;
+  } catch {
+    return src;
+  }
+};
+
+interface RenderCtx {
+  /** 크게 보기에 넣을 그림 (글 속 차례) */
+  srcs: string[];
+  /** 그림 주소 -> 옮긴 표·글자 */
+  texts: Record<string, string>;
+  job: string | null;
+  open: (i: number) => void;
+}
+
+/**
+ * 글 속 그림 하나 (제작자 2026-11-06 '시너지 다 하자'): 누르면 크게 보기(확대, 옆으로 넘기기, 뒤로 가기로 닫기),
+ * 옮긴 글자가 있으면 아래 '글자로 보기'를 눌러 표로 펼친다 (직업마다 표가 있으면 내 직업 탭이 앞)
+ */
+function OffImage({ src, index, ctx }: { src: string; index: number; ctx: RenderCtx }) {
+  const [open, setOpen] = useState(false);
+  const text = ctx.texts[normUrl(src)];
+  return (
+    <span className="off-img">
+      <button className="off-img-btn" onClick={() => ctx.open(index)} aria-label="그림 크게 보기">
+        <img src={src} alt="" loading="lazy" decoding="async" />
+      </button>
+      {text && (
+        <>
+          <button className={"off-img-text" + (open ? " on" : "")} aria-expanded={open} onClick={() => setOpen(!open)}>
+            {open ? "글자 접기" : "글자로 보기"}
+          </button>
+          {open && <ImageText text={text} job={ctx.job} />}
+        </>
+      )}
+    </span>
+  );
+}
+
+function renderNode(node: Node, key: number, ctx: RenderCtx, inLink = false): ReactNode {
   if (node.nodeType === Node.TEXT_NODE) return node.textContent;
   if (node.nodeType !== Node.ELEMENT_NODE) return null;
   const el = node as Element;
   const tag = TAGS[el.tagName];
-  const kids = [...el.childNodes].map(renderNode);
-  if (!tag) return <Fragment key={key}>{kids}</Fragment>;
+  const kids = (link: boolean) => [...el.childNodes].map((n, i) => renderNode(n, i, ctx, link));
+  if (!tag) return <Fragment key={key}>{kids(inLink)}</Fragment>;
   if (tag === "img") {
     const src = el.getAttribute("src") ?? "";
-    return /^https?:\/\//.test(src) ? <img key={key} src={src} alt="" loading="lazy" decoding="async" /> : null;
+    if (!/^https?:\/\//.test(src)) return null;
+    // 링크 안의 그림(배너)은 링크 그대로
+    if (inLink) return <img key={key} src={src} alt="" loading="lazy" decoding="async" />;
+    return <OffImage key={key} src={src} index={ctx.srcs.push(src) - 1} ctx={ctx} />;
   }
   if (tag === "a") {
     const href = el.getAttribute("href") ?? "";
-    if (!/^https?:\/\//.test(href)) return <Fragment key={key}>{kids}</Fragment>;
+    if (!/^https?:\/\//.test(href)) return <Fragment key={key}>{kids(inLink)}</Fragment>;
     // 다른 공식 글로 가는 링크는 앱 안에서
     const inApp = officialLink(href);
     return inApp ? (
       <a key={key} href={inApp}>
-        {kids}
+        {kids(true)}
       </a>
     ) : (
       <a key={key} href={href} target="_blank" rel="noopener noreferrer">
-        {kids}
+        {kids(true)}
       </a>
     );
   }
   if (tag === "br" || tag === "hr") return createElement(tag, { key });
-  if (tag === "table") return createElement("div", { key, className: "off-table" }, createElement("table", null, kids));
-  return createElement(tag, { key }, kids);
+  if (tag === "table") return createElement("div", { key, className: "off-table" }, createElement("table", null, kids(inLink)));
+  return createElement(tag, { key }, kids(inLink));
 }
 
 /**
@@ -313,11 +360,15 @@ export function OfficialPostPage({ me, id, job }: { me: Me; id: number; job: str
       alive = false;
     };
   }, [id]);
-  const body = useMemo(() => {
+  // 그림 크게 보기 (글 속 그림 차례)
+  const [viewing, setViewing] = useState<number | null>(null);
+  const rendered = useMemo(() => {
     if (!post?.html) return null;
     const doc = new DOMParser().parseFromString(`<body>${post.html}</body>`, "text/html");
-    return [...doc.body.childNodes].map(renderNode);
-  }, [post?.html]);
+    const ctx: RenderCtx = { srcs: [], texts: post.images ?? {}, job, open: setViewing };
+    return { nodes: [...doc.body.childNodes].map((n, i) => renderNode(n, i, ctx)), srcs: ctx.srcs };
+  }, [post?.html, post?.images, job]);
+  const body = rendered?.nodes ?? null;
 
   if (!post) {
     return (
@@ -383,6 +434,13 @@ export function OfficialPostPage({ me, id, job }: { me: Me; id: number; job: str
         add={addOfficialComment}
         remove={deleteOfficialComment}
       />
+      {viewing !== null && rendered && rendered.srcs.length > 0 && (
+        <ImageViewer
+          images={rendered.srcs.map((src) => ({ src }))}
+          start={Math.min(viewing, rendered.srcs.length - 1)}
+          onClose={() => setViewing(null)}
+        />
+      )}
     </>
   );
 }

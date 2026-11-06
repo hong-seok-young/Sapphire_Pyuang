@@ -218,12 +218,15 @@ export interface Box {
   cat: string;
   name: string;
   sections: BoxSection[];
+  /** 공식 이벤트 글 그림 속 확률표에서 만든 상자면 그 글 번호와 올린 날 (server/officialOdds.ts) */
+  post?: number;
+  date?: string | null;
 }
 /** 뽑기로 보지 않는 표: 강화(120…), 단계(50100, 40100), 펫(40200, 40300), 보석 합성·세공(30101, 30201), 장비 수리(80101), 옵션 표. 다른 칸에서 따로 한다 */
 const OWN = new Set(["50100", "40100", "40200", "40300", "30101", "30201", "80101"]);
 const NOT_BOX = (t: OddsTable) => t.key.startsWith("120") || OWN.has(t.key) || OPT_KEYS.has(t.key);
 const CATS: Record<string, string> = { 외형: "외형 · 염색", 염색: "외형 · 염색", "펫 강화": "기타", 아이템: "기타", "장비 수리": "기타", 조합책: "기타", 보석: "보석" };
-export const BOX_CATS = ["가챠샵", "랜덤상자", "랜덤 코스튬", "이벤트", "외형 · 염색", "기타"];
+export const BOX_CATS = ["가챠샵", "랜덤상자", "랜덤 코스튬", "이벤트", "이벤트 공지", "외형 · 염색", "기타"];
 
 const lastIndex = <T>(xs: T[], f: (x: T) => boolean) => {
   for (let i = xs.length - 1; i >= 0; i--) if (f(xs[i])) return i;

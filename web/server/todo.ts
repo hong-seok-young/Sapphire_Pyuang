@@ -5,9 +5,10 @@
 import { TEST_IDS } from "./auth";
 import type { Env } from "./auth";
 import { weekStart } from "./week";
-import { DIGEST_TAG, NO_TODO_TITLE, digestClient, digestPost, mergeSignature, mergeTasks, signatureSources, tasksUntil } from "./todoDigest";
+import { DIGEST_TAG, NO_TODO_TITLE, digestClient, digestPost, digestStale, mergeSignature, mergeTasks, signatureSources, tasksUntil } from "./todoDigest";
 import type { DigestOfPost, TodoTask } from "./todoDigest";
 import type Anthropic from "@anthropic-ai/sdk";
+import { RICH_DONE_SQL, RICH_IMG_SQL, richBody } from "./officialImages";
 
 const DAY = 86_400_000;
 const KST = 9 * 3_600_000;
@@ -130,15 +131,25 @@ export async function mergeIfStale(env: Env, client: Anthropic, now = Date.now()
 
 /** 정리할 글 (서버 몫: 최근 30일). 원문이 바뀌었거나 아직 안 했고, 다른 곳이 맡은 지 10분이 안 된 것은 뺀다 */
 export function pendingSql(withBody: boolean) {
-  const cols = withBody ? "n.id, n.kind, n.type, n.title, n.start_date, n.src, substr(n.body, 1, 20000) AS body, n.html" : "n.id, n.title, t.claimed_at";
-  // 아직 안 했거나, 맡기만 했거나, 원문이 바뀌었거나, 예전 지시문으로 정리한 글
-  const stale = `(t.id IS NULL OR t.made_at = 0 OR substr(t.src, 3) IS NOT substr(n.src, 3) OR t.model IS NOT '${DIGEST_TAG}')`;
+  const cols = withBody ? "n.id, n.kind, n.type, n.title, n.start_date, n.src" : "n.id, n.title, t.claimed_at";
+  const stale = digestStale(RICH_DONE_SQL);
   return (
     `SELECT ${cols} FROM official_news n LEFT JOIN official_todo t ON t.id = n.id ` +
     `WHERE n.kind = 'event' AND n.start_date >= ?1 AND ${stale} ` +
     `UNION ALL SELECT ${cols} FROM official_news n LEFT JOIN official_todo t ON t.id = n.id ` +
     `WHERE n.kind = 'notice' AND n.start_date >= ?1 AND n.type IN ('N', 'I') AND ${stale}`
   );
+}
+
+/** 맡은 글의 본문: 글자 + 그림 속 글자 (제작자 2026-11-06 '시너지 다 하자'). complete: 그림을 다 옮겼는지 */
+async function postBody(env: Env, id: number): Promise<{ body: string; html: string | null; complete: boolean }> {
+  const [news, rich, imgs] = await Promise.all([
+    env.DB.prepare("SELECT body, html FROM official_news WHERE id = ?").bind(id).first<{ body: string | null; html: string | null }>(),
+    env.DB.prepare("SELECT text, keys FROM official_rich WHERE id = ?").bind(id).first<{ text: string | null; keys: string | null }>(),
+    env.DB.prepare(RICH_IMG_SQL).bind(id).all<{ key: string; text: string }>(),
+  ]);
+  const r = richBody(news?.body ?? "", rich, new Map(imgs.results.map((g) => [g.key, g.text])));
+  return { ...r, html: news?.html ?? null };
 }
 
 /** 아직 정리 안 된 글: pending (맡을 수 있는 것), working (다른 곳이 정리하는 중) */
@@ -163,7 +174,6 @@ interface PendingPost {
   title: string;
   start_date: string | null;
   src: string | null;
-  body: string;
 }
 
 /** 표에 정리 결과를 넣는 SQL (?1 id, ?2 src, ?3 tasks, ?4 until, ?5 made_at, ?6 model) */
@@ -201,9 +211,11 @@ export async function digestPending(env: Env, max = 2, now = Date.now()): Promis
   await Promise.all(
     picked.map(async (p) => {
       try {
-        const tasks = NO_TODO_TITLE.test(p.title) ? [] : await digestPost(client, p);
+        const full = await postBody(env, p.id);
+        const tasks = NO_TODO_TITLE.test(p.title) ? [] : await digestPost(client, { ...p, body: full.body, html: full.html });
+        // 그림을 다 옮기기 전이면 판 끝에 p: 그림이 다 옮겨지면 다시 정리한다 (digestStale)
         await env.DB.prepare(SAVE_TODO_SQL)
-          .bind(p.id, p.src, JSON.stringify(tasks), tasksUntil(tasks, p.start_date), Date.now(), DIGEST_TAG)
+          .bind(p.id, p.src, JSON.stringify(tasks), tasksUntil(tasks, p.start_date), Date.now(), full.complete ? DIGEST_TAG : DIGEST_TAG + "p")
           .run();
       } catch (e) {
         // 맡은 채로 두면 10분 뒤 다시 한다

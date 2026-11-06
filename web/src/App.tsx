@@ -480,7 +480,7 @@ function Wiki({
     body = <Places wiki={wiki} region={route.query.get("r") ?? ""} />;
   else if (page === "place") body = <PlacePage wiki={wiki} id={arg} />;
   else if (page === "monster") body = <MonsterPage wiki={wiki} name={arg} />;
-  else if (page === "item") body = <ItemPage wiki={wiki} name={arg} />;
+  else if (page === "item") body = <ItemPage wiki={wiki} name={arg} job={me.job ? JOB_NAME[me.job] : null} />;
   else if (page === "equip")
     body = arg ? (
       <EquipSlot wiki={wiki} slot={arg} />

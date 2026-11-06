@@ -164,16 +164,6 @@ jobs:
             exit 1
           fi
 
-      # To do 의 이벤트 할 일: 아직 정리 안 된 공식 글을 Claude 로 정리한다 (scripts/digest-official.mjs, 4분까지. 남은 것은 30분마다 도는 공식 소식 작업이 한다).
-      # 사이트 배포가 끝난 뒤에 해서 배포를 늦추지 않고, 실패해도 배포는 성공으로 둔다
-      - name: To do digest
-        continue-on-error: true
-        working-directory: web
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
-        run: node --experimental-strip-types scripts/digest-official.mjs --budget 240
-
       # 공식 글 속 그림을 글자로 (제작자 요청 2026-11-06 '이벤트에 있는 모든 데이터 이미지 포함해서 싹 다 데이터화'): 사람이 확인한 그림 글(비공개 자료 공식/그림글.json)을 넣고,
       # 새 글의 그림 자리를 만들고, 남은 그림을 Claude 로 5분까지 옮긴다 (scripts/read-official-images.mjs. 남은 것은 30분마다 도는 공식 소식 작업이 한다). 실패해도 배포는 성공으로 둔다
       - name: Official images
@@ -183,6 +173,16 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
         run: node --experimental-strip-types scripts/read-official-images.mjs --manual ../자료/공식/그림글.json --budget 300
+
+      # To do 의 이벤트 할 일: 아직 정리 안 된 공식 글을 Claude 로 정리한다 (scripts/digest-official.mjs, 그림을 옮긴 뒤 그림 속 글자까지 읽는다, 4분까지. 남은 것은 30분마다 도는 공식 소식 작업이 한다).
+      # 사이트 배포가 끝난 뒤에 해서 배포를 늦추지 않고, 실패해도 배포는 성공으로 둔다
+      - name: To do digest
+        continue-on-error: true
+        working-directory: web
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+        run: node --experimental-strip-types scripts/digest-official.mjs --budget 240
 
       # 배포가 끝난 뒤에 한 번 하는 일 (scripts/ci-after.mjs: 챗봇 개선 완료 알림처럼 새 버전이 올라간 뒤에 보내야 하는 것). 실패해도 배포는 성공으로 둔다
       - name: After deploy
