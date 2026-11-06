@@ -6,6 +6,8 @@ import { FavStar, PicImg, TopBar } from "../ui";
 import { monstersByName } from "../data";
 import { forgetSearch, recentSearches, rememberSearch, useFavorites } from "../favorites";
 import type { FavKind } from "../favorites";
+import { TYPE_NAME, fetchOfficial } from "../official";
+import type { OfficialItem } from "../official";
 
 const KIND = { item: "아이템", monster: "몬스터", place: "사냥터" } as const;
 
@@ -41,6 +43,36 @@ function HitRow({ wiki, byName, kind, name, fkey, to, onOpen }: {
   );
 }
 
+/**
+ * 아이모 소식에서도 찾는다 (제작자 2026-11-06 '시너지 다 하자'): 제목·본문·그림 속 글자 (server/officialSearch.ts, 띄어쓰기 상관없이).
+ * 글자를 칠 때마다 묻지 않게 0.6초 기다린 뒤, 두 글자 이상일 때만. 받기 전은 null
+ */
+function useOfficialHits(q: string): OfficialItem[] | null {
+  const [items, setItems] = useState<OfficialItem[] | null>(null);
+  useEffect(() => {
+    setItems(null);
+    if (q.replace(/\s+/g, "").length < 2) {
+      setItems([]);
+      return;
+    }
+    let alive = true;
+    const timer = window.setTimeout(() => {
+      fetchOfficial("all", undefined, q.trim()).then(
+        (r) => alive && setItems(r.items),
+        () => alive && setItems([]),
+      );
+    }, 600);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [q]);
+  return items;
+}
+
+const HIT_NAME: Record<string, string> = { body: "본문", image: "그림 속 글자" };
+const OFFICIAL_MAX = 8;
+
 const linkOf = (kind: FavKind, key: string) =>
   kind === "place" ? "#/place/" + key : `#/${kind}/` + encodeURIComponent(key);
 
@@ -54,6 +86,7 @@ export function Search({ wiki, q }: { wiki: Wiki; q: string }) {
   // 최근 검색어 (이 기기에만): 결과를 누르거나 엔터를 치면 남긴다 (제작자 요청)
   const [recent, setRecent] = useState(recentSearches);
   const remember = () => rememberSearch(q);
+  const official = useOfficialHits(q);
 
   return (
     <>
@@ -123,13 +156,34 @@ export function Search({ wiki, q }: { wiki: Wiki; q: string }) {
           </ul>
         </section>
       )}
-      {q && !hits.length && <div className="empty">"{q}" 검색 결과가 없어요.</div>}
+      {q && !hits.length && official && !official.length && <div className="empty">"{q}" 검색 결과가 없어요.</div>}
       <ul className="list">
         {hits.map((h) => {
           const key = h.kind === "place" ? h.to.split("/").pop()! : h.name;
           return <HitRow key={h.kind + h.name} wiki={wiki} byName={byName} kind={h.kind} name={h.name} fkey={key} to={h.to} onOpen={remember} />;
         })}
       </ul>
+      {q && !!official?.length && (
+        <section className="search-off">
+          <h2 className="panel-title">아이모 소식 {official.length > OFFICIAL_MAX ? `${OFFICIAL_MAX}+` : official.length}</h2>
+          <ul className="list">
+            {official.slice(0, OFFICIAL_MAX).map((it) => (
+              <li key={it.id} className="hit">
+                <a className="row" href={`#/official/${it.id}`} onClick={remember}>
+                  <span className="row-main">
+                    <span className="row-title">{it.title}</span>
+                    <span className="row-sub">
+                      {it.start ?? ""}
+                      {it.hit && HIT_NAME[it.hit] ? ` · ${HIT_NAME[it.hit]}` : ""}
+                    </span>
+                  </span>
+                  <span className={"off-type off-type-" + it.type}>{TYPE_NAME[it.type] ?? it.type}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </>
   );
 }

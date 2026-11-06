@@ -1,6 +1,7 @@
 # 컴투스 공식 소식 받기 (제작자 요청 2026-11-01): 아이모 공식 홈페이지(withhive.com)의 공지사항·점검·이벤트를
 # 30분마다 받아 계정 DB(D1)의 official_news 에 넣고 (web/scripts/fetch-official.mjs, 처음이거나 '모든 쪽'을 고르면 전부),
-# To do 의 이벤트 할 일을 Claude 로 정리한다 (web/scripts/digest-official.mjs, 원문이 바뀐 글만). 게시판 '아이모 소식', 챗봇, To do 가 쓴다.
+# 글 속 그림의 표·글자를 옮긴 뒤(web/scripts/read-official-images.mjs) To do 의 이벤트 할 일을 Claude 로 정리한다 (web/scripts/digest-official.mjs, 원문이 바뀐 글만,
+# 그림 속 글자까지 읽는다). 게시판 '아이모 소식', 챗봇, To do 가 쓴다.
 # 점검 글은 서버도 2분마다 새로 받는다 (점검 전광판, web/server/official.ts). 비밀값은 배포(deploy-web.yml)와 같은
 # CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, ANTHROPIC_API_KEY (ANTHROPIC_WORKSPACE_ID). 공개 저장소라 실행 기록에는 개수만 찍는다.
 name: Official news
@@ -29,7 +30,7 @@ permissions:
 jobs:
   fetch:
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.image_budget && 330 || 60 }}
+    timeout-minutes: ${{ inputs.image_budget && 360 || 75 }}
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -51,13 +52,6 @@ jobs:
         working-directory: web
         run: node --experimental-strip-types scripts/fetch-official.mjs ${{ inputs.all && '--all' || '' }}
 
-      - name: To do digest
-        working-directory: web
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
-        run: node --experimental-strip-types scripts/digest-official.mjs --budget 1800
-
       # 공식 글 속 그림을 글자로 (제작자 요청 2026-11-06 '이벤트에 있는 모든 데이터 이미지 포함해서 싹 다 데이터화'). 새 글의 그림 자리를 만들고
       # 아직 안 옮긴 그림을 새 글 것부터 Claude 로 옮긴다 (scripts/read-official-images.mjs, 20분까지. 손으로 돌릴 때 image_budget 으로 더 길게)
       - name: Official images
@@ -66,3 +60,10 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
         run: node --experimental-strip-types scripts/read-official-images.mjs --budget ${{ inputs.image_budget || '1200' }}
+
+      - name: To do digest
+        working-directory: web
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+        run: node --experimental-strip-types scripts/digest-official.mjs --budget 1800

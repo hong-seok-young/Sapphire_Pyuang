@@ -7,13 +7,22 @@ import Anthropic from "@anthropic-ai/sdk";
 
 export const DIGEST_MODEL = "claude-opus-5-5";
 /** 정리한 모델과 지시문의 판 (official_todo.model). 지시문을 고치면 판을 올린다: 예전 판으로 정리한 글은 모두 다시 정리된다 */
-export const DIGEST_TAG = `${DIGEST_MODEL}#6`;
+export const DIGEST_TAG = `${DIGEST_MODEL}#7`;
+
+/**
+ * 다시 정리할 글 (SQL, 별칭 n = official_news, t = official_todo): 아직 안 했거나, 맡기만 했거나, 원문이 바뀌었거나, 예전 지시문으로 정리했거나,
+ * 그림을 다 옮기기 전에 정리했는데(판 끝에 'p') 이제 다 옮긴 글. done = 그림을 다 옮겼는지 (officialImages.ts RICH_DONE_SQL).
+ * 그림 속 표·기간도 같이 읽는다 (제작자 2026-11-06 '시너지 다 하자', #7)
+ */
+export const digestStale = (done: string) =>
+  `(t.id IS NULL OR t.made_at = 0 OR substr(t.src, 3) IS NOT substr(n.src, 3) OR (t.model IS NOT '${DIGEST_TAG}' AND t.model IS NOT '${DIGEST_TAG}p') OR (t.model = '${DIGEST_TAG}p' AND ${done}))`;
 
 const JOBS_KO = ["전사", "레인저", "마법사", "무도가"] as const;
 const JOB_KEY: Record<string, string> = { 전사: "warrior", 레인저: "ranger", 마법사: "mage", 무도가: "monk" };
 
 const SYSTEM = `너는 모바일 MMORPG 아이모(IMO: The World Of Magic)의 공식 공지·이벤트 글을 읽고, 이 게임을 하는 길드원이 기간 안에 챙겨야 할 일만 뽑는다.
 뽑은 줄은 길드 앱의 'To do' 화면에 체크 칸과 함께 그대로 보인다. 글을 안 읽어도 무엇을 하면 되는지 알게 쓰는 것이 목표다.
+공식 글은 기간, 교환 마감, 퀘스트 순서 같은 중요한 내용이 그림에만 있는 일이 많다. 그림 속 글자는 본문의 그 자리에 [그림 속 글자] … [그림 끝] 으로 들어 있으니 본문과 똑같이 읽는다.
 
 길드원에게는 할 일이 너무 많아 보이면 안 된다 (제작자 요청 2026-11-02: '너무 과하다'). 꼭 챙길 만한 것만 적게.
 
@@ -264,7 +273,7 @@ export async function digestPost(client: Anthropic, post: DigestPost): Promise<T
   const posted = post.start_date ?? "";
   const dow = /^\d{4}-\d{2}-\d{2}$/.test(posted) ? DOW[new Date(posted + "T00:00:00Z").getUTCDay()] : "";
   const user =
-    `글 올린 날: ${posted}${dow ? ` (${dow})` : ""}\n종류: ${post.kind === "event" ? "이벤트" : "공지사항"}\n제목: ${post.title}\n\n본문:\n` + post.body.slice(0, 20_000);
+    `글 올린 날: ${posted}${dow ? ` (${dow})` : ""}\n종류: ${post.kind === "event" ? "이벤트" : "공지사항"}\n제목: ${post.title}\n\n본문 (그림 속 표·글자는 [그림 속 글자] … [그림 끝] 안):\n` + post.body;
   // 글 속 링크 (응모하는 곳, 쿠폰 입력 페이지를 link 로 고르게)
   const links = postLinks(post);
   const linkText = links.length ? "\n\n글 속 링크:\n" + links.map((l) => `- ${l.text ? l.text + ": " : ""}${l.url}`).join("\n") : "";

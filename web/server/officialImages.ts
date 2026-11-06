@@ -18,19 +18,49 @@ export const NO_TEXT = "";
  * 본문 글자 속 그림 자리에 옮긴 글을 넣는다. 글자 없는 그림과 아직 못 옮긴 그림은 자리만 뺀다.
  * 그림 자리 앞뒤로 [그림 속 글자 · 그림 주소: …] … [그림 끝] 을 달아 챗봇이 본문과 그림 속 표를 구분하고 답에 그 그림을 넣게 한다
  */
-export function withImages(text: string, keys: string[], texts: Map<string, string>): string {
+export function withImages(text: string, keys: string[], texts: Map<string, string>, urls = true): string {
   return text
     .replace(IMG_TOKEN, (_, n: string) => {
       const key = keys[Number(n)] ?? "";
       const t = texts.get(key)?.trim();
       // 그림 주소도 준다: 챗봇이 답에 그 그림을 [[그림:주소|설명]] 으로 넣는다 (본문에 통째로 든 그림(data:)은 주소가 없다)
-      const url = key.startsWith("http") ? ` · 그림 주소: ${key}` : "";
+      const url = urls && key.startsWith("http") ? ` · 그림 주소: ${key}` : "";
       return t ? `\n[그림 속 글자${url}]\n${t}\n[그림 끝]\n` : "";
     })
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
+
+/**
+ * 글 본문 + 그림 속 글자 (To do 정리, 핵심 요약이 쓴다. 제작자 2026-11-06 '시너지 다 하자': 이벤트의 표·기간이 그림에만 있는 글이 많다).
+ * rich 는 official_rich 의 text·keys, texts 는 그 글 그림들의 official_img (글자 없는 그림은 ''). rich 가 없으면 원래 본문.
+ * complete: 그림을 모두 옮겼는지 (아직이면 그림이 다 옮겨진 뒤 다시 만든다)
+ */
+export function richBody(
+  body: string,
+  rich: { text: string | null; keys: string | null } | null | undefined,
+  texts: Map<string, string>,
+  urls = false,
+): { body: string; complete: boolean } {
+  if (!rich?.text) return { body, complete: false };
+  let keys: string[] = [];
+  try {
+    keys = JSON.parse(rich.keys ?? "[]") as string[];
+  } catch {
+    keys = [];
+  }
+  return { body: withImages(rich.text, keys, texts, urls), complete: keys.every((k) => texts.has(k)) };
+}
+
+/** SQL: 글(별칭 n)의 그림을 모두 옮겼는지 (official_rich 가 있고 그림마다 official_img 가 있다) */
+export const RICH_DONE_SQL =
+  "EXISTS (SELECT 1 FROM official_rich r WHERE r.id = n.id AND r.text IS NOT NULL AND NOT EXISTS " +
+  "(SELECT 1 FROM json_each(r.keys) k LEFT JOIN official_img g ON g.key = k.value WHERE g.key IS NULL))";
+
+/** SQL: 글 하나의 그림 글자 (?1 = 글 번호. 글자 없는 그림도 '' 로 와서 옮겼는지 알 수 있다) */
+export const RICH_IMG_SQL =
+  "SELECT g.key, COALESCE(g.text, '') AS text FROM official_rich r, json_each(r.keys) k JOIN official_img g ON g.key = k.value WHERE r.id = ?1";
 
 /**
  * 게임 안 은어를 공식 글에 쓰는 말로 (제작자 2026-11-06: '유물 이벤트인데 유물깡이라고 해'). 질문에 붙여 찾기에 쓴다.

@@ -22,6 +22,7 @@ import type { SimSave } from "../simState";
 import { QuestCtx, titleOf, todayQuests, useQuest } from "../simQuest";
 import type { SimEvent } from "../simQuest";
 import { api } from "../auth";
+import { fetchEventOdds } from "../official";
 import { IconCtx, iconLookup, useIcon } from "../simIcons";
 import type { IconOf } from "../simIcons";
 import type { Pic } from "../types";
@@ -287,6 +288,7 @@ function gameNamer(odds: Odds) {
   const srcs = new Map(optionSources(odds).map((x) => [x.key, x.name]));
   return (game: string) => {
     const [k, a, b, c] = game.split(":");
+    if (k === "box" && !boxes.has(a) && eventBoxCache.has(a)) boxes.set(a, eventBoxCache.get(a)!);
     if (k === "enh") return `${a} · ${b} 마법서${c ? " (이벤트)" : ""}`;
     if (k === "stat") return steps.get(a) ?? "스탯 부여";
     if (k === "repair") return a;
@@ -1654,8 +1656,30 @@ function OptLine({ d, v, n, i }: { d: Dist; v: Dist["vals"][number]; n: number; 
 
 // ================================================================ 상자
 
+/** 공식 이벤트 글 그림 속 확률표 상자 (제작자 2026-11-06 '시너지 다 하자', '이벤트 공지' 칸). 못 받으면 없이 */
+const eventBoxCache = new Map<string, Box>();
+function useEventBoxes(): Box[] {
+  const [boxes, setBoxes] = useState<Box[]>(() => [...eventBoxCache.values()]);
+  useEffect(() => {
+    let alive = true;
+    fetchEventOdds().then(
+      (r) => {
+        for (const b of r) eventBoxCache.set(b.key, b);
+        if (alive) setBoxes(r);
+      },
+      () => undefined,
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return boxes;
+}
+
 function BoxSim({ odds }: { odds: Odds }) {
-  const boxes = useMemo(() => boxesOf(odds), [odds]);
+  const official = useMemo(() => boxesOf(odds), [odds]);
+  const events = useEventBoxes();
+  const boxes = useMemo(() => [...official, ...events], [official, events]);
   const sources = useMemo(() => optionSources(odds), [odds]);
   const cats = BOX_CATS.filter((c) => boxes.some((b) => b.cat === c));
   const [cat, setCat] = useEntryState("sim.bcat", cats[0] ?? "");
@@ -1703,6 +1727,7 @@ function BoxSim({ odds }: { odds: Odds }) {
                 <span className="sim-pick-t">
                   <span>{b.name}</span>
                   <small>
+                    {b.date ? `${b.date} · ` : ""}
                     {b.sections.length > 1 ? `${b.sections.length}종 · ` : ""}
                     {b.sections.reduce((s, x) => s + x.items.length, 0)}가지
                   </small>
@@ -1845,6 +1870,11 @@ function BoxOpener({
           <NameIcon name={box.name} />
           <b>{box.name}</b>
           <small>{opened ? `${opened.toLocaleString()}번 열었어요` : ""}</small>
+          {box.post && (
+            <a className="sim-post" href={`#/official/${box.post}`}>
+              공식 글 ›
+            </a>
+          )}
         </div>
         {box.sections.length > 1 && (
           <div className="mk-cats sim-secs">

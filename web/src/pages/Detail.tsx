@@ -1,5 +1,8 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Wiki } from "../types";
+import { TYPE_NAME, fetchItemEvents } from "../official";
+import type { ItemEvent } from "../official";
+import { ImageText } from "./ImageText";
 import { FavStar, PicImg, TopBar, NotFound, Panel } from "../ui";
 import { MonsterCard } from "../wiki-ui";
 import { monstersByName } from "../data";
@@ -21,7 +24,49 @@ export function MonsterPage({ wiki, name }: { wiki: Wiki; name: string }) {
   );
 }
 
-export function ItemPage({ wiki, name }: { wiki: Wiki; name: string }) {
+/**
+ * 이 아이템이 나오는 공식 이벤트·소식 (제작자 2026-11-06 '시너지 다 하자'): 공식 글 그림 속 표(교환표, 확률표, 보상)와 본문에서 찾은 줄.
+ * 누르면 그 글(#/official/번호). 진행 중인 이벤트가 위, 같은 이벤트의 예전 회차는 수만. 없으면 칸을 그리지 않는다
+ */
+function ItemEvents({ name, job }: { name: string; job: string | null }) {
+  const [items, setItems] = useState<ItemEvent[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setItems(null);
+    fetchItemEvents(name).then(
+      (r) => alive && setItems(r),
+      () => alive && setItems([]),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [name]);
+  if (!items?.length) return null;
+  return (
+    <Panel title={`공식 이벤트·소식 (${items.length})`}>
+      <div className="ie-list">
+        {items.map((e) => (
+          <div key={e.id} className={"ie" + (e.ongoing ? " ie-on" : "")}>
+            <a className="ie-head" href={`#/official/${e.id}`}>
+              <span className={"off-type off-type-" + e.type}>{TYPE_NAME[e.type] ?? e.type}</span>
+              <b className="ie-title">{e.title}</b>
+              <span className="ie-go">›</span>
+            </a>
+            <small className="ie-sub">
+              {e.ongoing && <span className="ie-live">진행 중</span>}
+              {(e.start ?? "") + (e.end ? ` ~ ${e.end}` : "")}
+              {e.older > 0 && ` · 예전 회차 ${e.older}번`}
+              {e.image && " · 그림 속 표"}
+            </small>
+            <ImageText text={e.text} job={job} mark={name} />
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+export function ItemPage({ wiki, name, job = null }: { wiki: Wiki; name: string; job?: string | null }) {
   const it = wiki.items[name];
   const droppers = useMemo(
     () => (it ? it.from.map((k) => wiki.monsters[k]).filter(Boolean).sort((a, b) => (a.level ?? 0) - (b.level ?? 0)) : []),
@@ -74,6 +119,7 @@ export function ItemPage({ wiki, name }: { wiki: Wiki; name: string }) {
           ))}
         </ul>
       </Panel>
+      <ItemEvents name={name} job={job} />
     </>
   );
 }

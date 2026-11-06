@@ -35,7 +35,7 @@ const bigrams = (t: string) => {
   return new Set(Array.from({ length: Math.max(0, s.length - 1) }, (_, i) => s.slice(i, i + 2)));
 };
 /** 같은 이벤트를 다시 안내한 글 (용사의 유물 시즌 2 를 몇 달마다 다시 연다): 제목이 반 넘게 같으면 */
-function sameEvent(a: string, b: string): boolean {
+export function sameEvent(a: string, b: string): boolean {
   const x = bigrams(a);
   const y = bigrams(b);
   if (!x.size || !y.size) return false;

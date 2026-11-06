@@ -1,6 +1,7 @@
 // 아이모 소식 (제작자 요청 2026-11-01): 아이모 공식 홈페이지(withhive.com)의 공지사항, 점검, 이벤트.
 // 서버가 30분마다 받아 둔 것(functions/api/official.ts)을 게시판의 '아이모 소식'에서 보이고, 누르면 앱 안에서 읽는다 (원문은 링크로)
 import { api } from "./auth";
+import type { Box } from "./sim";
 import type { Role } from "./auth";
 import type { BoardComment } from "./board";
 
@@ -31,6 +32,8 @@ export interface OfficialPost extends Omit<OfficialItem, "comments"> {
   comments: BoardComment[];
   liked: boolean;
   roles: Record<string, Role>;
+  /** 글 속 그림마다 옮긴 표·글자 (그림 주소 -> 글, 글자 없는 그림은 없다) */
+  images?: Record<string, string>;
 }
 
 /** 게시판 '아이모 소식' 안의 칸 */
@@ -58,6 +61,43 @@ export const fetchOfficial = (tab: OfficialTab, before?: number, q?: string) =>
   api<{ items: OfficialItem[]; more: boolean; checkedAt: number | null }>(
     `/api/official?tab=${tab}${before ? `&before=${before}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`,
   );
+/** 아이템이 나오는 공식 글 (위키 아이템 화면 '공식 이벤트·소식', server/officialItem.ts) */
+export interface ItemEvent {
+  id: number;
+  kind: string;
+  type: string;
+  title: string;
+  start: string | null;
+  end: string | null;
+  ongoing: boolean;
+  /** 그 이름이 든 줄 (마크다운 표·줄) */
+  text: string;
+  image: boolean;
+  older: number;
+}
+/** 이번에 연 동안 이름마다 한 번만 받는다 */
+const itemEventCache = new Map<string, Promise<ItemEvent[]>>();
+export function fetchItemEvents(name: string): Promise<ItemEvent[]> {
+  let p = itemEventCache.get(name);
+  if (!p) {
+    p = api<{ items: ItemEvent[] }>(`/api/official/item?name=${encodeURIComponent(name)}`).then((r) => r.items);
+    p.catch(() => itemEventCache.delete(name));
+    itemEventCache.set(name, p);
+  }
+  return p;
+}
+
+/** 공식 이벤트 글 그림 속 확률표로 만든 뽑기 상자 (확률 시뮬레이터 '이벤트 공지', server/officialOdds.ts). 이번에 연 동안 한 번만 */
+let eventOdds: Promise<Box[]> | null = null;
+export const fetchEventOdds = () =>
+  (eventOdds ??= api<{ boxes: Box[] }>("/api/official/odds").then(
+    (r) => r.boxes,
+    (e) => {
+      eventOdds = null;
+      throw e;
+    },
+  ));
+
 /** 모든 글의 제목 (찾은 것이 적을 때 오타로 한 번 더 찾는다). 이번에 연 동안 한 번만 받는다 */
 let titles: Promise<OfficialItem[]> | null = null;
 export const fetchOfficialTitles = () =>

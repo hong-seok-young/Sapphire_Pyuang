@@ -7,8 +7,12 @@ import type { Env } from "./auth";
 export const SUMMARY_MODEL = "claude-opus-5-5";
 const JOBS = ["전사", "레인저", "마법사", "무도가"] as const;
 const CLAIM_MS = 90_000;
-/** 요약에 넣는 본문 글자 수 (이벤트 글은 3만 자까지 있다) */
-const MAX_BODY = 30_000;
+/**
+ * 요약을 만든 방법의 판. official_summary.src 에 원문 해시와 함께 둔다 ('<src>#s2', 그림을 다 옮기기 전이면 끝에 p).
+ * 2 (2026-11-06 제작자 '시너지 다 하자'): 그림 속 표·글자까지 읽는다. 그림이 다 옮겨지면 다시 만든다
+ */
+export const SUMMARY_V = 2;
+export const summaryKey = (src: string | null, complete: boolean) => `${src ?? ""}#s${SUMMARY_V}${complete ? "" : "p"}`;
 
 export interface Summary {
   lines: string[];
@@ -36,7 +40,8 @@ const SYSTEM = `너는 모바일 게임 아이모(IMO) 길드 앱에서 컴투�
   기간·시각, 길드원이 할 일이나 받을 것, 바뀌는 점처럼 꼭 알아야 할 것만. 인사말, 사과문, 보상 목록 나열, 유의사항은 쓰지 마.
 - jobs: 패치노트나 업데이트 글에서 직업마다 바뀐 점 (스킬, 밸런스, 장비 등)을 직업마다 5줄까지, 같은 모양의 짧은 명사형으로.
   직업과 상관없는 글이거나 그 직업의 변경이 없으면 빈 배열.
-- 글에 없는 것은 지어내지 마. 날짜는 글에 적힌 그대로.`;
+- 글에 없는 것은 지어내지 마. 날짜는 글에 적힌 그대로.
+- 공식 글은 기간, 교환표, 확률 같은 중요한 내용이 그림에만 있는 일이 많다. 그림 속 글자는 본문의 그 자리에 [그림 속 글자] … [그림 끝] 으로 들어 있으니 본문과 똑같이 읽어.`;
 
 /** 저장된 요약 (원문이 그대로일 때만). 만드는 중이면 "pending", 없으면 null */
 export async function storedSummary(env: Env, id: number, src: string | null, now = Date.now()): Promise<Summary | "pending" | null> {
@@ -82,7 +87,7 @@ export async function makeSummary(
       messages: [
         {
           role: "user",
-          content: `[${kind}] ${post.title}${post.start_date ? ` (${post.start_date}${post.end_date ? ` ~ ${post.end_date}` : ""})` : ""}\n\n${post.body.slice(0, MAX_BODY)}`,
+          content: `[${kind}] ${post.title}${post.start_date ? ` (${post.start_date}${post.end_date ? ` ~ ${post.end_date}` : ""})` : ""}\n\n${post.body}`,
         },
       ],
     } as Anthropic.Beta.MessageCreateParamsNonStreaming);
