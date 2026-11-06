@@ -371,7 +371,7 @@ function Wiki({
   // 새 글·새 물건 숫자 배지 (news.ts): 그 메뉴를 열면 지우고, 홈으로 올 때 다시 묻는다
   useEffect(() => startNews(me.id), [me.id]);
   useEffect(() => {
-    // 의뢰소는 칸이 하나라 열면 본 것. 게시판, 중개인, 장비대여는 그 화면 안의 단추마다 (useNewsSeen)
+    // 게시판·중개인·의뢰소·장비대여 목록의 새 것은 그 글·물건을 열어야 지운다 (news.ts markThingSeen, 여기 markNewsSeen 은 그 단추들을 건너뛴다)
     if (page === "requests") markNewsSeen("requests");
     if (page === "") void refreshNews();
   }, [page]);

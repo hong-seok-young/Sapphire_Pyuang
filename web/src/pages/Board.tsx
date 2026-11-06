@@ -12,8 +12,8 @@ import type { BoardComment, BoardFile, Cat, LinkPreview, PostDetail, PostSummary
 import { RoleBadge } from "../emblems";
 import { ago } from "../market";
 import { go, useEntryState } from "../router";
-import { FitLine, Loading, NewsDot, TopBar } from "../ui";
-import { markNewsSeen, newsSum, useNews, useNewsSeen } from "../news";
+import { FitLine, Loading, NewTag, NewsDot, ThingDot, TopBar } from "../ui";
+import { markThingSeen, newsSum, thingSince, useNews } from "../news";
 import type { NewsKey } from "../news";
 import { OfficialList } from "./Official";
 import { KakaoButton, Nick } from "../kakao";
@@ -58,11 +58,11 @@ const CAT_SHORT: Record<Cat, string> = { notice: "공지", event: "길드 이벤
 const IMO_NEWS: NewsKey[] = ["imo.notice", "imo.maint", "imo.event"];
 
 function BoardCats({ cat }: { cat: Cat | "imo" | null }) {
-  // 칸마다 새 글 수 (제작자 요청 2026-11-02: 홈의 게시판 숫자가 어느 칸에서 왔는지). 그 칸을 열거나 새 글을 열면 본 것으로.
-  // '전체'는 지우지 않는다 (열자마자 다 지워져 어느 칸에 새 글이 있는지 못 봤다), 아이모 소식은 Official.tsx
+  // 칸마다 새 글·새 댓글 수 (제작자 요청 2026-11-02: 홈의 게시판 숫자가 어느 칸에서 왔는지). 칸을 연다고 지우지 않고 그 글을 열어야 지운다
+  // (제작자 2026-11-06 '끝까지 배지가 추적해서'). '전체'는 게시판 네 칸의 합, 아이모 소식은 Official.tsx
   const news = useNews();
-  useNewsSeen(cat && cat !== "imo" ? [`board.${cat}` as NewsKey] : []);
-  const countOf = (key: Cat | "imo" | null) => (key === null ? 0 : newsSum(news, key === "imo" ? IMO_NEWS : [`board.${key}` as NewsKey]));
+  const countOf = (key: Cat | "imo" | null) =>
+    newsSum(news, key === null ? CATS.map((c) => `board.${c}` as NewsKey) : key === "imo" ? IMO_NEWS : [`board.${key}` as NewsKey]);
   const tabs: { key: Cat | "imo" | null; icon: string; name: string; to: string }[] = [
     { key: null, icon: "📋", name: "전체", to: "#/board" },
     ...CATS.map((c) => ({ key: c, icon: CAT_ICON[c], name: CAT_SHORT[c], to: `#/board?cat=${c}` })),
@@ -163,6 +163,7 @@ function List({ me, cat }: { me: Me; cat: Cat | null }) {
                     {p.pinned && <i className="bd-pin">고정</i>}
                     <i className={"bd-cat bd-cat-" + p.cat}>{CAT_NAME[p.cat]}</i>
                     {p.title}
+                    <ThingDot k={`post:${p.id}`} />
                   </span>
                   {p.snippet && <span className="bd-row-snippet">{p.snippet.replace(/\s+/g, " ")}</span>}
                   <small>
@@ -270,11 +271,13 @@ function PostView({ me, id }: { me: Me; id: number }) {
   const [confirm, setConfirm] = useState(false);
   const [viewing, setViewing] = useState<number | null>(null);
 
+  // 이 글을 마지막으로 본 때 (그 뒤에 남이 단 댓글에 'N'), 열면 이 글의 새 것을 지운다 (news.ts, 제작자 2026-11-06 '끝까지 배지가 추적해서')
+  const [since] = useState(() => thingSince(`post:${id}`));
   const reload = useCallback(() => {
     fetchPost(id).then(
       (r) => {
         setD(r);
-        markNewsSeen(`board.${r.post.cat}` as NewsKey); // 새 글을 열면 그 칸의 숫자를 지운다
+        markThingSeen(`post:${id}`);
       },
       (x) => setError(errorText(x)),
     );
@@ -381,16 +384,18 @@ function PostView({ me, id }: { me: Me; id: number }) {
         </div>
         {error && <p className="form-error">{error}</p>}
       </article>
-      <Comments me={me} id={id} comments={d.comments} roles={d.roles} onChange={(comments) => setD({ ...d, comments })} />
+      <Comments me={me} id={id} comments={d.comments} roles={d.roles} since={since} onChange={(comments) => setD({ ...d, comments })} />
     </>
   );
 }
 
-function Comments({ me, id, comments, roles, onChange }: {
+function Comments({ me, id, comments, roles, since, onChange }: {
   me: Me;
   id: number;
   comments: BoardComment[];
   roles: PostDetail["roles"];
+  /** 이 글을 마지막으로 본 때: 그 뒤에 남이 단 댓글에 'N' */
+  since: number;
   onChange: (c: BoardComment[]) => void;
 }) {
   const [text, setText] = useState("");
@@ -428,6 +433,7 @@ function Comments({ me, id, comments, roles, onChange }: {
   const line = (c: BoardComment, child: boolean) => (
     <li key={c.id} className={"bd-comment" + (child ? " bd-reply" : "")}>
       <div className="bd-comment-head">
+        <NewTag on={c.at > since && c.user !== me.id} />
         <b>
           <Nick name={c.user} />
         </b>

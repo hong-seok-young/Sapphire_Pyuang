@@ -26,8 +26,8 @@ import { useSample } from "../tutorialState";
 import { JOBS, JOB_NAME, errorText } from "../auth";
 import type { Job, Me } from "../auth";
 import type { Wiki } from "../types";
-import { FitLine, Loading, NewsDot, PicImg, TopBar } from "../ui";
-import { useNews, useNewsSeen } from "../news";
+import { FitLine, Loading, NewsDot, PicImg, ThingDot, TopBar } from "../ui";
+import { markThingSeen, newsSide, useNews, useNewsSeen } from "../news";
 import {
   STATUS_NAME,
   MAX_WEEKS,
@@ -120,15 +120,10 @@ export function RentalPage({
   const [panelRaw, setPanel] = useEntryState<Panel>("panel", "apps");
   // 예전에 고른 칸('paste' 등)이 남아 있으면 처음 칸으로
   const panel: Panel = PANELS.includes(panelRaw) ? panelRaw : "apps";
-  // 새 것 수 (news.ts, 제작자 요청 2026-11-02: 장비대여에 숫자 -> 안에서 목록·신청함·운영 어디에 새로 생겼는지). 보고 있는 칸은 본 것으로
+  // 새 것 수 (news.ts, 제작자 요청 2026-11-02: 장비대여에 숫자 -> 안에서 목록·신청함·운영 어디에 새로 생겼는지). 신청함·운영은 보고 있는 칸을 본 것으로,
+  // 목록의 새 무기는 직업 단추 -> 무기 줄을 따라가 정보창을 열어야 지운다 (제작자 2026-11-06 '끝까지 배지가 추적해서')
   const news = useNews();
-  useNewsSeen([
-    view === "apps"
-      ? "rent.apps"
-      : view === "staff"
-        ? "rent.staff"
-        : "rent.list",
-  ]);
+  useNewsSeen(view === "apps" ? ["rent.apps"] : view === "staff" ? ["rent.staff"] : []);
   const [showLedger, setShowLedger] = useState(false);
 
   const load = useCallback(async () => {
@@ -374,6 +369,7 @@ export function RentalPage({
                 onClick={() => setJob(j)}
               >
                 {JOB_NAME[j]}
+                <NewsDot n={newsSide("rent.list", (s) => jobsOf(s ?? "").includes(j))} />
               </button>
             ))}
           </nav>
@@ -425,6 +421,7 @@ export function RentalPage({
                             {isSample(i.id) && (
                               <i className="sample-tag">예시</i>
                             )}
+                            <ThingDot k={`rent:${i.id}`} />
                           </span>
                           <span className="rent-op">
                             {optionParts(i.options)
@@ -537,6 +534,10 @@ function ItemPopup({
   const facts = itemFacts(it);
   const values = optionFull(item.options);
   const holding = !!item.renter && data.mine.includes(item.renter);
+  // 정보창을 열면 이 무기의 '새 무기' 배지를 지운다 (news.ts, 제작자 2026-11-06 '끝까지 배지가 추적해서')
+  useEffect(() => {
+    markThingSeen(`rent:${item.id}`);
+  }, [item.id]);
   return (
     <>
       <div className="rent-pop-back" onClick={onClose} data-tut-dismiss />

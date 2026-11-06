@@ -11,6 +11,7 @@ import { goBack } from "./router";
 import { ClickTag, hasGuide, openGuide, useClickHint } from "./tutorial";
 import type { Pic } from "./types";
 import { useBackClose } from "./backClose";
+import { thingNew, useNews } from "./news";
 
 /**
  * 픽셀 그림. 작은 아이콘은 scale 배로 키워도 흐려지지 않게 그린다.
@@ -796,6 +797,19 @@ export function NewsDot({ n }: { n: number }) {
     <span className="news-badge in-news">{n > 99 ? "99+" : n}</span>
   ) : null;
 }
+
+/**
+ * 글·물건 줄의 새 것 수 (제작자 2026-11-06 '끝까지 배지가 추적해서, 마지막까지 들어가서 봐야 없어지게'): src/news.ts 의 글·물건 키 하나나 여럿의 합.
+ * 그 글·물건을 열면(markThingSeen) 사라진다
+ */
+export function ThingDot({ k }: { k: string | string[] }) {
+  useNews();
+  const n = (Array.isArray(k) ? k : [k]).reduce((s, x) => s + thingNew(x), 0);
+  return n > 0 ? <span className="news-badge row-new">{n > 99 ? "99+" : n}</span> : null;
+}
+
+/** 열었을 때 그 뒤에 달린 댓글·토론방 글 앞의 작은 'N' (글·물건을 마지막으로 본 때 뒤에 남이 쓴 것) */
+export const NewTag = ({ on }: { on: boolean }) => (on ? <i className="new-tag">N</i> : null);
 
 /**
  * 길드마스터에게만 보이는 메뉴 설명 (사용 기록, 챗봇 개선. 제작자 요청 2026-11-02: '길드마스터한테만 설명이 뜨게,
