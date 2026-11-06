@@ -17,7 +17,7 @@ import type { Me } from "../auth";
 import { Nick } from "../kakao";
 import { CAT_NAME, CoinCtx, SpaceCtx, fetchKing, luckOf, reachWithin, simUrl, stepsWithin, useCoinState, useCoins, useRecord, useSpace } from "../simRank";
 import type { Cat, King, SimRec, Space } from "../simRank";
-import { BAG_MAX, SaveCtx, expOf, legacySave, raiseExp, restoreFromRecords, useSave, useSaveState } from "../simState";
+import { BAG_MAX, SaveCtx, expOf, legacySave, raiseExp, restoreFromRecords, useKept, useSave, useSaveState } from "../simState";
 import type { SimSave } from "../simState";
 import { QuestCtx, titleOf, todayQuests, useQuest } from "../simQuest";
 import type { SimEvent } from "../simQuest";
@@ -634,8 +634,9 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
   const broken = held?.broken ?? false;
   const [fx, setFx] = useState<Fx | null>(null);
   const [gain, setGain] = useState<{ from: string; to: string; pct: number; n: number } | null>(null);
-  const [stats, setStats] = useState({ tries: 0, broke: 0, best: 0, coins: 0 });
-  const [log, setLog] = useState<LogDot[]>([]);
+  // 시도·부서진 장비·쓴 코인과 결과 점은 진행 상황에 (제작자 2026-11-06 '껐다가 다시 오면 기록이 사라지네')
+  const [stats, setStats] = useKept((s) => s.enh?.n, (s, v) => ({ ...s, enh: { ...s.enh, n: v } }), { tries: 0, broke: 0, best: 0, coins: 0 });
+  const [log, setLog] = useKept<LogDot[]>((s) => s.enh?.log, (s, v) => ({ ...s, enh: { ...s.enh, log: v } }), []);
   const [goal, setGoal] = useState(part === "무기" ? 8 : 6);
   // 자동은 직접 강화해 닿아 본 강화도까지만 (제작자 2026-11-04 '자동 강화는 우리가 강화해 본 곳까지만, 내가 수동으로 겪은 것만 자동으로')
   const expMax = held ? expOf(save, `enh:${held.name}`) : 0;
@@ -1196,10 +1197,12 @@ function StatSim({ odds }: { odds: Odds }) {
   const [key, setKey] = useEntryState("sim.steps", all[0]?.key ?? "");
   const st = all.find((s) => s.key === key) ?? all[0];
   const [stat, setStat] = useEntryState("sim.stat", "지능");
-  const [stage, setStage] = useState(0);
-  const [type, setType] = useState<string | null>(null);
+  // 표마다 지금 단계와 펫 옵션, 모든 표의 시도·성공 수는 진행 상황에 (제작자 2026-11-06 '껐다가 다시 오면 기록이 사라지네')
+  const kept = useSave().save.stat?.[st?.key ?? ""];
+  const [stage, setStage] = useState(() => kept?.stage ?? 0);
+  const [type, setType] = useState<string | null>(() => kept?.type ?? null);
   const [fx, setFx] = useState<Fx | null>(null);
-  const [stats, setStats] = useState({ tries: 0, ok: 0, big: 0 });
+  const [stats, setStats] = useKept((s) => s.statN, (s, v) => ({ ...s, statN: v }), { tries: 0, ok: 0, big: 0 });
   const [auto, setAuto] = useState(false);
   const stageRef = useRef(stage);
   stageRef.current = stage;
@@ -1231,12 +1234,24 @@ function StatInner(p: {
   const coins = useCoins();
   // 순위: 처음부터 몇 번 만에 끝 단계
   const rec = useRecord(`stat:${st.key}`);
-  const since = useRef(0);
-  const emit = useQuest();
   // 자동은 직접 닿아 본 단계까지만 (제작자 2026-11-04 '내가 수동으로 겪은 것만 자동으로')
   const { save, update } = useSave();
+  // 처음부터 센 시도 (순위): 단계와 함께 진행 상황에 두어 다시 열어도 이어서 센다
+  const since = useRef(save.stat?.[st.key]?.since ?? 0);
+  const emit = useQuest();
   const expStage = expOf(save, `stat:${st.key}`);
   const cap = Math.min(st.max, expStage);
+  const keep = (key: string, v: { stage: number; type: string | null; since: number }) => update((s) => ({ ...s, stat: { ...s.stat, [key]: v } }));
+  // 단계·펫 옵션이 바뀌거나 한 번 시도할 때마다 적는다 (처음 그릴 때는 그대로)
+  const firstKeep = useRef(true);
+  useEffect(() => {
+    if (firstKeep.current) {
+      firstKeep.current = false;
+      return;
+    }
+    keep(st.key, { stage, type: p.type, since: since.current });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [st.key, stage, p.type, p.stats.tries]);
   const reset = () => {
     setStage(0);
     stageRef.current = 0;
@@ -1244,6 +1259,17 @@ function StatInner(p: {
     setFx(() => null);
     setAuto(false);
     since.current = 0;
+    keep(st.key, { stage: 0, type: null, since: 0 });
+  };
+  // 다른 표로 바꾸면 그 표에서 하던 단계로 (예전에는 늘 0 부터)
+  const load = (key: string) => {
+    const k = save.stat?.[key];
+    setStage(k?.stage ?? 0);
+    stageRef.current = k?.stage ?? 0;
+    setType(k?.type ?? null);
+    setFx(() => null);
+    setAuto(false);
+    since.current = k?.since ?? 0;
   };
   const tryOnce = useCallback((manual = false) => {
     const cur = stageRef.current;
@@ -1305,8 +1331,9 @@ function StatInner(p: {
               aria-selected={s.key === st.key}
               className={"sub-tab" + (s.key === st.key ? " sub-tab-on" : "")}
               onClick={() => {
+                if (s.key === st.key) return;
                 p.setKey(s.key);
-                reset();
+                load(s.key);
               }}
             >
               {s.name}
@@ -1712,8 +1739,11 @@ function BoxOpener({
   const sec = box.sections[Math.min(si, box.sections.length - 1)];
   const total = sec.items.reduce((s, x) => s + x.p, 0) || 1;
   const [pulls, setPulls] = useState<Pull[]>([]);
-  const [tally, setTally] = useState<Map<string, number>>(new Map());
-  const [opened, setOpened] = useState(0);
+  // 상자·묶음마다 연 수와 나온 것은 진행 상황에 (제작자 2026-11-06 '껐다가 다시 오면 기록이 사라지네')
+  const keptBox = useSave().save.box;
+  const keptOf = (i: number) => keptBox?.[`${box.key}:${i}`];
+  const [tally, setTally] = useState<Map<string, number>>(() => new Map(Object.entries(keptOf(0)?.tally ?? {})));
+  const [opened, setOpened] = useState(() => keptOf(0)?.opened ?? 0);
   const [shake, setShake] = useState(0);
   // 표의 줄을 누르면 그것이 나올 때까지 열어 본다
   const [target, setTarget] = useState<string | null>(null);
@@ -1742,11 +1772,13 @@ function BoxOpener({
       open(k);
     }, 600);
   };
+  const boxKey = `${box.key}:${si}`;
   const record = (got: Pull[], k: number) => {
     const t = new Map(tally);
     for (const x of got) t.set(x.name, (t.get(x.name) ?? 0) + 1);
     setTally(t);
     setOpened(opened + k);
+    update((s) => ({ ...s, box: { ...s.box, [boxKey]: { opened: opened + k, tally: Object.fromEntries(t) } } }));
     setShake((s) => s + 1);
     const rare = got.reduce<Pull | null>((m, x) => (!m || x.p < m.p ? x : m), null);
     if (rare && cat === "box") emit({ kind: "box", p: rare.p });
@@ -1785,12 +1817,19 @@ function BoxOpener({
     setHunt({ name: goal.name, tries, expect: total / goal.p, k: (hunt?.k ?? 0) + 1, short: !hit });
     record(got, tries);
   };
-  const clear = () => {
+  // wipe: '지우기'를 눌렀을 때는 저장한 것도 지운다 (묶음을 바꿀 때는 그 묶음의 기록을 불러온다)
+  const clear = (wipe = true) => {
     setPulls([]);
     setTally(new Map());
     setOpened(0);
     setHunt(null);
     setOptItem(null);
+    if (wipe)
+      update((s) => {
+        const b = { ...s.box };
+        delete b[boxKey];
+        return { ...s, box: b };
+      });
   };
   const best = pulls.reduce((m, x) => Math.min(m, x.p), 1);
   const rows = [...sec.items].sort((a, b) => a.p - b.p);
@@ -1817,7 +1856,9 @@ function BoxOpener({
                 onClick={() => {
                   setSi(i);
                   setTarget(null);
-                  clear();
+                  clear(false);
+                  setTally(new Map(Object.entries(keptOf(i)?.tally ?? {})));
+                  setOpened(keptOf(i)?.opened ?? 0);
                 }}
               >
                 {s.title}
@@ -1915,7 +1956,7 @@ function BoxOpener({
           );
         })}
         {opened > 0 && (
-          <button type="button" className="btn btn-ghost sim-clear" onClick={clear}>
+          <button type="button" className="btn btn-ghost sim-clear" onClick={() => clear()}>
             처음부터
           </button>
         )}
@@ -1956,15 +1997,17 @@ const GEM_STARTS = [30, 90, 300, 1000];
 /** 1단계 보석 N개로 시작해 같은 단계 3개씩 합성한다 (실패하면 3개가 같은 단계 1개로) */
 function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
   const rules = useMemo(() => gemSynth(odds), [odds]);
-  const [start, setStart] = useEntryState("sim.gstart", 30);
-  const [inv, setInv] = useState<number[]>(() => [0, start, 0, 0, 0]);
-  const [runs, setRuns] = useState(0);
+  // 가진 보석과 합성 수는 진행 상황에 (제작자 2026-11-06 '껐다가 다시 오면 기록이 사라지네')
+  const kept = useSave().save.gem;
+  const [start, setStart] = useEntryState("sim.gstart", kept?.start ?? 30);
+  const [inv, setInv] = useState<number[]>(() => (kept?.inv?.length === 5 ? kept.inv : [0, start, 0, 0, 0]));
+  const [runs, setRuns] = useState(kept?.runs ?? 0);
   const [fx, setFx] = useState<{ from: number; to: number; n: number } | null>(null);
   const [avg, setAvg] = useState<number[] | null>(null);
   const coins = useCoins();
   // 순위: 1단계 몇 개로 몇 단계까지 (같은 단계면 적은 보석으로, 그다음 적은 합성으로)
   const rec = useRecord("gem:synth");
-  const best = useRef(1);
+  const best = useRef(kept?.best ?? 1);
   const can = (st: number, v = inv) => v[st] >= 3 && !!rules[st];
   const emit = useQuest();
   const reached = (stage: number, synths: number) => {
@@ -1979,6 +2022,14 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
   };
   // 모두 합성은 직접 합성해 본 단계만 (제작자 2026-11-04 '내가 수동으로 겪은 것만 자동으로')
   const { save, update } = useSave();
+  const firstKeep = useRef(true);
+  useEffect(() => {
+    if (firstKeep.current) {
+      firstKeep.current = false;
+      return;
+    }
+    update((s) => ({ ...s, gem: { inv, runs, start, best: best.current } }));
+  }, [inv, runs, start, update]);
   const tried = (st: number) => expOf(save, `gem:${st}`) > 0;
   const once = (st: number) => {
     if (!can(st) || coins.take(1) < 1) return;
