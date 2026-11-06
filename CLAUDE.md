@@ -1414,7 +1414,8 @@
   - 일꾼이 없으면(배포 실패) 예전 길: 서버가 같은 답을 뒤에서 받아 두고(`finishInBackground`, SSE 를 tee) 화면이 끊긴 뒤 30초까지만 넣는다.
   - 자동 배포가 일꾼을 사이트보다 먼저 `wrangler deploy` 하고 됐으면 사이트 wrangler.toml 에 바인딩을 붙인다 (`deploy-web.yml` 'Chat runner').
     Cloudflare API 토큰에 **Account > Workers Scripts > Edit** 권한이 있어야 한다. 2026-11-06 까지 배포마다 일꾼 올리기가 실패했다
-    (`wrangler deploy` 가 먼저 부르는 `/workers/scripts/sapphire-chat-runner/secrets` 에서 거절) -> 그동안은 일꾼 없는 예전 길. 실패하면 배포 기록에 wrangler 출력 끝 30줄을 찍는다. 일꾼 코드를 고치면 `server/chatRun.ts` (API 키는 사이트가 요청마다 넘겨서 일꾼에 비밀값이 없다).
+    (`wrangler deploy` 가 먼저 부르는 `/workers/scripts/sapphire-chat-runner/secrets` 에서 'No access to the specified resource') -> 그동안은 일꾼 없는 예전 길.
+    2026-11-06 제작자가 토큰에 Workers Scripts Edit 를 더한 뒤 첫 배포에서 일꾼이 올라가고 사이트도 CHATRUN 바인딩과 함께 배포됐다. 실패하면 배포 기록에 wrangler 출력 끝 30줄을 찍는다. 일꾼 코드를 고치면 `server/chatRun.ts` (API 키는 사이트가 요청마다 넘겨서 일꾼에 비밀값이 없다).
   - 로컬 시험: `scratchpad chatrun/mock.cjs`(가짜 Claude API, SSE 를 20초 동안 천천히) + `runner` 에서 `wrangler dev --port 8790` + `wrangler pages dev ... --do CHATRUN=ChatRun@sapphire-chat-runner
     --binding ANTHROPIC_API_KEY=test CHAT_API_BASE=http://127.0.0.1:8799` (같은 `--persist-to`), `chatrun/ui.cjs`(인터넷 3초 끊기, 닫고 다시 열기).
 - 챗봇 화면은 `#/chat`, `#/chat/번호`, `#/chat/list` 가 한 화면이다 (`App.tsx` 의 `main` key 가 'chat'). 바꾸면 새 대화가 번호를 받을 때 화면이 지워진다.
