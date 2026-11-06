@@ -390,7 +390,7 @@ export function wikiContext(
     // 3-1. 컴투스 공식 확률 (제작자 요청 2026-10-31): 확률을 묻거나, 질문의 이름(아이템, 상자, 옵션)이 공식 표에 나오면 그 표.
     // 이름이 든 섹션을 먼저, 표 전체 (자르지 않는다, 제작자 2026-11-03)
     if (odds) {
-      const askOdds = /확률|가챠|뽑기|상자|합성|세공|재설정|염색|퍼센트|%/.test(question);
+      const askOdds = /확률|가챠|뽑기|깡|상자|합성|세공|재설정|염색|퍼센트|%/.test(question);
       const terms = [...new Set([...picked.map((n) => n.name), ...ws.filter((w) => !/\d/.test(w) && !ASK_WORD.test(w) && !JOB_WORDS.includes(w) && w !== "확률")])].filter((w) => w.length >= 2);
       const scoredOdds = odds.tables
         .map((t) => {
