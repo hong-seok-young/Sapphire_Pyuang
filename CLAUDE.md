@@ -242,6 +242,10 @@
   누르면 앱 안에서 읽는다 (`#/official/번호`, `OfficialPostPage`, `/api/official/:id`): 맨 위 '📄 컴투스 공식 · 원문 보기 ↗',
   본문은 html 을 화면이 한 번 더 걸러서(정한 태그와 그림 주소, 링크만) 그린다. 다른 공식 글 링크는 앱 안으로. 정보의 '공식 소식' 칸은 게시판으로 옮겼다
   (예전 주소 `#/official` 은 게시판 아이모 소식으로).
+- 찾기 (제작자 요청 2026-11-06 '아이모 소식도 검색되게, 똑같은 단어만 말고 띄어쓰기 안 해도'): 아이모 소식 칸 단추 아래 찾기 칸 (`Official.tsx` `OfficialList`, 주소 대신 `useEntryState` 'imo.q').
+  서버(`GET /api/official?q=`, `server/officialSearch.ts` `findOfficial`)가 띄어쓰기·줄바꿈을 빼고 견주고, 낱말이 여럿이면 순서와 상관없이 모두 든 글을 제목·본문(자르지 않은 원문)·그림 속 글자에서
+  찾는다 (지금 칸 안에서, 제목에 다 든 글 먼저, 100개까지). 찾은 것이 5개보다 적으면 화면이 모든 제목(`?titles=1`, 한 번만 받음)을 오타(자모 한두 개 차이, `src/search.ts` `titleMatch`)로
+  한 번 더 찾아 뒤에 붙인다. 제목이 아닌 곳에 맞은 줄은 작은 표 '본문' · '그림 속 글자' · '비슷한 제목'.
 - 조회수·좋아요·댓글 (제작자 2026-11-06 '아이모 소식에서도 조회수 댓글 등등 달게, 일반 게시판이랑 똑같이', '지금까지 조회한 거 기록 있으면 반영'): 게시판 글과 같다.
   D1 `official_views`·`official_likes`·`official_comments`(글 번호는 공식 글 번호), `GET /api/official/:id` 가 본 사람으로 세고 댓글·좋아요·본 사람 수를 같이 준다,
   `POST /api/official/:id/comments`(답글 한 단계, 500자, 1분에 10개, 답글이면 원래 댓글 쓴 사람에게 알림), `PUT /api/official/:id/like`, `DELETE /api/official/comments/:cid`(쓴 사람·운영진).
