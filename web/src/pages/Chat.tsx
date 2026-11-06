@@ -100,8 +100,16 @@ const fromSaved = (m: SavedMsg): Shown => ({
   at: m.created_at,
 });
 
-/** 질문이 남아 있고 답이 없는 대화를 이만큼 안에 열면 서버가 받던 답을 기다린다 */
+/** 질문이 남아 있고 답이 없는 대화를 이만큼 안에 열면 서버가 받던 답을 기다린다 (더 지났으면 기다리지 않고 바로 다시 묻는다) */
 const RESUME_MS = 15 * 60_000;
+/** 일꾼 없이 받는 답은 화면이 끊긴 뒤 서버가 이만큼만 더 받아 둔다 (Pages Functions, chat/index.ts finishInBackground) */
+const SERVER_TAIL_MS = 40_000;
+/** 화면이 마지막으로 가려진 때 (다른 앱으로 간 때): 끊긴 답을 서버가 아직 받고 있을 수 있는지 셈한다 */
+let hiddenAt = 0;
+if (typeof document !== "undefined")
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") hiddenAt = Date.now();
+  });
 
 /** 복사할 글: 그림 단추 표시는 이름만, 추천 질문은 뺀다 */
 const plainAnswer = (text: string) =>
@@ -164,8 +172,8 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
   const [pending, setPending] = useState<{ image: ChatImage; preview: string }[]>([]);
   const [pendingFiles, setPendingFiles] = useState<ChatFile[]>([]);
   const [attachError, setAttachError] = useState("");
-  /** 다시 열었을 때 답이 없는 질문이 있으면 서버가 받던 답을 기다린다 */
-  const [resume, setResume] = useState(false);
+  /** 다시 열었을 때 답이 없는 질문이 있으면 서버가 받던 답을 기다리거나 다시 묻는다 (old: RESUME_MS 보다 오래된 질문이라 바로 다시 묻는다) */
+  const [resume, setResume] = useState<null | "fresh" | "old">(null);
   const [busy, setBusy] = useState(false);
   const [left, setLeft] = useState<number | null>(null);
   const threadRef = useRef<number | null>(null);
@@ -203,7 +211,8 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
         const gap = r.fixed?.find((g) => g.id === againId);
         if (gap) setRedo({ question: gap.question, note: gap.note ?? "" });
         const lastMsg = r.msgs[r.msgs.length - 1];
-        if (!gap && lastMsg?.role === "user" && Date.now() - lastMsg.created_at < RESUME_MS) setResume(true);
+        // 답 없이 남은 질문: 언제 물었든 답을 받아 온다 (제작자 2026-11-06 '화면 나가면 자꾸 답이 멈춰': 15분이 지나면 질문만 남고 아무것도 안 보였다)
+        if (!gap && lastMsg?.role === "user") setResume(Date.now() - lastMsg.created_at < RESUME_MS ? "fresh" : "old");
       })
       .catch((e) => alive && setLoadError(errorText(e)))
       .finally(() => alive && setLoading(false));
@@ -227,7 +236,8 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
   // 일꾼에 받을 것이 없으면 예전처럼 서버가 뒤에서 받아 두는 답을 기다리고 (3초마다, 45초까지), 그래도 없으면 다시 묻는다
   useEffect(() => {
     if (!resume || threadId === null) return;
-    setResume(false);
+    const old = resume === "old";
+    setResume(null);
     const id = threadId;
     const run0 = ++runRef.current;
     const base = turns;
@@ -253,7 +263,7 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
           return;
         }
         // 일꾼이 있는데 받을 것이 없으면 답이 없는 것이라 바로 다시 묻는다
-        if (!durable && tries < 15) {
+        if (!durable && !old && tries < 15) {
           window.setTimeout(() => void poll(), 3000);
           return;
         }
@@ -261,7 +271,7 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
         if (msgs?.length) void run(msgs, msgs[msgs.length - 1].text, true);
       };
       // 멈추는 것은 runRef 로 (setResume(false) 로 이 효과가 다시 돌 때 타이머를 지우면 안 된다)
-      window.setTimeout(() => void poll(), durable ? 0 : 1500);
+      window.setTimeout(() => void poll(), durable || old ? 0 : 1500);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resume, threadId]);
@@ -349,12 +359,12 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
    * 끊긴 반쪽 답은 대화에 넣지 않는다 (넣으면 다 된 답처럼 보였다). 일꾼에 받을 것이 없으면 'none' 을 돌려준다
    */
   async function follow(
-    run: number,
+    runId: number,
     base: Shown[],
     found: string[],
     first: (events: AskEvents, signal: AbortSignal) => Promise<ChatResult | { none: true; durable: boolean }>,
   ): Promise<"done" | "none"> {
-    const live = () => runRef.current === run;
+    const live = () => runRef.current === runId;
     const startedAt = Date.now();
     let firstText: number | null = null;
     let text = "";
@@ -440,6 +450,31 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
           break;
         }
         r = { ...w, left: r.left };
+      }
+      // 일꾼 없이 받던 답이 끊겼으면 (앱을 나갔다 옴, 제작자 2026-11-06 '화면 나가면 자꾸 답이 멈춰'): 서버가 끊긴 뒤 조금 더 받아 넣은 답이 있으면 그것을,
+      // 없으면 같은 질문을 저절로 다시 묻는다 (끊긴 반쪽 답과 '다시 답하기' 단추만 남기지 않는다)
+      if (r.broken && !r.durable && !r.aborted && !r.refused && thread !== null && live()) {
+        const since = hiddenAt > startedAt ? hiddenAt : Date.now();
+        update((last) => ({ ...last, streaming: true, phase: "답을 이어 받는 중" }));
+        await whenVisible();
+        for (let i = 0; live() && !ctrl.signal.aborted; i++) {
+          const saved = await loadThread(thread).catch(() => null);
+          if (!live() || ctrl.signal.aborted) break;
+          const msgs = saved?.msgs.map(fromSaved);
+          if (msgs?.length && msgs[msgs.length - 1].role === "assistant") {
+            setTurns(msgs);
+            return "done";
+          }
+          if (Date.now() - since > SERVER_TAIL_MS || i >= 15) {
+            if (msgs?.length && msgs[msgs.length - 1].role === "user") {
+              const q = msgs[msgs.length - 1].text;
+              window.setTimeout(() => void run(msgs, q, true), 0);
+              return "done";
+            }
+            break;
+          }
+          await sleep(3000);
+        }
       }
       if (r.left !== null) setLeft(r.left);
       const thinkMs = (firstText ?? Date.now()) - startedAt;

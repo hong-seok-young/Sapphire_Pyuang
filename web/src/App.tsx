@@ -129,7 +129,7 @@ const GuildDungeonPage = lazy(() => CHUNKS.GuildDungeon().then((m) => ({ default
 function prefetchPages(staff: boolean, master: boolean) {
   const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
   if (conn?.saveData || /(^|-)2g$/.test(conn?.effectiveType ?? "")) return () => undefined;
-  const list: (keyof typeof CHUNKS)[] = ["Board", "Ranking", "Market", "Todo", "GuildDungeon", "Requests", "Rental", "Enhance", "Chat", "Profile", "Alerts", "PlatShop", "Official"];
+  const list: (keyof typeof CHUNKS)[] = ["Board", "Ranking", "Market", "Todo", "GuildDungeon", "Requests", "Rental", "Enhance", "DevRequests", "Chat", "Profile", "Alerts", "PlatShop", "Official"];
   if (staff) list.push("Admin");
   if (master) list.push("ActivityLog", "ChatGaps");
   let stop = false;
@@ -407,8 +407,8 @@ function Wiki({
     body = <SwitchTo me={me} who={arg} to={route.query.get("to") ?? ""} />;
   else if (page === "ranking") body = <RankingPage me={me} onMe={onMe} />;
   else if (page === "requests") body = <RequestsPage me={me} />;
-  // 개발 요청 (개발중, 제작자 요청 2026-11-05): 미리 보는 사람만 (launcher.ts canPreview, 서버 server/devreq.ts canUseDevReq)
-  else if (page === "devreq") body = canPreview(me) ? <DevRequestsPage me={me} query={route.query} /> : <DevSoon title="개발 요청" />;
+  // 개발 요청 (제작자 요청 2026-11-05, 같은 날 길드원 전체에게 열었다. 서버 server/devreq.ts DEVREQ_OPEN)
+  else if (page === "devreq") body = <DevRequestsPage me={me} query={route.query} />;
   else if (page === "alerts")
     body = (
       <AlertsPage

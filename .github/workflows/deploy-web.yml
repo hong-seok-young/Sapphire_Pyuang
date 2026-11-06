@@ -144,7 +144,7 @@ jobs:
           if [ -z "$DBID" ]; then echo "::warning::계정 DB id 를 못 찾아서 답 받기 일꾼을 건너뜀"; exit 1; fi
           sed -i "s/00000000-0000-0000-0000-000000000000/$DBID/" runner/wrangler.toml
           if ! npx wrangler deploy --config runner/wrangler.toml > runner-deploy.log 2>&1; then
-            grep -iE "error|permission|auth|code" runner-deploy.log | head -n 12
+            tail -n 30 runner-deploy.log
             echo "::warning::챗봇 답 받기 일꾼을 올리지 못했어요 (Cloudflare API 토큰에 Account > Workers Scripts > Edit 권한이 필요해요)"
             exit 1
           fi

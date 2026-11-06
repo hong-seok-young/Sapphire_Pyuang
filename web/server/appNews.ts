@@ -18,6 +18,12 @@ export const APP_NEWS: AppNews[] = [
     text: "강화 비교 기능 추가 · 지금 무기와 바꿀 무기를 고르면 몇 % 강해지는지 바로 보여요",
     link: "#/enhance",
   },
+  {
+    key: "app_news_devreq_20261106",
+    at: Date.parse("2026-11-06T09:15:00+09:00"),
+    text: "개발 요청 기능 추가 · 필요한 기능을 앱개발자에게 무료로 신청하고 결재 단계를 모두 함께 볼 수 있어요",
+    link: "#/devreq",
+  },
 ];
 
 const WINDOW = 2 * 86_400_000;

@@ -12,6 +12,11 @@ export interface Patch {
 
 export const PATCHES: Patch[] = [
   {
+    version: "1.4",
+    date: "11.06",
+    items: ["개발 요청 기능 추가", "챗봇 답변 중 화면 이탈 시 답 끊김 수정"],
+  },
+  {
     version: "1.3",
     date: "11.05",
     items: [
