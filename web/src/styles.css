@@ -1283,16 +1283,17 @@ button { font: inherit; color: inherit; }
 .bd-photo { display: block; width: 100%; padding: 0; background: none; border: 0; cursor: zoom-in; }
 .bd-photo img { display: block; width: 100%; height: auto; border: var(--px) solid var(--edge); }
 /* photo viewer (Board.tsx PhotoViewer): the whole picture fits the screen, nothing is cut */
-.pv { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; background: rgba(5, 5, 12, 0.96); animation: page-in 0.12s ease-out; }
+.pv { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; background: #05050c; animation: page-in 0.12s ease-out; }
 .pv-top { display: flex; align-items: center; gap: 8px; padding: calc(env(safe-area-inset-top) + 8px) 10px 8px; color: var(--text); font-size: 13px; }
 .pv-top span { flex: 1; }
 .pv-btn { padding: 6px 12px; font-size: 14px; color: var(--text); text-decoration: none; background: var(--panel); border: var(--px) solid var(--edge); cursor: pointer; }
 .pv-btn:disabled { opacity: 0.35; }
-.pv-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: pan-y pinch-zoom; }
-.pv-stage img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; user-select: none; }
-.pv-zoom { overflow: auto; display: block; touch-action: auto; }
-.pv-zoom img { max-width: none; max-height: none; width: 200%; }
-.pv-nav { display: flex; justify-content: space-between; padding: 8px 10px calc(env(safe-area-inset-bottom) + 10px); }
+/* 확대·옮기기는 ImageViewer 가 직접 한다 (페이지 확대는 막혀 있다): 브라우저 손가락 동작을 끄고 그림에 transform */
+.pv-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: none; }
+.pv-stage img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; user-select: none; -webkit-user-drag: none; transform-origin: center; will-change: transform; }
+.pv-nav { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px calc(env(safe-area-inset-bottom) + 10px); }
+.pv-tip { color: var(--muted); font-size: 11px; text-align: center; }
+.pv-tip-solo { display: block; padding: 6px 10px calc(env(safe-area-inset-bottom) + 10px); }
 .bd-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .bd-files a { display: block; padding: 7px 9px; color: var(--text); text-decoration: none; background: var(--night-2); border: var(--px) solid var(--edge); word-break: break-all; }
 .bd-files small { color: var(--muted); }
@@ -3598,3 +3599,57 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 @keyframes chat-live-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 @keyframes chat-live-blink { from { opacity: 1; } to { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .chat-live-glass, .chat-live-text { animation: none; } }
+
+/* 챗봇 답의 보이는 모양 (제작자 요청 2026-11-06 '표를 텍스트로만 대답하면 안 돼, 이벤트 사진을 넣고 누르면 전체 화면·확대'). src/pages/ChatAnswer.tsx */
+.ans-fig { margin: 2px 0; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ans-img {
+  position: relative; display: block; width: 100%; padding: 0; background: #fff; border: var(--px) solid var(--edge); cursor: zoom-in; overflow: hidden;
+}
+.ans-img img { display: block; width: 100%; height: auto; max-height: 420px; object-fit: contain; background: #fff; }
+.ans-img-zoom {
+  position: absolute; right: 6px; bottom: 6px; padding: 2px 7px; font-size: 11px; color: #fff; background: rgba(10, 8, 30, 0.72); border: 1px solid rgba(255, 255, 255, 0.35);
+}
+.ans-img:active { transform: translateY(1px); }
+.ans-fig figcaption { font-size: 12px; color: var(--muted); line-height: 1.45; }
+.ans-table { max-width: 100%; overflow-x: auto; border: var(--px) solid var(--edge); background: rgba(0, 0, 0, 0.18); -webkit-overflow-scrolling: touch; }
+.ans-table table { border-collapse: collapse; min-width: 100%; font-size: 12.5px; line-height: 1.45; }
+/* 낱말 가운데에서 끊지 않는다 (칸이 넓어지면 표만 옆으로 넘긴다), 긴 글은 띄어쓰기에서 줄을 바꾼다 */
+.ans-table th, .ans-table td { padding: 5px 7px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); text-align: left; vertical-align: top; word-break: keep-all; overflow-wrap: normal; min-width: 3.5em; max-width: 14em; }
+.ans-table th { color: var(--gold); font-weight: 400; background: rgba(0, 0, 0, 0.35); white-space: nowrap; }
+.ans-table th:first-child, .ans-table td:first-child { position: sticky; left: 0; background: #1d1840; z-index: 1; }
+.ans-table th:first-child { background: #15112f; }
+.ans-table tbody tr:nth-child(even) td { background-color: rgba(255, 255, 255, 0.03); }
+.ans-table tbody tr:nth-child(even) td:first-child { background: #221c4a; }
+.ans-tabs { border: var(--px) solid var(--edge); background: rgba(0, 0, 0, 0.16); min-width: 0; }
+.ans-tabs-bar { display: flex; flex-wrap: wrap; gap: 0; border-bottom: var(--px) solid var(--edge); }
+.ans-tab { flex: 1 1 0; min-width: 0; padding: 7px 4px; font-size: 13px; color: var(--muted); background: transparent; border: 0; border-bottom: 2px solid transparent; cursor: pointer; }
+.ans-tab-on { color: var(--gold); border-bottom-color: var(--gold); background: rgba(255, 200, 80, 0.06); }
+.ans-tab:active { transform: translateY(1px); }
+.ans-tabs-body { padding: 8px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ans-odds { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: var(--px) solid var(--edge); background: rgba(0, 0, 0, 0.18); }
+.ans-odds-title { font-weight: 400; color: var(--gold); font-size: 13px; }
+.ans-odds-row { display: grid; grid-template-columns: minmax(0, 7em) minmax(0, 1fr) auto; gap: 6px; align-items: center; font-size: 12.5px; }
+.ans-odds-name { min-width: 0; overflow-wrap: anywhere; }
+.ans-odds-bar { height: 10px; background: rgba(255, 255, 255, 0.07); }
+.ans-odds-bar i { display: block; height: 100%; background: linear-gradient(90deg, #6aa8ff, #b78bff); }
+.ans-odds-val { color: var(--gold); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ans-calc { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: var(--px) solid var(--gold); background: rgba(255, 200, 80, 0.05); }
+.ans-calc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ans-calc-head b { color: var(--gold); font-weight: 400; }
+.ans-calc-head small { color: var(--muted); font-size: 11px; }
+.ans-calc-n { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.ans-calc-n b { font-size: 20px; color: var(--text); margin-right: 2px; }
+.ans-calc-got b { font-size: 20px; color: #7fe0a0; }
+.ans-calc-meter { position: relative; height: 12px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.12); }
+.ans-calc-meter i { display: block; height: 100%; background: linear-gradient(90deg, #3fae6a, #7fe0a0); transition: width 0.15s ease-out; }
+.ans-calc-meter em { position: absolute; top: -2px; bottom: -2px; width: 1px; background: rgba(255, 255, 255, 0.5); }
+.ans-calc-range { width: 100%; accent-color: var(--gold); }
+.ans-calc-marks { display: flex; flex-wrap: wrap; gap: 4px; }
+.ans-calc-marks .pill { padding: 3px 8px; font-size: 11.5px; }
+.ans-calc-out { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0; }
+.ans-calc-out div { padding: 6px 8px; background: rgba(0, 0, 0, 0.22); min-width: 0; }
+.ans-calc-out dt { font-size: 11px; color: var(--muted); }
+.ans-calc-out dd { margin: 0; font-size: 15px; color: var(--text); overflow-wrap: anywhere; }
+.ans-calc-out dd small { font-size: 11px; color: var(--muted); }
+.ans-calc-warn { margin: 0; font-size: 12px; color: #ff9d7a; }
+@media (prefers-reduced-motion: reduce) { .ans-calc-meter i { transition: none; } }
