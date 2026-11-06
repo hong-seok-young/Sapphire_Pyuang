@@ -481,6 +481,22 @@ CREATE TABLE IF NOT EXISTS official_news (
   src TEXT,                               -- 원문(제목+본문)의 해시와 바꾼 방법의 판 (server/officialText.ts): 같으면 다시 쓰지 않는다
   added_at INTEGER                        -- 우리 표에 처음 들어온 때 (새 글 숫자 배지는 이것으로 센다. 고쳐 받아도 그대로, 예전 글은 NULL)
 );
+-- 공식 글 속 그림을 글자로 (제작자 요청 2026-11-06 '이벤트에 있는 모든 데이터 이미지 포함해서 싹 다 데이터화'). scripts/read-official-images.mjs 가 채우고
+-- 챗봇이 본문과 합쳐 읽는다 (server/officialImages.ts, server/official.ts officialContext). 지우지 않는다
+CREATE TABLE IF NOT EXISTS official_img (
+  key TEXT PRIMARY KEY,                   -- 그림 주소 (본문에 통째로 든 그림은 'data:' + 내용 해시). 같은 그림을 쓰는 글끼리 같이 쓴다
+  text TEXT NOT NULL,                     -- 그림 속 글자·표를 옮긴 것 (마크다운 표). 글자 없는 그림·아이콘은 ''
+  made_at INTEGER NOT NULL,
+  model TEXT                              -- 'manual' (사람이 확인, 비공개 자료 공식/그림글.json) · 옮긴 모델#판 · small · gone · refused
+);
+CREATE TABLE IF NOT EXISTS official_rich (
+  id INTEGER PRIMARY KEY,                 -- official_news.id
+  src TEXT,                               -- 이걸 만든 원문 표시 (official_news.src 와 다르면 다시 만든다)
+  v TEXT,                                 -- 만든 방법의 판 (RICH_V, 끝에 p 면 본문 속 그림 자료를 다 못 옮겨서 다음에 원문을 다시 받는다)
+  text TEXT,                              -- 본문 글자 (자르지 않은 원문에서, 9만 바이트까지), 그림 자리에 ⟦그림 N⟧. 원문을 못 받았으면 NULL (그때는 body)
+  keys TEXT NOT NULL DEFAULT '[]',        -- 그림 N 의 official_img.key 목록 (JSON)
+  made_at INTEGER NOT NULL
+);
 -- 아이모 소식 글의 본 사람·좋아요·댓글 (제작자 2026-11-06 '아이모 소식에서도 조회수 댓글 등등 달게, 일반 게시판이랑 똑같이'). 게시판의 board_views·board_likes·board_comments 와 같은 모양,
 -- 글 번호는 공식 글 번호(official_news.id). 본 사람은 처음 배포 때 사용 기록의 '#/official/<글>' 화면 기록으로 채웠다 (scripts/ci-d1.mjs, setup 'official_views_backfill')
 CREATE TABLE IF NOT EXISTS official_views (

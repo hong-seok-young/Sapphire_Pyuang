@@ -117,6 +117,16 @@ function textPos(text: string, flatAt: number): number {
   return 0;
 }
 
+/**
+ * 게임 은어 -> 자료에 쓰는 말 (제작자 2026-11-06: '유물 이벤트인데 유물깡이라고 해'). 질문에 붙여 공식 확률 표와 위키를 찾는다.
+ * 서버(server/officialImages.ts SLANG)에도 같은 표가 있다 (공식 글 찾기). 둘을 같이 고친다
+ */
+const SLANG: [RegExp, string][] = [
+  [/유물\s*깡|유물\s*까기|유물\s*상자|과거의\s*유물|용사의\s*유물|유물\s*이벤트|글러트|전리품/, "과거의 기억 마법의유물 영웅의유물 전설의유물 용사의 보물"],
+  [/상자\s*깡/, "상자"],
+];
+const slangOf = (q: string) => SLANG.filter(([re]) => re.test(q)).map(([, w]) => w).join(" ");
+
 /** 질문 낱말 (두 글자 이상) */
 function words(q: string): string[] {
   return q.split(/[\s,.?!~·()[\]"'“”‘’]+/).map((w) => w.replace(/(은|는|이|가|을|를|에|에서|으로|로|랑|하고|의|도|만)$/, "")).filter((w) => w.length >= 2);
@@ -196,7 +206,7 @@ export function wikiContext(
   seen?: Seen,
 ): WikiContext {
   // 사진에서 읽은 이름도 질문 낱말처럼 쓴다 (사진만 보낸 질문은 글이 없다)
-  const asked = [question, ...(seen?.names ?? [])].join(" ");
+  const asked = [question, slangOf(question), ...(seen?.names ?? [])].filter(Boolean).join(" ");
   const q = norm(asked);
   const parts: string[] = [];
   const found: string[] = [];
