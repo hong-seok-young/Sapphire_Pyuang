@@ -2,6 +2,7 @@
 // (scripts/fetch-official.mjs, 30분마다). 화면 목록(functions/api/official.ts)과 챗봇 자료(functions/api/chat)가 쓴다.
 // 공식 홈페이지의 공개 글을 읽을 뿐 게임은 읽지 않는다 (CLAUDE.md 게임 안전 규칙).
 import type { Env } from "./auth";
+import { slangOf, withImages } from "./officialImages";
 import { UPSERT_SQL, rowOf, srcOf, upsertValues } from "./officialText";
 import type { HiveItem } from "./officialText";
 
@@ -28,78 +29,119 @@ interface Row {
 
 const dates = (r: Row) => (r.start_date ?? "") + (r.end_date ? ` ~ ${r.end_date}` : "");
 
+/** 제목 견주기: 꺾쇠·괄호 속 말과 글자 아닌 것을 빼고 두 글자씩 */
+const bigrams = (t: string) => {
+  const s = t.replace(/<[^>]*>|\([^)]*\)|\[[^\]]*\]/g, "").replace(/[^\p{L}\p{N}]/gu, "");
+  return new Set(Array.from({ length: Math.max(0, s.length - 1) }, (_, i) => s.slice(i, i + 2)));
+};
+/** 같은 이벤트를 다시 안내한 글 (용사의 유물 시즌 2 를 몇 달마다 다시 연다): 제목이 반 넘게 같으면 */
+function sameEvent(a: string, b: string): boolean {
+  const x = bigrams(a);
+  const y = bigrams(b);
+  if (!x.size || !y.size) return false;
+  let both = 0;
+  for (const g of x) if (y.has(g)) both++;
+  return both / (x.size + y.size - both) >= 0.5;
+}
+
 /**
  * 챗봇에 붙일 공식 소식: 최근 글 목록과, 질문에 맞는 글 3개까지의 본문.
  * 점검을 물으면 가장 최근 점검 글, 패치를 물으면 가장 최근 패치노트, 그 밖에는 제목에 질문 낱말이 많이 든 글.
- * 2026-11-03 (제작자: '밀가루 사용처 대답 왜 못해, 이벤트 있는데'): 질문에 점검·이벤트 같은 말이 없어도 질문의 낱말(밀가루, 주모 …)이 최근 글 **본문**에
+ * 2026-11-03 (제작자: '밀가루 사용처 대답 왜 못해, 이벤트 있는데'): 질문에 점검·이벤트 같은 말이 없어도 질문의 낱말(밀가루, 주모 …)이 글 **본문**에
  * 나오면 그 글을 붙이고, 본문은 자르지 않고 전부 준다 (제작자 '3500자 한도 이딴 거 하지 마, 무조건 다 봐').
+ * 2026-11-06 (제작자: 유물깡 교환표는 그림에만 있다, '이벤트에 있는 모든 데이터 이미지 포함해서 싹 다 데이터화'): 본문은 그림 속 표·글자를 옮긴 것까지
+ * (official_rich + official_img, server/officialImages.ts), 낱말은 그림 글자에서도 찾고, 몇 달마다 다시 여는 이벤트를 찾게 모든 글에서 찾는다.
+ * 같은 이벤트의 예전 안내는 가장 새 글 하나만. 게임 은어(유물깡)는 공식 글의 말로 바꿔 찾는다 (SLANG).
  * 진행 중인 이벤트(끝나는 날이 안 지난 것)를 먼저, 그다음 새 글.
  */
 export async function officialContext(env: Env, question: string): Promise<string> {
-  const words = [
-    ...new Set(
-      question
-        .split(/[^\p{L}\p{N}]+/u)
-        .filter((w) => w.length >= 2 && !ASK_WORD.test(w))
-        .map((w) => w.replace(/(은|는|이|가|을|를|에|의|도|로|으로|에서|에게|한테|께|부터|까지|처럼|보다|이나|이랑|랑|하고|만|요|야|좀)$/, ""))
-        .filter((w) => w.length >= 2 && !ASK_WORD.test(w)),
-    ),
-  ].slice(0, 6);
-  const asked = OFFICIAL_ASK.test(question);
+  const toWords = (q: string) =>
+    q
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((w) => w.length >= 2 && !ASK_WORD.test(w))
+      .map((w) => w.replace(/(은|는|이|가|을|를|에|의|도|로|으로|에서|에게|한테|께|부터|까지|처럼|보다|이나|이랑|랑|하고|만|요|야|좀)$/, ""))
+      .filter((w) => w.length >= 2 && !ASK_WORD.test(w));
+  const slang = slangOf(question);
+  const words = [...new Set([...toWords(question).slice(0, 6), ...toWords(slang)])].slice(0, 12);
+  const asked = OFFICIAL_ASK.test(question) || !!slang;
   if (!asked && !words.length) return "";
-  const { results } = await env.DB.prepare(
-    "SELECT id, kind, type, title, start_date, end_date FROM official_news ORDER BY id DESC LIMIT 80",
-  ).all<Row>();
+  const { results } = await env.DB.prepare("SELECT id, kind, type, title, start_date, end_date FROM official_news ORDER BY id DESC").all<Row>();
   if (!results.length) return "";
-  // 질문 낱말이 본문에 나오는 글 (글마다 처음 나온 자리): 최근 80개 안에서만, 낱말 6개까지
-  const inBody = new Map<number, { word: string; pos: number; n: number }>();
+  const recent = new Set(results.slice(0, 80).map((r) => r.id));
+  // 질문 낱말이 본문이나 그림 글자에 나오는 글 (낱말 12개까지). 그림 글자는 한 번만 훑어서 글로 모은다 (D1 무료 한도: 읽는 줄 수를 적게)
+  const inBody = new Map<number, number>();
   if (words.length) {
-    const cols = words.map((_, i) => `instr(body, ?${i + 2}) AS p${i}`).join(", ");
-    const cond = words.map((_, i) => `instr(body, ?${i + 2}) > 0`).join(" OR ");
-    const rows = await env.DB.prepare(`SELECT id, ${cols} FROM official_news WHERE id >= ?1 AND (${cond})`)
-      .bind(results[results.length - 1].id, ...words)
+    const hit = (col: string) => words.map((_, i) => `(instr(${col}, ?${i + 1}) > 0)`);
+    const rows = await env.DB.prepare(
+      `WITH g AS (SELECT key, ${hit("text").map((h, i) => `${h} AS g${i}`).join(", ")} FROM official_img WHERE text != '' AND (${hit("text").join(" OR ")})), ` +
+        `gi AS (SELECT r.id, ${words.map((_, i) => `MAX(g.g${i}) AS g${i}`).join(", ")} FROM official_rich r, json_each(r.keys) k JOIN g ON g.key = k.value GROUP BY r.id) ` +
+        `SELECT n.id, ${hit("COALESCE(r.text, n.body)").map((h, i) => `(${h} OR COALESCE(gi.g${i}, 0)) AS h${i}`).join(", ")} ` +
+        `FROM official_news n LEFT JOIN official_rich r ON r.id = n.id LEFT JOIN gi ON gi.id = n.id WHERE ${words.map((_, i) => `h${i}`).join(" OR ")}`,
+    )
+      .bind(...words)
       .all<Record<string, number>>();
-    for (const r of rows.results) {
-      let best: { word: string; pos: number } | null = null;
-      let n = 0;
-      words.forEach((w, i) => {
-        const p = r[`p${i}`];
-        if (p > 0) {
-          n++;
-          if (!best || p < best.pos) best = { word: w, pos: p };
-        }
-      });
-      if (best) inBody.set(r.id, { ...best, n });
-    }
+    for (const r of rows.results) inBody.set(r.id, words.filter((_, i) => r[`h${i}`]).length);
   }
+  // 진행 중인지: 공식 목록에는 이벤트 끝나는 날이 비어 있어서, To do 정리(official_todo)가 글에서 읽은 끝나는 때를 쓴다. 정리 전이면 올린 지 3주 안
+  const untilOf = new Map(
+    (await env.DB.prepare("SELECT id, until FROM official_todo WHERE id > 0").all<{ id: number; until: number }>()).results.map((t) => [t.id, t.until]),
+  );
   const today = new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
-  const ongoing = (r: Row) => r.kind === "event" && (!r.end_date || r.end_date.slice(0, 10) >= today);
+  const threeWeeks = new Date(Date.now() + 9 * 3_600_000 - 21 * 86_400_000).toISOString().slice(0, 10);
+  const ongoing = (r: Row) =>
+    r.kind === "event" &&
+    (r.end_date ? r.end_date.slice(0, 10) >= today : untilOf.has(r.id) ? (untilOf.get(r.id) ?? 0) > Date.now() : (r.start_date ?? "") >= threeWeeks);
   const picks: Row[] = [];
-  const add = (r: Row | undefined) => r && !picks.includes(r) && picks.length < 3 && picks.push(r);
+  const add = (r: Row | undefined) => r && !picks.some((p) => p === r || sameEvent(p.title, r.title)) && picks.length < 3 && picks.push(r);
   if (/점검/.test(question)) add(results.find((r) => r.type === "C"));
   if (/패치|업데이트/.test(question)) add(results.find((r) => /패치노트/.test(r.title)));
-  // 점수: 제목에 든 낱말 x3 + 본문에 든 낱말, 진행 중인 이벤트 +2. 같으면 새 글
+  // 점수: 제목에 든 낱말 x3 + 본문·그림에 든 낱말, 진행 중인 이벤트 +2, 최근 80개 +1. 같으면 새 글
   const scored = results
-    .map((r) => ({ r, n: words.filter((w) => r.title.includes(w)).length * 3 + (inBody.get(r.id)?.n ?? 0) + (inBody.has(r.id) && ongoing(r) ? 2 : 0) }))
+    .map((r) => {
+      const title = words.filter((w) => r.title.includes(w)).length * 3;
+      const body = inBody.get(r.id) ?? 0;
+      return { r, n: title + body + (title + body && ongoing(r) ? 2 : 0) + (title + body && recent.has(r.id) ? 1 : 0) };
+    })
     .filter((x) => x.n > 0)
     .sort((a, b) => b.n - a.n || b.r.id - a.r.id);
   for (const x of scored) add(x.r);
   if (!picks.length && /이벤트|쿠폰|보상|프로모션|콜라보/.test(question)) add(results.find((r) => r.kind === "event"));
   if (!asked && !picks.length) return "";
 
-  // 본문은 자르지 않고 전부 준다 (제작자 2026-11-03 '3500자 한도 이딴 거 하지 마, 무조건 다 봐'. 전에는 처음 3500자만 줘서 글 깊숙한 교환 안내를 못 봤다)
-  const bodies = picks.length
-    ? (await env.DB.prepare(`SELECT id, body FROM official_news WHERE id IN (${picks.map(() => "?").join(",")})`).bind(...picks.map((p) => p.id)).all<{ id: number; body: string }>())
-        .results.map((b) => [b.id, b.body] as const)
-    : [];
-  const bodyOf = new Map(bodies);
+  // 본문은 자르지 않고 전부, 그림 속 표·글자를 그 자리에 넣어서 준다
+  const bodyOf = new Map<number, string>();
+  if (picks.length) {
+    const rows = (
+      await env.DB.prepare(
+        `SELECT n.id, n.body, r.text AS rich, r.keys FROM official_news n LEFT JOIN official_rich r ON r.id = n.id WHERE n.id IN (${picks.map(() => "?").join(",")})`,
+      )
+        .bind(...picks.map((p) => p.id))
+        .all<{ id: number; body: string; rich: string | null; keys: string | null }>()
+    ).results;
+    const keysOf = new Map(rows.map((r) => [r.id, r.rich ? (JSON.parse(r.keys || "[]") as string[]) : []]));
+    const all = [...new Set([...keysOf.values()].flat())];
+    const texts = new Map<string, string>();
+    if (all.length) {
+      const imgs = await env.DB.prepare("SELECT key, text FROM official_img WHERE key IN (SELECT value FROM json_each(?1)) AND text != ''")
+        .bind(JSON.stringify(all))
+        .all<{ key: string; text: string }>();
+      for (const g of imgs.results) texts.set(g.key, g.text);
+    }
+    for (const r of rows) bodyOf.set(r.id, r.rich ? withImages(r.rich, keysOf.get(r.id) ?? [], texts) : r.body);
+  }
   const list = results
     .slice(0, 30)
     .map((r) => `#${r.id} [${TYPE_NAME[r.type] ?? r.type}] ${r.title} · ${dates(r)} · ${officialUrl(r.kind, r.id)}`);
   const parts = [`[컴투스 공식 소식: 최근 글 30개 (새 것 먼저, withhive.com 아이모 공지사항·이벤트)]\n${list.join("\n")}`];
   for (const p of picks) {
     const body = bodyOf.get(p.id);
-    if (body) parts.push(`[공식 글 본문: ${p.title} (${TYPE_NAME[p.type] ?? p.type}, ${dates(p)}, ${officialUrl(p.kind, p.id)}${ongoing(p) ? ", 진행 중" : ""})]\n${body}`);
+    if (!body) continue;
+    const again = p.kind === "event" ? results.filter((r) => r !== p && r.kind === "event" && sameEvent(r.title, p.title)).map((r) => dates(r)).slice(0, 8) : [];
+    parts.push(
+      `[공식 글 본문 (그림 속 표·글자 포함): ${p.title} (${TYPE_NAME[p.type] ?? p.type}, ${dates(p)}, ${officialUrl(p.kind, p.id)}${ongoing(p) ? ", 진행 중" : ""})` +
+        (again.length ? ` · 같은 이벤트의 예전 회차: ${again.join(", ")}` : "") +
+        `]\n${body}`,
+    );
   }
   return parts.join("\n\n");
 }

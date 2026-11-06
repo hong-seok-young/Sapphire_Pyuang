@@ -14,6 +14,10 @@ on:
         description: "모든 쪽 다시 받기"
         type: boolean
         default: false
+      image_budget:
+        description: "그림 글자 옮기기에 쓸 시간 (초, 비우면 1200)"
+        type: string
+        default: ""
 
 concurrency:
   group: official-news
@@ -25,7 +29,7 @@ permissions:
 jobs:
   fetch:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: ${{ inputs.image_budget && 330 || 60 }}
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -53,3 +57,12 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
         run: node --experimental-strip-types scripts/digest-official.mjs --budget 1800
+
+      # 공식 글 속 그림을 글자로 (제작자 요청 2026-11-06 '이벤트에 있는 모든 데이터 이미지 포함해서 싹 다 데이터화'). 새 글의 그림 자리를 만들고
+      # 아직 안 옮긴 그림을 새 글 것부터 Claude 로 옮긴다 (scripts/read-official-images.mjs, 20분까지. 손으로 돌릴 때 image_budget 으로 더 길게)
+      - name: Official images
+        working-directory: web
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+        run: node --experimental-strip-types scripts/read-official-images.mjs --budget ${{ inputs.image_budget || '1200' }}
