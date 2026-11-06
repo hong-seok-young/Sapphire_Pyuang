@@ -5,6 +5,9 @@ import "./styles.css";
 import { App } from "./App";
 import { registerWorker } from "./push";
 
+// 화면 확대 잠금 (제작자 2026-11-06): 아이폰 사파리는 user-scalable=no 를 듣지 않아서 두 손가락 확대를 여기서 막는다 (styles.css 의 html touch-action)
+for (const ev of ["gesturestart", "gesturechange"]) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+
 // 안드로이드 앱(v1.16 이상)은 이 표시가 있으면 앱의 맨 윗줄을 숨기고, 앱 기능을 아래 탭 '앱'으로 쓴다
 (window as unknown as { __sapphireAppMenu?: boolean }).__sapphireAppMenu = true;
 

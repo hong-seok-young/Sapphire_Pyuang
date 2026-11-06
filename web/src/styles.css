@@ -37,6 +37,9 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; }
+/* 화면 확대 잠금 (제작자 2026-11-06 '스크롤하면 맨 밑 메뉴까지 없어지면 어케, 맨 밑 5개 버튼은 고정이지'): 손가락으로 벌리거나 두 번 누르면 화면이 커져
+   고정된 아래 탭이 화면 밖으로 밀렸다. 앱처럼 확대를 막는다 (index.html 의 user-scalable=no, iOS 는 main.tsx 의 gesturestart). 사진 보기는 두 번 눌러 확대 */
+html { touch-action: pan-x pan-y; }
 body {
   background: var(--night);
   background-image:
