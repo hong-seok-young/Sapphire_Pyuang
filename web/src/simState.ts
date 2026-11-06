@@ -18,6 +18,16 @@ export interface SimSave {
   autoBuy?: boolean;
   /** 예전 폰 자료와 순위 기록에서 장비를 되살렸다 (한 번만) */
   restored?: boolean;
+  // 껐다 켜도 남는 기록 (제작자 2026-11-06 '껐다가 다시 오면 기록이 사라지네': 화면에만 있어서 다시 열면 0 이었다)
+  /** 강화: 시도·부서진 장비·가장 높은 강화도·쓴 코인, 최근 결과 점 40개 */
+  enh?: { n?: { tries: number; broke: number; best: number; coins: number }; log?: { to: number; ok: boolean; broke?: boolean; plus?: number }[] };
+  /** 성장: 표마다 지금 단계·펫 옵션·처음부터 센 시도(순위용), 그리고 모든 표의 시도·성공·+2 성공 */
+  stat?: Record<string, { stage: number; type: string | null; since: number }>;
+  statN?: { tries: number; ok: number; big: number };
+  /** 보석 합성: 가진 보석, 합성 수, 처음 1단계 개수, 닿은 가장 높은 단계 */
+  gem?: { inv: number[]; runs: number; start: number; best: number };
+  /** 상자: 상자·묶음마다 연 수와 나온 것 */
+  box?: Record<string, { opened: number; tally: Record<string, number> }>;
 }
 
 /** 보관함은 부위마다 이만큼 */
@@ -29,6 +39,26 @@ export interface SaveApi {
 }
 export const SaveCtx = createContext<SaveApi>({ save: {}, update: () => undefined });
 export const useSave = () => useContext(SaveCtx);
+
+/**
+ * 화면 값을 진행 상황에 같이 둔다 (useState 와 같게 쓴다): 처음엔 저장된 값, 바뀌면 진행 상황에 적는다 (서버에는 1.2초 모아서).
+ * 처음 그릴 때는 적지 않는다
+ */
+export function useKept<T>(read: (s: SimSave) => T | undefined, write: (s: SimSave, v: T) => SimSave, initial: T) {
+  const { save, update } = useSave();
+  const [v, setV] = useState<T>(() => read(save) ?? initial);
+  const writeRef = useRef(write);
+  writeRef.current = write;
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    update((s) => writeRef.current(s, v));
+  }, [v, update]);
+  return [v, setV] as const;
+}
 
 /** 직접 겪은 값 */
 export const expOf = (s: SimSave, key: string) => s.exp?.[key] ?? 0;
