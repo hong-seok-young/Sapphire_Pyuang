@@ -1869,6 +1869,7 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 .off-type-D { color: var(--red); }
 .off-type-E { color: var(--gold); }
 .off-new { font-size: 10px; padding: 1px 5px; color: var(--edge); background: #7fe0a0; }
+.off-hit { font-size: 10px; padding: 1px 5px; color: var(--muted); border: 1px solid var(--line, #3b3466); white-space: nowrap; }
 .off-title { font-size: 14px; font-weight: 400; line-height: 1.35; }
 .off-main small { font-size: 11px; color: var(--muted); }
 .off-go { flex: none; color: var(--muted); }

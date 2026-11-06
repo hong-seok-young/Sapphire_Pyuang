@@ -4,10 +4,12 @@ import { errorText } from "../auth";
 import type { Me } from "../auth";
 import { Comments } from "./Comments";
 import {
-  OFFICIAL_TABS, TYPE_NAME, addOfficialComment, deleteOfficialComment, fetchOfficial, fetchOfficialPost, fetchOfficialSummary, officialLink, officialUrl, setOfficialLike,
+  OFFICIAL_TABS, TYPE_NAME, addOfficialComment, deleteOfficialComment, fetchOfficial, fetchOfficialPost, fetchOfficialSummary, fetchOfficialTitles, officialLink, officialUrl,
+  setOfficialLike,
 } from "../official";
 import type { OfficialItem, OfficialPost, OfficialSummary, OfficialTab } from "../official";
-import { go } from "../router";
+import { go, useEntryState } from "../router";
+import { titleMatch } from "../search";
 import { Loading, NewsDot, ThingDot, TopBar } from "../ui";
 import { markThingSeen, newsSum, thingSince, useNews } from "../news";
 import type { NewsKey } from "../news";
@@ -22,6 +24,8 @@ const dates = (it: Pick<OfficialItem, "start" | "end">, today: string) =>
  * 게시판 '아이모 소식' (제작자 요청 2026-11-01): 아이모 공식 홈페이지의 공지사항, 점검, 이벤트를 칸으로 나눠 보인다.
  * 누르면 앱 안에서 읽는다 (#/official/번호). 고른 칸은 주소 ?t= 에 남는다
  */
+/** 찾기에서 제목이 아닌 곳에 맞았을 때 줄에 다는 작은 표 */
+const HIT_NAME: Record<string, string> = { body: "본문", image: "그림 속 글자", similar: "비슷한 제목" };
 /** 아이모 소식 칸마다 새 글 수 (news.ts) */
 const TAB_NEWS: Record<OfficialTab, NewsKey[]> = { all: ["imo.notice", "imo.maint", "imo.event"], notice: ["imo.notice"], maint: ["imo.maint"], event: ["imo.event"] };
 
@@ -34,13 +38,34 @@ export function OfficialList({ tab }: { tab: OfficialTab }) {
   const [error, setError] = useState("");
   const tabRef = useRef(tab);
   tabRef.current = tab;
+  // 찾기 (제작자 요청 2026-11-06 '아이모 소식도 검색되게, 띄어쓰기 안 해도'): 서버가 띄어쓰기를 빼고 제목·본문·그림 속 글자에서 찾고,
+  // 찾은 것이 적으면 오타(자모 한두 개 차이)로 제목을 한 번 더 찾아 뒤에 붙인다 (src/search.ts titleMatch)
+  const [text, setText] = useEntryState("imo.text", "");
+  const [q, setQ] = useEntryState("imo.q", "");
 
   useEffect(() => {
     let alive = true;
     setItems(null);
     setMore(false);
     setError("");
-    fetchOfficial(tab).then(
+    (async () => {
+      const r = await fetchOfficial(tab, undefined, q || undefined);
+      let list = r.items;
+      if (q && list.length < 5) {
+        const all = await fetchOfficialTitles().catch(() => [] as OfficialItem[]);
+        const inTab = (it: OfficialItem) =>
+          tab === "all" || (tab === "event" ? it.kind === "event" : tab === "maint" ? it.type === "C" : it.kind === "notice" && it.type !== "C");
+        const near = all
+          .filter((it) => inTab(it) && !list.some((x) => x.id === it.id))
+          .map((it) => ({ it, s: titleMatch(it.title, q) }))
+          .filter((x) => x.s > 0)
+          .sort((a, b) => b.s - a.s || b.it.id - a.it.id)
+          .slice(0, 30)
+          .map(({ it }) => ({ ...it, hit: "similar" as const }));
+        list = [...list, ...near];
+      }
+      return { items: list, more: r.more };
+    })().then(
       (r) => {
         if (!alive) return;
         setItems(r.items);
@@ -51,7 +76,7 @@ export function OfficialList({ tab }: { tab: OfficialTab }) {
     return () => {
       alive = false;
     };
-  }, [tab]);
+  }, [tab, q]);
 
   async function loadMore() {
     if (!items?.length) return;
@@ -86,10 +111,41 @@ export function OfficialList({ tab }: { tab: OfficialTab }) {
           </button>
         ))}
       </nav>
+      <form
+        className="bd-search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setQ(text.trim());
+        }}
+      >
+        <input
+          className="mk-input"
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            if (!e.target.value.trim()) setQ("");
+          }}
+          placeholder="🔍 제목, 내용, 그림 속 글자"
+          aria-label="아이모 소식 찾기"
+          enterKeyHint="search"
+        />
+        {q && (
+          <button
+            type="button"
+            className="btn btn-ghost bd-write"
+            onClick={() => {
+              setText("");
+              setQ("");
+            }}
+          >
+            지우기
+          </button>
+        )}
+      </form>
       {!items ? (
         <Loading error={error} />
       ) : items.length === 0 ? (
-        <div className="empty">아직 받아 온 소식이 없어요.</div>
+        <div className="empty">{q ? `"${q}" 소식이 없어요.` : "아직 받아 온 소식이 없어요."}</div>
       ) : (
         <ul className="off-list">
           {items.map((it) => {
@@ -102,6 +158,7 @@ export function OfficialList({ tab }: { tab: OfficialTab }) {
                     <span className="off-head">
                       <span className={"off-type off-type-" + it.type}>{TYPE_NAME[it.type] ?? it.type}</span>
                       {!ended && it.start && it.start >= fresh && <span className="off-new">NEW</span>}
+                      {q && it.hit && it.hit !== "title" && <span className="off-hit">{HIT_NAME[it.hit]}</span>}
                     </span>
                     <b className="off-title">
                       {it.title}

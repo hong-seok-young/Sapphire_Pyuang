@@ -69,6 +69,24 @@ function fuzzy(name: string, q: string, qj: string): number {
   }
   return 0;
 }
+/**
+ * 글 제목 찾기 (아이모 소식, 제작자 요청 2026-11-06 '똑같은 단어만 말고 띄어쓰기 안 해도'): 띄어쓰기를 빼고, 낱말마다 제목에 들었거나 자모 한두 개 차이면 맞다.
+ * 낱말이 모두 맞아야 한다. 맞으면 점수 (0 이면 아님)
+ */
+export function titleMatch(title: string, query: string): number {
+  const words = query.split(/\s+/).map(norm).filter((w) => w.length >= 2);
+  if (!words.length) return 0;
+  const t = norm(title);
+  let score = 1;
+  for (const w of words) {
+    if (t.includes(w)) continue;
+    const f = fuzzy(title, w, jamo(w));
+    if (!f) return 0;
+    score = Math.min(score, f);
+  }
+  return score;
+}
+
 /** 그냥 찾은 것이 이보다 적으면 오타로도 찾는다 */
 const FUZZY_BELOW = 5;
 const onlyCho = (s: string) => /^[ㄱ-ㅎ]+$/.test(s);

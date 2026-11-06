@@ -19,6 +19,8 @@ export interface OfficialItem {
   views?: number;
   likes?: number;
   comments?: number;
+  /** 찾기에서 어디에 맞았는지: 제목, 본문, 그림 속 글자, 비슷한 제목(오타) */
+  hit?: "title" | "body" | "image" | "similar";
 }
 
 export interface OfficialPost extends Omit<OfficialItem, "comments"> {
@@ -52,8 +54,20 @@ export function officialLink(href: string): string | null {
   return m ? `#/official/${m[1]}` : null;
 }
 
-export const fetchOfficial = (tab: OfficialTab, before?: number) =>
-  api<{ items: OfficialItem[]; more: boolean; checkedAt: number | null }>(`/api/official?tab=${tab}${before ? `&before=${before}` : ""}`);
+export const fetchOfficial = (tab: OfficialTab, before?: number, q?: string) =>
+  api<{ items: OfficialItem[]; more: boolean; checkedAt: number | null }>(
+    `/api/official?tab=${tab}${before ? `&before=${before}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`,
+  );
+/** 모든 글의 제목 (찾은 것이 적을 때 오타로 한 번 더 찾는다). 이번에 연 동안 한 번만 받는다 */
+let titles: Promise<OfficialItem[]> | null = null;
+export const fetchOfficialTitles = () =>
+  (titles ??= api<{ items: OfficialItem[] }>("/api/official?titles=1").then(
+    (r) => r.items,
+    (e) => {
+      titles = null;
+      throw e;
+    },
+  ));
 
 export const fetchOfficialPost = (id: number) => api<OfficialPost>(`/api/official/${id}`);
 export const addOfficialComment = (id: number, text: string, parent: number | null) =>
