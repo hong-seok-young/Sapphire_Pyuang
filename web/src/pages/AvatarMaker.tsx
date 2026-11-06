@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 import { errorText, uploadAvatar } from "../auth";
+import { HeroHalo } from "../heroHalo";
 
 /**
  * 캐릭터 사진 만들기 ('내 정보'). 길드원이 갤러리에서 직접 고른 자기 캐릭터 스샷에서
@@ -107,7 +108,10 @@ export function AvatarMaker({ onSaved, onCancel }: { onSaved: (avatar: number) =
           <div className="growth-hero avatar-preview">
             <span className="growth-crown">이번 주의 성장왕</span>
             <span className="growth-hero-face">
-              <img className="growth-face" src={png.url} alt="내 캐릭터" style={{ maxWidth: 96, maxHeight: 96 }} />
+              <HeroHalo />
+              <span className="gh-who">
+                <img className="growth-face" src={png.url} alt="내 캐릭터" style={{ maxWidth: 96, maxHeight: 96 }} />
+              </span>
             </span>
           </div>
           {fallback && (

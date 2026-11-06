@@ -9,6 +9,7 @@ import { JobEmblem, JobGlyph, MINE_TAG_PIC, RankMedal, RoleBadge } from "../embl
 import { ChangeAsk, FitLine, Loading, TopBar } from "../ui";
 import { weekStart } from "../week";
 import { GrowthChart } from "./GrowthChart";
+import { HeroHalo } from "../heroHalo";
 
 
 type View = "level" | GrowthPeriod;
@@ -373,7 +374,10 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
           <div className="growth-hero">
             <span className="growth-crown">👑 {PERIOD_NAME[period]}의 성장왕</span>
             <span className="growth-hero-face">
-              <Face e={first} size={96} />
+              <HeroHalo />
+              <span className="gh-who">
+                <Face e={first} size={96} />
+              </span>
             </span>
             <NickButton className="growth-hero-name" id={first.id} high={first.highSpec} open={openId === first.id} onToggle={() => toggle(first.id)} />
             <span className="growth-hero-sub">
