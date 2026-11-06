@@ -3618,6 +3618,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .ans-table th { color: var(--gold); font-weight: 400; background: rgba(0, 0, 0, 0.35); white-space: nowrap; }
 .ans-table th:first-child, .ans-table td:first-child { position: sticky; left: 0; background: #1d1840; z-index: 1; }
 .ans-table th:first-child { background: #15112f; }
+.ans-table td:first-child { white-space: nowrap; max-width: 9em; }
 .ans-table tbody tr:nth-child(even) td { background-color: rgba(255, 255, 255, 0.03); }
 .ans-table tbody tr:nth-child(even) td:first-child { background: #221c4a; }
 .ans-tabs { border: var(--px) solid var(--edge); background: rgba(0, 0, 0, 0.16); min-width: 0; }
