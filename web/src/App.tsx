@@ -422,6 +422,7 @@ function Wiki({
   else if (page === "official")
     body = Number(arg) ? (
       <OfficialPostPage
+        me={me}
         id={Number(arg)}
         job={me.job ? JOB_NAME[me.job] : null}
       />

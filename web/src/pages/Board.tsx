@@ -1,24 +1,25 @@
 import { peekMemo, putMemo } from "../memo";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import { ApiError, RANK, errorText } from "../auth";
 import type { Me } from "../auth";
 import {
-  CATS, CAT_ICON, CAT_NAME, URL_RE, addComment, createPost, deleteComment, deleteFile, deletePost, fetchPost, fetchPosts,
+  CATS, CAT_ICON, CAT_NAME, URL_RE, createPost, deleteFile, deletePost, fetchPost, fetchPosts,
   fileUrl, linkPreview, polishPost, setLike, shrinkPhoto, sizeText, updatePost, uploadFile, youtubeId,
 } from "../board";
-import type { BoardComment, BoardFile, Cat, LinkPreview, PostDetail, PostSummary } from "../board";
+import type { BoardFile, Cat, LinkPreview, PostDetail, PostSummary } from "../board";
 import { RoleBadge } from "../emblems";
 import { ago } from "../market";
 import { go, useEntryState } from "../router";
-import { FitLine, Loading, NewTag, NewsDot, ThingDot, TopBar } from "../ui";
+import { FitLine, Loading, NewsDot, ThingDot, TopBar } from "../ui";
 import { markThingSeen, newsSum, thingSince, useNews } from "../news";
 import type { NewsKey } from "../news";
 import { OfficialList } from "./Official";
 import { KakaoButton, Nick } from "../kakao";
 import { isOfficialTab } from "../official";
 import { useBackClose } from "../backClose";
+import { Comments } from "./Comments";
 
 /** 공지사항과 이벤트는 오피서 이상만 쓴다 (서버 server/board.ts canWrite 와 같다) */
 const canWrite = (me: Me, cat: Cat) => cat === "free" || cat === "suggest" || RANK[me.role] >= 1;
@@ -386,105 +387,6 @@ function PostView({ me, id }: { me: Me; id: number }) {
       </article>
       <Comments me={me} id={id} comments={d.comments} roles={d.roles} since={since} onChange={(comments) => setD({ ...d, comments })} />
     </>
-  );
-}
-
-function Comments({ me, id, comments, roles, since, onChange }: {
-  me: Me;
-  id: number;
-  comments: BoardComment[];
-  roles: PostDetail["roles"];
-  /** 이 글을 마지막으로 본 때: 그 뒤에 남이 단 댓글에 'N' */
-  since: number;
-  onChange: (c: BoardComment[]) => void;
-}) {
-  const [text, setText] = useState("");
-  const [reply, setReply] = useState<BoardComment | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const top = comments.filter((c) => c.parent === null);
-
-  async function send() {
-    const t = text.trim();
-    if (!t) return;
-    setBusy(true);
-    setError("");
-    try {
-      const c = await addComment(id, t, reply?.id ?? null);
-      onChange([...comments, c]);
-      setText("");
-      setReply(null);
-    } catch (x) {
-      setError(errorText(x));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function remove(c: BoardComment) {
-    try {
-      await deleteComment(c.id);
-      onChange(comments.filter((x) => x.id !== c.id && x.parent !== c.id));
-    } catch (x) {
-      setError(errorText(x));
-    }
-  }
-
-  const line = (c: BoardComment, child: boolean) => (
-    <li key={c.id} className={"bd-comment" + (child ? " bd-reply" : "")}>
-      <div className="bd-comment-head">
-        <NewTag on={c.at > since && c.user !== me.id} />
-        <b>
-          <Nick name={c.user} />
-        </b>
-        <KakaoButton name={c.user} />
-        {roles[c.user] && <RoleBadge role={roles[c.user]} />}
-        <small>{ago(c.at)}</small>
-        {!child && (
-          <button className="bd-mini" onClick={() => setReply(c)}>
-            답글
-          </button>
-        )}
-        {(c.user === me.id || staff(me)) && (
-          <button className="bd-mini" onClick={() => remove(c)}>
-            삭제
-          </button>
-        )}
-      </div>
-      <p>{c.text}</p>
-    </li>
-  );
-
-  return (
-    <section className="panel bd-comments">
-      <h2 className="panel-title">댓글 {comments.length}</h2>
-      <ul>
-        {top.map((c) => (
-          <Fragment key={c.id}>
-            {line(c, false)}
-            {comments.filter((r) => r.parent === c.id).map((r) => line(r, true))}
-          </Fragment>
-        ))}
-      </ul>
-      {reply && (
-        <p className="bd-replying">
-          ↳ {reply.user} 님에게 답글 <button className="bd-mini" onClick={() => setReply(null)}>취소</button>
-        </p>
-      )}
-      <form
-        className="bd-comment-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          send();
-        }}
-      >
-        <input className="mk-input" value={text} maxLength={500} onChange={(e) => setText(e.target.value)} placeholder={reply ? "답글" : "댓글"} />
-        <button className="pill" disabled={busy || !text.trim()}>
-          등록
-        </button>
-      </form>
-      {error && <p className="form-error">{error}</p>}
-    </section>
   );
 }
 

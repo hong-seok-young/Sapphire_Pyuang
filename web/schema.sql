@@ -481,6 +481,29 @@ CREATE TABLE IF NOT EXISTS official_news (
   src TEXT,                               -- 원문(제목+본문)의 해시와 바꾼 방법의 판 (server/officialText.ts): 같으면 다시 쓰지 않는다
   added_at INTEGER                        -- 우리 표에 처음 들어온 때 (새 글 숫자 배지는 이것으로 센다. 고쳐 받아도 그대로, 예전 글은 NULL)
 );
+-- 아이모 소식 글의 본 사람·좋아요·댓글 (제작자 2026-11-06 '아이모 소식에서도 조회수 댓글 등등 달게, 일반 게시판이랑 똑같이'). 게시판의 board_views·board_likes·board_comments 와 같은 모양,
+-- 글 번호는 공식 글 번호(official_news.id). 본 사람은 처음 배포 때 사용 기록의 '#/official/<글>' 화면 기록으로 채웠다 (scripts/ci-d1.mjs, setup 'official_views_backfill')
+CREATE TABLE IF NOT EXISTS official_views (
+  post_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  PRIMARY KEY (post_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS official_likes (
+  post_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  PRIMARY KEY (post_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS official_comments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  post_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  parent_id INTEGER,
+  text TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS official_comments_post ON official_comments (post_id, id);
+CREATE INDEX IF NOT EXISTS official_comments_at ON official_comments (created_at);
 -- 아이모 소식 글의 핵심 요약과 패치노트 직업별 변경점 (제작자 요청 2026-11-02, server/officialSummary.ts). 글을 처음 열 때 만들고 원문(src)이 바뀌면 다시
 CREATE TABLE IF NOT EXISTS official_summary (
   id INTEGER PRIMARY KEY,                 -- official_news.id
