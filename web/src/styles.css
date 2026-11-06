@@ -1592,52 +1592,6 @@ p.ps-charge { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px;
 .patch-head small { margin-left: auto; font-size: 11px; font-weight: 400; color: var(--muted); }
 .patch-tag { padding: 0 4px; font-size: 10px; line-height: 14px; color: var(--edge); background: var(--gold); border: 1px solid var(--edge); }
 .patch ul { margin: 0; padding-left: 16px; font-size: 12px; line-height: 1.6; }
-/* 업데이트 소식 (제작자 요청 2026-11-06, pages/PatchNotes.tsx): 새 기능 줄은 아이콘 · 이름 · '바로가기', 누르면 그 메뉴. 나머지는 '그 밖의 변경' 을 눌러 펼친다 */
-.upd-rows { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; margin: 2px 0 4px; }
-.upd-row {
-  display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 5px 8px; color: var(--text); text-decoration: none;
-  background: var(--panel-2); border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 var(--hi);
-}
-.upd-row:active { transform: translateY(1px); filter: brightness(1.15); }
-.upd-ico { flex: none; width: 22px; text-align: center; font-size: 17px; line-height: 1; }
-.upd-ico img { display: block; margin: 0 auto; image-rendering: pixelated; }
-.upd-text { flex: 1; min-width: 0; font-size: 13px; line-height: 1.35; }
-.upd-go {
-  flex: none; padding: 2px 6px; font-size: 10px; line-height: 14px; white-space: nowrap; color: var(--edge);
-  background: #7ce0c3; border: 1px solid var(--edge);
-}
-.upd-go::after { content: " ›"; }
-.upd-more, .upd-beta {
-  display: flex; align-items: center; gap: 4px; margin: 2px 0 0; padding: 4px 0; font-size: 11px; color: var(--muted);
-  background: none; border: 0; cursor: pointer;
-}
-.upd-beta { margin: 10px auto 6px; padding: 6px 4px; }
-.upd-chev { width: 6px; height: 6px; margin-left: 2px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform 0.15s; }
-[aria-expanded="true"] > .upd-chev { transform: translateY(1px) rotate(-135deg); }
-.upd-minor { margin: 2px 0 2px; padding-left: 16px; font-size: 12px; line-height: 1.6; color: var(--muted); }
-
-/* 홈 맨 위 '업데이트 소식' 단추 (Home.tsx UpdateStrip): 안 열어 본 새 버전이면 빨간 점이 깜박이고 빛이 지나간다 (transform·opacity 만) */
-.home-upd {
-  position: relative; display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 5px 10px; overflow: hidden;
-  color: var(--text); text-decoration: none; background: var(--panel); border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 var(--hi);
-}
-.home-upd:active { transform: translateY(1px); }
-.home-upd-tag { position: relative; flex: none; padding: 1px 5px; font-size: 10px; line-height: 14px; color: var(--edge); background: var(--gold); border: 1px solid var(--edge); }
-.home-upd-dot {
-  position: absolute; top: -5px; right: -5px; width: 8px; height: 8px; background: #ff3b4f; border: 1px solid var(--edge);
-  animation: home-upd-blink 1.2s ease-in-out infinite;
-}
-.home-upd-text { flex: 1; min-width: 0; font-size: 12px; line-height: 1.35; }
-.home-upd-go { flex: none; font-size: 16px; line-height: 1; color: var(--gold); }
-.home-upd-new { border-color: var(--edge); box-shadow: inset var(--px) var(--px) 0 var(--hi), 0 0 0 1px rgba(255, 195, 92, 0.55); }
-.home-upd-new::after {
-  content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; pointer-events: none;
-  background: linear-gradient(100deg, transparent, rgba(255, 220, 150, 0.18), transparent);
-  transform: translateX(-120%); animation: home-upd-shine 3.2s ease-in-out infinite;
-}
-@keyframes home-upd-blink { 50% { opacity: 0.35; } }
-@keyframes home-upd-shine { 0%, 35% { transform: translateX(-120%); } 85%, 100% { transform: translateX(320%); } }
-@media (prefers-reduced-motion: reduce) { .home-upd-dot, .home-upd-new::after { animation: none; } }
 
 /* wiki menu screens (pages/Menus.tsx, 제작자 요청): job cards with stage buttons for growth guides, job cards for skills,
    grouped icon cards for the rest. My job and the stage for my level are gold */
