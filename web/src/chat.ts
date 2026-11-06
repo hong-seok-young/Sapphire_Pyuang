@@ -6,7 +6,7 @@ import { search } from "./search";
 import { levelText } from "./ui";
 import { matchedSections, oddsName } from "./odds";
 import type { Odds } from "./odds";
-import { PATCHES } from "./patchnotes";
+import { PATCHES, itemText } from "./patchnotes";
 
 export interface ChatImage {
   type: string;
@@ -423,9 +423,9 @@ export function wikiContext(
   }
 
   // 3-2. 길드 앱 패치 내역 (홈 'v1.0' 을 누르면 보이는 화면과 같다. 2026-11-02 제작자 요청: 웹에서 볼 수 있는 모든 정보를 챗봇이)
-  if (/패치 ?내역|앱 ?(업데이트|패치|버전)|새 ?기능|새로 ?생긴|바뀐 ?(거|것|점)|v\d+\.\d+/i.test(question)) {
+  if (/패치 ?내역|업데이트 ?소식|앱 ?(업데이트|패치|버전)|새 ?기능|새로 ?생긴|바뀐 ?(거|것|점)|v\d+\.\d+/i.test(question)) {
     found.push("패치 내역");
-    add("[길드 앱 패치 내역 (새 버전 먼저)]\n" + PATCHES.slice(0, 4).map((p) => `v${p.version} (${p.date})\n` + p.items.map((i) => `- ${i}`).join("\n")).join("\n"));
+    add("[길드 앱 패치 내역 (새 버전 먼저)]\n" + PATCHES.slice(0, 4).map((p) => `v${p.version} (${p.date})\n` + p.items.map((i) => `- ${itemText(i)}`).join("\n")).join("\n"));
   }
 
   // 4. 위키 메뉴 이름 (답에서 [[메뉴:이름]] 으로 보낼 수 있게)

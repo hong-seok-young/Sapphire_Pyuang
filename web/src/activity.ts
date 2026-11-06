@@ -156,7 +156,7 @@ export function reportOpen(userId: string) {
 
 const PAGE_NAME: Record<string, string> = {
   "": "홈", places: "사냥터 목록", search: "검색", equip: "장비", chat: "챗봇", ranking: "길드 랭킹", market: "사파이어 중개인",
-  requests: "길드원 의뢰소", alerts: "알림", shop: "플래티넘 할인 상점", board: "게시판", me: "내 정보", admin: "길드원 관리", app: "앱", password: "비밀번호 바꾸기", log: "사용 기록", patch: "패치 내역", odds: "공식 확률",
+  requests: "길드원 의뢰소", alerts: "알림", shop: "플래티넘 할인 상점", board: "게시판", me: "내 정보", admin: "길드원 관리", app: "앱", password: "비밀번호 바꾸기", log: "사용 기록", patch: "업데이트 소식", odds: "공식 확률",
   match: "길드 던전", todo: "To do", rent: "장비대여", gaps: "챗봇 개선", info: "정보", as: "캐릭터 바꿔서 열기", trend: "시세 동향", enhance: "강화 비교", sim: "확률 시뮬레이터", simtest: "시뮬레이터 테스트", devreq: "개발 요청",
 };
 const RENT_VIEW: Record<string, string> = { apps: "신청함", staff: "운영", log: "기록" };
