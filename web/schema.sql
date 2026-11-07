@@ -865,3 +865,14 @@ CREATE TABLE IF NOT EXISTS dev_request_talk (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS dev_request_talk_req ON dev_request_talk (req_id, id);
+
+-- 생일 스티커 최대 콤보 (제작자 요청 2026-11-07 '최대 콤보 순위도 어딘가에 나열', src/birthday.tsx, functions/api/bday.ts).
+-- 생일(bday)마다 캐릭터마다 가장 높은 콤보 하나. 지우지 않는다 (기록은 평생)
+CREATE TABLE IF NOT EXISTS bday_combo (
+  bday TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  best INTEGER NOT NULL,
+  at INTEGER NOT NULL,
+  PRIMARY KEY (bday, user_id)
+);
+CREATE INDEX IF NOT EXISTS bday_combo_rank ON bday_combo (bday, best);

@@ -3736,6 +3736,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .bday-line-pixel { background: #1b1640; color: #7ee2a8; border: 2px solid #7ee2a8; box-shadow: 0 0 0 2px #1b1640, 0 0 0 4px #ff4d8d; text-shadow: 2px 2px 0 #000; }
 .bday-line-karaoke { background: rgba(20, 16, 50, 0.85); border-color: #ffc35c; color: rgba(255, 255, 255, 0.35); box-shadow: 0 0 16px rgba(255, 195, 92, 0.6); }
 .bday-line-karaoke i { font-style: normal; animation: bd-kara 0.25s ease-out both; animation-delay: calc(var(--i) * 0.06s + 0.15s); }
+.bday-line-keep { animation-duration: 4.6s; }
 @keyframes bd-kara { to { color: #ffe08a; text-shadow: 0 0 6px rgba(255, 210, 120, 0.9); } }
 /* 8비트: 점수·콤보 */
 .bday-score, .bday-combo { position: absolute; transform: translate(-50%, -50%); white-space: nowrap; font-size: 14px; color: #fff27a; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000; animation: bd-score 1.4s steps(8) both; }
@@ -3748,19 +3749,27 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .bday-levelup { font-size: 34px; }
 @keyframes bd-wave { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 @keyframes bd-drop { from { opacity: 0; } to { opacity: 1; } }
-.bday-bunting { top: calc(8px + env(safe-area-inset-top)); gap: 2px; animation: bd-bunt-in 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
-.bday-bunting b {
-  display: inline-flex; align-items: flex-start; justify-content: center; width: 19px; height: 26px; padding-top: 3px; font-size: 13px; font-weight: 400; color: #fff;
-  background: hsl(calc(var(--i) * 47deg), 80%, 55%); clip-path: polygon(0 0, 100% 0, 100% 72%, 50% 100%, 0 72%); text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.45);
-  transform-origin: 50% 0; animation: bd-swing 1.6s ease-in-out infinite; animation-delay: calc(var(--i) * -0.13s);
+/* 맨 위 'HAPPY BIRTHDAY 마을모금함' 띠: 그날 내내 (제작자 2026-11-07 '24시간 내내 띄워 줘'), 누를 때마다 깃발이 차례로 뛴다. 글자 수에 맞춰 화면 폭 안으로 */
+.bday-garland { position: absolute; left: 0; right: 0; top: env(safe-area-inset-top); display: flex; justify-content: center; padding: 0 6px; animation: bd-bunt-in 0.7s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+.bday-garland::before { content: ""; position: absolute; left: 4px; right: 4px; top: 1px; height: 2px; background: rgba(255, 236, 190, 0.55); }
+.bday-garland-row { display: flex; gap: 2px; }
+.bday-garland b { --fw: min(19px, calc((100vw - 16px) / var(--n) - 2px)); display: block; width: var(--fw); height: calc(var(--fw) * 1.37); transform-origin: 50% 0; animation: bd-swing 1.6s ease-in-out infinite; animation-delay: calc(var(--i) * -0.13s); }
+.bday-garland em {
+  display: flex; align-items: flex-start; justify-content: center; width: 100%; height: 100%; padding-top: 3px; font-style: normal; font-size: calc(var(--fw) * 0.68); line-height: 1; color: #fff;
+  background: hsl(calc(var(--i) * 47deg), 80%, 55%); clip-path: polygon(0 0, 100% 0, 100% 72%, 50% 100%, 0 72%); text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.45); transform-origin: 50% 0;
 }
+.bday-garland-hop em { animation: bd-hop 0.55s cubic-bezier(0.3, 1.6, 0.5, 1) both; animation-delay: calc(var(--i) * 0.03s); }
+@keyframes bd-hop { 0% { transform: translateY(0) scale(1); } 35% { transform: translateY(7px) scale(1.18); } 100% { transform: translateY(0) scale(1); } }
 @keyframes bd-bunt-in { from { transform: translateY(-60px); } to { transform: translateY(0); } }
 @keyframes bd-swing { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
-.bday-finale { top: 26%; flex-direction: column; align-items: center; gap: 2px; animation: bd-finale 3.8s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+/* '생일 축하해요': 다시 눌러도 정해진 시간 그대로 떠 있다가 (화면이 시간을 늘린다) 끝에만 사라진다 */
+.bday-finale { top: 26%; flex-direction: column; align-items: center; gap: 2px; animation: bd-finale-in 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.bday-finale-out { animation: bd-finale-out 0.6s ease-in both; }
+@keyframes bd-finale-in { 0% { transform: scale(0.3); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes bd-finale-out { from { transform: scale(1); opacity: 1; } to { transform: scale(1.06); opacity: 0; } }
 .bday-finale-cake { font-size: 54px; line-height: 1; animation: bd-wave 1s ease-in-out infinite; }
 .bday-finale-t { font-size: 30px; color: #ffe08a; text-shadow: 0 0 12px rgba(255, 180, 60, 0.95), 3px 3px 0 #6b2a00; }
 .bday-finale-who { font-size: 18px; color: #fff; text-shadow: 0 0 10px rgba(255, 120, 180, 0.9), 2px 2px 0 #000; }
-@keyframes bd-finale { 0% { transform: scale(0.3); opacity: 0; } 12% { transform: scale(1.15); opacity: 1; } 20% { transform: scale(1); } 85% { opacity: 1; } 100% { transform: scale(1.05); opacity: 0; } }
 @keyframes bd-bob { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-4px) rotate(1deg); } }
 @keyframes bd-in { 0% { transform: scale(1.6) rotate(-8deg); opacity: 0; } 60% { opacity: 1; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
 @keyframes bd-squish { 0% { transform: scale(1); } 30% { transform: scale(1.12, 0.88); } 60% { transform: scale(0.94, 1.08) translateY(-6px); } 100% { transform: scale(1); } }
@@ -3799,8 +3808,123 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 @keyframes bd-candy { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-6px) rotate(180deg); } }
 .bday-idle-rays .bday-aura { inset: -45% -30%; border-radius: 50%; background: repeating-conic-gradient(rgba(255, 220, 130, 0.32) 0 10deg, rgba(255, 220, 130, 0) 10deg 22deg); -webkit-mask: radial-gradient(closest-side, #000 35%, transparent 100%); mask: radial-gradient(closest-side, #000 35%, transparent 100%); animation: bd-rays 9s linear infinite; z-index: -1; }
 @keyframes bd-rays { to { transform: rotate(360deg); } }
+/* 누를 때 스티커에서 터지는 것 (제작자 2026-11-07 '스티커 누를 때마다 애니메이션 엄청 화려하게'): 빛살, 고리 셋, 번쩍임, 튀어 나가는 별. 콤보가 클수록 크게 (t1 5 · t2 15 · t3 30 · t4 50) */
+.bday-hit { position: absolute; inset: 0; pointer-events: none; --rs: 1.7; }
+.bday-hit-t2 { --rs: 2.1; }
+.bday-hit-t3 { --rs: 2.4; }
+.bday-hit-t4 { --rs: 2.8; }
+.bday-hit-rays {
+  position: absolute; left: 50%; top: 46%; width: 230%; aspect-ratio: 1; border-radius: 50%; z-index: -1; opacity: 0;
+  background: repeating-conic-gradient(rgba(255, 236, 160, 0.8) 0 7deg, rgba(255, 236, 160, 0) 7deg 20deg);
+  -webkit-mask: radial-gradient(closest-side, #000 20%, transparent 100%); mask: radial-gradient(closest-side, #000 20%, transparent 100%);
+  animation: bd-hit-rays 0.8s ease-out both;
+}
+.bday-hit-t2 .bday-hit-rays, .bday-hit-t3 .bday-hit-rays, .bday-hit-t4 .bday-hit-rays {
+  width: 290%; background: repeating-conic-gradient(rgba(255, 122, 168, 0.85) 0 6deg, rgba(0, 0, 0, 0) 6deg 15deg, rgba(122, 184, 255, 0.85) 15deg 21deg, rgba(0, 0, 0, 0) 21deg 30deg, rgba(255, 242, 122, 0.9) 30deg 36deg, rgba(0, 0, 0, 0) 36deg 45deg);
+}
+@keyframes bd-hit-rays { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(0); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.15) rotate(35deg); } }
+.bday-hit-ring {
+  position: absolute; left: 50%; top: 46%; width: 90%; aspect-ratio: 1; border-radius: 50%; opacity: 0; border: 3px solid #ffe08a;
+  box-shadow: 0 0 12px rgba(255, 210, 120, 0.9), inset 0 0 10px rgba(255, 210, 120, 0.7); animation: bd-hit-ring 0.65s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.bday-hit-ring2 { border-color: #ff9ec4; box-shadow: 0 0 12px rgba(255, 120, 180, 0.9); animation-delay: 0.08s; }
+.bday-hit-ring3 { border-width: 2px; border-color: #9cc4ff; box-shadow: 0 0 12px rgba(120, 170, 255, 0.9); animation-delay: 0.16s; }
+@keyframes bd-hit-ring { 0% { opacity: 1; transform: translate(-50%, -50%) scale(0.2); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(var(--rs)); } }
+.bday-hit b {
+  position: absolute; left: 50%; top: 46%; font-style: normal; font-weight: 400; font-size: 15px; line-height: 1; color: var(--c); text-shadow: 0 0 6px var(--c), 0 0 2px #fff;
+  opacity: 0; animation: bd-hit-star 0.75s cubic-bezier(0.15, 0.8, 0.3, 1) both;
+}
+.bday-hit-t3 b, .bday-hit-t4 b { font-size: 19px; }
+@keyframes bd-hit-star {
+  0% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--a)) translateY(0) scale(0.4); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(1.1) rotate(180deg); }
+}
+.bday-hit-flash {
+  position: absolute; left: 50%; top: 45%; width: 90%; aspect-ratio: 1; border-radius: 50%; pointer-events: none; opacity: 0;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.95), rgba(255, 240, 200, 0.5) 40%, rgba(255, 240, 200, 0) 72%); animation: bd-hit-flash 0.38s ease-out both;
+}
+@keyframes bd-hit-flash { 0% { opacity: 0.95; transform: translate(-50%, -50%) scale(0.4); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.25); } }
+/* 콤보 30 넘게 이어지는 동안: 스티커 뒤에 무지개 고리가 돈다 */
+.bday-fever-ring {
+  display: none; position: absolute; left: 50%; top: 46%; width: 165%; aspect-ratio: 1; border-radius: 50%; z-index: -1; pointer-events: none; opacity: 0.85;
+  background: conic-gradient(#ff4d8d, #ffc35c, #7ee2a8, #5ce1ff, #c58bff, #ff4d8d);
+  -webkit-mask: radial-gradient(closest-side, transparent 52%, #000 56%, #000 64%, transparent 70%); mask: radial-gradient(closest-side, transparent 52%, #000 56%, #000 64%, transparent 70%);
+  animation: bd-fever-spin 1.2s linear infinite;
+}
+.bday-fever .bday-fever-ring { display: block; }
+@keyframes bd-fever-spin { from { transform: translate(-50%, -50%) rotate(0); } to { transform: translate(-50%, -50%) rotate(360deg); } }
+/* 콤보 15 넘게: 누를 때마다 화면 가장자리가 번쩍 */
+.bday-edge { position: absolute; inset: 0; opacity: 0; box-shadow: inset 0 0 40px 12px rgba(255, 90, 170, 0.55); animation: bd-edge 0.55s ease-out both; }
+.bday-edge-t3 { box-shadow: inset 0 0 50px 16px rgba(255, 200, 80, 0.6); }
+.bday-edge-t4 { box-shadow: inset 0 0 60px 20px rgba(140, 180, 255, 0.65); }
+@keyframes bd-edge { 0% { opacity: 1; } 100% { opacity: 0; } }
+/* 콤보 수 (스티커 오른쪽 위) */
+.bday-cb { position: absolute; display: flex; flex-direction: column; align-items: center; line-height: 1; white-space: nowrap; animation: bd-cb-pop 0.32s cubic-bezier(0.2, 1.8, 0.4, 1) both; }
+.bday-cb b { font-size: 26px; font-weight: 400; color: #fff; text-shadow: 0 0 10px rgba(255, 120, 180, 0.9), 2px 2px 0 #6b0030, -1px -1px 0 #6b0030; }
+.bday-cb small { font-size: 9px; letter-spacing: 0.12em; color: #ffe08a; text-shadow: 1px 1px 0 #000; }
+.bday-cb-t1 b { font-size: 30px; color: #fff27a; }
+.bday-cb-t2 b { font-size: 34px; color: #ffd27a; text-shadow: 0 0 12px rgba(255, 170, 60, 0.95), 2px 2px 0 #6b2a00; }
+.bday-cb-t3 b { font-size: 38px; color: #7ee2ff; text-shadow: 0 0 14px rgba(90, 200, 255, 0.95), 2px 2px 0 #002a6b; }
+.bday-cb-t4 b { font-size: 42px; color: #fff; text-shadow: 0 0 16px #ff4d8d, 0 0 26px #ffc35c, 2px 2px 0 #3a0060; }
+@keyframes bd-cb-pop {
+  0% { transform: translate(-50%, -50%) scale(1.8) rotate(-8deg); opacity: 0.4; }
+  60% { transform: translate(-50%, -50%) scale(0.9) rotate(3deg); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1) rotate(0); opacity: 1; }
+}
+/* 콤보 10·20·30·50·100 외침 */
+.bday-shout { position: absolute; white-space: nowrap; font-size: 28px; color: #fff27a; text-shadow: 3px 3px 0 #000, 0 0 14px rgba(255, 200, 80, 0.9); animation: bd-shout 1.6s cubic-bezier(0.2, 1.5, 0.4, 1) both; }
+.bday-shout-t3, .bday-shout-t4 { font-size: 34px; color: #7ee2ff; text-shadow: 3px 3px 0 #000, 0 0 16px rgba(90, 200, 255, 0.95); }
+@keyframes bd-shout {
+  0% { transform: translate(-50%, -50%) scale(0.2) rotate(-10deg); opacity: 0; }
+  18% { transform: translate(-50%, -50%) scale(1.25) rotate(4deg); opacity: 1; }
+  30% { transform: translate(-50%, -50%) scale(1) rotate(0); }
+  80% { opacity: 1; }
+  100% { transform: translate(-50%, -90%) scale(1); opacity: 0; }
+}
+.bday-popword { position: absolute; white-space: nowrap; font-size: 15px; color: #fff; text-shadow: 2px 2px 0 #000, 0 0 8px rgba(255, 120, 180, 0.9); animation: bd-score 0.9s steps(6) both; }
+/* 콤보가 끝나면: 몇 콤보, 최고 기록인지, 순위 */
+.bday-result {
+  position: absolute; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 12px 5px; white-space: nowrap;
+  background: rgba(20, 14, 48, 0.92); border: 2px solid #ffc35c; box-shadow: 0 0 16px rgba(255, 195, 92, 0.6), 0 3px 0 rgba(0, 0, 0, 0.4);
+  animation: bd-result 3s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+.bday-result b { font-size: 20px; font-weight: 400; color: #ffe08a; }
+.bday-result small { font-size: 11px; color: #fff; }
+.bday-result-best { border-color: #ff7aa8; box-shadow: 0 0 20px rgba(255, 120, 180, 0.8), 0 3px 0 rgba(0, 0, 0, 0.4); }
+.bday-result-best b { color: #fff27a; }
+@keyframes bd-result {
+  0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+  12% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+  20% { transform: translate(-50%, -50%) scale(1); }
+  85% { opacity: 1; }
+  100% { transform: translate(-50%, -75%) scale(1); opacity: 0; }
+}
+/* 생일 콤보 순위: 스티커 왼쪽 위 단추와 창 */
+.bday-rank-btn {
+  position: absolute; left: -4px; top: -6px; z-index: 2; display: flex; align-items: center; gap: 2px; padding: 2px 6px 2px 4px; font-size: 11px; line-height: 14px; color: #3a2000;
+  background: linear-gradient(180deg, #ffe08a, #ffb83a); border: 1px solid #7a4a00; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); cursor: pointer; touch-action: manipulation;
+}
+.bday-rank-btn span { font-size: 9.5px; }
+.bday-rank-btn:active { transform: translateY(1px); }
+.bday-rank-back { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(6, 4, 20, 0.62); }
+.bday-rank { width: min(340px, 100%); max-height: 80vh; overflow: auto; padding: 12px 12px 10px; background: #1d1844; border: 2px solid #ffc35c; box-shadow: 0 0 24px rgba(255, 195, 92, 0.45); }
+.bday-rank-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bday-rank-head b { font-size: 16px; font-weight: 400; color: #ffe08a; }
+.bday-rank-x { flex: none; padding: 4px 6px; font-size: 16px; color: #cfc8ff; background: none; border: 0; cursor: pointer; }
+.bday-rank-sub { margin: 2px 0 8px; font-size: 11px; color: #a9a2d9; }
+.bday-rank-empty { padding: 18px 0; text-align: center; font-size: 13px; color: #a9a2d9; }
+.bday-rank-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; margin: 0; padding: 0; list-style: none; }
+.bday-rank-list li, .bday-rank-me { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: rgba(255, 255, 255, 0.04); }
+.bday-rank-list li.mine, .bday-rank-me { background: rgba(255, 195, 92, 0.14); outline: 1px solid rgba(255, 195, 92, 0.6); }
+.bday-rank-me { margin-top: 6px; }
+.bday-rank-r { flex: none; width: 26px; text-align: center; font-size: 14px; color: #ffe08a; }
+.bday-rank-n { flex: 1; min-width: 0; font-size: 14px; color: #fff; }
+.bday-rank-c { flex: none; font-size: 16px; color: #fff27a; }
+.bday-rank-c small { margin-left: 3px; font-size: 9px; letter-spacing: 0.08em; color: #cfc8ff; }
 @media (prefers-reduced-motion: reduce) {
-  .bday-bob, .bday-in, .bday-squish, .bday-bubble-pop, .bday-aura, .bday-aura i, .bday-banner, .bday-banner i, .bday-banner b { animation: none; }
+  .bday-bob, .bday-in, .bday-squish, .bday-bubble-pop, .bday-aura, .bday-aura i, .bday-banner, .bday-banner i, .bday-banner b,
+  .bday-garland, .bday-garland b, .bday-garland em, .bday-cb, .bday-shout, .bday-result, .bday-fever-ring, .bday-edge { animation: none; }
   .bday-line { animation: bd-line-still 2.6s linear both; }
 }
 @keyframes bd-line-still { 0%, 85% { opacity: 1; transform: translate(-50%, -100%); } 100% { opacity: 0; transform: translate(-50%, -100%); } }
