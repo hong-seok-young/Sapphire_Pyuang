@@ -1,5 +1,5 @@
 // 생일 스티커 최대 콤보 순위 (제작자 요청 2026-11-07 '최대 콤보 순위도 어딘가에 나열')
-// GET  /api/bday?key=village-2026      -> { top: [{ id, best }], mine: { best, rank } | null, total }
+// GET  /api/bday?key=village-2026      -> { top: [{ id, best }], mine: { best, rank } | null, total, resume: 이어서 할 콤보 | null }
 // POST /api/bday { key, combo }         -> 내 최고 콤보를 바꾼다 (더 클 때만), 답은 GET 과 같다
 // 콤보는 스티커·풍선을 1.3초 안에 이어 누른 수로 화면이 센다. 그날 0시 전 기록(앱개발자 미리 보기)은 그날이 되면 순위에서 빠지고 덮인다.
 // 테스트 계정은 순위에 넣지 않는다
@@ -34,7 +34,14 @@ async function board(env: Env, key: string, me: string) {
       .first<{ n: number }>();
     mineOut = { best: mine.best, rank: TEST_IDS.includes(me) ? null : (ahead?.n ?? 0) + 1 };
   }
-  return { top: top.results, mine: mineOut, total: total?.n ?? 0 };
+  // 끊긴 콤보 이어서 하기 (그날 안, 아직 안 쓴 것)
+  const d = BDAYS[key];
+  const now = Date.now();
+  const resume =
+    d && now < d.end
+      ? ((await env.DB.prepare("SELECT combo FROM bday_resume WHERE bday = ? AND user_id = ? AND used_at IS NULL").bind(key, me).first<{ combo: number }>())?.combo ?? null)
+      : null;
+  return { top: top.results, mine: mineOut, total: total?.n ?? 0, resume };
 }
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {

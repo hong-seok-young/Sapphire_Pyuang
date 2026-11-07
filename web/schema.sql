@@ -876,3 +876,13 @@ CREATE TABLE IF NOT EXISTS bday_combo (
   PRIMARY KEY (bday, user_id)
 );
 CREATE INDEX IF NOT EXISTS bday_combo_rank ON bday_combo (bday, best);
+-- 생일 콤보 이어서 하기 (제작자 2026-11-08 '쿨쿨 쿠루미는 억울하게 끊겼으니까 11700 에서 이어서 할 수 있게, 그 사람 웹 들어가면 이어서 하기 버튼'):
+-- 끊긴 콤보를 그 사람이 단추로 이어 간다. 누르면 used_at 을 적어 한 번만
+CREATE TABLE IF NOT EXISTS bday_resume (
+  bday TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  combo INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  used_at INTEGER,
+  PRIMARY KEY (bday, user_id)
+);

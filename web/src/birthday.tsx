@@ -93,8 +93,9 @@ interface Pop {
   y: number;
   text: string;
   cls: string;
-  /** 콤보 외침의 단계 (1~20) */
+  /** 콤보 외침의 단계 (1~20)와 아래 작은 글 ('STAGE 7', '300 COMBO') */
   lv?: number;
+  sub?: string;
 }
 interface Banner {
   id: number;
@@ -233,6 +234,26 @@ function shuffled(last: number): number[] {
 
 /** 생일 메인 폭죽: 10번째 누를 때마다 */
 const FINALE_EVERY = 10;
+/**
+ * 아주 빠른 연타에 폰이 버거우면 멈추지 않게 (제작자 2026-11-08 '엄청 빠르게 누르니까 멈췄대' -> '효과 줄이지 마'): 효과는 그대로 두고,
+ * 화면이 실제로 끊기기 시작할 때만(Fx.quality 가 OK 아래) 그만큼 띄엄띄엄 낸다. 잘 도는 폰에서는 아무것도 줄지 않는다.
+ * 아래 값은 끊길 때 쓰는 간격의 기준 (끊길수록 길게)
+ */
+const SMOOTH = 0.6;
+const GRAND_GAP = 7000;
+const FX_GAP = 160;
+const HIT_GAP = 140;
+const LINE_GAP = 230;
+/** 지금 품질(q)에서 그 효과를 낼 수 있는지: 잘 돌면 늘, 끊기면 gap/q 마다 */
+const ready = (q: number, since: number, gap: number) => q >= SMOOTH || since >= gap / Math.max(q, 0.25);
+function liteFinale({ fx, cx, cy, vw, vh, banner }: TapCtx) {
+  fx.shake();
+  fx.flash(cx, cy, "#ffffff", 50, 300);
+  fx.ring(cx, cy, "#ffd27a", 400);
+  fx.ring(cx, cy, "#ff7aa8", 300, 0.12);
+  banner("생일 축하해요", "bday-finale", 4600);
+  for (let i = 0; i < 3; i++) fx.rocket(rnd(0.1, 0.9) * vw, vh + 10, rnd(0.15, 0.85) * vw, rnd(0.08, 0.35) * vh, pat(ALL_PATTERNS), two(), i * 0.2, 1.1);
+}
 const ALL_PATTERNS = ["peony", "ring", "willow", "crossette", "star", "double", "heart", "pixel"];
 function grandFinale({ fx, cx, cy, top, vw, vh, banner }: TapCtx) {
   fx.shake();
@@ -278,11 +299,39 @@ const SHOUTS = [
   "FEVER!", "INCREDIBLE!", "UNSTOPPABLE!", "RAMPAGE!", "MONSTER!", "LEGEND!", "MYTHIC!", "DIVINE!", "IMMORTAL!", "GODLIKE!",
 ];
 const SHOUT_EVERY = 5;
-function shoutOf(n: number): { word: string; lv: number } | null {
+/**
+ * 100 콤보 다음부터는 100 마다 아래에서 아무 낱말이나 (제작자 2026-11-08 '굿럭 이런 거도 100 단위로 임의 단어로 막 10만 개까지 뜨게').
+ * 바로 앞과 같은 낱말은 안 나온다. 10만 콤보까지
+ */
+const BIG_SHOUTS = [
+  "GOOD LUCK!", "BRAVO!", "JACKPOT!", "PERFECT!", "SUPERB!", "MARVELOUS!", "SPECTACULAR!", "PHENOMENAL!", "OUTSTANDING!", "BRILLIANT!",
+  "EPIC!", "HEROIC!", "MAJESTIC!", "GLORIOUS!", "LEGENDARY!", "ULTRA!", "HYPER!", "MEGA!", "GIGA!", "TERA!",
+  "COSMIC!", "GALACTIC!", "STELLAR!", "SUPERNOVA!", "INFINITE!", "ETERNAL!", "ABSOLUTE!", "ULTIMATE!", "SUPREME!", "INSANE!",
+  "CRAZY!", "WILD!", "BEAST MODE!", "ON FIRE!", "UNSTOPPABLE!", "CHAMPION!", "MVP!", "KING!", "QUEEN!", "BOSS!",
+  "WOW!", "OMG!", "BOOM!", "KABOOM!", "UNREAL!", "MIRACLE!", "MAGIC!", "LUCKY!", "SAPPHIRE!", "HAPPY BIRTHDAY!",
+  "CONGRATS!", "CHEERS!", "PARTY TIME!", "SO GOOD!", "AMAZING!", "UNBELIEVABLE!", "GODLIKE!", "MYTHICAL!", "TITAN!", "DRAGON!",
+  "대박!", "미쳤다!", "전설!", "신의 손!", "생일 축하!", "손가락 장인!", "광클의 신!", "축하해요!", "최고!", "멈추지 마!",
+];
+const SHOUT_MAX = 100_000;
+/** 외침 글자 폭 (글자 크기 배수): 한글은 1, 나머지는 0.62 쯤 */
+const emLen = (t: string) => [...t].reduce((k, c) => k + (/[가-힣]/.test(c) ? 1 : 0.62), 0);
+/** 외침 글자 크기와 가운데 자리 (320px 화면에서도 안으로) */
+function shoutFit(word: string, lv: number, cx: number, vw: number) {
+  const em = emLen(word);
+  const fs = Math.min(22 + lv * 0.7, (vw - 24) / em);
+  const half = Math.min(vw / 2 - 6, (em * fs) / 2 + 8);
+  return Math.min(Math.max(cx, half), vw - half);
+}
+let lastBig = "";
+function shoutOf(n: number): { word: string; lv: number; sub: string } | null {
   if (n < SHOUT_EVERY || n % SHOUT_EVERY) return null;
   const lv = n / SHOUT_EVERY;
-  if (lv <= SHOUTS.length) return { word: SHOUTS[lv - 1], lv };
-  return n % 50 === 0 ? { word: `${n} COMBO!`, lv: SHOUTS.length } : null;
+  if (lv <= SHOUTS.length) return { word: SHOUTS[lv - 1], lv, sub: `STAGE ${lv}` };
+  if (n % 100 || n > SHOUT_MAX) return null;
+  let word = pick(BIG_SHOUTS);
+  if (word === lastBig) word = BIG_SHOUTS[(BIG_SHOUTS.indexOf(word) + 1) % BIG_SHOUTS.length];
+  lastBig = word;
+  return { word, lv: SHOUTS.length, sub: `${n.toLocaleString("ko-KR")} COMBO` };
 }
 const STAR_COLORS = ["#fff27a", "#ffd27a", "#ff7aa8", "#7ab8ff", "#7ee2a8", "#c58bff"];
 /** 누를 때 스티커에서 튀어 나가는 별 (누를 때마다 각도·거리가 조금씩 다르게) */
@@ -299,7 +348,11 @@ interface Board {
   top: { id: string; best: number }[];
   mine: { best: number; rank: number | null } | null;
   total: number;
+  /** 끊긴 콤보 이어서 하기 (운영이 넣어 준 것, 한 번) */
+  resume?: number | null;
 }
+/** 이어서 하기를 누른 뒤 첫 누름까지 기다려 주는 때 */
+const RESUME_GRACE = 6000;
 
 /** 생일 콤보 순위 창 */
 function ComboRank({ day, me, board, onClose }: { day: Birthday; me: string; board: Board | null; onClose: () => void }) {
@@ -396,13 +449,15 @@ function ComboTicker({ board, me, home, live, onOpen }: { board: Board | null; m
   ) : (
     <span className="bday-tk-row">{live != null ? `나 ${live}콤보 · 1위 도전 중` : "아직 기록이 없어요 · 스티커를 이어 눌러 1위에 도전해 보세요"}</span>
   );
-  // 한 줄에 다 들어가는지 (넘치면 흐르게)
+  // 한 줄에 다 들어가는지 (넘치면 흐르게). 글이 바뀔 때만 잰다 (연타 중 매번 재면 무겁다)
+  const sig = `${top.map((r) => `${r.id}:${r.best}`).join("|")}|${live ?? ""}|${myAt}|${home}`;
   useLayoutEffect(() => {
     const b = box.current;
     const o = one.current;
     // 흐를 때는 앞뒤 여백(42px)을 빼고 잰다 (짧아지면 다시 가운데 그대로)
     if (b && o) setRun(o.scrollWidth - (run ? 30 : 0) > b.clientWidth + 1);
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sig, run]);
   return createPortal(
     <button
       type="button"
@@ -458,6 +513,8 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
   /** 연타 중 순위를 제친 것 (제작자 2026-11-07 '순위 제치면 순위 제쳤다고 뜨게') */
   const [pass, setPass] = useState<{ id: number; name: string; extra: number; rank: number } | null>(null);
   const passed = useRef(new Set<string>());
+  /** 이어서 하기를 눌렀다 (단추를 숨긴다) */
+  const [resumed, setResumed] = useState(false);
   const boardAt = useRef(0);
   const [hitTier, setHitTier] = useState(0);
   const [cb, setCb] = useState<{ n: number; key: number } | null>(null);
@@ -475,10 +532,16 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
     lastV.current = bag.current.shift()!;
     return VARIANTS[lastV.current];
   };
+  /** 노래 줄 모양은 마지막에 터진 안의 것 */
+  const curVariant = () => VARIANTS[only ?? Math.max(0, lastV.current)];
   /** 스티커 둘레 꾸밈: 마지막에 터진 안의 것, 안 누르는 동안은 7초마다 다음 안으로 */
   const [idle, setIdle] = useState(() => VARIANTS[only ?? Math.floor(Math.random() * VARIANTS.length)].idle);
   const tapCount = useRef(0);
   const fx = useRef<Fx | null>(null);
+  /** 빠른 연타에서 효과를 덜어 내는 때 재기 (performance.now) */
+  const lastHit = useRef(0);
+  const lastFx = useRef(0);
+  const lastGrand = useRef(-1e9);
   const lastTap = useRef(0);
   const combo = useRef(0);
   const comboT = useRef(0);
@@ -486,7 +549,7 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
   const [dragging, setDragging] = useState(false);
   const press = useRef<{ x: number; y: number; px: number; py: number; moved: boolean; id: number } | null>(null);
   const lyric = useRef(0);
-  const lastLine = useRef<{ y: number; t: number; speed: number } | null>(null);
+  const lastLine = useRef<{ y: number; t: number; speed: number }>({ y: 0, t: -1e9, speed: 0 });
   const posRef = useRef(pos);
   posRef.current = pos;
 
@@ -568,8 +631,8 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
     `${day.who} 님 생일 축하해요`,
   ];
 
-  const pop = (t: string, x: number, y: number, cls: string, ms = 1400, lv?: number) => {
-    const it: Pop = { id: ++seq, x: Math.min(Math.max(x, 60), vw - 60), y, text: t, cls, lv };
+  const pop = (t: string, x: number, y: number, cls: string, ms = 1400, lv?: number, sub?: string) => {
+    const it: Pop = { id: ++seq, x: lv ? x : Math.min(Math.max(x, 60), vw - 60), y, text: t, cls, lv, sub };
     setPops((ps) => [...ps.slice(-8), it]);
     window.setTimeout(() => setPops((ps) => ps.filter((q) => q.id !== it.id)), ms);
   };
@@ -608,9 +671,7 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
     const p = posRef.current;
     if (s) {
       // 단계가 오를수록 크게 (긴 낱말은 화면 폭 안으로)
-      const fs = Math.min(22 + s.lv * 0.7, ((vw - 24) / s.word.length) * 1.55);
-      const half = Math.min(vw / 2 - 6, s.word.length * fs * 0.33 + 8);
-      pop(s.word, Math.min(Math.max(p.x + w / 2, half), vw - half), Math.max(80, p.y - 50), "bday-shout" + (s.lv >= 11 ? " bday-shout-hot" : "") + (s.lv >= 16 ? " bday-shout-top" : ""), 1700, s.lv);
+      pop(s.word, shoutFit(s.word, s.lv, p.x + w / 2, vw), Math.max(80, p.y - 50), "bday-shout" + (s.lv >= 11 ? " bday-shout-hot" : "") + (s.lv >= 16 ? " bday-shout-top" : ""), 1700, s.lv, s.sub);
       const f = fx.current;
       if (f && !reduced()) {
         const k = 0.8 + s.lv * 0.03;
@@ -706,41 +767,87 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
     };
   }, []);
 
-  function celebrate(tx: number, ty: number) {
-    setTaps((t) => t + 1);
+  /** 끊긴 콤보 이어서 하기 (제작자 2026-11-08 '쿨쿨 쿠루미 억울하게 끊겼으니까 11700 에서 이어서, 웹 들어가면 이어서 하기 버튼'): 6초 안에 스티커를 누르면 그 콤보부터 이어진다 */
+  function resumeCombo() {
+    const r = boardRef.current?.resume;
+    if (!r) return;
+    setResumed(true);
+    void api<{ combo: number }>("/api/bday/resume", "POST", { key: day.key }).catch(() => {});
+    const now = Date.now();
+    combo.current = r;
+    // 다음 누름까지 1.3초가 아니라 6초를 기다려 준다
+    lastTap.current = now + RESUME_GRACE - COMBO_MS;
+    window.clearTimeout(comboT.current);
+    comboT.current = window.setTimeout(() => endCombo(r), RESUME_GRACE);
+    passed.current = new Set();
+    setCb({ n: r, key: ++seq });
     const p = posRef.current;
-    const n = lyric.current;
-    const text = lyrics[n % lyrics.length];
-    lyric.current++;
-    // 노래 줄은 스티커 위에서 나와 화면 위로 끝없이 올라가 사라진다 (제작자 2026-11-07 '해피 버스데이 텍스트는 끝없이 올라가서 사라지게').
-    // 화면 맨 위에 붙어 있으면 스티커 아래에서 나온다. 가로는 글자 폭만큼 화면 안으로. 앞 줄이 아직 출발점 가까이 있으면 그 위에서 나온다 (겹치지 않게)
-    const tw = [...text].reduce((k, c) => k + (/[가-힣]/.test(c) ? 14 : 8), 26);
-    const lx = Math.min(Math.max(p.x + w / 2, tw / 2 + 6), vw - tw / 2 - 6);
-    const below = p.y < 44;
-    let ly = below ? p.y + h + 30 : p.y - 6;
-    const prev = lastLine.current;
-    const tnow = performance.now();
-    if (prev) {
-      const cur = prev.y - ((tnow - prev.t) / 1000) * prev.speed;
-      if (cur > ly - 30) ly = cur - 30;
+    const word = `${r.toLocaleString("ko-KR")} 이어서!`;
+    pop(word, shoutFit(word, SHOUTS.length, p.x + w / 2, vw), Math.max(80, p.y - 40), "bday-shout bday-shout-hot", 2200, SHOUTS.length, "6초 안에 누르세요");
+    const f = fx.current;
+    if (f && !reduced()) {
+      f.ring(p.x + w / 2, p.y + h / 2, "#ffd27a", 420);
+      f.explode(p.x + w / 2, p.y + h / 2 - 20, "double", PALETTE, 0.9);
     }
+    garland.current?.shake(1.2);
+  }
+  function celebrate(tx: number, ty: number) {
+    const t = performance.now();
+    const f = fx.current;
+    const q = f?.quality ?? 1;
+    // 스티커가 튀고 별이 터지는 것은 너무 잦으면 건너뛴다 (콤보는 누를 때마다 센다)
+    if (ready(q, t - lastHit.current, HIT_GAP)) {
+      lastHit.current = t;
+      setTaps((k) => k + 1);
+    }
+    const p = posRef.current;
     const count = ++tapCount.current;
     const grand = count % FINALE_EVERY === 0;
-    const variant = nextVariant();
-    setIdle(variant.idle);
-    // '… 님 생일 축하해요' 줄은 더 천천히
-    const keep = n % lyrics.length === lyrics.length - 1;
-    const speed = keep ? 65 : 85;
-    const rise = Math.max(120, ly + 80);
-    const dur = rise / speed;
-    lastLine.current = { y: ly, t: tnow, speed };
-    const line: Line = { id: ++seq, x: lx, y: ly, text, hue: HUES[n % HUES.length], cls: grand ? "bday-line-gold" : variant.line, keep, rise, dur };
-    setLines((ls) => [...ls.slice(-15), line]);
-    window.setTimeout(() => setLines((ls) => ls.filter((l) => l.id !== line.id)), dur * 1000 + 100);
+    // 노래 줄: 너무 잦으면 건너뛴다 (노래는 보인 줄만큼 이어진다)
+    if (ready(q, t - lastLine.current.t, LINE_GAP)) {
+      const n = lyric.current;
+      const text = lyrics[n % lyrics.length];
+      lyric.current++;
+      // 노래 줄은 스티커 위에서 나와 화면 위로 끝없이 올라가 사라진다 (제작자 2026-11-07 '해피 버스데이 텍스트는 끝없이 올라가서 사라지게').
+      // 화면 맨 위에 붙어 있으면 스티커 아래에서 나온다. 가로는 글자 폭만큼 화면 안으로. 앞 줄이 아직 출발점 가까이 있으면 그 위에서 나온다 (겹치지 않게)
+      const tw = [...text].reduce((k, c) => k + (/[가-힣]/.test(c) ? 14 : 8), 26);
+      const lx = Math.min(Math.max(p.x + w / 2, tw / 2 + 6), vw - tw / 2 - 6);
+      const below = p.y < 44;
+      let ly = below ? p.y + h + 30 : p.y - 6;
+      const prev = lastLine.current;
+      if (prev.speed) {
+        const cur = prev.y - ((t - prev.t) / 1000) * prev.speed;
+        if (cur > ly - 30) ly = cur - 30;
+      }
+      // '… 님 생일 축하해요' 줄은 더 천천히
+      const keep = n % lyrics.length === lyrics.length - 1;
+      const speed = keep ? 65 : 85;
+      const rise = Math.max(120, ly + 80);
+      const dur = rise / speed;
+      lastLine.current = { y: ly, t, speed };
+      const line: Line = { id: ++seq, x: lx, y: ly, text, hue: HUES[n % HUES.length], cls: grand ? "bday-line-gold" : curVariant().line, keep, rise, dur };
+      setLines((ls) => [...ls.slice(q < 0.6 ? -8 : -15), line]);
+      window.setTimeout(() => setLines((ls) => ls.filter((l) => l.id !== line.id)), dur * 1000 + 100);
+    }
     const cn = bump(tx, ty);
     setHitTier(tierOf(cn));
-    if (reduced() || !fx.current) return;
-    (grand ? grandFinale : variant.tap)(ctxOf(fx.current, tx, ty, n % lyrics.length === 3, cn));
+    if (reduced() || !f) return;
+    if (grand) {
+      // 메인 폭죽은 늘 다 터뜨리고, 폰이 끊길 때만 7초에 한 번 다 터뜨리고 그 사이 10번째는 가볍게
+      lastFx.current = t;
+      if (ready(q, t - lastGrand.current, GRAND_GAP)) {
+        lastGrand.current = t;
+        grandFinale(ctxOf(f, tx, ty, false, cn));
+      } else liteFinale(ctxOf(f, tx, ty, false, cn));
+      return;
+    }
+    // 다섯 안의 큰 효과: 잘 돌면 누를 때마다, 폰이 끊길 때만 띄엄띄엄 (그 사이는 누른 곳 작은 불꽃)
+    if (ready(q, t - lastFx.current, FX_GAP)) {
+      lastFx.current = t;
+      const variant = nextVariant();
+      setIdle(variant.idle);
+      variant.tap(ctxOf(f, tx, ty, lyric.current % lyrics.length === 4, cn));
+    } else if (q > 0.35) f.explode(tx, ty, pick(["star", "pixel", "ring"]), STAR_COLORS, 0.3);
   }
   /** 효과에 넘기는 것 (누른 곳, 스티커 자리, 글자·띠 띄우기) */
   function ctxOf(f: Fx, tx: number, ty: number, finale: boolean, cn: number): TapCtx {
@@ -774,14 +881,21 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
   grandRef.current = () => {
     garland.current?.shake(1.2);
     const p = posRef.current;
-    if (reduced() || !fx.current) return showFinale(5200);
-    grandFinale(ctxOf(fx.current, p.x + w / 2, p.y + h / 2, false, combo.current));
+    const f = fx.current;
+    if (reduced() || !f) return showFinale(5200);
+    const t = performance.now();
+    lastFx.current = t;
+    if (ready(f.quality, t - lastGrand.current, GRAND_GAP)) {
+      lastGrand.current = t;
+      grandFinale(ctxOf(f, p.x + w / 2, p.y + h / 2, false, combo.current));
+    } else liteFinale(ctxOf(f, p.x + w / 2, p.y + h / 2, false, combo.current));
   };
   const autoRef = useRef<() => void>(() => {});
   autoRef.current = () => {
     garland.current?.shake(1);
     const p = posRef.current;
     if (reduced() || !fx.current) return showFinale(5200);
+    lastGrand.current = performance.now();
     grandFinale(ctxOf(fx.current, p.x + w / 2, p.y + h / 2, false, 0));
   };
   useEffect(() => {
@@ -898,12 +1012,28 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
         >
           🏆<span>순위</span>
         </button>
+        {board?.resume && !resumed && (
+          <button
+            type="button"
+            className={"bday-resume" + (pos.y < 40 ? " bday-resume-below" : "")}
+            style={{ left: Math.min(Math.max(pos.x + w / 2, 100), vw - 100) - pos.x }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              resumeCombo();
+            }}
+          >
+            {board.resume.toLocaleString("ko-KR")} 콤보 이어서 하기
+          </button>
+        )}
       </div>
       {createPortal(
         <div className="bday-fx" aria-hidden>
           {/* 맨 위 현수막: 그날 내내 (제작자 2026-11-07 '맨 위에 해피 버스데이는 24시간 내내 띄워 줘'). 깃발은 Garland 가 그린다 */}
           <div ref={garlandEl} className="bday-garland" />
-          {tier >= 2 && cb && <i key={cb.key} className={"bday-edge bday-edge-t" + tier} />}
+          {tier >= 2 && cb && <i key={taps} className={"bday-edge bday-edge-t" + tier} />}
           {lines.map((l) => (
             <span key={l.id} className="bday-line-wrap" style={{ left: l.x, top: l.y, "--rise": `${l.rise}px`, "--dur": `${l.dur}s` } as CSSProperties}>
               <span className={"bday-line " + l.cls} style={{ "--hue": `${l.hue}deg` } as CSSProperties}>
@@ -919,7 +1049,7 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
           ))}
           {pops.map((q) =>
             q.lv ? (
-              <span key={q.id} className={q.cls} style={{ left: q.x, top: q.y, "--lv": q.lv, "--len": q.text.length } as CSSProperties}>
+              <span key={q.id} className={q.cls} style={{ left: q.x, top: q.y, "--lv": q.lv, "--len": emLen(q.text) / 0.645 } as CSSProperties}>
                 <span className="bday-shout-w">
                   {[...q.text].map((ch, i) => (
                     <i key={i} style={{ "--i": i } as CSSProperties}>
@@ -927,7 +1057,7 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
                     </i>
                   ))}
                 </span>
-                <small>STAGE {q.lv}</small>
+                <small>{q.sub ?? `STAGE ${q.lv}`}</small>
               </span>
             ) : (
               <span key={q.id} className={q.cls} style={{ left: q.x, top: q.y }}>
