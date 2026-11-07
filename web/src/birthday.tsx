@@ -351,6 +351,20 @@ interface Board {
   /** 끊긴 콤보 이어서 하기 (운영이 넣어 준 것, 한 번) */
   resume?: number | null;
 }
+/**
+ * 한 번 그린 효과를 다시 돌린다 (지우고 새로 그리지 않아 다시 그리는 일 없이 움직임만, 제작자 2026-11-08 '많이 누를수록 렉이 심해진대, 최적화해').
+ * 누를 때마다 큰 빛살·고리·화면 가장자리 빛·콤보 숫자를 새로 만들면 폰이 그때마다 그림을 다시 그려서 느려졌다
+ */
+function replay(el: Element | null, subtree = false) {
+  if (!el) return;
+  for (const a of el.getAnimations({ subtree })) {
+    a.currentTime = 0;
+    a.play();
+  }
+}
+/** 콤보 중 실시간 저장: 내 최고를 넘은 뒤 25 콤보·3초마다 (앱이 멈추거나 꺼져도 기록이 남게, 제작자 2026-11-08 '끊김 대비해서 실시간 저장도') */
+const LIVE_SAVE_STEP = 25;
+const LIVE_SAVE_MS = 3000;
 /** 이어서 하기를 누른 뒤 첫 누름까지 기다려 주는 때 */
 const RESUME_GRACE = 6000;
 
@@ -515,6 +529,15 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
   const passed = useRef(new Set<string>());
   /** 이어서 하기를 눌렀다 (단추를 숨긴다) */
   const [resumed, setResumed] = useState(false);
+  /** 다시 돌리는 효과들 (누를 때마다 새로 만들지 않는다) */
+  const hitEl = useRef<HTMLSpanElement>(null);
+  const bodyEl = useRef<HTMLDivElement>(null);
+  const edgeEl = useRef<HTMLElement>(null);
+  const cbEl = useRef<HTMLDivElement>(null);
+  /** 이번 콤보를 시작할 때의 내 최고, 이번 콤보에서 서버에 남긴 수, 마지막 실시간 저장 때 */
+  const startBest = useRef(0);
+  const savedN = useRef(0);
+  const lastSave = useRef(0);
   const boardAt = useRef(0);
   const [hitTier, setHitTier] = useState(0);
   const [cb, setCb] = useState<{ n: number; key: number } | null>(null);
@@ -659,14 +682,21 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
     const n = combo.current;
     window.clearTimeout(comboT.current);
     comboT.current = window.setTimeout(() => endCombo(n), COMBO_MS);
-    if (n >= 2) setCb({ n, key: ++seq });
+    if (n >= 2) {
+      setCb((c) => ({ n, key: c?.key ?? ++seq }));
+      replay(cbEl.current);
+    }
     if (n === 1) {
       passed.current = new Set();
+      startBest.current = boardRef.current?.mine?.best ?? 0;
+      savedN.current = 0;
       // 연타를 시작할 때 순위를 새로 (추월을 맞게 알리려고, 20초에 한 번까지)
       if (now - boardAt.current > 20_000) void loadBoard();
     }
     garland.current?.hit(n);
     checkPass(n);
+    // 실시간 저장: 내 최고를 넘었으면 25 콤보·3초마다 (끊겨도 여기까지는 남는다)
+    if (n >= 3 && n > startBest.current && n - savedN.current >= LIVE_SAVE_STEP && now - lastSave.current >= LIVE_SAVE_MS) saveLive(n);
     const s = shoutOf(n);
     const p = posRef.current;
     if (s) {
@@ -710,12 +740,25 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
     }
   }
   /** 콤보가 끝나면 (1.3초 동안 안 누르면) 결과를 보이고, 내 최고보다 크면 서버에 남긴다 */
+  function saveLive(n: number) {
+    lastSave.current = Date.now();
+    const before = savedN.current;
+    savedN.current = n;
+    api<Board>("/api/bday?live=1", "POST", { key: day.key, combo: n })
+      .then((b) => {
+        // 콤보 중에는 순위만 새로 (내 최고는 이번 콤보 시작 때 값으로 견준다)
+        setBoard(b);
+      })
+      .catch(() => {
+        if (savedN.current === n) savedN.current = before;
+      });
+  }
   function endCombo(n: number) {
     setCb(null);
     // 연타가 멈추면 떨어진 현수막이 하나씩 날아가 다시 걸린다
     garland.current?.end();
     if (n < 3) return;
-    const prev = boardRef.current?.mine?.best ?? 0;
+    const prev = startBest.current;
     const best = n > prev;
     const key = ++seq;
     setResult({ n, best, prev, rank: boardRef.current?.mine?.rank ?? null, key });
@@ -731,12 +774,38 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
           if (left > 0) window.setTimeout(() => void send(left - 1), (4 - left) * 2500);
           else pop("콤보 기록을 저장하지 못했어요", vw / 2, 120, "bday-popword", 2600);
         });
-    if (best) void send(3);
+    if (best && n > savedN.current) void send(3);
+    else if (best) setResult((r) => (r?.key === key ? { ...r, rank: boardRef.current?.mine?.rank ?? null } : r));
+    savedN.current = 0;
   }
   const bumpRef = useRef(bump);
   bumpRef.current = bump;
   const popRef = useRef(pop);
   popRef.current = pop;
+
+  // 콤보 중에 앱을 닫거나 다른 앱으로 가면 (폰이 화면을 끊기 전에) 지금 콤보를 바로 남긴다 (제작자 2026-11-08 '11700 까지 눌렀다가 멈춰서 사라졌대')
+  useEffect(() => {
+    const flush = () => {
+      const n = combo.current;
+      if (Date.now() - lastTap.current > COMBO_MS) return;
+      if (n < 3 || n <= startBest.current || n <= savedN.current) return;
+      savedN.current = n;
+      try {
+        navigator.sendBeacon("/api/bday?live=1", new Blob([JSON.stringify({ key: day.key, combo: n })], { type: "application/json" }));
+      } catch {
+        /* 보내지 못하면 3초마다 남긴 데까지 */
+      }
+    };
+    const onVis = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [day.key]);
 
   // 올라가는 풍선은 누르면 터진다 (제작자 2026-11-07 '풍선 올라가는 것도 누르면 터지게'): 풍선을 맞힌 누름은 아래 칸·단추로 가지 않는다
   useEffect(() => {
@@ -780,6 +849,8 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
     window.clearTimeout(comboT.current);
     comboT.current = window.setTimeout(() => endCombo(r), RESUME_GRACE);
     passed.current = new Set();
+    startBest.current = boardRef.current?.mine?.best ?? 0;
+    savedN.current = 0;
     setCb({ n: r, key: ++seq });
     const p = posRef.current;
     const word = `${r.toLocaleString("ko-KR")} 이어서!`;
@@ -798,7 +869,16 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
     // 스티커가 튀고 별이 터지는 것은 너무 잦으면 건너뛴다 (콤보는 누를 때마다 센다)
     if (ready(q, t - lastHit.current, HIT_GAP)) {
       lastHit.current = t;
-      setTaps((k) => k + 1);
+      if (taps === 0) setTaps(1);
+      else {
+        // 빛살·고리·별·스티커 튐·번쩍임은 한 번 만든 것을 다시 돌린다 (별 방향만 돌려서 매번 다르게)
+        if (hitEl.current) {
+          hitEl.current.style.transform = `rotate(${Math.round(Math.random() * 360)}deg)`;
+          replay(hitEl.current, true);
+        }
+        replay(bodyEl.current, true);
+        replay(edgeEl.current);
+      }
     }
     const p = posRef.current;
     const count = ++tapCount.current;
@@ -971,12 +1051,12 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
           <i />
         </span>
         {taps > 0 && !reduced() && (
-          <span key={taps} className={"bday-hit bday-hit-t" + hitTier} aria-hidden>
+          <span ref={hitEl} className={"bday-hit bday-hit-t" + hitTier} aria-hidden>
             <i className="bday-hit-rays" />
             <i className="bday-hit-ring" />
             <i className="bday-hit-ring bday-hit-ring2" />
             {hitTier >= 1 && <i className="bday-hit-ring bday-hit-ring3" />}
-            {starsOf(taps, hitTier).map((st, k) => (
+            {starsOf(hitTier + 1, hitTier).map((st, k) => (
               <b key={k} style={{ "--a": `${st.a}deg`, "--d": `${st.d}px`, "--c": st.c, animationDelay: `${st.dl}s` } as CSSProperties}>
                 ✦
               </b>
@@ -984,7 +1064,7 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
           </span>
         )}
         <div className="bday-bob">
-          <div key={taps} className={"bday-body" + (taps ? " bday-squish" : " bday-in")}>
+          <div ref={bodyEl} className={"bday-body" + (taps ? " bday-squish" : " bday-in")}>
             <img className="bday-img" src={day.base} alt="" draggable={false} />
             <img
               className={"bday-img bday-bubble" + (taps ? " bday-bubble-pop" : "")}
@@ -993,7 +1073,7 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
               draggable={false}
               style={{ transformOrigin: `${day.tip[0] * 100}% ${day.tip[1] * 100}%` }}
             />
-            {taps > 0 && !reduced() && <i key={taps} className="bday-hit-flash" aria-hidden />}
+            {taps > 0 && !reduced() && <i className="bday-hit-flash" aria-hidden />}
             <span className="bday-ribbon">HAPPY BIRTHDAY</span>
           </div>
         </div>
@@ -1033,7 +1113,7 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
         <div className="bday-fx" aria-hidden>
           {/* 맨 위 현수막: 그날 내내 (제작자 2026-11-07 '맨 위에 해피 버스데이는 24시간 내내 띄워 줘'). 깃발은 Garland 가 그린다 */}
           <div ref={garlandEl} className="bday-garland" />
-          {tier >= 2 && cb && <i key={taps} className={"bday-edge bday-edge-t" + tier} />}
+          {tier >= 2 && cb && <i ref={edgeEl} className={"bday-edge bday-edge-t" + tier} />}
           {lines.map((l) => (
             <span key={l.id} className="bday-line-wrap" style={{ left: l.x, top: l.y, "--rise": `${l.rise}px`, "--dur": `${l.dur}s` } as CSSProperties}>
               <span className={"bday-line " + l.cls} style={{ "--hue": `${l.hue}deg` } as CSSProperties}>
@@ -1074,7 +1154,7 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
             </div>
           )}
           {cb && (
-            <div key={cb.key} className={"bday-cb bday-cb-t" + tier} style={{ left: cbX, top: cbY }}>
+            <div key={cb.key} ref={cbEl} className={"bday-cb bday-cb-t" + tier} style={{ left: cbX, top: cbY }}>
               <b>{cb.n}</b>
               <small>COMBO</small>
             </div>

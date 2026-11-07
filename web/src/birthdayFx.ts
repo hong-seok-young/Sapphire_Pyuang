@@ -218,35 +218,63 @@ export class Fx {
       }
     }
   };
+  /** 불똥 꼬리는 색·굵기·밝기가 같은 것끼리 한 번에 긋는다 (불똥마다 stroke 하던 것이 가장 무거웠다, 제작자 2026-11-08 '많이 누를수록 렉') */
+  private sparkBuckets = new Map<string, { color: string; w: number; a: number; xs: number[] }>();
+  private drawSparks(ctx: CanvasRenderingContext2D) {
+    const bk = this.sparkBuckets;
+    for (const b of bk.values()) b.xs.length = 0;
+    const lite = this.quality < 0.45;
+    for (const p of this.ps) {
+      if (p.shape !== "spark" || !p.add || p.delay > 0) continue;
+      const r = p.life / p.max;
+      let a = r < 0.7 ? 1 : 1 - (r - 0.7) / 0.3;
+      if (p.twinkle && r > 0.45) a *= Math.random() < 0.5 ? 0.25 : 1;
+      if (a <= 0.02) continue;
+      // 밝기는 4칸, 굵기는 0.5 단위로 묶는다 (눈으로는 같다)
+      const qa = Math.ceil(a * 4) / 4;
+      const w = Math.round(p.size * 2) / 2;
+      const k = `${p.color}|${w}|${qa}`;
+      let b = bk.get(k);
+      if (!b) bk.set(k, (b = { color: p.color, w, a: qa, xs: [] }));
+      const tr = p.trail;
+      if (tr && tr.length >= 2) b.xs.push(tr[0], tr[1], p.x, p.y);
+      else b.xs.push(p.x - p.vx * 0.02, p.y - p.vy * 0.02, p.x, p.y);
+    }
+    ctx.lineCap = "round";
+    for (const b of bk.values()) {
+      if (!b.xs.length) continue;
+      ctx.globalAlpha = b.a;
+      ctx.strokeStyle = b.color;
+      ctx.lineWidth = b.w;
+      ctx.beginPath();
+      const xs = b.xs;
+      for (let i = 0; i < xs.length; i += 4) {
+        ctx.moveTo(xs[i], xs[i + 1]);
+        ctx.lineTo(xs[i + 2], xs[i + 3]);
+      }
+      ctx.stroke();
+      if (lite) continue;
+      // 머리의 빛 (같은 그림을 붙인다)
+      const g = this.glowOf(b.color);
+      const s = b.w * 3.2;
+      for (let i = 0; i < xs.length; i += 4) ctx.drawImage(g, xs[i + 2] - s / 2, xs[i + 3] - s / 2, s, s);
+    }
+    if (bk.size > 400) bk.clear();
+  }
   private draw(ctx: CanvasRenderingContext2D) {
     for (const pass of [false, true]) {
       ctx.globalCompositeOperation = pass ? "lighter" : "source-over";
+      if (pass) this.drawSparks(ctx);
       for (const p of this.ps) {
-        if (p.add !== pass || p.delay > 0 || p.shape === "none") continue;
+        if (p.add !== pass || p.delay > 0 || p.shape === "none" || p.shape === "spark") continue;
         const r = p.life / p.max;
         let a = r < 0.7 ? 1 : 1 - (r - 0.7) / 0.3;
         if (p.twinkle && r > 0.45) a *= Math.random() < 0.5 ? 0.25 : 1;
-        if (a <= 0) continue;
+        if (a <= 0.02) continue;
         ctx.globalAlpha = a;
         switch (p.shape) {
           case "dot": {
             const s = p.size * 4;
-            ctx.drawImage(this.glowOf(p.color), p.x - s / 2, p.y - s / 2, s, s);
-            break;
-          }
-          case "spark": {
-            const tr = p.trail;
-            const lite = this.quality < 0.45;
-            ctx.strokeStyle = p.color;
-            ctx.lineWidth = p.size;
-            ctx.lineCap = "round";
-            ctx.beginPath();
-            if (tr && tr.length >= 2) ctx.moveTo(tr[0], tr[1]);
-            else ctx.moveTo(p.x - p.vx * 0.02, p.y - p.vy * 0.02);
-            ctx.lineTo(p.x, p.y);
-            ctx.stroke();
-            if (lite) break;
-            const s = p.size * 3.2;
             ctx.drawImage(this.glowOf(p.color), p.x - s / 2, p.y - s / 2, s, s);
             break;
           }
