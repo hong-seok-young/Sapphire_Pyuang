@@ -31,6 +31,8 @@ export async function announceBday(env: Env, now = Date.now()): Promise<number> 
     const base = `bday_notice_${key}`;
     if (!(await has(env, base))) {
       if (await claim(env, base, now)) {
+        // 그날 0시 전 기록(앱개발자 미리 보기)은 지운다 (제작자 2026-11-07 '자정이 되는 순간 내 기록 지우고 올리는 거야')
+        await env.DB.prepare("DELETE FROM bday_combo WHERE bday = ? AND at < ?").bind(key, d.start).run();
         await notify(env, "all", "bday", d.notice, "#/", "");
         sent += BATCH;
       }
