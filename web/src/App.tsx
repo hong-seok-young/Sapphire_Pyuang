@@ -557,7 +557,7 @@ function Wiki({
       {/* 메뉴 설명 칸과 튜토리얼 (제목을 누르면, src/tutorial.tsx) */}
       <GuideHost me={me} />
       {/* 생일 스티커 (그날 한국 시간 하루, src/birthday.tsx) */}
-      <BirthdaySticker />
+      <BirthdaySticker me={me} />
       <nav
         className={
           "tabbar" + (launcher.editing && editable ? " launch-editing" : "")

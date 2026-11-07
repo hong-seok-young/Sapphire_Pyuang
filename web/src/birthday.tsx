@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as RPointerEvent } from "react";
 import { createPortal } from "react-dom";
+import type { Me } from "./auth";
 import { inFloat } from "./platform";
 import { useTutorial } from "./tutorialState";
 
@@ -38,9 +39,9 @@ export const BIRTHDAYS: Birthday[] = [
   },
 ];
 
-/** 지금 보일 생일: 그날 0시부터 24시간만, 앱개발자도 미리 보지 않는다 (제작자 2026-11-07 '11월 8일이 생일이라고, 내려') */
-function current(now: number): Birthday | null {
-  return BIRTHDAYS.find((b) => now >= b.start && now < b.end) ?? null;
+/** 지금 보일 생일 (앱개발자는 시작 전에도 미리 본다) */
+function current(me: Me, now: number): Birthday | null {
+  return BIRTHDAYS.find((b) => now < b.end && (now >= b.start || me.role === "developer")) ?? null;
 }
 
 const POS_KEY = "sapphire.bday.pos";
@@ -187,14 +188,14 @@ function burst(x: number, y: number, kinds: Kind[]): Bit[] {
 
 const EXTRA: Kind[] = ["spark", "confetti", "firework", "balloon", "party"];
 
-export function BirthdaySticker() {
+export function BirthdaySticker({ me }: { me: Me }) {
   const [now, setNow] = useState(() => Date.now());
   const tut = useTutorial();
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(t);
   }, []);
-  const day = current(now);
+  const day = current(me, now);
   if (!day || inFloat || tut) return null;
   return <Sticker day={day} />;
 }
