@@ -12,7 +12,9 @@ import { Fx, PALETTE, pick } from "./birthdayFx";
  * 하나씩, 하트와 폭죽 등등 막 랜덤으로').
  * 그림은 제작자가 준 게임 스샷에서 몸짱 동상·캐릭터·말풍선만 오린 것 (비공개 자료 이미지/생일, 자료/scripts/make_birthday_sticker.py ->
  * /data/birthday, 로그인한 길드원에게만). 화면 어디서나 떠 있고, 끌면 옮겨지고(이 기기에 자리 기억), 누르면 노래 한 줄과 하트·폭죽·풍선·반짝이가 랜덤으로.
- * 그날 한국 시간 0시부터 24시간만 보인다. 앱개발자는 미리 본다. 게임과 상관없는 꾸밈이라 게임 안전 규칙에 맞는다
+ * 그날 한국 시간 0시부터 24시간만 보인다. 앱개발자는 미리 본다. 게임과 상관없는 꾸밈이라 게임 안전 규칙에 맞는다.
+ * 효과는 초안 다섯 안을 모두 섞고 (누를 때마다 다섯 안을 한 번씩 돌아가며, 같은 안이 잇따르지 않게), 10번째 누를 때마다 생일 메인 폭죽
+ * (제작자 2026-11-07 '12345 다 섞고, 생축 메인 폭죽은 10번 누를 때마다 터트려 줘')
  */
 export interface Birthday {
   key: string;
@@ -104,7 +106,7 @@ interface TapCtx {
   top: number;
   vw: number;
   vh: number;
-  /** 노래의 마지막 줄 (네 번째 누름마다): 피날레 */
+  /** 안마다 조금 더 크게 터지는 때 (다섯 줄 노래의 네 번째 줄) */
   finale: boolean;
   combo: number;
   pop: (text: string, x: number, y: number, cls: string) => void;
@@ -198,16 +200,49 @@ export const VARIANTS: Variant[] = [
   },
 ];
 const FX_KEY = "sapphire.bday.fx";
-/** 쓸 안 (초안 볼 때는 이 기기에 적은 번호, 아니면 고른 안) */
-export const DEFAULT_FX = 0;
-function variantOf(): Variant {
+/** 이 기기에 1~5 를 적어 두면 그 안만 (초안 다시 보기), 아니면 다섯 안을 섞는다 */
+function onlyVariant(): number | null {
   try {
     const n = Number(localStorage.getItem(FX_KEY));
-    if (Number.isInteger(n) && n >= 1 && n <= VARIANTS.length) return VARIANTS[n - 1];
+    if (Number.isInteger(n) && n >= 1 && n <= VARIANTS.length) return n - 1;
   } catch {
-    /* 기본 */
+    /* 섞기 */
   }
-  return VARIANTS[DEFAULT_FX];
+  return null;
+}
+/** 다섯 안을 한 번씩 섞은 차례 (앞 차례의 마지막과 같은 안으로 시작하지 않게) */
+function shuffled(last: number): number[] {
+  const order = VARIANTS.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  if (order[0] === last) order.push(order.shift()!);
+  return order;
+}
+
+/** 생일 메인 폭죽: 10번째 누를 때마다 */
+const FINALE_EVERY = 10;
+const ALL_PATTERNS = ["peony", "ring", "willow", "crossette", "star", "double", "heart", "pixel"];
+function grandFinale({ fx, cx, cy, top, vw, vh, banner }: TapCtx) {
+  fx.shake();
+  fx.flash(cx, cy, "#ffffff", 70, 380);
+  fx.ring(cx, cy, "#ffd27a", 460);
+  fx.ring(cx, cy, "#ff7aa8", 360, 0.15);
+  fx.ring(cx, cy, "#7ab8ff", 280, 0.3);
+  fx.explode(cx, cy - 30, "heart", ["#ff4d8d"], 1.35);
+  banner("생일 축하해요", "bday-finale", 4600);
+  fx.confetti(-10, vh + 10, -1.05, 0.28, 110, [720, 1100]);
+  fx.confetti(vw + 10, vh + 10, -Math.PI + 1.05, 0.28, 110, [720, 1100]);
+  fx.fountain(cx, top + 14, 1.6);
+  fx.balloons(12, 0.3);
+  fx.heartRain(50, 0.5);
+  fx.confettiRain(150, 0.8);
+  // 하늘을 덮는 불꽃: 3초 동안 이어서
+  for (let i = 0; i < 18; i++)
+    fx.rocket(rnd(0.06, 0.94) * vw, vh + 10, rnd(0.08, 0.92) * vw, rnd(0.06, 0.42) * vh, pat(ALL_PATTERNS), two(), 0.15 + i * 0.17, 1.25);
+  // 마지막에 금빛 버드나무 불꽃
+  for (let i = 0; i < 4; i++) fx.explode(rnd(0.15, 0.85) * vw, rnd(0.06, 0.2) * vh, "willow", ["#ffd27a"], 1.45, 3.3 + i * 0.3);
 }
 
 export function BirthdaySticker({ me }: { me: Me }) {
@@ -242,7 +277,18 @@ function Sticker({ day }: { day: Birthday }) {
   const [lines, setLines] = useState<Line[]>([]);
   const [pops, setPops] = useState<Pop[]>([]);
   const [banner, setBanner] = useState<Banner | null>(null);
-  const variant = useRef(variantOf()).current;
+  const only = useRef(onlyVariant()).current;
+  const bag = useRef<number[]>([]);
+  const lastV = useRef(-1);
+  const nextVariant = (): Variant => {
+    if (only != null) return VARIANTS[only];
+    if (!bag.current.length) bag.current = shuffled(lastV.current);
+    lastV.current = bag.current.shift()!;
+    return VARIANTS[lastV.current];
+  };
+  /** 스티커 둘레 꾸밈: 마지막에 터진 안의 것, 안 누르는 동안은 7초마다 다음 안으로 */
+  const [idle, setIdle] = useState(() => VARIANTS[only ?? Math.floor(Math.random() * VARIANTS.length)].idle);
+  const tapCount = useRef(0);
   const fx = useRef<Fx | null>(null);
   const lastTap = useRef(0);
   const combo = useRef(0);
@@ -254,6 +300,16 @@ function Sticker({ day }: { day: Birthday }) {
   const posRef = useRef(pos);
   posRef.current = pos;
 
+  useEffect(() => {
+    if (only != null) return;
+    let k = 0;
+    const t = window.setInterval(() => {
+      if (document.hidden) return;
+      k++;
+      setIdle((cur) => VARIANTS[(VARIANTS.findIndex((v) => v.idle === cur) + 1 + (k % 2)) % VARIANTS.length].idle);
+    }, 7000);
+    return () => window.clearInterval(t);
+  }, [only, taps]);
   useEffect(() => {
     const f = new Fx();
     f.mount();
@@ -302,14 +358,18 @@ function Sticker({ day }: { day: Birthday }) {
     const below = p.y < 44;
     const stack = linesRef.current.length;
     const ly = below ? p.y + h + 30 + stack * 28 : p.y - 6 - stack * 28;
-    const line: Line = { id: ++seq, x: lx, y: ly, text, hue: HUES[n % HUES.length], cls: variant.line };
+    const count = ++tapCount.current;
+    const grand = count % FINALE_EVERY === 0;
+    const variant = nextVariant();
+    setIdle(variant.idle);
+    const line: Line = { id: ++seq, x: lx, y: ly, text, hue: HUES[n % HUES.length], cls: grand ? "bday-line-gold" : variant.line };
     setLines((ls) => [...ls.slice(-3), line]);
     window.setTimeout(() => setLines((ls) => ls.filter((l) => l.id !== line.id)), 2800);
     const now = Date.now();
     combo.current = now - lastTap.current < 1300 ? combo.current + 1 : 1;
     lastTap.current = now;
     if (reduced() || !fx.current) return;
-    variant.tap({
+    (grand ? grandFinale : variant.tap)({
       fx: fx.current,
       x: tx,
       y: ty,
@@ -362,7 +422,7 @@ function Sticker({ day }: { day: Birthday }) {
   return (
     <>
       <div
-        className={"bday " + variant.idle + (dragging ? " bday-drag" : "")}
+        className={"bday " + idle + (dragging ? " bday-drag" : "")}
         style={{ width: w, height: h, transform: `translate3d(${Math.round(pos.x)}px, ${Math.round(pos.y)}px, 0)` }}
         role="button"
         tabIndex={0}
