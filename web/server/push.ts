@@ -50,8 +50,9 @@ async function vapid(keys: Keys, endpoint: string): Promise<string> {
   return `vapid t=${head}.${body}.${b64url(sig)}, k=${keys.publicKey}`;
 }
 
-/** 방금 만든 알림을 받은 사람들의 폰에 신호를 보낸다. 실패해도 하던 일은 그대로. 없어진 구독은 지운다 */
-export async function pushNew(env: Env, kind: string, createdAt: number): Promise<void> {
+/** 방금 만든 알림을 받은 사람들의 폰에 신호를 보낸다. 실패해도 하던 일은 그대로. 없어진 구독은 지운다.
+ *  한 번에 40대까지라 모두에게 가는 큰 알림(생일 알림, server/birthday.ts)은 offset 으로 40대씩 이어 보낸다. 보낸(보내려 한) 폰 수를 돌려준다 */
+export async function pushNew(env: Env, kind: string, createdAt: number, offset = 0): Promise<number> {
   try {
     const { results } = await env.DB.prepare(
       // 받는 캐릭터와 같은 사람(부캐 묶기)의 어느 캐릭터로 켠 폰이든 보낸다
@@ -59,11 +60,11 @@ export async function pushNew(env: Env, kind: string, createdAt: number): Promis
         "JOIN users us ON COALESCE(us.main_id, us.id) = COALESCE(ua.main_id, ua.id) JOIN push_subs s ON s.user_id = us.id " +
         "WHERE a.created_at = ?1 AND a.kind = ?2 " +
         // 이 종류의 폰 알림을 끈 사람은 뺀다 (앱 알림함에는 그대로 남는다. 제작자 요청: 폰 알림은 따로 설정)
-        "AND COALESCE((SELECT p.push FROM alert_prefs p WHERE p.user_id = a.user_id AND p.kind = ?2), 1) = 1 LIMIT ?3",
+        "AND COALESCE((SELECT p.push FROM alert_prefs p WHERE p.user_id = a.user_id AND p.kind = ?2), 1) = 1 ORDER BY s.endpoint LIMIT ?3 OFFSET ?4",
     )
-      .bind(createdAt, kind, MAX_SENDS)
+      .bind(createdAt, kind, MAX_SENDS, offset)
       .all<{ endpoint: string }>();
-    if (!results.length) return;
+    if (!results.length) return 0;
     const keys = await vapidKeys(env);
     await Promise.all(
       results.map(async ({ endpoint }) => {
@@ -81,7 +82,9 @@ export async function pushNew(env: Env, kind: string, createdAt: number): Promis
         }
       }),
     );
+    return results.length;
   } catch (e) {
     console.error("push failed", e);
+    return 0;
   }
 }

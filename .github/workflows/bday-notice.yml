@@ -1,0 +1,32 @@
+# 생일 알림 (제작자 요청 2026-11-07 '11월 8일 되는 순간 바로 전원에게 알림 무조건 보내 화려하게'): 한국 시간 0시(UTC 15:00)에
+# POST /api/bday/announce 를 여러 번 불러 모두에게 앱 알림과 폰 알림을 보낸다 (web/server/birthday.ts announceBday:
+# 첫 번은 알림함과 폰 40대, 다음부터 남은 폰 40대씩. 그날 안에서만, 같은 것을 두 번 보내지 않으므로 비밀값 없이 부른다).
+# GitHub 예약은 정각에 늦게 도는 일이 많아 5분 일찍 깨어 0시 5초까지 기다렸다 부른다. 예약이 늦거나 안 돌아도
+# /api/news(앱을 연 사람마다 2분마다)가 같은 일을 이어서 한다. 공개 저장소라 실행 기록에는 보낸 수만 찍는다.
+name: Birthday notice
+
+on:
+  schedule:
+    - cron: "55 14 7 11 *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  notice:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Wait for midnight (KST) and send
+        run: |
+          target=$(date -u -d "2026-11-07 15:00:05" +%s)
+          now=$(date -u +%s)
+          if [ "$now" -lt "$target" ] && [ $((target - now)) -lt 1200 ]; then sleep $((target - now)); fi
+          for part in 1 2 3 4 5 6 7 8; do
+            out=$(curl -fsS -X POST https://sapphire-guild.pages.dev/api/bday/announce) || { echo "::warning::요청 $part 실패"; sleep 3; continue; }
+            n=$(printf '%s' "$out" | tr -cd '0-9')
+            echo "요청 $part: 폰 ${n:-0}대"
+            if [ "$part" -gt 1 ] && [ "${n:-0}" -lt 40 ]; then break; fi
+            sleep 3
+          done

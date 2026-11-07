@@ -232,7 +232,7 @@ const TODO_NAME: Record<string, string> = {
 const ALERT_NAME: Record<string, string> = {
   market_want: "중개인 살래요", market_bid: "경매 입찰", market_outbid: "더 높은 입찰", market_auction: "경매 전환", market_new: "새 물건", gold_want: "골드 거래",
   request: "의뢰", request_new: "새 의뢰", talk: "토론방", account: "계정", shop: "상점", board: "게시판 댓글", board_notice: "새 공지·이벤트", imo_news: "아이모 소식",
-  chat_fixed: "챗봇 개선됨", chat_gap: "챗봇 모르는 질문", chat_done: "챗봇 답변 완료", rent: "장비대여", todo: "To do 함께", gdungeon: "길드 던전", app_news: "새 기능", devreq: "개발 요청",
+  chat_fixed: "챗봇 개선됨", chat_gap: "챗봇 모르는 질문", chat_done: "챗봇 답변 완료", rent: "장비대여", todo: "To do 함께", gdungeon: "길드 던전", app_news: "새 기능", devreq: "개발 요청", bday: "생일 축하",
 };
 const RENT_ACTION: Record<string, string> = { accept: "대여 신청 수락", reject: "대여 신청 거절", cancel: "대여 신청 취소", hand: "대여 완료 (건네줌)" };
 

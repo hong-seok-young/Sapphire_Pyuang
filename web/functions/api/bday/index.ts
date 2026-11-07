@@ -3,9 +3,9 @@
 // POST /api/bday { key, combo }         -> 내 최고 콤보를 바꾼다 (더 클 때만), 답은 GET 과 같다
 // 콤보는 스티커·풍선을 1.3초 안에 이어 누른 수로 화면이 센다. 그날 0시 전 기록(앱개발자 미리 보기)은 그날이 되면 순위에서 빠지고 덮인다.
 // 테스트 계정은 순위에 넣지 않는다
-import { NEED_LOGIN, TEST_IDS, currentUser, json, readJson } from "../../server/auth";
-import type { Env } from "../../server/auth";
-import { BDAYS, MAX_COMBO } from "../../server/birthday";
+import { NEED_LOGIN, TEST_IDS, currentUser, json, readJson } from "../../../server/auth";
+import type { Env } from "../../../server/auth";
+import { BDAYS, MAX_COMBO } from "../../../server/birthday";
 
 const TOP = 20;
 const NOT_TEST = `user_id NOT IN (${TEST_IDS.map((id) => `'${id}'`).join(", ")})`;
