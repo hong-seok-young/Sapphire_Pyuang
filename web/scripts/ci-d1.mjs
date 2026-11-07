@@ -562,3 +562,20 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
     console.log(`아이모 소식 본 사람 채움: ${first.size}줄 (글 ${new Set([...first.keys()].map((k) => k.split("\t")[0])).size}개)`);
   }
 }
+
+// 생일 콤보 2140 (제작자 2026-11-08 '백돼쥐 2140 까지 했는데 반영 안 됐대, 순위에 2140 으로 반영'): 콤보 상한(MAX_COMBO 2000)에 걸려 서버가 받지 않았다.
+// 상한을 올리고 그 기록을 한 번 넣는다 (더 높은 기록이 있으면 그대로). 계정이 있을 때만, setup 'bday_fix_2140_20261108' 로 한 번만, 실행 기록에는 수만
+{
+  const KEY = "bday_fix_2140_20261108";
+  const WHO = "백돼쥐";
+  const now = Date.now();
+  const NOT_DONE = `NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}')`;
+  const has = queryFirst(`SELECT COUNT(*) AS n FROM users WHERE id = '${WHO}' AND ${NOT_DONE}`)?.n ?? 0;
+  runSql([
+    `INSERT INTO bday_combo (bday, user_id, best, at) SELECT 'village-2026', '${WHO}', 2140, ${now} ` +
+      `WHERE EXISTS (SELECT 1 FROM users WHERE id = '${WHO}') AND ${NOT_DONE} ` +
+      `ON CONFLICT (bday, user_id) DO UPDATE SET best = excluded.best, at = excluded.at WHERE bday_combo.best < excluded.best;`,
+    `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+  ]);
+  console.log(`생일 콤보 기록 넣음 ${has}명`);
+}
