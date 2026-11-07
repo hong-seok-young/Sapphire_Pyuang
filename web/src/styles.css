@@ -1745,7 +1745,7 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 .tab-locked { opacity: 0.6; cursor: default; }
 /* 'UPDATE' on a bottom tab (same mint as the home tiles) */
 .tab-up {
-  position: absolute; top: 3px; left: 50%; transform: translateX(4px); z-index: 2; padding: 0 3px; font-size: 7px; font-weight: 700;
+  position: absolute; top: 3px; left: 50%; transform: translateX(4px); z-index: 2; padding: 0 3px; font-size: 7px; font-weight: 700; white-space: nowrap;
   line-height: 12px; color: var(--edge); background: #3fe0a0; border: 1px solid var(--edge); pointer-events: none;
 }
 .launch-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 8px 10px; }
@@ -3700,3 +3700,73 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .ans-post-tag { flex: none; padding: 1px 6px; font-size: 10.5px; color: #0c0a24; background: #6aa8ff; }
 .ans-post-go { flex: none; font-size: 12px; color: #9cc4ff; white-space: nowrap; }
 .ans-post:active { transform: translateY(1px); }
+
+/* 생일 스티커 (제작자 요청 2026-11-07, src/birthday.tsx): 화면 어디서나 떠 있고 끌어서 옮기고 누르면 노래 한 줄과 하트·폭죽 등.
+   움직임은 transform·opacity 만. 모달(z 60~)보다 아래, 아래 탭(z 10)보다 위 */
+.bday { position: fixed; left: 0; top: 0; z-index: 50; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: grab; }
+.bday:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.bday-drag { cursor: grabbing; }
+.bday-bob { width: 100%; height: 100%; animation: bd-bob 3.2s ease-in-out infinite; }
+.bday-drag .bday-bob { animation-play-state: paused; }
+.bday-body { position: relative; width: 100%; height: 100%; transform-origin: 50% 90%; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.45)); }
+.bday-drag .bday-body { transform: scale(1.06) rotate(-2deg); transition: transform 0.12s ease-out; }
+.bday-img { position: absolute; left: 0; top: 0; width: 100%; height: auto; display: block; pointer-events: none; }
+.bday-in { animation: bd-in 0.55s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.bday-squish { animation: bd-squish 0.45s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.bday-bubble-pop { animation: bd-bubble 0.5s cubic-bezier(0.3, 1.6, 0.5, 1); }
+.bday-ribbon {
+  position: absolute; left: 50%; bottom: 1px; transform: translateX(-50%); white-space: nowrap;
+  padding: 1px 8px 2px; font-size: 9px; line-height: 11px; letter-spacing: 0.06em; color: #3a2000;
+  background: linear-gradient(180deg, #ffe08a, #ffb83a); border: 1px solid #7a4a00; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+.bday-fx { position: fixed; inset: 0; z-index: 51; pointer-events: none; overflow: hidden; }
+.bd-bit { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); animation-name: bd-fly; animation-timing-function: cubic-bezier(0.15, 0.7, 0.4, 1); animation-fill-mode: both; will-change: transform, opacity; }
+.bd-emoji { font-size: 18px; line-height: 1; }
+.bd-confetti { animation-name: bd-fall; animation-timing-function: cubic-bezier(0.2, 0.6, 0.6, 1); }
+.bd-spark { width: 6px; height: 6px; animation-name: bd-pop; }
+.bd-flash { width: 18px; height: 18px; border-radius: 50%; animation-name: bd-flash; }
+.bd-balloon { animation-name: bd-rise; animation-timing-function: ease-out; }
+.bday-line {
+  position: absolute; transform: translate(-50%, -100%); white-space: nowrap; font-size: 13px; line-height: 1.2; padding: 3px 8px;
+  color: #fff; background: linear-gradient(180deg, hsl(var(--hue), 80%, 52%), hsl(var(--hue), 75%, 38%)); border: 2px solid #fff; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5); animation: bd-line 2.6s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+@keyframes bd-bob { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-4px) rotate(1deg); } }
+@keyframes bd-in { 0% { transform: scale(1.6) rotate(-8deg); opacity: 0; } 60% { opacity: 1; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+@keyframes bd-squish { 0% { transform: scale(1); } 30% { transform: scale(1.12, 0.88); } 60% { transform: scale(0.94, 1.08) translateY(-6px); } 100% { transform: scale(1); } }
+@keyframes bd-bubble { 0% { transform: scale(1); } 35% { transform: scale(1.18) rotate(-3deg); } 70% { transform: scale(0.96) rotate(1deg); } 100% { transform: scale(1); } }
+@keyframes bd-fly {
+  0% { transform: translate(-50%, -50%) scale(0.3) rotate(0); opacity: 0; }
+  12% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(var(--s)) rotate(var(--rot)); opacity: 0; }
+}
+@keyframes bd-fall {
+  0% { transform: translate(-50%, -50%) rotate(0); opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--rot)); opacity: 0; }
+}
+@keyframes bd-pop {
+  0% { transform: translate(-50%, -50%) scale(1.4); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.4); opacity: 0; }
+}
+@keyframes bd-flash { 0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(3.4); opacity: 0; } }
+@keyframes bd-rise {
+  0% { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+  15% { transform: translate(-50%, -50%) scale(var(--s)); opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(var(--s)) rotate(var(--rot)); opacity: 0; }
+}
+@keyframes bd-line {
+  0% { transform: translate(-50%, -60%) scale(0.5); opacity: 0; }
+  15% { transform: translate(-50%, -100%) scale(1.08); opacity: 1; }
+  25% { transform: translate(-50%, -100%) scale(1); }
+  75% { opacity: 1; }
+  100% { transform: translate(-50%, -190%) scale(1); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bday-bob, .bday-in, .bday-squish, .bday-bubble-pop { animation: none; }
+  .bday-line { animation: bd-line-still 2.6s linear both; }
+}
+@keyframes bd-line-still { 0%, 85% { opacity: 1; transform: translate(-50%, -100%); } 100% { opacity: 0; transform: translate(-50%, -100%); } }
