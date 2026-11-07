@@ -33,8 +33,9 @@ export const BIRTHDAYS: Birthday[] = [
     who: "마을모금함",
     start: Date.parse("2026-11-08T00:00:00+09:00"),
     end: Date.parse("2026-11-09T00:00:00+09:00"),
-    base: "/data/birthday/bday-base.png",
-    bubble: "/data/birthday/bday-bubble.png",
+    // 그림을 바꾸면 ?v= 를 올린다 (/data 그림은 폰에 하루 저장된다)
+    base: "/data/birthday/bday-base.png?v=3",
+    bubble: "/data/birthday/bday-bubble.png?v=3",
     ratio: 503 / 600,
     tip: [0.4155, 0.3373],
   },
