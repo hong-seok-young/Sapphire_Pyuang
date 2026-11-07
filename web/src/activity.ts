@@ -265,6 +265,7 @@ const ACTIONS: [RegExp, (d: Rec, m: RegExpMatchArray, at: number) => string][] =
   [/^DELETE \/api\/push$/, () => "폰 알림 끔"],
   [/^POST \/api\/dev\/switch$/, (d) => join("테스트 계정 전환", str(d.to) ?? str(d.id))],
   [/^POST \/api\/bday$/, (d) => `생일 스티커 콤보 ${num(d.combo) ?? ""}`],
+  [/^POST \/api\/bday\/resume$/, () => "생일 스티커 콤보 이어서 하기"],
   [/^PUT \/api\/favorites$/, (d) => `즐겨찾기 ${d.on === false ? "뺌" : "추가"}${str(d.name) ? ` · ${d.name}` : ""}`],
   // 챗봇
   [/^POST \/api\/chat$/, (d) => join("챗봇에 질문", quote(d.question, 60), num(d.photos) ? `사진 ${d.photos}장` : null)],

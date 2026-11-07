@@ -3958,6 +3958,15 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
   background: linear-gradient(180deg, #ffe08a, #ffb83a); border: 1px solid #7a4a00; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); cursor: pointer; touch-action: manipulation;
 }
 .bday-rank-btn span { font-size: 9.5px; }
+/* 끊긴 콤보 이어서 하기 단추 (스티커 위, 화면 맨 위에 붙어 있으면 아래) */
+.bday-resume {
+  position: absolute; left: 50%; bottom: calc(100% + 8px); z-index: 3; transform: translateX(-50%); white-space: nowrap; padding: 6px 12px; font-size: 13px; line-height: 1.2;
+  color: #3a2000; background: linear-gradient(180deg, #fff3b0, #ffc35c 55%, #e08a1e); border: 2px solid #fff8d6; box-shadow: 0 0 16px rgba(255, 200, 80, 0.85), 0 2px 0 rgba(0, 0, 0, 0.4);
+  cursor: pointer; touch-action: manipulation; animation: bd-resume 1s ease-in-out infinite;
+}
+.bday-resume-below { bottom: auto; top: calc(100% + 8px); }
+.bday-resume:active { transform: translateX(-50%) translateY(1px); }
+@keyframes bd-resume { 0%, 100% { opacity: 1; } 50% { opacity: 0.75; } }
 .bday-rank-btn:active { transform: translateY(1px); }
 .bday-rank-back { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(6, 4, 20, 0.62); }
 .bday-rank { width: min(340px, 100%); max-height: 80vh; overflow: auto; padding: 12px 12px 10px; background: #1d1844; border: 2px solid #ffc35c; box-shadow: 0 0 24px rgba(255, 195, 92, 0.45); }
@@ -3976,7 +3985,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .bday-rank-c small { margin-left: 3px; font-size: 9px; letter-spacing: 0.08em; color: #cfc8ff; }
 @media (prefers-reduced-motion: reduce) {
   .bday-bob, .bday-in, .bday-squish, .bday-bubble-pop, .bday-aura, .bday-aura i, .bday-banner, .bday-banner i, .bday-banner b,
-  .bday-garland, .bday-flag > i, .bday-cb, .bday-shout, .bday-shout-w i, .bday-pass, .bday-ticker-top, .bday-tk-me, .bday-result, .bday-fever-ring, .bday-edge, .bday-line, .bday-ticker-run { animation: none; }
+  .bday-garland, .bday-flag > i, .bday-resume, .bday-cb, .bday-shout, .bday-shout-w i, .bday-pass, .bday-ticker-top, .bday-tk-me, .bday-result, .bday-fever-ring, .bday-edge, .bday-line, .bday-ticker-run { animation: none; }
   .bday-line-wrap { animation: bd-line-still 2.6s linear both; }
 }
 @keyframes bd-line-still { 0%, 85% { opacity: 1; transform: translate(-50%, -100%); } 100% { opacity: 0; transform: translate(-50%, -100%); } }

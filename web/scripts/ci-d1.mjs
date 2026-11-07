@@ -579,3 +579,22 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
   ]);
   console.log(`생일 콤보 기록 넣음 ${has}명`);
 }
+
+// 생일 콤보 이어서 하기 (제작자 2026-11-08 '쿨쿨 쿠루미는 억울하게 끊겼으니까 11700 에서 이어서 할 수 있게, 그 사람 웹 들어가면 이어서 하기 버튼'):
+// 그 사람에게 bday_resume 한 줄 (화면이 스티커 위에 '11,700 콤보 이어서 하기' 단추를 띄운다)과 순위에 11700 (더 높은 기록이 있으면 그대로).
+// 닉네임은 띄어쓰기가 있을 수도 없을 수도 있어 둘 다 본다. 계정이 있을 때만, setup 'bday_resume_kurumi_20261108' 로 한 번만, 실행 기록에는 수만
+{
+  const KEY = "bday_resume_kurumi_20261108";
+  const WHO = ["쿨쿨쿠루미", "쿨쿨 쿠루미"].map((w) => `'${w}'`).join(", ");
+  const now = Date.now();
+  const NOT_DONE = `NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}')`;
+  const has = queryFirst(`SELECT COUNT(*) AS n FROM users WHERE id IN (${WHO}) AND ${NOT_DONE}`)?.n ?? 0;
+  runSql([
+    `INSERT INTO bday_resume (bday, user_id, combo, created_at) SELECT 'village-2026', id, 11700, ${now} FROM users WHERE id IN (${WHO}) AND ${NOT_DONE} ` +
+      `ON CONFLICT (bday, user_id) DO UPDATE SET combo = excluded.combo, created_at = excluded.created_at, used_at = NULL;`,
+    `INSERT INTO bday_combo (bday, user_id, best, at) SELECT 'village-2026', id, 11700, ${now} FROM users WHERE id IN (${WHO}) AND ${NOT_DONE} ` +
+      `ON CONFLICT (bday, user_id) DO UPDATE SET best = excluded.best, at = excluded.at WHERE bday_combo.best < excluded.best;`,
+    `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+  ]);
+  console.log(`생일 콤보 이어서 하기 넣음 ${has}명`);
+}

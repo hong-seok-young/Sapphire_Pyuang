@@ -1,5 +1,7 @@
 // 생일 스티커 효과 엔진 (src/birthday.tsx): 화면 전체를 덮는 캔버스 하나에 불꽃놀이·색종이·하트·풍선을 그린다.
 // 누를 때만 돌고(파티클이 다 사라지면 멈춤), 누르는 데 걸리지 않는다(pointer-events: none). 파티클은 1800개까지.
+// 프레임이 느려지면(아주 빠른 연타, 느린 폰) 저절로 가볍게: 파티클 수를 줄이고 새로 생기는 것을 솎고 캔버스 해상도를 낮춘다
+// (제작자 2026-11-08 '누가 엄청 빠르게 누르니까 멈췄대', `quality`).
 
 type Shape = "dot" | "spark" | "square" | "confetti" | "heart" | "balloon" | "flash" | "ring" | "none";
 
@@ -37,6 +39,8 @@ export const PALETTE = ["#ff4d8d", "#ffc35c", "#6f8fff", "#7ee2a8", "#c58bff", "
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 export const pick = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
 const MAX = 1800;
+/** 가장 가벼울 때의 파티클 수 */
+const MIN_CAP = 260;
 
 const HEART = ["0110110", "1111111", "1111111", "0111110", "0011100", "0001000"];
 
@@ -50,7 +54,13 @@ export class Fx {
   w = 0;
   h = 0;
   private glow = new Map<string, HTMLCanvasElement>();
+  private heartPics = new Map<string, HTMLCanvasElement>();
   private onResize = () => this.size();
+  /** 최근 프레임 시간(ms, 평균)과 그에 따른 품질 0.2~1 (1 = 다 그림) */
+  private ft = 16;
+  quality = 1;
+  /** 지금 캔버스 배율 (느리면 1 로 낮춘다) */
+  private lowRes = false;
 
   mount() {
     if (this.cv) return;
@@ -82,14 +92,18 @@ export class Fx {
   }
   private size() {
     if (!this.cv) return;
-    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.dpr = this.lowRes ? 1 : Math.min(2, window.devicePixelRatio || 1);
     this.w = window.innerWidth;
     this.h = window.innerHeight;
     this.cv.width = Math.round(this.w * this.dpr);
     this.cv.height = Math.round(this.h * this.dpr);
   }
   add(p: Partial<P> & { x: number; y: number }) {
-    if (this.ps.length >= MAX) return;
+    // 30fps 아래로 끊길 때만 덜어 낸다 (잘 도는 폰은 다 그린다, 제작자 2026-11-08 '효과 줄이지 마')
+    const keep = Math.min(1, this.quality / 0.6);
+    if (this.ps.length >= MIN_CAP + (MAX - MIN_CAP) * keep) return;
+    // 끊길 때는 꾸밈 가루(반짝이·불똥·색종이)부터 솎는다. 터지는 씨앗(end)·풍선·번쩍임·고리는 그대로
+    if (keep < 1 && !p.end && !p.emit && p.shape !== "balloon" && p.shape !== "flash" && p.shape !== "ring" && Math.random() > keep) return;
     this.ps.push({
       vx: 0,
       vy: 0,
@@ -127,9 +141,36 @@ export class Fx {
     }
     return c;
   }
+  /** 도트 하트 그림 (색·크기마다 한 번 그려 두고 붙인다: 칸마다 fillRect 42번 대신) */
+  private heartOf(color: string, u: number) {
+    const k = `${color}|${u}`;
+    let c = this.heartPics.get(k);
+    if (!c) {
+      c = document.createElement("canvas");
+      c.width = 7 * u;
+      c.height = 6 * u;
+      const x = c.getContext("2d")!;
+      x.fillStyle = color;
+      for (let y = 0; y < HEART.length; y++) for (let i = 0; i < 7; i++) if (HEART[y][i] === "1") x.fillRect(i * u, y * u, u, u);
+      x.fillStyle = "rgba(255,255,255,0.7)";
+      x.fillRect(u, u, u, u);
+      this.heartPics.set(k, c);
+    }
+    return c;
+  }
   private tick = (t: number) => {
-    const dt = Math.min(0.05, (t - this.last) / 1000);
+    const raw = t - this.last;
+    const dt = Math.min(0.05, raw / 1000);
     this.last = t;
+    // 프레임이 느리면 품질을 낮추고(빠르게), 다시 빨라지면 천천히 올린다
+    this.ft = this.ft * 0.85 + Math.min(raw, 250) * 0.15;
+    // 45fps 보다 빠르면 1 (아무것도 안 줄임), 그보다 느려질수록 낮춘다
+    const want = Math.max(0.2, Math.min(1, 1 - (this.ft - 22) / 28));
+    this.quality = want < this.quality ? want : this.quality + (want - this.quality) * 0.04;
+    if (!this.lowRes && this.quality < 0.4) {
+      this.lowRes = true;
+      this.size();
+    }
     const ctx = this.ctx;
     if (!ctx) return;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -153,8 +194,9 @@ export class Fx {
       p.vy = p.vy * k + p.g * dt;
       if (p.sway) p.vx += Math.sin(p.life * 3 + p.rot) * p.sway * dt;
       if (p.trailLen) {
-        (p.trail ??= []).push(p.x, p.y);
-        if (p.trail.length > p.trailLen * 2) p.trail.splice(0, 2);
+        const tr = (p.trail ??= []);
+        tr.push(p.x, p.y);
+        if (tr.length > p.trailLen * 2) tr.splice(0, tr.length - p.trailLen * 2);
       }
       p.x += p.vx * dt;
       p.y += p.vy * dt;
@@ -167,6 +209,13 @@ export class Fx {
     else {
       this.raf = 0;
       ctx.clearRect(0, 0, this.w, this.h);
+      // 다 끝나면 다음을 위해 다시 또렷하게 (품질은 다음 프레임부터 다시 잰다)
+      this.ft = 16;
+      this.quality = 1;
+      if (this.lowRes) {
+        this.lowRes = false;
+        this.size();
+      }
     }
   };
   private draw(ctx: CanvasRenderingContext2D) {
@@ -187,6 +236,7 @@ export class Fx {
           }
           case "spark": {
             const tr = p.trail;
+            const lite = this.quality < 0.45;
             ctx.strokeStyle = p.color;
             ctx.lineWidth = p.size;
             ctx.lineCap = "round";
@@ -195,6 +245,7 @@ export class Fx {
             else ctx.moveTo(p.x - p.vx * 0.02, p.y - p.vy * 0.02);
             ctx.lineTo(p.x, p.y);
             ctx.stroke();
+            if (lite) break;
             const s = p.size * 3.2;
             ctx.drawImage(this.glowOf(p.color), p.x - s / 2, p.y - s / 2, s, s);
             break;
@@ -206,24 +257,20 @@ export class Fx {
             break;
           }
           case "confetti": {
-            ctx.save();
-            ctx.translate(p.x, p.y);
-            ctx.rotate(p.rot);
-            ctx.scale(1, Math.cos(p.life * (p.flutter ?? 8)));
+            // save/restore 대신 변환을 한 번에 (가볍게)
+            const d = this.dpr;
+            const c = Math.cos(p.rot);
+            const sn = Math.sin(p.rot);
+            const sy = Math.cos(p.life * (p.flutter ?? 8));
+            ctx.setTransform(d * c, d * sn, -d * sn * sy, d * c * sy, d * p.x, d * p.y);
             ctx.fillStyle = p.color;
             ctx.fillRect(-p.size / 2, -p.size * 0.35, p.size, p.size * 0.7);
-            ctx.restore();
+            ctx.setTransform(d, 0, 0, d, 0, 0);
             break;
           }
           case "heart": {
-            const u = Math.max(1, p.size / 7);
-            ctx.fillStyle = p.color;
-            const ox = p.x - 3.5 * u;
-            const oy = p.y - 3 * u;
-            for (let y = 0; y < HEART.length; y++)
-              for (let x = 0; x < 7; x++) if (HEART[y][x] === "1") ctx.fillRect(Math.round(ox + x * u), Math.round(oy + y * u), Math.ceil(u), Math.ceil(u));
-            ctx.fillStyle = "rgba(255,255,255,0.7)";
-            ctx.fillRect(Math.round(ox + 1 * u), Math.round(oy + 1 * u), Math.ceil(u), Math.ceil(u));
+            const u = Math.max(1, Math.round(p.size / 7));
+            ctx.drawImage(this.heartOf(p.color, u), Math.round(p.x - 3.5 * u), Math.round(p.y - 3 * u));
             break;
           }
           case "balloon": {
