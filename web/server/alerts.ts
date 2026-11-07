@@ -31,6 +31,8 @@ export const ALERT_KINDS = {
   app_news: true,
   // 개발 요청 결재선 (server/devreq.ts, 개발중)
   devreq: true,
+  // 생일 축하 (server/birthday.ts, 제작자 2026-11-07 '11월 8일 되는 순간 알림 무조건'): 알림 설정에 줄을 두지 않아 끄지 못한다
+  bday: true,
 } as const;
 export type AlertKind = keyof typeof ALERT_KINDS;
 export const isAlertKind = (k: unknown): k is AlertKind => typeof k === "string" && k in ALERT_KINDS;

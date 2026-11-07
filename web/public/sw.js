@@ -27,6 +27,7 @@ const KIND_TITLE = {
   gdungeon: "⚔️ 길드 던전",
   app_news: "✨ 새 기능",
   devreq: "📮 개발 요청",
+  bday: "🎂 생일 축하해요!",
 };
 
 self.addEventListener("install", () => self.skipWaiting());
@@ -54,6 +55,8 @@ self.addEventListener("push", (e) => {
         // 상태바 작은 아이콘: 안드로이드는 한 가지 색(모양)만 그려서, 하얀 사파이어 보석 모양 (badge-96.png)
         badge: "/badge-96.png",
         tag: latest ? "alert-" + latest.id : "alert",
+        // 생일 알림은 길게 떨고 화면에 남는다 (제작자 2026-11-07 '알림 무조건 보내 화려하게')
+        ...(latest && latest.kind === "bday" ? { vibrate: [200, 80, 200, 80, 600], requireInteraction: true } : {}),
         data: { link: (latest && latest.link) || "#/alerts" },
         ...(unread > 1 ? { renotify: false } : {}),
       });

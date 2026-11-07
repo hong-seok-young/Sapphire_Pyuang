@@ -19,6 +19,7 @@ import type { NewOfficial } from "../../server/officialAlert";
 import { canEnter, isManager } from "../../server/rental";
 import { remindIfDue } from "../../server/gdungeon";
 import { announceApp } from "../../server/appNews";
+import { announceBday } from "../../server/birthday";
 
 const IMO: Record<string, string> = { "imo.notice": "type IN ('N', 'I', 'D')", "imo.maint": "type = 'C'", "imo.event": "type = 'E'" };
 /** 아이모 소식은 올린 날이 이 날수 안인 것만 센다 (늦게 들어온 예전 글은 새 글이 아니다) */
@@ -177,6 +178,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
   waitUntil(remindIfDue(env, now).catch((e) => console.error("gd remind", e instanceof Error ? e.message : e)));
   // 새 기능 알림 (server/appNews.ts): 알릴 때부터 이틀 안에, 모두에게 한 번 (먼저 setup 을 적은 한 곳만)
   waitUntil(announceApp(env, now).catch((e) => console.error("app news", e instanceof Error ? e.message : e)));
+  // 생일 알림 (server/birthday.ts): 그날 0시가 되면 모두에게 한 번, 폰 알림은 부를 때마다 40대씩 이어서
+  waitUntil(announceBday(env, now).catch((e) => console.error("bday notice", e instanceof Error ? e.message : e)));
   return json(
     {
       counts,

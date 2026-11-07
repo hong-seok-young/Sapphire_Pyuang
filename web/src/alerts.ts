@@ -4,7 +4,7 @@ import { api } from "./auth";
 
 export type AlertKind =
   | "market_want" | "market_bid" | "market_outbid" | "market_auction" | "market_new" | "gold_want" | "request" | "request_new" | "talk" | "account" | "shop"
-  | "board" | "board_notice" | "imo_news" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo" | "gdungeon" | "app_news" | "devreq";
+  | "board" | "board_notice" | "imo_news" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo" | "gdungeon" | "app_news" | "devreq" | "bday";
 
 export interface Alert {
   id: number;

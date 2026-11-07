@@ -407,7 +407,20 @@ export class Fx {
     this.flash(bx, by, "#ffffff", 18, 200);
     this.ring(bx, by, color, 170, 0, 0.35);
     this.ring(bx, by, "#ffffff", 110, 0.05, 0.25);
-    // 고무 조각 (풍선 색) + 반짝이
+    // 터지면 작은 불꽃놀이 + 사방으로 색종이 + 반짝이 (제작자 2026-11-07 '풍선이 터지면 엄청난 종이와 반짝이와 폭죽이 터지게')
+    this.explode(bx, by, pick(["peony", "star", "double", "ring", "crossette"]), [color, pick(PALETTE)], 0.75);
+    this.explode(bx, by, "pixel", PALETTE, 0.45, 0.12);
+    for (let i = 0; i < 56; i++) {
+      const a = rnd(0, Math.PI * 2);
+      const v = rnd(140, 420);
+      this.add({ x: bx, y: by, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 120, g: 380, drag: 0.22, max: rnd(1.8, 2.8), size: rnd(6, 10), color: pick(PALETTE), shape: "confetti", rot: rnd(0, 6), vrot: rnd(-10, 10), flutter: rnd(6, 14), sway: 40, add: false, delay: rnd(0, 0.06) });
+    }
+    for (let i = 0; i < 36; i++) {
+      const a = rnd(0, Math.PI * 2);
+      const v = rnd(60, 260);
+      this.add({ x: bx, y: by, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: 60, drag: 0.5, max: rnd(0.9, 1.6), size: rnd(1.4, 2.4), color: pick(["#ffffff", "#fff27a", "#ffd27a", color]), shape: "dot", twinkle: true, delay: rnd(0, 0.2) });
+    }
+    // 고무 조각 (풍선 색) + 불똥
     for (let i = 0; i < 16; i++) {
       const a = rnd(0, Math.PI * 2);
       const v = rnd(120, 280);

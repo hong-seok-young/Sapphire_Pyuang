@@ -80,8 +80,11 @@ interface Line {
   text: string;
   hue: number;
   cls: string;
-  /** '… 님 생일 축하해요' 줄: 더 오래, 먼저 밀려나지 않는다 */
+  /** '… 님 생일 축하해요' 줄: 더 천천히 올라간다 */
   keep?: boolean;
+  /** 화면 위 밖까지 올라갈 거리(px)와 걸리는 시간(초) */
+  rise: number;
+  dur: number;
 }
 interface Pop {
   id: number;
@@ -182,7 +185,7 @@ export const VARIANTS: Variant[] = [
       for (let i = 0; i < 2; i++) fx.rocket(rnd(0.15, 0.85) * vw, vh + 10, rnd(0.15, 0.85) * vw, rnd(0.12, 0.38) * vh, "pixel", PALETTE, 0.15 + i * 0.25);
       fx.shake();
       pop("+1 ♥", x, y - 26, "bday-score");
-      banner(finale ? "LEVEL UP!" : "HAPPY BIRTHDAY", finale ? "bday-rainbow bday-levelup" : "bday-rainbow", 2300);
+      banner("HAPPY BIRTHDAY", finale ? "bday-rainbow bday-rainbow-big" : "bday-rainbow", 2300);
       if (finale) for (let i = 0; i < 6; i++) fx.rocket(rnd(0.1, 0.9) * vw, vh + 10, rnd(0.1, 0.9) * vw, rnd(0.1, 0.4) * vh, "pixel", PALETTE, 0.3 + i * 0.18, 1.3);
     },
   },
@@ -336,6 +339,30 @@ function ComboRank({ day, me, board, onClose }: { day: Birthday; me: string; boa
   );
 }
 
+/**
+ * 콤보 순위 전광판: 아래 탭 바로 위 한 줄에 순위가 흐른다 (제작자 2026-11-07 '순위 전광판도 맨 아래 5개 버튼 바로 윗줄에').
+ * 홈에서는 '배치 편집·날씨·버전' 줄 위에. 누르면 순위 창
+ */
+function ComboTicker({ board, home, onOpen }: { board: Board | null; home: boolean; onOpen: () => void }) {
+  const medal = ["🥇", "🥈", "🥉"];
+  const top = board?.top.slice(0, 10) ?? [];
+  const text = top.length
+    ? top.map((r, k) => `${medal[k] ?? `${k + 1}위`} ${r.id} ${r.best}콤보`).join("     ")
+    : "아직 기록이 없어요 · 스티커를 1.3초 안에 이어 눌러 1위에 도전해 보세요";
+  return createPortal(
+    <button type="button" className={"bday-ticker" + (home ? " bday-ticker-home" : "")} onClick={onOpen} aria-label="생일 콤보 순위 보기">
+      <span className="bday-ticker-tag">🏆 콤보 순위</span>
+      <span className="bday-ticker-box">
+        <span className="bday-ticker-run" style={{ animationDuration: `${Math.max(10, text.length * 0.3)}s` }}>
+          <span>{text}</span>
+          <span aria-hidden>{text}</span>
+        </span>
+      </span>
+    </button>,
+    document.body,
+  );
+}
+
 function Sticker({ day, me }: { day: Birthday; me: string }) {
   const [vw, setVw] = useState(() => window.innerWidth);
   const [vh, setVh] = useState(() => window.innerHeight);
@@ -389,8 +416,7 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
   const [dragging, setDragging] = useState(false);
   const press = useRef<{ x: number; y: number; px: number; py: number; moved: boolean; id: number } | null>(null);
   const lyric = useRef(0);
-  const linesRef = useRef<Line[]>([]);
-  linesRef.current = lines;
+  const lastLine = useRef<{ y: number; t: number; speed: number } | null>(null);
   const posRef = useRef(pos);
   posRef.current = pos;
 
@@ -434,8 +460,20 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
       .catch(() => {});
   useEffect(() => {
     void loadBoard();
+    // 전광판: 보고 있는 동안 3분마다 새 순위 (모두가 자주 부르면 무료 요청 한도라 길게)
+    const t = window.setInterval(() => {
+      if (!document.hidden) void loadBoard();
+    }, 180_000);
+    return () => window.clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day.key]);
+  const [hash, setHash] = useState(() => location.hash);
+  useEffect(() => {
+    const f = () => setHash(location.hash);
+    window.addEventListener("hashchange", f);
+    return () => window.removeEventListener("hashchange", f);
+  }, []);
+  const home = hash === "" || hash === "#" || hash === "#/" || hash.startsWith("#/?");
 
   const save = (p: Pos) => {
     try {
@@ -534,6 +572,8 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
       swallow.current = Date.now();
       const n = bumpRef.current(hit.x, hit.y);
       popRef.current(n >= 2 ? `POP! x${n}` : "POP!", hit.x, hit.y - 18, "bday-popword", 900);
+      // 풍선 터뜨리기도 누른 횟수에 든다: 10번째면 생일 메인 폭죽 (스티커 위로 지나가는 풍선을 눌러도 빠지지 않게)
+      if (++tapCount.current % FINALE_EVERY === 0) grandRef.current();
     };
     const onClick = (e: MouseEvent) => {
       if (Date.now() - swallow.current < 700) {
@@ -556,30 +596,41 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
     const n = lyric.current;
     const text = lyrics[n % lyrics.length];
     lyric.current++;
-    // 노래 줄은 스티커 위에 (화면 맨 위에 붙어 있으면 아래에), 가로는 글자 폭만큼 화면 안으로, 빨리 누르면 앞 줄 위로 쌓는다
+    // 노래 줄은 스티커 위에서 나와 화면 위로 끝없이 올라가 사라진다 (제작자 2026-11-07 '해피 버스데이 텍스트는 끝없이 올라가서 사라지게').
+    // 화면 맨 위에 붙어 있으면 스티커 아래에서 나온다. 가로는 글자 폭만큼 화면 안으로. 앞 줄이 아직 출발점 가까이 있으면 그 위에서 나온다 (겹치지 않게)
     const tw = [...text].reduce((k, c) => k + (/[가-힣]/.test(c) ? 14 : 8), 26);
     const lx = Math.min(Math.max(p.x + w / 2, tw / 2 + 6), vw - tw / 2 - 6);
     const below = p.y < 44;
-    const stack = linesRef.current.length;
-    const ly = below ? p.y + h + 30 + stack * 28 : p.y - 6 - stack * 28;
+    let ly = below ? p.y + h + 30 : p.y - 6;
+    const prev = lastLine.current;
+    const tnow = performance.now();
+    if (prev) {
+      const cur = prev.y - ((tnow - prev.t) / 1000) * prev.speed;
+      if (cur > ly - 30) ly = cur - 30;
+    }
     const count = ++tapCount.current;
     const grand = count % FINALE_EVERY === 0;
     const variant = nextVariant();
     setIdle(variant.idle);
-    // '… 님 생일 축하해요' 줄은 더 오래, 빨리 눌러도 먼저 밀려나지 않는다
+    // '… 님 생일 축하해요' 줄은 더 천천히
     const keep = n % lyrics.length === lyrics.length - 1;
-    const line: Line = { id: ++seq, x: lx, y: ly, text, hue: HUES[n % HUES.length], cls: (grand ? "bday-line-gold" : variant.line) + (keep ? " bday-line-keep" : ""), keep };
-    setLines((ls) => {
-      const next = [...ls, line];
-      while (next.filter((l) => !l.keep).length > 4) next.splice(next.findIndex((l) => !l.keep), 1);
-      return next;
-    });
-    window.setTimeout(() => setLines((ls) => ls.filter((l) => l.id !== line.id)), keep ? 4600 : 2800);
+    const speed = keep ? 65 : 85;
+    const rise = Math.max(120, ly + 80);
+    const dur = rise / speed;
+    lastLine.current = { y: ly, t: tnow, speed };
+    const line: Line = { id: ++seq, x: lx, y: ly, text, hue: HUES[n % HUES.length], cls: grand ? "bday-line-gold" : variant.line, keep, rise, dur };
+    setLines((ls) => [...ls.slice(-15), line]);
+    window.setTimeout(() => setLines((ls) => ls.filter((l) => l.id !== line.id)), dur * 1000 + 100);
     const cn = bump(tx, ty);
     setHitTier(tierOf(cn));
     if (reduced() || !fx.current) return;
-    (grand ? grandFinale : variant.tap)({
-      fx: fx.current,
+    (grand ? grandFinale : variant.tap)(ctxOf(fx.current, tx, ty, n % lyrics.length === 3, cn));
+  }
+  /** 효과에 넘기는 것 (누른 곳, 스티커 자리, 글자·띠 띄우기) */
+  function ctxOf(f: Fx, tx: number, ty: number, finale: boolean, cn: number): TapCtx {
+    const p = posRef.current;
+    return {
+      fx: f,
       x: tx,
       y: ty,
       cx: p.x + w / 2,
@@ -587,7 +638,7 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
       top: p.y,
       vw,
       vh,
-      finale: n % lyrics.length === 3,
+      finale,
       combo: cn,
       pop: (t, x, y, cls) => pop(t, x, y, cls),
       banner: (t, cls, ms) => {
@@ -600,8 +651,35 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
         setBanner(it);
         window.setTimeout(() => setBanner((b) => (b?.id === it.id ? null : b)), ms);
       },
-    });
+    };
   }
+  // 그날 처음 열면 (이 기기에 한 번) 저절로 생일 메인 폭죽과 '생일 축하해요' (제작자 2026-11-07 '11월 8일 되는 순간 화려하게')
+  const grandRef = useRef<() => void>(() => {});
+  grandRef.current = () => {
+    setHop((k) => k + 1);
+    const p = posRef.current;
+    if (reduced() || !fx.current) return showFinale(5200);
+    grandFinale(ctxOf(fx.current, p.x + w / 2, p.y + h / 2, false, combo.current));
+  };
+  const autoRef = useRef<() => void>(() => {});
+  autoRef.current = () => {
+    setHop((k) => k + 1);
+    const p = posRef.current;
+    if (reduced() || !fx.current) return showFinale(5200);
+    grandFinale(ctxOf(fx.current, p.x + w / 2, p.y + h / 2, false, 0));
+  };
+  useEffect(() => {
+    if (Date.now() < day.start) return;
+    const k = `sapphire.bday.opened.${day.key}`;
+    try {
+      if (localStorage.getItem(k)) return;
+      localStorage.setItem(k, "1");
+    } catch {
+      return;
+    }
+    const t = window.setTimeout(() => autoRef.current(), 1200);
+    return () => window.clearTimeout(t);
+  }, [day.key, day.start]);
 
   function down(e: RPointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return;
@@ -719,14 +797,16 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
           </div>
           {tier >= 2 && cb && <i key={cb.key} className={"bday-edge bday-edge-t" + tier} />}
           {lines.map((l) => (
-            <span key={l.id} className={"bday-line " + l.cls} style={{ left: l.x, top: l.y, "--hue": `${l.hue}deg` } as CSSProperties}>
-              {l.cls.includes("bday-line-karaoke")
-                ? [...l.text].map((ch, i) => (
-                    <i key={i} style={{ "--i": i } as CSSProperties}>
-                      {ch}
-                    </i>
-                  ))
-                : l.text}
+            <span key={l.id} className="bday-line-wrap" style={{ left: l.x, top: l.y, "--rise": `${l.rise}px`, "--dur": `${l.dur}s` } as CSSProperties}>
+              <span className={"bday-line " + l.cls} style={{ "--hue": `${l.hue}deg` } as CSSProperties}>
+                {l.cls.includes("bday-line-karaoke")
+                  ? [...l.text].map((ch, i) => (
+                      <i key={i} style={{ "--i": i } as CSSProperties}>
+                        {ch}
+                      </i>
+                    ))
+                  : l.text}
+              </span>
             </span>
           ))}
           {pops.map((q) => (
@@ -768,6 +848,14 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
         </div>,
         document.body,
       )}
+      <ComboTicker
+        board={board}
+        home={home}
+        onOpen={() => {
+          setRankOpen(true);
+          void loadBoard();
+        }}
+      />
       {rankOpen && <ComboRank day={day} me={me} board={board} onClose={() => setRankOpen(false)} />}
     </>
   );
