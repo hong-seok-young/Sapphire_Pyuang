@@ -3751,17 +3751,18 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .bday-rainbow-big { font-size: 32px; }
 @keyframes bd-wave { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 @keyframes bd-drop { from { opacity: 0; } to { opacity: 1; } }
-/* 맨 위 'HAPPY BIRTHDAY 마을모금함' 띠: 그날 내내 (제작자 2026-11-07 '24시간 내내 띄워 줘'), 누를 때마다 깃발이 차례로 뛴다. 글자 수에 맞춰 화면 폭 안으로 */
-.bday-garland { position: absolute; left: 0; right: 0; top: env(safe-area-inset-top); display: flex; justify-content: center; padding: 0 6px; animation: bd-bunt-in 0.7s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
-.bday-garland::before { content: ""; position: absolute; left: 4px; right: 4px; top: 1px; height: 2px; background: rgba(255, 236, 190, 0.55); }
-.bday-garland-row { display: flex; gap: 2px; }
-.bday-garland b { --fw: min(19px, calc((100vw - 16px) / var(--n) - 2px)); display: block; width: var(--fw); height: calc(var(--fw) * 1.37); transform-origin: 50% 0; animation: bd-swing 1.6s ease-in-out infinite; animation-delay: calc(var(--i) * -0.13s); }
-.bday-garland em {
+/* 맨 위 'HAPPY BIRTHDAY 마을모금함' 현수막: 그날 내내 (제작자 2026-11-07 '24시간 내내 띄워 줘'). 깃발 자리·떨어짐·쌓임·다시 걸림은 src/birthdayGarland.ts 가
+   바깥 b 의 transform 으로, 평소 살랑임은 안쪽 i 의 CSS. 떨어진 깃발은 살랑임을 멈춰 두었다가 다시 걸리면 그 자리에서 이어 간다 (튀지 않게) */
+.bday-garland { position: absolute; inset: 0; animation: bd-bunt-in 0.7s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+.bday-garland-probe { position: absolute; left: 0; top: env(safe-area-inset-top); width: 0; height: 0; }
+.bday-rope { position: absolute; left: 4px; right: 4px; height: 2px; background: rgba(255, 236, 190, 0.55); }
+.bday-flag { position: absolute; left: 0; top: 0; display: block; transform-origin: 50% 0; will-change: transform; }
+.bday-flag > i { display: block; width: 100%; height: 100%; transform-origin: 50% 0; animation: bd-swing 1.6s ease-in-out infinite; animation-delay: calc(var(--i) * -0.13s); }
+.bday-flag.loose > i { animation-play-state: paused; }
+.bday-flag em {
   display: flex; align-items: flex-start; justify-content: center; width: 100%; height: 100%; padding-top: 3px; font-style: normal; font-size: calc(var(--fw) * 0.68); line-height: 1; color: #fff;
-  background: hsl(calc(var(--i) * 47deg), 80%, 55%); clip-path: polygon(0 0, 100% 0, 100% 72%, 50% 100%, 0 72%); text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.45); transform-origin: 50% 0;
+  clip-path: polygon(0 0, 100% 0, 100% 72%, 50% 100%, 0 72%); text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.45);
 }
-.bday-garland-hop em { animation: bd-hop 0.55s cubic-bezier(0.3, 1.6, 0.5, 1) both; animation-delay: calc(var(--i) * 0.03s); }
-@keyframes bd-hop { 0% { transform: translateY(0) scale(1); } 35% { transform: translateY(7px) scale(1.18); } 100% { transform: translateY(0) scale(1); } }
 @keyframes bd-bunt-in { from { transform: translateY(-60px); } to { transform: translateY(0); } }
 @keyframes bd-swing { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
 /* '생일 축하해요': 다시 눌러도 정해진 시간 그대로 떠 있다가 (화면이 시간을 늘린다) 끝에만 사라진다 */
@@ -3867,15 +3868,50 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
   60% { transform: translate(-50%, -50%) scale(0.9) rotate(3deg); opacity: 1; }
   100% { transform: translate(-50%, -50%) scale(1) rotate(0); opacity: 1; }
 }
-/* 콤보 10·20·30·50·100 외침 */
-.bday-shout { position: absolute; white-space: nowrap; font-size: 28px; color: #fff27a; text-shadow: 3px 3px 0 #000, 0 0 14px rgba(255, 200, 80, 0.9); animation: bd-shout 1.6s cubic-bezier(0.2, 1.5, 0.4, 1) both; }
-.bday-shout-t3, .bday-shout-t4 { font-size: 34px; color: #7ee2ff; text-shadow: 3px 3px 0 #000, 0 0 16px rgba(90, 200, 255, 0.95); }
+/* 콤보 외침 20단계 (5콤보마다): 단계가 오를수록 크고 색이 바뀐다 (--lv 1~20). 11단계부터 글자마다 무지개, 16단계부터 더 크게 출렁 */
+.bday-shout {
+  --fs: min(calc(22px + var(--lv, 1) * 0.7px), calc((100vw - 24px) / var(--len, 8) * 1.55));
+  position: absolute; display: flex; flex-direction: column; align-items: center; white-space: nowrap; line-height: 1; font-size: var(--fs);
+  color: hsl(calc(40deg + var(--lv, 1) * 37deg), 100%, 72%); text-shadow: 3px 3px 0 #000, 0 0 14px hsl(calc(40deg + var(--lv, 1) * 37deg), 100%, 60%);
+  animation: bd-shout 1.7s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+.bday-shout-w { display: flex; }
+.bday-shout-w i { font-style: normal; display: inline-block; }
+.bday-shout small { margin-top: 3px; font-size: 10px; letter-spacing: 0.14em; color: #fff; text-shadow: 1px 1px 0 #000; opacity: 0.9; }
+.bday-shout-hot .bday-shout-w i { color: hsl(calc(var(--i) * 32deg + var(--lv) * 20deg), 100%, 68%); animation: bd-wave 0.7s ease-in-out infinite; animation-delay: calc(var(--i) * 0.05s); }
+.bday-shout-top { animation-name: bd-shout-top; }
 @keyframes bd-shout {
   0% { transform: translate(-50%, -50%) scale(0.2) rotate(-10deg); opacity: 0; }
   18% { transform: translate(-50%, -50%) scale(1.25) rotate(4deg); opacity: 1; }
   30% { transform: translate(-50%, -50%) scale(1) rotate(0); }
   80% { opacity: 1; }
   100% { transform: translate(-50%, -90%) scale(1); opacity: 0; }
+}
+@keyframes bd-shout-top {
+  0% { transform: translate(-50%, -50%) scale(0.1) rotate(-20deg); opacity: 0; }
+  14% { transform: translate(-50%, -50%) scale(1.45) rotate(6deg); opacity: 1; }
+  24% { transform: translate(-50%, -50%) scale(0.92) rotate(-3deg); }
+  34% { transform: translate(-50%, -50%) scale(1.08) rotate(1deg); }
+  44% { transform: translate(-50%, -50%) scale(1) rotate(0); }
+  82% { opacity: 1; }
+  100% { transform: translate(-50%, -95%) scale(1.05); opacity: 0; }
+}
+/* 연타 중 순위를 제치면 (제작자 2026-11-07 '순위 제치면 순위 제쳤다고 뜨게'): 맨 위 실시간 전광판 아래 */
+.bday-pass {
+  position: absolute; left: 50%; top: calc(env(safe-area-inset-top) + 60px); display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 14px 4px; white-space: nowrap;
+  background: linear-gradient(180deg, rgba(90, 30, 90, 0.95), rgba(36, 20, 80, 0.95)); border: 2px solid #ffc35c; box-shadow: 0 0 18px rgba(255, 195, 92, 0.7), 0 3px 0 rgba(0, 0, 0, 0.4);
+  animation: bd-pass 2.2s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+.bday-pass b { font-size: 19px; font-weight: 400; color: #fff27a; text-shadow: 2px 2px 0 #000; }
+.bday-pass small { font-size: 11px; color: #fff; }
+.bday-pass-1 { border-color: #fff27a; box-shadow: 0 0 26px rgba(255, 230, 120, 0.95), 0 3px 0 rgba(0, 0, 0, 0.4); }
+.bday-pass-1 b { font-size: 22px; }
+@keyframes bd-pass {
+  0% { transform: translate(-50%, -30px) scale(0.6); opacity: 0; }
+  12% { transform: translate(-50%, 0) scale(1.12); opacity: 1; }
+  20% { transform: translate(-50%, 0) scale(1); }
+  85% { transform: translate(-50%, 0) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -12px) scale(1); opacity: 0; }
 }
 .bday-popword { position: absolute; white-space: nowrap; font-size: 15px; color: #fff; text-shadow: 2px 2px 0 #000, 0 0 8px rgba(255, 120, 180, 0.9); animation: bd-score 0.9s steps(6) both; }
 /* 콤보가 끝나면: 몇 콤보, 최고 기록인지, 순위 */
@@ -3895,17 +3931,26 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
   85% { opacity: 1; }
   100% { transform: translate(-50%, -75%) scale(1); opacity: 0; }
 }
-/* 콤보 순위 전광판: 아래 탭 바로 위 (홈은 배치 편집·날씨·버전 줄 위). 누르면 순위 창 */
+/* 콤보 순위 전광판: 아래 탭 바로 위 (홈은 배치 편집·날씨·버전 줄 위)에 3위까지. 연타하는 동안은 맨 위로 (실시간). 누르면 순위 창 */
 .bday-ticker {
   position: fixed; left: 0; right: 0; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 2px); z-index: 49; display: flex; align-items: stretch; height: 21px; padding: 0;
   overflow: hidden; background: linear-gradient(90deg, rgba(70, 22, 70, 0.94), rgba(28, 18, 66, 0.94)); border: 0; border-top: 1px solid rgba(255, 195, 92, 0.7); border-bottom: 1px solid rgba(255, 195, 92, 0.7);
   cursor: pointer; text-align: left; touch-action: manipulation;
 }
 .bday-ticker-home { bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 19px); }
+.bday-ticker-top { top: calc(env(safe-area-inset-top) + 31px); bottom: auto; height: 23px; border-color: #ffc35c; box-shadow: 0 0 14px rgba(255, 150, 60, 0.55); animation: bd-tick-top 0.3s cubic-bezier(0.2, 1.5, 0.4, 1) both; }
+@keyframes bd-tick-top { from { transform: translateY(-14px); opacity: 0.2; } to { transform: translateY(0); opacity: 1; } }
 .bday-ticker-tag { flex: none; display: flex; align-items: center; padding: 0 7px; font-size: 11px; color: #3a2000; background: linear-gradient(180deg, #ffe08a, #ffb83a); }
+.bday-ticker-top .bday-ticker-tag { background: linear-gradient(180deg, #ffb08a, #ff5c7a); color: #fff; text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.4); }
 .bday-ticker-box { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+.bday-ticker-still { justify-content: center; }
+.bday-ticker-one, .bday-ticker-run > span { display: inline-flex; align-items: center; gap: 11px; white-space: nowrap; font-size: 11.5px; color: #fff; text-shadow: 0 0 6px rgba(255, 200, 120, 0.6); }
+.bday-ticker-one { padding: 0 6px; }
 .bday-ticker-run { display: inline-flex; white-space: nowrap; animation: bd-tick 20s linear infinite; }
-.bday-ticker-run span { padding: 0 28px 0 14px; font-size: 12px; color: #fff; text-shadow: 0 0 6px rgba(255, 200, 120, 0.6); }
+.bday-ticker-run > span { padding: 0 28px 0 14px; }
+.bday-tk-row b { font-weight: 400; color: #fff27a; }
+.bday-tk-me { color: #ffe08a; animation: bd-tk-me 0.5s ease-in-out infinite alternate; }
+@keyframes bd-tk-me { from { opacity: 0.65; } to { opacity: 1; } }
 @keyframes bd-tick { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 /* 생일 콤보 순위: 스티커 왼쪽 위 단추와 창 */
 .bday-rank-btn {
@@ -3931,7 +3976,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .bday-rank-c small { margin-left: 3px; font-size: 9px; letter-spacing: 0.08em; color: #cfc8ff; }
 @media (prefers-reduced-motion: reduce) {
   .bday-bob, .bday-in, .bday-squish, .bday-bubble-pop, .bday-aura, .bday-aura i, .bday-banner, .bday-banner i, .bday-banner b,
-  .bday-garland, .bday-garland b, .bday-garland em, .bday-cb, .bday-shout, .bday-result, .bday-fever-ring, .bday-edge, .bday-line, .bday-ticker-run { animation: none; }
+  .bday-garland, .bday-flag > i, .bday-cb, .bday-shout, .bday-shout-w i, .bday-pass, .bday-ticker-top, .bday-tk-me, .bday-result, .bday-fever-ring, .bday-edge, .bday-line, .bday-ticker-run { animation: none; }
   .bday-line-wrap { animation: bd-line-still 2.6s linear both; }
 }
 @keyframes bd-line-still { 0%, 85% { opacity: 1; transform: translate(-50%, -100%); } 100% { opacity: 0; transform: translate(-50%, -100%); } }

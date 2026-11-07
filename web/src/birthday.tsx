@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as RPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { api } from "./auth";
@@ -8,6 +8,7 @@ import { Nick } from "./kakao";
 import { inFloat } from "./platform";
 import { useTutorial } from "./tutorialState";
 import { Fx, PALETTE, pick } from "./birthdayFx";
+import { Garland } from "./birthdayGarland";
 
 /**
  * 생일 스티커 (제작자 요청 2026-11-07: '마을모금함이 길마인데 11월 8일 생일이야, 자정부터 자정까지 24시간 동안 웹 화면에
@@ -92,6 +93,8 @@ interface Pop {
   y: number;
   text: string;
   cls: string;
+  /** 콤보 외침의 단계 (1~20) */
+  lv?: number;
 }
 interface Banner {
   id: number;
@@ -261,7 +264,7 @@ export function BirthdaySticker({ me }: { me: Me }) {
   }, []);
   const day = current(me, now);
   if (!day || inFloat || tut) return null;
-  return <Sticker day={day} me={me.id} />;
+  return <Sticker day={day} me={me.id} live={now >= day.start} />;
 }
 
 // ---------- 콤보 (제작자 2026-11-07 '스티커 누를 때마다 애니메이션 엄청 화려하게, 최대 콤보 순위도 어딘가에 나열') ----------
@@ -269,8 +272,18 @@ export function BirthdaySticker({ me }: { me: Me }) {
 const COMBO_MS = 1300;
 /** 콤보가 커질수록 누를 때 터지는 것도 커진다 */
 const tierOf = (n: number) => (n >= 50 ? 4 : n >= 30 ? 3 : n >= 15 ? 2 : n >= 5 ? 1 : 0);
-const SHOUT: Record<number, string> = { 10: "GREAT!", 20: "AWESOME!", 30: "FEVER!", 50: "LEGEND!", 100: "GODLIKE!" };
-const shoutOf = (n: number) => SHOUT[n] ?? (n > 100 && n % 50 === 0 ? `${n} COMBO!` : null);
+/** 콤보 외침 20단계: 5콤보마다 한 단계 (제작자 2026-11-07 '레전드 어썸 이런 거 20단계로 나눠 줘'). 100 넘게는 50마다 'N COMBO!' */
+const SHOUTS = [
+  "NICE!", "GOOD!", "GREAT!", "COOL!", "SUPER!", "AWESOME!", "AMAZING!", "EXCELLENT!", "WONDERFUL!", "FANTASTIC!",
+  "FEVER!", "INCREDIBLE!", "UNSTOPPABLE!", "RAMPAGE!", "MONSTER!", "LEGEND!", "MYTHIC!", "DIVINE!", "IMMORTAL!", "GODLIKE!",
+];
+const SHOUT_EVERY = 5;
+function shoutOf(n: number): { word: string; lv: number } | null {
+  if (n < SHOUT_EVERY || n % SHOUT_EVERY) return null;
+  const lv = n / SHOUT_EVERY;
+  if (lv <= SHOUTS.length) return { word: SHOUTS[lv - 1], lv };
+  return n % 50 === 0 ? { word: `${n} COMBO!`, lv: SHOUTS.length } : null;
+}
 const STAR_COLORS = ["#fff27a", "#ffd27a", "#ff7aa8", "#7ab8ff", "#7ee2a8", "#c58bff"];
 /** 누를 때 스티커에서 튀어 나가는 별 (누를 때마다 각도·거리가 조금씩 다르게) */
 function starsOf(seed: number, tier: number) {
@@ -340,30 +353,82 @@ function ComboRank({ day, me, board, onClose }: { day: Birthday; me: string; boa
 }
 
 /**
- * 콤보 순위 전광판: 아래 탭 바로 위 한 줄에 순위가 흐른다 (제작자 2026-11-07 '순위 전광판도 맨 아래 5개 버튼 바로 윗줄에').
- * 홈에서는 '배치 편집·날씨·버전' 줄 위에. 누르면 순위 창
+ * 콤보 순위 전광판: 아래 탭 바로 위 한 줄에 3위까지 (제작자 2026-11-07 '순위 전광판도 맨 아래 5개 버튼 바로 윗줄에' -> '순위는 3위까지 전광판 띄워 주고 연타하면 맨 위에').
+ * 홈에서는 '배치 편집·날씨·버전' 줄 위에. 연타하는 동안은 맨 위로 올라가 지금 콤보를 넣은 실시간 순위 (현수막이 떨어져 아래 줄에 쌓이므로).
+ * 한 줄에 다 들어가면 가운데 그대로, 넘치면 흐른다. 누르면 순위 창
  */
-function ComboTicker({ board, home, onOpen }: { board: Board | null; home: boolean; onOpen: () => void }) {
+interface TickRow {
+  id: string;
+  best: number;
+  me: boolean;
+}
+function liveRows(board: Board | null, me: string, live: number | null): TickRow[] {
+  const top = board?.top ?? [];
+  if (live == null) return top.map((r) => ({ ...r, me: r.id === me }));
+  // 연타 중: 지금 콤보가 내 최고보다 크면 그 값으로 다시 줄 세운다 (같으면 먼저 올린 사람이 위)
+  const mine = Math.max(board?.mine?.best ?? 0, top.find((r) => r.id === me)?.best ?? 0, live);
+  const rows = top.filter((r) => r.id !== me).map((r) => ({ ...r, me: false }));
+  const at = rows.findIndex((r) => r.best < mine);
+  rows.splice(at < 0 ? rows.length : at, 0, { id: me, best: mine, me: true });
+  return rows;
+}
+function ComboTicker({ board, me, home, live, onOpen }: { board: Board | null; me: string; home: boolean; live: number | null; onOpen: () => void }) {
   const medal = ["🥇", "🥈", "🥉"];
-  const top = board?.top.slice(0, 10) ?? [];
-  const text = top.length
-    ? top.map((r, k) => `${medal[k] ?? `${k + 1}위`} ${r.id} ${r.best}콤보`).join("     ")
-    : "아직 기록이 없어요 · 스티커를 1.3초 안에 이어 눌러 1위에 도전해 보세요";
-  return createPortal(
-    <button type="button" className={"bday-ticker" + (home ? " bday-ticker-home" : "")} onClick={onOpen} aria-label="생일 콤보 순위 보기">
-      <span className="bday-ticker-tag">🏆 콤보 순위</span>
-      <span className="bday-ticker-box">
-        <span className="bday-ticker-run" style={{ animationDuration: `${Math.max(10, text.length * 0.3)}s` }}>
-          <span>{text}</span>
-          <span aria-hidden>{text}</span>
+  const rows = liveRows(board, me, live);
+  const top = rows.slice(0, 3);
+  const myAt = rows.findIndex((r) => r.me);
+  const box = useRef<HTMLSpanElement>(null);
+  const one = useRef<HTMLSpanElement>(null);
+  const [run, setRun] = useState(false);
+  const body = top.length ? (
+    <>
+      {top.map((r, k) => (
+        <span key={r.id} className={"bday-tk-row" + (r.me && live != null ? " bday-tk-me" : "")}>
+          {medal[k]} {r.id} <b>{r.best}</b>
         </span>
+      ))}
+      {live != null && myAt >= 3 && (
+        <span className="bday-tk-row bday-tk-me">
+          나 <b>{live}</b> · {myAt + 1}위
+        </span>
+      )}
+    </>
+  ) : (
+    <span className="bday-tk-row">{live != null ? `나 ${live}콤보 · 1위 도전 중` : "아직 기록이 없어요 · 스티커를 이어 눌러 1위에 도전해 보세요"}</span>
+  );
+  // 한 줄에 다 들어가는지 (넘치면 흐르게)
+  useLayoutEffect(() => {
+    const b = box.current;
+    const o = one.current;
+    // 흐를 때는 앞뒤 여백(42px)을 빼고 잰다 (짧아지면 다시 가운데 그대로)
+    if (b && o) setRun(o.scrollWidth - (run ? 30 : 0) > b.clientWidth + 1);
+  });
+  return createPortal(
+    <button
+      type="button"
+      className={"bday-ticker" + (live != null ? " bday-ticker-top" : home ? " bday-ticker-home" : "")}
+      onClick={onOpen}
+      aria-label="생일 콤보 순위 보기"
+    >
+      <span className="bday-ticker-tag">{live != null ? "🔥 LIVE" : "🏆 순위"}</span>
+      <span ref={box} className={"bday-ticker-box" + (run ? "" : " bday-ticker-still")}>
+        {run ? (
+          <span className="bday-ticker-run" style={{ animationDuration: `${Math.max(8, (one.current?.scrollWidth ?? 300) / 45)}s` }}>
+            <span ref={one}>{body}</span>
+            <span aria-hidden>{body}</span>
+          </span>
+        ) : (
+          <span ref={one} className="bday-ticker-one">
+            {body}
+          </span>
+        )}
       </span>
     </button>,
     document.body,
   );
 }
 
-function Sticker({ day, me }: { day: Birthday; me: string }) {
+function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }) {
   const [vw, setVw] = useState(() => window.innerWidth);
   const [vh, setVh] = useState(() => window.innerHeight);
   const w = widthOf(vw);
@@ -387,8 +452,13 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
   const [finale, setFinale] = useState<{ id: number; out: boolean } | null>(null);
   const finaleT = useRef<number[]>([]);
   const finaleOn = useRef(false);
-  /** 맨 위 'HAPPY BIRTHDAY 마을모금함' 띠가 누를 때마다 차례로 뛰는 것 */
-  const [hop, setHop] = useState(0);
+  /** 맨 위 'HAPPY BIRTHDAY 마을모금함' 현수막 (누를수록 터지고 떨어져 아래에 쌓이고, 연타가 멈추면 하나씩 다시 걸린다) */
+  const garlandEl = useRef<HTMLDivElement>(null);
+  const garland = useRef<Garland | null>(null);
+  /** 연타 중 순위를 제친 것 (제작자 2026-11-07 '순위 제치면 순위 제쳤다고 뜨게') */
+  const [pass, setPass] = useState<{ id: number; name: string; extra: number; rank: number } | null>(null);
+  const passed = useRef(new Set<string>());
+  const boardAt = useRef(0);
   const [hitTier, setHitTier] = useState(0);
   const [cb, setCb] = useState<{ n: number; key: number } | null>(null);
   const [result, setResult] = useState<{ n: number; best: boolean; prev: number; rank: number | null; key: number } | null>(null);
@@ -434,7 +504,11 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
     const f = new Fx();
     f.mount();
     fx.current = f;
+    const g = garlandEl.current ? new Garland(garlandEl.current, `HAPPY BIRTHDAY ${day.who}`, () => (reduced() ? null : fx.current)) : null;
+    garland.current = g;
     return () => {
+      g?.destroy();
+      garland.current = null;
       f.destroy();
       finaleT.current.forEach((t) => window.clearTimeout(t));
       window.clearTimeout(comboT.current);
@@ -454,10 +528,12 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vw, vh, w]);
   // 내 최고 콤보와 순위 (콤보가 끝났을 때 최고 기록인지 알려고)
-  const loadBoard = () =>
-    api<Board>(`/api/bday?key=${encodeURIComponent(day.key)}`)
+  const loadBoard = () => {
+    boardAt.current = Date.now();
+    return api<Board>(`/api/bday?key=${encodeURIComponent(day.key)}`)
       .then(setBoard)
       .catch(() => {});
+  };
   useEffect(() => {
     void loadBoard();
     // 전광판: 보고 있는 동안 3분마다 새 순위 (모두가 자주 부르면 무료 요청 한도라 길게)
@@ -465,8 +541,9 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
       if (!document.hidden) void loadBoard();
     }, 180_000);
     return () => window.clearInterval(t);
+    // 0시가 되면 다시 받는다 (그 전 미리 보기 기록은 빠진다)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [day.key]);
+  }, [day.key, live]);
   const [hash, setHash] = useState(() => location.hash);
   useEffect(() => {
     const f = () => setHash(location.hash);
@@ -491,8 +568,8 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
     `${day.who} 님 생일 축하해요`,
   ];
 
-  const pop = (t: string, x: number, y: number, cls: string, ms = 1400) => {
-    const it: Pop = { id: ++seq, x: Math.min(Math.max(x, 60), vw - 60), y, text: t, cls };
+  const pop = (t: string, x: number, y: number, cls: string, ms = 1400, lv?: number) => {
+    const it: Pop = { id: ++seq, x: Math.min(Math.max(x, 60), vw - 60), y, text: t, cls, lv };
     setPops((ps) => [...ps.slice(-8), it]);
     window.setTimeout(() => setPops((ps) => ps.filter((q) => q.id !== it.id)), ms);
   };
@@ -520,17 +597,29 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
     window.clearTimeout(comboT.current);
     comboT.current = window.setTimeout(() => endCombo(n), COMBO_MS);
     if (n >= 2) setCb({ n, key: ++seq });
-    const word = shoutOf(n);
+    if (n === 1) {
+      passed.current = new Set();
+      // 연타를 시작할 때 순위를 새로 (추월을 맞게 알리려고, 20초에 한 번까지)
+      if (now - boardAt.current > 20_000) void loadBoard();
+    }
+    garland.current?.hit(n);
+    checkPass(n);
+    const s = shoutOf(n);
     const p = posRef.current;
-    if (word) {
-      pop(word, Math.min(Math.max(p.x + w / 2, 110), vw - 110), Math.max(70, p.y - 48), "bday-shout bday-shout-t" + tierOf(n), 1600);
+    if (s) {
+      // 단계가 오를수록 크게 (긴 낱말은 화면 폭 안으로)
+      const fs = Math.min(22 + s.lv * 0.7, ((vw - 24) / s.word.length) * 1.55);
+      const half = Math.min(vw / 2 - 6, s.word.length * fs * 0.33 + 8);
+      pop(s.word, Math.min(Math.max(p.x + w / 2, half), vw - half), Math.max(80, p.y - 50), "bday-shout" + (s.lv >= 11 ? " bday-shout-hot" : "") + (s.lv >= 16 ? " bday-shout-top" : ""), 1700, s.lv);
       const f = fx.current;
       if (f && !reduced()) {
-        f.shake();
-        f.ring(p.x + w / 2, p.y + h / 2, "#ffd27a", 420);
-        f.ring(p.x + w / 2, p.y + h / 2, "#ff7aa8", 320, 0.12);
-        f.explode(p.x + w / 2, p.y + h / 2 - 20, "star", PALETTE, 1.15);
-        f.confetti(p.x + w / 2, p.y + h / 2, -Math.PI / 2, 1.4, 50, [260, 560]);
+        const k = 0.8 + s.lv * 0.03;
+        if (s.lv >= 4) f.shake();
+        f.ring(p.x + w / 2, p.y + h / 2, "#ffd27a", 360 * k);
+        f.ring(p.x + w / 2, p.y + h / 2, "#ff7aa8", 280 * k, 0.12);
+        f.explode(p.x + w / 2, p.y + h / 2 - 20, s.lv >= 16 ? pick(["double", "star", "crossette"]) : pick(["star", "peony", "ring"]), PALETTE, 0.75 + s.lv * 0.025);
+        f.confetti(p.x + w / 2, p.y + h / 2, -Math.PI / 2, 1.4, 24 + s.lv * 2, [260, 560]);
+        if (s.lv >= 10) f.explode(Math.min(Math.max(p.x + w / 2 + rnd(-90, 90), 40), vw - 40), Math.max(90, p.y - 60), "willow", PALETTE, 0.6, 0.15);
       }
     } else if (n >= 15 && fx.current && !reduced()) {
       // 콤보가 이어지는 동안은 누른 곳에서도 작은 불꽃
@@ -538,9 +627,32 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
     }
     return n;
   }
+  /** 지금 콤보로 내 위 사람을 제쳤으면 알린다 (그 사람을 처음 넘는 순간 한 번) */
+  function checkPass(n: number) {
+    const b = boardRef.current;
+    if (!b) return;
+    const myPrev = b.mine?.best ?? 0;
+    const myIdx = b.top.findIndex((r) => r.id === me);
+    const above = (myIdx >= 0 ? b.top.slice(0, myIdx) : b.top.filter((r) => r.best >= myPrev)).filter((r) => r.id !== me);
+    const newly = above.filter((r) => r.best < n && !passed.current.has(r.id));
+    if (!newly.length) return;
+    newly.forEach((r) => passed.current.add(r.id));
+    const rank = 1 + b.top.filter((r) => r.id !== me && r.best >= n).length;
+    const it = { id: ++seq, name: newly[0].id, extra: newly.length - 1, rank };
+    setPass(it);
+    window.setTimeout(() => setPass((q) => (q?.id === it.id ? null : q)), 2200);
+    const f = fx.current;
+    if (f && !reduced()) {
+      const y = 96;
+      f.explode(vw / 2, y, rank === 1 ? "double" : "star", rank === 1 ? ["#ffd27a", "#fff27a"] : ["#ffd27a", "#ff7aa8"], rank === 1 ? 0.9 : 0.6);
+      f.ring(vw / 2, y, "#ffe08a", 260);
+    }
+  }
   /** 콤보가 끝나면 (1.3초 동안 안 누르면) 결과를 보이고, 내 최고보다 크면 서버에 남긴다 */
   function endCombo(n: number) {
     setCb(null);
+    // 연타가 멈추면 떨어진 현수막이 하나씩 날아가 다시 걸린다
+    garland.current?.end();
     if (n < 3) return;
     const prev = boardRef.current?.mine?.best ?? 0;
     const best = n > prev;
@@ -591,7 +703,6 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
 
   function celebrate(tx: number, ty: number) {
     setTaps((t) => t + 1);
-    setHop((k) => k + 1);
     const p = posRef.current;
     const n = lyric.current;
     const text = lyrics[n % lyrics.length];
@@ -656,20 +767,20 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
   // 그날 처음 열면 (이 기기에 한 번) 저절로 생일 메인 폭죽과 '생일 축하해요' (제작자 2026-11-07 '11월 8일 되는 순간 화려하게')
   const grandRef = useRef<() => void>(() => {});
   grandRef.current = () => {
-    setHop((k) => k + 1);
+    garland.current?.shake(1.2);
     const p = posRef.current;
     if (reduced() || !fx.current) return showFinale(5200);
     grandFinale(ctxOf(fx.current, p.x + w / 2, p.y + h / 2, false, combo.current));
   };
   const autoRef = useRef<() => void>(() => {});
   autoRef.current = () => {
-    setHop((k) => k + 1);
+    garland.current?.shake(1);
     const p = posRef.current;
     if (reduced() || !fx.current) return showFinale(5200);
     grandFinale(ctxOf(fx.current, p.x + w / 2, p.y + h / 2, false, 0));
   };
   useEffect(() => {
-    if (Date.now() < day.start) return;
+    if (!live) return;
     const k = `sapphire.bday.opened.${day.key}`;
     try {
       if (localStorage.getItem(k)) return;
@@ -679,7 +790,8 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
     }
     const t = window.setTimeout(() => autoRef.current(), 1200);
     return () => window.clearTimeout(t);
-  }, [day.key, day.start]);
+    // 미리 보던 화면이 켜진 채 0시가 되어도 터진다
+  }, [day.key, live]);
 
   function down(e: RPointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return;
@@ -708,7 +820,6 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
   }
 
   const tier = cb ? tierOf(cb.n) : 0;
-  const garland = [...`HAPPY BIRTHDAY ${day.who}`];
   const cbX = Math.min(Math.max(pos.x + w - 10, 44), vw - 44);
   const cbY = pos.y < 60 ? pos.y + h - 30 : pos.y + 6;
   return (
@@ -785,16 +896,8 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
       </div>
       {createPortal(
         <div className="bday-fx" aria-hidden>
-          {/* 맨 위 띠: 그날 내내 (제작자 2026-11-07 '맨 위에 해피 버스데이는 24시간 내내 띄워 줘') */}
-          <div className="bday-garland" style={{ "--n": garland.length } as CSSProperties}>
-            <span key={hop} className={"bday-garland-row" + (hop ? " bday-garland-hop" : "")}>
-              {garland.map((ch, i) => (
-                <b key={i} style={{ "--i": i } as CSSProperties}>
-                  <em>{ch === " " ? " " : ch}</em>
-                </b>
-              ))}
-            </span>
-          </div>
+          {/* 맨 위 현수막: 그날 내내 (제작자 2026-11-07 '맨 위에 해피 버스데이는 24시간 내내 띄워 줘'). 깃발은 Garland 가 그린다 */}
+          <div ref={garlandEl} className="bday-garland" />
           {tier >= 2 && cb && <i key={cb.key} className={"bday-edge bday-edge-t" + tier} />}
           {lines.map((l) => (
             <span key={l.id} className="bday-line-wrap" style={{ left: l.x, top: l.y, "--rise": `${l.rise}px`, "--dur": `${l.dur}s` } as CSSProperties}>
@@ -809,11 +912,32 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
               </span>
             </span>
           ))}
-          {pops.map((q) => (
-            <span key={q.id} className={q.cls} style={{ left: q.x, top: q.y }}>
-              {q.text}
-            </span>
-          ))}
+          {pops.map((q) =>
+            q.lv ? (
+              <span key={q.id} className={q.cls} style={{ left: q.x, top: q.y, "--lv": q.lv, "--len": q.text.length } as CSSProperties}>
+                <span className="bday-shout-w">
+                  {[...q.text].map((ch, i) => (
+                    <i key={i} style={{ "--i": i } as CSSProperties}>
+                      {ch}
+                    </i>
+                  ))}
+                </span>
+                <small>STAGE {q.lv}</small>
+              </span>
+            ) : (
+              <span key={q.id} className={q.cls} style={{ left: q.x, top: q.y }}>
+                {q.text}
+              </span>
+            ),
+          )}
+          {pass && (
+            <div key={pass.id} className={"bday-pass" + (pass.rank === 1 ? " bday-pass-1" : "")}>
+              <b>{pass.rank === 1 ? "👑 1위 등극!" : `${["", "🥇", "🥈", "🥉"][pass.rank] ?? "🔥"} ${pass.rank}위로!`}</b>
+              <small>
+                <Nick name={pass.name} /> 님{pass.extra ? ` 외 ${pass.extra}명` : ""}을 제쳤어요
+              </small>
+            </div>
+          )}
           {cb && (
             <div key={cb.key} className={"bday-cb bday-cb-t" + tier} style={{ left: cbX, top: cbY }}>
               <b>{cb.n}</b>
@@ -850,7 +974,9 @@ function Sticker({ day, me }: { day: Birthday; me: string }) {
       )}
       <ComboTicker
         board={board}
+        me={me}
         home={home}
+        live={cb ? cb.n : null}
         onOpen={() => {
           setRankOpen(true);
           void loadBoard();
