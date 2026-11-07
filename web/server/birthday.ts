@@ -10,8 +10,9 @@ export const BDAYS: Record<string, { start: number; end: number; notice: string 
     notice: "🎂 오늘은 우리 길드마스터 마을모금함 님 생일이에요! 🎉 앱을 열면 생일 스티커가 떠 있어요 · 눌러서 축하 폭죽을 터뜨리고 콤보 순위에 도전해 보세요 🎆",
   },
 };
-/** 콤보 한 번의 최대 (누르는 사람 화면이 세어 보내므로 터무니없는 값만 막는다) */
-export const MAX_COMBO = 2000;
+/** 콤보 한 번의 최대 (누르는 사람 화면이 세어 보내므로 터무니없는 값만 막는다).
+ * 처음 2000 이었다가 백돼쥐 님 2140 콤보가 막혔다 (제작자 2026-11-08). 사람이 하루 내내 눌러도 닿지 않을 만큼으로 */
+export const MAX_COMBO = 1_000_000;
 /** 폰 알림 한 번에 보내는 수 (server/push.ts MAX_SENDS 와 같게) */
 const BATCH = 40;
 

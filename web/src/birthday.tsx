@@ -659,13 +659,18 @@ function Sticker({ day, me, live }: { day: Birthday; me: string; live: boolean }
     const key = ++seq;
     setResult({ n, best, prev, rank: boardRef.current?.mine?.rank ?? null, key });
     window.setTimeout(() => setResult((r) => (r?.key === key ? null : r)), 3000);
-    if (best)
+    // 최고 기록은 서버에 남긴다. 인터넷이 잠깐 끊겨도 놓치지 않게 몇 번 더 보낸다 (못 남기면 알린다)
+    const send = (left: number) =>
       api<Board>("/api/bday", "POST", { key: day.key, combo: n })
         .then((b) => {
           setBoard(b);
           setResult((r) => (r?.key === key ? { ...r, rank: b.mine?.rank ?? null } : r));
         })
-        .catch(() => {});
+        .catch(() => {
+          if (left > 0) window.setTimeout(() => void send(left - 1), (4 - left) * 2500);
+          else pop("콤보 기록을 저장하지 못했어요", vw / 2, 120, "bday-popword", 2600);
+        });
+    if (best) void send(3);
   }
   const bumpRef = useRef(bump);
   bumpRef.current = bump;
