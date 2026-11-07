@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as RPointerEvent } from "react";
 import { createPortal } from "react-dom";
+import { api } from "./auth";
 import type { Me } from "./auth";
+import { useBackClose } from "./backClose";
+import { Nick } from "./kakao";
 import { inFloat } from "./platform";
 import { useTutorial } from "./tutorialState";
 import { Fx, PALETTE, pick } from "./birthdayFx";
@@ -77,6 +80,8 @@ interface Line {
   text: string;
   hue: number;
   cls: string;
+  /** '… 님 생일 축하해요' 줄: 더 오래, 먼저 밀려나지 않는다 */
+  keep?: boolean;
 }
 interface Pop {
   id: number;
@@ -172,12 +177,11 @@ export const VARIANTS: Variant[] = [
     name: "8비트 아케이드",
     idle: "bday-idle-pixel",
     line: "bday-line-pixel",
-    tap: ({ fx, x, y, vw, vh, finale, combo, pop, banner }) => {
+    tap: ({ fx, x, y, vw, vh, finale, pop, banner }) => {
       fx.explode(x, y, "pixel", PALETTE, 0.8);
       for (let i = 0; i < 2; i++) fx.rocket(rnd(0.15, 0.85) * vw, vh + 10, rnd(0.15, 0.85) * vw, rnd(0.12, 0.38) * vh, "pixel", PALETTE, 0.15 + i * 0.25);
       fx.shake();
       pop("+1 ♥", x, y - 26, "bday-score");
-      if (combo >= 2) pop(`x${combo} COMBO!`, x, y - 52, "bday-combo");
       banner(finale ? "LEVEL UP!" : "HAPPY BIRTHDAY", finale ? "bday-rainbow bday-levelup" : "bday-rainbow", 2300);
       if (finale) for (let i = 0; i < 6; i++) fx.rocket(rnd(0.1, 0.9) * vw, vh + 10, rnd(0.1, 0.9) * vw, rnd(0.1, 0.4) * vh, "pixel", PALETTE, 0.3 + i * 0.18, 1.3);
     },
@@ -254,10 +258,85 @@ export function BirthdaySticker({ me }: { me: Me }) {
   }, []);
   const day = current(me, now);
   if (!day || inFloat || tut) return null;
-  return <Sticker day={day} />;
+  return <Sticker day={day} me={me.id} />;
 }
 
-function Sticker({ day }: { day: Birthday }) {
+// ---------- 콤보 (제작자 2026-11-07 '스티커 누를 때마다 애니메이션 엄청 화려하게, 최대 콤보 순위도 어딘가에 나열') ----------
+/** 이 안에 다시 누르면(스티커나 풍선) 콤보가 이어진다 */
+const COMBO_MS = 1300;
+/** 콤보가 커질수록 누를 때 터지는 것도 커진다 */
+const tierOf = (n: number) => (n >= 50 ? 4 : n >= 30 ? 3 : n >= 15 ? 2 : n >= 5 ? 1 : 0);
+const SHOUT: Record<number, string> = { 10: "GREAT!", 20: "AWESOME!", 30: "FEVER!", 50: "LEGEND!", 100: "GODLIKE!" };
+const shoutOf = (n: number) => SHOUT[n] ?? (n > 100 && n % 50 === 0 ? `${n} COMBO!` : null);
+const STAR_COLORS = ["#fff27a", "#ffd27a", "#ff7aa8", "#7ab8ff", "#7ee2a8", "#c58bff"];
+/** 누를 때 스티커에서 튀어 나가는 별 (누를 때마다 각도·거리가 조금씩 다르게) */
+function starsOf(seed: number, tier: number) {
+  const n = 10 + tier * 3;
+  return Array.from({ length: n }, (_, k) => {
+    const r = Math.sin(seed * 97.13 + k * 12.9898) * 43758.5453;
+    const f = r - Math.floor(r);
+    return { a: (360 / n) * k + f * 20, d: 60 + f * 40 + tier * 18, c: STAR_COLORS[(k + seed) % STAR_COLORS.length], dl: f * 0.08 };
+  });
+}
+
+interface Board {
+  top: { id: string; best: number }[];
+  mine: { best: number; rank: number | null } | null;
+  total: number;
+}
+
+/** 생일 콤보 순위 창 */
+function ComboRank({ day, me, board, onClose }: { day: Birthday; me: string; board: Board | null; onClose: () => void }) {
+  useBackClose(true, onClose);
+  const inTop = board?.top.some((r) => r.id === me);
+  const medal = (k: number) => (k === 0 ? "🥇" : k === 1 ? "🥈" : k === 2 ? "🥉" : `${k + 1}`);
+  return createPortal(
+    <div className="bday-rank-back" onClick={onClose}>
+      <div className="bday-rank" role="dialog" aria-label="생일 콤보 순위" onClick={(e) => e.stopPropagation()}>
+        <div className="bday-rank-head">
+          <b>🏆 생일 콤보 순위</b>
+          <button type="button" className="bday-rank-x" onClick={onClose} aria-label="닫기">
+            ✕
+          </button>
+        </div>
+        <div className="bday-rank-sub">{day.who} 님 생일 · 1.3초 안에 이어 누르기</div>
+        {!board ? (
+          <div className="bday-rank-empty">불러오는 중…</div>
+        ) : !board.top.length ? (
+          <div className="bday-rank-empty">아직 기록이 없어요</div>
+        ) : (
+          <ol className="bday-rank-list">
+            {board.top.map((r, k) => (
+              <li key={r.id} className={r.id === me ? "mine" : undefined}>
+                <span className="bday-rank-r">{medal(k)}</span>
+                <span className="bday-rank-n">
+                  <Nick name={r.id} />
+                </span>
+                <span className="bday-rank-c">
+                  {r.best}
+                  <small>COMBO</small>
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+        {board?.mine && !inTop && (
+          <div className="bday-rank-me">
+            <span className="bday-rank-r">{board.mine.rank ?? "-"}</span>
+            <span className="bday-rank-n">내 기록</span>
+            <span className="bday-rank-c">
+              {board.mine.best}
+              <small>COMBO</small>
+            </span>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function Sticker({ day, me }: { day: Birthday; me: string }) {
   const [vw, setVw] = useState(() => window.innerWidth);
   const [vh, setVh] = useState(() => window.innerHeight);
   const w = widthOf(vw);
@@ -277,6 +356,19 @@ function Sticker({ day }: { day: Birthday }) {
   const [lines, setLines] = useState<Line[]>([]);
   const [pops, setPops] = useState<Pop[]>([]);
   const [banner, setBanner] = useState<Banner | null>(null);
+  /** '생일 축하해요' 큰 띠: 다시 눌러도 정해진 시간 그대로 (제작자 2026-11-07 '또 누르면 바로 사라지게 하지 말고 일정 시간 띄워 줘') */
+  const [finale, setFinale] = useState<{ id: number; out: boolean } | null>(null);
+  const finaleT = useRef<number[]>([]);
+  const finaleOn = useRef(false);
+  /** 맨 위 'HAPPY BIRTHDAY 마을모금함' 띠가 누를 때마다 차례로 뛰는 것 */
+  const [hop, setHop] = useState(0);
+  const [hitTier, setHitTier] = useState(0);
+  const [cb, setCb] = useState<{ n: number; key: number } | null>(null);
+  const [result, setResult] = useState<{ n: number; best: boolean; prev: number; rank: number | null; key: number } | null>(null);
+  const [board, setBoard] = useState<Board | null>(null);
+  const boardRef = useRef<Board | null>(null);
+  boardRef.current = board;
+  const [rankOpen, setRankOpen] = useState(false);
   const only = useRef(onlyVariant()).current;
   const bag = useRef<number[]>([]);
   const lastV = useRef(-1);
@@ -292,6 +384,8 @@ function Sticker({ day }: { day: Birthday }) {
   const fx = useRef<Fx | null>(null);
   const lastTap = useRef(0);
   const combo = useRef(0);
+  const comboT = useRef(0);
+  const swallow = useRef(0);
   const [dragging, setDragging] = useState(false);
   const press = useRef<{ x: number; y: number; px: number; py: number; moved: boolean; id: number } | null>(null);
   const lyric = useRef(0);
@@ -314,7 +408,11 @@ function Sticker({ day }: { day: Birthday }) {
     const f = new Fx();
     f.mount();
     fx.current = f;
-    return () => f.destroy();
+    return () => {
+      f.destroy();
+      finaleT.current.forEach((t) => window.clearTimeout(t));
+      window.clearTimeout(comboT.current);
+    };
   }, []);
   useEffect(() => {
     const onResize = () => {
@@ -329,6 +427,15 @@ function Sticker({ day }: { day: Birthday }) {
     setPos((p) => clamp(p));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vw, vh, w]);
+  // 내 최고 콤보와 순위 (콤보가 끝났을 때 최고 기록인지 알려고)
+  const loadBoard = () =>
+    api<Board>(`/api/bday?key=${encodeURIComponent(day.key)}`)
+      .then(setBoard)
+      .catch(() => {});
+  useEffect(() => {
+    void loadBoard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [day.key]);
 
   const save = (p: Pos) => {
     try {
@@ -346,8 +453,105 @@ function Sticker({ day }: { day: Birthday }) {
     `${day.who} 님 생일 축하해요`,
   ];
 
+  const pop = (t: string, x: number, y: number, cls: string, ms = 1400) => {
+    const it: Pop = { id: ++seq, x: Math.min(Math.max(x, 60), vw - 60), y, text: t, cls };
+    setPops((ps) => [...ps.slice(-8), it]);
+    window.setTimeout(() => setPops((ps) => ps.filter((q) => q.id !== it.id)), ms);
+  };
+  /** '생일 축하해요' 띠: 떠 있으면 그대로 두고 시간만 늘린다 */
+  const showFinale = (ms: number) => {
+    finaleT.current.forEach((t) => window.clearTimeout(t));
+    finaleOn.current = true;
+    setBanner(null);
+    setFinale((f) => (f && !f.out ? f : { id: ++seq, out: false }));
+    finaleT.current = [
+      window.setTimeout(() => setFinale((f) => (f ? { ...f, out: true } : f)), ms - 600),
+      window.setTimeout(() => {
+        finaleOn.current = false;
+        setFinale(null);
+      }, ms),
+    ];
+  };
+
+  /** 콤보 하나 더 (스티커나 풍선을 누를 때) */
+  function bump(x: number, y: number) {
+    const now = Date.now();
+    combo.current = now - lastTap.current < COMBO_MS ? combo.current + 1 : 1;
+    lastTap.current = now;
+    const n = combo.current;
+    window.clearTimeout(comboT.current);
+    comboT.current = window.setTimeout(() => endCombo(n), COMBO_MS);
+    if (n >= 2) setCb({ n, key: ++seq });
+    const word = shoutOf(n);
+    const p = posRef.current;
+    if (word) {
+      pop(word, Math.min(Math.max(p.x + w / 2, 110), vw - 110), Math.max(70, p.y - 48), "bday-shout bday-shout-t" + tierOf(n), 1600);
+      const f = fx.current;
+      if (f && !reduced()) {
+        f.shake();
+        f.ring(p.x + w / 2, p.y + h / 2, "#ffd27a", 420);
+        f.ring(p.x + w / 2, p.y + h / 2, "#ff7aa8", 320, 0.12);
+        f.explode(p.x + w / 2, p.y + h / 2 - 20, "star", PALETTE, 1.15);
+        f.confetti(p.x + w / 2, p.y + h / 2, -Math.PI / 2, 1.4, 50, [260, 560]);
+      }
+    } else if (n >= 15 && fx.current && !reduced()) {
+      // 콤보가 이어지는 동안은 누른 곳에서도 작은 불꽃
+      fx.current.explode(x, y, pick(["star", "ring", "pixel"]), STAR_COLORS, 0.45);
+    }
+    return n;
+  }
+  /** 콤보가 끝나면 (1.3초 동안 안 누르면) 결과를 보이고, 내 최고보다 크면 서버에 남긴다 */
+  function endCombo(n: number) {
+    setCb(null);
+    if (n < 3) return;
+    const prev = boardRef.current?.mine?.best ?? 0;
+    const best = n > prev;
+    const key = ++seq;
+    setResult({ n, best, prev, rank: boardRef.current?.mine?.rank ?? null, key });
+    window.setTimeout(() => setResult((r) => (r?.key === key ? null : r)), 3000);
+    if (best)
+      api<Board>("/api/bday", "POST", { key: day.key, combo: n })
+        .then((b) => {
+          setBoard(b);
+          setResult((r) => (r?.key === key ? { ...r, rank: b.mine?.rank ?? null } : r));
+        })
+        .catch(() => {});
+  }
+  const bumpRef = useRef(bump);
+  bumpRef.current = bump;
+  const popRef = useRef(pop);
+  popRef.current = pop;
+
+  // 올라가는 풍선은 누르면 터진다 (제작자 2026-11-07 '풍선 올라가는 것도 누르면 터지게'): 풍선을 맞힌 누름은 아래 칸·단추로 가지 않는다
+  useEffect(() => {
+    const onDown = (e: PointerEvent) => {
+      const f = fx.current;
+      if (!f || !e.isPrimary || !f.hasBalloons()) return;
+      const hit = f.popAt(e.clientX, e.clientY);
+      if (!hit) return;
+      e.preventDefault();
+      e.stopPropagation();
+      swallow.current = Date.now();
+      const n = bumpRef.current(hit.x, hit.y);
+      popRef.current(n >= 2 ? `POP! x${n}` : "POP!", hit.x, hit.y - 18, "bday-popword", 900);
+    };
+    const onClick = (e: MouseEvent) => {
+      if (Date.now() - swallow.current < 700) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, []);
+
   function celebrate(tx: number, ty: number) {
     setTaps((t) => t + 1);
+    setHop((k) => k + 1);
     const p = posRef.current;
     const n = lyric.current;
     const text = lyrics[n % lyrics.length];
@@ -362,12 +566,17 @@ function Sticker({ day }: { day: Birthday }) {
     const grand = count % FINALE_EVERY === 0;
     const variant = nextVariant();
     setIdle(variant.idle);
-    const line: Line = { id: ++seq, x: lx, y: ly, text, hue: HUES[n % HUES.length], cls: grand ? "bday-line-gold" : variant.line };
-    setLines((ls) => [...ls.slice(-3), line]);
-    window.setTimeout(() => setLines((ls) => ls.filter((l) => l.id !== line.id)), 2800);
-    const now = Date.now();
-    combo.current = now - lastTap.current < 1300 ? combo.current + 1 : 1;
-    lastTap.current = now;
+    // '… 님 생일 축하해요' 줄은 더 오래, 빨리 눌러도 먼저 밀려나지 않는다
+    const keep = n % lyrics.length === lyrics.length - 1;
+    const line: Line = { id: ++seq, x: lx, y: ly, text, hue: HUES[n % HUES.length], cls: (grand ? "bday-line-gold" : variant.line) + (keep ? " bday-line-keep" : ""), keep };
+    setLines((ls) => {
+      const next = [...ls, line];
+      while (next.filter((l) => !l.keep).length > 4) next.splice(next.findIndex((l) => !l.keep), 1);
+      return next;
+    });
+    window.setTimeout(() => setLines((ls) => ls.filter((l) => l.id !== line.id)), keep ? 4600 : 2800);
+    const cn = bump(tx, ty);
+    setHitTier(tierOf(cn));
     if (reduced() || !fx.current) return;
     (grand ? grandFinale : variant.tap)({
       fx: fx.current,
@@ -379,13 +588,14 @@ function Sticker({ day }: { day: Birthday }) {
       vw,
       vh,
       finale: n % lyrics.length === 3,
-      combo: combo.current,
-      pop: (t, x, y, cls) => {
-        const it: Pop = { id: ++seq, x: Math.min(Math.max(x, 60), vw - 60), y, text: t, cls };
-        setPops((ps) => [...ps.slice(-6), it]);
-        window.setTimeout(() => setPops((ps) => ps.filter((q) => q.id !== it.id)), 1400);
-      },
+      combo: cn,
+      pop: (t, x, y, cls) => pop(t, x, y, cls),
       banner: (t, cls, ms) => {
+        if (cls.includes("bday-finale")) return showFinale(Math.max(ms, 5200));
+        // 'HAPPY BIRTHDAY' 띠는 맨 위에 늘 걸려 있다 (누를 때마다 뛴다)
+        if (cls.includes("bday-bunting")) return;
+        // '생일 축하해요' 가 떠 있는 동안은 다른 큰 글자를 겹쳐 띄우지 않는다
+        if (finaleOn.current) return;
         const it: Banner = { id: ++seq, text: t, cls };
         setBanner(it);
         window.setTimeout(() => setBanner((b) => (b?.id === it.id ? null : b)), ms);
@@ -419,10 +629,14 @@ function Sticker({ day }: { day: Birthday }) {
     } else if (e.type === "pointerup") celebrate(e.clientX, e.clientY);
   }
 
+  const tier = cb ? tierOf(cb.n) : 0;
+  const garland = [...`HAPPY BIRTHDAY ${day.who}`];
+  const cbX = Math.min(Math.max(pos.x + w - 10, 44), vw - 44);
+  const cbY = pos.y < 60 ? pos.y + h - 30 : pos.y + 6;
   return (
     <>
       <div
-        className={"bday " + idle + (dragging ? " bday-drag" : "")}
+        className={"bday " + idle + (dragging ? " bday-drag" : "") + (tier >= 3 ? " bday-fever" : "")}
         style={{ width: w, height: h, transform: `translate3d(${Math.round(pos.x)}px, ${Math.round(pos.y)}px, 0)` }}
         role="button"
         tabIndex={0}
@@ -439,6 +653,7 @@ function Sticker({ day }: { day: Birthday }) {
           }
         }}
       >
+        <span className="bday-fever-ring" aria-hidden />
         <span className="bday-aura" aria-hidden>
           <i />
           <i />
@@ -447,6 +662,19 @@ function Sticker({ day }: { day: Birthday }) {
           <i />
           <i />
         </span>
+        {taps > 0 && !reduced() && (
+          <span key={taps} className={"bday-hit bday-hit-t" + hitTier} aria-hidden>
+            <i className="bday-hit-rays" />
+            <i className="bday-hit-ring" />
+            <i className="bday-hit-ring bday-hit-ring2" />
+            {hitTier >= 1 && <i className="bday-hit-ring bday-hit-ring3" />}
+            {starsOf(taps, hitTier).map((st, k) => (
+              <b key={k} style={{ "--a": `${st.a}deg`, "--d": `${st.d}px`, "--c": st.c, animationDelay: `${st.dl}s` } as CSSProperties}>
+                ✦
+              </b>
+            ))}
+          </span>
+        )}
         <div className="bday-bob">
           <div key={taps} className={"bday-body" + (taps ? " bday-squish" : " bday-in")}>
             <img className="bday-img" src={day.base} alt="" draggable={false} />
@@ -457,15 +685,42 @@ function Sticker({ day }: { day: Birthday }) {
               draggable={false}
               style={{ transformOrigin: `${day.tip[0] * 100}% ${day.tip[1] * 100}%` }}
             />
+            {taps > 0 && !reduced() && <i key={taps} className="bday-hit-flash" aria-hidden />}
             <span className="bday-ribbon">HAPPY BIRTHDAY</span>
           </div>
         </div>
+        <button
+          type="button"
+          className="bday-rank-btn"
+          aria-label="생일 콤보 순위"
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            setRankOpen(true);
+            void loadBoard();
+          }}
+        >
+          🏆<span>순위</span>
+        </button>
       </div>
       {createPortal(
         <div className="bday-fx" aria-hidden>
+          {/* 맨 위 띠: 그날 내내 (제작자 2026-11-07 '맨 위에 해피 버스데이는 24시간 내내 띄워 줘') */}
+          <div className="bday-garland" style={{ "--n": garland.length } as CSSProperties}>
+            <span key={hop} className={"bday-garland-row" + (hop ? " bday-garland-hop" : "")}>
+              {garland.map((ch, i) => (
+                <b key={i} style={{ "--i": i } as CSSProperties}>
+                  <em>{ch === " " ? " " : ch}</em>
+                </b>
+              ))}
+            </span>
+          </div>
+          {tier >= 2 && cb && <i key={cb.key} className={"bday-edge bday-edge-t" + tier} />}
           {lines.map((l) => (
             <span key={l.id} className={"bday-line " + l.cls} style={{ left: l.x, top: l.y, "--hue": `${l.hue}deg` } as CSSProperties}>
-              {l.cls === "bday-line-karaoke"
+              {l.cls.includes("bday-line-karaoke")
                 ? [...l.text].map((ch, i) => (
                     <i key={i} style={{ "--i": i } as CSSProperties}>
                       {ch}
@@ -479,32 +734,41 @@ function Sticker({ day }: { day: Birthday }) {
               {q.text}
             </span>
           ))}
+          {cb && (
+            <div key={cb.key} className={"bday-cb bday-cb-t" + tier} style={{ left: cbX, top: cbY }}>
+              <b>{cb.n}</b>
+              <small>COMBO</small>
+            </div>
+          )}
+          {result && (
+            <div key={result.key} className={"bday-result" + (result.best ? " bday-result-best" : "")} style={{ left: Math.min(Math.max(pos.x + w / 2, 90), vw - 90), top: pos.y + h * 0.42 }}>
+              <b>{result.n} COMBO</b>
+              <small>
+                {result.best ? "최고 기록!" : `내 최고 ${result.prev}`}
+                {result.rank ? ` · ${result.rank}위` : ""}
+              </small>
+            </div>
+          )}
           {banner && (
             <div key={banner.id} className={"bday-banner " + banner.cls}>
-              {banner.cls.includes("bday-rainbow")
-                ? [...banner.text].map((ch, i) => (
-                    <i key={i} style={{ "--i": i } as CSSProperties}>
-                      {ch === " " ? "\u00a0" : ch}
-                    </i>
-                  ))
-                : banner.cls === "bday-bunting"
-                  ? [...`${banner.text} ${day.who}`].map((ch, i) => (
-                      <b key={i} style={{ "--i": i } as CSSProperties}>
-                        {ch === " " ? "\u00a0" : ch}
-                      </b>
-                    ))
-                  : (
-                    <>
-                      <span className="bday-finale-cake">🎂</span>
-                      <span className="bday-finale-t">{banner.text}</span>
-                      <span className="bday-finale-who">{day.who}</span>
-                    </>
-                  )}
+              {[...banner.text].map((ch, i) => (
+                <i key={i} style={{ "--i": i } as CSSProperties}>
+                  {ch === " " ? " " : ch}
+                </i>
+              ))}
+            </div>
+          )}
+          {finale && (
+            <div key={finale.id} className={"bday-banner bday-finale" + (finale.out ? " bday-finale-out" : "")}>
+              <span className="bday-finale-cake">🎂</span>
+              <span className="bday-finale-t">생일 축하해요</span>
+              <span className="bday-finale-who">{day.who}</span>
             </div>
           )}
         </div>,
         document.body,
       )}
+      {rankOpen && <ComboRank day={day} me={me} board={board} onClose={() => setRankOpen(false)} />}
     </>
   );
 }

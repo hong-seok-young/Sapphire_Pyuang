@@ -31,6 +31,7 @@ export async function deleteAccountData(env: Env, user: { id: string; main_id: s
     env.DB.prepare("DELETE FROM push_subs WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM cutout_log WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM favorites WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM bday_combo WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM todo_checks WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM todo_custom WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM todo_edits WHERE user_id = ?").bind(user.id),

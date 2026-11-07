@@ -381,6 +381,45 @@ export class Fx {
     for (let i = 0; i < n; i++)
       this.add({ x: rnd(20, this.w - 20), y: this.h + rnd(20, 60), vx: rnd(-10, 10), vy: rnd(-150, -100), max: rnd(4.5, 6), size: rnd(13, 19), color: pick(PALETTE), shape: "balloon", sway: 25, add: false, rot: rnd(0, 6), delay: delay + rnd(0, 0.6) });
   }
+  /** 지금 떠 있는 풍선이 있는지 (누른 곳 풍선 찾기는 이때만) */
+  hasBalloons() {
+    return this.ps.some((p) => p.shape === "balloon" && p.delay <= 0 && p.life < p.max);
+  }
+  /**
+   * 누른 곳의 풍선을 터뜨린다 (제작자 2026-11-07 '풍선 올라가는 것도 누르면 터지게'). 터뜨렸으면 그 자리와 색.
+   * 손가락이라 풍선 몸통보다 넉넉히 잡는다
+   */
+  popAt(x: number, y: number): { x: number; y: number; color: string } | null {
+    let hit: P | null = null;
+    let best = 1;
+    for (const p of this.ps) {
+      if (p.shape !== "balloon" || p.delay > 0 || p.life >= p.max) continue;
+      const d = Math.hypot((x - p.x) / (p.size + 14), (y - (p.y + p.size * 0.3)) / (p.size * 1.4 + 14));
+      if (d < best) {
+        best = d;
+        hit = p;
+      }
+    }
+    if (!hit) return null;
+    hit.shape = "none";
+    hit.max = hit.life;
+    const { x: bx, y: by, color } = hit;
+    this.flash(bx, by, "#ffffff", 18, 200);
+    this.ring(bx, by, color, 170, 0, 0.35);
+    this.ring(bx, by, "#ffffff", 110, 0.05, 0.25);
+    // 고무 조각 (풍선 색) + 반짝이
+    for (let i = 0; i < 16; i++) {
+      const a = rnd(0, Math.PI * 2);
+      const v = rnd(120, 280);
+      this.add({ x: bx, y: by, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 40, g: 520, drag: 0.3, max: rnd(0.6, 1.1), size: rnd(4, 8), color, shape: "confetti", rot: rnd(0, 6), vrot: rnd(-14, 14), flutter: rnd(8, 16), add: false });
+    }
+    for (let i = 0; i < 14; i++) {
+      const a = rnd(0, Math.PI * 2);
+      const v = rnd(90, 220);
+      this.add({ x: bx, y: by, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: 120, drag: 0.4, max: rnd(0.4, 0.8), size: 1.6, color: pick([color, "#ffffff", "#fff27a"]), shape: "spark", trailLen: 3, twinkle: true });
+    }
+    return { x: bx, y: by, color };
+  }
   /** 손에 든 불꽃처럼 위로 솟는 금빛 분수 */
   fountain(x: number, y: number, dur = 1.2, delay = 0) {
     this.add({

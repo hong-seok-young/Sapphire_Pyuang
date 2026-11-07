@@ -264,6 +264,7 @@ const ACTIONS: [RegExp, (d: Rec, m: RegExpMatchArray, at: number) => string][] =
   [/^POST \/api\/push$/, () => "폰 알림 켬"],
   [/^DELETE \/api\/push$/, () => "폰 알림 끔"],
   [/^POST \/api\/dev\/switch$/, (d) => join("테스트 계정 전환", str(d.to) ?? str(d.id))],
+  [/^POST \/api\/bday$/, (d) => `생일 스티커 콤보 ${num(d.combo) ?? ""}`],
   [/^PUT \/api\/favorites$/, (d) => `즐겨찾기 ${d.on === false ? "뺌" : "추가"}${str(d.name) ? ` · ${d.name}` : ""}`],
   // 챗봇
   [/^POST \/api\/chat$/, (d) => join("챗봇에 질문", quote(d.question, 60), num(d.photos) ? `사진 ${d.photos}장` : null)],
@@ -460,6 +461,7 @@ const ACT_SECTION: [RegExp, string][] = [
   [/^\w+ \/api\/(profile|avatar|password|kakao|characters)/, "내 정보"],
   [/^\w+ \/api\/todo/, "To do"],
   [/^\w+ \/api\/favorites/, "정보"],
+  [/^\w+ \/api\/bday/, "생일 스티커"],
 ];
 export function sectionOf(r: ActivityRow): string | null {
   if (r.kind === "view") {
