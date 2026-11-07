@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import type { Me } from "./auth";
 import { inFloat } from "./platform";
 import { useTutorial } from "./tutorialState";
+import { Fx, PALETTE, pick } from "./birthdayFx";
 
 /**
  * 생일 스티커 (제작자 요청 2026-11-07: '마을모금함이 길마인데 11월 8일 생일이야, 자정부터 자정까지 24시간 동안 웹 화면에
@@ -11,7 +12,9 @@ import { useTutorial } from "./tutorialState";
  * 하나씩, 하트와 폭죽 등등 막 랜덤으로').
  * 그림은 제작자가 준 게임 스샷에서 몸짱 동상·캐릭터·말풍선만 오린 것 (비공개 자료 이미지/생일, 자료/scripts/make_birthday_sticker.py ->
  * /data/birthday, 로그인한 길드원에게만). 화면 어디서나 떠 있고, 끌면 옮겨지고(이 기기에 자리 기억), 누르면 노래 한 줄과 하트·폭죽·풍선·반짝이가 랜덤으로.
- * 그날 한국 시간 0시부터 24시간만 보인다. 앱개발자는 미리 본다. 게임과 상관없는 꾸밈이라 게임 안전 규칙에 맞는다
+ * 그날 한국 시간 0시부터 24시간만 보인다. 앱개발자는 미리 본다. 게임과 상관없는 꾸밈이라 게임 안전 규칙에 맞는다.
+ * 효과는 초안 다섯 안을 모두 섞고 (누를 때마다 다섯 안을 한 번씩 돌아가며, 같은 안이 잇따르지 않게), 10번째 누를 때마다 생일 메인 폭죽
+ * (제작자 2026-11-07 '12345 다 섞고, 생축 메인 폭죽은 10번 누를 때마다 터트려 줘')
  */
 export interface Birthday {
   key: string;
@@ -66,128 +69,181 @@ function loadPos(): { fx: number; fy: number } | null {
   }
 }
 
-// ---------- 효과 ----------
-type Kind = "heart" | "spark" | "confetti" | "firework" | "balloon" | "party";
-interface Bit {
-  id: number;
-  x: number;
-  y: number;
-  style: CSSProperties;
-  cls: string;
-  text?: string;
-}
+// ---------- 효과: 다섯 안 (제작자 2026-11-07 '최대한 화려하고 성대하게, 폭죽 막 터트리고, 5개 안 움짤로') ----------
 interface Line {
   id: number;
   x: number;
   y: number;
   text: string;
   hue: number;
+  cls: string;
 }
-const HEARTS = ["❤️", "💖", "💗", "💕", "💘", "💝"];
-const SPARKS = ["✨", "⭐", "🌟", "💫"];
-const PARTY = ["🎉", "🥳", "🎂", "🎁", "🍰", "🎊"];
+interface Pop {
+  id: number;
+  x: number;
+  y: number;
+  text: string;
+  cls: string;
+}
+interface Banner {
+  id: number;
+  text: string;
+  cls: string;
+}
 /** 노래 줄 바탕색 (분홍, 금, 사파이어, 보라, 민트) */
 const HUES = [335, 38, 228, 280, 165];
-const COLORS = ["#ff5c8a", "#ffc35c", "#6f8fff", "#7ee2a8", "#c58bff", "#ff8a3d", "#5ce1ff", "#fff27a"];
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
-const pickOf = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
 let seq = 0;
 
-/** 한 번 누를 때 터지는 것들 (하트는 늘, 나머지 둘은 랜덤) */
-function burst(x: number, y: number, kinds: Kind[]): Bit[] {
-  const out: Bit[] = [];
-  const add = (b: Omit<Bit, "id">) => out.push({ ...b, id: ++seq });
-  for (const k of kinds) {
-    if (k === "heart" || k === "spark" || k === "party") {
-      const set = k === "heart" ? HEARTS : k === "spark" ? SPARKS : PARTY;
-      const n = k === "party" ? 5 : 8;
-      for (let i = 0; i < n; i++) {
-        const a = rnd(-Math.PI * 0.95, -Math.PI * 0.05);
-        const d = rnd(50, 130);
-        add({
-          x,
-          y,
-          cls: "bd-bit bd-emoji",
-          text: pickOf(set),
-          style: {
-            "--dx": `${Math.cos(a) * d}px`,
-            "--dy": `${Math.sin(a) * d - rnd(10, 40)}px`,
-            "--rot": `${rnd(-50, 50)}deg`,
-            "--s": `${rnd(0.8, 1.5)}`,
-            animationDuration: `${rnd(0.9, 1.5)}s`,
-            animationDelay: `${rnd(0, 0.12)}s`,
-          } as CSSProperties,
-        });
+interface TapCtx {
+  fx: Fx;
+  /** 누른 곳 */
+  x: number;
+  y: number;
+  /** 스티커 가운데와 위 */
+  cx: number;
+  cy: number;
+  top: number;
+  vw: number;
+  vh: number;
+  /** 안마다 조금 더 크게 터지는 때 (다섯 줄 노래의 네 번째 줄) */
+  finale: boolean;
+  combo: number;
+  pop: (text: string, x: number, y: number, cls: string) => void;
+  banner: (text: string, cls: string, ms: number) => void;
+}
+interface Variant {
+  name: string;
+  /** 스티커 둘레에 늘 도는 꾸밈 (보고 있는 동안) */
+  idle: string;
+  line: string;
+  tap: (c: TapCtx) => void;
+}
+const pat = (xs: string[]) => pick(xs);
+const two = () => [pick(PALETTE), pick(PALETTE)];
+
+export const VARIANTS: Variant[] = [
+  {
+    name: "불꽃 대축제",
+    idle: "bday-idle-gold",
+    line: "bday-line-gold",
+    tap: ({ fx, x, y, vw, vh, finale }) => {
+      const n = finale ? 9 : 3 + Math.floor(rnd(0, 3));
+      for (let i = 0; i < n; i++)
+        fx.rocket(rnd(0.1, 0.9) * vw, vh + 10, rnd(0.12, 0.88) * vw, rnd(0.1, 0.42) * vh, pat(["peony", "ring", "willow", "crossette", "star", "double"]), two(), i * 0.22 + rnd(0, 0.1), finale ? 1.25 : 1);
+      fx.explode(x, y, "peony", ["#ffd27a", "#ff4d8d"], 0.45);
+      if (finale) for (let i = 0; i < 3; i++) fx.explode(rnd(0.2, 0.8) * vw, rnd(0.08, 0.2) * vh, "willow", ["#ffd27a"], 1.3, 1.6 + i * 0.35);
+    },
+  },
+  {
+    name: "하트 폭발",
+    idle: "bday-idle-hearts",
+    line: "bday-line-pink",
+    tap: ({ fx, x, y, cx, cy, vw, vh, finale }) => {
+      fx.explode(cx, cy - 30, "heart", ["#ff4d8d"], 1.15);
+      fx.ring(cx, cy, "#ff7aa8", 360);
+      fx.ring(cx, cy, "#ffd1e3", 260, 0.12);
+      fx.hearts(x, y, 22);
+      for (let i = 0; i < 2; i++) fx.rocket(rnd(0.15, 0.85) * vw, vh + 10, rnd(0.2, 0.8) * vw, rnd(0.12, 0.35) * vh, "heart", ["#ff4d8d"], 0.25 + i * 0.3);
+      if (finale) {
+        fx.heartRain(70);
+        for (let i = 0; i < 4; i++) fx.rocket(rnd(0.1, 0.9) * vw, vh + 10, rnd(0.15, 0.85) * vw, rnd(0.1, 0.3) * vh, "heart", ["#ff4d8d"], 0.6 + i * 0.25, 1.3);
       }
-    } else if (k === "confetti") {
-      for (let i = 0; i < 18; i++) {
-        const a = rnd(-Math.PI, 0);
-        const d = rnd(60, 150);
-        add({
-          x,
-          y,
-          cls: "bd-bit bd-confetti",
-          style: {
-            "--dx": `${Math.cos(a) * d}px`,
-            "--dy": `${Math.sin(a) * d * 0.7 + rnd(40, 110)}px`,
-            "--rot": `${rnd(-540, 540)}deg`,
-            "--s": "1",
-            background: pickOf(COLORS),
-            width: `${Math.round(rnd(4, 7))}px`,
-            height: `${Math.round(rnd(7, 11))}px`,
-            animationDuration: `${rnd(1.1, 1.8)}s`,
-          } as CSSProperties,
-        });
+    },
+  },
+  {
+    name: "색종이 대포",
+    idle: "bday-idle-candy",
+    line: "bday-line-candy",
+    tap: ({ fx, x, y, vw, vh, finale, banner }) => {
+      fx.confetti(-10, vh + 10, -1.05, 0.28, 90, [700, 1050]);
+      fx.confetti(vw + 10, vh + 10, -Math.PI + 1.05, 0.28, 90, [700, 1050]);
+      fx.confetti(x, y, -Math.PI / 2, 1.1, 34, [220, 460]);
+      fx.flash(x, y, "#ffffff", 20, 200);
+      fx.rocket(rnd(0.2, 0.8) * vw, vh + 10, rnd(0.2, 0.8) * vw, rnd(0.12, 0.3) * vh, pat(["peony", "double", "ring"]), two(), 0.2);
+      banner("HAPPY BIRTHDAY", "bday-bunting", 5200);
+      if (finale) {
+        fx.confettiRain(170);
+        for (let i = 0; i < 4; i++) fx.rocket(rnd(0.1, 0.9) * vw, vh + 10, rnd(0.15, 0.85) * vw, rnd(0.1, 0.35) * vh, pat(["peony", "star", "crossette"]), two(), 0.4 + i * 0.25);
       }
-    } else if (k === "firework") {
-      // 스티커 위쪽 아무 데서나 팡: 가운데 번쩍 + 둘레로 퍼지는 불꽃
-      const fx = x + rnd(-70, 70);
-      const fy = y - rnd(70, 150);
-      const color = pickOf(COLORS);
-      const color2 = pickOf(COLORS);
-      add({ x: fx, y: fy, cls: "bd-bit bd-flash", style: { background: color, animationDuration: "0.5s" } as CSSProperties });
-      const n = 16;
-      for (let i = 0; i < n; i++) {
-        const a = (i / n) * Math.PI * 2 + rnd(-0.1, 0.1);
-        const d = rnd(46, 70);
-        add({
-          x: fx,
-          y: fy,
-          cls: "bd-bit bd-spark",
-          style: {
-            "--dx": `${Math.cos(a) * d}px`,
-            "--dy": `${Math.sin(a) * d + 14}px`,
-            "--rot": "0deg",
-            "--s": "1",
-            background: i % 2 ? color : color2,
-            animationDuration: `${rnd(0.8, 1.1)}s`,
-          } as CSSProperties,
-        });
+    },
+  },
+  {
+    name: "8비트 아케이드",
+    idle: "bday-idle-pixel",
+    line: "bday-line-pixel",
+    tap: ({ fx, x, y, vw, vh, finale, combo, pop, banner }) => {
+      fx.explode(x, y, "pixel", PALETTE, 0.8);
+      for (let i = 0; i < 2; i++) fx.rocket(rnd(0.15, 0.85) * vw, vh + 10, rnd(0.15, 0.85) * vw, rnd(0.12, 0.38) * vh, "pixel", PALETTE, 0.15 + i * 0.25);
+      fx.shake();
+      pop("+1 ♥", x, y - 26, "bday-score");
+      if (combo >= 2) pop(`x${combo} COMBO!`, x, y - 52, "bday-combo");
+      banner(finale ? "LEVEL UP!" : "HAPPY BIRTHDAY", finale ? "bday-rainbow bday-levelup" : "bday-rainbow", 2300);
+      if (finale) for (let i = 0; i < 6; i++) fx.rocket(rnd(0.1, 0.9) * vw, vh + 10, rnd(0.1, 0.9) * vw, rnd(0.1, 0.4) * vh, "pixel", PALETTE, 0.3 + i * 0.18, 1.3);
+    },
+  },
+  {
+    name: "피날레 파티",
+    idle: "bday-idle-rays",
+    line: "bday-line-karaoke",
+    tap: ({ fx, cx, top, vw, vh, finale, banner }) => {
+      fx.balloons(finale ? 14 : 6);
+      fx.fountain(cx, top + 14, 1.3);
+      for (let i = 0; i < 2; i++) fx.rocket(rnd(0.15, 0.85) * vw, vh + 10, rnd(0.15, 0.85) * vw, rnd(0.1, 0.35) * vh, pat(["peony", "double", "willow"]), two(), 0.3 + i * 0.35);
+      if (finale) {
+        banner("생일 축하해요", "bday-finale", 3800);
+        fx.confettiRain(140, 0.4);
+        for (let i = 0; i < 12; i++)
+          fx.rocket(rnd(0.08, 0.92) * vw, vh + 10, rnd(0.1, 0.9) * vw, rnd(0.08, 0.4) * vh, pat(["peony", "ring", "willow", "star", "crossette", "double"]), two(), 0.2 + i * 0.2, 1.2);
       }
-    } else if (k === "balloon") {
-      for (let i = 0; i < 4; i++) {
-        add({
-          x: x + rnd(-60, 60),
-          y: y + rnd(-10, 20),
-          cls: "bd-bit bd-emoji bd-balloon",
-          text: "🎈",
-          style: {
-            "--dx": `${rnd(-30, 30)}px`,
-            "--dy": `${-rnd(220, 340)}px`,
-            "--rot": `${rnd(-15, 15)}deg`,
-            "--s": `${rnd(1, 1.5)}`,
-            filter: `hue-rotate(${Math.round(rnd(0, 360))}deg)`,
-            animationDuration: `${rnd(2.2, 3.2)}s`,
-            animationDelay: `${rnd(0, 0.3)}s`,
-          } as CSSProperties,
-        });
-      }
-    }
+    },
+  },
+];
+const FX_KEY = "sapphire.bday.fx";
+/** 이 기기에 1~5 를 적어 두면 그 안만 (초안 다시 보기), 아니면 다섯 안을 섞는다 */
+function onlyVariant(): number | null {
+  try {
+    const n = Number(localStorage.getItem(FX_KEY));
+    if (Number.isInteger(n) && n >= 1 && n <= VARIANTS.length) return n - 1;
+  } catch {
+    /* 섞기 */
   }
-  return out;
+  return null;
+}
+/** 다섯 안을 한 번씩 섞은 차례 (앞 차례의 마지막과 같은 안으로 시작하지 않게) */
+function shuffled(last: number): number[] {
+  const order = VARIANTS.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  if (order[0] === last) order.push(order.shift()!);
+  return order;
 }
 
-const EXTRA: Kind[] = ["spark", "confetti", "firework", "balloon", "party"];
+/** 생일 메인 폭죽: 10번째 누를 때마다 */
+const FINALE_EVERY = 10;
+const ALL_PATTERNS = ["peony", "ring", "willow", "crossette", "star", "double", "heart", "pixel"];
+function grandFinale({ fx, cx, cy, top, vw, vh, banner }: TapCtx) {
+  fx.shake();
+  fx.flash(cx, cy, "#ffffff", 70, 380);
+  fx.ring(cx, cy, "#ffd27a", 460);
+  fx.ring(cx, cy, "#ff7aa8", 360, 0.15);
+  fx.ring(cx, cy, "#7ab8ff", 280, 0.3);
+  fx.explode(cx, cy - 30, "heart", ["#ff4d8d"], 1.35);
+  banner("생일 축하해요", "bday-finale", 4600);
+  fx.confetti(-10, vh + 10, -1.05, 0.28, 110, [720, 1100]);
+  fx.confetti(vw + 10, vh + 10, -Math.PI + 1.05, 0.28, 110, [720, 1100]);
+  fx.fountain(cx, top + 14, 1.6);
+  fx.balloons(12, 0.3);
+  fx.heartRain(50, 0.5);
+  fx.confettiRain(150, 0.8);
+  // 하늘을 덮는 불꽃: 3초 동안 이어서
+  for (let i = 0; i < 18; i++)
+    fx.rocket(rnd(0.06, 0.94) * vw, vh + 10, rnd(0.08, 0.92) * vw, rnd(0.06, 0.42) * vh, pat(ALL_PATTERNS), two(), 0.15 + i * 0.17, 1.25);
+  // 마지막에 금빛 버드나무 불꽃
+  for (let i = 0; i < 4; i++) fx.explode(rnd(0.15, 0.85) * vw, rnd(0.06, 0.2) * vh, "willow", ["#ffd27a"], 1.45, 3.3 + i * 0.3);
+}
 
 export function BirthdaySticker({ me }: { me: Me }) {
   const [now, setNow] = useState(() => Date.now());
@@ -218,8 +274,24 @@ function Sticker({ day }: { day: Birthday }) {
   };
   const [pos, setPos] = useState<Pos>(place);
   const [taps, setTaps] = useState(0);
-  const [bits, setBits] = useState<Bit[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
+  const [pops, setPops] = useState<Pop[]>([]);
+  const [banner, setBanner] = useState<Banner | null>(null);
+  const only = useRef(onlyVariant()).current;
+  const bag = useRef<number[]>([]);
+  const lastV = useRef(-1);
+  const nextVariant = (): Variant => {
+    if (only != null) return VARIANTS[only];
+    if (!bag.current.length) bag.current = shuffled(lastV.current);
+    lastV.current = bag.current.shift()!;
+    return VARIANTS[lastV.current];
+  };
+  /** 스티커 둘레 꾸밈: 마지막에 터진 안의 것, 안 누르는 동안은 7초마다 다음 안으로 */
+  const [idle, setIdle] = useState(() => VARIANTS[only ?? Math.floor(Math.random() * VARIANTS.length)].idle);
+  const tapCount = useRef(0);
+  const fx = useRef<Fx | null>(null);
+  const lastTap = useRef(0);
+  const combo = useRef(0);
   const [dragging, setDragging] = useState(false);
   const press = useRef<{ x: number; y: number; px: number; py: number; moved: boolean; id: number } | null>(null);
   const lyric = useRef(0);
@@ -228,6 +300,22 @@ function Sticker({ day }: { day: Birthday }) {
   const posRef = useRef(pos);
   posRef.current = pos;
 
+  useEffect(() => {
+    if (only != null) return;
+    let k = 0;
+    const t = window.setInterval(() => {
+      if (document.hidden) return;
+      k++;
+      setIdle((cur) => VARIANTS[(VARIANTS.findIndex((v) => v.idle === cur) + 1 + (k % 2)) % VARIANTS.length].idle);
+    }, 7000);
+    return () => window.clearInterval(t);
+  }, [only, taps]);
+  useEffect(() => {
+    const f = new Fx();
+    f.mount();
+    fx.current = f;
+    return () => f.destroy();
+  }, []);
   useEffect(() => {
     const onResize = () => {
       setVw(window.innerWidth);
@@ -258,26 +346,51 @@ function Sticker({ day }: { day: Birthday }) {
     `${day.who} 님 생일 축하해요`,
   ];
 
-  function celebrate(cx: number, cy: number) {
+  function celebrate(tx: number, ty: number) {
     setTaps((t) => t + 1);
     const p = posRef.current;
-    const text = lyrics[lyric.current % lyrics.length];
+    const n = lyric.current;
+    const text = lyrics[n % lyrics.length];
     lyric.current++;
     // 노래 줄은 스티커 위에 (화면 맨 위에 붙어 있으면 아래에), 가로는 글자 폭만큼 화면 안으로, 빨리 누르면 앞 줄 위로 쌓는다
-    const tw = [...text].reduce((n, c) => n + (/[가-힣]/.test(c) ? 13 : 7.4), 22);
+    const tw = [...text].reduce((k, c) => k + (/[가-힣]/.test(c) ? 14 : 8), 26);
     const lx = Math.min(Math.max(p.x + w / 2, tw / 2 + 6), vw - tw / 2 - 6);
     const below = p.y < 44;
     const stack = linesRef.current.length;
-    const ly = below ? p.y + h + 30 + stack * 26 : p.y - 6 - stack * 26;
-    const line: Line = { id: ++seq, x: lx, y: ly, text, hue: HUES[lyric.current % HUES.length] };
+    const ly = below ? p.y + h + 30 + stack * 28 : p.y - 6 - stack * 28;
+    const count = ++tapCount.current;
+    const grand = count % FINALE_EVERY === 0;
+    const variant = nextVariant();
+    setIdle(variant.idle);
+    const line: Line = { id: ++seq, x: lx, y: ly, text, hue: HUES[n % HUES.length], cls: grand ? "bday-line-gold" : variant.line };
     setLines((ls) => [...ls.slice(-3), line]);
-    window.setTimeout(() => setLines((ls) => ls.filter((l) => l.id !== line.id)), 2600);
-    if (reduced()) return;
-    const extra = [...EXTRA].sort(() => Math.random() - 0.5).slice(0, Math.random() < 0.4 ? 2 : 1);
-    const made = burst(cx, cy, ["heart", ...extra]);
-    setBits((bs) => [...bs.slice(-140), ...made]);
-    const ids = new Set(made.map((b) => b.id));
-    window.setTimeout(() => setBits((bs) => bs.filter((b) => !ids.has(b.id))), 3700);
+    window.setTimeout(() => setLines((ls) => ls.filter((l) => l.id !== line.id)), 2800);
+    const now = Date.now();
+    combo.current = now - lastTap.current < 1300 ? combo.current + 1 : 1;
+    lastTap.current = now;
+    if (reduced() || !fx.current) return;
+    (grand ? grandFinale : variant.tap)({
+      fx: fx.current,
+      x: tx,
+      y: ty,
+      cx: p.x + w / 2,
+      cy: p.y + h / 2,
+      top: p.y,
+      vw,
+      vh,
+      finale: n % lyrics.length === 3,
+      combo: combo.current,
+      pop: (t, x, y, cls) => {
+        const it: Pop = { id: ++seq, x: Math.min(Math.max(x, 60), vw - 60), y, text: t, cls };
+        setPops((ps) => [...ps.slice(-6), it]);
+        window.setTimeout(() => setPops((ps) => ps.filter((q) => q.id !== it.id)), 1400);
+      },
+      banner: (t, cls, ms) => {
+        const it: Banner = { id: ++seq, text: t, cls };
+        setBanner(it);
+        window.setTimeout(() => setBanner((b) => (b?.id === it.id ? null : b)), ms);
+      },
+    });
   }
 
   function down(e: RPointerEvent<HTMLDivElement>) {
@@ -309,7 +422,7 @@ function Sticker({ day }: { day: Birthday }) {
   return (
     <>
       <div
-        className={"bday" + (dragging ? " bday-drag" : "")}
+        className={"bday " + idle + (dragging ? " bday-drag" : "")}
         style={{ width: w, height: h, transform: `translate3d(${Math.round(pos.x)}px, ${Math.round(pos.y)}px, 0)` }}
         role="button"
         tabIndex={0}
@@ -326,6 +439,14 @@ function Sticker({ day }: { day: Birthday }) {
           }
         }}
       >
+        <span className="bday-aura" aria-hidden>
+          <i />
+          <i />
+          <i />
+          <i />
+          <i />
+          <i />
+        </span>
         <div className="bday-bob">
           <div key={taps} className={"bday-body" + (taps ? " bday-squish" : " bday-in")}>
             <img className="bday-img" src={day.base} alt="" draggable={false} />
@@ -342,16 +463,45 @@ function Sticker({ day }: { day: Birthday }) {
       </div>
       {createPortal(
         <div className="bday-fx" aria-hidden>
-          {bits.map((b) => (
-            <span key={b.id} className={b.cls} style={{ left: b.x, top: b.y, ...b.style }}>
-              {b.text}
-            </span>
-          ))}
           {lines.map((l) => (
-            <span key={l.id} className="bday-line" style={{ left: l.x, top: l.y, "--hue": `${l.hue}deg` } as CSSProperties}>
-              {l.text}
+            <span key={l.id} className={"bday-line " + l.cls} style={{ left: l.x, top: l.y, "--hue": `${l.hue}deg` } as CSSProperties}>
+              {l.cls === "bday-line-karaoke"
+                ? [...l.text].map((ch, i) => (
+                    <i key={i} style={{ "--i": i } as CSSProperties}>
+                      {ch}
+                    </i>
+                  ))
+                : l.text}
             </span>
           ))}
+          {pops.map((q) => (
+            <span key={q.id} className={q.cls} style={{ left: q.x, top: q.y }}>
+              {q.text}
+            </span>
+          ))}
+          {banner && (
+            <div key={banner.id} className={"bday-banner " + banner.cls}>
+              {banner.cls.includes("bday-rainbow")
+                ? [...banner.text].map((ch, i) => (
+                    <i key={i} style={{ "--i": i } as CSSProperties}>
+                      {ch === " " ? "\u00a0" : ch}
+                    </i>
+                  ))
+                : banner.cls === "bday-bunting"
+                  ? [...`${banner.text} ${day.who}`].map((ch, i) => (
+                      <b key={i} style={{ "--i": i } as CSSProperties}>
+                        {ch === " " ? "\u00a0" : ch}
+                      </b>
+                    ))
+                  : (
+                    <>
+                      <span className="bday-finale-cake">🎂</span>
+                      <span className="bday-finale-t">{banner.text}</span>
+                      <span className="bday-finale-who">{day.who}</span>
+                    </>
+                  )}
+            </div>
+          )}
         </div>,
         document.body,
       )}
