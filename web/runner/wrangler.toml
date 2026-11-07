@@ -11,9 +11,18 @@ workers_dev = false
 name = "CHATRUN"
 class_name = "ChatRun"
 
+[[durable_objects.bindings]]
+name = "BDAYLIVE"
+class_name = "BdayLive"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["ChatRun"]
+
+# 생일 콤보 실시간 (server/bdayLive.ts, 제작자 2026-11-08)
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["BdayLive"]
 
 # 답을 넣는 계정 DB (사이트와 같은 DB). 자동 배포가 진짜 database_id 로 바꾼다
 [[d1_databases]]

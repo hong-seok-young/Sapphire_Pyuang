@@ -17,6 +17,8 @@ export interface Env {
   ANTHROPIC_WORKSPACE_ID?: string;
   /** 챗봇 답 받기 일꾼 (server/chatRun.ts, 따로 배포한 Worker sapphire-chat-runner 의 Durable Object). 배포가 붙이고, 없으면 예전 길 */
   CHATRUN?: DurableObjectNamespace;
+  /** 생일 콤보 실시간 (server/bdayLive.ts, 답 받기 일꾼 Worker 안) */
+  BDAYLIVE?: DurableObjectNamespace;
   /** 로컬 시험에서만: 챗봇이 부를 가짜 API 주소 (.dev.vars) */
   CHAT_API_BASE?: string;
   /** 사이트에 올라간 정적 파일 (플래티넘 상점 물건 목록을 서버 안에서 읽는다) */

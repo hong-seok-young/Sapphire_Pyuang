@@ -149,6 +149,7 @@ jobs:
             exit 1
           fi
           printf '\n[[durable_objects.bindings]]\nname = "CHATRUN"\nclass_name = "ChatRun"\nscript_name = "sapphire-chat-runner"\n' >> wrangler.toml
+          printf '\n[[durable_objects.bindings]]\nname = "BDAYLIVE"\nclass_name = "BdayLive"\nscript_name = "sapphire-chat-runner"\n' >> wrangler.toml
           echo "챗봇 답 받기 일꾼을 올렸어요"
 
       - name: Deploy to Cloudflare Pages
