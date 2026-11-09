@@ -29,7 +29,8 @@ jobs:
       - name: Read
         working-directory: web
         run: |
-          q() { echo "==== $1 ===="; npx wrangler d1 execute sapphire-accounts --remote --json --command "$2" 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s.slice(s.search(/[[{]/)));for(const r of j[0]?.results??[])console.log(JSON.stringify(r))})'; }
+          W="$GITHUB_WORKSPACE/web/node_modules/.bin/wrangler"; cd "$RUNNER_TEMP"
+          q() { echo "==== $1 ===="; "$W" d1 execute sapphire-accounts --remote --json --command "$2" > out.txt || true; node -e 'const s=require("fs").readFileSync("out.txt","utf8");try{const j=JSON.parse(s.slice(s.search(/[[{]/)));const r=Array.isArray(j)?j[0]?.results:null;if(!r){console.log(s.slice(0,2000));return}for(const x of r)console.log(JSON.stringify(x))}catch(e){console.log("parse fail:",s.slice(0,2000))}'; }
           q dev_requests "SELECT * FROM dev_requests ORDER BY id"
           q dev_request_steps "SELECT * FROM dev_request_steps ORDER BY id"
           q dev_request_talk "SELECT * FROM dev_request_talk ORDER BY id"
