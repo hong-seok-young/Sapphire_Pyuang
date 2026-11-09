@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { officialContext } from "../server/official.ts";
 import { costContext } from "../server/chatCost.ts";
-import { CHAT_SYSTEM } from "../server/chatPrompt.ts";
+import { CHAT_SYSTEM, WEB_TOOLS, portalSearch } from "../server/chatPrompt.ts";
 
 const DB = "sapphire-accounts";
 const question = process.argv.slice(2).join(" ").trim();
@@ -53,6 +53,8 @@ for (const m of official.matchAll(/\[공식 글 본문[^\]]*\]/g)) console.log("
 const content = [];
 if (official) content.push({ type: "text", text: `<컴투스 공식 소식>\n${official}\n</컴투스 공식 소식>` });
 if (cost) content.push({ type: "text", text: `<과금 계산 자료>\n${cost}\n</과금 계산 자료>` });
+const portals = portalSearch(question);
+if (portals) content.push({ type: "text", text: `<포털 검색 주소>\n${portals}\n</포털 검색 주소>` });
 content.push({ type: "text", text: question });
 
 const ws = process.env.ANTHROPIC_WORKSPACE_ID?.trim();
@@ -67,13 +69,16 @@ const res = await client.beta.messages
     thinking: { type: "adaptive", display: "summarized" },
     output_config: { effort: "high" },
     system: [{ type: "text", text: CHAT_SYSTEM }],
-    tools: [
-      { type: "web_search_20260209", name: "web_search", max_uses: 5 },
-      { type: "web_fetch_20260209", name: "web_fetch", max_uses: 4 },
-    ],
+    tools: WEB_TOOLS,
     messages: [{ role: "user", content }],
   })
   .finalMessage();
+// 웹 찾기·읽기 결과의 오류 (횟수 제한, 일시 오류 등)도 찍는다
+const errs = res.content
+  .filter((b) => (b.type === "web_search_tool_result" || b.type === "web_fetch_tool_result") && b.content && !Array.isArray(b.content) && b.content.error_code)
+  .map((b) => `${b.type}: ${b.content.error_code}`);
+if (errs.length) console.log("웹 도구 오류: " + errs.join(", "));
+console.log("서버 도구 사용: " + JSON.stringify(res.usage.server_tool_use ?? {}));
 const used = res.content.filter((b) => b.type === "server_tool_use").map((b) => `${b.name} ${JSON.stringify(b.input).slice(0, 80)}`);
 console.log(`\n질문: ${question}\n걸린 시간 ${Math.round((Date.now() - started) / 1000)}초 · ${res.stop_reason} · 입력 ${res.usage.input_tokens} 출력 ${res.usage.output_tokens}${used.length ? `\n웹: ${used.join(" / ")}` : ""}\n`);
 console.log("=== 답 ===\n" + res.content.map((b) => (b.type === "text" ? b.text : "")).join(""));

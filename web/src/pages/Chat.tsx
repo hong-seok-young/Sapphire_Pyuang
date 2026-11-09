@@ -23,6 +23,7 @@ import {
 import type { AskEvents, ChatFile, ChatImage, ChatResult, ChatSource, ChatStep, ChatTurn, SavedMsg, Seen, ThreadSummary } from "../chat";
 import { loadPosts, useAsync } from "../data";
 import { loadOdds } from "../odds";
+import { appDataContext } from "../chatMarket";
 import { inFloat } from "../platform";
 import { go } from "../router";
 import { Loading, TopBar } from "../ui";
@@ -346,7 +347,11 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
     // 글 본문은 아직 받는 중일 수 있어서 기다린다 (못 받으면 없이)
     const allPosts = posts ?? (await loadPosts().catch(() => undefined));
     if (!live()) return;
-    const ctx = wikiContext(wiki, allPosts, question, asker, !!(lastUser?.images?.length || lastUser?.photos), odds, seen ?? undefined);
+    const wikiCtx = wikiContext(wiki, allPosts, question, asker, !!(lastUser?.images?.length || lastUser?.photos), odds, seen ?? undefined);
+    // 무기 강화 수치표, 거래 톡방 시세, 줄임말 (src/chatMarket.ts, 챗봇 개선 2026-11-09). 못 받으면 없이
+    const extra = await appDataContext([question, ...(seen?.names ?? [])].join(" ")).catch(() => ({ text: "", found: [] as string[] }));
+    if (!live()) return;
+    const ctx = { text: [extra.text, wikiCtx.text].filter(Boolean).join("\n\n"), found: [...extra.found, ...wikiCtx.found] };
     await follow(run, base, ctx.found, (events, signal) =>
       askChat({ turns: toHistory(base), context: ctx.text, thread: threadRef.current, again: reuse && lastUser.id !== undefined, found: ctx.found.join(" · ") }, events, signal),
     );

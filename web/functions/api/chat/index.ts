@@ -18,7 +18,7 @@ import { NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { appContext } from "../../../server/chatapp";
 import { officialContext } from "../../../server/official";
-import { CHAT_SYSTEM as SYSTEM } from "../../../server/chatPrompt";
+import { CHAT_SYSTEM as SYSTEM, WEB_TOOLS, portalSearch } from "../../../server/chatPrompt";
 import { costContext } from "../../../server/chatCost";
 import { addMsg, finishInBackground, newThread, ownThread, runStub, titleOf } from "../../../server/chatlog";
 import { errorCause, errorText, isWebOff } from "../../../server/chatErrors";
@@ -37,11 +37,7 @@ const MAX_FILES = 3;
 const MAX_PDF_B64 = 4_500_000; // PDF 하나 (약 3.3MB)
 const MAX_TEXT_FILE = 200_000; // 글 파일 하나의 글자 수
 
-/** 웹 찾기 도구 (서버에서 돈다). 한 번 답에 찾기 5번, 글 읽기 4번까지 */
-const WEB_TOOLS = [
-  { type: "web_search_20260209", name: "web_search", max_uses: 5 },
-  { type: "web_fetch_20260209", name: "web_fetch", max_uses: 4 },
-] as const;
+// 웹 찾기 도구(찾기 20번·읽기 15번, 한국에서)와 포털 검색 주소는 server/chatPrompt.ts (시험 스크립트와 같이 쓴다)
 
 interface ChatImage {
   type: (typeof IMAGE_TYPES)[number];
@@ -108,6 +104,8 @@ function toMessages(turns: ChatTurn[], context: string, app: string, official = 
     if (official) content.push({ type: "text", text: `<컴투스 공식 소식>\n${official}\n</컴투스 공식 소식>` });
     if (cost) content.push({ type: "text", text: `<과금 계산 자료>\n${cost}\n</과금 계산 자료>` });
     if (context) content.push({ type: "text", text: `<위키 자료>\n${context}\n</위키 자료>` });
+    const portals = portalSearch(t.text);
+    if (portals) content.push({ type: "text", text: `<포털 검색 주소>\n${portals}\n</포털 검색 주소>` });
     content.push({ type: "text", text: t.text.trim() || "첨부한 것을 보고 조언해 줘." });
     return { role: "user", content };
   });
