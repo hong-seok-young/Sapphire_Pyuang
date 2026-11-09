@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorText } from "../auth";
-import type { Me } from "../auth";
 import { useAsync } from "../data";
 import { Nick } from "../kakao";
 import { ago } from "../market";
@@ -26,7 +25,9 @@ import type { GcCurve, GcData, GcItem, GcOrder, GcWallet } from "../gcoin";
 import { Loading, TopBar } from "../ui";
 import { useBackClose } from "../backClose";
 
-type Tab = "shop" | "mine" | "orders" | "members" | "settings";
+type Tab = "shop" | "mine" | "staff";
+/** 담당자 메뉴 안의 칸 */
+type Staff = "orders" | "items" | "members" | "coins";
 const MEDAL = ["🥇", "🥈", "🥉"];
 
 /** 바뀐 숫자가 톡 튄다 (처음 그릴 때는 안 튐) */
@@ -98,16 +99,15 @@ function WalletCard({ w, curve, sample, data }: { w: GcWallet; curve: GcCurve[];
           <span className="gc-next-bar">
             <i style={{ transform: `scaleX(${pct / 100})` }} />
           </span>
-          <small>경험치 1% 마다 {(next / 100).toFixed(1)}코인 · 랭킹이나 내 정보에 적으면 바로 쌓여요</small>
         </div>
       )}
       <div className="gc-chips">
         <span className={"gc-chip" + (streak.count > 0 ? " gc-chip-fire" : "")}>
-          {streak.count > 0 ? `🔥 ${streak.count}주 연속 성장 · 이번 주도 올리면 +${streak.next}` : `🔥 매주 올리면 2주째부터 연속 보너스 +${streak.next}`}
+          🔥 {streak.count}주 연속 · 다음 +{streak.next}
         </span>
         {nextM && (
           <span className="gc-chip">
-            🎉 Lv.{nextM.level} 처음 넘으면 +{nextM.coin}
+            🎉 Lv.{nextM.level} 첫 달성 +{nextM.coin}
           </span>
         )}
       </div>
@@ -122,10 +122,9 @@ function WeekRank({ data }: { data: GcData }) {
     <div className="gc-week">
       <p className="gc-week-head">
         <b>이번 주 2군 성장 순위</b>
-        <small>이번 주 번 코인 순 · 목 10시에 1·2·3위 보너스</small>
       </p>
       {!top.length ? (
-        <p className="gc-week-empty">아직 이번 주에 레벨·경험치를 올린 2군이 없어요</p>
+        <p className="gc-week-empty">아직 없어요</p>
       ) : (
         <ol className="gc-week-list">
           {top.slice(0, 3).map((e, i) => (
@@ -177,7 +176,7 @@ function ShopTab({ data, wallet, sample, onDone }: { data: GcData; wallet: GcWal
       await buyItem(picked.id, qty);
       setPicked(null);
       setQty(1);
-      onDone(`${itemLabel({ ...picked, qty })} 신청했어요 · 오피서가 게임 안에서 줘요 (1~2일 걸릴 수 있어요)`);
+      onDone(`${itemLabel({ ...picked, qty })} 신청했어요`);
     } catch (x) {
       setError(errorText(x));
     } finally {
@@ -314,19 +313,13 @@ function MineTab({ data, wallet, history, sample, onChanged }: { data: GcData; w
           </li>
         ))}
         {!history.orders.length && !history.ledger.length && !history.levels.length && !history.milestones.length && (
-          <li className="gc-hist-empty">{wallet ? "아직 없어요 · 레벨이 오르면 여기에 쌓여요" : "2군 본캐만 코인이 쌓여요"}</li>
+          <li className="gc-hist-empty">{wallet ? "아직 없어요" : "2군 본캐만"}</li>
         )}
       </ul>
-      {wallet && wallet.base !== null && (
-        <p className="gc-note">
-          Lv.{wallet.base} {((wallet.baseExp ?? 0) / 1000).toFixed(1)}% 부터 오른 만큼 쌓여요 · 길드 랭킹이나 내 정보에 레벨·경험치를 적으면 바로
-        </p>
-      )}
       {error && <p className="form-error">{error}</p>}
       <div className="gc-curve">
         <p className="gc-week-head">
           <b>레벨업 코인표</b>
-          <small>레벨 하나 오를 때 · 경험치 % 는 그만큼 나눠서 · 높을수록 많이</small>
         </p>
         <ul>
           {rows.map((r) => {
@@ -392,7 +385,7 @@ function OrdersTab({ admin, onChanged }: { admin: NonNullable<GcData["admin"]>; 
               <span className="gc-order-act">
                 {rejecting === o.id ? (
                   <>
-                    <input className="mk-input" value={note} onChange={(e) => setNote(e.target.value.slice(0, 60))} placeholder="반려 의견 (안 적어도 돼요)" />
+                    <input className="mk-input" value={note} onChange={(e) => setNote(e.target.value.slice(0, 60))} placeholder="반려 의견" />
                     <button className="pill pill-danger gc-mini" disabled={busy} onClick={() => act(o, "reject")}>
                       반려 확인
                     </button>
@@ -498,7 +491,7 @@ function MembersTab({ admin, onChanged }: { admin: NonNullable<GcData["admin"]>;
                     </button>
                   </span>
                   <input className="mk-input" inputMode="numeric" value={delta} onChange={(e) => setDelta(e.target.value.replace(/\D/g, "").slice(0, 5))} placeholder="코인" />
-                  <input className="mk-input" value={note} onChange={(e) => setNote(e.target.value.slice(0, 60))} placeholder="왜 (예: 레벨 잘못 적음)" />
+                  <input className="mk-input" value={note} onChange={(e) => setNote(e.target.value.slice(0, 60))} placeholder="메모" />
                   <button className="pill gc-mini" disabled={busy || !Number(delta) || !note.trim()} onClick={() => save(m.id)}>
                     저장
                   </button>
@@ -514,16 +507,12 @@ function MembersTab({ admin, onChanged }: { admin: NonNullable<GcData["admin"]>;
   );
 }
 
-/** 설정 칸 (오피서 이상): 레벨업 코인표, 순위 보너스, 상점 물건 */
-function SettingsTab({ data, onChanged }: { data: GcData; onChanged: (msg: string) => void }) {
+/** 담당자 > 코인표: 레벨업 코인표, 주간 순위 보너스 */
+function CoinsTab({ data, onChanged }: { data: GcData; onChanged: (msg: string) => void }) {
   const [rows, setRows] = useState(() => [...data.curve].sort((a, b) => a.minLevel - b.minLevel).map((r) => ({ lv: String(r.minLevel), coin: String(r.coin) })));
   const [rank, setRank] = useState(() => data.rank.map(String));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [nName, setNName] = useState("");
-  const [nUnit, setNUnit] = useState("");
-  const [nPrice, setNPrice] = useState("");
-
   async function run(fn: () => Promise<unknown>, done: string) {
     setBusy(true);
     setError("");
@@ -536,22 +525,19 @@ function SettingsTab({ data, onChanged }: { data: GcData; onChanged: (msg: strin
       setBusy(false);
     }
   }
-  const num = (v: string, max: number) => v.replace(/\D/g, "").slice(0, max);
-
   return (
     <>
       {error && <p className="form-error">{error}</p>}
       <div className="panel gc-set">
         <p className="gc-week-head">
-          <b>레벨업 코인표</b>
-          <small>그 레벨부터 다음 줄 전까지, 레벨 하나에</small>
+          <b>레벨업 코인</b>
         </p>
         {rows.map((r, i) => (
           <div className="gc-set-row" key={i}>
             <span>Lv.</span>
-            <input className="mk-input" inputMode="numeric" value={r.lv} onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, lv: num(e.target.value, 2) } : x)))} />
+            <input className="mk-input" inputMode="numeric" value={r.lv} onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, lv: digits(e.target.value, 2) } : x)))} />
             <span>부터</span>
-            <input className="mk-input" inputMode="numeric" value={r.coin} onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, coin: num(e.target.value, 5) } : x)))} />
+            <input className="mk-input" inputMode="numeric" value={r.coin} onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, coin: digits(e.target.value, 5) } : x)))} />
             <span>코인</span>
             <button className="pill gc-mini" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} aria-label="이 줄 빼기">
               ✕
@@ -560,58 +546,92 @@ function SettingsTab({ data, onChanged }: { data: GcData; onChanged: (msg: strin
         ))}
         <div className="gc-set-actions">
           <button className="pill gc-mini" onClick={() => setRows((rs) => [...rs, { lv: "", coin: "" }])}>
-            ＋ 줄 추가
+            ＋ 줄
           </button>
           <button
             className="pill gc-mini gc-done-btn"
             disabled={busy}
-            onClick={() => run(() => saveGcSettings({ levels: rows.map((r) => ({ minLevel: Number(r.lv), coin: Number(r.coin) })) }), "레벨업 코인표를 저장했어요")}
+            onClick={() => run(() => saveGcSettings({ levels: rows.map((r) => ({ minLevel: Number(r.lv), coin: Number(r.coin) })) }), "저장했어요")}
           >
             저장
           </button>
         </div>
       </div>
-
       <div className="panel gc-set">
         <p className="gc-week-head">
-          <b>주간 2군 성장 보너스</b>
-          <small>목 10시, 지난주 1·2·3위</small>
+          <b>주간 1·2·3위 보너스</b>
         </p>
         <div className="gc-set-row">
           {rank.map((v, i) => (
             <label key={i} className="gc-rank-in">
               {MEDAL[i]}
-              <input className="mk-input" inputMode="numeric" value={v} onChange={(e) => setRank((rs) => rs.map((x, j) => (j === i ? num(e.target.value, 5) : x)))} />
+              <input className="mk-input" inputMode="numeric" value={v} onChange={(e) => setRank((rs) => rs.map((x, j) => (j === i ? digits(e.target.value, 5) : x)))} />
             </label>
           ))}
-          <button className="pill gc-mini gc-done-btn" disabled={busy} onClick={() => run(() => saveGcSettings({ rank: rank.map(Number) }), "순위 보너스를 저장했어요")}>
+          <button className="pill gc-mini gc-done-btn" disabled={busy} onClick={() => run(() => saveGcSettings({ rank: rank.map(Number) }), "저장했어요")}>
             저장
           </button>
         </div>
       </div>
+    </>
+  );
+}
 
-      <div className="panel gc-set">
+const digits = (v: string, max: number) => v.replace(/\D/g, "").slice(0, max);
+/** '20개' -> 20 (단위가 없거나 숫자가 아니면 1) */
+const qtyOf = (unit: string | null) => Number(/^(\d+)\s*개$/.exec(unit ?? "")?.[1] ?? 1) || 1;
+
+/**
+ * 담당자 > 물건 (제작자 2026-11-09 '담당자 메뉴는 템 뭐뭐를 골드 얼마의 가치인지 천원 단위로, 50개에 얼마 20개에 얼마 10개에 얼마'):
+ * 물건 이름마다 묶음(개수)과 골드 가치(천 골드 단위)를 적는다. 1천 골드 = 성장코인 1개라 적은 값이 곧 코인 값
+ */
+function ItemsTab({ data, onChanged }: { data: GcData; onChanged: (msg: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [nName, setNName] = useState("");
+  const [nQty, setNQty] = useState("");
+  const [nGold, setNGold] = useState("");
+  async function run(fn: () => Promise<unknown>, done: string) {
+    setBusy(true);
+    setError("");
+    try {
+      await fn();
+      onChanged(done);
+    } catch (x) {
+      setError(errorText(x));
+    } finally {
+      setBusy(false);
+    }
+  }
+  const groups = new Map<string, GcItem[]>();
+  for (const it of data.items) groups.set(it.name, [...(groups.get(it.name) ?? []), it]);
+  for (const list of groups.values()) list.sort((a, b) => qtyOf(a.unit) - qtyOf(b.unit));
+  return (
+    <>
+      {error && <p className="form-error">{error}</p>}
+      {[...groups.entries()].map(([name, list]) => (
+        <ItemGroup key={name} name={name} list={list} busy={busy} run={run} />
+      ))}
+      <div className="panel gc-item-new">
         <p className="gc-week-head">
-          <b>상점 물건</b>
-          <small>코인 1개 = 1,000골드쯤</small>
+          <b>새 물건</b>
         </p>
-        {data.items.map((it) => (
-          <ItemEdit key={it.id} it={it} busy={busy} run={run} />
-        ))}
-        <div className="gc-set-row">
-          <input className="mk-input gc-in-name" value={nName} onChange={(e) => setNName(e.target.value.slice(0, 20))} placeholder="이름 (예: 우파노래)" />
-          <input className="mk-input" value={nUnit} onChange={(e) => setNUnit(e.target.value.slice(0, 10))} placeholder="단위" />
-          <input className="mk-input" inputMode="numeric" value={nPrice} onChange={(e) => setNPrice(num(e.target.value, 6))} placeholder="코인" />
+        <div className="gc-bundle">
+          <input className="mk-input gc-in-name" value={nName} onChange={(e) => setNName(e.target.value.slice(0, 20))} placeholder="이름" />
+          <input className="mk-input" inputMode="numeric" value={nQty} onChange={(e) => setNQty(digits(e.target.value, 4))} placeholder="개수" />
+          <span>개</span>
+          <input className="mk-input" inputMode="numeric" value={nGold} onChange={(e) => setNGold(digits(e.target.value, 6))} placeholder="천 골드" />
+          <span>천</span>
           <button
             className="pill gc-mini gc-done-btn"
-            disabled={busy || !nName.trim() || !Number(nPrice)}
+            disabled={busy || !nName.trim() || !Number(nQty) || !Number(nGold)}
             onClick={() =>
               run(async () => {
-                await addGcItem({ name: nName.trim(), unit: nUnit.trim() || null, price: Number(nPrice) });
+                await addGcItem({ name: nName.trim(), unit: `${Number(nQty)}개`, price: Number(nGold) });
                 setNName("");
-                setNUnit("");
-                setNPrice("");
-              }, "물건을 더했어요")
+                setNQty("");
+                setNGold("");
+              }, "추가했어요")
             }
           >
             추가
@@ -622,34 +642,91 @@ function SettingsTab({ data, onChanged }: { data: GcData; onChanged: (msg: strin
   );
 }
 
-function ItemEdit({ it, busy, run }: { it: GcItem; busy: boolean; run: (fn: () => Promise<unknown>, done: string) => void }) {
-  const [name, setName] = useState(it.name);
-  const [unit, setUnit] = useState(it.unit ?? "");
-  const [price, setPrice] = useState(String(it.price));
-  const [del, setDel] = useState(false);
-  const dirty = name !== it.name || unit !== (it.unit ?? "") || price !== String(it.price);
+/** 물건 하나: 이름, 묶음마다 '20개 = 35천 골드', 묶음 더하기 */
+function ItemGroup({ name, list, busy, run }: { name: string; list: GcItem[]; busy: boolean; run: (fn: () => Promise<unknown>, done: string) => void }) {
+  const [nm, setNm] = useState(name);
+  const [qty, setQty] = useState("");
+  const [gold, setGold] = useState("");
   return (
-    <div className={"gc-set-row" + (it.active ? "" : " gc-off")}>
-      <span className="gc-hist-icon">{itemIcon(name)}</span>
-      <input className="mk-input gc-in-name" value={name} onChange={(e) => setName(e.target.value.slice(0, 20))} />
-      <input className="mk-input" value={unit} onChange={(e) => setUnit(e.target.value.slice(0, 10))} />
-      <input className="mk-input" inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value.replace(/\D/g, "").slice(0, 6))} />
-      {dirty && (
-        <button className="pill gc-mini gc-done-btn" disabled={busy} onClick={() => run(() => editGcItem(it.id, { name, unit: unit.trim() || null, price: Number(price) }), "물건을 고쳤어요")}>
+    <div className="panel gc-item">
+      <div className="gc-item-head">
+        <span className="gc-item-icon">{itemIcon(nm)}</span>
+        <input className="mk-input gc-in-name" value={nm} onChange={(e) => setNm(e.target.value.slice(0, 20))} aria-label="물건 이름" />
+        {nm.trim() && nm.trim() !== name && (
+          <button
+            className="pill gc-mini gc-done-btn"
+            disabled={busy}
+            onClick={() => run(() => Promise.all(list.map((it) => editGcItem(it.id, { name: nm.trim() }))), "이름을 바꿨어요")}
+          >
+            저장
+          </button>
+        )}
+      </div>
+      {list.map((it) => (
+        <Bundle key={it.id} it={it} busy={busy} run={run} />
+      ))}
+      <div className="gc-bundle gc-bundle-add">
+        <input className="mk-input" inputMode="numeric" value={qty} onChange={(e) => setQty(digits(e.target.value, 4))} placeholder="개수" />
+        <span>개</span>
+        <input className="mk-input" inputMode="numeric" value={gold} onChange={(e) => setGold(digits(e.target.value, 6))} placeholder="천 골드" />
+        <span>천</span>
+        <button
+          className="pill gc-mini"
+          disabled={busy || !Number(qty) || !Number(gold)}
+          onClick={() =>
+            run(async () => {
+              await addGcItem({ name, unit: `${Number(qty)}개`, price: Number(gold) });
+              setQty("");
+              setGold("");
+            }, "묶음을 더했어요")
+          }
+        >
+          ＋ 묶음
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** 묶음 한 줄: [20]개 = [35]천 골드 (= 35코인), 판매 중지, 삭제 */
+function Bundle({ it, busy, run }: { it: GcItem; busy: boolean; run: (fn: () => Promise<unknown>, done: string) => void }) {
+  const [qty, setQty] = useState(String(qtyOf(it.unit)));
+  const [gold, setGold] = useState(String(it.price));
+  const [del, setDel] = useState(false);
+  const dirty = qty !== String(qtyOf(it.unit)) || gold !== String(it.price);
+  return (
+    <div className={"gc-bundle" + (it.active ? "" : " gc-off")}>
+      <input className="mk-input" inputMode="numeric" value={qty} onChange={(e) => setQty(digits(e.target.value, 4))} aria-label="개수" />
+      <span>개</span>
+      <input className="mk-input" inputMode="numeric" value={gold} onChange={(e) => setGold(digits(e.target.value, 6))} aria-label="천 골드" />
+      <span>천</span>
+      <small className="gc-bundle-coin">
+        <Coin />
+        {Number(gold) || 0}
+      </small>
+      {dirty ? (
+        <button
+          className="pill gc-mini gc-done-btn"
+          disabled={busy || !Number(qty) || !Number(gold)}
+          onClick={() => run(() => editGcItem(it.id, { unit: `${Number(qty)}개`, price: Number(gold) }), "저장했어요")}
+        >
           저장
         </button>
-      )}
-      <button className="pill gc-mini" disabled={busy} onClick={() => run(() => editGcItem(it.id, { active: !it.active }), it.active ? "판매를 멈췄어요" : "다시 팔아요")}>
-        {it.active ? "판매 중지" : "다시 판매"}
-      </button>
-      {del ? (
-        <button className="pill pill-danger gc-mini" disabled={busy} onClick={() => run(() => deleteGcItem(it.id), "물건을 지웠어요")}>
-          삭제 확인
-        </button>
       ) : (
-        <button className="pill gc-mini" onClick={() => setDel(true)}>
-          삭제
-        </button>
+        <>
+          <button className="pill gc-mini" disabled={busy} onClick={() => run(() => editGcItem(it.id, { active: !it.active }), it.active ? "판매 중지" : "다시 판매")}>
+            {it.active ? "중지" : "판매"}
+          </button>
+          {del ? (
+            <button className="pill pill-danger gc-mini" disabled={busy} onClick={() => run(() => deleteGcItem(it.id), "삭제했어요")}>
+              확인
+            </button>
+          ) : (
+            <button className="pill gc-mini" onClick={() => setDel(true)} aria-label="삭제">
+              ✕
+            </button>
+          )}
+        </>
       )}
     </div>
   );
@@ -659,11 +736,14 @@ function ItemEdit({ it, busy, run }: { it: GcItem; busy: boolean; run: (fn: () =
  * 2군 성장코인샵 (개발중, 제작자 2026-11-09): 2군 본캐가 레벨업할 때마다 성장코인이 쌓이고(높은 레벨일수록 많이), 주간 2군 성장 1·2·3위는 보너스.
  * 코인으로 물건을 신청하면 오피서가 게임 안에서 주고 '지급 완료'를 누른다. 지금은 앱개발자만 본다
  */
-export function GrowthShopPage({ me }: { me: Me }) {
+export function GrowthShopPage() {
   const [reload, setReload] = useState(0);
   const { data, error } = useAsync(useCallback(() => fetchGcoin(), [reload]), "gcoin");
   const [cur, setCur] = useState<GcData | null>(null);
-  const [tab, setTab] = useEntryState<Tab>("gc.tab", (new URLSearchParams(location.hash.split("?")[1] ?? "").get("t") as Tab) || "shop");
+  // 알림에서 '#/gcoin?t=orders' 로 오면 담당자 > 신청
+  const asked = new URLSearchParams(location.hash.split("?")[1] ?? "").get("t");
+  const [tab, setTab] = useEntryState<Tab>("gc.tab", asked === "orders" ? "staff" : asked === "mine" ? "mine" : "shop");
+  const [staff, setStaff] = useEntryState<Staff>("gc.staff", "orders");
   const [notice, setNotice] = useState("");
   useEffect(() => {
     if (data) setCur(data);
@@ -678,15 +758,19 @@ export function GrowthShopPage({ me }: { me: Me }) {
   const tabs: { key: Tab; label: string }[] = [
     { key: "shop", label: "상점" },
     { key: "mine", label: "내 코인" },
-    ...(cur.manage
-      ? [
-          { key: "orders" as Tab, label: `신청${pending ? ` ${pending}` : ""}` },
-          { key: "members" as Tab, label: "현황" },
-          { key: "settings" as Tab, label: "설정" },
-        ]
-      : []),
+    ...(cur.manage ? [{ key: "staff" as Tab, label: `담당자${pending ? ` ${pending}` : ""}` }] : []),
   ];
   const shown = tabs.some((t) => t.key === tab) ? tab : "shop";
+  const staffTabs: { key: Staff; label: string }[] = [
+    { key: "orders", label: `신청${pending ? ` ${pending}` : ""}` },
+    { key: "items", label: "물건" },
+    { key: "members", label: "현황" },
+    { key: "coins", label: "코인표" },
+  ];
+  const saved = (m: string) => {
+    setNotice(m);
+    refresh();
+  };
 
   return (
     <>
@@ -698,34 +782,25 @@ export function GrowthShopPage({ me }: { me: Me }) {
           </button>
         ))}
       </div>
-      {!cur.open && <p className="gc-closed">개발 중 · 나만 보여요{me.role === "developer" && sample ? " · 내 캐릭터는 2군 본캐가 아니라 지갑은 예시예요" : ""}</p>}
+      {/* 담당자 메뉴: 아래 단계는 어두운 띠의 작은 단추 (위 단추와 상하위 구분, 장비대여 운영과 같은 모양) */}
+      {shown === "staff" && (
+        <nav className="sub-tabs">
+          {staffTabs.map((t) => (
+            <button key={t.key} className={"sub-tab" + (staff === t.key ? " sub-tab-on" : "")} onClick={() => { setStaff(t.key); setNotice(""); }}>
+              {t.label}
+            </button>
+          ))}
+        </nav>
+      )}
       {notice && <p className="form-note gc-notice">{notice}</p>}
 
       {(shown === "shop" || shown === "mine") && wallet && <WalletCard w={wallet} curve={cur.curve} sample={sample} data={cur} />}
-      {shown === "shop" && (
-        <ShopTab
-          data={cur}
-          wallet={cur.wallet}
-          sample={sample}
-          onDone={(m) => {
-            setNotice(m);
-            refresh();
-          }}
-        />
-      )}
+      {shown === "shop" && <ShopTab data={cur} wallet={cur.wallet} sample={sample} onDone={saved} />}
       {shown === "mine" && <MineTab data={cur} wallet={wallet} history={history} sample={sample} onChanged={refresh} />}
-      {shown === "orders" && cur.admin && <OrdersTab admin={cur.admin} onChanged={refresh} />}
-      {shown === "members" && cur.admin && <MembersTab admin={cur.admin} onChanged={refresh} />}
-      {shown === "settings" && cur.manage && (
-        <SettingsTab
-          key={reload}
-          data={cur}
-          onChanged={(m) => {
-            setNotice(m);
-            refresh();
-          }}
-        />
-      )}
+      {shown === "staff" && cur.admin && staff === "orders" && <OrdersTab admin={cur.admin} onChanged={refresh} />}
+      {shown === "staff" && cur.manage && staff === "items" && <ItemsTab key={reload} data={cur} onChanged={saved} />}
+      {shown === "staff" && cur.admin && staff === "members" && <MembersTab admin={cur.admin} onChanged={refresh} />}
+      {shown === "staff" && cur.manage && staff === "coins" && <CoinsTab key={reload} data={cur} onChanged={saved} />}
     </>
   );
 }

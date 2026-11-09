@@ -606,7 +606,7 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
 {
   const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
   const now = Date.now();
-  const LEVELS = [[1, 0], [21, 10], [26, 15], [31, 35], [34, 40], [36, 50], [37, 80], [38, 100], [39, 120], [45, 150]];
+  const LEVELS = [[1, 0], [21, 10], [26, 15], [31, 39], [34, 40], [36, 50], [37, 80], [38, 100], [39, 120], [45, 150]];
   const ITEMS = [
     ["사나운 멧돼지", "10개", 60],
     ["사나운 멧돼지", "20개", 120],
@@ -623,4 +623,15 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
   RANK.forEach((v, i) => lines.push(`INSERT OR IGNORE INTO gc_settings (key, value) VALUES ('rank${i + 1}', ${v});`));
   runSql(lines);
   console.log("2군 성장코인샵 기본값 (비어 있을 때만)");
+}
+
+// 성장코인 Lv.31~33 레벨당 35 -> 39 (제작자 2026-11-09 '30에서 32 찍으면 사멧 10개 망고워터 10개 살 코인 수준': 39 x 2 = 78 = 60 + 18).
+// 처음 넣은 값(35) 그대로일 때만 바꾼다 (오피서가 고친 값은 그대로). setup 'gcoin_lv31_39_20261109' 로 한 번만
+{
+  const KEY = "gcoin_lv31_39_20261109";
+  const now = Date.now();
+  runSql([
+    `UPDATE gc_levels SET coin = 39 WHERE min_level = 31 AND coin = 35 AND NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}');`,
+    `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+  ]);
 }
