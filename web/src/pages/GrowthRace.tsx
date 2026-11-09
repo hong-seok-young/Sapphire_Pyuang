@@ -1,7 +1,7 @@
 // 2군 성장코인샵 시범운영: 2주 목표 레벨 선착순 (서버 server/gcrace.ts, 김다혜·제작자 2026-11-09).
 // 성장 현황(리더보드 + 추월 차트), 상점 맨 위 성장 카드(달성률 · 성장반영), 담당자 '목표' 칸, 보상표.
 // 달성한 사람이 찍은 순서대로 위(1위 확정), 아직인 사람은 달성률 순. 1~5위 달성자가 상금을 받는다
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { JOB_NAME, avatarUrl, errorText } from "../auth";
 import { JobEmblem } from "../emblems";
@@ -44,8 +44,53 @@ function Face({ e, size }: { e: GcRaceEntry; size: number }) {
       draggable={false}
     />
   ) : (
-    <JobEmblem job={e.job} level={e.level} size={size} />
+    <JobEmblem job={e.job} size={size} />
   );
+}
+
+/** 닉네임 표 폭 어림 (11px 글씨, 한글 11px · 나머지 7px, 둘레 10px, 왕관 13px) */
+function tagWidth(name: string, crown: boolean): number {
+  let n = 10 + (crown ? 13 : 0);
+  for (const ch of name) n += /[\u3131-\uD7A3]/.test(ch) ? 11 : 7;
+  return n;
+}
+
+/**
+ * 선 끝 닉네임 자리: 점 위, 아래, 두 칸 위·아래 차례로, 그 안에서 가운데·왼쪽·오른쪽으로 비켜
+ * 앞 사람 표와 겹치지 않는 첫 자리 (모두 겹치면 처음 자리)
+ */
+function placeTags<P extends { e: GcRaceEntry; end: number; last: number }>(
+  list: P[],
+  x: (t: number) => number,
+  y: (p: number) => number,
+  w: number,
+  bottom: number,
+) {
+  const TH = 15;
+  const boxes: { l: number; r: number; t: number; b: number }[] = [];
+  return list.map((p) => {
+    const cx = x(p.end);
+    const cy = y(p.last);
+    const tw = tagWidth(p.e.id, p.e.rank === 1);
+    const hw = tw / 2;
+    const fit = (v: number) => Math.min(Math.max(v, hw + 2), w - hw - 2);
+    let pick: { tx: number; ty: number } | null = null;
+    for (const dy of [-13, 13, -29, 29, -45, 45]) {
+      const ty = cy + dy;
+      if (ty - TH / 2 < 2 || ty + TH / 2 > bottom) continue;
+      for (const dx of [0, -(hw + 4), hw + 4]) {
+        const tx = fit(cx + dx);
+        const box = { l: tx - hw - 2, r: tx + hw + 2, t: ty - TH / 2 - 1, b: ty + TH / 2 + 1 };
+        if (boxes.some((o) => o.l < box.r && box.l < o.r && o.t < box.b && box.t < o.b)) continue;
+        boxes.push(box);
+        pick = { tx, ty };
+        break;
+      }
+      if (pick) break;
+    }
+    if (!pick) pick = { tx: fit(cx), ty: Math.max(cy - 13, TH / 2 + 2) };
+    return { p, cx, cy, ...pick };
+  });
 }
 
 /** 어떤 때의 달성률 (그 때까지 마지막 점) */
@@ -117,7 +162,7 @@ function RaceChart({
   const H = 176;
   const L = 30;
   const R = 26;
-  const T = 28;
+  const T = 22;
   const B = 20;
   const tNow = Math.min(Math.max(now, race.start), race.end);
   const x = (t: number) =>
@@ -146,6 +191,13 @@ function RaceChart({
   const leader = paths.find((p) => p.e.rank === 1);
   const faces = paths.filter(
     (p) => colorOf.has(p.e.id) || p.e.id === me || p.e.id === pick,
+  );
+  const tags = placeTags(
+    [...faces].sort((a, b) => a.e.rank - b.e.rank),
+    x,
+    y,
+    w,
+    H - B,
   );
   const reduce =
     typeof matchMedia !== "undefined" &&
@@ -179,23 +231,8 @@ function RaceChart({
     });
   }
 
-  const legend = race.list
-    .slice(0, 3)
-    .concat(race.list.slice(3).filter((e) => e.id === me));
   return (
     <div className="gr-chart" ref={box}>
-      <div className="gr-legend">
-        {legend.map((e) => (
-          <button
-            key={e.id}
-            className={"gr-leg" + (pick === e.id ? " gr-leg-on" : "")}
-            onClick={() => onPick(e.id)}
-          >
-            <i style={{ background: color(e.id) }} />
-            {e.id}
-          </button>
-        ))}
-      </div>
       <div className="gr-plot">
         <svg
           width={w}
@@ -331,25 +368,26 @@ function RaceChart({
             />
           )}
         </svg>
-        {/* 선 끝 얼굴 (앞 세 사람, 나, 고른 사람). 1위는 왕관 */}
-        {faces.map((p) => (
-          <span
-            key={p.e.id}
-            className={
-              "gr-end" +
-              (p.e.rank === 1 ? " gr-end-1" : "") +
-              (p.e.doneAt !== null ? " gr-end-done" : "")
-            }
-            style={{
-              left: x(p.end),
-              top: y(p.last),
-              ["--c" as string]: color(p.e.id),
-            }}
-            onClick={() => onPick(p.e.id)}
-          >
-            {p.e.rank === 1 && <em className="gr-crown">👑</em>}
-            <Face e={p.e} size={18} />
-          </span>
+        {/* 선 끝 점과 닉네임 (앞 세 사람, 나, 고른 사람). 1위는 왕관 */}
+        {tags.map(({ p, cx, cy, tx, ty }) => (
+          <Fragment key={p.e.id}>
+            <span
+              className={
+                "gr-end" + (p.e.doneAt !== null ? " gr-end-done" : "")
+              }
+              style={{ left: cx, top: cy, ["--c" as string]: color(p.e.id) }}
+            />
+            <span
+              className={
+                "gr-tag" + (p.e.id === pick ? " gr-tag-on" : "")
+              }
+              style={{ left: tx, top: ty, ["--c" as string]: color(p.e.id) }}
+              onClick={() => onPick(p.e.id)}
+            >
+              {p.e.rank === 1 && <em className="gr-crown">👑</em>}
+              {p.e.id}
+            </span>
+          </Fragment>
         ))}
         {tip && (
           <span
