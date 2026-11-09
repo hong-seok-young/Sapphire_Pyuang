@@ -50,6 +50,57 @@ interface Job {
 
 /** 한 번 답에 쓰는 가장 긴 때 (알람은 15분까지) */
 const MAX_RUN_MS = 14 * 60_000;
+/** pause_turn 뒤 이어 묻는 횟수 (시간 14분이 실제 한도. 무한히 돌지 않게만) */
+const MAX_ROUNDS = 30;
+
+const joinText = (chunks: Uint8Array[]) => {
+  const d = new TextDecoder();
+  return chunks.map((c) => d.decode(c, { stream: true })).join("") + d.decode();
+};
+
+/**
+ * 한 회차 SSE 에서 답 블록을 그대로 다시 만든다 (pause_turn 뒤 assistant 로 돌려보내 이어 묻기).
+ * 생각(서명 포함), 글(인용 포함), 서버 도구 호출과 결과를 받은 그대로
+ */
+export function contentFromSse(raw: string): { blocks: Record<string, unknown>[]; stop: string | null } {
+  const blocks: Record<string, unknown>[] = [];
+  const json = new Map<number, string>();
+  let stop: string | null = null;
+  for (const chunk of raw.replace(/\r\n/g, "\n").split("\n\n")) {
+    const data = chunk
+      .split("\n")
+      .filter((l) => l.startsWith("data:"))
+      .map((l) => l.slice(5).replace(/^ /, ""))
+      .join("\n");
+    if (!data) continue;
+    let ev: { type: string; index?: number; content_block?: Record<string, unknown>; delta?: Record<string, unknown> };
+    try {
+      ev = JSON.parse(data);
+    } catch {
+      continue;
+    }
+    const i = ev.index ?? -1;
+    if (ev.type === "content_block_start" && ev.content_block) {
+      blocks[i] = { ...ev.content_block };
+      if (ev.content_block.type === "server_tool_use" || ev.content_block.type === "tool_use") json.set(i, "");
+    } else if (ev.type === "content_block_delta" && ev.delta && blocks[i]) {
+      const b = blocks[i];
+      const d = ev.delta;
+      if (d.type === "text_delta") b.text = String(b.text ?? "") + String(d.text ?? "");
+      else if (d.type === "thinking_delta") b.thinking = String(b.thinking ?? "") + String(d.thinking ?? "");
+      else if (d.type === "signature_delta") b.signature = d.signature;
+      else if (d.type === "citations_delta") b.citations = [...((b.citations as unknown[]) ?? []), d.citation];
+      else if (d.type === "input_json_delta") json.set(i, (json.get(i) ?? "") + String(d.partial_json ?? ""));
+    } else if (ev.type === "content_block_stop" && json.has(i) && blocks[i]) {
+      try {
+        blocks[i].input = JSON.parse(json.get(i) || "{}");
+      } catch {
+        blocks[i].input = {};
+      }
+    } else if (ev.type === "message_delta" && ev.delta?.stop_reason) stop = String(ev.delta.stop_reason);
+  }
+  return { blocks: blocks.filter(Boolean), stop };
+}
 
 const enc = new TextEncoder();
 const line = (obj: unknown) => enc.encode(`data: ${JSON.stringify(obj)}\n\n`);
@@ -294,17 +345,36 @@ export class ChatRun extends DurableObject<Env> {
     }
 
     const dec = new TextDecoder();
-    try {
-      const reader = upstream.body!.getReader();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (!value?.length) continue;
-        this.push(job, value);
-        if (job.firstTextAt === null && dec.decode(value, { stream: true }).includes('"text_delta"')) job.firstTextAt = Date.now();
+    // 웹 찾기를 오래 하면 API 가 답을 잠깐 멈춘다 (stop_reason pause_turn). 받은 내용을 그대로 붙여 다시 물어 이어 간다
+    // (챗봇 개선 2026-11-09, 제작자 '한도를 왜 두는 거야? 안 두면 안 돼?': 찾기·읽기 횟수 한도를 없애고, 멈추면 이어서. 14분이 넘으면 거기까지)
+    const sent = (start.params.messages ?? []) as unknown[];
+    const said: unknown[] = []; // 앞 회차들에 받은 답 블록 (이어 물을 때 assistant 로)
+    for (let round = 0; ; round++) {
+      const roundChunks: Uint8Array[] = [];
+      try {
+        const reader = upstream.body!.getReader();
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (!value?.length) continue;
+          this.push(job, value);
+          roundChunks.push(value);
+          if (job.firstTextAt === null && dec.decode(value, { stream: true }).includes('"text_delta"')) job.firstTextAt = Date.now();
+        }
+      } catch (e) {
+        if (!job.stopped) console.error("chat run stream broke", e instanceof Error ? e.message : e);
+        break;
       }
-    } catch (e) {
-      if (!job.stopped) console.error("chat run stream broke", e instanceof Error ? e.message : e);
+      if (job.stopped || round >= MAX_ROUNDS) break;
+      const got = contentFromSse(joinText(roundChunks));
+      if (got.stop !== "pause_turn" || !got.blocks.length) break;
+      said.push(...got.blocks);
+      try {
+        upstream = await ask({ ...start.params, messages: [...sent, { role: "assistant", content: said }] });
+      } catch (e) {
+        if (!job.stopped) console.error("chat run continue failed", e instanceof Anthropic.APIError ? e.status : e);
+        break;
+      }
     }
     clearTimeout(timer);
     if (job.stopped) return; // 화면이 중지했거나 같은 대화에 새로 물었다: 넣지 않는다
