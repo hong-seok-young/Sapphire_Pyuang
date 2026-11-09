@@ -109,21 +109,36 @@ export function curveRows(curve: GcCurve[], max = 55): { from: number; to: numbe
     .filter((r) => r.coin > 0 && r.from <= max);
 }
 
-/** 물건 이름으로 고른 그림 (물건 그림이 따로 없어서) */
+/** 물건 그림이 있는 이름 (게임 거래소 스샷에서 자른 칸, 자료 scripts/make_gcoin_icons.py -> data/gcoin/<이름(띄어쓰기 없이)>.png).
+ * 칸 오른쪽 아래 개수 표가 한 통(자몽주스·자몽케이크 50, 나머지 20)이다 */
+const PICS = new Set(["사나운멧돼지인형", "망고워터", "자몽주스", "자몽케이크", "우파우파의노래", "잠깬쿠이인형", "별과자", "동그리사탕", "데블랑사탕", "딸기빙수", "꿀사과", "알사탕", "칠면조구이", "송편", "자라의노래"]);
+export function itemPic(name: string): string | null {
+  let key = name.replace(/\s/g, "");
+  if (/멧돼지/.test(key)) key = "사나운멧돼지인형";
+  return PICS.has(key) ? `/data/gcoin/${encodeURIComponent(key)}.png` : null;
+}
+
+/** 그림이 없는 물건(오피서가 새로 넣은 것)의 그림 글자 */
 export function itemIcon(name: string): string {
   if (/멧돼지/.test(name)) return "🐗";
   if (/망고/.test(name)) return "🥭";
   if (/주스/.test(name)) return "🧃";
   if (/케이크/.test(name)) return "🍰";
   if (/노래|우파/.test(name)) return "🎵";
+  if (/사탕|과자/.test(name)) return "🍬";
   if (/도핑|물약|포션/.test(name)) return "🧪";
   return "🎁";
 }
 
+/** 한 통의 개수 (제작자 2026-11-09 '자몽주스와 자몽케이크는 통당 50개, 나머지는 한 통에 20개') */
+export const tongOf = (name: string) => (/자몽/.test(name) ? 50 : 20);
+/** 묶음 이름: 한 통이면 '1통(20개)' */
+export const unitOf = (name: string, qty: number) => (qty === tongOf(name) ? `1통(${qty}개)` : `${qty}개`);
+
 export const itemLabel = (o: { name: string; unit: string | null; qty?: number }) => `${o.name}${o.unit ? ` ${o.unit}` : ""}${o.qty && o.qty > 1 ? ` x${o.qty}` : ""}`;
 
 /** 내 캐릭터가 2군 본캐가 아닐 때(앱개발자는 1군) 보이는 예시 지갑. 화면에만 있고 서버에는 안 간다 */
-export const SAMPLE_WALLET: GcWallet = { id: "예시", level: 34, base: 31, baseExp: 40000, top: 34, topExp: 52000, earned: 116, milestone: 0, bonus: 80, adjust: 0, spent: 78, balance: 118 };
+export const SAMPLE_WALLET: GcWallet = { id: "예시", level: 34, base: 31, baseExp: 40000, top: 34, topExp: 52000, earned: 116, milestone: 0, bonus: 80, adjust: 0, spent: 155, balance: 41 };
 export const SAMPLE_HISTORY: GcData["history"] = {
   levels: [
     { level: 34, coin: 20, pct: 52 },
@@ -137,8 +152,8 @@ export const SAMPLE_HISTORY: GcData["history"] = {
     { delta: 60, kind: "rank", note: "주간 2군 성장 2위 (그 주 +52코인)", at: Date.now() - 2 * 86_400_000 },
   ],
   orders: [
-    { id: -1, user: "예시", itemId: null, name: "사나운 멧돼지", unit: "10개", price: 60, qty: 1, status: "done", note: null, at: Date.now() - 86_400_000, doneAt: Date.now() - 80_000_000, doneBy: "멍멍" },
-    { id: -2, user: "예시", itemId: null, name: "망고워터", unit: "10개", price: 18, qty: 1, status: "pending", note: null, at: Date.now() - 3_600_000, doneAt: null, doneBy: null },
+    { id: -1, user: "예시", itemId: null, name: "사나운 멧돼지 인형", unit: "1통(20개)", price: 120, qty: 1, status: "done", note: null, at: Date.now() - 86_400_000, doneAt: Date.now() - 80_000_000, doneBy: "멍멍" },
+    { id: -2, user: "예시", itemId: null, name: "망고워터", unit: "1통(20개)", price: 35, qty: 1, status: "pending", note: null, at: Date.now() - 3_600_000, doneAt: null, doneBy: null },
   ],
 };
 

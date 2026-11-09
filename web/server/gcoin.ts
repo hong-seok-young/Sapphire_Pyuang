@@ -55,13 +55,24 @@ export const milestonesBetween = (base: number, top: number) => MILESTONES.filte
 /** 주간 2군 성장 1·2·3위 보너스 기본값 */
 export const DEFAULT_RANK = [100, 60, 30];
 /** 처음 물건 (코인 1개 = 1,000골드쯤) */
+// 한 통씩 판다 (제작자 2026-11-09 '자몽주스와 자몽케이크는 통당 50개, 나머지는 한 통에 20개'). 값은 천 골드 = 코인.
+// 사나운 멧돼지 인형·망고워터·자몽주스·자몽케이크는 제작자가 처음 준 값, 나머지는 제작자가 보낸 거래소 스샷(2026-11-09)의 한 통 가장 싼 값
 export const DEFAULT_ITEMS: { name: string; unit: string; price: number }[] = [
-  { name: "사나운 멧돼지", unit: "10개", price: 60 },
-  { name: "사나운 멧돼지", unit: "20개", price: 120 },
-  { name: "망고워터", unit: "10개", price: 18 },
-  { name: "망고워터", unit: "20개", price: 35 },
-  { name: "자몽주스", unit: "1개", price: 60 },
-  { name: "자몽케이크", unit: "1개", price: 80 },
+  { name: "사나운 멧돼지 인형", unit: "1통(20개)", price: 120 },
+  { name: "망고워터", unit: "1통(20개)", price: 35 },
+  { name: "자몽주스", unit: "1통(50개)", price: 60 },
+  { name: "자몽케이크", unit: "1통(50개)", price: 80 },
+  { name: "우파우파의노래", unit: "1통(20개)", price: 144 },
+  { name: "잠깬쿠이인형", unit: "1통(20개)", price: 125 },
+  { name: "별과자", unit: "1통(20개)", price: 166 },
+  { name: "동그리사탕", unit: "1통(20개)", price: 289 },
+  { name: "데블랑사탕", unit: "1통(20개)", price: 400 },
+  { name: "딸기빙수", unit: "1통(20개)", price: 89 },
+  { name: "꿀사과", unit: "1통(20개)", price: 75 },
+  { name: "알사탕", unit: "1통(20개)", price: 32 },
+  { name: "칠면조 구이", unit: "1통(20개)", price: 30 },
+  { name: "송편", unit: "1통(20개)", price: 10 },
+  { name: "자라의노래", unit: "1통(20개)", price: 660 },
 ];
 export const MAX_NAME = 20;
 export const MAX_UNIT = 10;

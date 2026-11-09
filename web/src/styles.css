@@ -2537,7 +2537,6 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .st-list,
 .bd-suggest,
 .gc-hist,
-.gc-goods,
 .gc-curve ul,
 .rent-held { grid-template-columns: minmax(0, 1fr); }
 /* 입력 칸은 flex 줄 안에서 줄어들 수 있게 (기본 폭이 커서 옆 단추를 밀어냈다) */
@@ -4350,19 +4349,22 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .gc-pod small { font-size: 10px; color: #c3cfe6; }
 .gc-pod-bonus { display: flex; align-items: center; font-size: 11px; color: var(--gold); }
 
-.gc-goods { list-style: none; margin: 0 0 110px; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
-.gc-good { display: flex; align-items: stretch; gap: 6px; padding: 4px; background: var(--panel); border: var(--px) solid var(--edge); }
-.gc-good-head { flex: 0 0 34%; min-width: 0; display: flex; align-items: center; gap: 4px; }
-.gc-good-icon { flex: none; font-size: 22px; }
-.gc-good-name { min-width: 0; font-size: 13px; line-height: 1.2; }
-.gc-packs { flex: 1; min-width: 0; display: flex; gap: 4px; }
-.gc-pack {
-  position: relative; flex: 1 1 0; min-width: 0; display: grid; justify-items: center; gap: 1px; padding: 4px 2px; cursor: pointer; color: var(--text);
-  background: var(--night-2); border: 1px solid var(--edge); box-shadow: inset 0 1px 0 var(--hi); transition: transform 0.08s ease;
+/* 상점: 물건 칸 3칸 격자 (게임 거래소 칸 그림, 개수 표가 한 통) */
+.gc-goods { list-style: none; margin: 0 0 110px; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.gc-good {
+  position: relative; width: 100%; height: 100%; display: grid; justify-items: center; align-content: start; gap: 2px; padding: 6px 3px 5px; cursor: pointer;
+  color: var(--text); background: var(--panel); border: var(--px) solid var(--edge); box-shadow: inset 0 1px 0 var(--hi); transition: transform 0.08s ease;
 }
-.gc-pack small { font-size: 11px; color: var(--muted); }
-.gc-pack b { display: flex; align-items: center; font-size: 13px; color: var(--gold); }
-.gc-pack:active { transform: scale(0.94); }
+.gc-good:active { transform: scale(0.95); }
+.gc-good .gc-pic { width: 46px; height: 46px; }
+.gc-good-name { width: 100%; font-size: 12px; line-height: 1.2; text-align: center; }
+.gc-good-price { display: flex; align-items: center; flex-wrap: wrap; justify-content: center; font-size: 13px; color: var(--gold); }
+.gc-good-price small { width: 100%; text-align: center; font-size: 10px; font-weight: 400; color: var(--muted); }
+.gc-pic { flex: none; width: 30px; height: 30px; object-fit: contain; image-rendering: pixelated; }
+.gc-pic-s { width: 24px; height: 24px; }
+.gc-pic-emoji { display: grid; place-items: center; font-size: 22px; line-height: 1; }
+.gc-pic-s.gc-pic-emoji { font-size: 16px; }
+.gc-buy-name { display: flex; align-items: center; gap: 4px; }
 .gc-short { opacity: 0.5; }
 .gc-picked { background: #2c3456; box-shadow: 0 0 0 2px #c3cfe6; }
 .gc-picked::after { content: ""; position: absolute; inset: -3px; border: 1px solid #c3cfe6; pointer-events: none; animation: gc-halo 1.2s ease-out infinite; }

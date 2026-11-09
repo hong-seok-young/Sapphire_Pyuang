@@ -960,7 +960,8 @@ def copy_rank_pictures():
     data/ 아래에 두어 위키 자료처럼 로그인한 길드원에게만 보인다 (functions/data/_middleware.ts)."""
     # 시세동향: 위키에 없는 물건(코스튬 등)의 그림, 제작자가 보낸 도감 스샷에서 자른 것 (자료/scripts/make_trend_icons.py)
     # 생일: 생일 스티커 (src/birthday.tsx, 자료/scripts/make_birthday_sticker.py)
-    for src, dst in (("랭킹", "rank"), ("중개인", "market"), ("상점", "shop"), ("시세동향", "trend"), ("생일", "birthday")):
+    # 성장코인샵: 2군 성장코인샵 물건 칸 그림, 제작자가 보낸 거래소 스샷에서 자른 것 (src/gcoin.ts itemPic, 자료/scripts/make_gcoin_icons.py)
+    for src, dst in (("랭킹", "rank"), ("중개인", "market"), ("상점", "shop"), ("시세동향", "trend"), ("생일", "birthday"), ("성장코인샵", "gcoin")):
         out = OUT / "data" / dst
         if out.exists():
             shutil.rmtree(out)
