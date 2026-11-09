@@ -27,6 +27,8 @@ export interface RunStart {
     /** 오늘(한국 날짜): 답을 못 받으면 질문 수를 되돌린다 */
     day: string;
     developer: boolean;
+    /** 위키 자료가 질문 뒤에 따라온다 (/context). 25초까지 기다렸다가 붙이고, 안 오면(앱을 껐다) 없이 답한다 */
+    waitContext?: boolean;
   };
   /** Claude API 요청 (stream 은 일꾼이 붙인다) */
   params: Record<string, unknown>;
@@ -46,10 +48,28 @@ interface Job {
   begun: boolean;
   done: boolean;
   stopped: boolean;
+  /** 뒤따라온 위키 자료 */
+  ctx: { text: string; found: string } | null;
+  ctxWait: (() => void) | null;
 }
+
+/** 위키 자료를 기다리는 가장 긴 때 */
+const CONTEXT_WAIT_MS = 25_000;
 
 /** 한 번 답에 쓰는 가장 긴 때 (알람은 15분까지) */
 const MAX_RUN_MS = 14 * 60_000;
+/** 마지막 질문의 맨 끝(질문 글) 바로 앞에 <위키 자료> 를 넣는다 */
+function withContext(params: Record<string, unknown>, text: string): Record<string, unknown> {
+  const messages = [...((params.messages ?? []) as { role: string; content: unknown }[])];
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== "user") return params;
+  const block = { type: "text", text: `<위키 자료>\n${text}\n</위키 자료>` };
+  const content = Array.isArray(last.content) ? [...last.content] : [{ type: "text", text: String(last.content) }];
+  content.splice(Math.max(0, content.length - 1), 0, block);
+  messages[messages.length - 1] = { ...last, content };
+  return { ...params, messages };
+}
+
 /** pause_turn 뒤 이어 묻는 횟수 (시간 14분이 실제 한도. 무한히 돌지 않게만) */
 const MAX_ROUNDS = 30;
 
@@ -228,6 +248,8 @@ export class ChatRun extends DurableObject<Env> {
         begun: false,
         done: false,
         stopped: false,
+        ctx: null,
+        ctxWait: null,
       };
       this.job = job;
       const res = this.watch(job);
@@ -238,6 +260,13 @@ export class ChatRun extends DurableObject<Env> {
     if (path === "/watch") {
       if (!this.job) return new Response(null, { status: 204 });
       return this.watch(this.job);
+    }
+    if (path === "/context" && request.method === "POST") {
+      const c = (await request.json()) as { text?: string; found?: string };
+      if (!this.job || this.job.done) return new Response("late", { status: 409 });
+      this.job.ctx = { text: String(c.text ?? ""), found: String(c.found ?? "") };
+      this.job.ctxWait?.();
+      return new Response("ok");
     }
     if (path === "/stop" && request.method === "POST") {
       if (this.job && !this.job.done) this.finish(this.job, true);
@@ -302,6 +331,22 @@ export class ChatRun extends DurableObject<Env> {
   private async run(job: Job): Promise<void> {
     const { start } = job;
     const { meta } = start;
+    // 위키 자료를 기다려 질문 바로 앞에 붙인다 (화면이 질문을 먼저 보냈다)
+    if (meta.waitContext) {
+      if (!job.ctx) {
+        await new Promise<void>((resolve) => {
+          const t = setTimeout(resolve, CONTEXT_WAIT_MS);
+          job.ctxWait = () => {
+            clearTimeout(t);
+            resolve();
+          };
+        });
+        job.ctxWait = null;
+      }
+      if (job.stopped) return;
+      if (job.ctx?.found) meta.found = job.ctx.found;
+      if (job.ctx?.text) start.params = withContext(start.params, job.ctx.text);
+    }
     const env = this.env;
     const timer = setTimeout(() => job.ctrl.abort(), MAX_RUN_MS);
     const client = new Anthropic({

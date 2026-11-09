@@ -555,20 +555,49 @@ const host = (url: string) => {
  * 실패하면 길드원에게 보여 줄 글로 Error 를 던진다. 멈추기(signal)는 받은 데까지로 끝낸다
  */
 export async function askChat(
-  req: { turns: ChatTurn[]; context: string; thread: number | null; again?: boolean; found?: string },
+  req: {
+    turns: ChatTurn[];
+    context: string;
+    thread: number | null;
+    again?: boolean;
+    found?: string;
+    /** 위키 자료를 고르는 중이면: 질문을 먼저 보내고 자료는 고르는 대로 뒤따라 보낸다 (제작자 2026-11-09 '질문하자마자 웹을 꺼도 끝까지') */
+    later?: Promise<{ context: string; found: string }>;
+  },
   on: AskEvents,
   signal: AbortSignal,
 ): Promise<ChatResult> {
   const result = emptyResult();
-  let res: Response;
-  try {
-    res = await fetch("/api/chat", {
+  const post = (body: Record<string, unknown>) =>
+    fetch("/api/chat", {
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ messages: req.turns, context: req.context, thread: req.thread, again: req.again === true, found: req.found ?? "" }),
+      body: JSON.stringify(body),
       signal,
     });
+  const base = { messages: req.turns, thread: req.thread, again: req.again === true };
+  let res: Response;
+  try {
+    if (req.later) {
+      res = await post({ ...base, context: "", found: "", later: true });
+      // 서버에 답 받기 일꾼이 없으면 자료를 다 고른 뒤 같이 보낸다
+      if (res.status === 409) {
+        const c = await req.later;
+        res = await post({ ...base, context: c.context, found: c.found });
+      } else if (res.ok) {
+        const thread = Number(res.headers.get("x-chat-thread"));
+        void req.later.then((c) =>
+          fetch("/api/chat/context", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ thread, context: c.context, found: c.found }),
+            keepalive: c.context.length < 60_000, // 앱을 닫는 중이어도 가게 (64KB 한도)
+          }).catch(() => undefined),
+        );
+      }
+    } else res = await post({ ...base, context: req.context, found: req.found ?? "" });
   } catch {
     if (signal.aborted) return { ...result, aborted: true };
     throw new Error("인터넷 연결을 확인해 주세요");

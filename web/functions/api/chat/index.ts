@@ -116,7 +116,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
   if (!me) return NEED_LOGIN();
   if (!env.ANTHROPIC_API_KEY) return json({ error: "챗봇이 아직 준비 중이에요" }, 503);
 
-  const body = await readJson<{ messages: unknown; context: string; thread: unknown; again: unknown; found: unknown }>(request);
+  const body = await readJson<{ messages: unknown; context: string; thread: unknown; again: unknown; found: unknown; later: unknown }>(request);
   const turns = parseTurns(body.messages);
   if (!turns) return json({ error: "질문을 다시 보내 주세요 (사진 4장, 파일 3개까지)" }, 400);
   // 위키 자료는 자르지 않는다 (제작자 2026-11-03 '무조건 다 봐', '없애': 1만 6천 자 한도를 뺐다)
@@ -124,6 +124,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
   const thread = body.thread == null ? null : await ownThread(env, me.id, body.thread);
   if (body.thread != null && !thread) return json({ error: "대화를 찾지 못했어요" }, 404);
   const again = body.again === true && thread !== null;
+  // 위키 자료는 질문 뒤에 따라온다 (/api/chat/context, 답 받기 일꾼이 기다린다). 일꾼이 없으면 자료와 같이 다시 보내라고 한다 (아무것도 넣기 전에)
+  const later = body.later === true;
+  if (later && !env.CHATRUN) return json({ needContext: true }, 409);
 
   // 오늘(한국 시간) 몇 번째 질문인지. 답을 못 받으면 되돌린다
   const day = new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
@@ -208,6 +211,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
           found: typeof body.found === "string" ? body.found.slice(0, 400) : "",
           day,
           developer: me.role === "developer",
+          ...(later ? { waitContext: true } : {}),
         },
         params: params(true),
         key: env.ANTHROPIC_API_KEY,
