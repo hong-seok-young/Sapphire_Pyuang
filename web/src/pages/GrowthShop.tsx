@@ -19,6 +19,7 @@ import {
   fetchGcoin,
   itemIcon,
   itemLabel,
+  itemInfo,
   itemPic,
   packOf,
   qtyOf,
@@ -557,7 +558,7 @@ function Pic({ name, small }: { name: string; small?: boolean }) {
 
 /** 물건을 누르면 보이는 정보창 (게임 정보창처럼: 이름, 쿨타임은 파란 글씨, 옵션 한 줄씩) */
 function ItemInfo({ it }: { it: GcItem }) {
-  const lines = (it.info ?? "").split(/\s*[·\n]\s*/).filter(Boolean);
+  const lines = itemInfo(it.name);
   return (
     <div className="gc-info">
       <Pic name={it.name} />
@@ -638,11 +639,8 @@ function ItemsTab({ data, onChanged }: { data: GcData; onChanged: (msg: string) 
 /** 물건 하나: 이름, 묶음마다 '20개 = 35천 골드', 묶음 더하기 */
 function ItemGroup({ name, list, busy, run }: { name: string; list: GcItem[]; busy: boolean; run: (fn: () => Promise<unknown>, done: string) => void }) {
   const [nm, setNm] = useState(name);
-  const info0 = list[0]?.info ?? "";
-  const [info, setInfo] = useState(info0);
   // 저장한 뒤 새로 받은 값으로 맞춘다 (다시 열 때 예전 목록으로 먼저 그린다)
   useEffect(() => setNm(name), [name]);
-  useEffect(() => setInfo(info0), [info0]);
   const [qty, setQty] = useState("");
   const [gold, setGold] = useState("");
   return (
@@ -655,18 +653,6 @@ function ItemGroup({ name, list, busy, run }: { name: string; list: GcItem[]; bu
             className="pill gc-mini gc-done-btn"
             disabled={busy}
             onClick={() => run(() => Promise.all(list.map((it) => editGcItem(it.id, { name: nm.trim() }))), "이름을 바꿨어요")}
-          >
-            저장
-          </button>
-        )}
-      </div>
-      <div className="gc-item-info">
-        <input className="mk-input" value={info} onChange={(e) => setInfo(e.target.value.slice(0, 120))} placeholder="옵션" aria-label="옵션" />
-        {info.trim() !== info0.trim() && (
-          <button
-            className="pill gc-mini gc-done-btn"
-            disabled={busy}
-            onClick={() => run(() => Promise.all(list.map((it) => editGcItem(it.id, { info: info.trim() || null }))), "옵션을 저장했어요")}
           >
             저장
           </button>
@@ -685,7 +671,7 @@ function ItemGroup({ name, list, busy, run }: { name: string; list: GcItem[]; bu
           disabled={busy || !Number(qty) || !Number(gold)}
           onClick={() =>
             run(async () => {
-              await addGcItem({ name, unit: `${Number(qty)}개`, price: Number(gold), info: list[0]?.info ?? null });
+              await addGcItem({ name, unit: `${Number(qty)}개`, price: Number(gold) });
               setQty("");
               setGold("");
             }, "묶음을 더했어요")

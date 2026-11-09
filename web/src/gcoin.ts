@@ -23,8 +23,6 @@ export interface GcItem {
   unit: string | null;
   /** 성장코인 = 관리자가 적은 골드 가치(천 골드). 0 이면 값을 정하기 전 */
   price: number;
-  /** 누르면 보이는 옵션 ('쿨타임 5초 · 20분 동안 지속: 크리티컬 5 증가') */
-  info: string | null;
   active: boolean;
 }
 export type GcStatus = "pending" | "done" | "reject" | "cancel";
@@ -91,8 +89,8 @@ export const buyItem = (itemId: number, qty: number) => api<{ ok: boolean; balan
 export const actOrder = (id: number, action: "done" | "reject" | "cancel", note?: string | null) =>
   api<{ ok: boolean }>(`/api/gcoin/orders/${id}`, "PATCH", { action, note });
 export const saveGcSettings = (input: { levels?: GcCurve[]; rank?: number[] }) => api<{ ok: boolean }>("/api/gcoin/settings", "PUT", input);
-export const addGcItem = (input: { name: string; unit: string | null; price: number; info?: string | null }) => api<{ ok: boolean }>("/api/gcoin/items", "POST", input);
-export const editGcItem = (id: number, input: Partial<{ name: string; unit: string | null; price: number; info: string | null; active: boolean }>) =>
+export const addGcItem = (input: { name: string; unit: string | null; price: number }) => api<{ ok: boolean }>("/api/gcoin/items", "POST", input);
+export const editGcItem = (id: number, input: Partial<{ name: string; unit: string | null; price: number; active: boolean }>) =>
   api<{ ok: boolean }>(`/api/gcoin/items/${id}`, "PATCH", input);
 export const deleteGcItem = (id: number) => api<{ ok: boolean }>(`/api/gcoin/items/${id}`, "DELETE");
 export const adjustCoin = (userId: string, delta: number, note: string) => api<{ ok: boolean }>("/api/gcoin/adjust", "POST", { userId, delta, note });
@@ -120,6 +118,19 @@ export function itemPic(name: string): string | null {
   if (/멧돼지/.test(key)) key = "사나운멧돼지인형";
   return PICS.has(key) ? `/data/gcoin/${encodeURIComponent(key)}.png` : null;
 }
+
+/** 물건 옵션 (게임 정보창 그대로, 고정이라 관리자가 적지 않는다. 제작자 2026-11-09 '옵션은 고정인데, 상점에서 템을 누르면 옵션이 뜨게').
+ * 제작자가 보낸 거래소 스샷의 정보창에 보인 것만. 키는 띄어쓰기 없는 이름. 새 물건 옵션을 받으면 여기에 더한다 */
+const ITEM_INFO: Record<string, string[]> = {
+  망고워터: ["쿨타임 60초", "20분 동안 지속: 크리티컬 4 증가"],
+  잠깬쿠이인형: ["쿨타임 5초", "20분 동안 지속: 데미지 20% 증가"],
+  별과자: ["쿨타임 5초", "20분 동안 지속: 크리티컬 5 증가"],
+  데블랑사탕: ["쿨타임 5초", "20분 동안 지속: 크리티컬 5 증가"],
+  자라의노래: ["쿨타임 5초", "20분 동안 지속: 경험치 30% 증가"],
+  자몽주스: ["쿨타임 5초"],
+  자몽케이크: ["쿨타임 5초"],
+};
+export const itemInfo = (name: string): string[] => ITEM_INFO[name.replace(/\s/g, "")] ?? [];
 
 /** 그림이 없는 물건(오피서가 새로 넣은 것)의 그림 글자 */
 export function itemIcon(name: string): string {

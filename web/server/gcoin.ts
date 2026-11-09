@@ -58,28 +58,26 @@ export const DEFAULT_RANK = [100, 60, 30];
 /** 처음 물건 (코인 1개 = 1,000골드쯤) */
 // 자몽주스·자몽케이크는 50개, 나머지는 20개씩 판다 (제작자 2026-11-09). price 는 관리자가 적은 골드 가치(천 골드) = 성장코인.
 // 제작자가 처음 준 값(사나운 멧돼지 인형·망고워터·자몽주스·자몽케이크) 말고는 0 = 값을 정하기 전 (제작자 '스샷 골드 가격 무시해, 골드 값어치는 관리자가 쓸 거야').
-// info 는 제작자가 보낸 거래소 스샷의 정보창에 보인 옵션
-export const DEFAULT_ITEMS: { name: string; unit: string; price: number; info: string | null }[] = [
-  { name: "사나운 멧돼지 인형", unit: "20개", price: 120, info: null },
-  { name: "망고워터", unit: "20개", price: 35, info: "쿨타임 60초 · 20분 동안 지속: 크리티컬 4 증가" },
-  { name: "자몽주스", unit: "50개", price: 60, info: "쿨타임 5초" },
-  { name: "자몽케이크", unit: "50개", price: 80, info: "쿨타임 5초" },
-  { name: "우파우파의노래", unit: "20개", price: 0, info: null },
-  { name: "잠깬쿠이인형", unit: "20개", price: 0, info: "쿨타임 5초 · 20분 동안 지속: 데미지 20% 증가" },
-  { name: "별과자", unit: "20개", price: 0, info: "쿨타임 5초 · 20분 동안 지속: 크리티컬 5 증가" },
-  { name: "동그리사탕", unit: "20개", price: 0, info: null },
-  { name: "데블랑사탕", unit: "20개", price: 0, info: "쿨타임 5초 · 20분 동안 지속: 크리티컬 5 증가" },
-  { name: "딸기빙수", unit: "20개", price: 0, info: null },
-  { name: "꿀사과", unit: "20개", price: 0, info: null },
-  { name: "알사탕", unit: "20개", price: 0, info: null },
-  { name: "칠면조 구이", unit: "20개", price: 0, info: null },
-  { name: "송편", unit: "20개", price: 0, info: null },
-  { name: "자라의노래", unit: "20개", price: 0, info: "쿨타임 5초 · 20분 동안 지속: 경험치 30% 증가" },
+export const DEFAULT_ITEMS: { name: string; unit: string; price: number }[] = [
+  { name: "사나운 멧돼지 인형", unit: "20개", price: 120 },
+  { name: "망고워터", unit: "20개", price: 35 },
+  { name: "자몽주스", unit: "50개", price: 60 },
+  { name: "자몽케이크", unit: "50개", price: 80 },
+  { name: "우파우파의노래", unit: "20개", price: 0 },
+  { name: "잠깬쿠이인형", unit: "20개", price: 0 },
+  { name: "별과자", unit: "20개", price: 0 },
+  { name: "동그리사탕", unit: "20개", price: 0 },
+  { name: "데블랑사탕", unit: "20개", price: 0 },
+  { name: "딸기빙수", unit: "20개", price: 0 },
+  { name: "꿀사과", unit: "20개", price: 0 },
+  { name: "알사탕", unit: "20개", price: 0 },
+  { name: "칠면조 구이", unit: "20개", price: 0 },
+  { name: "송편", unit: "20개", price: 0 },
+  { name: "자라의노래", unit: "20개", price: 0 },
 ];
 export const MAX_NAME = 20;
 export const MAX_UNIT = 10;
 export const MAX_NOTE = 60;
-export const MAX_INFO = 120;
 /** 신청 이름: '자몽주스 100개' (묶음 '50개' x 2). 단위에 개수가 없으면 '이름 단위 x2' */
 export function orderLabel(name: string, unit: string | null, qty: number): string {
   const n = Number(/(\d+)\s*개/.exec(unit ?? "")?.[1]);
