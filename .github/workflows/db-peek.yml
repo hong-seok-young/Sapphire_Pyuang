@@ -30,7 +30,7 @@ jobs:
         working-directory: web
         run: |
           W="$GITHUB_WORKSPACE/web/node_modules/.bin/wrangler"; cd "$RUNNER_TEMP"
-          q() { echo "==== $1 ===="; "$W" d1 execute sapphire-accounts --remote --json --command "$2" > out.txt || true; node -e 'const s=require("fs").readFileSync("out.txt","utf8");try{const j=JSON.parse(s.slice(s.search(/[[{]/)));const r=Array.isArray(j)?j[0]?.results:null;if(!r){console.log(s.slice(0,2000));return}for(const x of r)console.log(JSON.stringify(x))}catch(e){console.log("parse fail:",s.slice(0,2000))}'; }
+          q() { echo "==== $1 ===="; "$W" d1 execute sapphire-accounts --remote --json --command "$2" > out.txt || true; node -e 'const s=require("fs").readFileSync("out.txt","utf8");try{const j=JSON.parse(s.slice(s.search(/[[{]/)));const r=Array.isArray(j)?j[0]?.results:null;if(!r)console.log(s.slice(0,2000));else for(const x of r)console.log(JSON.stringify(x))}catch(e){console.log("parse fail:",s.slice(0,2000))}'; }
           q dev_requests "SELECT * FROM dev_requests ORDER BY id"
           q dev_request_steps "SELECT * FROM dev_request_steps ORDER BY id"
           q dev_request_talk "SELECT * FROM dev_request_talk ORDER BY id"
