@@ -54,7 +54,8 @@ export const streakBonus = (count: number) => (count >= 2 ? STREAK_COIN * Math.m
 export const milestonesBetween = (base: number, top: number) => MILESTONES.filter((m) => base < m.level && top >= m.level);
 
 /** 주간 2군 성장 1·2·3위 보너스 기본값 */
-export const DEFAULT_RANK = [100, 60, 30];
+/** 주간 순위 보너스 1~5위 (제작자 2026-11-09 '총 5위까지 추가 보상') */
+export const DEFAULT_RANK = [100, 60, 30, 20, 10];
 /** 처음 물건 (코인 1개 = 1,000골드쯤) */
 // 자몽주스·자몽케이크는 50개, 나머지는 20개씩 판다 (제작자 2026-11-09). price 는 관리자가 적은 골드 가치(천 골드) = 성장코인.
 // 제작자가 처음 준 값(사나운 멧돼지 인형·망고워터·자몽주스·자몽케이크) 말고는 0 = 값을 정하기 전 (제작자 '스샷 골드 가격 무시해, 골드 값어치는 관리자가 쓸 거야').
@@ -110,9 +111,9 @@ export async function readCurve(env: Env): Promise<Curve[]> {
 }
 
 export async function readRank(env: Env): Promise<number[]> {
-  const { results } = await env.DB.prepare("SELECT key, value FROM gc_settings WHERE key IN ('rank1', 'rank2', 'rank3')").all<{ key: string; value: number }>();
+  const { results } = await env.DB.prepare("SELECT key, value FROM gc_settings WHERE key IN ('rank1', 'rank2', 'rank3', 'rank4', 'rank5')").all<{ key: string; value: number }>();
   const m = new Map(results.map((r) => [r.key, r.value]));
-  return [1, 2, 3].map((i) => m.get(`rank${i}`) ?? DEFAULT_RANK[i - 1]);
+  return DEFAULT_RANK.map((d, i) => m.get(`rank${i + 1}`) ?? d);
 }
 
 /** 코인을 세기 시작한 때. 없으면 지금으로 적는다 (배포가 처음 한 번 적는다, scripts/ci-d1.mjs) */
@@ -322,7 +323,7 @@ export async function settleWeeks(env: Env, curve: Curve[], now = Date.now()): P
     if (!claim.meta.changes) continue;
     const all = await weekRanking(env, Math.max(w, start), w + WEEK, curve);
     if (!all.length) continue;
-    const top = all.slice(0, 3);
+    const top = all.slice(0, rank.length);
     // 연속 성장: 지난주에도 벌었으면 이어서, 아니면 1주째부터 (gc_streak 은 사람마다 마지막으로 번 주와 이어진 주 수)
     const ids = all.map((e) => e.id);
     const prev = await env.DB.prepare(`SELECT user_id, week, count FROM gc_streak WHERE user_id IN (${ids.map(() => "?").join(",")})`)

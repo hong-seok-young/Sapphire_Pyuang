@@ -103,7 +103,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     items: items.results.map((i) => ({ id: i.id, name: i.name, unit: i.unit, price: i.price, gold: i.gold ?? i.price * 1000, active: i.active === 1 })),
     curve,
     rank,
-    week: { start: ws, top: top.slice(0, 5) },
+    week: { start: ws, top: top.slice(0, 60) },
     lastWinners: winners.results,
     admin,
   });

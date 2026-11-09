@@ -1,4 +1,4 @@
-// PUT /api/gcoin/settings { levels?: [{ minLevel, coin }], rank?: [1위, 2위, 3위] } -> 레벨업 코인 표와 주간 순위 보너스 바꾸기 (오피서 이상)
+// PUT /api/gcoin/settings { levels?: [{ minLevel, coin }], rank?: [1위 ~ 5위] } -> 레벨업 코인 표와 주간 순위 보너스 바꾸기 (오피서 이상)
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { canManageGcoin, canUseGcoin, int } from "../../../server/gcoin";
@@ -25,7 +25,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
     for (const [lv, coin] of rows) stmts.push(env.DB.prepare("INSERT INTO gc_levels (min_level, coin) VALUES (?, ?)").bind(lv, coin));
   }
   if (b.rank !== undefined) {
-    if (!Array.isArray(b.rank) || b.rank.length !== 3) return json({ error: "순위 보너스가 맞지 않아요" }, 400);
+    if (!Array.isArray(b.rank) || b.rank.length !== 5) return json({ error: "순위 보너스가 맞지 않아요" }, 400);
     for (const [i, v] of (b.rank as unknown[]).entries()) {
       const n = int(v, 0, 10_000);
       if (n === null) return json({ error: "순위 보너스가 맞지 않아요" }, 400);

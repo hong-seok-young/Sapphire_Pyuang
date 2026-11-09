@@ -626,7 +626,7 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
     ["송편", "20개", 0, null],
     ["자라의노래", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 경험치 30% 증가"],
   ];
-  const RANK = [100, 60, 30];
+  const RANK = [100, 60, 30, 20, 10];
   const lines = [`INSERT OR IGNORE INTO setup (key, done_at) VALUES ('gcoin_start', ${now});`];
   if (!queryFirst("SELECT 1 AS x FROM gc_levels")) for (const [lv, c] of LEVELS) lines.push(`INSERT INTO gc_levels (min_level, coin) VALUES (${lv}, ${c});`);
   if (!queryFirst("SELECT 1 AS x FROM gc_items"))
