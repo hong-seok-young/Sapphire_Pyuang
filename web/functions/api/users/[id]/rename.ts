@@ -15,7 +15,7 @@ const ID_COLUMNS: [string, string][] = [
   ["listing_bids", "user_id"], ["gold_offers", "owner"], ["gold_wants", "user_id"], ["requests", "owner"], ["requests", "accepter"], ["request_offers", "user_id"],
   ["activity", "user_id"], ["alerts", "user_id"], ["gd_parties", "leader"], ["gd_members", "user_id"], ["gd_avail", "user_id"], ["gd_answers", "user_id"], ["alert_prefs", "user_id"], ["listing_talk", "user_id"], ["plat_orders", "user_id"],
   ["favorites", "user_id"], ["board_posts", "author"], ["board_comments", "user_id"], ["board_likes", "user_id"], ["board_views", "user_id"], ["official_comments", "user_id"], ["official_likes", "user_id"], ["official_views", "user_id"],
-  ["chat_threads", "user_id"], ["chat_gaps", "user_id"], ["plat_wallets", "user_id"], ["layouts", "user_id"], ["bday_combo", "user_id"], ["bday_resume", "user_id"], ["smack_stats", "hitter"], ["smack_stats", "target"],
+  ["chat_threads", "user_id"], ["chat_gaps", "user_id"], ["plat_wallets", "user_id"], ["layouts", "user_id"], ["bday_combo", "user_id"], ["bday_resume", "user_id"], ["smack_stats", "hitter"], ["smack_stats", "target"], ["gc_targets", "user_id"], ["gc_orders", "user_id"], ["gc_ledger", "user_id"], ["gc_streak", "user_id"],
   ["users", "main_id"], ["signup_requests", "owner"],
   ["push_subs", "user_id"], ["cutout_log", "user_id"], ["plat_orders", "done_by"], ["plat_orders", "voided_by"], ["plat_settings", "updated_by"],
   ["todo_checks", "user_id"], ["todo_custom", "user_id"], ["todo_edits", "user_id"], ["todo_shares", "owner"], ["todo_share_members", "user_id"],

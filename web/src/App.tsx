@@ -60,7 +60,7 @@ import {
 import { LoginPage, PasswordPage } from "./pages/Login";
 import { GuideHost } from "./tutorial";
 import { BirthdaySticker } from "./birthday";
-import { CoinToast } from "./coinToast";
+import { CoinToast, RaceToast } from "./coinToast";
 import { Opening, shouldCelebrate } from "./pages/Opening";
 import { reportOpen, reportView } from "./activity";
 import { markMenuVisit } from "./updates";
@@ -491,7 +491,7 @@ function Wiki({
   else if (page === "smack")
     body = canSmack(me) ? <SmackPage me={me} arg={arg} /> : <DevSoon title="운영진 때리기" />;
   // 2군 성장코인샵 (개발중, 제작자 2026-11-09 '오피서랑 길마 보게 열어 줘'): 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (launcher.ts canGcoin, 서버 server/gcoin.ts)
-  else if (page === "gcoin") body = canGcoin(me) ? <GrowthShopPage me={me.id} /> : <DevSoon title="성장코인샵" />;
+  else if (page === "gcoin") body = canGcoin(me) ? <GrowthShopPage me={me} onMe={onMe} /> : <DevSoon title="성장코인샵" />;
   else if (!wiki)
     body = (
       <Loading
@@ -584,6 +584,7 @@ function Wiki({
       <BirthdaySticker me={me} />
       {/* 2군 성장코인: 레벨·경험치를 적어 코인이 생기면 동전 팝업 (src/coinToast.tsx) */}
       <CoinToast />
+      <RaceToast />
       <nav
         className={
           "tabbar" + (launcher.editing && editable ? " launch-editing" : "")

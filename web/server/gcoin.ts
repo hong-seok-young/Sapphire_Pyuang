@@ -19,6 +19,9 @@ import { WEEK, weekStart } from "./week";
 /** 2군에게 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (개발 중, 제작자 2026-11-09 '오피서랑 길마 보게 열어 줘, 개발 중으로 두고').
  * 화면 launcher.ts 의 GCOIN_OPEN·canGcoin 과 같이 바꾼다 */
 export const GCOIN_OPEN = false;
+/** 레벨·경험치마다 코인 (김다혜 2026-11-09 시범운영 '레벨별 코인은 일단 빼고 선착순만, 레벨 구간별 보너스는 나중에'):
+ *  끄면 지갑의 성장·첫 달성 보너스가 0, 주간 순위·연속 보너스 정산도 쉰다. 코인은 2주 목표 선착순 상금(server/gcrace.ts)과 조정만 */
+export const LEVEL_COINS = false;
 export const canUseGcoin = (me: User) =>
   GCOIN_OPEN || RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
 /** 신청 처리, 설정, 코인 조정: 오피서 이상 */
@@ -59,7 +62,7 @@ export const milestonesBetween = (base: number, top: number) =>
 
 /** 주간 2군 성장 1·2·3위 보너스 기본값 */
 /** 주간 순위 보너스 1~5위 (제작자 2026-11-09 '총 5위까지 추가 보상') */
-export const DEFAULT_RANK = [100, 60, 30, 20, 10];
+export const DEFAULT_RANK = [5, 4, 3, 2, 1];
 /** 처음 물건 (코인 1개 = 1,000골드쯤) */
 // 자몽주스·자몽케이크는 50개, 나머지는 20개씩 판다 (제작자 2026-11-09). price 는 관리자가 적은 골드 가치(천 골드) = 성장코인.
 // 제작자가 처음 준 값(사나운 멧돼지 인형·망고워터·자몽주스·자몽케이크) 말고는 0 = 값을 정하기 전 (제작자 '스샷 골드 가격 무시해, 골드 값어치는 관리자가 쓸 거야').
@@ -97,8 +100,10 @@ export const MAX_QTY = 20;
 export const MAX_PRICE = 100_000;
 /** 담당자가 골드로 적는 값 (제작자 2026-11-09 '천 단위로 적게 하지 말고 그냥 원 단위로'): 1,000골드 = 성장코인 1개, 반올림 (1골드 이상이면 1코인부터) */
 export const MAX_GOLD = 100_000_000;
+/** 성장코인 1개의 골드 가치 (김다혜 2026-11-09 '1코인당 3만 골드') */
+export const COIN_GOLD = 30_000;
 export const coinOfGold = (gold: number) =>
-  gold > 0 ? Math.max(1, Math.round(gold / 1000)) : 0;
+  gold > 0 ? Math.max(1, Math.round(gold / COIN_GOLD)) : 0;
 /** 지난주 보너스를 한 번에 몇 주까지 몰아서 정산하나 (CPU 한도) */
 const SETTLE_WEEKS = 4;
 
@@ -317,11 +322,10 @@ export async function wallets(
   return now.results.map((r) => {
     const b = base.get(r.id) ?? r;
     const t = top.get(r.id) ?? r;
-    const earned = Math.floor(coinsBetween(posOf(b), posOf(t), curve));
-    const milestone = milestonesBetween(b.level, t.level).reduce(
-      (n, m) => n + m.coin,
-      0,
-    );
+    const earned = LEVEL_COINS ? Math.floor(coinsBetween(posOf(b), posOf(t), curve)) : 0;
+    const milestone = LEVEL_COINS
+      ? milestonesBetween(b.level, t.level).reduce((n, m) => n + m.coin, 0)
+      : 0;
     const l = led.get(r.id) ?? { bonus: 0, adjust: 0 };
     const s = sp.get(r.id) ?? 0;
     return {
@@ -406,6 +410,7 @@ export async function settleWeeks(
   curve: Curve[],
   now = Date.now(),
 ): Promise<void> {
+  if (!LEVEL_COINS) return;
   const start = await startAt(env);
   const rank = await readRank(env);
   const thisWeek = weekStart(now);
@@ -554,6 +559,8 @@ export interface CoinGain {
   prevRank: number | null;
   /** 이번에 처음 넘은 레벨 보너스 */
   milestones: { level: number; coin: number; name: string }[];
+  /** 팝업 막대의 이정표 (지금 레벨에서 경험치 몇 % 마다 코인 몇 개) */
+  step: { pct: number; coin: number };
 }
 
 /** 레벨·경험치를 저장하기 전 내 지갑 (2군 본캐가 아니거나 상점을 못 쓰면 null: 그때는 저장 뒤에도 아무것도 안 한다) */

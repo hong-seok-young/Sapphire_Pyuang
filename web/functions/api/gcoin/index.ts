@@ -3,7 +3,8 @@
 //   member: 내가 2군 본캐인지 (아니면 지갑이 없다). admin(오피서 이상): 기다리는 신청, 2군 본캐 모두의 지갑, 최근 처리한 신청
 import { FORBIDDEN, NEED_LOGIN, currentUser, json } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { GCOIN_OPEN, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
+import { raceData } from "../../../server/gcrace";
+import { GCOIN_OPEN, LEVEL_COINS, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
 import { weekStart } from "../../../server/week";
 
 interface OrderRow {
@@ -43,6 +44,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const curve = await readCurve(env);
   // 끝난 주의 순위 보너스 (아직이면 지금 한 번)
   await settleWeeks(env, curve);
+  // 2주 목표 선착순 (시범운영, server/gcrace.ts): 순위·달성률·추월 차트. 달성한 1~5위 상금도 여기서 넣으므로 지갑보다 먼저
+  const race = await raceData(env);
   const [start, rank, mine] = await Promise.all([startAt(env), readRank(env), wallets(env, curve, me.id)]);
   // 2군 본캐만 지갑이 있다 (wallets 는 프로필만 보고 세므로 여기서 2군 본캐인지 다시 본다)
   const wallet = (await isMember(env, me.id)) ? (mine[0] ?? null) : null;
@@ -58,7 +61,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       gold: number | null;
       active: number;
     }>(),
-    weekRanking(env, ws, null, curve),
+    LEVEL_COINS ? weekRanking(env, ws, null, curve) : Promise.resolve([]),
     env.DB.prepare("SELECT * FROM gc_orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 60").bind(me.id).all<OrderRow>(),
     env.DB.prepare("SELECT delta, kind, note, created_at AS at FROM gc_ledger WHERE user_id = ? ORDER BY created_at DESC LIMIT 60").bind(me.id).all(),
     env.DB.prepare(
@@ -99,17 +102,19 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
   // 번 코인 내역: 레벨마다 한 줄 (덜 채운 레벨은 그 % 까지)
   const levels =
-    wallet && wallet.base !== null && wallet.top !== null
+    LEVEL_COINS && wallet && wallet.base !== null && wallet.top !== null
       ? earnedRows(wallet.base + (wallet.baseExp ?? 0) / 100_000, wallet.top + (wallet.topExp ?? 0) / 100_000, curve).filter((r) => r.coin > 0)
       : [];
 
   // 처음 넘은 레벨 보너스, 다음 첫 달성 보너스, 연속 성장 (재미 요소, 제작자 2026-11-09 '다 만들어봐')
-  const milestones = wallet && wallet.base !== null && wallet.top !== null ? milestonesBetween(wallet.base, wallet.top) : [];
-  const nextMilestone = wallet && wallet.top !== null ? (MILESTONES.find((m) => m.level > (wallet.top as number)) ?? null) : null;
-  const streak = wallet ? await myStreak(env, me.id, now) : 0;
+  const milestones = LEVEL_COINS && wallet && wallet.base !== null && wallet.top !== null ? milestonesBetween(wallet.base, wallet.top) : [];
+  const nextMilestone = LEVEL_COINS && wallet && wallet.top !== null ? (MILESTONES.find((m) => m.level > (wallet.top as number)) ?? null) : null;
+  const streak = LEVEL_COINS && wallet ? await myStreak(env, me.id, now) : 0;
 
   return json({
     open: GCOIN_OPEN,
+    levelCoins: LEVEL_COINS,
+    race,
     manage,
     member: !!wallet,
     start,

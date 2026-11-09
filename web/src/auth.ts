@@ -238,9 +238,11 @@ export function errorText(e: unknown): string {
 export type ChangeKind = "grow" | "fix";
 
 export const saveMyProfile = (job: Job, level: number, exp: number | null, guild: Guild, change: ChangeKind = "grow") =>
-  api<{ job: Job; level: number; exp: number | null; guild: Guild; coin?: unknown }>("/api/profile", "PUT", { job, level, exp, guild, change }).then((r) => {
+  api<{ job: Job; level: number; exp: number | null; guild: Guild; coin?: unknown; race?: unknown }>("/api/profile", "PUT", { job, level, exp, guild, change }).then((r) => {
     // 2군 성장코인샵: 레벨·경험치를 적어 새 성장코인이 생기면 동전 팝업 (src/coinToast.tsx, 서버 server/gcoin.ts coinGain)
     if (r.coin) window.dispatchEvent(new CustomEvent("sapphire:gcoin", { detail: r.coin }));
+    // 2주 목표 선착순: 달성률이 오르거나 목표를 찍으면 팝업 (src/coinToast.tsx RaceToast, 서버 server/gcrace.ts raceAfter)
+    if (r.race) window.dispatchEvent(new CustomEvent("sapphire:gcrace", { detail: r.race }));
     return r;
   });
 

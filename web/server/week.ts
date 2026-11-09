@@ -16,3 +16,11 @@ export function gdWeekStart(now = Date.now()): number {
   return weekStart(now - GD_WEEK_OFFSET) + GD_WEEK_OFFSET;
 }
 
+
+/** 길드 랭킹의 주간 성장 한 주 (제작자 2026-11-09 '길드 랭킹 주간 성장도 월요일 00시부터 일요일 24시로, 딱 7일'): 월요일 0시 (한국 시간) ~ 다음 월요일 0시.
+ *  주간 성장 랭킹, 랭킹의 레벨업 ▲ 와 경험치 +% 가 이것을 쓴다. 플래티넘 지급·To do 는 게임 초기화 때인 목 10시 그대로 (weekStart).
+ *  1970-01-01 은 목요일이라 그 뒤 첫 한국 시간 월요일 0시는 1/4 15:00 UTC */
+const MONDAY_0_KST = 3 * 86_400_000 + 15 * 3_600_000;
+export function growthWeekStart(now = Date.now()): number {
+  return now - ((((now - MONDAY_0_KST) % WEEK) + WEEK) % WEEK);
+}

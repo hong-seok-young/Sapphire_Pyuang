@@ -1,6 +1,15 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { JOB_NAME, avatarUrl, errorText } from "../auth";
+import type { Me } from "../auth";
+import { LevelEditor } from "./LevelEditor";
+import {
+  PrizeSheet,
+  RaceBoard,
+  RaceCard,
+  TargetsTab,
+  goldText,
+} from "./GrowthRace";
 import { JobEmblem } from "../emblems";
 import { HeroHalo } from "../heroHalo";
 import { GrowthChart } from "./GrowthChart";
@@ -31,10 +40,13 @@ import {
   packOf,
   qtyOf,
   saveGcSettings,
+  sampleRace,
 } from "../gcoin";
 import type {
   GcCurve,
   GcData,
+  GcRace,
+  GcRaceEntry,
   GcItem,
   GcOrder,
   GcRankEntry,
@@ -45,7 +57,7 @@ import { useBackClose } from "../backClose";
 
 type Tab = "status" | "shop" | "mine" | "staff";
 /** 담당자 메뉴 안의 칸 */
-type Staff = "orders" | "items" | "members" | "coins";
+type Staff = "orders" | "items" | "targets" | "members" | "coins";
 const MEDAL = ["🥇", "🥈", "🥉"];
 
 /** 바뀐 숫자가 톡 튄다 (처음 그릴 때는 안 튐) */
@@ -77,13 +89,23 @@ function WalletCard({
   w,
   curve,
   sample,
+  race,
+  me,
+  onMe,
+  onSaved,
 }: {
   w: GcWallet;
   curve: GcCurve[];
   sample: boolean;
+  /** 시범운영(레벨 코인 끔): 2주 목표 판과 내 줄 */
+  race?: { race: GcRace; mine: GcRaceEntry | null } | null;
+  me: Me;
+  onMe?: (p: Partial<Me>) => void;
+  onSaved: () => void;
 }) {
-  const g = nextGoal(w, curve);
+  const g = race ? null : nextGoal(w, curve);
   const [table, setTable] = useState(false);
+  const [edit, setEdit] = useState(false);
   // 카드에는 내 코인과 다음 이정표만 (제작자 2026-11-09 '레벨업하면 몇이 오른다, 경험치 몇 퍼 올리면 코인 몇 개, 이 정도만',
   // '지금 2% 만 더 올리면 코인 얼마 얻어요, 다음 이정표로 안내'). 성장·보너스·사용 합계는 기록표에
   return (
@@ -95,9 +117,26 @@ function WalletCard({
           {sample && <i className="sample-tag">예시</i>}
         </span>
         <button className="gc-table-btn" onClick={() => setTable(true)}>
-          코인표
+          {race ? "보상표" : "코인표"}
         </button>
       </div>
+      {/* 시범운영: 성장 카드 = 2주 목표 달성률 (제작자 2026-11-09 '상점의 성장 카드는 달성률이 나오게', '성장 반영 버튼, 길드 랭킹에도 연동') */}
+      {race && (
+        <RaceCard
+          entry={race.mine}
+          race={race.race}
+          editing={edit}
+          onEdit={() => setEdit((x) => !x)}
+        />
+      )}
+      {edit && me.job && me.guild && (
+        <LevelEditor
+          me={me}
+          onMe={onMe}
+          onSaved={onSaved}
+          onClose={() => setEdit(false)}
+        />
+      )}
       {/* 경험치 막대 위 이정표 (제작자 2026-11-09 '텍스트 말고 퍼센트마다 수직 막대나 이정표를 가시적으로, 최소 10퍼로 너무 많지 않게'):
           코인이 들어오는 칸마다 세로 표시와 그 칸의 코인, 지난 것은 금색, 다음 것은 깜박 */}
       {g && (
@@ -126,9 +165,16 @@ function WalletCard({
           <span className="gc-ms-lv gc-ms-to">Lv.{g.level + 1}</span>
         </div>
       )}
-      {table && (
-        <CoinTable curve={curve} top={w.top} onClose={() => setTable(false)} />
-      )}
+      {table &&
+        (race ? (
+          <PrizeSheet race={race.race} onClose={() => setTable(false)} />
+        ) : (
+          <CoinTable
+            curve={curve}
+            top={w.top}
+            onClose={() => setTable(false)}
+          />
+        ))}
     </div>
   );
 }
@@ -199,10 +245,6 @@ function CoinTable({
     document.body,
   );
 }
-
-/** 코인이 몇 골드인지 '1.5만 골드' (1코인 = 1,000골드, 제작자 2026-11-09 '코인 세팅 맨 오른쪽 한 열에 몇만 골드인지도') */
-const goldText = (coin: number) =>
-  `${(coin / 10).toLocaleString("ko-KR", { maximumFractionDigits: 1 })}만 골드`;
 
 /** 순위 표시: 1~3위 메달, 그 뒤는 숫자 */
 const rankMark = (i: number) => MEDAL[i] ?? String(i + 1);
@@ -467,7 +509,9 @@ function MineTab({
   history,
   sample,
   onChanged,
+  levelCoins,
 }: {
+  levelCoins: boolean;
   w: GcWallet | null;
   history: GcData["history"];
   sample: boolean;
@@ -498,12 +542,14 @@ function MineTab({
         {/* 코인 합계는 카드가 아니라 기록표에 (제작자 2026-11-09 '성장으로 얼마, 소모 얼마 이런 거 그냥 기록에 다 정리') */}
         {w && (
           <div className="gc-sum">
+            {levelCoins && (
+              <span>
+                <small>성장</small>
+                <b className="gc-plus">+{w.earned}</b>
+              </span>
+            )}
             <span>
-              <small>성장</small>
-              <b className="gc-plus">+{w.earned}</b>
-            </span>
-            <span>
-              <small>보너스</small>
+              <small>{levelCoins ? "보너스" : "상금"}</small>
               <b className="gc-plus">+{w.milestone + w.bonus + w.adjust}</b>
             </span>
             <span>
@@ -871,79 +917,83 @@ function CoinsTab({
   return (
     <>
       {error && <p className="form-error">{error}</p>}
-      <div className="panel gc-set">
-        <p className="gc-week-head">
-          <b>레벨업 코인</b>
-        </p>
-        {rows.map((r, i) => (
-          <div className="gc-set-row" key={i}>
-            <span>Lv.</span>
-            <input
-              className="mk-input"
-              inputMode="numeric"
-              value={r.lv}
-              onChange={(e) =>
-                setRows((rs) =>
-                  rs.map((x, j) =>
-                    j === i ? { ...x, lv: digits(e.target.value, 2) } : x,
-                  ),
-                )
-              }
-            />
-            <span>부터</span>
-            <input
-              className="mk-input"
-              inputMode="numeric"
-              value={r.coin}
-              onChange={(e) =>
-                setRows((rs) =>
-                  rs.map((x, j) =>
-                    j === i ? { ...x, coin: digits(e.target.value, 5) } : x,
-                  ),
-                )
-              }
-            />
-            <span>코인</span>
+      {data.levelCoins && (
+        <div className="panel gc-set">
+          <p className="gc-week-head">
+            <b>레벨업 코인</b>
+          </p>
+          {rows.map((r, i) => (
+            <div className="gc-set-row" key={i}>
+              <span>Lv.</span>
+              <input
+                className="mk-input"
+                inputMode="numeric"
+                value={r.lv}
+                onChange={(e) =>
+                  setRows((rs) =>
+                    rs.map((x, j) =>
+                      j === i ? { ...x, lv: digits(e.target.value, 2) } : x,
+                    ),
+                  )
+                }
+              />
+              <span>부터</span>
+              <input
+                className="mk-input"
+                inputMode="numeric"
+                value={r.coin}
+                onChange={(e) =>
+                  setRows((rs) =>
+                    rs.map((x, j) =>
+                      j === i ? { ...x, coin: digits(e.target.value, 5) } : x,
+                    ),
+                  )
+                }
+              />
+              <span>코인</span>
+              <button
+                className="pill gc-mini"
+                onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}
+                aria-label="이 줄 빼기"
+              >
+                ✕
+              </button>
+              <span className="gc-set-gold">{goldText(Number(r.coin))}</span>
+            </div>
+          ))}
+          <div className="gc-set-actions">
             <button
               className="pill gc-mini"
-              onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}
-              aria-label="이 줄 빼기"
+              onClick={() => setRows((rs) => [...rs, { lv: "", coin: "" }])}
             >
-              ✕
+              ＋ 줄
             </button>
-            <span className="gc-set-gold">{goldText(Number(r.coin))}</span>
+            <button
+              className="pill gc-mini gc-done-btn"
+              disabled={busy}
+              onClick={() =>
+                run(
+                  () =>
+                    saveGcSettings({
+                      levels: rows.map((r) => ({
+                        minLevel: Number(r.lv),
+                        coin: Number(r.coin),
+                      })),
+                    }),
+                  "저장했어요",
+                )
+              }
+            >
+              저장
+            </button>
           </div>
-        ))}
-        <div className="gc-set-actions">
-          <button
-            className="pill gc-mini"
-            onClick={() => setRows((rs) => [...rs, { lv: "", coin: "" }])}
-          >
-            ＋ 줄
-          </button>
-          <button
-            className="pill gc-mini gc-done-btn"
-            disabled={busy}
-            onClick={() =>
-              run(
-                () =>
-                  saveGcSettings({
-                    levels: rows.map((r) => ({
-                      minLevel: Number(r.lv),
-                      coin: Number(r.coin),
-                    })),
-                  }),
-                "저장했어요",
-              )
-            }
-          >
-            저장
-          </button>
         </div>
-      </div>
+      )}
       <div className="panel gc-set">
         <p className="gc-week-head">
-          <b>주간 1~5위 보너스</b>
+          <b>
+            {data.levelCoins ? "주간 1~5위 보너스" : "2주 목표 달성 1~5위 상금"}
+          </b>
         </p>
         {rank.map((v, i) => (
           <div className="gc-set-row" key={i}>
@@ -957,7 +1007,7 @@ function CoinsTab({
                   rs.map((x, j) => (j === i ? digits(e.target.value, 5) : x)),
                 )
               }
-              aria-label={`${i + 1}위 보너스`}
+              aria-label={`${i + 1}위 상금`}
             />
             <span>코인</span>
             <span className="gc-set-gold">{goldText(Number(v))}</span>
@@ -1305,7 +1355,14 @@ function Bundle({
  * 2군 성장코인샵 (개발중, 제작자 2026-11-09): 2군 본캐가 레벨업할 때마다 성장코인이 쌓이고(높은 레벨일수록 많이), 주간 2군 성장 1·2·3위는 보너스.
  * 코인으로 물건을 신청하면 오피서가 게임 안에서 주고 '지급 완료'를 누른다. 지금은 앱개발자만 본다
  */
-export function GrowthShopPage({ me }: { me: string }) {
+export function GrowthShopPage({
+  me: meInfo,
+  onMe,
+}: {
+  me: Me;
+  onMe?: (p: Partial<Me>) => void;
+}) {
+  const me = meInfo.id;
   const [reload, setReload] = useState(0);
   const { data, error } = useAsync(
     useCallback(() => fetchGcoin(), [reload]),
@@ -1338,6 +1395,20 @@ export function GrowthShopPage({ me }: { me: string }) {
   const wallet = cur.wallet ?? (sample ? SAMPLE_WALLET : null);
   const history = cur.member ? cur.history : SAMPLE_HISTORY;
   const pending = cur.admin?.pending.length ?? 0;
+  // 시범운영 2주 목표 선착순: 목표를 아무도 안 정했으면 예시 판 (제작자 2026-11-09 '테스트 데이터 몇 개 넣어 주고')
+  const now = Date.now();
+  const raceSample = !cur.race.list.length;
+  // 예시는 판이 나흘쯤 지난 것처럼 (첫날이면 선이 안 보인다)
+  const raceNow = raceSample ? cur.race.start + 4.2 * 86_400_000 : now;
+  const race = raceSample ? sampleRace(cur.race.start, raceNow) : cur.race;
+  const myRace = cur.levelCoins
+    ? null
+    : {
+        race,
+        mine:
+          race.list.find((e) => e.id === me) ??
+          (raceSample && sample ? race.list[1] : null),
+      };
   const tabs: { key: Tab; label: string }[] = [
     { key: "status", label: "성장 현황" },
     { key: "shop", label: "상점" },
@@ -1355,8 +1426,9 @@ export function GrowthShopPage({ me }: { me: string }) {
   const staffTabs: { key: Staff; label: string }[] = [
     { key: "orders", label: `신청${pending ? ` ${pending}` : ""}` },
     { key: "items", label: "물건" },
+    ...(cur.levelCoins ? [] : [{ key: "targets" as Staff, label: "목표" }]),
     { key: "members", label: "현황" },
-    { key: "coins", label: "코인표" },
+    { key: "coins", label: cur.levelCoins ? "코인표" : "보상" },
   ];
   const saved = (m: string) => {
     setNotice(m);
@@ -1401,7 +1473,15 @@ export function GrowthShopPage({ me }: { me: string }) {
       {notice && <p className="form-note gc-notice">{notice}</p>}
 
       {(shown === "shop" || shown === "mine") && wallet && (
-        <WalletCard w={wallet} curve={cur.curve} sample={sample} />
+        <WalletCard
+          w={wallet}
+          curve={cur.curve}
+          sample={sample}
+          race={myRace}
+          me={meInfo}
+          onMe={onMe}
+          onSaved={refresh}
+        />
       )}
       {shown === "shop" && (
         <ShopTab
@@ -1411,17 +1491,31 @@ export function GrowthShopPage({ me }: { me: string }) {
           onDone={saved}
         />
       )}
-      {shown === "status" && <StatusTab data={cur} me={me} />}
+      {shown === "status" &&
+        (cur.levelCoins ? (
+          <StatusTab data={cur} me={me} />
+        ) : (
+          <RaceBoard race={race} me={me} sample={raceSample} now={raceNow} />
+        ))}
       {shown === "mine" && (
         <MineTab
           w={wallet}
           history={history}
           sample={sample}
           onChanged={refresh}
+          levelCoins={cur.levelCoins}
         />
       )}
       {shown === "staff" && cur.admin && staff === "orders" && (
         <OrdersTab admin={cur.admin} onChanged={refresh} />
+      )}
+      {shown === "staff" && cur.admin && staff === "targets" && (
+        <TargetsTab
+          key={reload}
+          members={cur.admin.members}
+          race={cur.race}
+          onChanged={saved}
+        />
       )}
       {shown === "staff" && cur.manage && staff === "items" && (
         <ItemsTab key={reload} data={cur} onChanged={saved} />

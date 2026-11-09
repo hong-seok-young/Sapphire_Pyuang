@@ -18,7 +18,7 @@ import { CAT_NAME, shownName } from "./board";
 import type { Cat } from "./board";
 import { growthEntries } from "./growth";
 import type { Period } from "./growth";
-import { weekStart } from "./week";
+import { growthWeekStart } from "./week";
 import { TODO_OPEN, doneKeys, eventTasks, todoExtras } from "./todo";
 import { ASK_MORE, mineExtras, newsNow, shopCatalog } from "./chatmine";
 import { canUseDevReq } from "./devreq";
@@ -107,7 +107,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
   const q = question;
   const k = new Date(now + KST);
   const today = Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate()) - KST;
-  const week = weekStart(now);
+  const week = growthWeekStart(now);
 
   const [peopleR, listingsR, myWantersR, myBidsR, myWantsR, rateR, goldR, myGoldWantsR, requestsR, offersR, boardR, platR, myOrdersR, openOrdersR] =
     await env.DB.batch([
@@ -235,7 +235,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
 
   // ---------- 성장 랭킹 ----------
   if (ASK.growth.test(q) || mentioned.length) {
-    const periods: [Period, string][] = [["week", "이번 주(목요일 오전 10시부터)"]];
+    const periods: [Period, string][] = [["week", "이번 주(월요일 0시부터)"]];
     if (/오늘/.test(q)) periods.unshift(["day", "오늘(0시부터)"]);
     if (/이번 ?달|월간|한 ?달/.test(q)) periods.push(["month", "이번 달(1일 0시부터)"]);
     for (const [period, label] of periods) {

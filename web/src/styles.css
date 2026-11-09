@@ -4490,3 +4490,120 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
   .gc-ms-bar > i::after, .gc-ms-next em, .gc-ms-next::before, .ct-bar-fill, .ct-mark-hit::before, .ct-mark-hit em, .ct-bar-lv b, .gc-st-podium::after, .gc-st .gc-st-value .gc-coin { animation: none; }
   .ct-mark-hit em { opacity: 1; transform: translateX(-50%); }
 }
+
+/* ===== 성장코인샵 시범운영: 2주 목표 선착순 (src/pages/GrowthRace.tsx, 2026-11-09 제작자 '이펙트 팍팍, 고급지고 귀엽게, 콤팩트하게') ===== */
+.gr { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.gr-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; }
+.gr-period { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #e3e9f6; }
+.gr-dday { padding: 0 5px; font-size: 11px; color: var(--edge); background: var(--gold); animation: gr-dday 2.4s ease-in-out infinite; }
+@keyframes gr-dday { 50% { opacity: 0.6; } }
+.gr-prizes { display: inline-flex; gap: 3px; }
+.gr-prize { display: inline-flex; align-items: center; gap: 1px; padding: 1px 4px; font-size: 11px; color: var(--gold); background: rgba(255, 211, 77, 0.1); border: 1px solid rgba(255, 211, 77, 0.35); }
+.gr-prize .gc-coin { width: 10px; height: 10px; }
+.gr-prize-1 { border-color: var(--gold); background: rgba(255, 211, 77, 0.2); }
+
+.gr-chart { position: relative; padding: 4px 0 2px; background: linear-gradient(180deg, #1b1d3a, #22244a); border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 #34386a; overflow: hidden; }
+.gr-chart svg { display: block; touch-action: pan-y; cursor: pointer; }
+.gr-legend { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 6px 2px; }
+.gr-leg { display: inline-flex; align-items: center; gap: 3px; padding: 0 5px; font-size: 11px; color: #e3e9f6; background: none; border: 1px solid transparent; cursor: pointer; }
+.gr-leg i { width: 10px; height: 3px; }
+.gr-leg-on { border-color: #c3cfe6; }
+.gr-grid { stroke: rgba(195, 207, 230, 0.08); }
+.gr-grid-w { stroke: rgba(195, 207, 230, 0.2); stroke-dasharray: 2 3; }
+.gr-axis { stroke: rgba(195, 207, 230, 0.35); }
+.gr-tick { fill: #8d93b8; font-size: 9px; }
+.gr-finish { opacity: 0.35; animation: gr-finish 1.6s ease-in-out infinite; }
+@keyframes gr-finish { 50% { opacity: 0.7; } }
+.gr-flag { font-size: 12px; }
+.gr-today line { stroke: #fff3b0; stroke-dasharray: 3 3; opacity: 0.6; }
+.gr-today text { fill: #fff3b0; font-size: 9px; }
+.gr-line { fill: none; stroke-linejoin: round; stroke-linecap: round; transition: opacity 0.25s; }
+.gr-line-dim { opacity: 0.25; }
+.gr-line-pick { filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.5)); }
+.gr-comet { fill: #fff3b0; filter: drop-shadow(0 0 4px #fff3b0); }
+.gr-spark path { fill: #fff3b0; }
+.gr-spark { animation: gr-twinkle 1.4s ease-in-out infinite; transform-box: fill-box; }
+@keyframes gr-twinkle { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+.gr-cross { stroke: #c3cfe6; stroke-dasharray: 2 2; opacity: 0.7; }
+.gr-end { position: absolute; z-index: 2; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%; background: #1b1d3a; box-shadow: 0 0 0 2px var(--c); cursor: pointer; line-height: 0; }
+.gr-end::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; box-shadow: 0 0 0 2px var(--c); animation: gr-ring 1.8s ease-out infinite; }
+@keyframes gr-ring { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.8); opacity: 0; } }
+.gr-end img, .gr-end .emblem { max-width: 18px; max-height: 18px; }
+.gr-end-done { box-shadow: 0 0 0 2px var(--gold); }
+.gr-crown { position: absolute; top: -15px; left: 50%; font-size: 12px; font-style: normal; transform: translateX(-50%); animation: gr-crown 1.6s ease-in-out infinite; }
+@keyframes gr-crown { 50% { transform: translate(-50%, -2px) rotate(-8deg); } }
+.gr-tip { position: absolute; z-index: 3; transform: translate(-50%, -150%); padding: 2px 6px; font-size: 11px; white-space: nowrap; color: #e3e9f6; background: #2c3456; border: 1px solid #c3cfe6; pointer-events: none; }
+.gr-ot { margin: 0; padding: 2px 8px 4px; font-size: 11px; color: #c3cfe6; }
+.gr-ot b { color: #fff3b0; font-weight: 700; }
+.gr-ot-star { display: inline-block; color: #fff3b0; animation: gr-spin 2.4s linear infinite; }
+@keyframes gr-spin { to { transform: rotate(360deg); } }
+
+.gr-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; }
+.gr-row { position: relative; display: flex; align-items: center; gap: 7px; min-height: 42px; padding: 3px 8px 3px 4px; overflow: hidden; cursor: pointer;
+  background: var(--panel); border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 var(--hi), inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--lo); }
+.gr-row:active { transform: scale(0.985); }
+.gr-mine { box-shadow: inset 0 0 0 2px var(--sapphire); }
+.gr-pick { box-shadow: inset 0 0 0 2px #c3cfe6; }
+.gr-done { background: linear-gradient(90deg, #3d3214, var(--panel) 70%); }
+.gr-podium::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 40%, rgba(255, 243, 176, 0.2) 50%, transparent 60%); transform: translateX(-100%); animation: gc-st-sweep 3.2s ease-in-out infinite; }
+.gr-rank { flex: none; width: 24px; text-align: center; font-size: 14px; font-weight: 700; color: #c3cfe6; }
+.gr-rank-run { color: #8d93b8; font-weight: 400; }
+.gr-face { flex: none; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; box-shadow: inset 0 -3px 0 var(--c, transparent); }
+.gr-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.gr-name { display: flex; align-items: baseline; gap: 5px; min-width: 0; font-size: 14px; white-space: nowrap; }
+.gr-name small { font-size: 10px; color: var(--muted); overflow: hidden; }
+.gr-bar { position: relative; display: block; height: 5px; background: var(--lo); border: 1px solid var(--edge); overflow: hidden; }
+.gr-bar i { position: absolute; inset: 0; transform-origin: 0 50%; background: linear-gradient(90deg, #8d7fe0, #c3cfe6 70%, var(--gold)); transition: transform 0.6s cubic-bezier(0.2, 1, 0.3, 1); }
+.gr-done .gr-bar i { background: var(--gold); }
+.gr-val { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; min-width: 44px; }
+.gr-val b { font-size: 14px; color: #e3e9f6; }
+.gr-val small { display: inline-flex; align-items: center; font-size: 10px; color: var(--muted); }
+.gr-done .gr-val small { color: var(--gold); }
+.gr-stamp { padding: 0 4px; font-size: 12px !important; color: var(--edge) !important; background: var(--gold); transform: rotate(-6deg); box-shadow: 1px 1px 0 var(--edge); animation: gr-stamp 2s ease-in-out infinite; }
+@keyframes gr-stamp { 50% { transform: rotate(-6deg) scale(1.08); } }
+.gr-foot { margin: 0; font-size: 11px; color: var(--muted); text-align: center; }
+
+/* 상점 맨 위 성장 카드: 큰 달성률, 순위, 시작 ~ 목표 막대, 성장반영 */
+.gr-card { margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(195, 207, 230, 0.25); }
+.gr-card-top { display: flex; align-items: center; gap: 8px; }
+.gr-card-pct { flex: none; display: inline-flex; align-items: baseline; gap: 1px; font-size: 13px; color: #fff3b0; white-space: nowrap; }
+.gr-card-num { font-size: 24px; line-height: 1; color: #fff3b0; text-shadow: 2px 2px 0 var(--edge); }
+.gr-card-pct small { margin-left: 4px; font-size: 10px; color: var(--muted); }
+.gr-card-rank { flex: 1; min-width: 0; display: inline-flex; flex-wrap: wrap; align-items: center; font-size: 12px; color: #e3e9f6; }
+.gr-card-rank small { margin-left: 2px; color: var(--muted); }
+.gr-card-rank em { display: inline-flex; align-items: center; font-style: normal; color: var(--gold); }
+.gr-card-none { font-size: 12px; color: var(--muted); }
+.gr-edit-btn { flex: none; white-space: nowrap; margin-left: auto; padding: 4px 10px; font-size: 12px; font-weight: 700; color: var(--edge); background: linear-gradient(180deg, #fff3b0, var(--gold)); border: 1px solid var(--edge); box-shadow: 0 2px 0 var(--edge); cursor: pointer; position: relative; overflow: hidden; }
+.gr-edit-btn::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 35%, rgba(255, 255, 255, 0.8) 50%, transparent 65%); transform: translateX(-100%); animation: gc-ms-flow 2.6s ease-in-out infinite; }
+.gr-edit-btn:active, .gr-edit-on { transform: translateY(2px); box-shadow: none; }
+.gr-card-done .gr-card-num { color: var(--gold); }
+.gr-card-bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: end; gap: 6px; margin-top: 4px; font-size: 11px; color: #e3e9f6; white-space: nowrap; }
+.gr-track { position: relative; height: 10px; margin-top: 14px; background: var(--lo); border: 1px solid var(--edge); }
+.gr-track > i { position: absolute; inset: 0; transform-origin: 0 50%; background: linear-gradient(90deg, #8d7fe0, #c3cfe6 60%, var(--gold)); transition: transform 0.7s cubic-bezier(0.2, 1, 0.3, 1); overflow: hidden; }
+.gr-track > i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.7) 50%, transparent 70%); transform: translateX(-100%); animation: gc-ms-flow 2.4s ease-in-out infinite; }
+.gr-tick-lv { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: #4a5480; z-index: 1; }
+.gr-tick-lv em { position: absolute; bottom: calc(100% + 1px); left: 50%; transform: translateX(-50%); font-style: normal; font-size: 9px; color: #8d93b8; }
+.gr-tick-on { background: var(--gold); }
+.gr-tick-on em { color: var(--gold); }
+.gr-flag-me { position: absolute; top: -5px; bottom: -5px; width: 3px; margin-left: -1px; background: #fff3b0; box-shadow: 0 0 0 1px var(--edge); z-index: 2; transition: left 0.7s cubic-bezier(0.2, 1, 0.3, 1); }
+.gr-flag-me::before { content: ""; position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border: 2px solid #fff3b0; animation: gc-ms-ring 1.6s ease-out infinite; }
+.gr-goal { color: var(--gold); }
+.gc-wallet .rank-lv-edit { margin: 6px 0 0; }
+
+.gr-prize-row { grid-template-columns: 34px minmax(0, 1fr) 40px 70px !important; }
+.gr-targets ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.gr-tg { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 4px 6px; background: rgba(13, 15, 34, 0.35); border: 1px solid #4a5480; }
+.gr-tg-set { border-color: var(--gold); }
+.gr-tg-name { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 5px; font-size: 13px; }
+.gr-tg-name small { font-size: 11px; color: var(--muted); }
+.gr-tg-step b { min-width: 46px; }
+.gr-tg-suggest { opacity: 0.5; }
+.gr-tg-done { color: var(--gold); font-size: 11px; }
+
+/* 팝업: 달성률 */
+.ct-race-pct { flex: none; min-width: 52px; font-size: 18px; font-weight: 700; color: #fff3b0; text-align: center; text-shadow: 2px 2px 0 var(--edge); }
+.ct-num-s { font-size: 18px; }
+@media (prefers-reduced-motion: reduce) {
+  .gr-dday, .gr-finish, .gr-spark, .gr-end::after, .gr-crown, .gr-ot-star, .gr-podium::after, .gr-stamp, .gr-edit-btn::after, .gr-track > i::after, .gr-flag-me::before { animation: none; }
+}
+.gr-plot { position: relative; }

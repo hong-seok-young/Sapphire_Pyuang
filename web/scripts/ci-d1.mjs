@@ -626,7 +626,7 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
     ["송편", "20개", 0, null],
     ["자라의노래", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 경험치 30% 증가"],
   ];
-  const RANK = [100, 60, 30, 20, 10];
+  const RANK = [5, 4, 3, 2, 1];
   const lines = [`INSERT OR IGNORE INTO setup (key, done_at) VALUES ('gcoin_start', ${now});`];
   if (!queryFirst("SELECT 1 AS x FROM gc_levels")) for (const [lv, c] of LEVELS) lines.push(`INSERT INTO gc_levels (min_level, coin) VALUES (${lv}, ${c});`);
   if (!queryFirst("SELECT 1 AS x FROM gc_items"))
@@ -687,5 +687,25 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
       `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
     ]);
     console.log("성장코인샵 물건", ITEMS.length);
+  }
+}
+
+// 성장코인샵 시범운영 (김다혜 2026-11-09 '1코인당 3만 골드, 사멧 10개 2코인, 자몽주스·케이크 50개당 2코인, 크4물약 20개당 1코인', '1등부터 5등만, 37렙 먼저 찍으면 5코인'):
+// 사나운 멧돼지 인형은 10개 단위로, 넷의 골드 값을 그 코인만큼(3만 골드 x 코인), 나머지 물건의 코인은 골드 값으로 다시 셈한다 (1,000골드 -> 3만 골드).
+// 2주 목표 선착순 상금은 1~5위 5 · 4 · 3 · 2 · 1 (예전 주간 순위 보너스 100 · 60 · 30 · 20 · 10 그대로일 때만). setup 'gcoin_trial_20261109' 로 한 번만
+{
+  const KEY = "gcoin_trial_20261109";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    runSql([
+      "UPDATE gc_items SET unit = '10개', gold = 60000, price = 2 WHERE name = '사나운 멧돼지 인형';",
+      "UPDATE gc_items SET gold = 30000, price = 1 WHERE name = '망고워터';",
+      "UPDATE gc_items SET gold = 60000, price = 2 WHERE name IN ('자몽주스', '자몽케이크');",
+      "UPDATE gc_items SET price = MAX(1, CAST(ROUND(gold / 30000.0) AS INTEGER)) WHERE gold > 0 AND name NOT IN ('사나운 멧돼지 인형', '망고워터', '자몽주스', '자몽케이크');",
+      // 골드 칸이 생기기 전에 코인만 적은 물건(1코인 = 1,000골드 때)은 그 골드로 다시 셈한다
+      "UPDATE gc_items SET gold = price * 1000, price = MAX(1, CAST(ROUND(price * 1000 / 30000.0) AS INTEGER)) WHERE gold IS NULL AND price > 0 AND name NOT IN ('사나운 멧돼지 인형', '망고워터', '자몽주스', '자몽케이크');",
+      ...[[1, 100, 5], [2, 60, 4], [3, 30, 3], [4, 20, 2], [5, 10, 1]].map(([i, old, v]) => `UPDATE gc_settings SET value = ${v} WHERE key = 'rank${i}' AND value = ${old};`),
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
+    ]);
+    console.log("성장코인샵 시범운영 값 (한 번)");
   }
 }

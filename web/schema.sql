@@ -1003,6 +1003,16 @@ CREATE TABLE IF NOT EXISTS gc_ledger (
   created_at INTEGER NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS gc_ledger_once ON gc_ledger (user_id, kind, ref);
+-- 2주 목표 선착순 (시범운영, server/gcrace.ts): 판(시작 ms)마다 사람마다 목표 레벨. from_level 은 정할 때 레벨 (달성률 0%). 달성은 level_log 로 센다
+CREATE TABLE IF NOT EXISTS gc_targets (
+  round INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  from_level INTEGER NOT NULL,
+  target INTEGER NOT NULL,
+  set_at INTEGER NOT NULL,
+  set_by TEXT,
+  PRIMARY KEY (round, user_id)
+);
 -- 연속 성장 (server/gcoin.ts settleWeeks): 사람마다 마지막으로 코인을 번 주(시작 ms)와 그때까지 이어진 주 수. 2주째부터 연속 보너스 (gc_ledger kind streak)
 CREATE TABLE IF NOT EXISTS gc_streak (
   user_id TEXT PRIMARY KEY,

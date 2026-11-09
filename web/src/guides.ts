@@ -92,7 +92,7 @@ export const GUIDES: Guide[] = [
       {
         sel: ".rank-views button:has-text('주간')",
         head: "주간 성장",
-        text: "목요일 오전 10시마다 새로 시작해요. 1등 카드의 사진은 내 정보의 캐릭터 사진이에요.",
+        text: "월요일 0시마다 새로 시작해요. 1등 카드의 사진은 내 정보의 캐릭터 사진이에요.",
         tap: true,
         opens: ".growth-hero",
         undo: false,

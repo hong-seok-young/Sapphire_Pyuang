@@ -69,8 +69,50 @@ export interface GcRankEntry {
   avatar: number | null;
   highSpec?: boolean;
 }
+/** 2주 목표 선착순 (시범운영, 서버 server/gcrace.ts) */
+export interface GcRaceEntry {
+  id: string;
+  fromLevel: number;
+  target: number;
+  level: number;
+  exp: number | null;
+  job: Job;
+  avatar: number | null;
+  highSpec: boolean;
+  /** 목표를 처음 찍은 때 (아직이면 null) */
+  doneAt: number | null;
+  /** 달성률 0~100 */
+  pct: number;
+  rank: number;
+  /** 1~5위 달성자의 상금 */
+  coins: number;
+}
+export interface GcRace {
+  start: number;
+  end: number;
+  /** 1~5위 상금 */
+  prizes: number[];
+  list: GcRaceEntry[];
+  /** 사람마다 [때, 달성률] (추월 차트) */
+  series: Record<string, [number, number][]>;
+}
+/** 레벨을 저장해 달성률이 오르거나 목표를 찍었을 때 (팝업) */
+export interface RaceGain {
+  target: number;
+  fromLevel: number;
+  prevPct: number;
+  pct: number;
+  justDone: boolean;
+  rank: number;
+  coins: number;
+}
+export const RACE_EVENT = "sapphire:gcrace";
+
 export interface GcData {
   open: boolean;
+  /** 레벨·경험치마다 코인 (지금 시범운영은 꺼짐: 2주 목표 선착순만) */
+  levelCoins: boolean;
+  race: GcRace;
   manage: boolean;
   /** 내가 2군 본캐인지 (아니면 지갑이 없다) */
   member: boolean;
@@ -97,6 +139,9 @@ export interface GcData {
 }
 
 export const fetchGcoin = () => api<GcData>("/api/gcoin");
+/** 담당자: 이번 2주 목표 레벨 (null 이면 뺀다) */
+export const setTarget = (userId: string, target: number | null) =>
+  api<{ ok: boolean }>("/api/gcoin/targets", "PUT", { userId, target });
 export const buyItem = (itemId: number, qty: number) =>
   api<{ ok: boolean; balance: number }>("/api/gcoin/orders", "POST", {
     itemId,
@@ -230,8 +275,10 @@ const ITEM_INFO: Record<string, string[]> = {
   ],
 };
 /** 골드 -> 성장코인 (서버 server/gcoin.ts coinOfGold 와 같다) */
+/** 성장코인 1개 = 3만 골드 (김다혜 2026-11-09, 서버 server/gcoin.ts COIN_GOLD) */
+export const COIN_GOLD = 30_000;
 export const coinOfGold = (gold: number) =>
-  gold > 0 ? Math.max(1, Math.round(gold / 1000)) : 0;
+  gold > 0 ? Math.max(1, Math.round(gold / COIN_GOLD)) : 0;
 export const itemInfo = (name: string): string[] =>
   ITEM_INFO[name.replace(/\s/g, "")] ?? [];
 
@@ -248,7 +295,8 @@ export function itemIcon(name: string): string {
 }
 
 /** 파는 단위 (제작자 2026-11-09 '자몽주스와 자몽케이크는 50개 단위, 나머지는 20개'): 새 물건·묶음의 처음 개수 */
-export const packOf = (name: string) => (/자몽/.test(name) ? 50 : 20);
+export const packOf = (name: string) =>
+  /자몽/.test(name) ? 50 : /멧돼지/.test(name) ? 10 : 20;
 /** '20개' -> 20 (단위에 개수가 없으면 1) */
 export const qtyOf = (unit: string | null) =>
   Number(/(\d+)\s*개/.exec(unit ?? "")?.[1] ?? 1) || 1;
@@ -358,4 +406,61 @@ export function milestone(from: number, to: number): string | null {
   if (hit(55)) return "만렙 달성!";
   if (Math.floor(to) > Math.floor(from)) return `Lv.${Math.floor(to)} 달성!`;
   return null;
+}
+
+/**
+ * 예시 판 (제작자 2026-11-09 '테스트 데이터 몇 개 넣어 주고'): 목표를 아직 아무도 안 정했으면 성장 현황에 '예시'로 보인다 (서버로 가지 않음).
+ * 시작 때부터 며칠 사이 몇 번 적은 것처럼, 추월이 두 번 일어난다
+ */
+export function sampleRace(start: number, now: number): GcRace {
+  const d = (x: number) => Math.min(now, start + x * 86_400_000);
+  // 2군 길드원 닉네임과 공지의 목표로 (제작자 2026-11-09 '테스트 데이터 많이, 우리 길드원 닉네임 활용해서'). [닉네임, 직업, 시작 Lv, 목표 Lv, [며칠째, 달성률]...]
+  const P: [string, Job, number, number, [number, number][]][] = [
+    ["펀취", "monk", 36, 37, [[0, 20], [0.7, 46], [1.4, 71], [2.1, 100]]],
+    ["혈천도마", "warrior", 30, 32, [[0, 30], [0.5, 42], [1.3, 58], [2.2, 79], [2.9, 100]]],
+    ["체인소맨", "warrior", 34, 36, [[0, 10], [0.9, 35], [1.8, 61], [2.6, 83], [3.4, 100]]],
+    ["무도가", "monk", 31, 33, [[0, 40], [1.1, 52], [2.0, 66], [3.0, 90], [3.9, 96]]],
+    ["가져가", "ranger", 33, 35, [[0, 0], [0.4, 15], [1.6, 47], [2.8, 70], [3.6, 88]]],
+    ["춘천다크갈비", "monk", 31, 33, [[0, 55], [1.5, 61], [2.4, 74], [3.8, 82]]],
+    ["먼쥐", "monk", 32, 34, [[0, 25], [0.8, 38], [2.0, 50], [3.3, 77]]],
+    ["도아햄", "mage", 34, 36, [[0, 5], [1.2, 30], [2.5, 49], [3.7, 68]]],
+    ["마가목", "ranger", 32, 34, [[0, 45], [1.9, 51], [3.1, 60]]],
+    ["이름뭐로짓지", "mage", 34, 36, [[0, 0], [2.2, 22], [3.5, 41]]],
+    ["미즈로바", "ranger", 23, 28, [[0, 4], [1.0, 14], [2.3, 25], [3.9, 36]]],
+    ["도등", "warrior", 21, 27, [[0, 2], [1.7, 15], [3.2, 27]]],
+  ];
+  const series: Record<string, [number, number][]> = {};
+  const list: GcRaceEntry[] = P.map(([id, job, from, target, pts]) => {
+    series[id] = pts
+      .filter(([x]) => start + x * 86_400_000 <= now)
+      .map(([x, p]) => [d(x), p]);
+    const last = series[id][series[id].length - 1]?.[1] ?? 0;
+    const done = last >= 100 ? series[id][series[id].length - 1][0] : null;
+    const pos = from + ((target - from) * last) / 100;
+    return {
+      id,
+      fromLevel: from,
+      target,
+      level: Math.floor(pos),
+      exp: Math.round((pos % 1) * 100_000),
+      job,
+      avatar: null,
+      highSpec: false,
+      doneAt: done,
+      pct: last,
+      rank: 0,
+      coins: 0,
+    };
+  });
+  list.sort((a, b) =>
+    a.doneAt !== null || b.doneAt !== null
+      ? (a.doneAt ?? Infinity) - (b.doneAt ?? Infinity)
+      : b.pct - a.pct,
+  );
+  const prizes = [5, 4, 3, 2, 1];
+  list.forEach((e, i) => {
+    e.rank = i + 1;
+    if (e.doneAt !== null) e.coins = prizes[i] ?? 0;
+  });
+  return { start, end: start + 14 * 86_400_000, prizes, list, series };
 }

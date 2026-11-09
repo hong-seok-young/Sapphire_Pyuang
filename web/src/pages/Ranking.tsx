@@ -7,10 +7,10 @@ import type { ChangeKind, GrowthEntry, GrowthPeriod, Guild, Job, Me, RankEntry }
 import { useAsync } from "../data";
 import { JobEmblem, JobGlyph, MINE_TAG_PIC, RankMedal, RoleBadge } from "../emblems";
 import { ChangeAsk, FitLine, Loading, TopBar } from "../ui";
-import { weekStart } from "../week";
+import { growthWeekStart } from "../week";
 import { GrowthChart } from "./GrowthChart";
+import { LevelEditor } from "./LevelEditor";
 import { HeroHalo } from "../heroHalo";
-import { useBackClose } from "../backClose";
 
 
 type View = "level" | GrowthPeriod;
@@ -82,9 +82,9 @@ function expUpText(v: number): string {
   return String(Math.max(0.01, Math.round(pct * 100) / 100));
 }
 
-/** 이번 주(목요일 오전 10시부터, 제작자 요청)에 오른 레벨 수 (없으면 0). 다음 목요일 10시에 표시가 사라진다 */
+/** 이번 주(월요일 0시부터, 제작자 2026-11-09)에 오른 레벨 수 (없으면 0). 다음 월요일 0시에 표시가 사라진다 */
 function recentUp(r: RankEntry, now: number): number {
-  return r.prevLevel !== null && r.level > r.prevLevel && r.levelAt >= weekStart(now) ? r.level - r.prevLevel : 0;
+  return r.prevLevel !== null && r.level > r.prevLevel && r.levelAt >= growthWeekStart(now) ? r.level - r.prevLevel : 0;
 }
 
 /** 닉네임. 고스펙은 글자 색은 그대로 두고 글자에만 반짝임이 늘 흐른다 (제작자 요청) */
@@ -226,105 +226,6 @@ function ExpBar({ r, mine, onMe, onSaved }: { r: Ranked; mine: boolean; onMe?: (
   );
 }
 
-/**
- * 맨 아래 '성장반영' 칸 (제작자 2026-11-09 '랭킹에서 레벨업 버튼을 성장반영으로'): 레벨(− +)과 경험치를 랭킹에서 바로 적는다 (제작자 2026-11-09 '여기 자체에서 레벨업과 경치 둘 다 적게해줘, 내정보로 가게 하지말고').
- * 레벨을 올리면 경험치는 0% 로 바뀐다 (그 레벨에서 다시 시작하니까). 이미 적은 값을 바꾸면 내 정보처럼 '실제 성장 / 오타 수정'을 묻는다
- */
-function LevelEditor({ me, onMe, onSaved, onClose }: { me: Me; onMe?: (p: Partial<Me>) => void; onSaved?: () => void; onClose: () => void }) {
-  const cur = me.level ?? 1;
-  const [level, setLevel] = useState(cur);
-  const [text, setText] = useState(me.exp !== null ? (me.exp / 1000).toFixed(3) : "");
-  const [asking, setAsking] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  useBackClose(true, onClose);
-  const validExp = text.trim() === "" || /^\d{1,2}(\.\d{1,3})?$/.test(text.trim());
-  const exp = text.trim() === "" ? null : Math.round(Number(text) * 1000);
-  const changed = level !== cur || exp !== me.exp;
-
-  function step(d: number) {
-    const next = Math.min(99, Math.max(1, level + d));
-    setLevel(next);
-    setAsking(false);
-    // 레벨이 바뀌면 경험치는 그 레벨의 0% 부터 (원래 레벨로 돌아오면 원래 경험치)
-    setText(next === cur ? (me.exp !== null ? (me.exp / 1000).toFixed(3) : "") : "0.000");
-  }
-
-  async function save(change?: ChangeKind) {
-    if (!me.job || !me.guild || !validExp || !changed) return;
-    // 이미 적은 값이 있었으면 실제로 오른 것인지 잘못 쓴 것을 고친 것인지 묻는다 (제작자 요청, 내 정보와 같다)
-    if (!change && (me.level !== null || me.exp !== null)) {
-      setAsking(true);
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      await saveMyProfile(me.job, level, exp, me.guild, change);
-      onMe?.({ level, exp });
-      onSaved?.();
-      onClose();
-    } catch (x) {
-      setError(errorText(x));
-      setAsking(false);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // 한 줄로 촘촘히 (제작자 2026-11-09 '성장치 적는 팝업 좀 더 콤팩트하게, 큼직하고 너저분해', '0퍼부터 이런 설명 빼고'): Lv − 36 + · 경험치 % · 저장 ✕.
-  // 저장을 누르면 그 자리가 '실제 성장 / 오타 수정' 두 단추로 바뀐다
-  return (
-    <div className="rank-lv-edit">
-      <span className="rank-lv-step">
-        <button type="button" onClick={() => step(-1)} disabled={busy || level <= 1} aria-label="레벨 내리기">
-          −
-        </button>
-        <b key={level} className={level > cur ? "rank-lv-up" : ""}>
-          <small>Lv</small>
-          {level}
-        </b>
-        <button type="button" onClick={() => step(1)} disabled={busy || level >= 99} aria-label="레벨 올리기">
-          +
-        </button>
-      </span>
-      <span className="rank-lv-exp">
-        <input
-          inputMode="decimal"
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value.replace(/[^\d.]/g, "").slice(0, 6));
-            setAsking(false);
-          }}
-          placeholder="0.000"
-          aria-label="경험치 퍼센트"
-        />
-        <b>%</b>
-      </span>
-      <span className="rank-lv-actions">
-        {asking ? (
-          <>
-            <button type="button" className="rank-lv-save" disabled={busy} onClick={() => save("grow")}>
-              실제 성장
-            </button>
-            <button type="button" disabled={busy} onClick={() => save("fix")}>
-              오타 수정
-            </button>
-          </>
-        ) : (
-          <button type="button" className="rank-lv-save" disabled={busy || !validExp || !changed} onClick={() => save()}>
-            {busy ? "…" : "저장"}
-          </button>
-        )}
-        <button type="button" className="rank-lv-x" onClick={asking ? () => setAsking(false) : onClose} aria-label={asking ? "취소" : "닫기"}>
-          ✕
-        </button>
-      </span>
-      {error && <small className="rank-exp-error">{error}</small>}
-    </div>
-  );
-}
-
 /** 레벨 랭킹: 게임의 경험치 랭킹 목록처럼 (메달, 엠블럼, 맨 아래 '내순위'). 길드(통합/1군/2군)와 직업으로 거른다 */
 function LevelRanking({ me, data, guild, onGuild, onMe, onSaved, saved, editOpen, onEdit }: {
   me: Me; data: RankEntry[]; guild: GuildFilter; onGuild: (g: GuildFilter) => void; onMe?: (p: Partial<Me>) => void;
@@ -456,7 +357,7 @@ function whenText(t: number): string {
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}(${"일월화수목금토"[d.getUTCDay()]}) ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
 }
 
-/** 기간이 끝나는 때: 오늘은 다음 날 0시, 주간은 다음 목요일 오전 10시, 월간은 다음 달 1일 0시 (한국 시간) */
+/** 기간이 끝나는 때: 오늘은 다음 날 0시, 주간은 다음 월요일 0시, 월간은 다음 달 1일 0시 (한국 시간) */
 function periodEnd(period: GrowthPeriod, start: number): number {
   if (period === "day") return start + 86_400_000;
   if (period === "week") return start + 7 * 86_400_000;
