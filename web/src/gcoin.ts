@@ -44,7 +44,8 @@ export interface GcCurve {
 }
 export interface GcRankEntry {
   id: string;
-  score: number;
+  /** 그 주에 레벨·경험치로 번 코인 */
+  coins: number;
   fromLevel: number;
   level: number;
 }
@@ -117,7 +118,7 @@ export const SAMPLE_HISTORY: GcData["history"] = {
     { level: 33, coin: 35, pct: null },
     { level: 32, coin: 21, pct: null },
   ],
-  ledger: [{ delta: 60, kind: "rank", note: "주간 2군 성장 2위 (점수 52.5)", at: Date.now() - 2 * 86_400_000 }],
+  ledger: [{ delta: 60, kind: "rank", note: "주간 2군 성장 2위 (그 주 +52코인)", at: Date.now() - 2 * 86_400_000 }],
   orders: [
     { id: -1, user: "예시", itemId: null, name: "사나운 멧돼지", unit: "10개", price: 60, qty: 1, status: "done", note: null, at: Date.now() - 86_400_000, doneAt: Date.now() - 80_000_000, doneBy: "멍멍" },
     { id: -2, user: "예시", itemId: null, name: "망고워터", unit: "10개", price: 18, qty: 1, status: "pending", note: null, at: Date.now() - 3_600_000, doneAt: null, doneBy: null },
@@ -131,7 +132,8 @@ export interface CoinGain {
   from: number;
   to: number;
   rank: number | null;
-  score: number;
+  /** 이번 주 번 코인, 바로 위 사람까지 코인 차이 */
+  week: number;
   gap: number | null;
 }
 export const COIN_EVENT = "sapphire:gcoin";

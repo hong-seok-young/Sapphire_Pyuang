@@ -228,42 +228,40 @@ export async function isMember(env: Env, id: string): Promise<boolean> {
     .first());
 }
 
-/**
- * 성장 점수: 오른 만큼을 레벨마다 그 레벨의 코인 값으로 무게를 준다 (레벨이 높을수록 1레벨이 힘들어서 공평하게, 제작자 '모두가 공평하게').
- * Lv.36 0% -> 36 50% 는 0.5 x (37 에 오르는 코인). 어느 한쪽 경험치를 모르면 레벨만 센다 (growth.ts grown 과 같다)
- */
-export function growthScore(from: { level: number; exp: number | null }, to: { level: number; exp: number | null }, curve: Curve[]): number {
-  const exact = from.exp !== null && to.exp !== null;
-  const a = from.level + (exact ? (from.exp as number) / 100_000 : 0);
-  const b = to.level + (exact ? (to.exp as number) / 100_000 : 0);
-  return b <= a ? 0 : Math.round(coinsBetween(a, b, curve) * 10) / 10;
-}
-
 export interface RankEntry {
   id: string;
-  score: number;
+  /** 그 주에 레벨·경험치로 번 성장코인 (지갑과 같은 셈) */
+  coins: number;
   fromLevel: number;
   level: number;
 }
 
-/** [from, to) 동안 2군 본캐의 성장 점수 순위 (오른 사람만). to 가 null 이면 지금 프로필까지 */
+/**
+ * [from, to) 동안 2군 본캐가 레벨·경험치로 번 성장코인 순위 (번 사람만, 많이 번 순). to 가 null 이면 지금까지.
+ * 제작자 2026-11-09 '레벨별 난이도로 순위 매기지 마, 코인 많이 번 순위로': 지갑과 똑같이 주 시작 때 위치부터 그 주에 적은 가장 높은 위치까지
+ */
 export async function weekRanking(env: Env, from: number, to: number | null, curve: Curve[]): Promise<RankEntry[]> {
-  const [base, end] = await Promise.all([
+  const until = to ?? Number.MAX_SAFE_INTEGER;
+  const [base, logs, now] = await Promise.all([
     pointsAt(env, from, null),
+    env.DB.prepare(`SELECT user_id, level, exp FROM level_log WHERE at > ? AND at < ? AND user_id IN (${MEMBERS_SQL})`).bind(from, until).all<Point>(),
     to === null
       ? env.DB.prepare(`SELECT user_id, level, exp FROM profiles WHERE user_id IN (${MEMBERS_SQL})`).all<Point>()
-      : env.DB.prepare(`SELECT user_id, level, exp, MAX(at) AS at FROM level_log WHERE at < ? AND user_id IN (${MEMBERS_SQL}) GROUP BY user_id`)
-          .bind(to)
-          .all<Point>(),
+      : Promise.resolve({ results: [] as Point[] }),
   ]);
-  const out: RankEntry[] = [];
-  for (const e of end.results) {
-    const b = base.get(e.user_id);
-    if (!b) continue;
-    const score = growthScore(b, e, curve);
-    if (score > 0) out.push({ id: e.user_id, score, fromLevel: b.level, level: e.level });
+  const top = new Map<string, Point>();
+  for (const r of [...logs.results, ...now.results]) {
+    const t = top.get(r.user_id);
+    if (!t || posOf(r) > posOf(t)) top.set(r.user_id, r);
   }
-  return out.sort((x, y) => y.score - x.score || x.id.localeCompare(y.id));
+  const out: RankEntry[] = [];
+  for (const [id, t] of top) {
+    const b = base.get(id);
+    if (!b) continue;
+    const coins = Math.floor(coinsBetween(posOf(b), posOf(t), curve));
+    if (coins > 0) out.push({ id, coins, fromLevel: b.level, level: t.level });
+  }
+  return out.sort((x, y) => y.coins - x.coins || x.id.localeCompare(y.id));
 }
 
 /**
@@ -286,7 +284,7 @@ export async function settleWeeks(env: Env, curve: Curve[], now = Date.now()): P
       top.map((e, i) =>
         env.DB.prepare(
           "INSERT OR IGNORE INTO gc_ledger (user_id, delta, kind, ref, note, by_user, created_at) VALUES (?, ?, 'rank', ?, ?, NULL, ?)",
-        ).bind(e.id, rank[i], `w${w}`, `주간 2군 성장 ${i + 1}위 (점수 ${e.score})`, now),
+        ).bind(e.id, rank[i], `w${w}`, `주간 2군 성장 ${i + 1}위 (그 주 +${e.coins}코인)`, now),
       ),
     );
     if (GCOIN_OPEN)
@@ -323,9 +321,10 @@ export interface CoinGain {
   /** 저장 전·후 가장 높은 위치 (레벨 + 경험치 %) */
   from: number;
   to: number;
-  /** 이번 주 2군 성장 순위 (오른 게 없으면 null), 바로 위 사람까지 점수 차이 */
+  /** 이번 주 2군 성장 순위 (이번 주 번 코인 순, 번 게 없으면 null) */
   rank: number | null;
-  score: number;
+  /** 이번 주 번 코인과 바로 위 사람까지 코인 차이 */
+  week: number;
   gap: number | null;
 }
 
@@ -353,7 +352,7 @@ export async function coinGain(env: Env, me: User, before: { curve: Curve[]; w: 
     from: pos(before.w),
     to: pos(w),
     rank: i >= 0 ? i + 1 : null,
-    score: i >= 0 ? top[i].score : 0,
-    gap: i > 0 ? Math.round((top[i - 1].score - top[i].score) * 10) / 10 : null,
+    week: i >= 0 ? top[i].coins : 0,
+    gap: i > 0 ? top[i - 1].coins - top[i].coins : null,
   };
 }

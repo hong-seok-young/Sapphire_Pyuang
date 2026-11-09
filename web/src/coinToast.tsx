@@ -52,8 +52,8 @@ export function CoinToast() {
     gain.rank === null
       ? null
       : gain.rank <= 3
-        ? `${MEDAL[gain.rank - 1]} 이번 주 2군 성장 ${gain.rank}위${gain.gap !== null ? ` · ${gain.rank - 1}위까지 ${gain.gap}점` : " · 1위!"}`
-        : `이번 주 2군 성장 ${gain.rank}위${gain.gap !== null ? ` · 바로 위까지 ${gain.gap}점` : ""}`;
+        ? `${MEDAL[gain.rank - 1]} 이번 주 2군 성장 ${gain.rank}위${gain.gap !== null ? ` · ${gain.rank - 1}위까지 ${gain.gap}코인` : ""}`
+        : `이번 주 2군 성장 ${gain.rank}위${gain.gap !== null ? ` · 바로 위까지 ${gain.gap}코인` : ""}`;
   return (
     <button
       key={k}

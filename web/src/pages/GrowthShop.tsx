@@ -98,14 +98,14 @@ function WalletCard({ w, curve, sample }: { w: GcWallet; curve: GcCurve[]; sampl
   );
 }
 
-/** 이번 주 2군 성장 순위 (점수 = 오른 만큼 x 그 레벨의 코인 값, 높은 레벨일수록 크게) */
+/** 이번 주 2군 성장 순위 (이번 주 레벨·경험치로 코인을 많이 번 순) */
 function WeekRank({ data }: { data: GcData }) {
   const top = data.week.top;
   return (
     <div className="gc-week">
       <p className="gc-week-head">
         <b>이번 주 2군 성장 순위</b>
-        <small>목 10시에 1·2·3위 보너스</small>
+        <small>이번 주 번 코인 순 · 목 10시에 1·2·3위 보너스</small>
       </p>
       {!top.length ? (
         <p className="gc-week-empty">아직 이번 주에 레벨·경험치를 올린 2군이 없어요</p>
@@ -118,7 +118,7 @@ function WeekRank({ data }: { data: GcData }) {
                 <Nick name={e.id} />
                 <small>
                   Lv.{e.fromLevel}
-                  {e.level !== e.fromLevel ? ` → ${e.level}` : ""} · 점수 {e.score}
+                  {e.level !== e.fromLevel ? ` → ${e.level}` : ""} · 이번 주 +{e.coins}코인
                 </small>
               </span>
               <span className="gc-week-bonus">
