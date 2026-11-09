@@ -34,7 +34,7 @@ export interface LaunchItem {
   /** 칸 오른쪽 위 작은 글자 줄들 (상자 없이 글자만. 장비대여의 '담당자' / '멍멍', 제작자 요청 2026-11-03) */
   corner?: string[];
   /** 특정 사람만 들어가는 칸: 테두리에 빛이 돈다 (gold 1군 전용, blue 운영진, purple 개발자) */
-  ring?: "gold" | "blue" | "purple" | "mint";
+  ring?: "gold" | "blue" | "purple" | "mint" | "silver";
   /** 개발 중·검토 후 오픈: 홈에서는 열린 칸 아래 접힌 '개발 중' 묶음에 들어간다 (제작자 요청 2026-11-02, Home.tsx) */
   soon?: boolean;
   /** soon 일 때 오른쪽 위 표 (없으면 '준비 중') */
@@ -104,7 +104,7 @@ export const ITEMS: LaunchItem[] = [
   { key: "smack", title: "운영진 때리기", short: "때리기", to: "#/smack", icon: "🥊", developer: !SMACK_OPEN, soon: !SMACK_OPEN, badge: "개발중", match: ["smack"] },
   // 2군 성장코인샵 (개발중, 제작자 2026-11-09 '1군전용처럼 2군전용 성장코인샵, 개발중, 나한테만'): 레벨업마다 쌓이는 성장코인으로 산다 (pages/GrowthShop.tsx).
   // 열 때는 developer·soon·badge 를 빼고 GCOIN_OPEN (CLAUDE.md '2군 성장코인샵')
-  { key: "gcoin", title: "성장코인샵", short: "코인샵", to: "#/gcoin", icon: "🪙", ribbon: "2군 전용", ring: "mint", developer: !GCOIN_OPEN, soon: !GCOIN_OPEN, badge: "개발중", match: ["gcoin"] },
+  { key: "gcoin", title: "성장코인샵", short: "코인샵", to: "#/gcoin", icon: "🪙", ribbon: "2군 전용", ring: "silver", developer: !GCOIN_OPEN, soon: !GCOIN_OPEN, badge: "개발중", match: ["gcoin"] },
   { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
   // 헬스 루틴 (개발중, 길드원 완뻔치 님 개발 요청 #8, 제작자 2026-11-09 '플릭 같은 헬스 어플'): 실제 헬스장 운동 기록 (pages/Fit.tsx). 게임과 상관없다
   { key: "fit", title: "헬스 루틴", short: "헬스", to: "#/fit", icon: "🏋️", developer: !FIT_OPEN, soon: !FIT_OPEN, badge: "개발중", match: ["fit"] },

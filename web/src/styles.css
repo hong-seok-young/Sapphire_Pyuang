@@ -1157,6 +1157,8 @@ button { font: inherit; color: inherit; }
 .tile-ring-blue { --ring-a: #6fb6ff; --ring-b: #d8ecff; }
 .tile-ring-purple { --ring-a: #b98cff; --ring-b: #efe2ff; }
 .tile-ring-mint { --ring-a: #3fe0a0; --ring-b: #c8fff0; }
+/* 2군 전용 (성장코인샵): 1군 금색과 짝인 은색 (초록은 UPDATE 색이라 겹치지 않게, 제작자 2026-11-09) */
+.tile-ring-silver { --ring-a: #c9d3e6; --ring-b: #ffffff; }
 .tile-ring > * { position: relative; z-index: 2; }
 .tile-ring > .tile-ribbon { position: absolute; z-index: 3; }
 /* 띠도 있고 개발 중이기도 한 칸 (길드 던전: 1군 전용 + 개발 중): 개발 중 표는 오른쪽 위 그대로, 둘 다 조금 작게 해서 좁은 폰에서도 겹치지 않게 */
@@ -2310,7 +2312,7 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 /* 2군 성장코인샵 (pages/GrowthShop.tsx): 도트 동전, 지갑 칸, 주간 순위, 물건 카드 2줄, 아래 신청 칸, 내역 줄.
    움직임은 보는 동안·누를 때만 (지갑 동전이 가끔 반짝, 바뀐 숫자가 톡, 1위 메달이 살랑, 카드 누름) */
 .gc-tabs { margin-bottom: 8px; }
-.gc-closed { margin: 0 0 8px; padding: 2px 6px; text-align: center; font-size: 11px; color: var(--edge); background: #3fe0a0; }
+.gc-closed { margin: 0 0 8px; padding: 2px 6px; text-align: center; font-size: 11px; color: var(--edge); background: #c3cfe6; }
 .gc-notice { margin: 0 0 8px; }
 .gc-coin {
   display: inline-block; width: 12px; height: 12px; margin-right: 3px; vertical-align: -1px; flex: none;
@@ -2351,13 +2353,13 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .gc-minus { color: #ffb27a; }
 .gc-void { color: var(--muted); text-decoration: line-through; }
 .gc-mini { padding: 2px 8px; font-size: 11px; }
-.gc-done-btn { color: var(--edge); background: #3fe0a0; }
+.gc-done-btn { color: var(--edge); background: #c3cfe6; }
 .gc-order-act { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; margin-left: auto; }
 .gc-order-act .mk-input { flex: 1; min-width: 120px; padding: 4px 6px; font-size: 12px; }
 .gc-sub, .gc-note { margin: 0 0 6px; font-size: 11px; color: var(--muted); }
 .gc-member-row { width: 100%; border: 0; cursor: pointer; color: var(--text); text-align: left; }
 .gc-member-row:active { transform: scale(0.99); }
-.gc-member-open .gc-member-row { box-shadow: inset 3px 0 0 #3fe0a0; }
+.gc-member-open .gc-member-row { box-shadow: inset 3px 0 0 #c3cfe6; }
 .gc-balance { flex: none; display: flex; align-items: center; color: var(--gold); font-weight: 700; }
 .gc-member-detail { padding: 6px 8px 8px; background: var(--night-2); }
 .gc-adjust { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
@@ -2368,8 +2370,8 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .gc-curve li { display: grid; grid-template-columns: 64px minmax(0, 1fr) 58px; align-items: center; gap: 8px; padding: 3px 4px; font-size: 12px; }
 .gc-curve li b { display: flex; align-items: center; justify-content: flex-end; color: var(--gold); }
 .gc-curve-bar { height: 6px; background: var(--lo); border: 1px solid var(--edge); }
-.gc-curve-bar i { display: block; height: 100%; background: linear-gradient(90deg, #3fe0a0, var(--gold)); transform-origin: 0 50%; }
-.gc-curve-me { background: var(--night-2); box-shadow: inset 3px 0 0 #3fe0a0; }
+.gc-curve-bar i { display: block; height: 100%; background: linear-gradient(90deg, #c3cfe6, var(--gold)); transform-origin: 0 50%; }
+.gc-curve-me { background: var(--night-2); box-shadow: inset 3px 0 0 #c3cfe6; }
 
 .gc-set { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin-bottom: 10px; }
 .gc-set-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; }
@@ -4262,7 +4264,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .ct {
   position: fixed; z-index: 45; left: 50%; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 12px); transform: translateX(-50%);
   width: min(340px, calc(100% - 24px)); display: flex; align-items: center; gap: 12px; padding: 10px 14px; cursor: pointer; text-align: left; color: var(--text);
-  background: linear-gradient(180deg, #1f4a40, var(--panel)); border: var(--px) solid var(--edge); box-shadow: 0 0 0 2px #3fe0a0, 0 6px 0 rgba(0, 0, 0, 0.35);
+  background: linear-gradient(180deg, #2c3456, var(--panel)); border: var(--px) solid var(--edge); box-shadow: 0 0 0 2px #c3cfe6, 0 6px 0 rgba(0, 0, 0, 0.35);
   animation: ct-in 0.32s cubic-bezier(0.2, 1.4, 0.4, 1) both, ct-out 0.3s ease-in 3.9s forwards;
 }
 @keyframes ct-in { from { transform: translate(-50%, 24px) scale(0.85); opacity: 0; } to { transform: translate(-50%, 0) scale(1); opacity: 1; } }
@@ -4271,7 +4273,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 @keyframes ct-flip { 0% { transform: scaleX(1); } 50% { transform: scaleX(0.08); } 100% { transform: scaleX(1); } }
 .ct-main { display: flex; flex-direction: column; min-width: 0; }
 .ct-num { font-size: 26px; line-height: 1; color: #fff3b0; text-shadow: 2px 2px 0 var(--edge); }
-.ct-main small { font-size: 11px; color: #c8fff0; }
+.ct-main small { font-size: 11px; color: #e3e9f6; }
 .ct-line { margin-top: 3px; font-size: 12px; color: var(--gold); }
 .ct-sub { margin-top: 0; font-size: 11px; color: var(--muted); }
 .ct-spark { position: absolute; left: 31px; top: 50%; width: 0; height: 0; pointer-events: none; }
@@ -4308,7 +4310,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
    지갑은 한 칸에 촘촘히(가끔 빛이 비스듬히 지나감), 순위는 1·2·3위 세 칸을 늘 꽉 채우고, 물건은 이름마다 한 줄에 묶음이 줄을 나눠 채운다 */
 .gc-wallet {
   position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin-bottom: 8px; padding: 8px 10px;
-  background: linear-gradient(135deg, #1f4a40, #262150 70%); border: var(--px) solid var(--edge); box-shadow: inset 0 var(--px) 0 #3fe0a0;
+  background: linear-gradient(135deg, #2c3456, #262150 70%); border: var(--px) solid var(--edge); box-shadow: inset 0 var(--px) 0 #c3cfe6;
 }
 .gc-wallet::after {
   content: ""; position: absolute; top: -20%; bottom: -20%; left: -40%; width: 30%; pointer-events: none;
@@ -4320,14 +4322,14 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .gc-wallet-main { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .gc-wallet-num { display: flex; align-items: center; gap: 4px; }
 .gc-wallet-num b { font-size: 26px; line-height: 1; color: #fff3b0; text-shadow: 2px 2px 0 var(--edge); }
-.gc-next { flex: 1; min-width: 0; display: grid; gap: 3px; font-size: 11px; color: #c8fff0; }
+.gc-next { flex: 1; min-width: 0; display: grid; gap: 3px; font-size: 11px; color: #e3e9f6; }
 .gc-next-top { display: flex; justify-content: space-between; gap: 4px; white-space: nowrap; }
 .gc-next-top b { display: flex; align-items: center; color: var(--gold); }
 .gc-next-bar { display: block; height: 5px; background: var(--lo); border: 1px solid var(--edge); overflow: hidden; }
-.gc-next-bar i { display: block; height: 100%; background: linear-gradient(90deg, #3fe0a0, var(--gold)); transform-origin: 0 50%; transition: transform 0.6s ease; }
+.gc-next-bar i { display: block; height: 100%; background: linear-gradient(90deg, #c3cfe6, var(--gold)); transform-origin: 0 50%; transition: transform 0.6s ease; }
 .gc-wallet-rows { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 8px; font-size: 11px; color: var(--muted); }
 .gc-wallet-rows b { color: var(--text); font-weight: 400; }
-.gc-chip { padding: 0 5px; font-size: 10px; line-height: 16px; color: #c8fff0; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--edge); }
+.gc-chip { padding: 0 5px; font-size: 10px; line-height: 16px; color: #e3e9f6; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--edge); }
 .gc-chip-fire { color: #ffd0a0; }
 
 .gc-podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin-bottom: 8px; }
@@ -4345,7 +4347,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .gc-medal { font-size: 16px; line-height: 1.1; }
 .gc-pod-1 .gc-medal { display: inline-block; animation: gc-sway 2.4s ease-in-out infinite; }
 .gc-pod-name { max-width: 100%; overflow-wrap: anywhere; font-size: 12px; }
-.gc-pod small { font-size: 10px; color: #3fe0a0; }
+.gc-pod small { font-size: 10px; color: #c3cfe6; }
 .gc-pod-bonus { display: flex; align-items: center; font-size: 11px; color: var(--gold); }
 
 .gc-goods { list-style: none; margin: 0 0 110px; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
@@ -4362,21 +4364,21 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .gc-pack b { display: flex; align-items: center; font-size: 13px; color: var(--gold); }
 .gc-pack:active { transform: scale(0.94); }
 .gc-short { opacity: 0.5; }
-.gc-picked { background: #1f4a40; box-shadow: 0 0 0 2px #3fe0a0; }
-.gc-picked::after { content: ""; position: absolute; inset: -3px; border: 1px solid #3fe0a0; pointer-events: none; animation: gc-halo 1.2s ease-out infinite; }
+.gc-picked { background: #2c3456; box-shadow: 0 0 0 2px #c3cfe6; }
+.gc-picked::after { content: ""; position: absolute; inset: -3px; border: 1px solid #c3cfe6; pointer-events: none; animation: gc-halo 1.2s ease-out infinite; }
 @keyframes gc-halo { from { opacity: 0.9; transform: scale(1); } to { opacity: 0; transform: scale(1.12); } }
 
 .gc-buy {
   position: fixed; z-index: 20; left: 50%; transform: translateX(-50%); width: min(616px, calc(100% - 16px));
   bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 6px);
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px; background: var(--panel-2); border: var(--px) solid var(--edge);
-  box-shadow: 0 0 0 1px #3fe0a0; animation: gc-rise 0.18s ease-out;
+  box-shadow: 0 0 0 1px #c3cfe6; animation: gc-rise 0.18s ease-out;
 }
 .gc-buy-name { flex: 1; min-width: 0; font-size: 13px; }
 .gc-step { display: flex; align-items: center; gap: 4px; }
 .gc-step b { min-width: 18px; text-align: center; }
 .gc-step .pill { padding: 1px 9px; }
-.gc-buy-btn { display: flex; align-items: center; color: var(--edge); background: #3fe0a0; font-weight: 700; }
+.gc-buy-btn { display: flex; align-items: center; color: var(--edge); background: #c3cfe6; font-weight: 700; }
 .gc-buy-btn:active { transform: scale(1.06); }
 .gc-over { background: var(--red); }
 @media (prefers-reduced-motion: reduce) { .gc-wallet::after, .gc-pod-1::after, .gc-pod-1 .gc-medal, .gc-picked::after { animation: none; } .gc-next-bar i { transition: none; } }
