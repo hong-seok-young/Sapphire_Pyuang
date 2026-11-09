@@ -157,7 +157,7 @@ export function reportOpen(userId: string) {
 const PAGE_NAME: Record<string, string> = {
   "": "홈", places: "사냥터 목록", search: "검색", equip: "장비", chat: "챗봇", ranking: "길드 랭킹", market: "사파이어 중개인",
   requests: "길드원 의뢰소", alerts: "알림", shop: "플래티넘 할인 상점", board: "게시판", me: "내 정보", admin: "길드원 관리", app: "앱", password: "비밀번호 바꾸기", log: "사용 기록", patch: "패치 내역", odds: "공식 확률",
-  match: "길드 던전", todo: "To do", rent: "장비대여", gaps: "챗봇 개선", info: "정보", as: "캐릭터 바꿔서 열기", trend: "시세 동향", enhance: "강화 비교", sim: "확률 시뮬레이터", simtest: "시뮬레이터 테스트", devreq: "개발 요청",
+  match: "길드 던전", todo: "To do", rent: "장비대여", gaps: "챗봇 개선", info: "정보", as: "캐릭터 바꿔서 열기", trend: "시세 동향", enhance: "강화 비교", sim: "확률 시뮬레이터", simtest: "시뮬레이터 테스트", devreq: "개발 요청", fit: "헬스 루틴",
 };
 const RENT_VIEW: Record<string, string> = { apps: "신청함", staff: "운영", log: "기록" };
 
@@ -287,6 +287,22 @@ const ACTIONS: [RegExp, (d: Rec, m: RegExpMatchArray, at: number) => string][] =
       ),
   ],
   [/^POST \/api\/devreq\/(\d+)\/talk$/, (d, m) => join(`개발 요청 #${m[1]} 대화`, quote(d.text, 60))],
+  // 헬스 루틴 (하는 중인 운동 저장 /api/fit/draft PUT 은 남기지 않는다)
+  [/^POST \/api\/fit\/exercises$/, (d) => join("헬스 루틴 내 종목 추가", str(d.name))],
+  [/^DELETE \/api\/fit\/exercises\/\d+$/, () => "헬스 루틴 내 종목 지움"],
+  [/^POST \/api\/fit\/routines$/, (d) => join("헬스 루틴 루틴 만듦", str(d.name))],
+  [/^PUT \/api\/fit\/routines\/\d+$/, (d) => join("헬스 루틴 루틴 고침", str(d.name))],
+  [/^DELETE \/api\/fit\/routines\/\d+$/, () => "헬스 루틴 루틴 지움"],
+  [/^DELETE \/api\/fit\/draft$/, () => "헬스 루틴 운동 취소"],
+  [
+    /^POST \/api\/fit\/workouts$/,
+    (d) => {
+      const w = (d.data ?? {}) as Rec;
+      const n = Array.isArray(w.entries) ? w.entries.length : 0;
+      return join("헬스 루틴 운동 끝", str(w.title), n ? `${n}종목` : null);
+    },
+  ],
+  [/^DELETE \/api\/fit\/workouts\/\d+$/, () => "헬스 루틴 운동 기록 지움"],
   [/^POST \/api\/chat\/stop$/, () => "챗봇 답 중지"],
   [/^\w+ \/api\/chat\/gaps\/\d+$/, () => "챗봇 개선 완료"],
   // 길드원 관리
@@ -449,6 +465,7 @@ const VIEW_SECTION: Record<string, string> = {
   board: "게시판", official: "게시판", market: "중개인", rent: "장비대여", requests: "의뢰소", shop: "플래티넘 상점", chat: "챗봇",
   ranking: "길드 랭킹", admin: "길드원 관리", me: "내 정보", password: "내 정보", alerts: "알림", todo: "To do", log: "사용 기록",
   info: "정보", menu: "정보", post: "정보", place: "정보", places: "정보", monster: "정보", item: "정보", equip: "정보", odds: "정보", search: "검색",
+  fit: "헬스 루틴",
 };
 const ACT_SECTION: [RegExp, string][] = [
   [/^\w+ \/api\/board/, "게시판"],
@@ -463,6 +480,7 @@ const ACT_SECTION: [RegExp, string][] = [
   [/^\w+ \/api\/todo/, "To do"],
   [/^\w+ \/api\/favorites/, "정보"],
   [/^\w+ \/api\/bday/, "생일 스티커"],
+  [/^\w+ \/api\/fit/, "헬스 루틴"],
 ];
 export function sectionOf(r: ActivityRow): string | null {
   if (r.kind === "view") {

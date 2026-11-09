@@ -116,6 +116,7 @@ export const TITLE_EN: Record<string, string> = {
   "전장 · 헌팅그라운드": "BATTLEFIELD",
   "퀘스트 · 지도": "QUESTS · MAPS",
   "길드 던전": "GUILD DUNGEON",
+  "헬스 루틴": "WORKOUT LOG",
 };
 
 export function TopBar({

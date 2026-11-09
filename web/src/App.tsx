@@ -98,6 +98,7 @@ const CHUNKS = {
   Todo: () => import("./pages/Todo"),
   Rental: () => import("./pages/Rental"),
   GuildDungeon: () => import("./pages/GuildDungeon"),
+  Fit: () => import("./pages/Fit"),
 };
 const ChatPage = lazy(() => CHUNKS.Chat().then((m) => ({ default: m.ChatPage })));
 const AdminPage = lazy(() => CHUNKS.Admin().then((m) => ({ default: m.AdminPage })));
@@ -122,6 +123,7 @@ const OddsTablePage = lazy(() => CHUNKS.Odds().then((m) => ({ default: m.OddsTab
 const TodoPage = lazy(() => CHUNKS.Todo().then((m) => ({ default: m.TodoPage })));
 const RentalPage = lazy(() => CHUNKS.Rental().then((m) => ({ default: m.RentalPage })));
 const GuildDungeonPage = lazy(() => CHUNKS.GuildDungeon().then((m) => ({ default: m.GuildDungeonPage })));
+const FitPage = lazy(() => CHUNKS.Fit().then((m) => ({ default: m.FitPage })));
 
 /**
  * 홈이 뜬 뒤 쉬는 때에 자주 여는 화면의 조각을 하나씩 미리 받아 둔다 (제작자 2026-11-04 '화면 전환이나 버튼 동작별로 반응이 늦거나 렉').
@@ -468,6 +470,8 @@ function Wiki({
       ) : (
         <GuildDungeonPage me={me} />
       );
+  // 헬스 루틴 (개발중, 길드원 완뻔치 님 개발 요청 #8): 실제 헬스장 운동 기록. 미리 보는 사람만 (server/fit.ts FIT_OPEN). 위키 자료를 쓰지 않아 기다리지 않는다
+  else if (page === "fit") body = canPreview(me) ? <FitPage me={me} /> : <DevSoon title="헬스 루틴" />;
   else if (!wiki)
     body = (
       <Loading

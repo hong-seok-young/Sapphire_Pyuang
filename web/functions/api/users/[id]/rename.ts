@@ -22,6 +22,7 @@ const ID_COLUMNS: [string, string][] = [
   ["rental_items", "donor"], ["rental_items", "renter"], ["rental_items", "updated_by"], ["rental_requests", "user_id"], ["rental_requests", "done_by"],
   ["rental_mileage", "who"], ["rental_mileage", "by_user"], ["rental_apps", "user_id"], ["rental_talk", "user_id"],
   ["dev_requests", "user_id"], ["dev_request_steps", "user_id"], ["dev_request_talk", "user_id"],
+  ["fit_exercises", "user_id"], ["fit_routines", "user_id"], ["fit_workouts", "user_id"], ["fit_drafts", "user_id"],
 ];
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
