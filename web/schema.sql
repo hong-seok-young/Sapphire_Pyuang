@@ -948,3 +948,52 @@ CREATE TABLE IF NOT EXISTS smack_stats (
   PRIMARY KEY (hitter, target)
 );
 CREATE INDEX IF NOT EXISTS smack_stats_target ON smack_stats (target);
+
+-- 2군 성장 퀘스트 (개발중, 제작자 2026-11-09 '일단 나만 보이게', server/quest2.ts, src/pages/Quest2.tsx): 2군 캐릭터마다 정한 목표 레벨까지 올리면
+-- 레벨 하나마다 정해진 골드를 쌓아 두고 '보상받기 신청'을 누르면 오피서가 게임 안에서 준다. 격주로 라운드를 새로 연다. 게임을 읽지 않고 profiles.level(본인이 적음)만 본다
+CREATE TABLE IF NOT EXISTS quest2_rounds (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  note TEXT,
+  starts_at INTEGER NOT NULL,
+  ends_at INTEGER,                        -- 비어 있으면 끝을 정하지 않음
+  active INTEGER NOT NULL DEFAULT 1,      -- 새 라운드를 열면 이전 라운드는 0 (목록·신청은 막되 기록은 남는다)
+  created_by TEXT,
+  created_at INTEGER NOT NULL
+);
+-- 캐릭터마다 이번 라운드의 목표: start_level(시작) -> end_level(목표). paid_to_level 은 이미 지급을 마친 레벨(처음은 start_level)
+CREATE TABLE IF NOT EXISTS quest2_targets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  round_id INTEGER NOT NULL,
+  nickname TEXT NOT NULL,
+  start_level INTEGER NOT NULL,
+  end_level INTEGER NOT NULL,
+  note TEXT,                              -- 예: 길톡 들어오기
+  paid_to_level INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS quest2_targets_round ON quest2_targets (round_id);
+CREATE INDEX IF NOT EXISTS quest2_targets_nick ON quest2_targets (nickname);
+-- 레벨 하나 올릴 때 주는 골드 (레벨대마다, 높을수록 많게 해서 공평하게. min_level 이상 다음 구간 전까지). 오피서가 조정할 수 있다
+CREATE TABLE IF NOT EXISTS quest2_bands (
+  min_level INTEGER PRIMARY KEY,
+  gold_per_level INTEGER NOT NULL
+);
+-- 보상받기 신청 (쌓인 만큼 한 번에, 캐릭터마다 한 라운드에 겹치는 신청은 못 한다). 오피서가 게임 안에서 주고 '지급 완료'를 누른다
+CREATE TABLE IF NOT EXISTS quest2_claims (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  target_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  from_level INTEGER NOT NULL,
+  to_level INTEGER NOT NULL,
+  gold INTEGER NOT NULL DEFAULT 0,
+  doping INTEGER NOT NULL DEFAULT 0,      -- 도핑 지원도 같이 요청
+  note TEXT,
+  status TEXT NOT NULL DEFAULT 'pending', -- pending | paid | rejected
+  requested_at INTEGER NOT NULL,
+  paid_at INTEGER,
+  paid_by TEXT
+);
+CREATE INDEX IF NOT EXISTS quest2_claims_target ON quest2_claims (target_id, status);
+CREATE INDEX IF NOT EXISTS quest2_claims_status ON quest2_claims (status, requested_at);

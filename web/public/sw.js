@@ -28,6 +28,7 @@ const KIND_TITLE = {
   app_news: "✨ 새 기능",
   devreq: "📮 개발 요청",
   bday: "🎂 생일 축하해요!",
+  quest2: "🎯 2군 성장 퀘스트",
 };
 
 self.addEventListener("install", () => self.skipWaiting());

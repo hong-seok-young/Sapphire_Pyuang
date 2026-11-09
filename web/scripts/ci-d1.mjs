@@ -600,3 +600,58 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
   ]);
   console.log(`생일 콤보 이어서 하기 넣음 ${has}명`);
 }
+
+// 2군 성장 퀘스트 보상 레벨대 (server/quest2.ts DEFAULT_BANDS): 표가 비어 있을 때만 기본값을 넣는다. 오피서가 이미 고친 값은 그대로 둔다 (OR IGNORE, 매번 돌아도 안전)
+{
+  const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+  const BANDS = [
+    [1, 10000],
+    [30, 30000],
+    [36, 35000],
+    [40, 40000],
+  ];
+  runSql(BANDS.map(([min, gold]) => `INSERT OR IGNORE INTO quest2_bands (min_level, gold_per_level) VALUES (${min}, ${gold});`));
+  console.log("2군 성장 퀘스트 보상 레벨대 기본값 (비어 있을 때만)");
+}
+
+// 2군 성장 퀘스트 1회차 (제작자 2026-11-09 길드 공지 그대로): 목표 레벨을 1레벨씩 올릴 때마다 보상이 쌓인다. setup 'quest2_seed_20261109' 로 한 번만 (그 뒤 라운드는 화면에서 연다)
+{
+  const KEY = "quest2_seed_20261109";
+  const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+  const now = Date.now();
+  const TITLE = "2군 성장 퀘스트 1회차";
+  const NOTE = "일주일 안으로 목표 레벨을 달성하면 보상 · 격주로 진행";
+  // 닉네임, 시작 레벨, 목표 레벨, 쪽지
+  const TARGETS = [
+    ["도등", 21, 27, null],
+    ["미즈로바", 23, 28, null],
+    ["혈천도마", 30, 32, null],
+    ["무도가", 31, 33, null],
+    ["춘천다크갈비", 31, 33, null],
+    ["먼쥐", 32, 34, null],
+    ["마가목", 32, 34, null],
+    ["가져가", 33, 35, "길톡 들어오기"],
+    ["도아햄", 34, 36, null],
+    ["이름뭐로짓지", 34, 36, null],
+    ["체인소맨", 34, 36, null],
+    ["펀취", 36, 37, null],
+    ["공포티모", 48, 48, "이미 목표 레벨 · 필요하면 도핑 지원"],
+  ];
+  if (!queryFirst(`SELECT 1 AS done FROM setup WHERE key = '${KEY}'`)) {
+    const lines = [
+      "UPDATE quest2_rounds SET active = 0 WHERE active = 1;",
+      `INSERT INTO quest2_rounds (title, note, starts_at, active, created_by, created_at) SELECT ${q(TITLE)}, ${q(NOTE)}, ${now}, 1, '${DEVELOPER}', ${now} ` +
+        `WHERE NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}');`,
+    ];
+    for (const [nickname, start, end, note] of TARGETS) {
+      lines.push(
+        `INSERT INTO quest2_targets (round_id, nickname, start_level, end_level, note, paid_to_level, created_at, updated_at) ` +
+          `SELECT id, ${q(nickname)}, ${start}, ${end}, ${note === null ? "NULL" : q(note)}, ${start}, ${now}, ${now} FROM quest2_rounds ` +
+          `WHERE title = ${q(TITLE)} AND created_at = ${now} AND NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}');`,
+      );
+    }
+    lines.push(`INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`);
+    runSql(lines);
+    console.log(`2군 성장 퀘스트 1회차 넣음 (목표 ${TARGETS.length}개)`);
+  }
+}
