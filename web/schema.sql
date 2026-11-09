@@ -889,3 +889,47 @@ CREATE TABLE IF NOT EXISTS bday_resume (
   used_at INTEGER,
   PRIMARY KEY (bday, user_id)
 );
+
+-- 헬스 루틴 (개발중, 길드원 완뻔치 님 개발 요청 #8, 제작자 2026-11-09 '플릭 같은 헬스 어플'): 실제 헬스장 운동 기록. 캐릭터마다 자기 것만 (server/fit.ts).
+-- 기록은 저절로 지우지 않는다 (사람이 지우는 것만)
+-- 내 종목 (기본 종목은 화면 src/fit.ts 의 LIBRARY, 키는 'c<번호>')
+CREATE TABLE IF NOT EXISTS fit_exercises (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  part TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS fit_exercises_user ON fit_exercises (user_id);
+-- 루틴: 종목 목록 JSON [{ key, name, part, kind, sets, goal }]
+CREATE TABLE IF NOT EXISTS fit_routines (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  items TEXT NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS fit_routines_user ON fit_routines (user_id, sort);
+-- 끝낸 운동 하나에 한 줄: day 는 한국 날짜, data 는 { title, started, ended, memo?, entries: [{ key, name, part, kind, sets: [{ kg, reps | sec | min, km }] }] } (끝낸 세트만)
+CREATE TABLE IF NOT EXISTS fit_workouts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  day TEXT NOT NULL,
+  started_at INTEGER NOT NULL,
+  ended_at INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  volume REAL NOT NULL DEFAULT 0,
+  sets INTEGER NOT NULL DEFAULT 0,
+  data TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS fit_workouts_user ON fit_workouts (user_id, started_at);
+-- 하는 중인 운동 (사람마다 한 줄, 새로 고쳐도 이어서)
+CREATE TABLE IF NOT EXISTS fit_drafts (
+  user_id TEXT PRIMARY KEY,
+  data TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);

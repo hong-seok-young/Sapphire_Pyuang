@@ -1,0 +1,223 @@
+/* 헬스 루틴 (개발중, 길드원 완뻔치 님 개발 요청 #8, src/pages/Fit.tsx 가 읽는다: 화면 조각과 같이 받는다).
+   화면 폭 대원칙: 칸은 모두 minmax(0, 1fr), 320px 에서 확인.
+   움직임은 보거나 누를 때만 (바뀐 값 톡, 체크 눌림, 하던 운동 점 숨쉬기, 휴식 끝 깜박임), 움직임 줄이기면 끈다 */
+.fit { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.fit-resting { padding-bottom: 64px; }
+.fit-tabs { margin-bottom: 2px; }
+.fit-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.fit-stats > span { padding: 6px 4px; text-align: center; font-size: 12px; color: var(--muted); background: rgba(11, 10, 26, 0.5); }
+.fit-stats b { font-size: 16px; color: var(--gold); margin: 0 1px; }
+.fit-start {
+  display: block; width: 100%; padding: 14px 10px; text-align: center; color: var(--gold); cursor: pointer;
+  background: var(--panel); border: var(--px) dashed var(--hi);
+}
+.fit-start b { font-size: 15px; }
+.fit-start:disabled { opacity: 0.5; }
+.fit-add { padding: 10px; }
+.fit-add b { font-size: 13px; }
+.fit-resume {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; text-align: left; cursor: pointer;
+  background: var(--panel-2); border: var(--px) solid var(--gold); box-shadow: inset var(--px) var(--px) 0 var(--hi);
+}
+.fit-resume-dot { flex: none; width: 10px; height: 10px; background: #4fd18b; animation: fit-breathe 1.6s ease-in-out infinite; }
+.fit-resume-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.fit-resume-main small { color: var(--muted); font-size: 12px; }
+.fit-resume-go { flex: none; color: var(--gold); font-size: 13px; }
+.fit-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+.fit-head h2 { margin: 0; font-size: 14px; color: var(--gold); }
+.fit-head .pill { padding: 4px 10px; font-size: 12px; }
+.fit-empty { margin: 4px 0; padding: 14px 6px; text-align: center; font-size: 13px; color: var(--muted); }
+.fit-routines, .fit-exlist, .fit-workout-list, .fit-prs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.fit-routine, .fit-entry, .fit-workout, .fit-cal, .fit-form, .fit-now, .fit-exrow {
+  border: var(--px) solid var(--edge);
+  box-shadow: inset var(--px) var(--px) 0 var(--hi), inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--lo);
+  background: var(--panel);
+}
+.fit-routine { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 10px; }
+.fit-routine-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fit-routine-main small { font-size: 11px; color: var(--muted); }
+.fit-routine-main p { margin: 2px 0 0; font-size: 12px; color: #cfd3ff; }
+.fit-routine-act { display: flex; flex-direction: column; gap: 4px; }
+.fit-routine-act .pill { padding: 5px 10px; font-size: 12px; }
+.fit-mini {
+  flex: none; padding: 3px 7px; font-size: 12px; line-height: 1.3; color: var(--text); cursor: pointer; white-space: nowrap;
+  background: var(--night-2); border: 1px solid var(--edge); box-shadow: inset 1px 1px 0 var(--hi);
+}
+.fit-mini:disabled { opacity: 0.35; }
+.fit-mini:active, .fit-check:active, .fit-cal-day:active, .fit-exrow:active { transform: scale(0.94); }
+.fit-armed { color: var(--edge) !important; background: var(--red) !important; animation: fit-blink 0.9s steps(2, end) infinite; }
+.fit-del { justify-self: end; margin-top: 4px; padding: 4px 8px; font-size: 12px; color: var(--muted); background: none; border: 0; cursor: pointer; text-decoration: underline; }
+.fit-del.fit-armed { text-decoration: none; }
+
+/* 운동 중 */
+.fit-session { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.fit-now { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 8px 10px; }
+.fit-title-in {
+  min-width: 0; padding: 2px 0; font: inherit; font-size: 16px; font-weight: 700; color: var(--gold);
+  background: none; border: 0; border-bottom: 1px dashed var(--hi); border-radius: 0;
+}
+.fit-now-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.fit-clock { font-family: Galmuri11, monospace; font-size: 26px; font-variant-numeric: tabular-nums; text-shadow: 1px 1px 0 var(--edge); }
+.fit-now-meta { display: flex; gap: 10px; font-size: 12px; color: var(--muted); }
+.fit-entry { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 8px; }
+.fit-entry-head { display: flex; align-items: flex-start; gap: 6px; flex-wrap: wrap; }
+.fit-entry-name {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  padding: 0; font: inherit; color: inherit; text-align: left; background: none; border: 0;
+}
+button.fit-entry-name { cursor: pointer; }
+button.fit-entry-name b { text-decoration: underline dotted var(--hi); text-underline-offset: 3px; }
+.fit-entry-name small { font-size: 11px; color: var(--muted); }
+.fit-entry-act { display: flex; gap: 4px; margin-left: auto; }
+.fit-last { margin: 0; font-size: 11px; color: var(--muted); }
+.fit-sets { display: grid; gap: 4px 6px; align-items: center; }
+.fit-cols-2 { grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr) 44px; }
+.fit-cols-1 { grid-template-columns: 28px minmax(0, 1fr) 44px; }
+.fit-sets-h { font-size: 11px; color: var(--muted); text-align: center; }
+.fit-set-no { text-align: center; font-size: 13px; color: var(--muted); }
+.fit-set-no.fit-done { color: #4fd18b; }
+.fit-num {
+  width: 100%; height: 36px; padding: 0 4px; font: inherit; font-size: 16px; text-align: center; color: var(--text);
+  background: var(--night-2); border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 var(--lo); border-radius: 0;
+}
+.fit-num::placeholder { color: rgba(169, 162, 207, 0.55); }
+.fit-num.fit-done { background: rgba(79, 209, 139, 0.14); }
+.fit-check {
+  height: 36px; padding: 0; font-size: 18px; color: var(--muted); cursor: pointer;
+  background: var(--night-2); border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 var(--hi);
+}
+.fit-check-on { color: var(--edge); background: #4fd18b; box-shadow: inset var(--px) var(--px) 0 #b5f5d2; animation: fit-pop 0.22s ease-out; }
+.fit-check-bad { animation: fit-shake 0.35s ease-in-out; border-color: var(--red); }
+.fit-set-btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.fit-set-btns .pill { padding: 5px; font-size: 12px; text-align: center; }
+.fit-end { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.fit-end .btn { flex: none; }
+
+/* 쉬는 시간: 아래 탭 바로 위 */
+.fit-rest {
+  position: fixed; z-index: 9; left: 50%; transform: translateX(-50%); bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 6px);
+  width: min(616px, calc(100vw - 16px)); display: flex; align-items: center; gap: 6px; padding: 8px 10px; overflow: hidden;
+  background: var(--panel-2); border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 var(--hi), 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+.fit-rest-bar { position: absolute; left: 0; bottom: 0; width: 100%; height: 3px; background: var(--sapphire); transform-origin: left; transition: transform 0.25s linear; }
+.fit-rest-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.fit-rest-main small { font-size: 11px; color: var(--muted); }
+.fit-rest-main b { font-family: Galmuri11, monospace; font-size: 20px; font-variant-numeric: tabular-nums; }
+.fit-rest-soon .fit-rest-main b { color: var(--gold); animation: fit-breathe 1s ease-in-out infinite; }
+.fit-rest-done { border-color: #4fd18b; }
+.fit-rest-done .fit-rest-main b { color: #4fd18b; animation: fit-blink 0.6s steps(2, end) 4; }
+.fit-rest-done .fit-rest-bar { background: #4fd18b; }
+
+/* 루틴 편집 */
+.fit-editor { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.fit-name-in { width: 100%; }
+.fit-goal { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fit-step { display: inline-flex; align-items: center; gap: 6px; }
+.fit-step b { min-width: 38px; text-align: center; font-size: 13px; }
+.fit-goal-f { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.fit-goal-f .fit-num { width: 62px; height: 32px; }
+
+/* 기록: 달력 */
+.fit-cal { padding: 8px; }
+.fit-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.fit-cal-head b { font-size: 14px; }
+.fit-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+.fit-cal-wd { text-align: center; font-size: 11px; color: var(--muted); padding-bottom: 2px; }
+.fit-cal-day {
+  position: relative; height: 36px; padding: 0; font: inherit; font-size: 13px; color: var(--text); cursor: pointer;
+  background: rgba(11, 10, 26, 0.45); border: 1px solid transparent;
+}
+.fit-cal-on { color: var(--edge); font-weight: 700; background: #6585f5; box-shadow: inset 1px 1px 0 #a9bbff; }
+.fit-cal-today { border-color: var(--gold); }
+.fit-cal-sel { outline: var(--px) solid var(--text); outline-offset: -1px; z-index: 1; }
+.fit-workout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 8px 10px; }
+.fit-workout-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.fit-workout-head small { font-size: 11px; color: var(--muted); }
+.fit-workout-sum { margin: 0; font-size: 12px; color: var(--gold); }
+.fit-workout-list { margin: 0; padding: 0; list-style: none; gap: 3px; }
+.fit-workout-list li { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr); gap: 8px; font-size: 12px; }
+.fit-workout-list li > :first-child { color: var(--text); }
+.fit-workout-list li > :last-child { color: var(--muted); }
+.fit-workout-list button {
+  padding: 0; font: inherit; font-size: 12px; text-align: left; color: #cfd3ff; background: none; border: 0; cursor: pointer;
+  text-decoration: underline dotted var(--hi); text-underline-offset: 3px;
+}
+.fit-workout-list .fit-day { color: var(--muted); }
+
+/* 종목 */
+.fit-parts { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.fit-parts .sub-tab, .fit-metric .sub-tab { text-align: center; }
+.fit-metric { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
+.fit-exrow { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.fit-exrow-on { background: var(--panel-2); border-color: var(--gold); }
+.fit-exrow-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.fit-exrow-main b { font-size: 14px; }
+.fit-exrow-main small, .fit-exrow-side small { font-size: 11px; color: var(--muted); }
+.fit-exrow-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; max-width: 45%; }
+.fit-exrow-side b { font-size: 12px; color: var(--gold); text-align: right; }
+.fit-tick {
+  flex: none; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px;
+  border: var(--px) solid var(--hi); background: var(--night-2);
+}
+.fit-tick-on { color: var(--edge); background: var(--gold); border-color: var(--edge); animation: fit-pop 0.2s ease-out; }
+.fit-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 8px; }
+.fit-choose { display: grid; gap: 5px; }
+.fit-choose-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.fit-choose .pill { min-width: 0; padding: 6px 3px; font-size: 12px; text-align: center; }
+
+/* 창 (종목 고르기, 종목 자세히, 운동 끝): 아래에서 올라온 판 */
+.fit-sheet-back { position: fixed; inset: 0; z-index: 59; background: rgba(5, 4, 15, 0.55); }
+.fit-sheet {
+  position: fixed; z-index: 60; left: 50%; bottom: 0; transform: translateX(-50%);
+  width: min(640px, 100vw); max-height: 88vh; max-height: 88dvh; display: flex; flex-direction: column;
+  background: var(--panel); border: var(--px) solid var(--edge); border-bottom: 0;
+  box-shadow: inset var(--px) var(--px) 0 var(--hi), 0 -8px 30px rgba(0, 0, 0, 0.6);
+}
+.fit-sheet-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px 6px; }
+.fit-sheet-head b { min-width: 0; font-size: 15px; color: var(--gold); }
+.fit-sheet-body {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: grid; grid-template-columns: minmax(0, 1fr);
+  align-content: start; gap: 8px; padding: 0 12px 12px;
+}
+.fit-sheet-body .mk-search { margin: 0; }
+.fit-sheet-body .mk-sub { margin: 0; }
+.fit-sheet-foot { flex: none; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--edge); background: var(--panel-2); }
+.fit-sheet-foot > .btn { display: block; width: 100%; }
+.fit-detail-sub { margin: -4px 0 0; font-size: 12px; color: var(--muted); }
+.fit-tiles { display: grid; gap: 6px; }
+.fit-tiles-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.fit-tiles-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.fit-tiles-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.fit-tile { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; background: rgba(11, 10, 26, 0.5); min-width: 0; }
+.fit-tile small { font-size: 11px; color: var(--muted); }
+.fit-tile b { font-size: 15px; }
+.fit-sub-h { margin: 4px 0 0; font-size: 13px; color: var(--gold); }
+.fit-chart { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.fit-chart-val { display: flex; align-items: baseline; gap: 8px; margin: 0; font-size: 12px; color: var(--muted); }
+.fit-chart-val b { display: inline-block; font-size: 18px; color: var(--text); }
+.fit-chart-svg { display: block; width: 100%; height: auto; touch-action: pan-y; cursor: crosshair; user-select: none; -webkit-user-select: none; }
+.fit-grid { stroke: rgba(243, 240, 255, 0.08); stroke-width: 1; }
+.fit-axis { fill: var(--muted); font-size: 10px; }
+.fit-cross { stroke: rgba(243, 240, 255, 0.25); stroke-width: 1; stroke-dasharray: 2 3; }
+/* 그래프 색: dataviz 검사기(validate_palette, 어두운 판 #262150)를 통과한 파랑 */
+.fit-line { fill: none; stroke: #6585f5; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.fit-dot { fill: #6585f5; stroke: var(--panel); stroke-width: 2; }
+.fit-dot-sel { fill: #6585f5; stroke: var(--text); stroke-width: 2; }
+.fit-done-title { display: flex; flex-direction: column; gap: 2px; margin: 0; }
+.fit-done-title small { font-size: 12px; color: var(--muted); }
+.fit-pr-h { color: #4fd18b; }
+.fit-prs { margin: 0; padding: 0; list-style: none; }
+.fit-prs li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; animation: fit-pop 0.3s ease-out; }
+.fit-prs li > span:last-child { color: var(--gold); }
+.fit-pr-tag { padding: 0 5px; font-size: 10px; font-weight: 700; line-height: 16px; color: var(--edge); background: #4fd18b; }
+
+.fit-pop { display: inline-block; animation: fit-pop 0.22s ease-out; }
+@keyframes fit-pop { 50% { transform: scale(1.12); } }
+@keyframes fit-breathe { 50% { opacity: 0.35; } }
+@keyframes fit-blink { 50% { opacity: 0.55; } }
+@keyframes fit-shake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+@media (prefers-reduced-motion: reduce) {
+  .fit-pop, .fit-check-on, .fit-check-bad, .fit-tick-on, .fit-prs li, .fit-resume-dot, .fit-armed,
+  .fit-rest-soon .fit-rest-main b, .fit-rest-done .fit-rest-main b { animation: none; }
+  .fit-rest-bar { transition: none; }
+}
