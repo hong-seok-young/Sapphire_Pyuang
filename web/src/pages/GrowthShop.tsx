@@ -1398,8 +1398,8 @@ export function GrowthShopPage({
   // 시범운영 2주 목표 선착순: 목표를 아무도 안 정했으면 예시 판 (제작자 2026-11-09 '테스트 데이터 몇 개 넣어 주고')
   const now = Date.now();
   const raceSample = !cur.race.list.length;
-  // 예시는 판이 나흘쯤 지난 것처럼 (첫날이면 선이 안 보인다)
-  const raceNow = raceSample ? cur.race.start + 4.2 * 86_400_000 : now;
+  // 예시는 판이 열흘쯤 지난 것처럼 (제작자 2026-11-09 '10일간 진행한 차트로, 너무 빽빽해') (첫날이면 선이 안 보인다)
+  const raceNow = raceSample ? cur.race.start + 10.2 * 86_400_000 : now;
   const race = raceSample ? sampleRace(cur.race.start, raceNow) : cur.race;
   const myRace = cur.levelCoins
     ? null
