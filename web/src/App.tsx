@@ -60,6 +60,7 @@ import {
 import { LoginPage, PasswordPage } from "./pages/Login";
 import { GuideHost } from "./tutorial";
 import { BirthdaySticker } from "./birthday";
+import { CoinToast } from "./coinToast";
 import { Opening, shouldCelebrate } from "./pages/Opening";
 import { reportOpen, reportView } from "./activity";
 import { markMenuVisit } from "./updates";
@@ -581,6 +582,8 @@ function Wiki({
       <GuideHost me={me} />
       {/* 생일 스티커 (그날 한국 시간 하루, src/birthday.tsx) */}
       <BirthdaySticker me={me} />
+      {/* 2군 성장코인: 레벨·경험치를 적어 코인이 생기면 동전 팝업 (src/coinToast.tsx) */}
+      <CoinToast />
       <nav
         className={
           "tabbar" + (launcher.editing && editable ? " launch-editing" : "")

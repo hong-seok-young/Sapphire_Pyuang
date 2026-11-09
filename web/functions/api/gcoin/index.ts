@@ -3,7 +3,7 @@
 //   member: 내가 2군 본캐인지 (아니면 지갑이 없다). admin(오피서 이상): 기다리는 신청, 2군 본캐 모두의 지갑, 최근 처리한 신청
 import { FORBIDDEN, NEED_LOGIN, currentUser, json } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { GCOIN_OPEN, canManageGcoin, canUseGcoin, coinFor, isMember, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
+import { GCOIN_OPEN, canManageGcoin, canUseGcoin, earnedRows, isMember, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
 import { weekStart } from "../../../server/week";
 
 interface OrderRow {
@@ -79,9 +79,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     };
   }
 
-  const levels: { level: number; coin: number }[] = [];
-  if (wallet && wallet.base !== null && wallet.top !== null)
-    for (let lv = wallet.top; lv > wallet.base; lv--) levels.push({ level: lv, coin: coinFor(lv, curve) });
+  // 번 코인 내역: 레벨마다 한 줄 (덜 채운 레벨은 그 % 까지)
+  const levels =
+    wallet && wallet.base !== null && wallet.top !== null
+      ? earnedRows(wallet.base + (wallet.baseExp ?? 0) / 100_000, wallet.top + (wallet.topExp ?? 0) / 100_000, curve).filter((r) => r.coin > 0)
+      : [];
 
   return json({
     open: GCOIN_OPEN,

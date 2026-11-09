@@ -4278,3 +4278,35 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
   .smk-hp-ghost, .smk-hp-fill { transition: none; }
 }
 @keyframes smk-ko-still { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }
+
+/* 성장코인 팝업 (src/coinToast.tsx): 아래 탭 위 가운데, 동전이 돌고 숫자가 올라가고 반짝이가 튄다. 누르면 상점 */
+.ct {
+  position: fixed; z-index: 45; left: 50%; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 12px); transform: translateX(-50%);
+  width: min(340px, calc(100% - 24px)); display: flex; align-items: center; gap: 12px; padding: 10px 14px; cursor: pointer; text-align: left; color: var(--text);
+  background: linear-gradient(180deg, #1f4a40, var(--panel)); border: var(--px) solid var(--edge); box-shadow: 0 0 0 2px #3fe0a0, 0 6px 0 rgba(0, 0, 0, 0.35);
+  animation: ct-in 0.32s cubic-bezier(0.2, 1.4, 0.4, 1) both, ct-out 0.3s ease-in 3.9s forwards;
+}
+@keyframes ct-in { from { transform: translate(-50%, 24px) scale(0.85); opacity: 0; } to { transform: translate(-50%, 0) scale(1); opacity: 1; } }
+@keyframes ct-out { to { transform: translate(-50%, 10px); opacity: 0; } }
+.ct-coin { animation: ct-flip 0.5s linear 2; }
+@keyframes ct-flip { 0% { transform: scaleX(1); } 50% { transform: scaleX(0.08); } 100% { transform: scaleX(1); } }
+.ct-main { display: flex; flex-direction: column; min-width: 0; }
+.ct-num { font-size: 26px; line-height: 1; color: #fff3b0; text-shadow: 2px 2px 0 var(--edge); }
+.ct-main small { font-size: 11px; color: #c8fff0; }
+.ct-line { margin-top: 3px; font-size: 12px; color: var(--gold); }
+.ct-sub { margin-top: 0; font-size: 11px; color: var(--muted); }
+.ct-spark { position: absolute; left: 31px; top: 50%; width: 0; height: 0; pointer-events: none; }
+.ct-spark i {
+  position: absolute; width: 4px; height: 4px; background: #fff3b0; box-shadow: 0 0 0 1px var(--edge);
+  transform: rotate(var(--a)) translateX(0); opacity: 0; animation: ct-burst 0.7s ease-out 0.1s both;
+}
+@keyframes ct-burst { 0% { opacity: 1; transform: rotate(var(--a)) translateX(4px); } 100% { opacity: 0; transform: rotate(var(--a)) translateX(34px); } }
+.gc-next { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; font-size: 12px; color: #c8fff0; }
+.gc-next b { color: var(--gold); }
+.gc-next small { font-size: 10px; color: var(--muted); }
+.gc-next-bar { display: block; height: 5px; background: var(--lo); border: 1px solid var(--edge); }
+.gc-next-bar i { display: block; height: 100%; background: linear-gradient(90deg, #3fe0a0, var(--gold)); transform-origin: 0 50%; transition: transform 0.6s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .ct, .ct-coin, .ct-spark i { animation: none; }
+  .gc-next-bar i { transition: none; }
+}

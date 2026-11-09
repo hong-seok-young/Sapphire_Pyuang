@@ -6,7 +6,8 @@
 // 레벨 하나 오를 때의 코인(DEFAULT_LEVELS)은 처음 공지의 목표(도등 21→27 … 펀취 36→37)를 하나씩 다 채우면 저마다 70~90코인,
 // 곧 공지의 완주 보상 '사나운 멧돼지 10개 + 망고워터 10개'(60 + 18 = 78코인)쯤이 되게 맞췄다. 30 아래는 빨라서 적게, 30부터 어려워져 많게.
 //
-// 버는 코인 = (시작 때 레벨 + 1 ~ 지금까지 오른 가장 높은 레벨) 마다 gc_levels 값 + gc_ledger(주간 순위 보너스, 오피서 조정).
+// 버는 코인 = 시작 때 위치(레벨 + 경험치 %)부터 그 뒤 적은 가장 높은 위치까지 레벨마다 gc_levels 값(경험치 % 는 그만큼 나눠서) + gc_ledger(주간 순위 보너스, 오피서 조정).
+// 곧 길드 랭킹·내 정보에 레벨이나 경험치를 적는 순간 코인이 쌓인다 (제작자 '그냥 길드원 랭킹에서 레벨하고 겸치 입력하면 성장코인 주게').
 // 쓰는 코인 = 기다리는 중·지급한 구매 신청 (gc_orders). 레벨업 코인은 표에 쌓지 않고 그때그때 센다:
 // 오타 수정은 level_log 마지막 줄을 고치므로 잘못 적은 레벨의 코인은 저절로 빠진다.
 import type { Env, User } from "./auth";
@@ -118,15 +119,47 @@ async function pointsAt(env: Env, at: number, ids: string | null): Promise<Map<s
   return out;
 }
 
+/** 레벨·경험치를 한 줄 위치로 (Lv.36 50% -> 36.5). 경험치를 안 적었으면 0% */
+export const posOf = (p: { level: number; exp: number | null }) => p.level + (p.exp ?? 0) / 100_000;
+
+/** a 위치에서 b 위치까지 오른 만큼의 코인 (레벨마다 그 레벨에 오르는 코인 값, 경험치 % 는 그만큼 나눠서). 소수 그대로 */
+export function coinsBetween(a: number, b: number, curve: Curve[]): number {
+  let s = 0;
+  for (let l = Math.floor(a); l < b; l++) s += Math.max(0, Math.min(b, l + 1) - Math.max(a, l)) * coinFor(l + 1, curve);
+  return s;
+}
+
+/**
+ * 번 코인 내역 (레벨마다 한 줄, 올라선 레벨은 '달성', 지금 채우는 레벨은 그 % 까지). 줄마다 정수로 나눠 합이 earned 와 같게
+ * (누적값의 내림 차이). 최근 것부터
+ */
+export function earnedRows(a: number, b: number, curve: Curve[]): { level: number; coin: number; pct: number | null }[] {
+  const rows: { level: number; coin: number; pct: number | null }[] = [];
+  let cum = 0;
+  for (let l = Math.floor(a); l < b; l++) {
+    const lo = Math.max(a, l);
+    const hi = Math.min(b, l + 1);
+    if (hi <= lo) continue;
+    const before = Math.floor(cum);
+    cum += (hi - lo) * coinFor(l + 1, curve);
+    // 그 레벨을 끝까지 채웠으면(중간부터 시작했어도) 'Lv.N 달성', 아직 채우는 중이면 그 % 까지
+    const up = hi === l + 1;
+    rows.push({ level: up ? l + 1 : l, coin: Math.floor(cum) - before, pct: up ? null : Math.round((hi - l) * 1000) / 10 });
+  }
+  return rows.reverse();
+}
+
 export interface Wallet {
   id: string;
   /** 지금 레벨 (프로필) */
   level: number | null;
-  /** 시작 때 레벨 (이 레벨 위로 오른 만큼 코인) */
+  /** 시작 때 레벨·경험치 (이 위로 오른 만큼 코인) */
   base: number | null;
-  /** 지금까지 오른 가장 높은 레벨 */
+  baseExp: number | null;
+  /** 지금까지 오른 가장 높은 레벨·경험치 */
   top: number | null;
-  /** 레벨업으로 번 코인 */
+  topExp: number | null;
+  /** 레벨업·경험치로 번 코인 (내림 정수) */
   earned: number;
   /** 순위 보너스 */
   bonus: number;
@@ -137,19 +170,22 @@ export interface Wallet {
   balance: number;
 }
 
-/** 사람들(ids 없으면 2군 본캐 모두)의 지갑 */
+/**
+ * 사람들(one 이 없으면 2군 본캐 모두)의 지갑. 길드 랭킹·내 정보에 레벨·경험치를 적으면 그만큼 바로 코인 (제작자 '그냥 길드원 랭킹에서 레벨하고 겸치 입력하면 성장코인 주게').
+ * 시작 때 위치(진짜 시작점)에서 그 뒤 적은 가장 높은 위치까지
+ */
 export async function wallets(env: Env, curve: Curve[], one?: string): Promise<Wallet[]> {
   const start = await startAt(env);
   const where = one === undefined ? `IN (${MEMBERS_SQL})` : "= ?";
   const bind = one === undefined ? [] : [one];
-  const [base, tops, ledger, spent] = await Promise.all([
+  const [base, now, logs, ledger, spent] = await Promise.all([
     pointsAt(env, start, one ?? null),
-    env.DB.prepare(
-      `SELECT p.user_id AS id, p.level AS level, MAX(p.level, COALESCE((SELECT MAX(l.level) FROM level_log l WHERE l.user_id = p.user_id AND l.at > ?), 0)) AS top ` +
-        `FROM profiles p WHERE p.user_id ${where}`,
-    )
+    env.DB.prepare(`SELECT user_id AS id, level, exp FROM profiles WHERE user_id ${where}`)
+      .bind(...bind)
+      .all<{ id: string; level: number; exp: number | null }>(),
+    env.DB.prepare(`SELECT user_id AS id, level, exp FROM level_log WHERE at > ? AND user_id ${where}`)
       .bind(start, ...bind)
-      .all<{ id: string; level: number; top: number }>(),
+      .all<{ id: string; level: number; exp: number | null }>(),
     env.DB.prepare(`SELECT user_id AS id, kind, SUM(delta) AS n FROM gc_ledger WHERE user_id ${where} GROUP BY user_id, kind`)
       .bind(...bind)
       .all<{ id: string; kind: string; n: number }>(),
@@ -157,6 +193,11 @@ export async function wallets(env: Env, curve: Curve[], one?: string): Promise<W
       .bind(...bind)
       .all<{ id: string; n: number }>(),
   ]);
+  const top = new Map<string, { level: number; exp: number | null }>();
+  for (const r of [...now.results, ...logs.results]) {
+    const t = top.get(r.id);
+    if (!t || posOf(r) > posOf(t)) top.set(r.id, { level: r.level, exp: r.exp });
+  }
   const led = new Map<string, { bonus: number; adjust: number }>();
   for (const r of ledger.results) {
     const w = led.get(r.id) ?? { bonus: 0, adjust: 0 };
@@ -165,13 +206,16 @@ export async function wallets(env: Env, curve: Curve[], one?: string): Promise<W
     led.set(r.id, w);
   }
   const sp = new Map(spent.results.map((r) => [r.id, r.n]));
-  return tops.results.map((r) => {
-    const b = base.get(r.id)?.level ?? r.level;
-    let earned = 0;
-    for (let lv = b + 1; lv <= r.top; lv++) earned += coinFor(lv, curve);
+  return now.results.map((r) => {
+    const b = base.get(r.id) ?? r;
+    const t = top.get(r.id) ?? r;
+    const earned = Math.floor(coinsBetween(posOf(b), posOf(t), curve));
     const l = led.get(r.id) ?? { bonus: 0, adjust: 0 };
     const s = sp.get(r.id) ?? 0;
-    return { id: r.id, level: r.level, base: b, top: r.top, earned, bonus: l.bonus, adjust: l.adjust, spent: s, balance: earned + l.bonus + l.adjust - s };
+    return {
+      id: r.id, level: r.level, base: b.level, baseExp: b.exp, top: t.level, topExp: t.exp,
+      earned, bonus: l.bonus, adjust: l.adjust, spent: s, balance: earned + l.bonus + l.adjust - s,
+    };
   });
 }
 
@@ -192,10 +236,7 @@ export function growthScore(from: { level: number; exp: number | null }, to: { l
   const exact = from.exp !== null && to.exp !== null;
   const a = from.level + (exact ? (from.exp as number) / 100_000 : 0);
   const b = to.level + (exact ? (to.exp as number) / 100_000 : 0);
-  if (b <= a) return 0;
-  let s = 0;
-  for (let l = Math.floor(a); l < b; l++) s += (Math.min(b, l + 1) - Math.max(a, l)) * coinFor(l + 1, curve);
-  return Math.round(s * 10) / 10;
+  return b <= a ? 0 : Math.round(coinsBetween(a, b, curve) * 10) / 10;
 }
 
 export interface RankEntry {
@@ -274,3 +315,45 @@ export const int = (v: unknown, min: number, max: number): number | null => {
   const n = Number(v);
   return Number.isInteger(n) && n >= min && n <= max ? n : null;
 };
+
+export interface CoinGain {
+  /** 이번에 저장해서 새로 생긴 코인 */
+  gained: number;
+  balance: number;
+  /** 저장 전·후 가장 높은 위치 (레벨 + 경험치 %) */
+  from: number;
+  to: number;
+  /** 이번 주 2군 성장 순위 (오른 게 없으면 null), 바로 위 사람까지 점수 차이 */
+  rank: number | null;
+  score: number;
+  gap: number | null;
+}
+
+/** 레벨·경험치를 저장하기 전 내 지갑 (2군 본캐가 아니거나 상점을 못 쓰면 null: 그때는 저장 뒤에도 아무것도 안 한다) */
+export async function walletBefore(env: Env, me: User): Promise<{ curve: Curve[]; w: Wallet } | null> {
+  if (!canUseGcoin(me) || !(await isMember(env, me.id))) return null;
+  const curve = await readCurve(env);
+  const [w] = await wallets(env, curve, me.id);
+  return w ? { curve, w } : null;
+}
+
+/** 저장한 뒤 새로 생긴 코인과 이번 주 순위 (화면이 동전 팝업을 띄운다) */
+export async function coinGain(env: Env, me: User, before: { curve: Curve[]; w: Wallet }): Promise<CoinGain | null> {
+  const [w] = await wallets(env, before.curve, me.id);
+  if (!w) return null;
+  const gained = w.earned - before.w.earned;
+  if (gained <= 0) return null;
+  const start = await startAt(env);
+  const top = await weekRanking(env, Math.max(weekStart(), start), null, before.curve);
+  const i = top.findIndex((e) => e.id === me.id);
+  const pos = (x: Wallet) => (x.top ?? 0) + (x.topExp ?? 0) / 100_000;
+  return {
+    gained,
+    balance: w.balance,
+    from: pos(before.w),
+    to: pos(w),
+    rank: i >= 0 ? i + 1 : null,
+    score: i >= 0 ? top[i].score : 0,
+    gap: i > 0 ? Math.round((top[i - 1].score - top[i].score) * 10) / 10 : null,
+  };
+}

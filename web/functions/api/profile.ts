@@ -2,6 +2,7 @@
 // exp 는 경험치 % x 1000 (12.345% -> 12345). 비우면 null, 안 보내면(예전 화면) 그대로 둔다
 import { NEED_LOGIN, currentUser, json, readChange, readJson, readProfile, saveProfile } from "../../server/auth";
 import type { Env } from "../../server/auth";
+import { coinGain, walletBefore } from "../../server/gcoin";
 
 export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
@@ -9,7 +10,10 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   const body = await readJson<{ job: unknown; level: unknown; exp: unknown; guild: unknown; change: unknown }>(request);
   const p = readProfile(body);
   if (!p) return json({ error: "길드와 직업을 고르고 레벨을 1~99, 경험치를 0~99.999% 로 넣어 주세요" }, 400);
+  // 2군 성장코인샵: 2군 본캐가 레벨·경험치를 적으면 그만큼 성장코인 (server/gcoin.ts). 새로 생긴 코인을 같이 돌려주면 화면이 동전 팝업을 띄운다
+  const before = await walletBefore(env, me);
   // change: 'grow' 실제 성장 / 'fix' 잘못 쓴 것 고침 (화면이 묻는다)
   await saveProfile(env, me.id, me.id, p, readChange(body.change));
-  return json(p);
+  const coin = before ? await coinGain(env, me, before) : null;
+  return json(coin ? { ...p, coin } : p);
 };

@@ -53,6 +53,9 @@ const Coin = ({ big = false }: { big?: boolean }) => <i className={"gc-coin" + (
 /** 맨 위 지갑: 가진 코인, 번 것·쓴 것, 다음 레벨에 받을 코인 */
 function WalletCard({ w, curve, sample }: { w: GcWallet; curve: GcCurve[]; sample: boolean }) {
   const next = w.top !== null ? coinFor(w.top + 1, curve) : 0;
+  // 지금 채우는 레벨: 남은 % 와 다 채우면 받을 코인 (경험치도 코인이 된다)
+  const pct = (w.topExp ?? 0) / 1000;
+  const left = Math.max(0, Math.floor(next * (1 - pct / 100)));
   return (
     <div className={"gc-wallet" + (sample ? " gc-sample" : "")}>
       <div className="gc-wallet-top">
@@ -65,7 +68,7 @@ function WalletCard({ w, curve, sample }: { w: GcWallet; curve: GcCurve[]; sampl
       </div>
       <div className="gc-wallet-rows">
         <span>
-          레벨업 <b>+{w.earned}</b>
+          레벨·경험치 <b>+{w.earned}</b>
         </span>
         <span>
           순위 보너스 <b>+{w.bonus}</b>
@@ -80,9 +83,16 @@ function WalletCard({ w, curve, sample }: { w: GcWallet; curve: GcCurve[]; sampl
         </span>
       </div>
       {w.top !== null && next > 0 && (
-        <p className="gc-next">
-          Lv.{w.top + 1} 에 오르면 <Coin /> <b>+{next}</b>
-        </p>
+        <div className="gc-next">
+          <span>
+            Lv.{w.top} {pct.toFixed(1)}% → Lv.{w.top + 1} 까지 <Coin />
+            <b>+{left}</b>
+          </span>
+          <span className="gc-next-bar">
+            <i style={{ transform: `scaleX(${pct / 100})` }} />
+          </span>
+          <small>경험치 1% 마다 {(next / 100).toFixed(1)}코인 · 랭킹이나 내 정보에 적으면 바로 쌓여요</small>
+        </div>
       )}
     </div>
   );
@@ -273,9 +283,9 @@ function MineTab({ data, wallet, history, sample, onChanged }: { data: GcData; w
           </li>
         ))}
         {history.levels.map((l) => (
-          <li key={"v" + l.level} className="gc-hist-row">
-            <span className="gc-hist-icon">⬆️</span>
-            <span className="gc-hist-main">Lv.{l.level} 달성</span>
+          <li key={"v" + l.level + (l.pct ?? "")} className="gc-hist-row">
+            <span className="gc-hist-icon">{l.pct === null ? "⬆️" : "📈"}</span>
+            <span className="gc-hist-main">{l.pct === null ? `Lv.${l.level} 달성` : `Lv.${l.level} 경험치 ${l.pct}% 까지`}</span>
             <span className="gc-delta gc-plus">+{l.coin}</span>
           </li>
         ))}
@@ -283,12 +293,16 @@ function MineTab({ data, wallet, history, sample, onChanged }: { data: GcData; w
           <li className="gc-hist-empty">{wallet ? "아직 없어요 · 레벨이 오르면 여기에 쌓여요" : "2군 본캐만 코인이 쌓여요"}</li>
         )}
       </ul>
-      {wallet && wallet.base !== null && <p className="gc-note">Lv.{wallet.base} 부터 오른 레벨마다 코인이 쌓여요 · 레벨은 '내 정보'에 적은 것</p>}
+      {wallet && wallet.base !== null && (
+        <p className="gc-note">
+          Lv.{wallet.base} {((wallet.baseExp ?? 0) / 1000).toFixed(1)}% 부터 오른 만큼 쌓여요 · 길드 랭킹이나 내 정보에 레벨·경험치를 적으면 바로
+        </p>
+      )}
       {error && <p className="form-error">{error}</p>}
       <div className="gc-curve">
         <p className="gc-week-head">
           <b>레벨업 코인표</b>
-          <small>레벨 하나 오를 때 · 높을수록 많이</small>
+          <small>레벨 하나 오를 때 · 경험치 % 는 그만큼 나눠서 · 높을수록 많이</small>
         </p>
         <ul>
           {rows.map((r) => {

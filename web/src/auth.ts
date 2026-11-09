@@ -238,7 +238,11 @@ export function errorText(e: unknown): string {
 export type ChangeKind = "grow" | "fix";
 
 export const saveMyProfile = (job: Job, level: number, exp: number | null, guild: Guild, change: ChangeKind = "grow") =>
-  api<{ job: Job; level: number; exp: number | null; guild: Guild }>("/api/profile", "PUT", { job, level, exp, guild, change });
+  api<{ job: Job; level: number; exp: number | null; guild: Guild; coin?: unknown }>("/api/profile", "PUT", { job, level, exp, guild, change }).then((r) => {
+    // 2군 성장코인샵: 레벨·경험치를 적어 새 성장코인이 생기면 동전 팝업 (src/coinToast.tsx, 서버 server/gcoin.ts coinGain)
+    if (r.coin) window.dispatchEvent(new CustomEvent("sapphire:gcoin", { detail: r.coin }));
+    return r;
+  });
 
 export interface LevelLogEntry {
   at: number;
