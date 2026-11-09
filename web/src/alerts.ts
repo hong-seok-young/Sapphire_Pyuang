@@ -4,7 +4,7 @@ import { api } from "./auth";
 
 export type AlertKind =
   | "market_want" | "market_bid" | "market_outbid" | "market_auction" | "market_new" | "gold_want" | "request" | "request_new" | "talk" | "account" | "shop"
-  | "board" | "board_notice" | "imo_news" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo" | "gdungeon" | "app_news" | "devreq" | "bday" | "quest2";
+  | "board" | "board_notice" | "imo_news" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo" | "gdungeon" | "app_news" | "devreq" | "bday" | "gcoin";
 
 export interface Alert {
   id: number;
@@ -47,8 +47,8 @@ export const ALERT_GROUPS: { menu: string; kinds: { kind: AlertKind; name: strin
   { menu: "앱", kinds: [{ kind: "app_news", name: "새 기능" }] },
   // 개발 요청 결재선 (server/devreq.ts)
   { menu: "개발 요청", kinds: [{ kind: "devreq", name: "신청·결재" }] },
-  // 2군 성장 퀘스트 (server/quest2.ts, 개발중, 제작자 2026-11-09 '일단 나만 보이게'): 보상받기 신청·지급
-  { menu: "2군 성장 퀘스트", kinds: [{ kind: "quest2", name: "신청·지급", developer: true }] },
+  // 2군 성장코인샵 (server/gcoin.ts, 개발중, 제작자 2026-11-09 '나한테만 보이게'): 구매 신청·지급, 순위 보너스
+  { menu: "성장코인샵", kinds: [{ kind: "gcoin", name: "신청·지급", developer: true }] },
 ];
 
 export const fetchAlerts = () =>

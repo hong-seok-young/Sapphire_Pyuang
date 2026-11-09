@@ -949,58 +949,55 @@ CREATE TABLE IF NOT EXISTS smack_stats (
 );
 CREATE INDEX IF NOT EXISTS smack_stats_target ON smack_stats (target);
 
--- 2군 성장 퀘스트 (개발중, 제작자 2026-11-09 '일단 나만 보이게', server/quest2.ts, src/pages/Quest2.tsx): 2군 캐릭터마다 정한 목표 레벨까지 올리면
--- '완주'로 보상을 신청한다 (레벨마다 골드가 아니라 실제 게임 안 물건, 날마다·직업마다 다를 수 있어 글로 적는다). 먼저 끝낸 몇 명은 더 큰 보상(bonus_reward),
--- 나머지 완주자는 보통 보상(standard_reward). 격주로 라운드를 새로 연다. 게임을 읽지 않고 profiles.level(본인이 적음)만 본다
-CREATE TABLE IF NOT EXISTS quest2_rounds (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  title TEXT NOT NULL,
-  note TEXT,
-  starts_at INTEGER NOT NULL,
-  ends_at INTEGER,                        -- 비어 있으면 끝을 정하지 않음
-  bonus_slots INTEGER NOT NULL DEFAULT 2, -- 선착 몇 명까지 더 큰 보상을 받는지
-  bonus_reward TEXT NOT NULL,             -- 선착순 보상 글 (예: 사나운 멧돼지 20개 + 직업에 맞는 보상)
-  standard_reward TEXT NOT NULL,          -- 나머지 완주자 보상 글 (예: 사나운 멧돼지 10개 + 망고워터 10개)
-  active INTEGER NOT NULL DEFAULT 1,      -- 새 라운드를 열면 이전 라운드는 0 (목록·신청은 막되 기록은 남는다)
-  created_by TEXT,
-  created_at INTEGER NOT NULL
+
+-- 2군 성장코인샵 (개발중, 제작자 2026-11-09 '골드말고 성장코인이 쌓이게, 성장코인샵에서 구매', '대상은 2군 전원', '렙업당 성장코인', '성장 123위는 더 주자',
+-- server/gcoin.ts, src/pages/GrowthShop.tsx). 레벨업으로 버는 코인은 표에 쌓지 않고 level_log 로 그때그때 센다 (시작 때 레벨부터 오른 레벨마다 gc_levels 의 값).
+-- 오타 수정은 level_log 의 마지막 줄을 고치므로 저절로 빠진다. 시작 때는 setup 'gcoin_start'
+-- 레벨 하나 오를 때 주는 코인: 오른 레벨이 min_level 이상이고 다음 줄의 min_level 보다 작으면 coin (오피서가 조정)
+CREATE TABLE IF NOT EXISTS gc_levels (
+  min_level INTEGER PRIMARY KEY,
+  coin INTEGER NOT NULL
 );
--- 캐릭터마다 이번 라운드의 목표: start_level(시작) -> end_level(목표). 시작과 목표가 같으면(공포티모처럼) 이미 목표 레벨 -> 도핑 지원만 신청
-CREATE TABLE IF NOT EXISTS quest2_targets (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  round_id INTEGER NOT NULL,
-  nickname TEXT NOT NULL,
-  start_level INTEGER NOT NULL,
-  end_level INTEGER NOT NULL,
-  note TEXT,                              -- 예: 길톡 들어오기
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
+-- 그 밖의 설정 (rank1, rank2, rank3: 주간 2군 성장 1·2·3위 보너스 코인)
+CREATE TABLE IF NOT EXISTS gc_settings (
+  key TEXT PRIMARY KEY,
+  value INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS quest2_targets_round ON quest2_targets (round_id);
-CREATE INDEX IF NOT EXISTS quest2_targets_nick ON quest2_targets (nickname);
--- 레벨 구간 참고표 (오피서가 적어 두는 안내일 뿐, 신청·지급과는 따로다): 이름이 없는 2군 길드원이 어느 레벨대면 대충 어떤 보상인지 가늠하는 참고 자료.
--- '20부터 25는 한 구간으로 퉁쳐도 됨', '30부터 어려워짐', '38 + 38제무기 +8강부터 1군 편입 고려', '39+ 는 오피서·길마 판단, 대략 44까지' 같은 안내를 담는다
-CREATE TABLE IF NOT EXISTS quest2_brackets (
+-- 상점 물건 (실제로는 오피서가 게임 안에서 준다). price 는 성장코인
+CREATE TABLE IF NOT EXISTS gc_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  min_level INTEGER NOT NULL,
-  max_level INTEGER NOT NULL,
-  note TEXT NOT NULL,
+  name TEXT NOT NULL,
+  unit TEXT,                              -- 예: 10개
+  price INTEGER NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,      -- 0 이면 판매 중지 (상점에 안 보인다)
   sort INTEGER NOT NULL DEFAULT 0
 );
--- 보상받기 신청 (목표를 다 채워야만, 한 목표에 살아 있는 신청은 하나). rank 는 그 라운드에서 몇 번째로 완주 신청했는지(선착순 판단용, 신청 때 스냅샷),
--- reward 는 그때 정해진 보상 글(스냅샷, 나중에 라운드 보상 글을 바꿔도 이미 신청한 것은 안 바뀐다). 오피서가 게임 안에서 주고 '지급 완료'를 누른다
-CREATE TABLE IF NOT EXISTS quest2_claims (
+-- 구매 신청: 이름·단위·값은 신청 때 그대로 남긴다. 코인은 pending·done 인 동안 빠진다 (cancel·reject 면 돌아온다)
+CREATE TABLE IF NOT EXISTS gc_orders (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  target_id INTEGER NOT NULL,
   user_id TEXT NOT NULL,
-  rank INTEGER,                           -- 완주 순서 (도핑 지원만 신청한 것은 비움)
-  reward TEXT,                            -- 보상 글 (도핑 지원만 신청한 것은 비움)
-  doping INTEGER NOT NULL DEFAULT 0,      -- 도핑 지원도 같이(또는 단독으로) 신청
-  note TEXT,
-  status TEXT NOT NULL DEFAULT 'pending', -- pending | paid | rejected
-  requested_at INTEGER NOT NULL,
-  paid_at INTEGER,
-  paid_by TEXT
+  item_id INTEGER,
+  name TEXT NOT NULL,
+  unit TEXT,
+  price INTEGER NOT NULL,                 -- 하나 값
+  qty INTEGER NOT NULL DEFAULT 1,
+  status TEXT NOT NULL DEFAULT 'pending', -- pending | done | reject | cancel
+  note TEXT,                              -- 반려 의견
+  created_at INTEGER NOT NULL,
+  done_at INTEGER,
+  done_by TEXT
 );
-CREATE INDEX IF NOT EXISTS quest2_claims_target ON quest2_claims (target_id, status);
-CREATE INDEX IF NOT EXISTS quest2_claims_status ON quest2_claims (status, requested_at);
+CREATE INDEX IF NOT EXISTS gc_orders_user ON gc_orders (user_id, status);
+CREATE INDEX IF NOT EXISTS gc_orders_status ON gc_orders (status, created_at);
+-- 레벨업 말고 들어오고 나간 코인: rank (주간 성장 순위 보너스, ref 'w<주 시작 ms>'), adjust (오피서가 손으로 더하거나 뺌). 지우지 않는다
+CREATE TABLE IF NOT EXISTS gc_ledger (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  delta INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  ref TEXT NOT NULL,
+  note TEXT,
+  by_user TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS gc_ledger_once ON gc_ledger (user_id, kind, ref);

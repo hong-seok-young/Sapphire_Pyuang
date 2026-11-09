@@ -21,7 +21,7 @@ import { HomeWeather } from "./pages/Weather";
 import {
   canFit,
   canPreview,
-  canQuest2,
+  canGcoin,
   canSmack,
   canSuggest,
   canSee,
@@ -104,7 +104,7 @@ const CHUNKS = {
   GuildDungeon: () => import("./pages/GuildDungeon"),
   Fit: () => import("./pages/Fit"),
   Smack: () => import("./pages/Smack"),
-  Quest2: () => import("./pages/Quest2"),
+  GrowthShop: () => import("./pages/GrowthShop"),
 };
 const ChatPage = lazy(() => CHUNKS.Chat().then((m) => ({ default: m.ChatPage })));
 const AdminPage = lazy(() => CHUNKS.Admin().then((m) => ({ default: m.AdminPage })));
@@ -132,7 +132,7 @@ const RentalPage = lazy(() => CHUNKS.Rental().then((m) => ({ default: m.RentalPa
 const GuildDungeonPage = lazy(() => CHUNKS.GuildDungeon().then((m) => ({ default: m.GuildDungeonPage })));
 const FitPage = lazy(() => CHUNKS.Fit().then((m) => ({ default: m.FitPage })));
 const SmackPage = lazy(() => CHUNKS.Smack().then((m) => ({ default: m.SmackPage })));
-const Quest2Page = lazy(() => CHUNKS.Quest2().then((m) => ({ default: m.Quest2Page })));
+const GrowthShopPage = lazy(() => CHUNKS.GrowthShop().then((m) => ({ default: m.GrowthShopPage })));
 
 /**
  * 홈이 뜬 뒤 쉬는 때에 자주 여는 화면의 조각을 하나씩 미리 받아 둔다 (제작자 2026-11-04 '화면 전환이나 버튼 동작별로 반응이 늦거나 렉').
@@ -489,9 +489,8 @@ function Wiki({
   // 운영진 때리기 (개발 요청 #10, 제작자 2026-11-09 '우선 나한테만 보이게'): 열기 전에는 앱개발자(와 테스트 계정)만 (launcher.ts canSmack, 서버 server/smack.ts)
   else if (page === "smack")
     body = canSmack(me) ? <SmackPage me={me} arg={arg} /> : <DevSoon title="운영진 때리기" />;
-  // 2군 성장 퀘스트 (개발중, 제작자 2026-11-09 '일단 나만 보이게'): 열기 전에는 앱개발자(와 테스트 계정)만 (launcher.ts canQuest2, 서버 server/quest2.ts)
-  else if (page === "quest2")
-    body = canQuest2(me) ? <Quest2Page me={me} /> : <DevSoon title="2군 성장 퀘스트" />;
+  // 2군 성장코인샵 (개발중, 제작자 2026-11-09 '나한테만 보이게'): 열기 전에는 앱개발자(와 테스트 계정)만 (launcher.ts canGcoin, 서버 server/gcoin.ts)
+  else if (page === "gcoin") body = canGcoin(me) ? <GrowthShopPage me={me} /> : <DevSoon title="2군 성장코인샵" />;
   else if (!wiki)
     body = (
       <Loading

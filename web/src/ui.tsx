@@ -119,7 +119,7 @@ export const TITLE_EN: Record<string, string> = {
   "길드 던전": "GUILD DUNGEON",
   "헬스 루틴": "WORKOUT LOG",
   "운영진 때리기": "STRESS RELIEF",
-  "2군 성장 퀘스트": "LEVEL QUEST",
+  "2군 성장코인샵": "GROWTH COIN SHOP",
 };
 
 export function TopBar({

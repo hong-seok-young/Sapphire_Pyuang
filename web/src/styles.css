@@ -2277,59 +2277,131 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .rent-ledger li { display: flex; gap: 8px; align-items: baseline; }
 .rent-ledger li span:nth-child(2) { flex: 1; min-width: 0; color: var(--muted); }
 .rent-ledger small { color: var(--muted); }
-/* 2군 성장 퀘스트: 보상·구간 안내 줄(q2-ledger), 완주 신청 때 톡 튀는 느낌(q2-pop), 신청 중 표의 숨 쉬는 점(q2-pending-dot) */
-.q2-ledger { list-style: none; margin: 4px 0 8px; padding: 0; display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
-.q2-ledger li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: baseline; }
-.q2-ledger b { color: var(--text); font-weight: 400; }
-.q2-doping { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
-.q2-pop { animation: q2-pop 0.5s ease; }
-@keyframes q2-pop {
-  0% { transform: scale(1); }
-  35% { transform: scale(1.03); box-shadow: 0 0 0 2px #ffd76a inset; }
-  100% { transform: scale(1); box-shadow: none; }
+/* 2군 성장코인샵 (pages/GrowthShop.tsx): 도트 동전, 지갑 칸, 주간 순위, 물건 카드 2줄, 아래 신청 칸, 내역 줄.
+   움직임은 보는 동안·누를 때만 (지갑 동전이 가끔 반짝, 바뀐 숫자가 톡, 1위 메달이 살랑, 카드 누름) */
+.gc-tabs { margin-bottom: 8px; }
+.gc-closed { margin: 0 0 8px; padding: 2px 6px; text-align: center; font-size: 11px; color: var(--edge); background: #3fe0a0; }
+.gc-notice { margin: 0 0 8px; }
+.gc-coin {
+  display: inline-block; width: 12px; height: 12px; margin-right: 3px; vertical-align: -1px; flex: none;
+  background:
+    linear-gradient(#fff6c8, #fff6c8) 3px 2px / 2px 2px no-repeat,
+    radial-gradient(circle at 50% 50%, #ffe27a 0 45%, #f2a93b 46% 62%, #9a5a12 63% 100%);
+  border-radius: 50%; image-rendering: pixelated; box-shadow: 0 0 0 1px var(--edge);
 }
-.q2-pending-dot { display: inline-block; animation: q2-pulse 1.8s ease-in-out infinite; }
-@keyframes q2-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-/* 라운드 안내 칸: 제목 줄, 보상 두 칸(선착순은 금색, 자리가 남았으면 테두리 빛이 숨 쉼), 아래 안내 */
-.q2-panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
-.q2-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 8px; margin: 0; }
-.q2-head b { color: var(--gold); }
-.q2-head small { flex: 1; min-width: 0; color: var(--muted); font-size: 11px; }
-.q2-round-note, .q2-round-foot { margin: 0; font-size: 12px; color: var(--muted); }
-.q2-round-foot { font-size: 11px; text-align: center; }
-.q2-rewards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
-.q2-reward { display: grid; gap: 3px; padding: 8px 10px; font-size: 12px; background: var(--night-2); border: var(--px) solid var(--edge); box-shadow: inset 0 var(--px) 0 var(--hi); }
-.q2-reward-tag { font-size: 11px; color: var(--sapphire); }
-.q2-reward-bonus { position: relative; background: linear-gradient(180deg, #3a2f12, var(--night-2)); }
-.q2-reward-bonus .q2-reward-tag { color: var(--gold); }
-.q2-reward-bonus::after { content: ""; position: absolute; inset: -2px; border: var(--px) solid var(--gold); opacity: 0; pointer-events: none; }
-.q2-live::after { animation: q2-breathe 2.4s ease-in-out infinite; }
-@keyframes q2-breathe { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.85; } }
+.gc-coin-big { width: 34px; height: 34px; margin-right: 0; position: relative; overflow: hidden; }
+.gc-coin-big::after {
+  content: ""; position: absolute; inset: -40% auto -40% -60%; width: 40%; transform: rotate(20deg) translateX(0);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent); animation: gc-shine 3.6s ease-in-out infinite;
+}
+@keyframes gc-shine { 0%, 70% { transform: rotate(20deg) translateX(0); } 100% { transform: rotate(20deg) translateX(420%); } }
+.gc-wallet {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin-bottom: 10px; padding: 10px 12px;
+  background: linear-gradient(180deg, #1f4a40, var(--panel)); border: var(--px) solid var(--edge); box-shadow: inset 0 var(--px) 0 #3fe0a0;
+}
+.gc-sample { opacity: 0.85; }
+.gc-wallet-top { display: flex; align-items: center; gap: 10px; }
+.gc-wallet-num { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.gc-wallet-num b { font-size: 28px; line-height: 1; color: #fff3b0; text-shadow: 2px 2px 0 var(--edge); }
+.gc-wallet-num small { font-size: 12px; color: #c8fff0; }
+.gc-wallet-rows { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11px; color: var(--muted); }
+.gc-wallet-rows b { color: var(--text); font-weight: 400; }
+.gc-next { margin: 0; font-size: 12px; color: #c8fff0; }
+.gc-next b { color: var(--gold); }
+.gc-pop { display: inline-block; animation: gc-pop 0.45s ease; }
+@keyframes gc-pop { 0% { transform: scale(1); } 40% { transform: scale(1.25); } 100% { transform: scale(1); } }
 
-/* 목표 줄: 상태 표(색만 다르게), 진행 막대, 신청할 수 있는 내 줄은 금색 테두리 */
-.q2-st { width: 50px; font-size: 11px; }
-.q2-st-run { color: var(--edge); background: #8fb4ff; }
-.q2-st-clear { color: var(--edge); background: var(--gold); }
-.q2-st-wait { color: var(--edge); background: #ffb27a; }
-.q2-st-done { color: var(--muted); background: var(--night-2); }
-.q2-bar { display: block; height: 4px; margin-top: 4px; background: var(--lo); border: 1px solid var(--edge); overflow: hidden; }
-.q2-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--sapphire), var(--gold)); transform-origin: 0 50%; transition: transform 0.6s ease; }
-.q2-ready { box-shadow: 0 0 0 var(--px) var(--gold); }
-.q2-ready .mk-row:active, .q2-item .mk-row:active { transform: scale(0.985); }
-.q2-mini { padding: 2px 8px; font-size: 11px; }
+.gc-week { margin-bottom: 10px; padding: 8px 10px; background: var(--panel); border: var(--px) solid var(--edge); }
+.gc-week-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin: 0 0 6px; }
+.gc-week-head b { color: var(--gold); font-size: 13px; }
+.gc-week-head small { color: var(--muted); font-size: 11px; }
+.gc-week-empty, .gc-week-last { margin: 0; font-size: 11px; color: var(--muted); }
+.gc-week-last { margin-top: 6px; }
+.gc-week-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.gc-week-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; background: var(--night-2); }
+.gc-week-1 { box-shadow: inset 3px 0 0 var(--gold); }
+.gc-medal { flex: none; font-size: 18px; }
+.gc-week-1 .gc-medal { display: inline-block; animation: gc-sway 2.4s ease-in-out infinite; }
+@keyframes gc-sway { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
+.gc-week-name { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 13px; }
+.gc-week-name small { font-size: 11px; color: var(--muted); }
+.gc-week-bonus { flex: none; display: flex; align-items: center; font-size: 12px; color: var(--gold); }
 
-/* 레벨 구간 참고표: 왼쪽 레벨 칸 고정, 오른쪽 안내, 편집 중에만 단추. 내 레벨 구간은 금색 */
-.q2-brackets { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; font-size: 12px; }
-.q2-brackets li { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 4px 8px; align-items: baseline; padding: 5px 6px; background: var(--night-2); }
-.q2-br-lv { color: var(--sapphire); white-space: nowrap; }
-.q2-br-note { color: var(--text); }
-.q2-br-edit, .q2-br-act { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px; }
-.q2-br-edit .mk-input { flex: 1; }
-.q2-br-me { box-shadow: inset 3px 0 0 var(--gold); }
-.q2-br-me .q2-br-lv { color: var(--gold); }
+.gc-grid { list-style: none; margin: 0 0 120px; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.gc-grid > li { min-width: 0; }
+.gc-card {
+  width: 100%; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px 8px; cursor: pointer; color: var(--text);
+  background: var(--panel); border: var(--px) solid var(--edge); box-shadow: inset 0 var(--px) 0 var(--hi); transition: transform 0.08s ease;
+}
+.gc-card:active { transform: scale(0.96); }
+.gc-picked { box-shadow: 0 0 0 2px #3fe0a0, inset 0 var(--px) 0 var(--hi); }
+.gc-picked .gc-card-icon { animation: gc-bob 0.9s ease-in-out infinite; }
+@keyframes gc-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+.gc-short { opacity: 0.55; }
+.gc-card-icon { display: inline-block; font-size: 28px; line-height: 1.1; }
+.gc-card-name { font-size: 13px; }
+.gc-card-unit { font-size: 11px; color: var(--muted); }
+.gc-price { display: flex; align-items: center; font-size: 13px; font-weight: 700; color: var(--gold); }
+.gc-buy {
+  position: fixed; z-index: 20; left: 50%; transform: translateX(-50%); width: min(616px, calc(100% - 16px));
+  bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 6px);
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 8px; background: var(--panel-2); border: var(--px) solid var(--edge);
+  box-shadow: 0 0 0 1px #3fe0a0; animation: gc-rise 0.18s ease-out;
+}
+@keyframes gc-rise { from { transform: translate(-50%, 8px); opacity: 0.4; } to { transform: translate(-50%, 0); opacity: 1; } }
+.gc-buy-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.gc-buy-name { min-width: 0; font-size: 13px; }
+.gc-step { display: flex; align-items: center; gap: 6px; }
+.gc-step b { min-width: 20px; text-align: center; }
+.gc-step .pill { padding: 2px 10px; }
+.gc-buy-total { display: flex; align-items: center; font-size: 14px; color: var(--gold); }
+.gc-buy-total small { margin-left: 4px; font-size: 11px; color: var(--muted); }
+.gc-over { color: var(--red); }
+.gc-buy-btn { color: var(--edge); background: #3fe0a0; }
+.gc-buy-btn:active { transform: scale(1.08); }
+
+.gc-hist { list-style: none; margin: 0 0 10px; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.gc-hist-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 6px 8px; font-size: 13px; background: var(--panel); }
+.gc-hist-icon { flex: none; width: 22px; text-align: center; font-size: 16px; }
+.gc-hist-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.gc-hist-main small { font-size: 11px; color: var(--muted); }
+.gc-hist-empty { padding: 12px; text-align: center; font-size: 12px; color: var(--muted); background: var(--panel); }
+.gc-hist-cancel, .gc-hist-reject { opacity: 0.6; }
+.gc-delta { flex: none; font-weight: 700; }
+.gc-plus { color: #3fe0a0; }
+.gc-minus { color: #ffb27a; }
+.gc-void { color: var(--muted); text-decoration: line-through; }
+.gc-mini { padding: 2px 8px; font-size: 11px; }
+.gc-done-btn { color: var(--edge); background: #3fe0a0; }
+.gc-order-act { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; margin-left: auto; }
+.gc-order-act .mk-input { flex: 1; min-width: 120px; padding: 4px 6px; font-size: 12px; }
+.gc-sub, .gc-note { margin: 0 0 6px; font-size: 11px; color: var(--muted); }
+.gc-member-row { width: 100%; border: 0; cursor: pointer; color: var(--text); text-align: left; }
+.gc-member-row:active { transform: scale(0.99); }
+.gc-member-open .gc-member-row { box-shadow: inset 3px 0 0 #3fe0a0; }
+.gc-balance { flex: none; display: flex; align-items: center; color: var(--gold); font-weight: 700; }
+.gc-member-detail { padding: 6px 8px 8px; background: var(--night-2); }
+.gc-adjust { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.gc-adjust .mk-input { flex: 1; min-width: 70px; padding: 4px 6px; font-size: 12px; }
+
+.gc-curve { padding: 8px 10px; margin-bottom: 90px; background: var(--panel); border: var(--px) solid var(--edge); }
+.gc-curve ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.gc-curve li { display: grid; grid-template-columns: 64px minmax(0, 1fr) 58px; align-items: center; gap: 8px; padding: 3px 4px; font-size: 12px; }
+.gc-curve li b { display: flex; align-items: center; justify-content: flex-end; color: var(--gold); }
+.gc-curve-bar { height: 6px; background: var(--lo); border: 1px solid var(--edge); }
+.gc-curve-bar i { display: block; height: 100%; background: linear-gradient(90deg, #3fe0a0, var(--gold)); transform-origin: 0 50%; }
+.gc-curve-me { background: var(--night-2); box-shadow: inset 3px 0 0 #3fe0a0; }
+
+.gc-set { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin-bottom: 10px; }
+.gc-set-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; }
+.gc-set-row .mk-input { width: 58px; padding: 4px 6px; font-size: 12px; text-align: center; }
+.gc-set-row .mk-input, .gc-adjust .mk-input, .gc-order-act .mk-input { height: 28px; min-height: 0; }
+.gc-set-row .gc-in-name { flex: 1; min-width: 90px; width: auto; text-align: left; }
+.gc-set-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.gc-rank-in { display: flex; align-items: center; gap: 2px; }
+.gc-off { opacity: 0.5; }
 @media (prefers-reduced-motion: reduce) {
-  .q2-pop, .q2-pending-dot, .q2-live::after { animation: none; }
-  .q2-bar i { transition: none; }
+  .gc-coin-big::after, .gc-pop, .gc-week-1 .gc-medal, .gc-picked .gc-card-icon, .gc-buy { animation: none; }
 }
 .rent-plus { color: #7fe0a0; }
 .rent-minus { color: #ff8fa3; }
@@ -2483,7 +2555,9 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .rent-ledger,
 .st-list,
 .bd-suggest,
-.q2-ledger,
+.gc-hist,
+.gc-week-list,
+.gc-curve ul,
 .rent-held { grid-template-columns: minmax(0, 1fr); }
 /* 입력 칸은 flex 줄 안에서 줄어들 수 있게 (기본 폭이 커서 옆 단추를 밀어냈다) */
 input, textarea { min-width: 0; max-width: 100%; }

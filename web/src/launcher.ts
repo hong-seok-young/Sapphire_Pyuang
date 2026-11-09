@@ -34,7 +34,7 @@ export interface LaunchItem {
   /** 칸 오른쪽 위 작은 글자 줄들 (상자 없이 글자만. 장비대여의 '담당자' / '멍멍', 제작자 요청 2026-11-03) */
   corner?: string[];
   /** 특정 사람만 들어가는 칸: 테두리에 빛이 돈다 (gold 1군 전용, blue 운영진, purple 개발자) */
-  ring?: "gold" | "blue" | "purple";
+  ring?: "gold" | "blue" | "purple" | "mint";
   /** 개발 중·검토 후 오픈: 홈에서는 열린 칸 아래 접힌 '개발 중' 묶음에 들어간다 (제작자 요청 2026-11-02, Home.tsx) */
   soon?: boolean;
   /** soon 일 때 오른쪽 위 표 (없으면 '준비 중') */
@@ -56,10 +56,10 @@ export const SMACK_OPEN = false;
 /** 운영진 때리기에 들어가는 사람: 열기 전에는 앱개발자(와 테스트 계정)만 */
 export const canSmack = (me: Me) => SMACK_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
 
-/** 2군 성장 퀘스트를 모두에게 열었는지 (서버 server/quest2.ts QUEST2_OPEN 과 같이 바꾼다) */
-export const QUEST2_OPEN = false;
-/** 2군 성장 퀘스트에 들어가는 사람: 열기 전에는 앱개발자(와 테스트 계정)만 (제작자 2026-11-09 '일단 나만 보이게 해줘야해') */
-export const canQuest2 = (me: Me) => QUEST2_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
+/** 2군 성장코인샵을 열었는지 (서버 server/gcoin.ts GCOIN_OPEN 과 같이 바꾼다) */
+export const GCOIN_OPEN = false;
+/** 2군 성장코인샵에 들어가는 사람: 열기 전에는 앱개발자(와 테스트 계정)만 (제작자 2026-11-09 '나한테만 보이게') */
+export const canGcoin = (me: Me) => GCOIN_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
 
 /** 헬스 루틴을 모두에게 열었는지 (서버 server/fit.ts FIT_OPEN 과 같이 바꾼다) */
 export const FIT_OPEN = false;
@@ -102,9 +102,9 @@ export const ITEMS: LaunchItem[] = [
   // 운영진 때리기 (개발 요청 #10, 제작자 2026-11-09 '우선 나한테만 보이게'): 길마·오피서 캐릭터를 두드려 스트레스 풀기 (pages/Smack.tsx).
   // 열 때는 developer·soon·badge 를 빼고 SMACK_OPEN (CLAUDE.md '운영진 때리기')
   { key: "smack", title: "운영진 때리기", short: "때리기", to: "#/smack", icon: "🥊", developer: !SMACK_OPEN, soon: !SMACK_OPEN, badge: "개발중", match: ["smack"] },
-  // 2군 성장 퀘스트 (개발중, 제작자 2026-11-09 '2군 인원들에게 성장지원, 웹에서 퀘스트 식으로, 렙업마다 보상', '일단 나만 보이게').
-  // 열 때는 developer·soon·badge 를 빼고 QUEST2_OPEN (CLAUDE.md '2군 성장 퀘스트')
-  { key: "quest2", title: "2군 성장 퀘스트", short: "성장퀘스트", to: "#/quest2", icon: "🎯", developer: !QUEST2_OPEN, soon: !QUEST2_OPEN, badge: "개발중", match: ["quest2"] },
+  // 2군 성장코인샵 (개발중, 제작자 2026-11-09 '1군전용처럼 2군전용 성장코인샵, 개발중, 나한테만'): 레벨업마다 쌓이는 성장코인으로 산다 (pages/GrowthShop.tsx).
+  // 열 때는 developer·soon·badge 를 빼고 GCOIN_OPEN (CLAUDE.md '2군 성장코인샵')
+  { key: "gcoin", title: "2군 성장코인샵", short: "코인샵", to: "#/gcoin", icon: "🪙", ribbon: "2군 전용", ring: "mint", developer: !GCOIN_OPEN, soon: !GCOIN_OPEN, badge: "개발중", match: ["gcoin"] },
   { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
   // 헬스 루틴 (개발중, 길드원 완뻔치 님 개발 요청 #8, 제작자 2026-11-09 '플릭 같은 헬스 어플'): 실제 헬스장 운동 기록 (pages/Fit.tsx). 게임과 상관없다
   { key: "fit", title: "헬스 루틴", short: "헬스", to: "#/fit", icon: "🏋️", developer: !FIT_OPEN, soon: !FIT_OPEN, badge: "개발중", match: ["fit"] },
@@ -196,7 +196,7 @@ function build(dock: string[], slots: string[], search: boolean): Layout {
 /** 처음 배치 (제작자 요청 2026-11-02: 제작자 폰의 배치 그대로 '이걸 기본 배치로') */
 export const DEFAULT_LAYOUT: Layout = {
   dock: ["home", "board", "info", "search", "chat"],
-  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "trend", "enhance", "sim", "simtest", "devreq", "suggest", "fit", "app", "smack", "quest2"],
+  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "trend", "enhance", "sim", "simtest", "devreq", "suggest", "fit", "app", "smack", "gcoin"],
 };
 
 /**
