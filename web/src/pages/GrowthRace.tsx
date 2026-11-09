@@ -48,10 +48,10 @@ function Face({ e, size }: { e: GcRaceEntry; size: number }) {
   );
 }
 
-/** 닉네임 표 폭 어림 (11px 글씨, 한글 11px · 나머지 7px, 둘레 10px, 왕관 13px) */
+/** 닉네임 표 폭 어림 (12px 굵은 글씨, 한글 12.5px · 나머지 7.5px, 둘레 12px, 왕관 14px) */
 function tagWidth(name: string, crown: boolean): number {
-  let n = 10 + (crown ? 13 : 0);
-  for (const ch of name) n += /[\u3131-\uD7A3]/.test(ch) ? 11 : 7;
+  let n = 12 + (crown ? 14 : 0);
+  for (const ch of name) n += /[\u3131-\uD7A3]/.test(ch) ? 12.5 : 7.5;
   return n;
 }
 
@@ -65,9 +65,10 @@ function placeTags<P extends { e: GcRaceEntry; end: number; last: number }>(
   y: (p: number) => number,
   w: number,
   bottom: number,
+  keep: { l: number; r: number; t: number; b: number }[] = [],
 ) {
-  const TH = 15;
-  const boxes: { l: number; r: number; t: number; b: number }[] = [];
+  const TH = 18;
+  const boxes = [...keep];
   return list.map((p) => {
     const cx = x(p.end);
     const cy = y(p.last);
@@ -75,7 +76,7 @@ function placeTags<P extends { e: GcRaceEntry; end: number; last: number }>(
     const hw = tw / 2;
     const fit = (v: number) => Math.min(Math.max(v, hw + 2), w - hw - 2);
     let pick: { tx: number; ty: number } | null = null;
-    for (const dy of [-13, 13, -29, 29, -45, 45]) {
+    for (const dy of [-15, 15, -35, 35, -55, 55]) {
       const ty = cy + dy;
       if (ty - TH / 2 < 2 || ty + TH / 2 > bottom) continue;
       for (const dx of [0, -(hw + 4), hw + 4]) {
@@ -88,7 +89,7 @@ function placeTags<P extends { e: GcRaceEntry; end: number; last: number }>(
       }
       if (pick) break;
     }
-    if (!pick) pick = { tx: fit(cx), ty: Math.max(cy - 13, TH / 2 + 2) };
+    if (!pick) pick = { tx: fit(cx), ty: Math.max(cy - 15, TH / 2 + 2) };
     return { p, cx, cy, ...pick };
   });
 }
@@ -162,7 +163,7 @@ function RaceChart({
   const H = 176;
   const L = 30;
   const R = 26;
-  const T = 22;
+  const T = 30;
   const B = 20;
   const tNow = Math.min(Math.max(now, race.start), race.end);
   const x = (t: number) =>
@@ -198,6 +199,8 @@ function RaceChart({
     y,
     w,
     H - B,
+    // '오늘' 글자 자리는 비워 둔다
+    now < race.end ? [{ l: x(tNow) - 15, r: x(tNow) + 15, t: T - 18, b: T - 2 }] : [],
   );
   const reduce =
     typeof matchMedia !== "undefined" &&
@@ -381,7 +384,12 @@ function RaceChart({
               className={
                 "gr-tag" + (p.e.id === pick ? " gr-tag-on" : "")
               }
-              style={{ left: tx, top: ty, ["--c" as string]: color(p.e.id) }}
+              style={{
+                left: tx,
+                top: ty,
+                ["--c" as string]: color(p.e.id),
+                ["--t" as string]: p.e.id === me && !colorOf.has(me) ? "#12142b" : "#fff",
+              }}
               onClick={() => onPick(p.e.id)}
             >
               {p.e.rank === 1 && <em className="gr-crown">👑</em>}
