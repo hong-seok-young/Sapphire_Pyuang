@@ -89,6 +89,7 @@ const ADDED_COLUMNS = [
   ["profiles", "exp", "INTEGER"], ["listings", "options", "TEXT"], ["profiles", "guild", "TEXT"],
   ["listings", "mode", "TEXT NOT NULL DEFAULT 'sale'"], ["listings", "ends_at", "INTEGER"], ["listing_wants", "offer", "INTEGER"],
   ["listing_talk", "parent_id", "INTEGER"],
+  ["gc_items", "info", "TEXT"],
   ["users", "high_spec", "INTEGER NOT NULL DEFAULT 0"], ["plat_settings", "high_ratio", "REAL NOT NULL DEFAULT 4"],
   ["plat_items", "high_ratio", "REAL"],
   ["activity", "ip", "TEXT"],
@@ -608,27 +609,27 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
   const now = Date.now();
   const LEVELS = [[1, 0], [21, 10], [26, 15], [31, 39], [34, 40], [36, 50], [37, 80], [38, 100], [39, 120], [45, 150]];
   const ITEMS = [
-    ["사나운 멧돼지 인형", "1통(20개)", 120],
-    ["망고워터", "1통(20개)", 35],
-    ["자몽주스", "1통(50개)", 60],
-    ["자몽케이크", "1통(50개)", 80],
-    ["우파우파의노래", "1통(20개)", 144],
-    ["잠깬쿠이인형", "1통(20개)", 125],
-    ["별과자", "1통(20개)", 166],
-    ["동그리사탕", "1통(20개)", 289],
-    ["데블랑사탕", "1통(20개)", 400],
-    ["딸기빙수", "1통(20개)", 89],
-    ["꿀사과", "1통(20개)", 75],
-    ["알사탕", "1통(20개)", 32],
-    ["칠면조 구이", "1통(20개)", 30],
-    ["송편", "1통(20개)", 10],
-    ["자라의노래", "1통(20개)", 660],
+    ["사나운 멧돼지 인형", "20개", 120, null],
+    ["망고워터", "20개", 35, "쿨타임 60초 · 20분 동안 지속: 크리티컬 4 증가"],
+    ["자몽주스", "50개", 60, "쿨타임 5초"],
+    ["자몽케이크", "50개", 80, "쿨타임 5초"],
+    ["우파우파의노래", "20개", 0, null],
+    ["잠깬쿠이인형", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 데미지 20% 증가"],
+    ["별과자", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 크리티컬 5 증가"],
+    ["동그리사탕", "20개", 0, null],
+    ["데블랑사탕", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 크리티컬 5 증가"],
+    ["딸기빙수", "20개", 0, null],
+    ["꿀사과", "20개", 0, null],
+    ["알사탕", "20개", 0, null],
+    ["칠면조 구이", "20개", 0, null],
+    ["송편", "20개", 0, null],
+    ["자라의노래", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 경험치 30% 증가"],
   ];
   const RANK = [100, 60, 30];
   const lines = [`INSERT OR IGNORE INTO setup (key, done_at) VALUES ('gcoin_start', ${now});`];
   if (!queryFirst("SELECT 1 AS x FROM gc_levels")) for (const [lv, c] of LEVELS) lines.push(`INSERT INTO gc_levels (min_level, coin) VALUES (${lv}, ${c});`);
   if (!queryFirst("SELECT 1 AS x FROM gc_items"))
-    ITEMS.forEach(([n, u, p], i) => lines.push(`INSERT INTO gc_items (name, unit, price, active, sort) VALUES (${q(n)}, ${q(u)}, ${p}, 1, ${i});`));
+    ITEMS.forEach(([n, u, p, info], i) => lines.push(`INSERT INTO gc_items (name, unit, price, info, active, sort) VALUES (${q(n)}, ${q(u)}, ${p}, ${info ? q(info) : "NULL"}, 1, ${i});`));
   RANK.forEach((v, i) => lines.push(`INSERT OR IGNORE INTO gc_settings (key, value) VALUES ('rank${i + 1}', ${v});`));
   runSql(lines);
   console.log("2군 성장코인샵 기본값 (비어 있을 때만)");
@@ -645,34 +646,35 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
   ]);
 }
 
-// 성장코인샵 물건을 한 통씩으로 (제작자 2026-11-09 '자몽주스와 자몽케이크는 통당 50개, 나머지는 한 통에 20개, 이미지 이거 써'):
-// 처음 넣은 물건(사나운 멧돼지 10개·20개 …)을 지우고 게임 거래소 스샷의 물건 15개로 바꾼다. 아직 개발 중이라 오피서가 고친 물건이 없다. setup 'gcoin_items_tong_20261109' 로 한 번만
+// 성장코인샵 물건 (제작자 2026-11-09 '자몽주스와 자몽케이크는 50개 단위, 나머지는 20개, 이미지 이거 써' -> '누르면 옵션 보여 줘, 스샷 골드 가격 무시해,
+// 골드 값어치는 관리자가 쓸 거야'): 처음 물건(사나운 멧돼지 10개·20개 …)을 지우고 거래소 스샷의 물건 15개로 바꾼다. 값은 제작자가 처음 준 넷만, 나머지는 0(값 정하기 전),
+// 옵션은 스샷 정보창에 보인 것. 아직 개발 중이라 관리자가 고친 물건이 없다. setup 'gcoin_items_v3_20261109' 로 한 번만 (그 전 판 'gcoin_items_tong_20261109' 는 스샷 값을 넣었다)
 {
-  const KEY = "gcoin_items_tong_20261109";
+  const KEY = "gcoin_items_v3_20261109";
   if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
     const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
     const ITEMS = [
-      ["사나운 멧돼지 인형", "1통(20개)", 120],
-      ["망고워터", "1통(20개)", 35],
-      ["자몽주스", "1통(50개)", 60],
-      ["자몽케이크", "1통(50개)", 80],
-      ["우파우파의노래", "1통(20개)", 144],
-      ["잠깬쿠이인형", "1통(20개)", 125],
-      ["별과자", "1통(20개)", 166],
-      ["동그리사탕", "1통(20개)", 289],
-      ["데블랑사탕", "1통(20개)", 400],
-      ["딸기빙수", "1통(20개)", 89],
-      ["꿀사과", "1통(20개)", 75],
-      ["알사탕", "1통(20개)", 32],
-      ["칠면조 구이", "1통(20개)", 30],
-      ["송편", "1통(20개)", 10],
-      ["자라의노래", "1통(20개)", 660],
+      ["사나운 멧돼지 인형", "20개", 120, null],
+      ["망고워터", "20개", 35, "쿨타임 60초 · 20분 동안 지속: 크리티컬 4 증가"],
+      ["자몽주스", "50개", 60, "쿨타임 5초"],
+      ["자몽케이크", "50개", 80, "쿨타임 5초"],
+      ["우파우파의노래", "20개", 0, null],
+      ["잠깬쿠이인형", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 데미지 20% 증가"],
+      ["별과자", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 크리티컬 5 증가"],
+      ["동그리사탕", "20개", 0, null],
+      ["데블랑사탕", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 크리티컬 5 증가"],
+      ["딸기빙수", "20개", 0, null],
+      ["꿀사과", "20개", 0, null],
+      ["알사탕", "20개", 0, null],
+      ["칠면조 구이", "20개", 0, null],
+      ["송편", "20개", 0, null],
+      ["자라의노래", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 경험치 30% 증가"],
     ];
     runSql([
       "DELETE FROM gc_items;",
-      ...ITEMS.map(([n, u, p], i) => `INSERT INTO gc_items (name, unit, price, active, sort) VALUES (${q(n)}, ${q(u)}, ${p}, 1, ${i});`),
+      ...ITEMS.map(([n, u, p, info], i) => `INSERT INTO gc_items (name, unit, price, info, active, sort) VALUES (${q(n)}, ${q(u)}, ${p}, ${info ? q(info) : "NULL"}, 1, ${i});`),
       `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
     ]);
-    console.log("성장코인샵 물건을 한 통씩으로", ITEMS.length);
+    console.log("성장코인샵 물건", ITEMS.length);
   }
 }

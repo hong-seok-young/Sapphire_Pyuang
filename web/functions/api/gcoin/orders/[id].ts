@@ -5,7 +5,7 @@
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, paramId, readJson } from "../../../../server/auth";
 import { notify } from "../../../../server/alerts";
 import type { Env } from "../../../../server/auth";
-import { MAX_NOTE, canManageGcoin, canUseGcoin, text } from "../../../../server/gcoin";
+import { MAX_NOTE, canManageGcoin, canUseGcoin, text, orderLabel } from "../../../../server/gcoin";
 
 export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params }) => {
   const me = await currentUser(env, request);
@@ -26,7 +26,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
   if (o.status !== "pending") return json({ error: "이미 처리됐어요" }, 409);
   const b = await readJson<{ action: string; note: unknown }>(request);
   const now = Date.now();
-  const label = `${o.name}${o.unit ? ` ${o.unit}` : ""}${o.qty > 1 ? ` x${o.qty}` : ""}`;
+  const label = orderLabel(o.name, o.unit, o.qty);
   // 상태가 pending 일 때만 바꾼다 (두 사람이 같이 눌러도 한 번만)
   const set = (status: string, note: string | null) =>
     env.DB.prepare("UPDATE gc_orders SET status = ?, note = ?, done_at = ?, done_by = ? WHERE id = ? AND status = 'pending'")

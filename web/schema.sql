@@ -967,8 +967,9 @@ CREATE TABLE IF NOT EXISTS gc_settings (
 CREATE TABLE IF NOT EXISTS gc_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
-  unit TEXT,                              -- 예: 10개
-  price INTEGER NOT NULL,
+  unit TEXT,                              -- 예: 20개 (자몽주스·자몽케이크는 50개)
+  price INTEGER NOT NULL,                 -- 성장코인 = 관리자가 적은 골드 가치(천 골드). 0 이면 값을 정하기 전 (상점에 안 보인다)
+  info TEXT,                              -- 누르면 보이는 옵션 (예: 쿨타임 5초 · 20분 동안 지속: 크리티컬 5 증가)
   active INTEGER NOT NULL DEFAULT 1,      -- 0 이면 판매 중지 (상점에 안 보인다)
   sort INTEGER NOT NULL DEFAULT 0
 );

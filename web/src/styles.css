@@ -2014,6 +2014,11 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 @keyframes maint-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 /* 강화 비교의 마법사 안내 (Enhance.tsx MAGE_NOTE): 같은 띠를 화면 맨 위 좌우 꽉 차게 */
 .enh-note { margin: -4px -12px 0; }
+/* 성장코인샵 맨 위 '2군 전용' 전광판: 같은 띠를 은색으로 (2군 전용 색) */
+.gc-board { margin: -4px -12px 8px; }
+.gc-board .maint { color: rgba(227, 233, 246, 0.95); background: repeating-linear-gradient(-45deg, rgba(195, 207, 230, 0.16) 0 7px, rgba(195, 207, 230, 0.05) 7px 14px); }
+.gc-board .maint-dot { animation: maint-blink 1.6s steps(1) infinite; }
+@media (prefers-reduced-motion: reduce) { .gc-board .maint-dot { animation: none; } }
 @media (prefers-reduced-motion: reduce) {
   .maint-flow .maint-run, .maint-on .maint-dot { animation: none; }
   .maint { height: auto; }
@@ -4364,7 +4369,18 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .gc-pic-s { width: 24px; height: 24px; }
 .gc-pic-emoji { display: grid; place-items: center; font-size: 22px; line-height: 1; }
 .gc-pic-s.gc-pic-emoji { font-size: 16px; }
-.gc-buy-name { display: flex; align-items: center; gap: 4px; }
+/* 물건을 누르면 구매 칸 위에 정보창 (게임 정보창처럼: 이름, 파란 쿨타임, 옵션 한 줄씩) */
+.gc-info { flex: 1 1 100%; min-width: 0; display: flex; align-items: flex-start; gap: 8px; padding: 2px 0 6px; border-bottom: 1px solid #3a4466; }
+.gc-info .gc-pic { width: 40px; height: 40px; }
+.gc-info-text { min-width: 0; display: grid; gap: 1px; font-size: 12px; line-height: 1.35; }
+.gc-info-name { font-size: 14px; color: #e3e9f6; }
+.gc-info-cool { color: #5db8f5; font-weight: 700; }
+.gc-info-line { color: var(--text); }
+.gc-info-none { color: var(--muted); }
+.gc-item-info { display: flex; gap: 4px; margin: 4px 0; }
+.gc-item-info .mk-input { flex: 1; min-width: 0; font-size: 12px; }
+.gc-need .mk-input:nth-of-type(2) { box-shadow: 0 0 0 1px var(--gold); }
+.gc-need .gc-bundle-coin { color: var(--gold); }
 .gc-short { opacity: 0.5; }
 .gc-picked { background: #2c3456; box-shadow: 0 0 0 2px #c3cfe6; }
 .gc-picked::after { content: ""; position: absolute; inset: -3px; border: 1px solid #c3cfe6; pointer-events: none; animation: gc-halo 1.2s ease-out infinite; }

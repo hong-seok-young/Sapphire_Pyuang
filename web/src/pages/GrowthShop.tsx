@@ -20,12 +20,12 @@ import {
   itemIcon,
   itemLabel,
   itemPic,
-  tongOf,
-  unitOf,
+  packOf,
+  qtyOf,
   saveGcSettings,
 } from "../gcoin";
 import type { GcCurve, GcData, GcItem, GcOrder, GcWallet } from "../gcoin";
-import { FitLine, Loading, TopBar } from "../ui";
+import { FitLine, FlowLine, Loading, TopBar } from "../ui";
 import { useBackClose } from "../backClose";
 
 type Tab = "shop" | "mine" | "staff";
@@ -139,7 +139,7 @@ function ShopTab({ data, wallet, sample, onDone }: { data: GcData; wallet: GcWal
   const balance = wallet?.balance ?? 0;
   const total = picked ? picked.price * qty : 0;
   const groups = new Map<string, GcItem[]>();
-  for (const it of data.items.filter((i) => i.active)) groups.set(it.name, [...(groups.get(it.name) ?? []), it]);
+  for (const it of data.items.filter((i) => i.active && i.price > 0)) groups.set(it.name, [...(groups.get(it.name) ?? []), it]);
   for (const list of groups.values()) list.sort((a, b) => qtyOf(a.unit) - qtyOf(b.unit));
 
   async function buy() {
@@ -171,7 +171,6 @@ function ShopTab({ data, wallet, sample, onDone }: { data: GcData; wallet: GcWal
         <ul className="gc-goods">
           {[...groups.values()].flat().map((it) => {
             const short = !wallet || balance < it.price;
-            const odd = qtyOf(it.unit) !== tongOf(it.name);
             return (
               <li key={it.id}>
                 <button
@@ -187,7 +186,7 @@ function ShopTab({ data, wallet, sample, onDone }: { data: GcData; wallet: GcWal
                   <b className="gc-good-price">
                     <Coin />
                     {it.price}
-                    {odd && <small>{it.unit}</small>}
+                    <small>{qtyOf(it.unit)}개</small>
                   </b>
                 </button>
               </li>
@@ -197,25 +196,19 @@ function ShopTab({ data, wallet, sample, onDone }: { data: GcData; wallet: GcWal
       )}
       {picked && (
         <div className="gc-buy">
-          <span className="gc-buy-name">
-            <Pic name={picked.name} small />
-            {itemLabel(picked)}
-          </span>
+          <ItemInfo it={picked} />
           <span className="gc-step">
-            <button className="pill" disabled={qty <= 1} onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="하나 빼기">
+            <button className="pill" disabled={qty <= 1} onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="한 묶음 빼기">
               −
             </button>
-            <b>
-              {qty}
-              {qtyOf(picked.unit) === tongOf(picked.name) ? "통" : ""}
-            </b>
-            <button className="pill" disabled={qty >= 20} onClick={() => setQty((q) => Math.min(20, q + 1))} aria-label="하나 더">
+            <b>{(qtyOf(picked.unit) * qty).toLocaleString("ko-KR")}개</b>
+            <button className="pill" disabled={qty >= 20} onClick={() => setQty((q) => Math.min(20, q + 1))} aria-label="한 묶음 더">
               +
             </button>
           </span>
-          <button className={"pill gc-buy-btn" + (wallet && total > balance ? " gc-over" : "")} disabled={busy || !wallet || total > balance} onClick={buy}>
+          <button className={"pill gc-buy-btn" + (wallet && total > balance ? " gc-over" : "")} disabled={busy || (!wallet && !sample) || (!!wallet && total > balance)} onClick={buy}>
             <Coin />
-            {total} {busy ? "…" : !wallet ? "2군 본캐만" : total > balance ? "부족" : "신청"}
+            {total} {busy ? "…" : wallet && total > balance ? "부족" : "신청"}
           </button>
           {error && <p className="form-error">{error}</p>}
         </div>
@@ -289,7 +282,7 @@ function MineTab({ data, wallet, history, sample, onChanged }: { data: GcData; w
           </li>
         ))}
         {!history.orders.length && !history.ledger.length && !history.levels.length && !history.milestones.length && (
-          <li className="gc-hist-empty">{wallet ? "아직 없어요" : "2군 본캐만"}</li>
+          <li className="gc-hist-empty">아직 없어요</li>
         )}
       </ul>
       {error && <p className="form-error">{error}</p>}
@@ -433,7 +426,7 @@ function MembersTab({ admin, onChanged }: { admin: NonNullable<GcData["admin"]>;
   return (
     <>
       <p className="gc-note">
-        2군 본캐 {admin.members.length}명 · 남은 코인 합 {total.toLocaleString("ko-KR")}
+        2군 {admin.members.length}명 · 남은 코인 합 {total.toLocaleString("ko-KR")}
       </p>
       <ul className="gc-hist">
         {admin.members.map((m) => (
@@ -477,7 +470,7 @@ function MembersTab({ admin, onChanged }: { admin: NonNullable<GcData["admin"]>;
             )}
           </li>
         ))}
-        {!admin.members.length && <li className="gc-hist-empty">2군 본캐가 아직 없어요 (길드원 관리에서 2군으로 정한 사람)</li>}
+        {!admin.members.length && <li className="gc-hist-empty">2군 길드원이 아직 없어요</li>}
       </ul>
     </>
   );
@@ -554,8 +547,8 @@ function CoinsTab({ data, onChanged }: { data: GcData; onChanged: (msg: string) 
 }
 
 const digits = (v: string, max: number) => v.replace(/\D/g, "").slice(0, max);
-/** '20개' -> 20 (단위가 없거나 숫자가 아니면 1) */
-const qtyOf = (unit: string | null) => Number(/(\d+)\s*개/.exec(unit ?? "")?.[1] ?? 1) || 1;
+
+const BOARD = "2군 FairyTale 전용 상점 · 레벨·경험치를 올리면 성장코인이 쌓여요";
 
 /** 물건 그림: 게임 거래소 칸 그림(개수 표가 한 통), 없으면 그림 글자 */
 function Pic({ name, small }: { name: string; small?: boolean }) {
@@ -564,9 +557,32 @@ function Pic({ name, small }: { name: string; small?: boolean }) {
   return src ? <img className={cls} src={src} alt="" loading="lazy" /> : <span className={cls + " gc-pic-emoji"}>{itemIcon(name)}</span>;
 }
 
+/** 물건을 누르면 보이는 정보창 (게임 정보창처럼: 이름, 쿨타임은 파란 글씨, 옵션 한 줄씩) */
+function ItemInfo({ it }: { it: GcItem }) {
+  const lines = (it.info ?? "").split(/\s*[·\n]\s*/).filter(Boolean);
+  return (
+    <div className="gc-info">
+      <Pic name={it.name} />
+      <div className="gc-info-text">
+        <b className="gc-info-name">{it.name}</b>
+        {lines.length ? (
+          lines.map((l, i) => (
+            <span key={i} className={/^쿨타임/.test(l) ? "gc-info-cool" : "gc-info-line"}>
+              {l}
+            </span>
+          ))
+        ) : (
+          <span className="gc-info-none">옵션 정보 없음</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /**
  * 담당자 > 물건 (제작자 2026-11-09 '담당자 메뉴는 템 뭐뭐를 골드 얼마의 가치인지 천원 단위로, 50개에 얼마 20개에 얼마 10개에 얼마'):
- * 물건 이름마다 묶음(개수)과 골드 가치(천 골드 단위)를 적는다. 1천 골드 = 성장코인 1개라 적은 값이 곧 코인 값
+ * 물건 이름마다 묶음(개수)과 골드 가치(천 골드 단위)를 적는다. 1천 골드 = 성장코인 1개라 적은 값이 곧 코인 값.
+ * 골드 값을 아직 안 적은 묶음(0)은 상점에 안 보인다 (제작자 2026-11-09 '골드 값어치는 관리자가 쓸 거야, 그에 따라 몇 코인인지 네가 계산'). 옵션은 상점에서 누르면 보인다
  */
 function ItemsTab({ data, onChanged }: { data: GcData; onChanged: (msg: string) => void }) {
   const [busy, setBusy] = useState(false);
@@ -610,7 +626,7 @@ function ItemsTab({ data, onChanged }: { data: GcData; onChanged: (msg: string) 
             disabled={busy || !nName.trim() || !Number(nQty) || !Number(nGold)}
             onClick={() =>
               run(async () => {
-                await addGcItem({ name: nName.trim(), unit: unitOf(nName.trim(), Number(nQty)), price: Number(nGold) });
+                await addGcItem({ name: nName.trim(), unit: `${Number(nQty)}개`, price: Number(nGold) });
                 setNName("");
                 setNQty("");
                 setNGold("");
@@ -628,6 +644,11 @@ function ItemsTab({ data, onChanged }: { data: GcData; onChanged: (msg: string) 
 /** 물건 하나: 이름, 묶음마다 '20개 = 35천 골드', 묶음 더하기 */
 function ItemGroup({ name, list, busy, run }: { name: string; list: GcItem[]; busy: boolean; run: (fn: () => Promise<unknown>, done: string) => void }) {
   const [nm, setNm] = useState(name);
+  const info0 = list[0]?.info ?? "";
+  const [info, setInfo] = useState(info0);
+  // 저장한 뒤 새로 받은 값으로 맞춘다 (다시 열 때 예전 목록으로 먼저 그린다)
+  useEffect(() => setNm(name), [name]);
+  useEffect(() => setInfo(info0), [info0]);
   const [qty, setQty] = useState("");
   const [gold, setGold] = useState("");
   return (
@@ -645,11 +666,23 @@ function ItemGroup({ name, list, busy, run }: { name: string; list: GcItem[]; bu
           </button>
         )}
       </div>
+      <div className="gc-item-info">
+        <input className="mk-input" value={info} onChange={(e) => setInfo(e.target.value.slice(0, 120))} placeholder="옵션 (쿨타임 5초 · 20분 동안 지속: 크리티컬 5 증가)" aria-label="옵션" />
+        {info.trim() !== info0.trim() && (
+          <button
+            className="pill gc-mini gc-done-btn"
+            disabled={busy}
+            onClick={() => run(() => Promise.all(list.map((it) => editGcItem(it.id, { info: info.trim() || null }))), "옵션을 저장했어요")}
+          >
+            저장
+          </button>
+        )}
+      </div>
       {list.map((it) => (
         <Bundle key={it.id} it={it} busy={busy} run={run} />
       ))}
       <div className="gc-bundle gc-bundle-add">
-        <input className="mk-input" inputMode="numeric" value={qty} onChange={(e) => setQty(digits(e.target.value, 4))} placeholder="개수" />
+        <input className="mk-input" inputMode="numeric" value={qty} onChange={(e) => setQty(digits(e.target.value, 4))} placeholder={String(packOf(name))} />
         <span>개</span>
         <input className="mk-input" inputMode="numeric" value={gold} onChange={(e) => setGold(digits(e.target.value, 6))} placeholder="천 골드" />
         <span>천</span>
@@ -658,7 +691,7 @@ function ItemGroup({ name, list, busy, run }: { name: string; list: GcItem[]; bu
           disabled={busy || !Number(qty) || !Number(gold)}
           onClick={() =>
             run(async () => {
-              await addGcItem({ name, unit: unitOf(name, Number(qty)), price: Number(gold) });
+              await addGcItem({ name, unit: `${Number(qty)}개`, price: Number(gold), info: list[0]?.info ?? null });
               setQty("");
               setGold("");
             }, "묶음을 더했어요")
@@ -674,24 +707,34 @@ function ItemGroup({ name, list, busy, run }: { name: string; list: GcItem[]; bu
 /** 묶음 한 줄: [20]개 = [35]천 골드 (= 35코인), 판매 중지, 삭제 */
 function Bundle({ it, busy, run }: { it: GcItem; busy: boolean; run: (fn: () => Promise<unknown>, done: string) => void }) {
   const [qty, setQty] = useState(String(qtyOf(it.unit)));
-  const [gold, setGold] = useState(String(it.price));
+  const gold0 = it.price ? String(it.price) : "";
+  const [gold, setGold] = useState(gold0);
+  const qty0 = String(qtyOf(it.unit));
+  useEffect(() => setGold(gold0), [gold0]);
+  useEffect(() => setQty(qty0), [qty0]);
   const [del, setDel] = useState(false);
-  const dirty = qty !== String(qtyOf(it.unit)) || gold !== String(it.price);
+  const dirty = qty !== String(qtyOf(it.unit)) || gold !== gold0;
   return (
-    <div className={"gc-bundle" + (it.active ? "" : " gc-off")}>
+    <div className={"gc-bundle" + (it.active ? "" : " gc-off") + (it.price ? "" : " gc-need")}>
       <input className="mk-input" inputMode="numeric" value={qty} onChange={(e) => setQty(digits(e.target.value, 4))} aria-label="개수" />
       <span>개</span>
-      <input className="mk-input" inputMode="numeric" value={gold} onChange={(e) => setGold(digits(e.target.value, 6))} aria-label="천 골드" />
+      <input className="mk-input" inputMode="numeric" value={gold} onChange={(e) => setGold(digits(e.target.value, 6))} placeholder="골드 값" aria-label="천 골드" />
       <span>천</span>
       <small className="gc-bundle-coin">
-        <Coin />
-        {Number(gold) || 0}
+        {Number(gold) ? (
+          <>
+            <Coin />
+            {Number(gold)}
+          </>
+        ) : (
+          "미정"
+        )}
       </small>
       {dirty ? (
         <button
           className="pill gc-mini gc-done-btn"
           disabled={busy || !Number(qty) || !Number(gold)}
-          onClick={() => run(() => editGcItem(it.id, { unit: unitOf(it.name, Number(qty)), price: Number(gold) }), "저장했어요")}
+          onClick={() => run(() => editGcItem(it.id, { unit: `${Number(qty)}개`, price: Number(gold) }), "저장했어요")}
         >
           저장
         </button>
@@ -758,6 +801,13 @@ export function GrowthShopPage() {
   return (
     <>
       <TopBar title="성장코인샵" />
+      {/* 맨 위 전광판 (제작자 2026-11-09 '2군 전용이라고 떡하니 써 있잖아, 맨 위에 전광판으로'. 구매 단추의 '2군 본캐만'은 뺐다) */}
+      <div className="maint-wrap gc-board">
+        <div className="maint" role="note">
+          <span className="maint-dot" aria-hidden />
+          <FlowLine text={BOARD} />
+        </div>
+      </div>
       <div className="pill-row gc-tabs">
         {tabs.map((t) => (
           <button key={t.key} className={"pill" + (shown === t.key ? " pill-on" : "")} aria-pressed={shown === t.key} onClick={() => { setTab(t.key); setNotice(""); }}>

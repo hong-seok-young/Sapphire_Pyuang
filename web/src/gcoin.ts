@@ -21,7 +21,10 @@ export interface GcItem {
   id: number;
   name: string;
   unit: string | null;
+  /** 성장코인 = 관리자가 적은 골드 가치(천 골드). 0 이면 값을 정하기 전 */
   price: number;
+  /** 누르면 보이는 옵션 ('쿨타임 5초 · 20분 동안 지속: 크리티컬 5 증가') */
+  info: string | null;
   active: boolean;
 }
 export type GcStatus = "pending" | "done" | "reject" | "cancel";
@@ -88,8 +91,8 @@ export const buyItem = (itemId: number, qty: number) => api<{ ok: boolean; balan
 export const actOrder = (id: number, action: "done" | "reject" | "cancel", note?: string | null) =>
   api<{ ok: boolean }>(`/api/gcoin/orders/${id}`, "PATCH", { action, note });
 export const saveGcSettings = (input: { levels?: GcCurve[]; rank?: number[] }) => api<{ ok: boolean }>("/api/gcoin/settings", "PUT", input);
-export const addGcItem = (input: { name: string; unit: string | null; price: number }) => api<{ ok: boolean }>("/api/gcoin/items", "POST", input);
-export const editGcItem = (id: number, input: Partial<{ name: string; unit: string | null; price: number; active: boolean }>) =>
+export const addGcItem = (input: { name: string; unit: string | null; price: number; info?: string | null }) => api<{ ok: boolean }>("/api/gcoin/items", "POST", input);
+export const editGcItem = (id: number, input: Partial<{ name: string; unit: string | null; price: number; info: string | null; active: boolean }>) =>
   api<{ ok: boolean }>(`/api/gcoin/items/${id}`, "PATCH", input);
 export const deleteGcItem = (id: number) => api<{ ok: boolean }>(`/api/gcoin/items/${id}`, "DELETE");
 export const adjustCoin = (userId: string, delta: number, note: string) => api<{ ok: boolean }>("/api/gcoin/adjust", "POST", { userId, delta, note });
@@ -130,12 +133,17 @@ export function itemIcon(name: string): string {
   return "🎁";
 }
 
-/** 한 통의 개수 (제작자 2026-11-09 '자몽주스와 자몽케이크는 통당 50개, 나머지는 한 통에 20개') */
-export const tongOf = (name: string) => (/자몽/.test(name) ? 50 : 20);
-/** 묶음 이름: 한 통이면 '1통(20개)' */
-export const unitOf = (name: string, qty: number) => (qty === tongOf(name) ? `1통(${qty}개)` : `${qty}개`);
+/** 파는 단위 (제작자 2026-11-09 '자몽주스와 자몽케이크는 50개 단위, 나머지는 20개'): 새 물건·묶음의 처음 개수 */
+export const packOf = (name: string) => (/자몽/.test(name) ? 50 : 20);
+/** '20개' -> 20 (단위에 개수가 없으면 1) */
+export const qtyOf = (unit: string | null) => Number(/(\d+)\s*개/.exec(unit ?? "")?.[1] ?? 1) || 1;
 
-export const itemLabel = (o: { name: string; unit: string | null; qty?: number }) => `${o.name}${o.unit ? ` ${o.unit}` : ""}${o.qty && o.qty > 1 ? ` x${o.qty}` : ""}`;
+/** '자몽주스 100개' (50개 묶음 x 2. 서버 orderLabel 과 같다) */
+export function itemLabel(o: { name: string; unit: string | null; qty?: number }): string {
+  const n = Number(/(\d+)\s*개/.exec(o.unit ?? "")?.[1]);
+  if (n) return `${o.name} ${(n * (o.qty ?? 1)).toLocaleString("ko-KR")}개`;
+  return `${o.name}${o.unit ? ` ${o.unit}` : ""}${o.qty && o.qty > 1 ? ` x${o.qty}` : ""}`;
+}
 
 /** 내 캐릭터가 2군 본캐가 아닐 때(앱개발자는 1군) 보이는 예시 지갑. 화면에만 있고 서버에는 안 간다 */
 export const SAMPLE_WALLET: GcWallet = { id: "예시", level: 34, base: 31, baseExp: 40000, top: 34, topExp: 52000, earned: 116, milestone: 0, bonus: 80, adjust: 0, spent: 155, balance: 41 };
@@ -152,8 +160,8 @@ export const SAMPLE_HISTORY: GcData["history"] = {
     { delta: 60, kind: "rank", note: "주간 2군 성장 2위 (그 주 +52코인)", at: Date.now() - 2 * 86_400_000 },
   ],
   orders: [
-    { id: -1, user: "예시", itemId: null, name: "사나운 멧돼지 인형", unit: "1통(20개)", price: 120, qty: 1, status: "done", note: null, at: Date.now() - 86_400_000, doneAt: Date.now() - 80_000_000, doneBy: "멍멍" },
-    { id: -2, user: "예시", itemId: null, name: "망고워터", unit: "1통(20개)", price: 35, qty: 1, status: "pending", note: null, at: Date.now() - 3_600_000, doneAt: null, doneBy: null },
+    { id: -1, user: "예시", itemId: null, name: "사나운 멧돼지 인형", unit: "20개", price: 120, qty: 1, status: "done", note: null, at: Date.now() - 86_400_000, doneAt: Date.now() - 80_000_000, doneBy: "멍멍" },
+    { id: -2, user: "예시", itemId: null, name: "망고워터", unit: "20개", price: 35, qty: 1, status: "pending", note: null, at: Date.now() - 3_600_000, doneAt: null, doneBy: null },
   ],
 };
 

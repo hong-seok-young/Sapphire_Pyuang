@@ -55,28 +55,36 @@ export const milestonesBetween = (base: number, top: number) => MILESTONES.filte
 /** 주간 2군 성장 1·2·3위 보너스 기본값 */
 export const DEFAULT_RANK = [100, 60, 30];
 /** 처음 물건 (코인 1개 = 1,000골드쯤) */
-// 한 통씩 판다 (제작자 2026-11-09 '자몽주스와 자몽케이크는 통당 50개, 나머지는 한 통에 20개'). 값은 천 골드 = 코인.
-// 사나운 멧돼지 인형·망고워터·자몽주스·자몽케이크는 제작자가 처음 준 값, 나머지는 제작자가 보낸 거래소 스샷(2026-11-09)의 한 통 가장 싼 값
-export const DEFAULT_ITEMS: { name: string; unit: string; price: number }[] = [
-  { name: "사나운 멧돼지 인형", unit: "1통(20개)", price: 120 },
-  { name: "망고워터", unit: "1통(20개)", price: 35 },
-  { name: "자몽주스", unit: "1통(50개)", price: 60 },
-  { name: "자몽케이크", unit: "1통(50개)", price: 80 },
-  { name: "우파우파의노래", unit: "1통(20개)", price: 144 },
-  { name: "잠깬쿠이인형", unit: "1통(20개)", price: 125 },
-  { name: "별과자", unit: "1통(20개)", price: 166 },
-  { name: "동그리사탕", unit: "1통(20개)", price: 289 },
-  { name: "데블랑사탕", unit: "1통(20개)", price: 400 },
-  { name: "딸기빙수", unit: "1통(20개)", price: 89 },
-  { name: "꿀사과", unit: "1통(20개)", price: 75 },
-  { name: "알사탕", unit: "1통(20개)", price: 32 },
-  { name: "칠면조 구이", unit: "1통(20개)", price: 30 },
-  { name: "송편", unit: "1통(20개)", price: 10 },
-  { name: "자라의노래", unit: "1통(20개)", price: 660 },
+// 자몽주스·자몽케이크는 50개, 나머지는 20개씩 판다 (제작자 2026-11-09). price 는 관리자가 적은 골드 가치(천 골드) = 성장코인.
+// 제작자가 처음 준 값(사나운 멧돼지 인형·망고워터·자몽주스·자몽케이크) 말고는 0 = 값을 정하기 전 (제작자 '스샷 골드 가격 무시해, 골드 값어치는 관리자가 쓸 거야').
+// info 는 제작자가 보낸 거래소 스샷의 정보창에 보인 옵션
+export const DEFAULT_ITEMS: { name: string; unit: string; price: number; info: string | null }[] = [
+  { name: "사나운 멧돼지 인형", unit: "20개", price: 120, info: null },
+  { name: "망고워터", unit: "20개", price: 35, info: "쿨타임 60초 · 20분 동안 지속: 크리티컬 4 증가" },
+  { name: "자몽주스", unit: "50개", price: 60, info: "쿨타임 5초" },
+  { name: "자몽케이크", unit: "50개", price: 80, info: "쿨타임 5초" },
+  { name: "우파우파의노래", unit: "20개", price: 0, info: null },
+  { name: "잠깬쿠이인형", unit: "20개", price: 0, info: "쿨타임 5초 · 20분 동안 지속: 데미지 20% 증가" },
+  { name: "별과자", unit: "20개", price: 0, info: "쿨타임 5초 · 20분 동안 지속: 크리티컬 5 증가" },
+  { name: "동그리사탕", unit: "20개", price: 0, info: null },
+  { name: "데블랑사탕", unit: "20개", price: 0, info: "쿨타임 5초 · 20분 동안 지속: 크리티컬 5 증가" },
+  { name: "딸기빙수", unit: "20개", price: 0, info: null },
+  { name: "꿀사과", unit: "20개", price: 0, info: null },
+  { name: "알사탕", unit: "20개", price: 0, info: null },
+  { name: "칠면조 구이", unit: "20개", price: 0, info: null },
+  { name: "송편", unit: "20개", price: 0, info: null },
+  { name: "자라의노래", unit: "20개", price: 0, info: "쿨타임 5초 · 20분 동안 지속: 경험치 30% 증가" },
 ];
 export const MAX_NAME = 20;
 export const MAX_UNIT = 10;
 export const MAX_NOTE = 60;
+export const MAX_INFO = 120;
+/** 신청 이름: '자몽주스 100개' (묶음 '50개' x 2). 단위에 개수가 없으면 '이름 단위 x2' */
+export function orderLabel(name: string, unit: string | null, qty: number): string {
+  const n = Number(/(\d+)\s*개/.exec(unit ?? "")?.[1]);
+  if (n) return `${name} ${(n * qty).toLocaleString("ko-KR")}개`;
+  return `${name}${unit ? ` ${unit}` : ""}${qty > 1 ? ` x${qty}` : ""}`;
+}
 export const MAX_QTY = 20;
 export const MAX_PRICE = 100_000;
 /** 지난주 보너스를 한 번에 몇 주까지 몰아서 정산하나 (CPU 한도) */
