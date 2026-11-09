@@ -565,7 +565,7 @@ function ItemInfo({ it }: { it: GcItem }) {
       <div className="gc-info-text">
         <b className="gc-info-name">{it.name}</b>
         {lines.map((l, i) => (
-          <span key={i} className={/^쿨타임/.test(l) ? "gc-info-cool" : "gc-info-line"}>
+          <span key={i} className={/^(쿨타임|요구 레벨)/.test(l) ? "gc-info-cool" : "gc-info-line"}>
             {l}
           </span>
         ))}
