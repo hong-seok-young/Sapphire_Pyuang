@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { errorText } from "../auth";
 import { useAsync } from "../data";
@@ -13,7 +14,9 @@ import {
   addGcItem,
   adjustCoin,
   buyItem,
-  coinFor,
+  nextGoal,
+  pctText,
+  stepOf,
   curveRows,
   deleteGcItem,
   editGcItem,
@@ -70,10 +73,12 @@ function WalletCard({
   curve: GcCurve[];
   sample: boolean;
 }) {
-  const next = w.top !== null ? coinFor(w.top + 1, curve) : 0;
-  const pct = (w.topExp ?? 0) / 1000;
-  const left = Math.max(0, Math.floor(next * (1 - pct / 100)));
+  const g = nextGoal(w, curve);
   const [table, setTable] = useState(false);
+  // 카드에는 내 코인과 다음 이정표만 (제작자 2026-11-09 '레벨업하면 몇이 오른다, 경험치 몇 퍼 올리면 코인 몇 개, 이 정도만',
+  // '지금 2% 만 더 올리면 코인 얼마 얻어요, 다음 이정표로 안내'). 성장·보너스·사용 합계는 기록표에
+  const ticks =
+    g && g.step.pct < 100 && 100 / g.step.pct <= 50 ? g.step.pct : 0;
   return (
     <div className={"gc-wallet" + (sample ? " gc-sample" : "")}>
       <div className="gc-wallet-main">
@@ -82,26 +87,51 @@ function WalletCard({
           <PopNum n={w.balance} />
           {sample && <i className="sample-tag">예시</i>}
         </span>
-        <span className="gc-next-col">
-          {w.top !== null && next > 0 && (
-            <span className="gc-next">
-              <span className="gc-next-top">
-                Lv.{w.top} {pct.toFixed(1)}%
+        <button className="gc-table-btn" onClick={() => setTable(true)}>
+          코인표
+        </button>
+      </div>
+      {g && (
+        <>
+          <div className="gc-goal-bar">
+            <span>Lv.{g.level}</span>
+            <span
+              className="gc-next-bar"
+              style={
+                ticks ? ({ "--tick": `${ticks}%` } as CSSProperties) : undefined
+              }
+            >
+              <i style={{ transform: `scaleX(${g.pct / 100})` }} />
+              {g.goal < 100 && (
+                <em className="gc-goal-mark" style={{ left: `${g.goal}%` }} />
+              )}
+            </span>
+            <span>{pctText(Math.round(g.pct * 10) / 10)}</span>
+          </div>
+          <div className="gc-goals">
+            {g.goal < 100 && (
+              <span className="gc-goal gc-goal-next">
+                <small>다음 목표 {pctText(g.goal)}</small>
                 <b>
-                  <Coin />+{left}
+                  {pctText(g.need)} 더 올리면
+                  <em>
+                    <Coin />+{g.step.coin}
+                  </em>
                 </b>
               </span>
-              <span className="gc-next-bar">
-                <i style={{ transform: `scaleX(${pct / 100})` }} />
-              </span>
+            )}
+            <span className="gc-goal">
+              <small>Lv.{g.level + 1} 달성</small>
+              <b>
+                {pctText(g.levelNeed)} 더 올리면
+                <em>
+                  <Coin />+{g.levelLeft}
+                </em>
+              </b>
             </span>
-          )}
-          {/* 코인표는 눌러서 본다 (제작자 2026-11-09 '상점 이용자가 보는 코인표는 따로 버튼 만들어서 눌러서 보게, 카드에서 작게') */}
-          <button className="gc-table-btn" onClick={() => setTable(true)}>
-            코인표
-          </button>
-        </span>
-      </div>
+          </div>
+        </>
+      )}
       {table && (
         <CoinTable curve={curve} top={w.top} onClose={() => setTable(false)} />
       )}
@@ -110,6 +140,12 @@ function WalletCard({
 }
 
 /** 레벨업 코인표 창: 지갑의 '코인표' 단추로 연다 (폰 뒤로 가기·바깥 누르기로 닫힘) */
+/** '2.5% 마다 1' (레벨 코인을 나눈 칸) */
+function stepText(c: number) {
+  const st = stepOf(c);
+  return st.pct >= 100 ? "레벨업 때" : `${pctText(st.pct)}마다 ${st.coin}`;
+}
+
 function CoinTable({
   curve,
   top,
@@ -159,6 +195,7 @@ function CoinTable({
                   <Coin />
                   {r.coin}
                 </b>
+                <small className="gc-curve-step">{stepText(r.coin)}</small>
               </li>
             );
           })}
@@ -361,10 +398,12 @@ function ShopTab({
 
 /** 내 코인 칸: 기록표 (들어오고 나간 것). 레벨업 코인표는 지갑의 '코인표' 단추로 */
 function MineTab({
+  w,
   history,
   sample,
   onChanged,
 }: {
+  w: GcWallet | null;
   history: GcData["history"];
   sample: boolean;
   onChanged: () => void;
@@ -391,6 +430,30 @@ function MineTab({
         <p className="gc-week-head">
           <b>기록표</b>
         </p>
+        {/* 코인 합계는 카드가 아니라 기록표에 (제작자 2026-11-09 '성장으로 얼마, 소모 얼마 이런 거 그냥 기록에 다 정리') */}
+        {w && (
+          <div className="gc-sum">
+            <span>
+              <small>성장</small>
+              <b className="gc-plus">+{w.earned}</b>
+            </span>
+            <span>
+              <small>보너스</small>
+              <b className="gc-plus">+{w.milestone + w.bonus + w.adjust}</b>
+            </span>
+            <span>
+              <small>사용</small>
+              <b className="gc-minus">−{w.spent}</b>
+            </span>
+            <span className="gc-sum-total">
+              <small>지금</small>
+              <b>
+                <Coin />
+                {w.balance}
+              </b>
+            </span>
+          </div>
+        )}
         <ul className="gc-hist">
           {history.orders.map((o) => (
             <li key={"o" + o.id} className={"gc-hist-row gc-hist-" + o.status}>
@@ -1282,7 +1345,12 @@ export function GrowthShopPage() {
       )}
       {shown === "status" && <StatusTab data={cur} />}
       {shown === "mine" && (
-        <MineTab history={history} sample={sample} onChanged={refresh} />
+        <MineTab
+          w={wallet}
+          history={history}
+          sample={sample}
+          onChanged={refresh}
+        />
       )}
       {shown === "staff" && cur.admin && staff === "orders" && (
         <OrdersTab admin={cur.admin} onChanged={refresh} />

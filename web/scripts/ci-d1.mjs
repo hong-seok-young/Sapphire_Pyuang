@@ -608,7 +608,7 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
 {
   const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
   const now = Date.now();
-  const LEVELS = [[1, 0], [21, 10], [26, 15], [31, 39], [34, 40], [36, 50], [37, 80], [38, 100], [39, 120], [45, 150]];
+  const LEVELS = [[1, 0], [21, 10], [26, 15], [31, 40], [34, 40], [36, 50], [37, 80], [38, 100], [39, 120], [45, 150]];
   const ITEMS = [
     ["사나운 멧돼지 인형", "20개", 120, null],
     ["망고워터", "20개", 35, "쿨타임 60초 · 20분 동안 지속: 크리티컬 4 증가"],
@@ -644,6 +644,16 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
   runSql([
     `UPDATE gc_levels SET coin = 39 WHERE min_level = 31 AND coin = 35 AND NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}');`,
     `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+  ]);
+}
+
+// 성장코인 Lv.31~33 레벨당 39 -> 40 (제작자 2026-11-09 '경험치 % 마다 딱 떨어지는 단위로 잘게 쪼개': 39 는 어느 % 로도 안 나눠져 레벨업 때 한꺼번에만 줄 수 있다.
+// 40 이면 2.5% 마다 1개, 30 -> 32 는 80 이라 사멧 10개 + 망고워터 10개(78)도 그대로). 39 그대로일 때만, setup 'gcoin_lv31_40_20261109' 로 한 번만
+{
+  const KEY = "gcoin_lv31_40_20261109";
+  runSql([
+    `UPDATE gc_levels SET coin = 40 WHERE min_level = 31 AND coin = 39 AND NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}');`,
+    `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
   ]);
 }
 

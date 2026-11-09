@@ -28,7 +28,12 @@ export interface GcItem {
   active: boolean;
 }
 export type GcStatus = "pending" | "done" | "reject" | "cancel";
-export const STATUS_NAME: Record<GcStatus, string> = { pending: "기다리는 중", done: "지급 완료", reject: "반려", cancel: "취소" };
+export const STATUS_NAME: Record<GcStatus, string> = {
+  pending: "기다리는 중",
+  done: "지급 완료",
+  reject: "반려",
+  cancel: "취소",
+};
 export interface GcOrder {
   id: number;
   user: string;
@@ -87,15 +92,38 @@ export interface GcData {
 }
 
 export const fetchGcoin = () => api<GcData>("/api/gcoin");
-export const buyItem = (itemId: number, qty: number) => api<{ ok: boolean; balance: number }>("/api/gcoin/orders", "POST", { itemId, qty });
-export const actOrder = (id: number, action: "done" | "reject" | "cancel", note?: string | null) =>
-  api<{ ok: boolean }>(`/api/gcoin/orders/${id}`, "PATCH", { action, note });
-export const saveGcSettings = (input: { levels?: GcCurve[]; rank?: number[] }) => api<{ ok: boolean }>("/api/gcoin/settings", "PUT", input);
-export const addGcItem = (input: { name: string; unit: string | null; gold: number }) => api<{ ok: boolean }>("/api/gcoin/items", "POST", input);
-export const editGcItem = (id: number, input: Partial<{ name: string; unit: string | null; gold: number; active: boolean }>) =>
-  api<{ ok: boolean }>(`/api/gcoin/items/${id}`, "PATCH", input);
-export const deleteGcItem = (id: number) => api<{ ok: boolean }>(`/api/gcoin/items/${id}`, "DELETE");
-export const adjustCoin = (userId: string, delta: number, note: string) => api<{ ok: boolean }>("/api/gcoin/adjust", "POST", { userId, delta, note });
+export const buyItem = (itemId: number, qty: number) =>
+  api<{ ok: boolean; balance: number }>("/api/gcoin/orders", "POST", {
+    itemId,
+    qty,
+  });
+export const actOrder = (
+  id: number,
+  action: "done" | "reject" | "cancel",
+  note?: string | null,
+) => api<{ ok: boolean }>(`/api/gcoin/orders/${id}`, "PATCH", { action, note });
+export const saveGcSettings = (input: {
+  levels?: GcCurve[];
+  rank?: number[];
+}) => api<{ ok: boolean }>("/api/gcoin/settings", "PUT", input);
+export const addGcItem = (input: {
+  name: string;
+  unit: string | null;
+  gold: number;
+}) => api<{ ok: boolean }>("/api/gcoin/items", "POST", input);
+export const editGcItem = (
+  id: number,
+  input: Partial<{
+    name: string;
+    unit: string | null;
+    gold: number;
+    active: boolean;
+  }>,
+) => api<{ ok: boolean }>(`/api/gcoin/items/${id}`, "PATCH", input);
+export const deleteGcItem = (id: number) =>
+  api<{ ok: boolean }>(`/api/gcoin/items/${id}`, "DELETE");
+export const adjustCoin = (userId: string, delta: number, note: string) =>
+  api<{ ok: boolean }>("/api/gcoin/adjust", "POST", { userId, delta, note });
 
 /** 레벨 L 에 올라서는 데 주는 코인 (서버 server/gcoin.ts coinFor 와 같다) */
 export function coinFor(level: number, curve: GcCurve[]): number {
@@ -104,17 +132,73 @@ export function coinFor(level: number, curve: GcCurve[]): number {
   return c;
 }
 
+/** 경험치 몇 % 마다 코인 몇 개 (서버 server/gcoin.ts stepOf 와 같다: 레벨 코인을 나누어떨어지는 가장 작은 깔끔한 % 칸으로) */
+const STEPS = [0.5, 1, 2, 2.5, 4, 5, 10, 20, 25, 50, 100];
+export function stepOf(c: number): { pct: number; coin: number } {
+  if (c <= 0) return { pct: 100, coin: 0 };
+  for (const pct of STEPS)
+    if ((c * pct * 10) % 1000 === 0) return { pct, coin: (c * pct) / 100 };
+  return { pct: 100, coin: c };
+}
+export const pctText = (n: number) =>
+  (Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, "")) + "%";
+
+/** 지갑 카드의 다음 이정표: 경험치 몇 % 더 올리면 코인 몇 개, 레벨업하면 남은 코인 몇 개 */
+export function nextGoal(w: GcWallet, curve: GcCurve[]) {
+  if (w.top === null) return null;
+  const c = coinFor(w.top + 1, curve);
+  if (c <= 0) return null;
+  const step = stepOf(c);
+  const pct = (w.topExp ?? 0) / 1000;
+  const done = Math.floor(pct / step.pct + 1e-6);
+  const goal = (done + 1) * step.pct;
+  return {
+    level: w.top,
+    pct,
+    step,
+    /** 다음 칸 (100 이면 레벨업이 곧 다음 칸) */
+    goal,
+    need: Math.round((goal - pct) * 1000) / 1000,
+    /** 레벨업까지 남은 코인 */
+    levelLeft: c - done * step.coin,
+    levelNeed: Math.round((100 - pct) * 1000) / 1000,
+  };
+}
+
 /** 코인표를 '구간 -> 코인' 줄로 (Lv.21~25 10, Lv.26~30 15 …). 0 코인 구간은 뺀다. 마지막은 만렙 55 까지 */
-export function curveRows(curve: GcCurve[], max = 55): { from: number; to: number; coin: number }[] {
+export function curveRows(
+  curve: GcCurve[],
+  max = 55,
+): { from: number; to: number; coin: number }[] {
   const sorted = [...curve].sort((a, b) => a.minLevel - b.minLevel);
   return sorted
-    .map((r, i) => ({ from: r.minLevel, to: (sorted[i + 1]?.minLevel ?? max + 1) - 1, coin: r.coin }))
+    .map((r, i) => ({
+      from: r.minLevel,
+      to: (sorted[i + 1]?.minLevel ?? max + 1) - 1,
+      coin: r.coin,
+    }))
     .filter((r) => r.coin > 0 && r.from <= max);
 }
 
 /** 물건 그림이 있는 이름 (게임 거래소 스샷에서 자른 칸, 자료 scripts/make_gcoin_icons.py -> data/gcoin/<이름(띄어쓰기 없이)>.png).
  * 칸 오른쪽 아래 개수 표가 한 통(자몽주스·자몽케이크 50, 나머지 20)이다 */
-const PICS = new Set(["사나운멧돼지인형", "망고워터", "자몽주스", "자몽케이크", "우파우파의노래", "잠깬쿠이인형", "별과자", "동그리사탕", "데블랑사탕", "딸기빙수", "꿀사과", "알사탕", "칠면조구이", "송편", "자라의노래"]);
+const PICS = new Set([
+  "사나운멧돼지인형",
+  "망고워터",
+  "자몽주스",
+  "자몽케이크",
+  "우파우파의노래",
+  "잠깬쿠이인형",
+  "별과자",
+  "동그리사탕",
+  "데블랑사탕",
+  "딸기빙수",
+  "꿀사과",
+  "알사탕",
+  "칠면조구이",
+  "송편",
+  "자라의노래",
+]);
 export function itemPic(name: string): string | null {
   let key = name.replace(/\s/g, "");
   if (/멧돼지/.test(key)) key = "사나운멧돼지인형";
@@ -135,12 +219,22 @@ const ITEM_INFO: Record<string, string[]> = {
   별과자: ["쿨타임 5초", "20분 동안 지속: 크리티컬 5 증가"],
   데블랑사탕: ["쿨타임 5초", "20분 동안 지속: 크리티컬 5 증가"],
   자라의노래: ["쿨타임 5초", "20분 동안 지속: 경험치 30% 증가"],
-  자몽주스: ["쿨타임 5초", "요구 레벨 27", "10초 동안 지속: 초당 100 마나 회복"],
-  자몽케이크: ["쿨타임 5초", "요구 레벨 27", "10초 동안 지속: 초당 100 체력 회복"],
+  자몽주스: [
+    "쿨타임 5초",
+    "요구 레벨 27",
+    "10초 동안 지속: 초당 100 마나 회복",
+  ],
+  자몽케이크: [
+    "쿨타임 5초",
+    "요구 레벨 27",
+    "10초 동안 지속: 초당 100 체력 회복",
+  ],
 };
 /** 골드 -> 성장코인 (서버 server/gcoin.ts coinOfGold 와 같다) */
-export const coinOfGold = (gold: number) => (gold > 0 ? Math.max(1, Math.round(gold / 1000)) : 0);
-export const itemInfo = (name: string): string[] => ITEM_INFO[name.replace(/\s/g, "")] ?? [];
+export const coinOfGold = (gold: number) =>
+  gold > 0 ? Math.max(1, Math.round(gold / 1000)) : 0;
+export const itemInfo = (name: string): string[] =>
+  ITEM_INFO[name.replace(/\s/g, "")] ?? [];
 
 /** 그림이 없는 물건(오피서가 새로 넣은 것)의 그림 글자 */
 export function itemIcon(name: string): string {
@@ -157,17 +251,35 @@ export function itemIcon(name: string): string {
 /** 파는 단위 (제작자 2026-11-09 '자몽주스와 자몽케이크는 50개 단위, 나머지는 20개'): 새 물건·묶음의 처음 개수 */
 export const packOf = (name: string) => (/자몽/.test(name) ? 50 : 20);
 /** '20개' -> 20 (단위에 개수가 없으면 1) */
-export const qtyOf = (unit: string | null) => Number(/(\d+)\s*개/.exec(unit ?? "")?.[1] ?? 1) || 1;
+export const qtyOf = (unit: string | null) =>
+  Number(/(\d+)\s*개/.exec(unit ?? "")?.[1] ?? 1) || 1;
 
 /** '자몽주스 100개' (50개 묶음 x 2. 서버 orderLabel 과 같다) */
-export function itemLabel(o: { name: string; unit: string | null; qty?: number }): string {
+export function itemLabel(o: {
+  name: string;
+  unit: string | null;
+  qty?: number;
+}): string {
   const n = Number(/(\d+)\s*개/.exec(o.unit ?? "")?.[1]);
   if (n) return `${o.name} ${(n * (o.qty ?? 1)).toLocaleString("ko-KR")}개`;
   return `${o.name}${o.unit ? ` ${o.unit}` : ""}${o.qty && o.qty > 1 ? ` x${o.qty}` : ""}`;
 }
 
 /** 내 캐릭터가 2군 본캐가 아닐 때(앱개발자는 1군) 보이는 예시 지갑. 화면에만 있고 서버에는 안 간다 */
-export const SAMPLE_WALLET: GcWallet = { id: "예시", level: 34, base: 31, baseExp: 40000, top: 34, topExp: 52000, earned: 116, milestone: 0, bonus: 80, adjust: 0, spent: 155, balance: 41 };
+export const SAMPLE_WALLET: GcWallet = {
+  id: "예시",
+  level: 34,
+  base: 31,
+  baseExp: 40000,
+  top: 34,
+  topExp: 52000,
+  earned: 116,
+  milestone: 0,
+  bonus: 80,
+  adjust: 0,
+  spent: 155,
+  balance: 41,
+};
 export const SAMPLE_HISTORY: GcData["history"] = {
   levels: [
     { level: 34, coin: 20, pct: 52 },
@@ -177,12 +289,48 @@ export const SAMPLE_HISTORY: GcData["history"] = {
   ],
   milestones: [],
   ledger: [
-    { delta: 20, kind: "streak", note: "2주 연속 성장", at: Date.now() - 2 * 86_400_000 },
-    { delta: 60, kind: "rank", note: "주간 2군 성장 2위 (그 주 +52코인)", at: Date.now() - 2 * 86_400_000 },
+    {
+      delta: 20,
+      kind: "streak",
+      note: "2주 연속 성장",
+      at: Date.now() - 2 * 86_400_000,
+    },
+    {
+      delta: 60,
+      kind: "rank",
+      note: "주간 2군 성장 2위 (그 주 +52코인)",
+      at: Date.now() - 2 * 86_400_000,
+    },
   ],
   orders: [
-    { id: -1, user: "예시", itemId: null, name: "사나운 멧돼지 인형", unit: "20개", price: 120, qty: 1, status: "done", note: null, at: Date.now() - 86_400_000, doneAt: Date.now() - 80_000_000, doneBy: "멍멍" },
-    { id: -2, user: "예시", itemId: null, name: "망고워터", unit: "20개", price: 35, qty: 1, status: "pending", note: null, at: Date.now() - 3_600_000, doneAt: null, doneBy: null },
+    {
+      id: -1,
+      user: "예시",
+      itemId: null,
+      name: "사나운 멧돼지 인형",
+      unit: "20개",
+      price: 120,
+      qty: 1,
+      status: "done",
+      note: null,
+      at: Date.now() - 86_400_000,
+      doneAt: Date.now() - 80_000_000,
+      doneBy: "멍멍",
+    },
+    {
+      id: -2,
+      user: "예시",
+      itemId: null,
+      name: "망고워터",
+      unit: "20개",
+      price: 35,
+      qty: 1,
+      status: "pending",
+      note: null,
+      at: Date.now() - 3_600_000,
+      doneAt: null,
+      doneBy: null,
+    },
   ],
 };
 
