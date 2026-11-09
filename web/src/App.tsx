@@ -20,6 +20,7 @@ import { Home, HomeCorner, InfoPage, TileIcon } from "./pages/Home";
 import { HomeWeather } from "./pages/Weather";
 import {
   canPreview,
+  canSmack,
   canSee,
   clickItem,
   isLocked,
@@ -98,6 +99,7 @@ const CHUNKS = {
   Todo: () => import("./pages/Todo"),
   Rental: () => import("./pages/Rental"),
   GuildDungeon: () => import("./pages/GuildDungeon"),
+  Smack: () => import("./pages/Smack"),
 };
 const ChatPage = lazy(() => CHUNKS.Chat().then((m) => ({ default: m.ChatPage })));
 const AdminPage = lazy(() => CHUNKS.Admin().then((m) => ({ default: m.AdminPage })));
@@ -122,6 +124,7 @@ const OddsTablePage = lazy(() => CHUNKS.Odds().then((m) => ({ default: m.OddsTab
 const TodoPage = lazy(() => CHUNKS.Todo().then((m) => ({ default: m.TodoPage })));
 const RentalPage = lazy(() => CHUNKS.Rental().then((m) => ({ default: m.RentalPage })));
 const GuildDungeonPage = lazy(() => CHUNKS.GuildDungeon().then((m) => ({ default: m.GuildDungeonPage })));
+const SmackPage = lazy(() => CHUNKS.Smack().then((m) => ({ default: m.SmackPage })));
 
 /**
  * 홈이 뜬 뒤 쉬는 때에 자주 여는 화면의 조각을 하나씩 미리 받아 둔다 (제작자 2026-11-04 '화면 전환이나 버튼 동작별로 반응이 늦거나 렉').
@@ -468,6 +471,9 @@ function Wiki({
       ) : (
         <GuildDungeonPage me={me} />
       );
+  // 운영진 때리기 (개발 요청 #10, 제작자 2026-11-09 '우선 나한테만 보이게'): 열기 전에는 앱개발자(와 테스트 계정)만 (launcher.ts canSmack, 서버 server/smack.ts)
+  else if (page === "smack")
+    body = canSmack(me) ? <SmackPage me={me} arg={arg} /> : <DevSoon title="운영진 때리기" />;
   else if (!wiki)
     body = (
       <Loading

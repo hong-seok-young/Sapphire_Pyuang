@@ -886,3 +886,19 @@ CREATE TABLE IF NOT EXISTS bday_resume (
   used_at INTEGER,
   PRIMARY KEY (bday, user_id)
 );
+
+-- 운영진 때리기 (개발 요청 #10, 제작자 2026-11-09, server/smack.ts, src/pages/Smack.tsx): 때린 사람(캐릭터)마다 맞은 운영진(그 역할의 캐릭터)마다 한 줄.
+-- 화면이 3초마다 모아 더한다. 지우지 않는다 (기록은 평생). 닉네임 바꾸기·계정 삭제에 따라간다
+CREATE TABLE IF NOT EXISTS smack_stats (
+  hitter TEXT NOT NULL,
+  target TEXT NOT NULL,
+  hits INTEGER NOT NULL DEFAULT 0,
+  damage INTEGER NOT NULL DEFAULT 0,
+  kos INTEGER NOT NULL DEFAULT 0,
+  crits INTEGER NOT NULL DEFAULT 0,       -- 크리티컬 수
+  deadly INTEGER NOT NULL DEFAULT 0,      -- 죽음의 일격 수
+  best INTEGER NOT NULL DEFAULT 0,        -- 최고 콤보
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (hitter, target)
+);
+CREATE INDEX IF NOT EXISTS smack_stats_target ON smack_stats (target);

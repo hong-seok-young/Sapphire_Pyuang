@@ -50,6 +50,11 @@ export interface LaunchItem {
   masters?: boolean;
 }
 
+/** 운영진 때리기를 모두에게 열었는지 (서버 server/smack.ts SMACK_OPEN 과 같이 바꾼다) */
+export const SMACK_OPEN = false;
+/** 운영진 때리기에 들어가는 사람: 열기 전에는 앱개발자(와 테스트 계정)만 */
+export const canSmack = (me: Me) => SMACK_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
+
 export const ITEMS: LaunchItem[] = [
   { key: "home", title: "홈", to: "#/", icon: "🏠", pic: "home", match: [""] },
   // 게시판 (제작자 요청): 공지사항, 길드 이벤트, 자유 게시판. 처음에는 아래 탭 홈 오른쪽 (제작자 요청 2026-11-01)
@@ -76,6 +81,9 @@ export const ITEMS: LaunchItem[] = [
   { key: "simtest", title: "확률 시뮬레이터", short: "확률", to: "#/simtest", icon: "🎰", developer: true, soon: true, badge: "테스트", match: ["simtest"] },
   // 개발 요청 (개발중, 제작자 요청 2026-11-05 '개발 중 버튼 하나 더, 개발자한테 자유롭게 신청, 결재선'): src/pages/DevRequests.tsx
   { key: "devreq", title: "개발 요청", short: "요청", to: "#/devreq", icon: "📮", match: ["devreq"] },
+  // 운영진 때리기 (개발 요청 #10, 제작자 2026-11-09 '우선 나한테만 보이게'): 길마·오피서 캐릭터를 두드려 스트레스 풀기 (pages/Smack.tsx).
+  // 열 때는 developer·soon·badge 를 빼고 SMACK_OPEN (CLAUDE.md '운영진 때리기')
+  { key: "smack", title: "운영진 때리기", short: "때리기", to: "#/smack", icon: "🥊", developer: !SMACK_OPEN, soon: !SMACK_OPEN, badge: "개발중", match: ["smack"] },
   { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
   // 장비대여 (2026-11-02 제작자 요청으로 열었다), 길드던전과 인던 같이 갈 사람 찾기 (칸만 먼저 두고 개발 중으로 막는다)
   // 오른쪽 위에 담당자 (제작자 요청 2026-11-03 '장비대여 담당자는 멍멍, 버튼 우측 상단에 텍스트로만 관리자 줄바꿈 멍멍'. 담당이 바뀌면 server/rental.ts RENT_STAFF 와 같이 고친다)
@@ -165,7 +173,7 @@ function build(dock: string[], slots: string[], search: boolean): Layout {
 /** 처음 배치 (제작자 요청 2026-11-02: 제작자 폰의 배치 그대로 '이걸 기본 배치로') */
 export const DEFAULT_LAYOUT: Layout = {
   dock: ["home", "board", "info", "search", "chat"],
-  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "trend", "enhance", "sim", "simtest", "devreq", "app"],
+  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "trend", "enhance", "sim", "simtest", "devreq", "app", "smack"],
 };
 
 /**

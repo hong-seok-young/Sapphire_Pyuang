@@ -33,8 +33,8 @@ const handle: PagesFunction<Env> = async (context) => {
   const path = new URL(request.url).pathname;
   const method = request.method;
   // 사진 질문의 사진 먼저 읽기(/api/chat/peek)는 바로 뒤의 챗봇 질문이 남으므로 따로 남기지 않는다 (사진 본문을 두 번 풀지 않게)
-  // 생일 콤보 실시간 저장(?live=1, 콤보 중 3초마다)은 남기지 않는다 (콤보가 끝날 때 한 번 남는다)
-  if (method === "GET" || method === "HEAD" || method === "OPTIONS" || path === "/api/activity" || path === "/api/chat/peek" || path === "/api/push" || path === "/api/todo/digest" || path.startsWith("/api/alerts") || path.startsWith("/api/sim") || (path === "/api/bday" && new URL(request.url).searchParams.has("live"))) return context.next();
+  // 생일 콤보 실시간 저장(?live=1, 콤보 중 3초마다)은 남기지 않는다 (콤보가 끝날 때 한 번 남는다). 운영진 때리기도 3초마다 모아 보내서 남기지 않는다
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS" || path === "/api/activity" || path === "/api/chat/peek" || path === "/api/push" || path === "/api/todo/digest" || path.startsWith("/api/alerts") || path.startsWith("/api/sim") || path === "/api/smack" || (path === "/api/bday" && new URL(request.url).searchParams.has("live"))) return context.next();
 
   let me: User | null = null;
   let body: unknown = null;
