@@ -51,63 +51,51 @@ function PopNum({ n, className = "" }: { n: number; className?: string }) {
 /** 성장코인 그림 (도트 동전) */
 const Coin = ({ big = false }: { big?: boolean }) => <i className={"gc-coin" + (big ? " gc-coin-big" : "")} aria-hidden="true" />;
 
-/** 맨 위 지갑: 가진 코인, 번 것·쓴 것, 다음 레벨에 받을 코인 */
+/** 맨 위 지갑 (한 칸에 촘촘히): 왼쪽 가진 코인, 오른쪽 지금 레벨 막대와 다 채우면 받을 코인, 아래 한 줄에 번 것·쓴 것과 연속·첫 달성 */
 function WalletCard({ w, curve, sample, data }: { w: GcWallet; curve: GcCurve[]; sample: boolean; data: GcData }) {
-  const streak = sample ? { count: 2, next: 30 } : data.streak;
-  const nextM = sample ? { level: 38, coin: 100, name: "Lv.38 · 1군 편입 고려" } : data.nextMilestone;
   const next = w.top !== null ? coinFor(w.top + 1, curve) : 0;
-  // 지금 채우는 레벨: 남은 % 와 다 채우면 받을 코인 (경험치도 코인이 된다)
   const pct = (w.topExp ?? 0) / 1000;
   const left = Math.max(0, Math.floor(next * (1 - pct / 100)));
+  const streak = sample ? { count: 2, next: 30 } : data.streak;
+  const nextM = sample ? { level: 38, coin: 100, name: "Lv.38" } : data.nextMilestone;
   return (
     <div className={"gc-wallet" + (sample ? " gc-sample" : "")}>
-      <div className="gc-wallet-top">
+      <div className="gc-wallet-main">
         <Coin big />
         <span className="gc-wallet-num">
           <PopNum n={w.balance} />
-          <small>성장코인</small>
+          {sample && <i className="sample-tag">예시</i>}
         </span>
-        {sample && <i className="sample-tag">예시</i>}
+        {w.top !== null && next > 0 && (
+          <span className="gc-next">
+            <span className="gc-next-top">
+              Lv.{w.top} {pct.toFixed(1)}%
+              <b>
+                <Coin />+{left}
+              </b>
+            </span>
+            <span className="gc-next-bar">
+              <i style={{ transform: `scaleX(${pct / 100})` }} />
+            </span>
+          </span>
+        )}
       </div>
       <div className="gc-wallet-rows">
         <span>
-          레벨·경험치 <b>+{w.earned}</b>
+          성장 <b>+{w.earned + w.milestone}</b>
         </span>
-        {w.milestone > 0 && (
-          <span>
-            첫 달성 <b>+{w.milestone}</b>
-          </span>
-        )}
         <span>
-          보너스 <b>+{w.bonus}</b>
+          보너스 <b>+{w.bonus + w.adjust}</b>
         </span>
-        {w.adjust !== 0 && (
-          <span>
-            조정 <b>{w.adjust > 0 ? `+${w.adjust}` : w.adjust}</b>
-          </span>
-        )}
         <span>
           사용 <b>−{w.spent}</b>
         </span>
-      </div>
-      {w.top !== null && next > 0 && (
-        <div className="gc-next">
-          <span>
-            Lv.{w.top} {pct.toFixed(1)}% → Lv.{w.top + 1} 까지 <Coin />
-            <b>+{left}</b>
-          </span>
-          <span className="gc-next-bar">
-            <i style={{ transform: `scaleX(${pct / 100})` }} />
-          </span>
-        </div>
-      )}
-      <div className="gc-chips">
         <span className={"gc-chip" + (streak.count > 0 ? " gc-chip-fire" : "")}>
-          🔥 {streak.count}주 연속 · 다음 +{streak.next}
+          🔥{streak.count}주 +{streak.next}
         </span>
         {nextM && (
           <span className="gc-chip">
-            🎉 Lv.{nextM.level} 첫 달성 +{nextM.coin}
+            🎉Lv.{nextM.level} +{nextM.coin}
           </span>
         )}
       </div>
@@ -115,54 +103,41 @@ function WalletCard({ w, curve, sample, data }: { w: GcWallet; curve: GcCurve[];
   );
 }
 
-/** 이번 주 2군 성장 순위 (이번 주 레벨·경험치로 코인을 많이 번 순) */
+/** 이번 주 성장 순위: 1·2·3위 세 칸을 늘 채운다 (빈 자리는 '—') */
 function WeekRank({ data }: { data: GcData }) {
   const top = data.week.top;
   return (
-    <div className="gc-week">
-      <p className="gc-week-head">
-        <b>이번 주 2군 성장 순위</b>
-      </p>
-      {!top.length ? (
-        <p className="gc-week-empty">아직 없어요</p>
-      ) : (
-        <ol className="gc-week-list">
-          {top.slice(0, 3).map((e, i) => (
-            <li key={e.id} className={"gc-week-row gc-week-" + (i + 1)}>
-              <span className="gc-medal">{MEDAL[i]}</span>
-              <span className="gc-week-name">
-                <Nick name={e.id} />
-                <small>
-                  Lv.{e.fromLevel}
-                  {e.level !== e.fromLevel ? ` → ${e.level}` : ""} · 이번 주 +{e.coins}코인
-                </small>
-              </span>
-              <span className="gc-week-bonus">
-                <Coin />+{data.rank[i]}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
-      {data.lastWinners.length > 0 && (
-        <p className="gc-week-last">
-          지난 보너스: {data.lastWinners.map((w, i) => `${MEDAL[i] ?? ""}${w.id} +${w.delta}`).join(" · ")}
-        </p>
-      )}
+    <div className="gc-podium">
+      {[0, 1, 2].map((i) => {
+        const e = top[i];
+        return (
+          <div key={i} className={"gc-pod gc-pod-" + (i + 1) + (e ? "" : " gc-pod-empty")}>
+            <span className="gc-medal">{MEDAL[i]}</span>
+            <span className="gc-pod-name">{e ? <Nick name={e.id} /> : "—"}</span>
+            <small>{e ? `+${e.coins}` : "　"}</small>
+            <span className="gc-pod-bonus">
+              <Coin />
+              {data.rank[i]}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-/** 상점 칸: 물건 카드 2줄, 고르면 아래에 개수와 신청 */
+/** 상점 칸: 물건마다 한 줄, 그 안에 묶음(10개·20개·50개)이 줄을 꽉 채워 나란히. 고르면 아래에 개수와 신청 */
 function ShopTab({ data, wallet, sample, onDone }: { data: GcData; wallet: GcWallet | null; sample: boolean; onDone: (msg: string) => void }) {
   const [picked, setPicked] = useState<GcItem | null>(null);
   const [qty, setQty] = useState(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useBackClose(picked !== null, () => setPicked(null));
-  const items = data.items.filter((i) => i.active);
   const balance = wallet?.balance ?? 0;
   const total = picked ? picked.price * qty : 0;
+  const groups = new Map<string, GcItem[]>();
+  for (const it of data.items.filter((i) => i.active)) groups.set(it.name, [...(groups.get(it.name) ?? []), it]);
+  for (const list of groups.values()) list.sort((a, b) => qtyOf(a.unit) - qtyOf(b.unit));
 
   async function buy() {
     if (!picked) return;
@@ -187,60 +162,60 @@ function ShopTab({ data, wallet, sample, onDone }: { data: GcData; wallet: GcWal
   return (
     <>
       <WeekRank data={data} />
-      {!items.length ? (
+      {!groups.size ? (
         <div className="empty">아직 파는 물건이 없어요</div>
       ) : (
-        <ul className="gc-grid">
-          {items.map((it) => {
-            const short = wallet ? balance < it.price : true;
-            return (
-              <li key={it.id}>
-                <button
-                  className={"gc-card" + (picked?.id === it.id ? " gc-picked" : "") + (short ? " gc-short" : "")}
-                  onClick={() => {
-                    setPicked(picked?.id === it.id ? null : it);
-                    setQty(1);
-                    setError("");
-                  }}
-                >
-                  <span className="gc-card-icon">{itemIcon(it.name)}</span>
-                  <span className="gc-card-name">{it.name}</span>
-                  {it.unit && <small className="gc-card-unit">{it.unit}</small>}
-                  <span className="gc-price">
-                    <Coin />
-                    {it.price}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
+        <ul className="gc-goods">
+          {[...groups.entries()].map(([name, list]) => (
+            <li key={name} className="gc-good">
+              <span className="gc-good-head">
+                <span className="gc-good-icon">{itemIcon(name)}</span>
+                <span className="gc-good-name">{name}</span>
+              </span>
+              <span className="gc-packs">
+                {list.map((it) => {
+                  const short = !wallet || balance < it.price;
+                  return (
+                    <button
+                      key={it.id}
+                      className={"gc-pack" + (picked?.id === it.id ? " gc-picked" : "") + (short ? " gc-short" : "")}
+                      onClick={() => {
+                        setPicked(picked?.id === it.id ? null : it);
+                        setQty(1);
+                        setError("");
+                      }}
+                    >
+                      <small>{it.unit ?? "1개"}</small>
+                      <b>
+                        <Coin />
+                        {it.price}
+                      </b>
+                    </button>
+                  );
+                })}
+              </span>
+            </li>
+          ))}
         </ul>
       )}
       {picked && (
         <div className="gc-buy">
-          <div className="gc-buy-row">
-            <span className="gc-buy-name">
-              {itemIcon(picked.name)} {itemLabel(picked)}
-            </span>
-            <span className="gc-step">
-              <button className="pill" disabled={qty <= 1} onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="하나 빼기">
-                −
-              </button>
-              <b>{qty}</b>
-              <button className="pill" disabled={qty >= 20} onClick={() => setQty((q) => Math.min(20, q + 1))} aria-label="하나 더">
-                +
-              </button>
-            </span>
-          </div>
-          <div className="gc-buy-row">
-            <span className={"gc-buy-total" + (wallet && total > balance ? " gc-over" : "")}>
-              <Coin />
-              {total} <small>/ 가진 {balance}</small>
-            </span>
-            <button className="pill gc-buy-btn" disabled={busy || !wallet || total > balance} onClick={buy}>
-              {busy ? "신청하는 중…" : !wallet ? "2군 본캐만" : total > balance ? "코인 부족" : "구매 신청"}
+          <span className="gc-buy-name">
+            {itemIcon(picked.name)} {itemLabel(picked)}
+          </span>
+          <span className="gc-step">
+            <button className="pill" disabled={qty <= 1} onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="하나 빼기">
+              −
             </button>
-          </div>
+            <b>{qty}</b>
+            <button className="pill" disabled={qty >= 20} onClick={() => setQty((q) => Math.min(20, q + 1))} aria-label="하나 더">
+              +
+            </button>
+          </span>
+          <button className={"pill gc-buy-btn" + (wallet && total > balance ? " gc-over" : "")} disabled={busy || !wallet || total > balance} onClick={buy}>
+            <Coin />
+            {total} {busy ? "…" : !wallet ? "2군 본캐만" : total > balance ? "부족" : "신청"}
+          </button>
           {error && <p className="form-error">{error}</p>}
         </div>
       )}
@@ -774,7 +749,7 @@ export function GrowthShopPage() {
 
   return (
     <>
-      <TopBar title="2군 성장코인샵" />
+      <TopBar title="성장코인샵" />
       <div className="pill-row gc-tabs">
         {tabs.map((t) => (
           <button key={t.key} className={"pill" + (shown === t.key ? " pill-on" : "")} aria-pressed={shown === t.key} onClick={() => { setTab(t.key); setNotice(""); }}>
