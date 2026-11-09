@@ -11,14 +11,15 @@
 // 쓰는 코인 = 기다리는 중·지급한 구매 신청 (gc_orders). 레벨업 코인은 표에 쌓지 않고 그때그때 센다:
 // 오타 수정은 level_log 마지막 줄을 고치므로 잘못 적은 레벨의 코인은 저절로 빠진다.
 import type { Env, User } from "./auth";
-import { TEST_IDS } from "./auth";
+import { RANK, TEST_IDS } from "./auth";
 import { notify } from "./alerts";
 import { realStart } from "./growth";
 import { WEEK, weekStart } from "./week";
 
-/** 2군에게 열기 전에는 앱개발자(와 테스트 계정)만. 화면 launcher.ts 의 GCOIN_OPEN·canGcoin 과 같이 바꾼다 */
+/** 2군에게 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (개발 중, 제작자 2026-11-09 '오피서랑 길마 보게 열어 줘, 개발 중으로 두고').
+ * 화면 launcher.ts 의 GCOIN_OPEN·canGcoin 과 같이 바꾼다 */
 export const GCOIN_OPEN = false;
-export const canUseGcoin = (me: User) => GCOIN_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
+export const canUseGcoin = (me: User) => GCOIN_OPEN || RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
 /** 신청 처리, 설정, 코인 조정: 오피서 이상 */
 export const canManageGcoin = (role: User["role"]) => role === "developer" || role === "master" || role === "officer";
 
@@ -362,10 +363,9 @@ export async function myStreak(env: Env, id: string, now = Date.now()): Promise<
   return r && r.week >= weekStart(now) - WEEK ? r.count : 0;
 }
 
-/** 운영(오피서 이상)에게 알림. 열기 전에는 앱개발자에게만 */
+/** 운영(길드마스터·오피서·앱개발자)에게 알림 */
 export async function notifyStaff(env: Env, msg: string, from: string): Promise<void> {
-  const where = GCOIN_OPEN ? "role IN ('officer', 'master', 'developer')" : "role = 'developer'";
-  const { results } = await env.DB.prepare(`SELECT DISTINCT COALESCE(main_id, id) AS id FROM users WHERE ${where}`).all<{ id: string }>();
+  const { results } = await env.DB.prepare("SELECT DISTINCT COALESCE(main_id, id) AS id FROM users WHERE role IN ('officer', 'master', 'developer')").all<{ id: string }>();
   await notify(env, results.map((r) => r.id), "gcoin", msg, "#/gcoin?t=orders", from);
 }
 

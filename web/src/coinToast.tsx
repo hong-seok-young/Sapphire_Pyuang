@@ -53,13 +53,13 @@ export function CoinToast() {
   const king = gain.rank === 1 && gain.prevRank !== 1;
   // 처음 넘은 레벨 보너스가 있으면 그것을, 없으면 구간 한마디
   const ms = gain.milestones?.length ? gain.milestones[gain.milestones.length - 1] : null;
-  const line = king ? "👑 이번 주 2군 성장 1위 등극!" : ms ? `🎉 ${ms.name} · 첫 달성 보너스 +${ms.coin}` : milestone(gain.from, gain.to);
+  const line = king ? "👑 이번 주 1위!" : ms ? `🎉 ${ms.name} +${ms.coin}` : milestone(gain.from, gain.to);
   const rank =
     gain.rank === null
       ? null
       : gain.rank <= 3
-        ? `${MEDAL[gain.rank - 1]} 이번 주 2군 성장 ${gain.rank}위${gain.gap !== null ? ` · ${gain.rank - 1}위까지 ${gain.gap}코인` : ""}`
-        : `이번 주 2군 성장 ${gain.rank}위${gain.gap !== null ? ` · 바로 위까지 ${gain.gap}코인` : ""}`;
+        ? `${MEDAL[gain.rank - 1]} 이번 주 ${gain.rank}위${gain.gap !== null ? ` · ${gain.rank - 1}위까지 ${gain.gap}` : ""}`
+        : `이번 주 ${gain.rank}위${gain.gap !== null ? ` · 바로 위까지 ${gain.gap}` : ""}`;
   return (
     <button
       key={k}
@@ -86,10 +86,9 @@ export function CoinToast() {
       <i className="gc-coin gc-coin-big ct-coin" aria-hidden="true" />
       <span className="ct-main">
         <b className="ct-num">+{shown}</b>
-        <small>성장코인 · 가진 {gain.balance}</small>
+        <small>성장코인 {gain.balance}</small>
         {(line || rank) && <span className="ct-line">{line ?? rank}</span>}
         {line && rank && !king && <span className="ct-line ct-sub">{rank}</span>}
-        {king && gain.week > 0 && <span className="ct-line ct-sub">이번 주 +{gain.week}코인 · 목 10시까지 지키면 1위 보너스</span>}
       </span>
     </button>
   );

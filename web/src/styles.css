@@ -2014,11 +2014,6 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 @keyframes maint-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 /* 강화 비교의 마법사 안내 (Enhance.tsx MAGE_NOTE): 같은 띠를 화면 맨 위 좌우 꽉 차게 */
 .enh-note { margin: -4px -12px 0; }
-/* 성장코인샵 맨 위 '2군 전용' 전광판: 같은 띠를 은색으로 (2군 전용 색) */
-.gc-board { margin: -4px -12px 8px; }
-.gc-board .maint { color: rgba(227, 233, 246, 0.95); background: repeating-linear-gradient(-45deg, rgba(195, 207, 230, 0.16) 0 7px, rgba(195, 207, 230, 0.05) 7px 14px); }
-.gc-board .maint-dot { animation: maint-blink 1.6s steps(1) infinite; }
-@media (prefers-reduced-motion: reduce) { .gc-board .maint-dot { animation: none; } }
 @media (prefers-reduced-motion: reduce) {
   .maint-flow .maint-run, .maint-on .maint-dot { animation: none; }
   .maint { height: auto; }
@@ -4376,7 +4371,6 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .gc-info-name { font-size: 14px; color: #e3e9f6; }
 .gc-info-cool { color: #5db8f5; font-weight: 700; }
 .gc-info-line { color: var(--text); }
-.gc-info-none { color: var(--muted); }
 .gc-item-info { display: flex; gap: 4px; margin: 4px 0; }
 .gc-item-info .mk-input { flex: 1; min-width: 0; font-size: 12px; }
 .gc-need .mk-input:nth-of-type(2) { box-shadow: 0 0 0 1px var(--gold); }

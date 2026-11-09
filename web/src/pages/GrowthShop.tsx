@@ -25,7 +25,7 @@ import {
   saveGcSettings,
 } from "../gcoin";
 import type { GcCurve, GcData, GcItem, GcOrder, GcWallet } from "../gcoin";
-import { FitLine, FlowLine, Loading, TopBar } from "../ui";
+import { FitLine, Loading, TopBar } from "../ui";
 import { useBackClose } from "../backClose";
 
 type Tab = "shop" | "mine" | "staff";
@@ -548,8 +548,6 @@ function CoinsTab({ data, onChanged }: { data: GcData; onChanged: (msg: string) 
 
 const digits = (v: string, max: number) => v.replace(/\D/g, "").slice(0, max);
 
-const BOARD = "2군 FairyTale 전용 상점 · 레벨·경험치를 올리면 성장코인이 쌓여요";
-
 /** 물건 그림: 게임 거래소 칸 그림(개수 표가 한 통), 없으면 그림 글자 */
 function Pic({ name, small }: { name: string; small?: boolean }) {
   const src = itemPic(name);
@@ -565,15 +563,11 @@ function ItemInfo({ it }: { it: GcItem }) {
       <Pic name={it.name} />
       <div className="gc-info-text">
         <b className="gc-info-name">{it.name}</b>
-        {lines.length ? (
-          lines.map((l, i) => (
-            <span key={i} className={/^쿨타임/.test(l) ? "gc-info-cool" : "gc-info-line"}>
-              {l}
-            </span>
-          ))
-        ) : (
-          <span className="gc-info-none">옵션 정보 없음</span>
-        )}
+        {lines.map((l, i) => (
+          <span key={i} className={/^쿨타임/.test(l) ? "gc-info-cool" : "gc-info-line"}>
+            {l}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -667,7 +661,7 @@ function ItemGroup({ name, list, busy, run }: { name: string; list: GcItem[]; bu
         )}
       </div>
       <div className="gc-item-info">
-        <input className="mk-input" value={info} onChange={(e) => setInfo(e.target.value.slice(0, 120))} placeholder="옵션 (쿨타임 5초 · 20분 동안 지속: 크리티컬 5 증가)" aria-label="옵션" />
+        <input className="mk-input" value={info} onChange={(e) => setInfo(e.target.value.slice(0, 120))} placeholder="옵션" aria-label="옵션" />
         {info.trim() !== info0.trim() && (
           <button
             className="pill gc-mini gc-done-btn"
@@ -718,7 +712,7 @@ function Bundle({ it, busy, run }: { it: GcItem; busy: boolean; run: (fn: () => 
     <div className={"gc-bundle" + (it.active ? "" : " gc-off") + (it.price ? "" : " gc-need")}>
       <input className="mk-input" inputMode="numeric" value={qty} onChange={(e) => setQty(digits(e.target.value, 4))} aria-label="개수" />
       <span>개</span>
-      <input className="mk-input" inputMode="numeric" value={gold} onChange={(e) => setGold(digits(e.target.value, 6))} placeholder="골드 값" aria-label="천 골드" />
+      <input className="mk-input" inputMode="numeric" value={gold} onChange={(e) => setGold(digits(e.target.value, 6))} placeholder="천 골드" aria-label="천 골드" />
       <span>천</span>
       <small className="gc-bundle-coin">
         {Number(gold) ? (
@@ -801,13 +795,6 @@ export function GrowthShopPage() {
   return (
     <>
       <TopBar title="성장코인샵" />
-      {/* 맨 위 전광판 (제작자 2026-11-09 '2군 전용이라고 떡하니 써 있잖아, 맨 위에 전광판으로'. 구매 단추의 '2군 본캐만'은 뺐다) */}
-      <div className="maint-wrap gc-board">
-        <div className="maint" role="note">
-          <span className="maint-dot" aria-hidden />
-          <FlowLine text={BOARD} />
-        </div>
-      </div>
       <div className="pill-row gc-tabs">
         {tabs.map((t) => (
           <button key={t.key} className={"pill" + (shown === t.key ? " pill-on" : "")} aria-pressed={shown === t.key} onClick={() => { setTab(t.key); setNotice(""); }}>

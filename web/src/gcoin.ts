@@ -185,12 +185,7 @@ export const COIN_EVENT = "sapphire:gcoin";
 /** 이번에 넘은 구간 한마디 (가장 높은 것 하나) */
 export function milestone(from: number, to: number): string | null {
   const hit = (l: number) => Math.floor(from) < l && Math.floor(to) >= l;
-  if (hit(55)) return "만렙 55 달성!";
-  if (hit(45)) return "Lv.45 돌파 · 여기부터 레벨당 150코인";
-  if (hit(39)) return "Lv.39 돌파 · 레벨당 120코인 구간";
-  if (hit(38)) return "Lv.38 · 38제 무기 +8강이면 1군 편입 고려!";
-  if (hit(37)) return "Lv.37 · 다음 레벨은 100코인";
-  if (hit(30)) return "Lv.30 돌파 · 여기부터 레벨당 35코인";
+  if (hit(55)) return "만렙 달성!";
   if (Math.floor(to) > Math.floor(from)) return `Lv.${Math.floor(to)} 달성!`;
   return null;
 }

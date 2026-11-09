@@ -48,7 +48,7 @@ export const ALERT_GROUPS: { menu: string; kinds: { kind: AlertKind; name: strin
   // 개발 요청 결재선 (server/devreq.ts)
   { menu: "개발 요청", kinds: [{ kind: "devreq", name: "신청·결재" }] },
   // 2군 성장코인샵 (server/gcoin.ts, 개발중, 제작자 2026-11-09 '나한테만 보이게'): 구매 신청·지급, 순위 보너스
-  { menu: "성장코인샵", kinds: [{ kind: "gcoin", name: "신청·지급", developer: true }] },
+  { menu: "성장코인샵", kinds: [{ kind: "gcoin", name: "신청·지급", preview: true }] },
 ];
 
 export const fetchAlerts = () =>
