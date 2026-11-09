@@ -19,9 +19,11 @@ import { DevSoon, FitLine, PixelIcon, Loading, NotFound } from "./ui";
 import { Home, HomeCorner, InfoPage, TileIcon } from "./pages/Home";
 import { HomeWeather } from "./pages/Weather";
 import {
+  canFit,
   canPreview,
   canQuest2,
   canSmack,
+  canSuggest,
   canSee,
   clickItem,
   isLocked,
@@ -60,7 +62,6 @@ import { GuideHost } from "./tutorial";
 import { BirthdaySticker } from "./birthday";
 import { Opening, shouldCelebrate } from "./pages/Opening";
 import { reportOpen, reportView } from "./activity";
-import { SUGGEST_OPEN } from "./board";
 import { markMenuVisit } from "./updates";
 import { ensurePush, reportPush } from "./push";
 import {
@@ -458,9 +459,10 @@ function Wiki({
         query={route.query}
       />
     );
-  // 건의함 (개발중, 제작자 요청 2026-11-09 개발 요청 #13): 게시판의 건의 사항을 따로, 익명 글·댓글. 열면 src/board.ts SUGGEST_OPEN
+  // 건의함 (개발중, 제작자 요청 2026-11-09 개발 요청 #13, 2026-11-09 '일단 나만 보이게'): 게시판의 건의 사항을 따로, 익명 글·댓글.
+  // 열기 전에는 앱개발자(와 테스트 계정)만 (launcher.ts canSuggest). 게시판 안의 예전 '건의' 칸은 그대로 모두에게 열려 있다
   else if (page === "suggest")
-    body = SUGGEST_OPEN || canPreview(me) ? <SuggestPage me={me} arg={arg} sub={route.parts[2] ?? ""} /> : <DevSoon title="건의함" />;
+    body = canSuggest(me) ? <SuggestPage me={me} arg={arg} sub={route.parts[2] ?? ""} /> : <DevSoon title="건의함" />;
   else if (page === "") body = <Home me={me} />;
   else if (page === "info") body = <InfoPage me={me} />;
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
@@ -481,14 +483,15 @@ function Wiki({
       ) : (
         <GuildDungeonPage me={me} />
       );
-  // 헬스 루틴 (개발중, 길드원 완뻔치 님 개발 요청 #8): 실제 헬스장 운동 기록. 미리 보는 사람만 (server/fit.ts FIT_OPEN). 위키 자료를 쓰지 않아 기다리지 않는다
-  else if (page === "fit") body = canPreview(me) ? <FitPage me={me} /> : <DevSoon title="헬스 루틴" />;
+  // 헬스 루틴 (개발중, 길드원 완뻔치 님 개발 요청 #8, 2026-11-09 '일단 나만 보이게'): 실제 헬스장 운동 기록. 열기 전에는 앱개발자(와 테스트 계정)만
+  // (launcher.ts canFit, 서버 server/fit.ts). 위키 자료를 쓰지 않아 기다리지 않는다
+  else if (page === "fit") body = canFit(me) ? <FitPage me={me} /> : <DevSoon title="헬스 루틴" />;
   // 운영진 때리기 (개발 요청 #10, 제작자 2026-11-09 '우선 나한테만 보이게'): 열기 전에는 앱개발자(와 테스트 계정)만 (launcher.ts canSmack, 서버 server/smack.ts)
   else if (page === "smack")
     body = canSmack(me) ? <SmackPage me={me} arg={arg} /> : <DevSoon title="운영진 때리기" />;
   // 2군 성장 퀘스트 (개발중, 제작자 2026-11-09 '일단 나만 보이게'): 열기 전에는 앱개발자(와 테스트 계정)만 (launcher.ts canQuest2, 서버 server/quest2.ts)
   else if (page === "quest2")
-    body = canQuest2(me) ? <Quest2Page /> : <DevSoon title="2군 성장 퀘스트" />;
+    body = canQuest2(me) ? <Quest2Page me={me} /> : <DevSoon title="2군 성장 퀘스트" />;
   else if (!wiki)
     body = (
       <Loading

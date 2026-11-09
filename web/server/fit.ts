@@ -4,11 +4,11 @@
 // - 표: fit_exercises(내 종목), fit_routines(루틴, 종목 목록 JSON), fit_workouts(끝낸 운동 하나에 한 줄, 세트 JSON), fit_drafts(하는 중인 운동, 사람마다 한 줄).
 // - 서버는 모양만 맞추고 저장한다 (CPU 를 아끼려고 그래프·최고 기록은 화면이 셈한다). 기록은 저절로 지우지 않는다 (사람이 지우는 것만)
 import type { User } from "./auth";
-import { canSim } from "./simcoin";
+import { TEST_IDS } from "./auth";
 
-/** 길드원에게 열기 전에는 미리 보는 사람만 (server/simcoin.ts canSim, 화면 src/launcher.ts canPreview) */
+/** 길드원에게 열기 전에는 앱개발자(와 테스트 계정)만 (제작자 2026-11-09 '일단 나만 보이게 해줘'. 화면 src/launcher.ts 의 canFit, App.tsx 도 같이) */
 export const FIT_OPEN = false;
-export const canUseFit = (me: User) => FIT_OPEN || canSim(me);
+export const canUseFit = (me: User) => FIT_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
 
 export const PARTS = ["chest", "back", "legs", "shoulder", "arm", "abs", "cardio", "etc"] as const;
 export type Part = (typeof PARTS)[number];

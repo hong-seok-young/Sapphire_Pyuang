@@ -1,11 +1,11 @@
 // PATCH /api/quest2/claims/:id { action: "pay" | "reject", note? } -> 오피서 이상만.
-//   pay    게임 안에서 실제로 준 뒤: 목표의 paid_to_level 을 이 신청의 to_level 로 올리고 신청자에게 알림
-//   reject 거절 (의견은 신청자에게): paid_to_level 은 그대로라 다시 신청할 수 있다
+//   pay    게임 안에서 실제로 준 뒤: 신청자에게 알림 (보상 지급은 1~2일 걸릴 수 있다고 미리 안내했다)
+//   reject 거절 (의견은 신청자에게): 다시 신청할 수 있다
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, paramId, readJson } from "../../../../server/auth";
 import { notify } from "../../../../server/alerts";
 import type { Env } from "../../../../server/auth";
 import { MAX_NOTE, canManageQuest2, canUseQuest2, text } from "../../../../server/quest2";
-import type { ClaimRow, TargetRow } from "../../../../server/quest2";
+import type { ClaimRow } from "../../../../server/quest2";
 
 export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params }) => {
   const me = await currentUser(env, request);
@@ -16,19 +16,14 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
   const claim = await env.DB.prepare("SELECT * FROM quest2_claims WHERE id = ?").bind(id).first<ClaimRow>();
   if (!claim) return json({ error: "없는 신청이에요" }, 404);
   if (claim.status !== "pending") return json({ error: "이미 처리됐어요" }, 409);
-  const target = await env.DB.prepare("SELECT * FROM quest2_targets WHERE id = ?").bind(claim.target_id).first<TargetRow>();
-  if (!target) return json({ error: "없는 목표예요" }, 404);
 
   const body = await readJson<{ action: string; note: unknown }>(request);
   const now = Date.now();
 
   if (body.action === "pay") {
-    await env.DB.batch([
-      env.DB.prepare("UPDATE quest2_claims SET status = 'paid', paid_at = ?, paid_by = ? WHERE id = ?").bind(now, me.id, claim.id),
-      env.DB.prepare("UPDATE quest2_targets SET paid_to_level = ?, updated_at = ? WHERE id = ? AND paid_to_level = ?").bind(claim.to_level, now, target.id, claim.from_level),
-    ]);
-    const goldText = claim.gold ? ` · ${claim.gold.toLocaleString("ko-KR")}골드` : "";
-    await notify(env, [claim.user_id], "quest2", `2군 성장 퀘스트 보상 지급 완료${goldText}`, "#/quest2", me.id);
+    await env.DB.prepare("UPDATE quest2_claims SET status = 'paid', paid_at = ?, paid_by = ? WHERE id = ?").bind(now, me.id, claim.id).run();
+    const rewardText = claim.reward ? ` · ${claim.reward}` : "";
+    await notify(env, [claim.user_id], "quest2", `2군 성장 퀘스트 보상 지급 완료${rewardText}`, "#/quest2", me.id);
     return json({ ok: true });
   }
 

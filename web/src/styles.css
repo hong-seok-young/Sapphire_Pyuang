@@ -2277,11 +2277,60 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .rent-ledger li { display: flex; gap: 8px; align-items: baseline; }
 .rent-ledger li span:nth-child(2) { flex: 1; min-width: 0; color: var(--muted); }
 .rent-ledger small { color: var(--muted); }
-/* 2군 성장 퀘스트 레벨 하나마다의 보상 줄 (q2-ledger) */
+/* 2군 성장 퀘스트: 보상·구간 안내 줄(q2-ledger), 완주 신청 때 톡 튀는 느낌(q2-pop), 신청 중 표의 숨 쉬는 점(q2-pending-dot) */
 .q2-ledger { list-style: none; margin: 4px 0 8px; padding: 0; display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
-.q2-ledger li { display: flex; justify-content: space-between; gap: 8px; }
+.q2-ledger li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: baseline; }
 .q2-ledger b { color: var(--text); font-weight: 400; }
 .q2-doping { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.q2-pop { animation: q2-pop 0.5s ease; }
+@keyframes q2-pop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.03); box-shadow: 0 0 0 2px #ffd76a inset; }
+  100% { transform: scale(1); box-shadow: none; }
+}
+.q2-pending-dot { display: inline-block; animation: q2-pulse 1.8s ease-in-out infinite; }
+@keyframes q2-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+/* 라운드 안내 칸: 제목 줄, 보상 두 칸(선착순은 금색, 자리가 남았으면 테두리 빛이 숨 쉼), 아래 안내 */
+.q2-panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.q2-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 8px; margin: 0; }
+.q2-head b { color: var(--gold); }
+.q2-head small { flex: 1; min-width: 0; color: var(--muted); font-size: 11px; }
+.q2-round-note, .q2-round-foot { margin: 0; font-size: 12px; color: var(--muted); }
+.q2-round-foot { font-size: 11px; text-align: center; }
+.q2-rewards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.q2-reward { display: grid; gap: 3px; padding: 8px 10px; font-size: 12px; background: var(--night-2); border: var(--px) solid var(--edge); box-shadow: inset 0 var(--px) 0 var(--hi); }
+.q2-reward-tag { font-size: 11px; color: var(--sapphire); }
+.q2-reward-bonus { position: relative; background: linear-gradient(180deg, #3a2f12, var(--night-2)); }
+.q2-reward-bonus .q2-reward-tag { color: var(--gold); }
+.q2-reward-bonus::after { content: ""; position: absolute; inset: -2px; border: var(--px) solid var(--gold); opacity: 0; pointer-events: none; }
+.q2-live::after { animation: q2-breathe 2.4s ease-in-out infinite; }
+@keyframes q2-breathe { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.85; } }
+
+/* 목표 줄: 상태 표(색만 다르게), 진행 막대, 신청할 수 있는 내 줄은 금색 테두리 */
+.q2-st { width: 50px; font-size: 11px; }
+.q2-st-run { color: var(--edge); background: #8fb4ff; }
+.q2-st-clear { color: var(--edge); background: var(--gold); }
+.q2-st-wait { color: var(--edge); background: #ffb27a; }
+.q2-st-done { color: var(--muted); background: var(--night-2); }
+.q2-bar { display: block; height: 4px; margin-top: 4px; background: var(--lo); border: 1px solid var(--edge); overflow: hidden; }
+.q2-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--sapphire), var(--gold)); transform-origin: 0 50%; transition: transform 0.6s ease; }
+.q2-ready { box-shadow: 0 0 0 var(--px) var(--gold); }
+.q2-ready .mk-row:active, .q2-item .mk-row:active { transform: scale(0.985); }
+.q2-mini { padding: 2px 8px; font-size: 11px; }
+
+/* 레벨 구간 참고표: 왼쪽 레벨 칸 고정, 오른쪽 안내, 편집 중에만 단추. 내 레벨 구간은 금색 */
+.q2-brackets { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; font-size: 12px; }
+.q2-brackets li { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 4px 8px; align-items: baseline; padding: 5px 6px; background: var(--night-2); }
+.q2-br-lv { color: var(--sapphire); white-space: nowrap; }
+.q2-br-note { color: var(--text); }
+.q2-br-edit, .q2-br-act { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px; }
+.q2-br-edit .mk-input { flex: 1; }
+.q2-br-me { box-shadow: inset 3px 0 0 var(--gold); }
+.q2-br-me .q2-br-lv { color: var(--gold); }
+@media (prefers-reduced-motion: reduce) {
+  .q2-pop, .q2-pending-dot, .q2-live::after { animation: none; }
+  .q2-bar i { transition: none; }
+}
 .rent-plus { color: #7fe0a0; }
 .rent-minus { color: #ff8fa3; }
 

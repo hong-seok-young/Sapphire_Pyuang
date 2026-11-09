@@ -601,26 +601,46 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
   console.log(`생일 콤보 이어서 하기 넣음 ${has}명`);
 }
 
-// 2군 성장 퀘스트 보상 레벨대 (server/quest2.ts DEFAULT_BANDS): 표가 비어 있을 때만 기본값을 넣는다. 오피서가 이미 고친 값은 그대로 둔다 (OR IGNORE, 매번 돌아도 안전)
+// 2군 성장 퀘스트 레벨 구간 참고표 (server/quest2.ts DEFAULT_BRACKETS): 표가 비어 있을 때만 기본값을 넣는다. 오피서가 이미 고친 값은 그대로 둔다
 {
   const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
-  const BANDS = [
-    [1, 10000],
-    [30, 30000],
-    [36, 35000],
-    [40, 40000],
+  // server/quest2.ts DEFAULT_BRACKETS 와 같다 (만렙 55, 겹치지 않는 Lv.min~max)
+  const BRACKETS = [
+    [20, 24, "쉬움 · 한 구간으로 퉁침 (예: 사나운 멧돼지 5개)"],
+    [25, 29, "쉬움 (예: 사나운 멧돼지 10개)"],
+    [30, 31, "여기부터 어려워짐 (예: 사나운 멧돼지 10개 + 망고워터 5개)"],
+    [32, 33, "어려움 (예: 사나운 멧돼지 10개 + 망고워터 10개)"],
+    [34, 35, "어려움 (예: 사나운 멧돼지 15개 + 망고워터 10개)"],
+    [36, 36, "많이 어려움 (예: 사나운 멧돼지 15개 + 망고워터 10개 + 자몽주스)"],
+    [37, 37, "많이 어려움 (예: 사나운 멧돼지 20개 + 자몽주스)"],
+    [38, 38, "38제 무기 +8강부터 1군 편입 고려 (예: 사나운 멧돼지 20개 + 직업 아이템)"],
+    [39, 39, "보통 1군 편입 뒤 · 오피서·길마 판단 (예: 사나운 멧돼지 20개 + 직업 아이템)"],
+    [40, 40, "오피서·길마 판단 (예: 사나운 멧돼지 20개 + 자몽케이크)"],
+    [41, 41, "오피서·길마 판단 (예: 사나운 멧돼지 20개 + 자몽케이크)"],
+    [42, 42, "오피서·길마 판단 (예: 사나운 멧돼지 20개 + 자몽케이크 + 직업 아이템)"],
+    [43, 43, "오피서·길마 판단 (예: 사나운 멧돼지 20개 + 자몽케이크 + 직업 아이템)"],
+    [44, 44, "보통 닿는 끝 · 오피서·길마 판단 (예: 사나운 멧돼지 20개 + 자몽케이크 + 직업 아이템)"],
+    [45, 49, "인원 거의 없음 · 길마 판단"],
+    [50, 55, "만렙 구간 · 길마 판단"],
   ];
-  runSql(BANDS.map(([min, gold]) => `INSERT OR IGNORE INTO quest2_bands (min_level, gold_per_level) VALUES (${min}, ${gold});`));
-  console.log("2군 성장 퀘스트 보상 레벨대 기본값 (비어 있을 때만)");
+  const empty = !queryFirst("SELECT 1 AS x FROM quest2_brackets");
+  if (empty) {
+    runSql(BRACKETS.map(([min, max, note], i) => `INSERT INTO quest2_brackets (min_level, max_level, note, sort) VALUES (${min}, ${max}, ${q(note)}, ${i});`));
+  }
+  console.log(`2군 성장 퀘스트 레벨 구간표 기본값 ${empty ? "넣음" : "(이미 있어서 건너뜀)"}`);
 }
 
-// 2군 성장 퀘스트 1회차 (제작자 2026-11-09 길드 공지 그대로): 목표 레벨을 1레벨씩 올릴 때마다 보상이 쌓인다. setup 'quest2_seed_20261109' 로 한 번만 (그 뒤 라운드는 화면에서 연다)
+// 2군 성장 퀘스트 1회차 (제작자 2026-11-09 길드 공지 그대로, '가져가' 는 11-09 공지에서 빠졌다): 완주하면 보상 신청, 먼저 끝낸 2명은 더 큰 보상.
+// setup 'quest2_seed_20261109' 로 한 번만 (그 뒤 라운드는 화면에서 연다)
 {
   const KEY = "quest2_seed_20261109";
   const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
   const now = Date.now();
   const TITLE = "2군 성장 퀘스트 1회차";
-  const NOTE = "일주일 안으로 목표 레벨을 달성하면 보상 · 격주로 진행";
+  const NOTE = "일주일 안으로 목표 레벨을 달성하면 보상 · 절대 강요 아니에요, 못해도 불이익 없어요 · 격주로 진행";
+  const BONUS_SLOTS = 2;
+  const BONUS_REWARD = "사나운 멧돼지 20개 + 직업에 맞는 보상 (자몽케이크·자몽주스·우파노래 등, 날마다 다를 수 있어요)";
+  const STANDARD_REWARD = "사나운 멧돼지 10개 + 망고워터 10개";
   // 닉네임, 시작 레벨, 목표 레벨, 쪽지
   const TARGETS = [
     ["도등", 21, 27, null],
@@ -630,7 +650,6 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
     ["춘천다크갈비", 31, 33, null],
     ["먼쥐", 32, 34, null],
     ["마가목", 32, 34, null],
-    ["가져가", 33, 35, "길톡 들어오기"],
     ["도아햄", 34, 36, null],
     ["이름뭐로짓지", 34, 36, null],
     ["체인소맨", 34, 36, null],
@@ -640,13 +659,14 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
   if (!queryFirst(`SELECT 1 AS done FROM setup WHERE key = '${KEY}'`)) {
     const lines = [
       "UPDATE quest2_rounds SET active = 0 WHERE active = 1;",
-      `INSERT INTO quest2_rounds (title, note, starts_at, active, created_by, created_at) SELECT ${q(TITLE)}, ${q(NOTE)}, ${now}, 1, '${DEVELOPER}', ${now} ` +
+      `INSERT INTO quest2_rounds (title, note, starts_at, bonus_slots, bonus_reward, standard_reward, active, created_by, created_at) ` +
+        `SELECT ${q(TITLE)}, ${q(NOTE)}, ${now}, ${BONUS_SLOTS}, ${q(BONUS_REWARD)}, ${q(STANDARD_REWARD)}, 1, '${DEVELOPER}', ${now} ` +
         `WHERE NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}');`,
     ];
     for (const [nickname, start, end, note] of TARGETS) {
       lines.push(
-        `INSERT INTO quest2_targets (round_id, nickname, start_level, end_level, note, paid_to_level, created_at, updated_at) ` +
-          `SELECT id, ${q(nickname)}, ${start}, ${end}, ${note === null ? "NULL" : q(note)}, ${start}, ${now}, ${now} FROM quest2_rounds ` +
+        `INSERT INTO quest2_targets (round_id, nickname, start_level, end_level, note, created_at, updated_at) ` +
+          `SELECT id, ${q(nickname)}, ${start}, ${end}, ${note === null ? "NULL" : q(note)}, ${now}, ${now} FROM quest2_rounds ` +
           `WHERE title = ${q(TITLE)} AND created_at = ${now} AND NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}');`,
       );
     }

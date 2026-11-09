@@ -28,10 +28,8 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
     if (n === undefined) return json({ error: `쪽지는 ${MAX_NOTE}자까지예요` }, 400);
     note = n;
   }
-  // paid_to_level 이 새 범위를 넘으면 범위 안으로 (레벨대를 좁혔을 때)
-  const paidTo = Math.min(Math.max(t.paid_to_level, startLevel as number), endLevel as number);
-  await env.DB.prepare("UPDATE quest2_targets SET start_level = ?, end_level = ?, note = ?, paid_to_level = ?, updated_at = ? WHERE id = ?")
-    .bind(startLevel, endLevel, note, paidTo, Date.now(), t.id)
+  await env.DB.prepare("UPDATE quest2_targets SET start_level = ?, end_level = ?, note = ?, updated_at = ? WHERE id = ?")
+    .bind(startLevel, endLevel, note, Date.now(), t.id)
     .run();
   return json({ ok: true });
 };

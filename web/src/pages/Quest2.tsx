@@ -1,58 +1,93 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { errorText } from "../auth";
+import type { Me } from "../auth";
 import { useAsync } from "../data";
 import { KakaoButton, Nick } from "../kakao";
 import { goldWords } from "../market";
 import {
+  DEFAULT_BONUS_REWARD,
+  DEFAULT_BONUS_SLOTS,
+  DEFAULT_STANDARD_REWARD,
   MAX_NOTE,
+  MAX_REWARD,
   REWARD_ITEMS,
+  addBracket,
   addTarget,
+  deleteBracket,
   deleteTarget,
+  editBracket,
   editTarget,
   fetchQuest2,
   openRound,
   payClaim,
+  progressOf,
   rejectClaim,
   requestClaim,
-  rewardLedger,
-  saveBands,
-  totalReward,
 } from "../quest2";
-import type { Band, Quest2Data, Quest2Target } from "../quest2";
+import type { Quest2Bracket, Quest2Data, Quest2Target } from "../quest2";
 import { Loading, TopBar } from "../ui";
 import { useBackClose } from "../backClose";
 
-/** 레벨 하나마다 올린 보상 표 (제작자 요청: '1렙업마다' 보상을 공평하게, 대충 몇에서 몇 올리면 보상 뭐다) */
-function Ledger({ from, to, bands }: { from: number; to: number; bands: Band[] }) {
-  const rows = rewardLedger(from, to, bands);
-  if (!rows.length) return null;
-  return (
-    <ul className="q2-ledger">
-      {rows.map((r) => (
-        <li key={r.level}>
-          Lv.{r.level - 1} → Lv.{r.level} <b>{goldWords(r.gold)} 골드</b>
-        </li>
-      ))}
-    </ul>
-  );
-}
+/** 개발자 혼자 볼 샘플 (실제 서버에는 안 가고 화면에만, id 는 음수) */
+const SAMPLE_TARGETS: Quest2Target[] = [
+  {
+    id: -1,
+    nickname: "예시길동",
+    startLevel: 31,
+    endLevel: 33,
+    note: null,
+    currentLevel: 33,
+    doneAlready: false,
+    done: true,
+    mine: false,
+    claimed: false,
+    pending: { id: -1, reward: DEFAULT_BONUS_REWARD, doping: false, note: "먼저 도착했어요!", requestedAt: Date.now() - 3_600_000 },
+  },
+  {
+    id: -2,
+    nickname: "예시춘향",
+    startLevel: 34,
+    endLevel: 36,
+    note: null,
+    currentLevel: 36,
+    doneAlready: false,
+    done: true,
+    mine: false,
+    claimed: true,
+    pending: null,
+  },
+  {
+    id: -3,
+    nickname: "예시철수",
+    startLevel: 36,
+    endLevel: 37,
+    note: null,
+    currentLevel: 36,
+    doneAlready: false,
+    done: false,
+    mine: true,
+    claimed: false,
+    pending: null,
+  },
+];
+const isSampleId = (id: number) => id < 0;
 
-/** 목표 하나: 진행 상태, 레벨대 사다리, 보상받기 신청 (본인), 지급·반려 (오피서 이상) */
+/** 목표 하나: 진행 상태, 보상받기 신청 (본인, 완주해야만), 지급·반려·수정·내리기 (오피서 이상) */
 function TargetRow({
   t,
-  bands,
   canManage,
   onChanged,
 }: {
   t: Quest2Target;
-  bands: Band[];
   canManage: boolean;
   onChanged: () => void;
 }) {
+  const sample = isSampleId(t.id);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [justClaimed, setJustClaimed] = useState(false);
   const [doping, setDoping] = useState(false);
   const [note, setNote] = useState("");
   const [rejecting, setRejecting] = useState(false);
@@ -63,12 +98,21 @@ function TargetRow({
   const [editNote, setEditNote] = useState(t.note ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  function blockSample(): boolean {
+    if (!sample) return false;
+    setError("예시 자료예요 · 실제로 신청·처리되지 않아요");
+    return true;
+  }
+
   async function claim() {
+    if (blockSample()) return;
     setBusy(true);
     setError("");
     try {
       await requestClaim(t.id, doping, note.trim() || null);
       setNote("");
+      setJustClaimed(true);
+      window.setTimeout(() => setJustClaimed(false), 900);
       onChanged();
     } catch (x) {
       setError(errorText(x));
@@ -77,7 +121,7 @@ function TargetRow({
     }
   }
   async function pay() {
-    if (!t.pending) return;
+    if (blockSample() || !t.pending) return;
     setBusy(true);
     setError("");
     try {
@@ -90,7 +134,7 @@ function TargetRow({
     }
   }
   async function reject() {
-    if (!t.pending) return;
+    if (blockSample() || !t.pending) return;
     setBusy(true);
     setError("");
     try {
@@ -105,6 +149,7 @@ function TargetRow({
     }
   }
   async function saveEdit() {
+    if (blockSample()) return;
     setBusy(true);
     setError("");
     try {
@@ -118,6 +163,7 @@ function TargetRow({
     }
   }
   async function remove() {
+    if (blockSample()) return;
     setBusy(true);
     setError("");
     try {
@@ -130,47 +176,43 @@ function TargetRow({
     }
   }
 
-  const done = t.currentLevel !== null && t.currentLevel >= t.endLevel;
-  const canClaim = t.mine && !t.pending && (t.claimableGold > 0 || t.doneAlready);
+  const canClaim = t.mine && !t.pending && !t.claimed && (t.done || t.doneAlready);
+  // 상태 표는 짧게 (54px 칸에서 세 줄로 접혔다)
+  const status = t.doneAlready ? "도달" : t.claimed ? "받음" : t.pending ? "신청함" : t.done ? "완주" : "진행 중";
+  const tone = t.claimed || t.doneAlready ? "q2-st-done" : t.pending ? "q2-st-wait" : t.done ? "q2-st-clear" : "q2-st-run";
+  const pct = Math.round(progressOf(t) * 100);
 
   return (
-    <li className={"mk-item" + (open ? " mk-open" : "")}>
+    <li className={"mk-item q2-item" + (open ? " mk-open" : "") + (justClaimed ? " q2-pop" : "") + (canClaim ? " q2-ready" : "")}>
       <button className="mk-row" onClick={() => setOpen((o) => !o)}>
-        <span className={"rq-status rq-status-" + (done ? "done" : "open")}>{t.doneAlready ? "목표 도달" : done ? "달성" : "진행 중"}</span>
+        <span className={"rq-status q2-st " + tone + (t.pending ? " q2-pending-dot" : "")}>{status}</span>
         <span className="mk-name">
           <b>
             <Nick name={t.nickname} /> <KakaoButton name={t.nickname} nested />
+            {sample && <i className="sample-tag">예시</i>}
           </b>
           <small>
-            {t.doneAlready ? `Lv.${t.startLevel} (이미 목표 레벨)` : `Lv.${t.startLevel} → Lv.${t.endLevel}`}
-            {t.currentLevel !== null ? ` · 지금 Lv.${t.currentLevel}` : " · 레벨 정보 없음"}
+            {t.doneAlready ? `Lv.${t.startLevel}` : `Lv.${t.startLevel} → ${t.endLevel}`}
+            {!t.doneAlready && (t.currentLevel !== null ? ` · 지금 ${t.currentLevel}` : " · 레벨 모름")}
             {t.note && ` · ${t.note}`}
           </small>
-        </span>
-        <span className="mk-price">
-          <small>{t.claimableGold > 0 ? <b>{goldWords(t.claimableGold)} 골드</b> : "—"}</small>
-          {t.pending && <small>신청함</small>}
+          {!t.doneAlready && (
+            <span className="q2-bar" aria-label={`진행 ${pct}%`}>
+              <i style={{ transform: `scaleX(${pct / 100})` }} />
+            </span>
+          )}
         </span>
       </button>
       {open && (
         <div className="mk-detail">
-          {!t.doneAlready && t.paidToLevel < t.endLevel && (
-            <>
-              <p className="mk-meta">레벨 하나마다 쌓이는 보상 (지급 완료: Lv.{t.paidToLevel}까지 · 목표 전체 {goldWords(totalReward(t, bands))} 골드)</p>
-              <Ledger from={t.paidToLevel} to={t.endLevel} bands={bands} />
-              <p className="mk-meta">
-                끝까지 올리면 앞으로 총 <b>{goldWords(rewardLedger(t.paidToLevel, t.endLevel, bands).reduce((s, r) => s + r.gold, 0))} 골드</b>
-              </p>
-            </>
-          )}
-
           {t.pending && (
             <p className="mk-note">
-              신청 중: {t.pending.gold > 0 ? `${goldWords(t.pending.gold)} 골드` : ""}
+              신청 중{t.pending.reward && `: ${t.pending.reward}`}
               {t.pending.doping ? " · 도핑 지원" : ""}
               {t.pending.note && ` · “${t.pending.note}”`}
             </p>
           )}
+          {!t.pending && t.claimed && <p className="mk-note">완주 보상을 받았어요.</p>}
 
           {canClaim && (
             <form
@@ -194,6 +236,9 @@ function TargetRow({
                 🎯 보상받기 신청
               </button>
             </form>
+          )}
+          {t.doneAlready && !canClaim && !t.pending && !t.claimed && t.mine === false && (
+            <p className="mk-meta">본인만 도핑 지원을 신청할 수 있어요.</p>
           )}
 
           {canManage && t.pending && (
@@ -337,10 +382,13 @@ function AddTargetForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** 새 라운드 열기 (오피서 이상): 목표 목록을 한 줄에 하나씩, '닉네임, 시작, 목표, 쪽지' 로 붙여 넣으면 한 번에 만든다 */
+/** 새 라운드 열기 (오피서 이상): 목표 목록을 한 줄에 하나씩 붙여 넣고, 선착순·완주 보상 글을 같이 정한다 */
 function NewRoundForm({ onDone }: { onDone: () => void }) {
   const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
+  const [bonusSlots, setBonusSlots] = useState(String(DEFAULT_BONUS_SLOTS));
+  const [bonusReward, setBonusReward] = useState(DEFAULT_BONUS_REWARD);
+  const [standardReward, setStandardReward] = useState(DEFAULT_STANDARD_REWARD);
   const [bulk, setBulk] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -352,7 +400,7 @@ function NewRoundForm({ onDone }: { onDone: () => void }) {
       .filter(Boolean)
       .map((line) => {
         const [nickname, s, e, ...rest] = line.split(",").map((v) => v.trim());
-        return { nickname, startLevel: Number(s), endLevel: Number(e), note: rest.join(",").trim() || null };
+        return { nickname, startLevel: Number(s), endLevel: Number(e || s), note: rest.join(",").trim() || null };
       });
   }
 
@@ -363,7 +411,14 @@ function NewRoundForm({ onDone }: { onDone: () => void }) {
     setBusy(true);
     setError("");
     try {
-      await openRound({ title: title.trim(), note: note.trim() || null, targets });
+      await openRound({
+        title: title.trim(),
+        note: note.trim() || null,
+        bonusSlots: Number(bonusSlots) || 0,
+        bonusReward: bonusReward.trim() || DEFAULT_BONUS_REWARD,
+        standardReward: standardReward.trim() || DEFAULT_STANDARD_REWARD,
+        targets,
+      });
       onDone();
     } catch (x) {
       setError(errorText(x));
@@ -380,11 +435,23 @@ function NewRoundForm({ onDone }: { onDone: () => void }) {
       </label>
       <label className="mk-field">
         <span>안내 (안 적어도 돼요)</span>
-        <input className="mk-input" value={note} onChange={(e) => setNote(e.target.value.slice(0, 80))} placeholder="예: 일주일 안으로 달성하면 도핑 지원" />
+        <input className="mk-input" value={note} onChange={(e) => setNote(e.target.value.slice(0, 80))} placeholder="예: 절대 강요 아니에요, 못해도 불이익 없어요" />
+      </label>
+      <label className="mk-field">
+        <span>선착 몇 명까지 보너스 보상</span>
+        <input className="mk-input" inputMode="numeric" value={bonusSlots} onChange={(e) => setBonusSlots(e.target.value.replace(/\D/g, "").slice(0, 2))} />
+      </label>
+      <label className="mk-field">
+        <span>선착순 보상</span>
+        <input className="mk-input" value={bonusReward} onChange={(e) => setBonusReward(e.target.value.slice(0, MAX_REWARD))} />
+      </label>
+      <label className="mk-field">
+        <span>나머지 완주 보상</span>
+        <input className="mk-input" value={standardReward} onChange={(e) => setStandardReward(e.target.value.slice(0, MAX_REWARD))} />
       </label>
       <label className="mk-field">
         <span>목표 (한 줄에 하나: 닉네임, 시작 레벨, 목표 레벨, 쪽지)</span>
-        <textarea className="mk-input rq-detail" value={bulk} onChange={(e) => setBulk(e.target.value)} placeholder={"펀취, 36, 37\n가져가, 33, 35, 길톡 들어오기"} />
+        <textarea className="mk-input rq-detail" value={bulk} onChange={(e) => setBulk(e.target.value)} placeholder={"펀취, 36, 37\n공포티모, 48, 48"} />
       </label>
       {error && <p className="form-error">{error}</p>}
       <button className="btn" disabled={busy || !title.trim() || !parse().length}>
@@ -394,19 +461,64 @@ function NewRoundForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** 보상 레벨대 조정 (오피서 이상, '조정해도 됨'): 레벨이 높을수록 1레벨이 힘들어서 더 많이 주도록 */
-function BandsForm({ bands, onDone }: { bands: Band[]; onDone: () => void }) {
-  const [rows, setRows] = useState(bands.map((b) => ({ minLevel: String(b.minLevel), goldPerLevel: String(b.goldPerLevel) })));
+/** 레벨 구간 참고표 (오피서 이상이 조정): 명단에 없는 2군 길드원을 위한 대략적인 안내일 뿐, 신청·지급과는 따로다 */
+function BracketTable({
+  brackets,
+  canManage,
+  myLevel,
+  onChanged,
+}: {
+  brackets: Quest2Bracket[];
+  canManage: boolean;
+  /** 내 지금 레벨 (그 구간을 금색으로) */
+  myLevel: number | null;
+  onChanged: () => void;
+}) {
+  const [editMode, setEditMode] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [minLevel, setMinLevel] = useState("");
+  const [maxLevel, setMaxLevel] = useState("");
+  const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editNote, setEditNote] = useState("");
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError("");
     try {
-      await saveBands(rows.map((r) => ({ minLevel: Number(r.minLevel), goldPerLevel: Number(r.goldPerLevel) })));
-      onDone();
+      await addBracket({ minLevel: Number(minLevel), maxLevel: Number(maxLevel), note: note.trim() });
+      setMinLevel("");
+      setMaxLevel("");
+      setNote("");
+      setAdding(false);
+      onChanged();
+    } catch (x) {
+      setError(errorText(x));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function saveNote(id: number) {
+    setBusy(true);
+    setError("");
+    try {
+      await editBracket(id, { note: editNote.trim() });
+      setEditingId(null);
+      onChanged();
+    } catch (x) {
+      setError(errorText(x));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function remove(id: number) {
+    setBusy(true);
+    try {
+      await deleteBracket(id);
+      onChanged();
     } catch (x) {
       setError(errorText(x));
     } finally {
@@ -415,125 +527,196 @@ function BandsForm({ bands, onDone }: { bands: Band[]; onDone: () => void }) {
   }
 
   return (
-    <form className="panel mk-form" onSubmit={submit}>
-      {rows.map((r, i) => (
-        <div className="mk-chips" key={i}>
-          <span>Lv.{r.minLevel || "?"} 부터</span>
-          <input
-            className="mk-input"
-            inputMode="numeric"
-            value={r.minLevel}
-            onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, minLevel: e.target.value.replace(/\D/g, "").slice(0, 2) } : x)))}
-          />
-          <input
-            className="mk-input"
-            inputMode="numeric"
-            value={r.goldPerLevel}
-            onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, goldPerLevel: e.target.value.replace(/\D/g, "").slice(0, 9) } : x)))}
-          />
-          <small>골드/레벨</small>
-          <button type="button" className="pill" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}>
-            ✕
+    <div className="panel q2-panel">
+      <p className="q2-head">
+        <b>레벨 구간 참고표</b>
+        <small>만렙 55 · 20 아래는 안 봐도 돼요</small>
+        {canManage && (
+          <button type="button" className={"pill q2-mini" + (editMode ? " pill-on" : "")} onClick={() => setEditMode((v) => !v)}>
+            {editMode ? "완료" : "편집"}
           </button>
-        </div>
-      ))}
-      <button type="button" className="pill" onClick={() => setRows((rs) => [...rs, { minLevel: "", goldPerLevel: "" }])}>
-        ＋ 구간 추가
-      </button>
-      {error && <p className="form-error">{error}</p>}
-      <button className="btn" disabled={busy}>
-        {busy ? "저장하는 중…" : "보상 레벨대 저장"}
-      </button>
-    </form>
+        )}
+      </p>
+      <ul className="q2-brackets">
+        {brackets.map((b) => (
+          <li key={b.id} className={myLevel !== null && myLevel >= b.minLevel && myLevel <= b.maxLevel ? "q2-br-me" : ""}>
+            <span className="q2-br-lv">{b.minLevel === b.maxLevel ? `Lv.${b.minLevel}` : `Lv.${b.minLevel}~${b.maxLevel}`}</span>
+            {editingId === b.id ? (
+              <span className="q2-br-edit">
+                <input className="mk-input" value={editNote} onChange={(e) => setEditNote(e.target.value.slice(0, MAX_REWARD))} />
+                <button type="button" className="pill q2-mini" disabled={busy} onClick={() => saveNote(b.id)}>
+                  저장
+                </button>
+              </span>
+            ) : (
+              <span className="q2-br-note">{b.note}</span>
+            )}
+            {editMode && editingId !== b.id && (
+              <span className="q2-br-act">
+                <button
+                  type="button"
+                  className="pill q2-mini"
+                  onClick={() => {
+                    setEditingId(b.id);
+                    setEditNote(b.note);
+                  }}
+                >
+                  수정
+                </button>
+                <button type="button" className="pill q2-mini" disabled={busy} onClick={() => remove(b.id)}>
+                  삭제
+                </button>
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {editMode &&
+        (adding ? (
+          <form className="mk-form" onSubmit={submit}>
+            <div className="mk-chips">
+              <input className="mk-input" inputMode="numeric" value={minLevel} onChange={(e) => setMinLevel(e.target.value.replace(/\D/g, "").slice(0, 2))} placeholder="시작" />
+              <input className="mk-input" inputMode="numeric" value={maxLevel} onChange={(e) => setMaxLevel(e.target.value.replace(/\D/g, "").slice(0, 2))} placeholder="끝" />
+            </div>
+            <input className="mk-input" value={note} onChange={(e) => setNote(e.target.value.slice(0, MAX_REWARD))} placeholder="안내 글" />
+            {error && <p className="form-error">{error}</p>}
+            <button className="btn" disabled={busy}>
+              구간 추가
+            </button>
+          </form>
+        ) : (
+          <button className="pill" onClick={() => setAdding(true)}>
+            ＋ 구간 추가
+          </button>
+        ))}
+    </div>
   );
 }
 
 /**
- * 2군 성장 퀘스트 (개발중, 제작자 2026-11-09): 2군 캐릭터마다 목표 레벨까지 올리면 레벨 하나마다 정해진 골드가 쌓인다.
- * '보상받기 신청'을 누르면 오피서에게 알림이 가고 게임 안에서 실제로 준다. 격주로 라운드를 새로 연다.
+ * 2군 성장 퀘스트 (개발중, 제작자 2026-11-09): 2군 캐릭터마다 목표 레벨까지 다 올리면 보상을 신청할 수 있다. 먼저 완주한 몇 명은 더 큰 보상,
+ * 나머지 완주자는 보통 보상 (둘 다 글로 적은 실제 게임 안 물건). 오피서에게 알림이 가고 게임 안에서 실제로 준 뒤 지급 완료를 누른다.
  */
-export function Quest2Page() {
+export function Quest2Page({ me }: { me: Me }) {
   const [reload, setReload] = useState(0);
   const { data, error } = useAsync(useCallback(() => fetchQuest2(), [reload]), "quest2");
   const [current, setCurrent] = useState<Quest2Data | null>(null);
   const [addingTarget, setAddingTarget] = useState(false);
   const [newRound, setNewRound] = useState(false);
-  const [editBands, setEditBands] = useState(false);
+  const [showBrackets, setShowBrackets] = useState(false);
   const [showRef, setShowRef] = useState(false);
+  const [showSample, setShowSample] = useState(true);
   useEffect(() => {
     if (data) setCurrent(data);
   }, [data]);
-  const anyOpen = addingTarget || newRound || editBands;
+  const anyOpen = addingTarget || newRound || showBrackets;
   useBackClose(anyOpen, () => {
     setAddingTarget(false);
     setNewRound(false);
-    setEditBands(false);
+    setShowBrackets(false);
   });
 
   const refresh = useCallback(() => setReload((n) => n + 1), []);
 
   if (!current) return <Loading error={error} />;
-  const { round, targets, bands, canManage } = current;
+  const { round, targets, brackets, canManage, payoutNote } = current;
+  const shown = showSample ? [...targets, ...SAMPLE_TARGETS] : targets;
+  const left = round ? Math.max(0, round.bonusSlots - round.completed) : 0;
 
   return (
     <>
       <TopBar title="2군 성장 퀘스트" />
-      <p className="growth-note">
-        목표 레벨을 1레벨씩 올릴 때마다 보상이 쌓여요. 다 쌓이면 '보상받기 신청'을 눌러요 · 오피서가 게임 안에서 준 뒤 지급을 완료해요.
-      </p>
 
       {!round ? (
         <div className="empty">지금 열린 라운드가 없어요{canManage ? " · 아래에서 새로 열어 보세요" : ""}.</div>
       ) : (
-        <div className="panel">
-          <p className="mk-meta">
+        <div className="panel q2-panel q2-round">
+          <p className="q2-head">
             <b>{round.title}</b>
+            <small>완주 {round.completed}명</small>
           </p>
-          {round.note && <p className="mk-note">{round.note}</p>}
+          {round.note && <p className="q2-round-note">{round.note}</p>}
+          <div className="q2-rewards">
+            <div className={"q2-reward q2-reward-bonus" + (left > 0 ? " q2-live" : "")}>
+              <span className="q2-reward-tag">
+                선착 {round.bonusSlots}명 · {left > 0 ? `남은 자리 ${left}` : "마감"}
+              </span>
+              <span>{round.bonusReward}</span>
+            </div>
+            <div className="q2-reward">
+              <span className="q2-reward-tag">나머지 완주</span>
+              <span>{round.standardReward}</span>
+            </div>
+          </div>
+          <p className="q2-round-foot">목표 레벨에 닿으면 내 줄을 눌러 신청 · {payoutNote}</p>
         </div>
       )}
 
-      {canManage && (
-        <div className="mk-cats">
-          <button className={"pill mk-chip" + (addingTarget ? " pill-on" : "")} onClick={() => setAddingTarget((v) => !v)} disabled={!round}>
-            ＋ 목표 추가
-          </button>
-          <button className={"pill mk-chip" + (newRound ? " pill-on" : "")} onClick={() => setNewRound((v) => !v)}>
-            🆕 새 라운드 열기
-          </button>
-          <button className={"pill mk-chip" + (editBands ? " pill-on" : "")} onClick={() => setEditBands((v) => !v)}>
-            ⚙️ 보상 레벨대
-          </button>
-          <button className={"pill mk-chip" + (showRef ? " pill-on" : "")} onClick={() => setShowRef((v) => !v)}>
-            🎁 예시 보상 아이템
-          </button>
-          <button className="pill mk-chip" onClick={refresh} aria-label="새로 보기">
-            ⟳
-          </button>
-        </div>
-      )}
+      <div className="mk-cats">
+        {canManage && (
+          <>
+            <button className={"pill mk-chip" + (addingTarget ? " pill-on" : "")} onClick={() => setAddingTarget((v) => !v)} disabled={!round}>
+              ＋ 목표 추가
+            </button>
+            <button className={"pill mk-chip" + (newRound ? " pill-on" : "")} onClick={() => setNewRound((v) => !v)}>
+              🆕 새 라운드 열기
+            </button>
+          </>
+        )}
+        <button className={"pill mk-chip" + (showBrackets ? " pill-on" : "")} onClick={() => setShowBrackets((v) => !v)}>
+          📊 레벨 구간표
+        </button>
+        <button className={"pill mk-chip" + (showRef ? " pill-on" : "")} onClick={() => setShowRef((v) => !v)}>
+          🎁 예시 보상 아이템
+        </button>
+        <button className={"pill mk-chip" + (showSample ? " pill-on" : "")} onClick={() => setShowSample((v) => !v)}>
+          {showSample ? "예시 숨기기" : "예시 보기"}
+        </button>
+        <button className="pill mk-chip" onClick={refresh} aria-label="새로 보기">
+          ⟳
+        </button>
+      </div>
 
       {showRef && (
         <ul className="q2-ledger">
           {REWARD_ITEMS.map((it) => (
             <li key={it.name}>
-              {it.name} {it.unit} <b>{goldWords(it.gold)} 골드</b>
+              <span>
+                {it.name} {it.unit}
+              </span>
+              <span>
+                <b>{goldWords(it.gold)} 골드</b>
+              </span>
             </li>
           ))}
         </ul>
       )}
-      {addingTarget && <AddTargetForm onDone={() => { setAddingTarget(false); refresh(); }} />}
-      {newRound && <NewRoundForm onDone={() => { setNewRound(false); refresh(); }} />}
-      {editBands && <BandsForm bands={bands} onDone={() => { setEditBands(false); refresh(); }} />}
+      {showBrackets && <BracketTable brackets={brackets} canManage={canManage} myLevel={me.level} onChanged={refresh} />}
+      {addingTarget && (
+        <AddTargetForm
+          onDone={() => {
+            setAddingTarget(false);
+            refresh();
+          }}
+        />
+      )}
+      {newRound && (
+        <NewRoundForm
+          onDone={() => {
+            setNewRound(false);
+            refresh();
+          }}
+        />
+      )}
 
       {round && (
         <>
-          {!targets.length ? (
+          {!shown.length ? (
             <div className="empty">아직 목표가 없어요.</div>
           ) : (
             <ul className="mk-list">
-              {targets.map((t) => (
-                <TargetRow key={t.id} t={t} bands={bands} canManage={canManage} onChanged={refresh} />
+              {shown.map((t) => (
+                <TargetRow key={t.id} t={t} canManage={canManage} onChanged={refresh} />
               ))}
             </ul>
           )}
@@ -548,9 +731,14 @@ export function Quest2Page() {
           <ul className="q2-ledger">
             {current.pendingClaims.map((c) => (
               <li key={c.id}>
-                <Nick name={c.nickname} /> Lv.{c.fromLevel} → Lv.{c.toLevel} {c.gold > 0 && <b>{goldWords(c.gold)} 골드</b>}
-                {c.doping && " · 도핑 지원"}
-                {c.note && ` · “${c.note}”`}
+                <span>
+                  <Nick name={c.nickname} /> {c.rank && `· 완주 ${c.rank}번째`}
+                  {c.doping && " · 도핑 지원"}
+                </span>
+                <span>
+                  {c.reward}
+                  {c.note && ` · “${c.note}”`}
+                </span>
               </li>
             ))}
           </ul>

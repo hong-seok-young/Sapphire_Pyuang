@@ -15,9 +15,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if ((count?.n ?? 0) >= MAX_TARGETS_PER_ROUND) return json({ error: `목표는 ${MAX_TARGETS_PER_ROUND}개까지예요` }, 409);
   const now = Date.now();
   const row = await env.DB.prepare(
-    "INSERT INTO quest2_targets (round_id, nickname, start_level, end_level, note, paid_to_level, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+    "INSERT INTO quest2_targets (round_id, nickname, start_level, end_level, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
   )
-    .bind(round.id, input.nickname, input.startLevel, input.endLevel, input.note, input.startLevel, now, now)
+    .bind(round.id, input.nickname, input.startLevel, input.endLevel, input.note, now, now)
     .first<{ id: number }>();
   if (!row) return json({ error: "넣지 못했어요" }, 500);
   return json({ ok: true, id: row.id }, 201);

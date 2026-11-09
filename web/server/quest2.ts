@@ -1,10 +1,14 @@
-// 2군 성장 퀘스트 (개발중, 제작자 2026-11-09 '2군 인원들에게 성장지원을 해줄거야, 웹에서 퀘스트 식으로, 렙업마다 보상, 공평하게 1렙업마다 계산해서'):
-// 2군 캐릭터마다 정해진 목표 레벨까지 레벨을 올리면 레벨 하나마다 정해진 골드가 쌓인다 (높은 레벨일수록 1레벨이 어려워 더 많이, 오피서가 조정할 수 있다).
-// '보상받기 신청'을 누르면 오피서에게 알림이 가고, 게임 안에서 실제로 주고받은 뒤 오피서가 '지급 완료'를 누른다 (장비대여 신청/장비대여 완료와 같은 흐름).
+// 2군 성장 퀘스트 (개발중, 제작자 2026-11-09 '2군 인원들에게 성장지원을 해줄거야, 웹에서 퀘스트 식으로, 완주하면 보상, 먼저 끝낸 사람은 더 크게'):
+// 2군 캐릭터마다 정해진 목표 레벨까지 레벨을 다 올리면(완주) '보상받기 신청'을 할 수 있다. 보상은 골드가 아니라 실제 게임 안 물건(사나운 멧돼지, 망고워터,
+// 직업에 맞는 자몽케이크·자몽주스·우파노래 등 날마다·직업마다 다를 수 있어 글로 적는다). 먼저 완주한 몇 명은 더 큰 보상, 나머지 완주자는 보통 보상을 받는다.
+// '보상받기 신청'을 누르면 오피서에게 알림이 가고, 게임 안에서 실제로 준 뒤(1~2일 걸릴 수 있다) 오피서가 '지급 완료'를 누른다.
 // 레벨은 게임을 읽지 않고 본인이 적어 둔 profiles.level(길드 랭킹과 같은 자료)만 본다. 화면: src/pages/Quest2.tsx, src/quest2.ts. API: functions/api/quest2
 //
-// 격주로 새 라운드를 연다 (제작자 요청): 오피서가 새 목표 목록으로 라운드를 열면 이전 라운드는 active=0 이 되어 목록에서 접히고(기록은 남는다),
-// 그 라운드의 신청·지급 기록은 그대로 둔다. 목표(quest2_targets)는 오피서가 추가·수정·삭제할 수 있어 코드를 고치지 않고도 다음 라운드를 만들 수 있다.
+// 격주로 새 라운드를 연다 (제작자 요청): 오피서가 새 목표 목록과 보상 글로 라운드를 열면 이전 라운드는 active=0 이 되어 목록에서 접히고(기록은 남는다).
+// 목표(quest2_targets)는 오피서가 추가·수정·삭제할 수 있어 코드를 고치지 않고도 다음 라운드를 만들 수 있다.
+//
+// 명단에 없는 2군 길드원을 위한 레벨 구간 참고표(quest2_brackets, 제작자 '20부터 25는 한 구간으로 퉁쳐도 됨', '30부터 어려워짐',
+// '38 + 38제무기 +8강부터 1군 편입 고려', '39+ 는 오피서·길마 판단, 대략 44까지'): 신청·지급과는 따로인 안내용 표다.
 import type { Env, User } from "./auth";
 import { TEST_IDS } from "./auth";
 import { text } from "./requests";
@@ -16,25 +20,20 @@ export { text };
  *  열 때는 QUEST2_OPEN 을 true 로 (CLAUDE.md '2군 성장 퀘스트' 참고) */
 export const QUEST2_OPEN = false;
 export const canUseQuest2 = (me: User) => QUEST2_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
-/** 라운드·목표·보상 곡선을 다루고 신청을 처리할 수 있는 사람 (오피서 이상). RANK 는 auth.ts 에서 따로 쓴다 */
+/** 라운드·목표·레벨 구간표를 다루고 신청을 처리할 수 있는 사람 (오피서 이상). RANK 는 auth.ts 에서 따로 쓴다 */
 export const canManageQuest2 = (role: User["role"]) => role === "developer" || role === "master" || role === "officer";
 
 export const MAX_NICK = 20;
 export const MAX_TITLE = 40;
 export const MAX_NOTE = 80;
+export const MAX_REWARD = 120;
 export const MAX_TARGETS_PER_ROUND = 60;
 export const MAX_LEVEL = 99;
-
-export const validLevel = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= MAX_LEVEL;
-
-/** 보상 레벨대 (기본값, 오피서가 조정할 수 있다): 레벨이 높을수록 1레벨 올리기가 힘들어서 더 많이 준다.
- *  30~35 구간을 2연업 기준 6만 골드(원래 글의 '6만골드어치')에 맞췄다: 2 x 30,000 = 60,000 */
-export const DEFAULT_BANDS: { minLevel: number; goldPerLevel: number }[] = [
-  { minLevel: 1, goldPerLevel: 10_000 },
-  { minLevel: 30, goldPerLevel: 30_000 },
-  { minLevel: 36, goldPerLevel: 35_000 },
-  { minLevel: 40, goldPerLevel: 40_000 },
-];
+export const DEFAULT_BONUS_SLOTS = 2;
+export const DEFAULT_BONUS_REWARD = "사나운 멧돼지 20개 + 직업에 맞는 보상 (자몽케이크·자몽주스·우파노래 등, 날마다 다를 수 있어요)";
+export const DEFAULT_STANDARD_REWARD = "사나운 멧돼지 10개 + 망고워터 10개";
+/** 길드 공지 그대로: 보상은 실제로 주고받는 데 며칠 걸릴 수 있다 */
+export const PAYOUT_NOTE = "보상 지급은 1~2일 걸릴 수 있어요";
 
 /** 참고용 보상 아이템 (제작자가 알려 준 골드 값. 실제로는 오피서가 이 값 안에서 자유롭게 골라 게임 안에서 준다) */
 export const REWARD_ITEMS: { name: string; unit: string; gold: number }[] = [
@@ -44,37 +43,29 @@ export const REWARD_ITEMS: { name: string; unit: string; gold: number }[] = [
   { name: "망고워터", unit: "20개", gold: 35_000 },
 ];
 
-export interface Band {
-  minLevel: number;
-  goldPerLevel: number;
-}
+/** 레벨 구간 참고표 기본값 (오피서가 조정할 수 있다. 신청·지급 계산에는 쓰지 않는 안내용 자료) */
+/** 레벨 구간 참고표 기본값 (만렙 55, 제작자 2026-11-09 '레벨 더 많이 쪼개도 되겠다'). 구간은 겹치지 않는 Lv.min~max (둘 다 포함).
+ *  30 아래는 빨라서 크게 묶고, 30부터 2레벨씩, 36부터는 1레벨씩, 45 넘으면 사람이 거의 없어 다시 크게 묶는다 */
+export const DEFAULT_BRACKETS: { minLevel: number; maxLevel: number; note: string }[] = [
+  { minLevel: 20, maxLevel: 24, note: "쉬움 · 한 구간으로 퉁침 (예: 사나운 멧돼지 5개)" },
+  { minLevel: 25, maxLevel: 29, note: "쉬움 (예: 사나운 멧돼지 10개)" },
+  { minLevel: 30, maxLevel: 31, note: "여기부터 어려워짐 (예: 사나운 멧돼지 10개 + 망고워터 5개)" },
+  { minLevel: 32, maxLevel: 33, note: "어려움 (예: 사나운 멧돼지 10개 + 망고워터 10개)" },
+  { minLevel: 34, maxLevel: 35, note: "어려움 (예: 사나운 멧돼지 15개 + 망고워터 10개)" },
+  { minLevel: 36, maxLevel: 36, note: "많이 어려움 (예: 사나운 멧돼지 15개 + 망고워터 10개 + 자몽주스)" },
+  { minLevel: 37, maxLevel: 37, note: "많이 어려움 (예: 사나운 멧돼지 20개 + 자몽주스)" },
+  { minLevel: 38, maxLevel: 38, note: "38제 무기 +8강부터 1군 편입 고려 (예: 사나운 멧돼지 20개 + 직업 아이템)" },
+  { minLevel: 39, maxLevel: 39, note: "보통 1군 편입 뒤 · 오피서·길마 판단 (예: 사나운 멧돼지 20개 + 직업 아이템)" },
+  { minLevel: 40, maxLevel: 40, note: "오피서·길마 판단 (예: 사나운 멧돼지 20개 + 자몽케이크)" },
+  { minLevel: 41, maxLevel: 41, note: "오피서·길마 판단 (예: 사나운 멧돼지 20개 + 자몽케이크)" },
+  { minLevel: 42, maxLevel: 42, note: "오피서·길마 판단 (예: 사나운 멧돼지 20개 + 자몽케이크 + 직업 아이템)" },
+  { minLevel: 43, maxLevel: 43, note: "오피서·길마 판단 (예: 사나운 멧돼지 20개 + 자몽케이크 + 직업 아이템)" },
+  { minLevel: 44, maxLevel: 44, note: "보통 닿는 끝 · 오피서·길마 판단 (예: 사나운 멧돼지 20개 + 자몽케이크 + 직업 아이템)" },
+  { minLevel: 45, maxLevel: 49, note: "인원 거의 없음 · 길마 판단" },
+  { minLevel: 50, maxLevel: 55, note: "만렙 구간 · 길마 판단" },
+];
 
-/** 그 레벨에 올라서는 데 주는 골드 (band 는 min_level 내림차순으로 미리 정렬해 둔다) */
-function goldForLevel(level: number, bands: Band[]): number {
-  for (const b of bands) if (level >= b.minLevel) return b.goldPerLevel;
-  return bands.length ? bands[bands.length - 1].goldPerLevel : 0;
-}
-
-/** from(안 셈) + 1 부터 to 까지 올린 만큼의 골드 합. to 가 from 보다 낮거나 같으면 0 */
-export function levelReward(from: number, to: number, bands: Band[]): number {
-  const sorted = [...bands].sort((a, b) => b.minLevel - a.minLevel);
-  let sum = 0;
-  for (let lv = from + 1; lv <= to; lv++) sum += goldForLevel(lv, sorted);
-  return sum;
-}
-
-/** 레벨 하나씩의 보상 내역 (화면의 '자세히' 표) */
-export function rewardLedger(from: number, to: number, bands: Band[]): { level: number; gold: number }[] {
-  const sorted = [...bands].sort((a, b) => b.minLevel - a.minLevel);
-  const rows: { level: number; gold: number }[] = [];
-  for (let lv = from + 1; lv <= to; lv++) rows.push({ level: lv, gold: goldForLevel(lv, sorted) });
-  return rows;
-}
-
-export async function readBands(env: Env): Promise<Band[]> {
-  const { results } = await env.DB.prepare("SELECT min_level AS minLevel, gold_per_level AS goldPerLevel FROM quest2_bands ORDER BY min_level ASC").all<Band>();
-  return results.length ? results : DEFAULT_BANDS;
-}
+export const validLevel = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= MAX_LEVEL;
 
 export function readNick(v: unknown): string | null {
   const t = text(v, MAX_NICK);
@@ -94,14 +85,36 @@ export function readTargetInput(b: { nickname?: unknown; startLevel?: unknown; e
   return { nickname, startLevel: b.startLevel as number, endLevel: b.endLevel as number, note };
 }
 
-/** 라운드 열기 입력 검사 (목표 목록까지 한 번에) */
-export function readRoundInput(b: { title?: unknown; note?: unknown; targets?: unknown }):
-  | { title: string; note: string | null; targets: { nickname: string; startLevel: number; endLevel: number; note: string | null }[] }
+/** 라운드 열기 입력 검사 (목표 목록·보상 글까지 한 번에) */
+export function readRoundInput(b: {
+  title?: unknown;
+  note?: unknown;
+  bonusSlots?: unknown;
+  bonusReward?: unknown;
+  standardReward?: unknown;
+  targets?: unknown;
+}):
+  | {
+      title: string;
+      note: string | null;
+      bonusSlots: number;
+      bonusReward: string;
+      standardReward: string;
+      targets: { nickname: string; startLevel: number; endLevel: number; note: string | null }[];
+    }
   | string {
   const title = text(b.title, MAX_TITLE);
   if (!title) return `라운드 이름을 ${MAX_TITLE}자 안으로 적어 주세요`;
   const note = text(b.note, MAX_NOTE);
   if (note === undefined) return `쪽지는 ${MAX_NOTE}자까지예요`;
+  const bonusSlots = Number(b.bonusSlots ?? DEFAULT_BONUS_SLOTS);
+  if (!Number.isInteger(bonusSlots) || bonusSlots < 0 || bonusSlots > 50) return "선착순 인원이 맞지 않아요";
+  // 안 보내면 기본값, 보내면 글자 수만 본다 (빈 칸으로 보내는 건 틀린 입력)
+  const rewardOr = (v: unknown, fallback: string) => (v === undefined ? fallback : text(v, MAX_REWARD));
+  const bonusReward = rewardOr(b.bonusReward, DEFAULT_BONUS_REWARD);
+  if (!bonusReward) return `선착순 보상은 ${MAX_REWARD}자 안으로 적어 주세요`;
+  const standardReward = rewardOr(b.standardReward, DEFAULT_STANDARD_REWARD);
+  if (!standardReward) return `완주 보상은 ${MAX_REWARD}자 안으로 적어 주세요`;
   if (!Array.isArray(b.targets) || !b.targets.length) return "목표를 하나 이상 넣어 주세요";
   if (b.targets.length > MAX_TARGETS_PER_ROUND) return `목표는 ${MAX_TARGETS_PER_ROUND}개까지예요`;
   const targets: { nickname: string; startLevel: number; endLevel: number; note: string | null }[] = [];
@@ -110,24 +123,31 @@ export function readRoundInput(b: { title?: unknown; note?: unknown; targets?: u
     if (typeof t === "string") return t;
     targets.push(t);
   }
-  return { title, note, targets };
+  return { title, note, bonusSlots, bonusReward, standardReward, targets };
 }
 
-export function readBandsInput(b: { bands?: unknown }): Band[] | string {
-  if (!Array.isArray(b.bands) || !b.bands.length) return "레벨대를 하나 이상 넣어 주세요";
-  if (b.bands.length > 20) return "레벨대는 20개까지예요";
-  const bands: Band[] = [];
-  const seen = new Set<number>();
-  for (const raw of b.bands as Record<string, unknown>[]) {
-    const minLevel = Number(raw?.minLevel);
-    const goldPerLevel = Number(raw?.goldPerLevel);
-    if (!validLevel(minLevel)) return "레벨대의 시작 레벨이 맞지 않아요";
-    if (!Number.isInteger(goldPerLevel) || goldPerLevel < 0 || goldPerLevel > 10_000_000) return "레벨대의 골드가 맞지 않아요";
-    if (seen.has(minLevel)) return "같은 시작 레벨이 두 번 있어요";
-    seen.add(minLevel);
-    bands.push({ minLevel, goldPerLevel });
-  }
-  return bands.sort((a, b) => a.minLevel - b.minLevel);
+export function readBracketInput(b: { minLevel?: unknown; maxLevel?: unknown; note?: unknown }):
+  | { minLevel: number; maxLevel: number; note: string }
+  | string {
+  if (!validLevel(b.minLevel) || !validLevel(b.maxLevel)) return "레벨이 맞지 않아요";
+  if ((b.maxLevel as number) < (b.minLevel as number)) return "끝 레벨이 시작 레벨보다 낮아요";
+  const note = text(b.note, MAX_REWARD);
+  if (!note) return `안내는 ${MAX_REWARD}자 안으로 적어 주세요`;
+  return { minLevel: b.minLevel as number, maxLevel: b.maxLevel as number, note };
+}
+
+export interface RoundRow {
+  id: number;
+  title: string;
+  note: string | null;
+  starts_at: number;
+  ends_at: number | null;
+  bonus_slots: number;
+  bonus_reward: string;
+  standard_reward: string;
+  active: number;
+  created_by: string | null;
+  created_at: number;
 }
 
 export interface TargetRow {
@@ -137,18 +157,24 @@ export interface TargetRow {
   start_level: number;
   end_level: number;
   note: string | null;
-  paid_to_level: number;
   created_at: number;
   updated_at: number;
+}
+
+export interface BracketRow {
+  id: number;
+  min_level: number;
+  max_level: number;
+  note: string;
+  sort: number;
 }
 
 export interface ClaimRow {
   id: number;
   target_id: number;
   user_id: string;
-  from_level: number;
-  to_level: number;
-  gold: number;
+  rank: number | null;
+  reward: string | null;
   doping: number;
   note: string | null;
   status: "pending" | "paid" | "rejected";
@@ -161,20 +187,29 @@ export interface ClaimRow {
 export const isPending = (c: Pick<ClaimRow, "status">) => c.status === "pending";
 
 /** 지금 열려 있는 라운드 (없으면 null) */
-export async function activeRound(env: Env) {
-  return env.DB.prepare("SELECT id, title, note, starts_at AS startsAt, ends_at AS endsAt FROM quest2_rounds WHERE active = 1 ORDER BY id DESC LIMIT 1").first<{
-    id: number;
-    title: string;
-    note: string | null;
-    startsAt: number;
-    endsAt: number | null;
-  }>();
+export async function activeRound(env: Env): Promise<RoundRow | null> {
+  return env.DB.prepare("SELECT * FROM quest2_rounds WHERE active = 1 ORDER BY id DESC LIMIT 1").first<RoundRow>();
+}
+
+export async function readBrackets(env: Env): Promise<BracketRow[]> {
+  const { results } = await env.DB.prepare("SELECT * FROM quest2_brackets ORDER BY sort ASC, min_level ASC").all<BracketRow>();
+  return results;
 }
 
 /** 그 닉네임(캐릭터)이 적어 둔 지금 레벨 (앱 계정이 없으면 null) */
 export async function levelOf(env: Env, nickname: string): Promise<number | null> {
   const r = await env.DB.prepare("SELECT level FROM profiles WHERE user_id = ?").bind(nickname).first<{ level: number }>();
   return r?.level ?? null;
+}
+
+/** 이 라운드에서 완주 신청(도핑 전용 제외)이 몇 건 있었는지 (다음 신청의 순서 = 이 값 + 1) */
+export async function completionCount(env: Env, roundId: number): Promise<number> {
+  const r = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM quest2_claims c JOIN quest2_targets t ON t.id = c.target_id WHERE t.round_id = ? AND c.rank IS NOT NULL",
+  )
+    .bind(roundId)
+    .first<{ n: number }>();
+  return r?.n ?? 0;
 }
 
 /** 운영(오피서 이상)에게 알림. 열기 전에는 앱개발자에게만 (나만 보이는 동안 오피서를 혼란스럽게 하지 않으려고) */

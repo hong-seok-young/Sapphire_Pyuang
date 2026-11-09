@@ -61,6 +61,15 @@ export const QUEST2_OPEN = false;
 /** 2군 성장 퀘스트에 들어가는 사람: 열기 전에는 앱개발자(와 테스트 계정)만 (제작자 2026-11-09 '일단 나만 보이게 해줘야해') */
 export const canQuest2 = (me: Me) => QUEST2_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
 
+/** 헬스 루틴을 모두에게 열었는지 (서버 server/fit.ts FIT_OPEN 과 같이 바꾼다) */
+export const FIT_OPEN = false;
+/** 헬스 루틴에 들어가는 사람: 열기 전에는 앱개발자(와 테스트 계정)만 (제작자 2026-11-09 '일단 나만 보이게 해줘') */
+export const canFit = (me: Me) => FIT_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
+
+/** 건의함(새 전용 화면, 익명 기능)을 모두에게 열었는지 (src/board.ts SUGGEST_OPEN 과 같이 바꾼다. 게시판 안의 예전 '건의' 칸은 그대로 열려 있다) */
+/** 건의함 전용 화면에 들어가는 사람: 열기 전에는 앱개발자(와 테스트 계정)만 (제작자 2026-11-09 '일단 나만 보이게 해줘') */
+export const canSuggest = (me: Me) => SUGGEST_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
+
 export const ITEMS: LaunchItem[] = [
   { key: "home", title: "홈", to: "#/", icon: "🏠", pic: "home", match: [""] },
   // 게시판 (제작자 요청): 공지사항, 길드 이벤트, 자유 게시판. 처음에는 아래 탭 홈 오른쪽 (제작자 요청 2026-11-01)
@@ -89,7 +98,7 @@ export const ITEMS: LaunchItem[] = [
   { key: "devreq", title: "개발 요청", short: "요청", to: "#/devreq", icon: "📮", match: ["devreq"] },
   // 건의함 (개발중, 제작자 요청 2026-11-09 개발 요청 #13 유어아너 '건의사항은 게시판에서 빼고 별도 버튼, 익명 기능'): 게시판의 건의 사항을 따로, 익명 글·댓글.
   // 열면 src/board.ts SUGGEST_OPEN (그때 soon·badge 가 빠진다)
-  { key: "suggest", title: "건의함", short: "건의", to: "#/suggest", icon: "💡", soon: !SUGGEST_OPEN, badge: "개발중", match: ["suggest"] },
+  { key: "suggest", title: "건의함", short: "건의", to: "#/suggest", icon: "💡", developer: !SUGGEST_OPEN, soon: !SUGGEST_OPEN, badge: "개발중", match: ["suggest"] },
   // 운영진 때리기 (개발 요청 #10, 제작자 2026-11-09 '우선 나한테만 보이게'): 길마·오피서 캐릭터를 두드려 스트레스 풀기 (pages/Smack.tsx).
   // 열 때는 developer·soon·badge 를 빼고 SMACK_OPEN (CLAUDE.md '운영진 때리기')
   { key: "smack", title: "운영진 때리기", short: "때리기", to: "#/smack", icon: "🥊", developer: !SMACK_OPEN, soon: !SMACK_OPEN, badge: "개발중", match: ["smack"] },
@@ -98,7 +107,7 @@ export const ITEMS: LaunchItem[] = [
   { key: "quest2", title: "2군 성장 퀘스트", short: "성장퀘스트", to: "#/quest2", icon: "🎯", developer: !QUEST2_OPEN, soon: !QUEST2_OPEN, badge: "개발중", match: ["quest2"] },
   { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
   // 헬스 루틴 (개발중, 길드원 완뻔치 님 개발 요청 #8, 제작자 2026-11-09 '플릭 같은 헬스 어플'): 실제 헬스장 운동 기록 (pages/Fit.tsx). 게임과 상관없다
-  { key: "fit", title: "헬스 루틴", short: "헬스", to: "#/fit", icon: "🏋️", soon: true, badge: "개발중", match: ["fit"] },
+  { key: "fit", title: "헬스 루틴", short: "헬스", to: "#/fit", icon: "🏋️", developer: !FIT_OPEN, soon: !FIT_OPEN, badge: "개발중", match: ["fit"] },
   // 장비대여 (2026-11-02 제작자 요청으로 열었다), 길드던전과 인던 같이 갈 사람 찾기 (칸만 먼저 두고 개발 중으로 막는다)
   // 오른쪽 위에 담당자 (제작자 요청 2026-11-03 '장비대여 담당자는 멍멍, 버튼 우측 상단에 텍스트로만 관리자 줄바꿈 멍멍'. 담당이 바뀌면 server/rental.ts RENT_STAFF 와 같이 고친다)
   { key: "rent", title: "장비대여", to: "#/rent", icon: "🤝", corner: ["담당자", "멍멍"], match: ["rent"] },
