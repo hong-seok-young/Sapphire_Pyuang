@@ -227,7 +227,7 @@ function ExpBar({ r, mine, onMe, onSaved }: { r: Ranked; mine: boolean; onMe?: (
 }
 
 /**
- * 맨 아래 '레벨업' 칸: 레벨(− +)과 경험치를 랭킹에서 바로 적는다 (제작자 2026-11-09 '여기 자체에서 레벨업과 경치 둘 다 적게해줘, 내정보로 가게 하지말고').
+ * 맨 아래 '성장반영' 칸 (제작자 2026-11-09 '랭킹에서 레벨업 버튼을 성장반영으로'): 레벨(− +)과 경험치를 랭킹에서 바로 적는다 (제작자 2026-11-09 '여기 자체에서 레벨업과 경치 둘 다 적게해줘, 내정보로 가게 하지말고').
  * 레벨을 올리면 경험치는 0% 부터 (그 레벨에서 다시 시작하니까). 이미 적은 값을 바꾸면 내 정보처럼 '실제 성장 / 오타 수정'을 묻는다
  */
 function LevelEditor({ me, onMe, onSaved, onClose }: { me: Me; onMe?: (p: Partial<Me>) => void; onSaved?: () => void; onClose: () => void }) {
@@ -325,7 +325,7 @@ function LevelEditor({ me, onMe, onSaved, onClose }: { me: Me; onMe?: (p: Partia
 /** 레벨 랭킹: 게임의 경험치 랭킹 목록처럼 (메달, 엠블럼, 맨 아래 '내순위'). 길드(통합/1군/2군)와 직업으로 거른다 */
 function LevelRanking({ me, data, guild, onGuild, onMe, onSaved, saved, editOpen, onEdit }: {
   me: Me; data: RankEntry[]; guild: GuildFilter; onGuild: (g: GuildFilter) => void; onMe?: (p: Partial<Me>) => void;
-  /** 맨 아래 '레벨업' 칸 (레벨·경험치를 여기서 바로 적는다) */
+  /** 맨 아래 '성장반영' 칸 (레벨·경험치를 여기서 바로 적는다) */
   editOpen: boolean; onEdit: (open: boolean) => void;
   /** 내 경험치를 저장했을 때 (목록 다시 받기), saved 는 저장한 횟수 (펼친 그래프도 다시 받는다) */
   onSaved?: () => void; saved?: number;
@@ -426,12 +426,12 @@ function LevelRanking({ me, data, guild, onGuild, onMe, onSaved, saved, editOpen
         </span>
         {/* 레벨·경험치는 여기서 바로 (제작자 2026-11-09 '여기 자체에서 레벨업과 경치 둘 다 적게, 내 정보로 가게 하지 말고') */}
         <button className={"pill rank-edit" + (editOpen ? " pill-on" : "")} onClick={() => onEdit(!editOpen)} disabled={!me.job || !me.guild}>
-          레벨업
+          성장반영
         </button>
       </div>
       </div>
       <p className="rank-note">
-        닉네임을 누르면 레벨·경험치 그래프가 보여요. 내 레벨·경험치는 아래 '레벨업'이나 내 경험치 막대를 눌러 바로 적어요. 잘못 적힌 레벨은 오피서에게 말해 주세요.
+        닉네임을 누르면 레벨·경험치 그래프가 보여요. 내 레벨·경험치는 아래 '성장반영'이나 내 경험치 막대를 눌러 바로 적어요. 잘못 적힌 레벨은 오피서에게 말해 주세요.
       </p>
     </>
   );
@@ -483,7 +483,7 @@ function GrowthRanking({ me, period, guild, onGuild, onEdit }: { me: Me; period:
         {whenText(data.start)} ~ {whenText(periodEnd(period, data.start))}
       </p>
       {!first ? (
-        <div className="empty">{PERIOD_NAME[period]} 아직 오른 사람이 없어요. 레벨업 하면 레벨 칸 아래 '레벨업'에서 적어 주세요!</div>
+        <div className="empty">{PERIOD_NAME[period]} 아직 오른 사람이 없어요. 레벨업 하면 레벨 칸 아래 '성장반영'에서 적어 주세요!</div>
       ) : (
         <>
           <div className="growth-hero">
