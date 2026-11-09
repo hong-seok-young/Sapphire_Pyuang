@@ -6,6 +6,7 @@ import type { Env, User } from "../../server/auth";
 import { detailOf, record, subjectOf, whereOf } from "../../server/activity";
 import { withBackground } from "../../server/background";
 import { canSim, earnFor } from "../../server/simcoin";
+import { anonWrite } from "../../server/board";
 
 /** 본문이 JSON 이 아닌 곳: 캐릭터 사진, AI 지우기(그림 파일)는 크기만 적는다 */
 const BINARY = /^\/api\/(avatar(\/cutout)?|board\/\d+\/files)$/;
@@ -48,6 +49,9 @@ const handle: PagesFunction<Env> = async (context) => {
   } catch {
     // 기록 준비가 안 돼도 하던 일은 한다
   }
+  // 건의함 익명 글·댓글을 쓰거나 고친 일은 남기지 않는다 (길드마스터가 사용 기록으로 글쓴이를 알아내지 못하게, server/board.ts). 지우기는 끝난 뒤엔 모르므로 먼저 본다
+  const anon = me ? await anonWrite(env, me, method, path, body).catch(() => false) : false;
+  if (anon) return context.next();
   const res = await context.next();
   // 로그인은 틀린 것도 남긴다 (누가 몇 번 틀렸는지). 다른 실패는 남기지 않는다
   if (!res.ok && path !== "/api/login") return res;

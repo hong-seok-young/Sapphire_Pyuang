@@ -10,6 +10,7 @@
 // 단추의 수 = 그 안에서 아직 안 본 일의 합, 줄에는 그 줄의 수(ThingDot), 토론방 단추에는 토론방 글 수. 14일 지난 것은 본 것으로 (서버).
 import { useEffect, useSyncExternalStore } from "react";
 import { api } from "./auth";
+import { SUGGEST_OPEN } from "./board";
 
 export const KEYS = [
   "board.notice",
@@ -28,7 +29,14 @@ export const KEYS = [
 ] as const;
 export type NewsKey = (typeof KEYS)[number];
 /** 홈 칸(launcher.ts 의 key)마다 더하는 단추들 */
-const GROUPS: Record<string, string[]> = { board: ["board.", "imo."], market: ["market."], requests: ["requests"], rent: ["rent."] };
+// 건의함(suggest)은 게시판의 건의 사항 수. 건의함을 열면(SUGGEST_OPEN) 게시판 칸에서는 뺀다
+const GROUPS: Record<string, string[]> = {
+  board: SUGGEST_OPEN ? ["board.notice", "board.event", "board.free", "imo."] : ["board.", "imo."],
+  suggest: ["board.suggest"],
+  market: ["market."],
+  requests: ["requests"],
+  rent: ["rent."],
+};
 const POLL_MS = 120_000;
 /**
  * 아이모 소식을 글 번호로 세던 기기(예전 값이 글 번호)는 이때부터 센다 (2026-11-02 11/2 17:00 KST): 번호로 세다 놓친 새 글을 다시 보이게
