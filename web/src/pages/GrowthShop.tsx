@@ -51,7 +51,9 @@ function PopNum({ n, className = "" }: { n: number; className?: string }) {
 const Coin = ({ big = false }: { big?: boolean }) => <i className={"gc-coin" + (big ? " gc-coin-big" : "")} aria-hidden="true" />;
 
 /** 맨 위 지갑: 가진 코인, 번 것·쓴 것, 다음 레벨에 받을 코인 */
-function WalletCard({ w, curve, sample }: { w: GcWallet; curve: GcCurve[]; sample: boolean }) {
+function WalletCard({ w, curve, sample, data }: { w: GcWallet; curve: GcCurve[]; sample: boolean; data: GcData }) {
+  const streak = sample ? { count: 2, next: 30 } : data.streak;
+  const nextM = sample ? { level: 38, coin: 100, name: "Lv.38 · 1군 편입 고려" } : data.nextMilestone;
   const next = w.top !== null ? coinFor(w.top + 1, curve) : 0;
   // 지금 채우는 레벨: 남은 % 와 다 채우면 받을 코인 (경험치도 코인이 된다)
   const pct = (w.topExp ?? 0) / 1000;
@@ -70,8 +72,13 @@ function WalletCard({ w, curve, sample }: { w: GcWallet; curve: GcCurve[]; sampl
         <span>
           레벨·경험치 <b>+{w.earned}</b>
         </span>
+        {w.milestone > 0 && (
+          <span>
+            첫 달성 <b>+{w.milestone}</b>
+          </span>
+        )}
         <span>
-          순위 보너스 <b>+{w.bonus}</b>
+          보너스 <b>+{w.bonus}</b>
         </span>
         {w.adjust !== 0 && (
           <span>
@@ -94,6 +101,16 @@ function WalletCard({ w, curve, sample }: { w: GcWallet; curve: GcCurve[]; sampl
           <small>경험치 1% 마다 {(next / 100).toFixed(1)}코인 · 랭킹이나 내 정보에 적으면 바로 쌓여요</small>
         </div>
       )}
+      <div className="gc-chips">
+        <span className={"gc-chip" + (streak.count > 0 ? " gc-chip-fire" : "")}>
+          {streak.count > 0 ? `🔥 ${streak.count}주 연속 성장 · 이번 주도 올리면 +${streak.next}` : `🔥 매주 올리면 2주째부터 연속 보너스 +${streak.next}`}
+        </span>
+        {nextM && (
+          <span className="gc-chip">
+            🎉 Lv.{nextM.level} 처음 넘으면 +{nextM.coin}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -274,12 +291,19 @@ function MineTab({ data, wallet, history, sample, onChanged }: { data: GcData; w
         ))}
         {history.ledger.map((l, i) => (
           <li key={"l" + i} className="gc-hist-row">
-            <span className="gc-hist-icon">{l.kind === "rank" ? "🏆" : "✏️"}</span>
+            <span className="gc-hist-icon">{l.kind === "rank" ? "🏆" : l.kind === "streak" ? "🔥" : "✏️"}</span>
             <span className="gc-hist-main">
               {l.note ?? (l.kind === "rank" ? "순위 보너스" : "조정")}
               <small>{ago(l.at)}</small>
             </span>
             <span className={"gc-delta " + (l.delta >= 0 ? "gc-plus" : "gc-minus")}>{l.delta >= 0 ? `+${l.delta}` : l.delta}</span>
+          </li>
+        ))}
+        {history.milestones.map((m) => (
+          <li key={"m" + m.level} className="gc-hist-row gc-hist-ms">
+            <span className="gc-hist-icon">🎉</span>
+            <span className="gc-hist-main">{m.name} · 첫 달성 보너스</span>
+            <span className="gc-delta gc-plus">+{m.coin}</span>
           </li>
         ))}
         {history.levels.map((l) => (
@@ -289,7 +313,7 @@ function MineTab({ data, wallet, history, sample, onChanged }: { data: GcData; w
             <span className="gc-delta gc-plus">+{l.coin}</span>
           </li>
         ))}
-        {!history.orders.length && !history.ledger.length && !history.levels.length && (
+        {!history.orders.length && !history.ledger.length && !history.levels.length && !history.milestones.length && (
           <li className="gc-hist-empty">{wallet ? "아직 없어요 · 레벨이 오르면 여기에 쌓여요" : "2군 본캐만 코인이 쌓여요"}</li>
         )}
       </ul>
@@ -461,7 +485,8 @@ function MembersTab({ admin, onChanged }: { admin: NonNullable<GcData["admin"]>;
             {open === m.id && (
               <div className="gc-member-detail">
                 <p className="gc-note">
-                  레벨업 +{m.earned} · 순위 +{m.bonus} · 조정 {m.adjust >= 0 ? `+${m.adjust}` : m.adjust} · 사용 −{m.spent}
+                  레벨업 +{m.earned}
+                  {m.milestone > 0 && ` · 첫 달성 +${m.milestone}`} · 보너스 +{m.bonus} · 조정 {m.adjust >= 0 ? `+${m.adjust}` : m.adjust} · 사용 −{m.spent}
                 </p>
                 <div className="gc-adjust">
                   <span className="mk-unit">
@@ -676,7 +701,7 @@ export function GrowthShopPage({ me }: { me: Me }) {
       {!cur.open && <p className="gc-closed">개발 중 · 나만 보여요{me.role === "developer" && sample ? " · 내 캐릭터는 2군 본캐가 아니라 지갑은 예시예요" : ""}</p>}
       {notice && <p className="form-note gc-notice">{notice}</p>}
 
-      {(shown === "shop" || shown === "mine") && wallet && <WalletCard w={wallet} curve={cur.curve} sample={sample} />}
+      {(shown === "shop" || shown === "mine") && wallet && <WalletCard w={wallet} curve={cur.curve} sample={sample} data={cur} />}
       {shown === "shop" && (
         <ShopTab
           data={cur}

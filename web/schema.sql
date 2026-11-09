@@ -1001,3 +1001,9 @@ CREATE TABLE IF NOT EXISTS gc_ledger (
   created_at INTEGER NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS gc_ledger_once ON gc_ledger (user_id, kind, ref);
+-- 연속 성장 (server/gcoin.ts settleWeeks): 사람마다 마지막으로 코인을 번 주(시작 ms)와 그때까지 이어진 주 수. 2주째부터 연속 보너스 (gc_ledger kind streak)
+CREATE TABLE IF NOT EXISTS gc_streak (
+  user_id TEXT PRIMARY KEY,
+  week INTEGER NOT NULL,
+  count INTEGER NOT NULL
+);

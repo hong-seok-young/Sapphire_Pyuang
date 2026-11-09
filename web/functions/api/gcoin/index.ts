@@ -3,7 +3,7 @@
 //   member: 내가 2군 본캐인지 (아니면 지갑이 없다). admin(오피서 이상): 기다리는 신청, 2군 본캐 모두의 지갑, 최근 처리한 신청
 import { FORBIDDEN, NEED_LOGIN, currentUser, json } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { GCOIN_OPEN, canManageGcoin, canUseGcoin, earnedRows, isMember, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
+import { GCOIN_OPEN, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
 import { weekStart } from "../../../server/week";
 
 interface OrderRow {
@@ -85,13 +85,20 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       ? earnedRows(wallet.base + (wallet.baseExp ?? 0) / 100_000, wallet.top + (wallet.topExp ?? 0) / 100_000, curve).filter((r) => r.coin > 0)
       : [];
 
+  // 처음 넘은 레벨 보너스, 다음 첫 달성 보너스, 연속 성장 (재미 요소, 제작자 2026-11-09 '다 만들어봐')
+  const milestones = wallet && wallet.base !== null && wallet.top !== null ? milestonesBetween(wallet.base, wallet.top) : [];
+  const nextMilestone = wallet && wallet.top !== null ? (MILESTONES.find((m) => m.level > (wallet.top as number)) ?? null) : null;
+  const streak = wallet ? await myStreak(env, me.id, now) : 0;
+
   return json({
     open: GCOIN_OPEN,
     manage,
     member: !!wallet,
     start,
     wallet,
-    history: { levels, ledger: myLedger.results, orders: myOrders.results.map(orderOut) },
+    history: { levels, milestones, ledger: myLedger.results, orders: myOrders.results.map(orderOut) },
+    nextMilestone,
+    streak: { count: streak, next: streakBonus(streak + 1) },
     items: items.results.map((i) => ({ id: i.id, name: i.name, unit: i.unit, price: i.price, active: i.active === 1 })),
     curve,
     rank,

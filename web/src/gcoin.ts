@@ -10,6 +10,8 @@ export interface GcWallet {
   top: number | null;
   topExp: number | null;
   earned: number;
+  /** 처음 넘은 레벨 보너스 (Lv.30 · 38 · 45 · 55) */
+  milestone: number;
   bonus: number;
   adjust: number;
   spent: number;
@@ -42,6 +44,11 @@ export interface GcCurve {
   minLevel: number;
   coin: number;
 }
+export interface GcMilestone {
+  level: number;
+  coin: number;
+  name: string;
+}
 export interface GcRankEntry {
   id: string;
   /** 그 주에 레벨·경험치로 번 코인 */
@@ -59,6 +66,8 @@ export interface GcData {
   history: {
     /** 번 코인 내역 (레벨마다, pct 가 있으면 그 레벨을 그 % 까지만 채운 줄) */
     levels: { level: number; coin: number; pct: number | null }[];
+    /** 처음 넘은 레벨 보너스 */
+    milestones: GcMilestone[];
     ledger: { delta: number; kind: string; note: string | null; at: number }[];
     orders: GcOrder[];
   };
@@ -67,6 +76,10 @@ export interface GcData {
   rank: number[];
   week: { start: number; top: GcRankEntry[] };
   lastWinners: { id: string; delta: number; note: string | null; at: number }[];
+  /** 다음에 처음 넘으면 받을 레벨 보너스 */
+  nextMilestone: GcMilestone | null;
+  /** 연속 성장: 지난주까지 이어진 주 수, 이번 주도 벌면 받을 보너스 */
+  streak: { count: number; next: number };
   admin?: { pending: GcOrder[]; recent: GcOrder[]; members: GcWallet[] };
 }
 
@@ -110,7 +123,7 @@ export function itemIcon(name: string): string {
 export const itemLabel = (o: { name: string; unit: string | null; qty?: number }) => `${o.name}${o.unit ? ` ${o.unit}` : ""}${o.qty && o.qty > 1 ? ` x${o.qty}` : ""}`;
 
 /** 내 캐릭터가 2군 본캐가 아닐 때(앱개발자는 1군) 보이는 예시 지갑. 화면에만 있고 서버에는 안 간다 */
-export const SAMPLE_WALLET: GcWallet = { id: "예시", level: 34, base: 31, baseExp: 40000, top: 34, topExp: 52000, earned: 116, bonus: 60, adjust: 0, spent: 78, balance: 98 };
+export const SAMPLE_WALLET: GcWallet = { id: "예시", level: 34, base: 31, baseExp: 40000, top: 34, topExp: 52000, earned: 116, milestone: 0, bonus: 80, adjust: 0, spent: 78, balance: 118 };
 export const SAMPLE_HISTORY: GcData["history"] = {
   levels: [
     { level: 34, coin: 20, pct: 52 },
@@ -118,7 +131,11 @@ export const SAMPLE_HISTORY: GcData["history"] = {
     { level: 33, coin: 35, pct: null },
     { level: 32, coin: 21, pct: null },
   ],
-  ledger: [{ delta: 60, kind: "rank", note: "주간 2군 성장 2위 (그 주 +52코인)", at: Date.now() - 2 * 86_400_000 }],
+  milestones: [],
+  ledger: [
+    { delta: 20, kind: "streak", note: "2주 연속 성장", at: Date.now() - 2 * 86_400_000 },
+    { delta: 60, kind: "rank", note: "주간 2군 성장 2위 (그 주 +52코인)", at: Date.now() - 2 * 86_400_000 },
+  ],
   orders: [
     { id: -1, user: "예시", itemId: null, name: "사나운 멧돼지", unit: "10개", price: 60, qty: 1, status: "done", note: null, at: Date.now() - 86_400_000, doneAt: Date.now() - 80_000_000, doneBy: "멍멍" },
     { id: -2, user: "예시", itemId: null, name: "망고워터", unit: "10개", price: 18, qty: 1, status: "pending", note: null, at: Date.now() - 3_600_000, doneAt: null, doneBy: null },
@@ -135,6 +152,10 @@ export interface CoinGain {
   /** 이번 주 번 코인, 바로 위 사람까지 코인 차이 */
   week: number;
   gap: number | null;
+  /** 저장 전 이번 주 순위 */
+  prevRank: number | null;
+  /** 이번에 처음 넘은 레벨 보너스 */
+  milestones: GcMilestone[];
 }
 export const COIN_EVENT = "sapphire:gcoin";
 

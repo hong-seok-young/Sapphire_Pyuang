@@ -4339,3 +4339,15 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
   .ct, .ct-coin, .ct-spark i { animation: none; }
   .gc-next-bar i { transition: none; }
 }
+/* 이번 주 1위로 올라선 순간 (coinToast king): 금빛 테두리, 왕관이 떨어져 내려앉고 색종이가 내린다 */
+.ct-king { box-shadow: 0 0 0 2px var(--gold), 0 0 18px rgba(255, 211, 77, 0.55), 0 6px 0 rgba(0, 0, 0, 0.35); background: linear-gradient(180deg, #4a3a12, var(--panel)); animation: ct-in 0.32s cubic-bezier(0.2, 1.4, 0.4, 1) both, ct-out 0.3s ease-in 5.7s forwards; }
+.ct-crown { position: absolute; left: 20px; top: -20px; font-size: 22px; animation: ct-crown 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) 0.2s both; }
+@keyframes ct-crown { from { transform: translateY(-30px) rotate(-30deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.ct-confetti { position: absolute; inset: -60px 0 auto; height: 60px; overflow: visible; pointer-events: none; }
+.ct-confetti i { position: absolute; top: 0; left: var(--x); width: 5px; height: 8px; background: var(--c); animation: ct-fall 1.4s ease-in var(--d) both; }
+@keyframes ct-fall { from { transform: translateY(-10px) rotate(0); opacity: 1; } to { transform: translateY(110px) rotate(320deg); opacity: 0; } }
+.gc-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.gc-chip { padding: 2px 6px; font-size: 11px; color: #c8fff0; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--edge); }
+.gc-chip-fire { color: #ffd0a0; }
+.gc-hist-ms { box-shadow: inset 3px 0 0 var(--gold); }
+@media (prefers-reduced-motion: reduce) { .ct-king, .ct-crown, .ct-confetti i { animation: none; } .ct-confetti { display: none; } }

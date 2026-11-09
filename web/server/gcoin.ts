@@ -35,6 +35,23 @@ export const DEFAULT_LEVELS: { minLevel: number; coin: number }[] = [
   { minLevel: 39, coin: 120 },
   { minLevel: 45, coin: 150 },
 ];
+/**
+ * 처음 넘는 레벨 보너스 (코인을 세기 시작한 뒤 처음 넘을 때 한 번. 표에 적지 않고 지갑을 셀 때 같이 센다: 오타 수정으로 레벨이 내려가면 같이 빠진다).
+ * 제작자 '30부터 어려워짐', '38 + 38제 무기 +8강이면 1군 편입 고려', 만렙 55
+ */
+export const MILESTONES: { level: number; coin: number; name: string }[] = [
+  { level: 30, coin: 50, name: "Lv.30 돌파" },
+  { level: 38, coin: 100, name: "Lv.38 · 1군 편입 고려" },
+  { level: 45, coin: 150, name: "Lv.45 돌파" },
+  { level: 55, coin: 300, name: "만렙 55" },
+];
+/** 주마다 코인을 번(레벨·경험치를 올린) 주가 이어지면 연속 보너스: 2주째 20, 3주째 30 … 5주째부터 50 */
+export const STREAK_COIN = 10;
+export const STREAK_MAX = 5;
+export const streakBonus = (count: number) => (count >= 2 ? STREAK_COIN * Math.min(count, STREAK_MAX) : 0);
+/** base 레벨보다 높고 top 레벨까지 넘은 첫 달성 보너스 */
+export const milestonesBetween = (base: number, top: number) => MILESTONES.filter((m) => base < m.level && top >= m.level);
+
 /** 주간 2군 성장 1·2·3위 보너스 기본값 */
 export const DEFAULT_RANK = [100, 60, 30];
 /** 처음 물건 (코인 1개 = 1,000골드쯤) */
@@ -126,7 +143,8 @@ export const posOf = (p: { level: number; exp: number | null }) => p.level + (p.
 export function coinsBetween(a: number, b: number, curve: Curve[]): number {
   let s = 0;
   for (let l = Math.floor(a); l < b; l++) s += Math.max(0, Math.min(b, l + 1) - Math.max(a, l)) * coinFor(l + 1, curve);
-  return s;
+  // 소수 오차를 지운다 (30.2 - 30 = 0.19999… 라 7코인이 6.999… 로 내려가 1코인이 빠졌다)
+  return Math.round(s * 1e6) / 1e6;
 }
 
 /**
@@ -141,7 +159,7 @@ export function earnedRows(a: number, b: number, curve: Curve[]): { level: numbe
     const hi = Math.min(b, l + 1);
     if (hi <= lo) continue;
     const before = Math.floor(cum);
-    cum += (hi - lo) * coinFor(l + 1, curve);
+    cum = Math.round((cum + (hi - lo) * coinFor(l + 1, curve)) * 1e6) / 1e6;
     // 그 레벨을 끝까지 채웠으면(중간부터 시작했어도) 'Lv.N 달성', 아직 채우는 중이면 그 % 까지
     const up = hi === l + 1;
     rows.push({ level: up ? l + 1 : l, coin: Math.floor(cum) - before, pct: up ? null : Math.round((hi - l) * 1000) / 10 });
@@ -161,7 +179,9 @@ export interface Wallet {
   topExp: number | null;
   /** 레벨업·경험치로 번 코인 (내림 정수) */
   earned: number;
-  /** 순위 보너스 */
+  /** 처음 넘은 레벨 보너스 (MILESTONES) */
+  milestone: number;
+  /** 순위·연속 성장 보너스 */
   bonus: number;
   /** 오피서 조정 */
   adjust: number;
@@ -201,8 +221,8 @@ export async function wallets(env: Env, curve: Curve[], one?: string): Promise<W
   const led = new Map<string, { bonus: number; adjust: number }>();
   for (const r of ledger.results) {
     const w = led.get(r.id) ?? { bonus: 0, adjust: 0 };
-    if (r.kind === "rank") w.bonus += r.n;
-    else w.adjust += r.n;
+    if (r.kind === "adjust") w.adjust += r.n;
+    else w.bonus += r.n;
     led.set(r.id, w);
   }
   const sp = new Map(spent.results.map((r) => [r.id, r.n]));
@@ -210,11 +230,12 @@ export async function wallets(env: Env, curve: Curve[], one?: string): Promise<W
     const b = base.get(r.id) ?? r;
     const t = top.get(r.id) ?? r;
     const earned = Math.floor(coinsBetween(posOf(b), posOf(t), curve));
+    const milestone = milestonesBetween(b.level, t.level).reduce((n, m) => n + m.coin, 0);
     const l = led.get(r.id) ?? { bonus: 0, adjust: 0 };
     const s = sp.get(r.id) ?? 0;
     return {
       id: r.id, level: r.level, base: b.level, baseExp: b.exp, top: t.level, topExp: t.exp,
-      earned, bonus: l.bonus, adjust: l.adjust, spent: s, balance: earned + l.bonus + l.adjust - s,
+      earned, milestone, bonus: l.bonus, adjust: l.adjust, spent: s, balance: earned + milestone + l.bonus + l.adjust - s,
     };
   });
 }
@@ -278,19 +299,48 @@ export async function settleWeeks(env: Env, curve: Curve[], now = Date.now()): P
     const key = `gcoin_rank_${w}`;
     const claim = await env.DB.prepare("INSERT OR IGNORE INTO setup (key, done_at) VALUES (?, ?)").bind(key, now).run();
     if (!claim.meta.changes) continue;
-    const top = (await weekRanking(env, Math.max(w, start), w + WEEK, curve)).slice(0, 3);
-    if (!top.length) continue;
-    await env.DB.batch(
-      top.map((e, i) =>
+    const all = await weekRanking(env, Math.max(w, start), w + WEEK, curve);
+    if (!all.length) continue;
+    const top = all.slice(0, 3);
+    // 연속 성장: 지난주에도 벌었으면 이어서, 아니면 1주째부터 (gc_streak 은 사람마다 마지막으로 번 주와 이어진 주 수)
+    const ids = all.map((e) => e.id);
+    const prev = await env.DB.prepare(`SELECT user_id, week, count FROM gc_streak WHERE user_id IN (${ids.map(() => "?").join(",")})`)
+      .bind(...ids)
+      .all<{ user_id: string; week: number; count: number }>();
+    const pm = new Map(prev.results.map((r) => [r.user_id, r]));
+    const streaks = all.map((e) => {
+      const p = pm.get(e.id);
+      return { id: e.id, count: p && p.week === w ? p.count : p && p.week === w - WEEK ? p.count + 1 : 1 };
+    });
+    await env.DB.batch([
+      ...top.map((e, i) =>
         env.DB.prepare(
           "INSERT OR IGNORE INTO gc_ledger (user_id, delta, kind, ref, note, by_user, created_at) VALUES (?, ?, 'rank', ?, ?, NULL, ?)",
         ).bind(e.id, rank[i], `w${w}`, `주간 2군 성장 ${i + 1}위 (그 주 +${e.coins}코인)`, now),
       ),
-    );
+      ...streaks.map((t) =>
+        env.DB.prepare(
+          "INSERT INTO gc_streak (user_id, week, count) VALUES (?, ?, ?) ON CONFLICT (user_id) DO UPDATE SET week = excluded.week, count = excluded.count",
+        ).bind(t.id, w, t.count),
+      ),
+      ...streaks
+        .filter((t) => streakBonus(t.count) > 0)
+        .map((t) =>
+          env.DB.prepare(
+            "INSERT OR IGNORE INTO gc_ledger (user_id, delta, kind, ref, note, by_user, created_at) VALUES (?, ?, 'streak', ?, ?, NULL, ?)",
+          ).bind(t.id, streakBonus(t.count), `w${w}`, `${t.count}주 연속 성장`, now),
+        ),
+    ]);
     if (GCOIN_OPEN)
       for (const [i, e] of top.entries())
         await notify(env, [e.id], "gcoin", `이번 주 2군 성장 ${i + 1}위! 성장코인 +${rank[i]}`, "#/gcoin", "system");
   }
+}
+
+/** 내 연속 성장: 지난주까지 이어진 주 수 (지난주에 못 벌었으면 0) */
+export async function myStreak(env: Env, id: string, now = Date.now()): Promise<number> {
+  const r = await env.DB.prepare("SELECT week, count FROM gc_streak WHERE user_id = ?").bind(id).first<{ week: number; count: number }>();
+  return r && r.week >= weekStart(now) - WEEK ? r.count : 0;
 }
 
 /** 운영(오피서 이상)에게 알림. 열기 전에는 앱개발자에게만 */
@@ -323,24 +373,31 @@ export interface CoinGain {
   to: number;
   /** 이번 주 2군 성장 순위 (이번 주 번 코인 순, 번 게 없으면 null) */
   rank: number | null;
-  /** 이번 주 번 코인과 바로 위 사람까지 코인 차이 */
+  /** 이번 주 번 코인, 바로 위 사람까지 코인 차이 */
   week: number;
   gap: number | null;
+  /** 저장하기 전 이번 주 순위 (1위로 올라선 순간을 크게 축하하려고) */
+  prevRank: number | null;
+  /** 이번에 처음 넘은 레벨 보너스 */
+  milestones: { level: number; coin: number; name: string }[];
 }
 
 /** 레벨·경험치를 저장하기 전 내 지갑 (2군 본캐가 아니거나 상점을 못 쓰면 null: 그때는 저장 뒤에도 아무것도 안 한다) */
-export async function walletBefore(env: Env, me: User): Promise<{ curve: Curve[]; w: Wallet } | null> {
+export async function walletBefore(env: Env, me: User): Promise<{ curve: Curve[]; w: Wallet; rank: number | null } | null> {
   if (!canUseGcoin(me) || !(await isMember(env, me.id))) return null;
   const curve = await readCurve(env);
   const [w] = await wallets(env, curve, me.id);
-  return w ? { curve, w } : null;
+  if (!w) return null;
+  const top = await weekRanking(env, Math.max(weekStart(), await startAt(env)), null, curve);
+  const i = top.findIndex((e) => e.id === me.id);
+  return { curve, w, rank: i >= 0 ? i + 1 : null };
 }
 
 /** 저장한 뒤 새로 생긴 코인과 이번 주 순위 (화면이 동전 팝업을 띄운다) */
-export async function coinGain(env: Env, me: User, before: { curve: Curve[]; w: Wallet }): Promise<CoinGain | null> {
+export async function coinGain(env: Env, me: User, before: { curve: Curve[]; w: Wallet; rank: number | null }): Promise<CoinGain | null> {
   const [w] = await wallets(env, before.curve, me.id);
   if (!w) return null;
-  const gained = w.earned - before.w.earned;
+  const gained = w.earned + w.milestone - before.w.earned - before.w.milestone;
   if (gained <= 0) return null;
   const start = await startAt(env);
   const top = await weekRanking(env, Math.max(weekStart(), start), null, before.curve);
@@ -354,5 +411,7 @@ export async function coinGain(env: Env, me: User, before: { curve: Curve[]; w: 
     rank: i >= 0 ? i + 1 : null,
     week: i >= 0 ? top[i].coins : 0,
     gap: i > 0 ? top[i - 1].coins - top[i].coins : null,
+    prevRank: before.rank,
+    milestones: milestonesBetween(Math.max(before.w.top ?? 0, before.w.base ?? 0), w.top ?? 0),
   };
 }
