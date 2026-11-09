@@ -66,6 +66,23 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     ).all(),
   ]);
 
+  // 성장 현황은 길드 랭킹(성장 랭킹)과 같은 모양이라 직업·캐릭터 사진·고스펙을 붙인다 (제작자 2026-11-09 '랭킹 보여 주는 거는 우리 길드 랭킹 디자인을 따오면 될 듯')
+  const shown = top.slice(0, 60);
+  const faces = new Map<string, { job: string; avatar: number | null; high: number }>();
+  if (shown.length) {
+    const rows = await env.DB.prepare(
+      "SELECT p.user_id AS id, p.job AS job, a.updated_at AS avatar, u.high_spec AS high FROM profiles p JOIN users u ON u.id = p.user_id " +
+        "LEFT JOIN avatars a ON a.user_id = p.user_id WHERE p.user_id IN (SELECT value FROM json_each(?))",
+    )
+      .bind(JSON.stringify(shown.map((e) => e.id)))
+      .all<{ id: string; job: string; avatar: number | null; high: number | null }>();
+    for (const r of rows.results) faces.set(r.id, { job: r.job, avatar: r.avatar, high: r.high ?? 0 });
+  }
+  const weekTop = shown.map((e) => {
+    const f = faces.get(e.id);
+    return { ...e, job: f?.job ?? "warrior", avatar: f?.avatar ?? null, highSpec: f?.high === 1 };
+  });
+
   let admin: unknown;
   if (manage) {
     const [pending, recent, members] = await Promise.all([
@@ -103,7 +120,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     items: items.results.map((i) => ({ id: i.id, name: i.name, unit: i.unit, price: i.price, gold: i.gold ?? i.price * 1000, active: i.active === 1 })),
     curve,
     rank,
-    week: { start: ws, top: top.slice(0, 60) },
+    week: { start: ws, top: weekTop },
     lastWinners: winners.results,
     admin,
   });

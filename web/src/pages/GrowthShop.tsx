@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { errorText } from "../auth";
+import { JOB_NAME, avatarUrl, errorText } from "../auth";
+import { JobEmblem } from "../emblems";
+import { HeroHalo } from "../heroHalo";
+import { GrowthChart } from "./GrowthChart";
 import { useAsync } from "../data";
 import { Nick } from "../kakao";
 import { ago } from "../market";
@@ -30,7 +32,14 @@ import {
   qtyOf,
   saveGcSettings,
 } from "../gcoin";
-import type { GcCurve, GcData, GcItem, GcOrder, GcWallet } from "../gcoin";
+import type {
+  GcCurve,
+  GcData,
+  GcItem,
+  GcOrder,
+  GcRankEntry,
+  GcWallet,
+} from "../gcoin";
 import { FitLine, Loading, TopBar } from "../ui";
 import { useBackClose } from "../backClose";
 
@@ -77,8 +86,6 @@ function WalletCard({
   const [table, setTable] = useState(false);
   // 카드에는 내 코인과 다음 이정표만 (제작자 2026-11-09 '레벨업하면 몇이 오른다, 경험치 몇 퍼 올리면 코인 몇 개, 이 정도만',
   // '지금 2% 만 더 올리면 코인 얼마 얻어요, 다음 이정표로 안내'). 성장·보너스·사용 합계는 기록표에
-  const ticks =
-    g && g.step.pct < 100 && 100 / g.step.pct <= 50 ? g.step.pct : 0;
   return (
     <div className={"gc-wallet" + (sample ? " gc-sample" : "")}>
       <div className="gc-wallet-main">
@@ -91,46 +98,33 @@ function WalletCard({
           코인표
         </button>
       </div>
+      {/* 경험치 막대 위 이정표 (제작자 2026-11-09 '텍스트 말고 퍼센트마다 수직 막대나 이정표를 가시적으로, 최소 10퍼로 너무 많지 않게'):
+          코인이 들어오는 칸마다 세로 표시와 그 칸의 코인, 지난 것은 금색, 다음 것은 깜박 */}
       {g && (
-        <>
-          <div className="gc-goal-bar">
-            <span>Lv.{g.level}</span>
-            <span
-              className="gc-next-bar"
-              style={
-                ticks ? ({ "--tick": `${ticks}%` } as CSSProperties) : undefined
-              }
-            >
-              <i style={{ transform: `scaleX(${g.pct / 100})` }} />
-              {g.goal < 100 && (
-                <em className="gc-goal-mark" style={{ left: `${g.goal}%` }} />
-              )}
-            </span>
-            <span>{pctText(Math.round(g.pct * 10) / 10)}</span>
-          </div>
-          <div className="gc-goals">
-            {g.goal < 100 && (
-              <span className="gc-goal gc-goal-next">
-                <small>다음 목표 {pctText(g.goal)}</small>
-                <b>
-                  {pctText(g.need)} 더 올리면
+        <div className="gc-ms">
+          <span className="gc-ms-lv">
+            Lv.{g.level}
+            <small>{Math.floor(g.pct * 10) / 10}%</small>
+          </span>
+          <span className="gc-ms-bar">
+            <i style={{ transform: `scaleX(${g.pct / 100})` }} />
+            {g.marks.map((m) => (
+              <span
+                key={m.at}
+                className={"gc-ms-mark gc-ms-" + m.state}
+                style={{ left: `${m.at}%` }}
+              >
+                {/* 글자는 다음 이정표에만 (다 달면 320px 에서 겹친다) */}
+                {m.state === "next" && (
                   <em>
-                    <Coin />+{g.step.coin}
+                    <Coin />+{m.coin}
                   </em>
-                </b>
+                )}
               </span>
-            )}
-            <span className="gc-goal">
-              <small>Lv.{g.level + 1} 달성</small>
-              <b>
-                {pctText(g.levelNeed)} 더 올리면
-                <em>
-                  <Coin />+{g.levelLeft}
-                </em>
-              </b>
-            </span>
-          </div>
-        </>
+            ))}
+          </span>
+          <span className="gc-ms-lv gc-ms-to">Lv.{g.level + 1}</span>
+        </div>
       )}
       {table && (
         <CoinTable curve={curve} top={w.top} onClose={() => setTable(false)} />
@@ -223,51 +217,119 @@ function weekText(ms: number): string {
  * 성장 현황 칸 (첫 칸, 제작자 2026-11-09 '상점에 랭킹을 나타내야 되나, 상점 누르자마자 첫 메뉴로 2군 성장 현황, 총 5위까지 추가 보상'):
  * 이번 주에 레벨·경험치로 성장코인을 번 2군 길드원 순서. 1~5위 자리는 비어도 늘 보이고 보너스 코인이 붙는다
  */
-function StatusTab({ data }: { data: GcData }) {
+function StatusTab({ data, me }: { data: GcData; me: string }) {
+  // 길드 랭킹의 성장 랭킹과 같은 모양 (제작자 2026-11-09 '이번 주 2군 성장 랭킹은 코인 획득이 많은 순서대로, 우리 길드 랭킹 디자인을 따오면 될 듯'):
+  // 1위는 성장왕 카드(후광, 캐릭터 사진), 2위부터 한 줄씩, 1~5위는 보너스 코인. 닉네임을 누르면 레벨·경험치 그래프
   const list = data.week.top;
-  const rows = Math.max(list.length, data.rank.length);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const toggle = (id: string) => setOpenId(openId === id ? null : id);
+  const [first, ...rest] = list;
+  const mine = list.findIndex((e) => e.id === me);
+  const lv = (e: GcRankEntry) =>
+    `${JOB_NAME[e.job]} · Lv.${e.fromLevel}${e.level !== e.fromLevel ? ` → ${e.level}` : ""}`;
+  const bonus = (i: number) =>
+    data.rank[i] ? (
+      <small className="gc-st-bonus">
+        보너스 <Coin />
+        {data.rank[i]}
+      </small>
+    ) : null;
   return (
-    <div className="gc-log gc-status">
-      <p className="gc-week-head">
-        <b>이번 주 2군 성장</b>
-        <small>{weekText(data.week.start)} ~</small>
+    <div className="gc-st">
+      <p className="growth-note">
+        {weekText(data.week.start)} ~{" "}
+        {weekText(data.week.start + 7 * 86_400_000)}
       </p>
-      <ul className="gc-hist">
-        {Array.from({ length: rows }, (_, i) => {
-          const e = list[i];
-          const bonus = data.rank[i];
-          return (
-            <li
-              key={i}
-              className={
-                "gc-hist-row gc-st-row" +
-                (i === 0 && e ? " gc-st-1" : "") +
-                (e ? "" : " gc-st-empty")
-              }
-            >
-              <span className="gc-st-rank">{rankMark(i)}</span>
-              <span className="gc-hist-main">
-                {e ? <Nick name={e.id} /> : "—"}
-                {e && (
-                  <small>
-                    {e.fromLevel === e.level
-                      ? `Lv.${e.level}`
-                      : `Lv.${e.fromLevel} → ${e.level}`}
-                  </small>
-                )}
+      {!first ? (
+        <div className="empty">이번 주 아직 코인을 번 사람이 없어요</div>
+      ) : (
+        <>
+          <div className="growth-hero">
+            <span className="growth-crown">👑 이번 주 2군 성장왕</span>
+            <span className="growth-hero-face">
+              <HeroHalo />
+              <span className="gh-who">
+                <Face e={first} size={96} />
               </span>
-              {e && <span className="gc-delta gc-plus">+{e.coins}</span>}
-              {bonus !== undefined && (
-                <span className="gc-st-bonus">
-                  <Coin />
-                  {bonus}
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+            </span>
+            <button
+              className="growth-hero-name gc-st-nick"
+              onClick={() => toggle(first.id)}
+            >
+              <Nick name={first.id} />
+            </button>
+            <span className="growth-hero-sub">{lv(first)}</span>
+            <span className="growth-hero-value gc-st-value">
+              <Coin big />+{first.coins}
+            </span>
+            {bonus(0)}
+          </div>
+          {openId === first.id && <GrowthChart id={first.id} />}
+          {rest.length > 0 && (
+            <ol className="growth-list">
+              {rest.map((e, i) => (
+                <Fragment key={e.id}>
+                  <li
+                    className={
+                      "growth-row" +
+                      (e.id === me ? " growth-mine" : "") +
+                      (i < 2 ? ` gc-st-podium gc-st-podium-${i + 2}` : "")
+                    }
+                  >
+                    <span className={"growth-rank growth-rank-" + (i + 2)}>
+                      {i + 2}
+                    </span>
+                    <span className="growth-row-face">
+                      <Face e={e} size={40} />
+                    </span>
+                    <span className="growth-row-name">
+                      <button
+                        className="growth-nick gc-st-nick"
+                        onClick={() => toggle(e.id)}
+                      >
+                        <Nick name={e.id} />
+                      </button>
+                      <small>{lv(e)}</small>
+                    </span>
+                    <span className="growth-row-value gc-st-value">
+                      <span>
+                        <Coin />+{e.coins}
+                      </span>
+                      {bonus(i + 1)}
+                    </span>
+                  </li>
+                  {openId === e.id && (
+                    <li className="rank-chart">
+                      <GrowthChart id={e.id} />
+                    </li>
+                  )}
+                </Fragment>
+              ))}
+            </ol>
+          )}
+        </>
+      )}
+      {mine >= 0 && (
+        <p className="growth-me">
+          내 이번 주: {mine + 1}등 +{list[mine].coins}코인
+        </p>
+      )}
     </div>
+  );
+}
+
+/** 캐릭터 사진이 있으면 사진, 없으면 직업 엠블럼 (길드 랭킹 Face 와 같다) */
+function Face({ e, size }: { e: GcRankEntry; size: number }) {
+  return e.avatar ? (
+    <img
+      className="growth-face"
+      src={avatarUrl(e.id, e.avatar)}
+      alt=""
+      style={{ maxWidth: size, maxHeight: size }}
+      draggable={false}
+    />
+  ) : (
+    <JobEmblem job={e.job} level={e.level} size={size} />
   );
 }
 
@@ -275,12 +337,12 @@ function StatusTab({ data }: { data: GcData }) {
 function ShopTab({
   data,
   wallet,
-  sample,
+  member,
   onDone,
 }: {
   data: GcData;
   wallet: GcWallet | null;
-  sample: boolean;
+  member: boolean;
   onDone: (msg: string) => void;
 }) {
   const [picked, setPicked] = useState<GcItem | null>(null);
@@ -298,8 +360,8 @@ function ShopTab({
 
   async function buy() {
     if (!picked) return;
-    if (sample) {
-      setError("예시 지갑이라 신청되지 않아요");
+    if (!member) {
+      setError("2군 전용이에요");
       return;
     }
     setBusy(true);
@@ -323,7 +385,7 @@ function ShopTab({
       ) : (
         <ul className="gc-goods">
           {[...groups.values()].flat().map((it) => {
-            const short = !wallet || balance < it.price;
+            const short = !!wallet && balance < it.price;
             return (
               <li key={it.id}>
                 <button
@@ -367,7 +429,9 @@ function ShopTab({
             >
               −
             </button>
-            <b>{(qtyOf(picked.unit) * qty).toLocaleString("ko-KR")}개</b>
+            <span>
+              <PopNum n={qtyOf(picked.unit) * qty} />개
+            </span>
             <button
               className="pill"
               disabled={qty >= 20}
@@ -379,15 +443,16 @@ function ShopTab({
           </span>
           <button
             className={
-              "pill gc-buy-btn" + (wallet && total > balance ? " gc-over" : "")
+              "pill gc-buy-btn" +
+              (wallet && total > balance ? " gc-over" : "") +
+              (member ? "" : " gc-locked")
             }
-            disabled={
-              busy || (!wallet && !sample) || (!!wallet && total > balance)
-            }
+            disabled={busy || (!!wallet && total > balance)}
             onClick={buy}
           >
             <Coin />
-            {total} {busy ? "…" : wallet && total > balance ? "부족" : "신청"}
+            <PopNum n={total} />
+            &nbsp;{busy ? "…" : wallet && total > balance ? "부족" : "신청"}
           </button>
           {error && <p className="form-error">{error}</p>}
         </div>
@@ -1168,9 +1233,10 @@ function Bundle({
         inputMode="numeric"
         value={gold}
         onChange={(e) => setGold(digits(e.target.value, 9))}
-        placeholder="골드"
+        placeholder="골드 값"
         aria-label="골드"
       />
+      <span>골드</span>
       <small className="gc-bundle-coin">
         {Number(gold) ? (
           <>
@@ -1239,7 +1305,7 @@ function Bundle({
  * 2군 성장코인샵 (개발중, 제작자 2026-11-09): 2군 본캐가 레벨업할 때마다 성장코인이 쌓이고(높은 레벨일수록 많이), 주간 2군 성장 1·2·3위는 보너스.
  * 코인으로 물건을 신청하면 오피서가 게임 안에서 주고 '지급 완료'를 누른다. 지금은 앱개발자만 본다
  */
-export function GrowthShopPage() {
+export function GrowthShopPage({ me }: { me: string }) {
   const [reload, setReload] = useState(0);
   const { data, error } = useAsync(
     useCallback(() => fetchGcoin(), [reload]),
@@ -1266,14 +1332,16 @@ export function GrowthShopPage() {
   const refresh = useCallback(() => setReload((n) => n + 1), []);
 
   if (!cur) return <Loading error={error} />;
-  const sample = !cur.member;
+  // 메뉴는 모두가 보고 신청은 2군 본캐만 (제작자 2026-11-09 '이 메뉴는 모두가 봐야 하지만 2군만 상점 등 구매 버튼이 활성화, 1군이 누르면 2군 전용이라고 안내').
+  // 2군이 아닌 운영진은 화면을 보려고 예시 지갑을, 그 밖의 사람은 지갑과 내 코인 칸 없이 성장 현황·상점만
+  const sample = !cur.member && cur.manage;
   const wallet = cur.wallet ?? (sample ? SAMPLE_WALLET : null);
   const history = cur.member ? cur.history : SAMPLE_HISTORY;
   const pending = cur.admin?.pending.length ?? 0;
   const tabs: { key: Tab; label: string }[] = [
     { key: "status", label: "성장 현황" },
     { key: "shop", label: "상점" },
-    { key: "mine", label: "내 코인" },
+    ...(cur.member || sample ? [{ key: "mine" as Tab, label: "내 코인" }] : []),
     ...(cur.manage
       ? [
           {
@@ -1339,11 +1407,11 @@ export function GrowthShopPage() {
         <ShopTab
           data={cur}
           wallet={cur.wallet}
-          sample={sample}
+          member={cur.member}
           onDone={saved}
         />
       )}
-      {shown === "status" && <StatusTab data={cur} />}
+      {shown === "status" && <StatusTab data={cur} me={me} />}
       {shown === "mine" && (
         <MineTab
           w={wallet}

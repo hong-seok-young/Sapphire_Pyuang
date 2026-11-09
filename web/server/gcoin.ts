@@ -192,10 +192,11 @@ export const posOf = (p: { level: number; exp: number | null }) =>
 /** a 위치에서 b 위치까지 오른 만큼의 코인 (레벨마다 그 레벨에 오르는 코인 값, 경험치 % 는 그만큼 나눠서). 소수 그대로 */
 /**
  * 경험치 몇 % 마다 코인 몇 개 (제작자 2026-11-09 '레벨업에 10개면 20% 마다 2개든 10% 마다 1개든, 딱 떨어지는 단위로 최대한 잘게').
- * 레벨 하나의 코인 C 를 나누어떨어지는 가장 작은 '깔끔한' % 칸으로 쪼갠다 (40 -> 2.5% 마다 1, 35 -> 20% 마다 7, 150 -> 2% 마다 3).
+ * 레벨 하나의 코인 C 를 나누어떨어지는 가장 작은 '깔끔한' % 칸으로 쪼갠다. 칸은 10% 아래로 두지 않는다 (제작자 2026-11-09 '최소 10퍼로, 너무 많지 않게'):
+ * 40 -> 10% 마다 4, 15 -> 20% 마다 3, 35 -> 20% 마다 7, 150 -> 10% 마다 15.
  * 어느 칸으로도 안 떨어지면(39 같은 수) 레벨업 때 한꺼번에. 화면 src/gcoin.ts stepOf 와 같다
  */
-export const STEPS = [0.5, 1, 2, 2.5, 4, 5, 10, 20, 25, 50, 100];
+export const STEPS = [10, 20, 25, 50, 100];
 export function stepOf(c: number): { pct: number; coin: number } {
   if (c <= 0) return { pct: 100, coin: 0 };
   for (const pct of STEPS)
@@ -602,6 +603,8 @@ export async function coinGain(
     week: i >= 0 ? top[i].coins : 0,
     gap: i > 0 ? top[i - 1].coins - top[i].coins : null,
     prevRank: before.rank,
+    // 팝업의 경험치 막대 이정표 (지금 레벨에서 코인이 들어오는 칸)
+    step: stepOf(coinFor(Math.floor(pos(w)) + 1, before.curve)),
     milestones: milestonesBetween(
       Math.max(before.w.top ?? 0, before.w.base ?? 0),
       w.top ?? 0,

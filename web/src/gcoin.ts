@@ -1,6 +1,7 @@
 // 2군 성장코인샵 (개발중, 서버 server/gcoin.ts, functions/api/gcoin): 2군 본캐가 레벨업할 때마다 성장코인이 쌓이고(높은 레벨일수록 많이),
 // 주간 2군 성장 1·2·3위는 보너스. 코인으로 상점 물건을 신청하면 오피서가 게임 안에서 주고 '지급 완료'를 누른다.
 import { api } from "./auth";
+import type { Job } from "./auth";
 
 export interface GcWallet {
   id: string;
@@ -63,6 +64,10 @@ export interface GcRankEntry {
   coins: number;
   fromLevel: number;
   level: number;
+  /** 길드 랭킹과 같은 얼굴 (캐릭터 사진, 없으면 직업 엠블럼) */
+  job: Job;
+  avatar: number | null;
+  highSpec?: boolean;
 }
 export interface GcData {
   open: boolean;
@@ -133,7 +138,7 @@ export function coinFor(level: number, curve: GcCurve[]): number {
 }
 
 /** 경험치 몇 % 마다 코인 몇 개 (서버 server/gcoin.ts stepOf 와 같다: 레벨 코인을 나누어떨어지는 가장 작은 깔끔한 % 칸으로) */
-const STEPS = [0.5, 1, 2, 2.5, 4, 5, 10, 20, 25, 50, 100];
+const STEPS = [10, 20, 25, 50, 100];
 export function stepOf(c: number): { pct: number; coin: number } {
   if (c <= 0) return { pct: 100, coin: 0 };
   for (const pct of STEPS)
@@ -143,7 +148,7 @@ export function stepOf(c: number): { pct: number; coin: number } {
 export const pctText = (n: number) =>
   (Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, "")) + "%";
 
-/** 지갑 카드의 다음 이정표: 경험치 몇 % 더 올리면 코인 몇 개, 레벨업하면 남은 코인 몇 개 */
+/** 지갑 카드의 경험치 막대 이정표: 코인이 들어오는 칸(10% 이상)마다 표시 하나, 지난 것·다음 것 */
 export function nextGoal(w: GcWallet, curve: GcCurve[]) {
   if (w.top === null) return null;
   const c = coinFor(w.top + 1, curve);
@@ -151,18 +156,12 @@ export function nextGoal(w: GcWallet, curve: GcCurve[]) {
   const step = stepOf(c);
   const pct = (w.topExp ?? 0) / 1000;
   const done = Math.floor(pct / step.pct + 1e-6);
-  const goal = (done + 1) * step.pct;
-  return {
-    level: w.top,
-    pct,
-    step,
-    /** 다음 칸 (100 이면 레벨업이 곧 다음 칸) */
-    goal,
-    need: Math.round((goal - pct) * 1000) / 1000,
-    /** 레벨업까지 남은 코인 */
-    levelLeft: c - done * step.coin,
-    levelNeed: Math.round((100 - pct) * 1000) / 1000,
-  };
+  const marks = Array.from({ length: Math.round(100 / step.pct) }, (_, i) => ({
+    at: (i + 1) * step.pct,
+    coin: step.coin,
+    state: i < done ? "on" : i === done ? "next" : "off",
+  }));
+  return { level: w.top, pct, step, marks };
 }
 
 /** 코인표를 '구간 -> 코인' 줄로 (Lv.21~25 10, Lv.26~30 15 …). 0 코인 구간은 뺀다. 마지막은 만렙 55 까지 */
@@ -348,6 +347,8 @@ export interface CoinGain {
   prevRank: number | null;
   /** 이번에 처음 넘은 레벨 보너스 */
   milestones: GcMilestone[];
+  /** 지금 레벨에서 경험치 몇 % 마다 코인 몇 개 (팝업 막대의 이정표) */
+  step?: { pct: number; coin: number };
 }
 export const COIN_EVENT = "sapphire:gcoin";
 
