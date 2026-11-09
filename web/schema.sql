@@ -968,7 +968,8 @@ CREATE TABLE IF NOT EXISTS gc_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   unit TEXT,                              -- 예: 20개 (자몽주스·자몽케이크는 50개)
-  price INTEGER NOT NULL,                 -- 성장코인 = 관리자가 적은 골드 가치(천 골드). 0 이면 값을 정하기 전 (상점에 안 보인다)
+  price INTEGER NOT NULL,                 -- 성장코인 = gold / 1000 (반올림). 0 이면 값을 정하기 전 (상점에 안 보인다)
+  gold INTEGER,                           -- 담당자가 적은 골드 가치 (원 단위 그대로, 없던 예전 줄은 price x 1000)
   info TEXT,                              -- 안 씀 (옵션은 고정이라 화면 src/gcoin.ts ITEM_INFO)
   active INTEGER NOT NULL DEFAULT 1,      -- 0 이면 판매 중지 (상점에 안 보인다)
   sort INTEGER NOT NULL DEFAULT 0

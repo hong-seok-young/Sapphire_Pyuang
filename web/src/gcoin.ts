@@ -23,6 +23,8 @@ export interface GcItem {
   unit: string | null;
   /** 성장코인 = 관리자가 적은 골드 가치(천 골드). 0 이면 값을 정하기 전 */
   price: number;
+  /** 담당자가 적은 골드 가치 (원 단위). 코인 = gold / 1000 반올림 */
+  gold: number;
   active: boolean;
 }
 export type GcStatus = "pending" | "done" | "reject" | "cancel";
@@ -89,8 +91,8 @@ export const buyItem = (itemId: number, qty: number) => api<{ ok: boolean; balan
 export const actOrder = (id: number, action: "done" | "reject" | "cancel", note?: string | null) =>
   api<{ ok: boolean }>(`/api/gcoin/orders/${id}`, "PATCH", { action, note });
 export const saveGcSettings = (input: { levels?: GcCurve[]; rank?: number[] }) => api<{ ok: boolean }>("/api/gcoin/settings", "PUT", input);
-export const addGcItem = (input: { name: string; unit: string | null; price: number }) => api<{ ok: boolean }>("/api/gcoin/items", "POST", input);
-export const editGcItem = (id: number, input: Partial<{ name: string; unit: string | null; price: number; active: boolean }>) =>
+export const addGcItem = (input: { name: string; unit: string | null; gold: number }) => api<{ ok: boolean }>("/api/gcoin/items", "POST", input);
+export const editGcItem = (id: number, input: Partial<{ name: string; unit: string | null; gold: number; active: boolean }>) =>
   api<{ ok: boolean }>(`/api/gcoin/items/${id}`, "PATCH", input);
 export const deleteGcItem = (id: number) => api<{ ok: boolean }>(`/api/gcoin/items/${id}`, "DELETE");
 export const adjustCoin = (userId: string, delta: number, note: string) => api<{ ok: boolean }>("/api/gcoin/adjust", "POST", { userId, delta, note });
@@ -123,6 +125,7 @@ export function itemPic(name: string): string | null {
  * 제작자가 보낸 거래소 스샷의 정보창에 보인 것만. 키는 띄어쓰기 없는 이름. 새 물건 옵션을 받으면 여기에 더한다 */
 const ITEM_INFO: Record<string, string[]> = {
   망고워터: ["쿨타임 60초", "20분 동안 지속: 크리티컬 4 증가"],
+  사나운멧돼지인형: ["쿨타임 5초", "20분 동안 지속: 데미지 30% 증가"],
   잠깬쿠이인형: ["쿨타임 5초", "20분 동안 지속: 데미지 20% 증가"],
   별과자: ["쿨타임 5초", "20분 동안 지속: 크리티컬 5 증가"],
   데블랑사탕: ["쿨타임 5초", "20분 동안 지속: 크리티컬 5 증가"],
@@ -130,6 +133,8 @@ const ITEM_INFO: Record<string, string[]> = {
   자몽주스: ["쿨타임 5초", "요구 레벨 27", "10초 동안 지속: 초당 100 마나 회복"],
   자몽케이크: ["쿨타임 5초", "요구 레벨 27", "10초 동안 지속: 초당 100 체력 회복"],
 };
+/** 골드 -> 성장코인 (서버 server/gcoin.ts coinOfGold 와 같다) */
+export const coinOfGold = (gold: number) => (gold > 0 ? Math.max(1, Math.round(gold / 1000)) : 0);
 export const itemInfo = (name: string): string[] => ITEM_INFO[name.replace(/\s/g, "")] ?? [];
 
 /** 그림이 없는 물건(오피서가 새로 넣은 것)의 그림 글자 */

@@ -50,11 +50,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const now = Date.now();
   const ws = Math.max(weekStart(now), start);
   const [items, top, myOrders, myLedger, winners] = await Promise.all([
-    env.DB.prepare(`SELECT id, name, unit, price, active FROM gc_items ${manage ? "" : "WHERE active = 1 AND price > 0 "}ORDER BY sort, id`).all<{
+    env.DB.prepare(`SELECT id, name, unit, price, gold, active FROM gc_items ${manage ? "" : "WHERE active = 1 AND price > 0 "}ORDER BY sort, id`).all<{
       id: number;
       name: string;
       unit: string | null;
       price: number;
+      gold: number | null;
       active: number;
     }>(),
     weekRanking(env, ws, null, curve),
@@ -99,7 +100,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     history: { levels, milestones, ledger: myLedger.results, orders: myOrders.results.map(orderOut) },
     nextMilestone,
     streak: { count: streak, next: streakBonus(streak + 1) },
-    items: items.results.map((i) => ({ id: i.id, name: i.name, unit: i.unit, price: i.price, active: i.active === 1 })),
+    items: items.results.map((i) => ({ id: i.id, name: i.name, unit: i.unit, price: i.price, gold: i.gold ?? i.price * 1000, active: i.active === 1 })),
     curve,
     rank,
     week: { start: ws, top: top.slice(0, 5) },

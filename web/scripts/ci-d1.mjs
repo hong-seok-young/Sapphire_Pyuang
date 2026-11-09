@@ -90,6 +90,7 @@ const ADDED_COLUMNS = [
   ["listings", "mode", "TEXT NOT NULL DEFAULT 'sale'"], ["listings", "ends_at", "INTEGER"], ["listing_wants", "offer", "INTEGER"],
   ["listing_talk", "parent_id", "INTEGER"],
   ["gc_items", "info", "TEXT"],
+  ["gc_items", "gold", "INTEGER"],
   ["users", "high_spec", "INTEGER NOT NULL DEFAULT 0"], ["plat_settings", "high_ratio", "REAL NOT NULL DEFAULT 4"],
   ["plat_items", "high_ratio", "REAL"],
   ["activity", "ip", "TEXT"],

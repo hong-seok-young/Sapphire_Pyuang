@@ -2365,6 +2365,8 @@ section.todo-form { padding: 10px; margin-bottom: 10px; }
 .gc-adjust { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .gc-adjust .mk-input { flex: 1; min-width: 70px; padding: 4px 6px; font-size: 12px; }
 
+.gc-log { padding: 8px 10px; margin-bottom: 10px; background: var(--panel); border: var(--px) solid var(--edge); }
+.gc-log .gc-hist { margin: 0; }
 .gc-curve { padding: 8px 10px; margin-bottom: 90px; background: var(--panel); border: var(--px) solid var(--edge); }
 .gc-curve ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
 .gc-curve li { display: grid; grid-template-columns: 64px minmax(0, 1fr) 58px; align-items: center; gap: 8px; padding: 3px 4px; font-size: 12px; }

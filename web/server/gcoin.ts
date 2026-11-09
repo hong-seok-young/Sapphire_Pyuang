@@ -86,6 +86,9 @@ export function orderLabel(name: string, unit: string | null, qty: number): stri
 }
 export const MAX_QTY = 20;
 export const MAX_PRICE = 100_000;
+/** 담당자가 골드로 적는 값 (제작자 2026-11-09 '천 단위로 적게 하지 말고 그냥 원 단위로'): 1,000골드 = 성장코인 1개, 반올림 (1골드 이상이면 1코인부터) */
+export const MAX_GOLD = 100_000_000;
+export const coinOfGold = (gold: number) => (gold > 0 ? Math.max(1, Math.round(gold / 1000)) : 0);
 /** 지난주 보너스를 한 번에 몇 주까지 몰아서 정산하나 (CPU 한도) */
 const SETTLE_WEEKS = 4;
 
