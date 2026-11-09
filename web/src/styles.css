@@ -1280,6 +1280,13 @@ button { font: inherit; color: inherit; }
 .bd-title { margin: 0; font-size: 18px; line-height: 1.4; color: var(--text); }
 .bd-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .bd-meta b { color: var(--text); font-weight: 400; }
+/* 건의함 익명 (2026-11-09): 가린 이름은 '익명', 이름을 볼 수 있는 사람에게는 이름 뒤 작은 '익명' 표 */
+.bd-anon-name { color: var(--text); font-weight: 400; }
+.bd-row-main small .bd-anon-name { color: inherit; }
+.bd-anon { margin-left: 4px; padding: 0 4px; font-size: 10px; font-style: normal; color: var(--edge); background: #b9a7ff; vertical-align: 1px; white-space: nowrap; }
+.sg-anon { display: flex; flex-direction: column; gap: 4px; }
+.sg-anon small { font-size: 11px; color: var(--gold); }
+.bd-anon-toggle { flex: none; height: 36px; }
 .bd-body { white-space: pre-wrap; word-break: break-word; font-size: 15px; line-height: 1.7; color: var(--text); }
 .bd-body a { color: #8fd0ff; word-break: break-all; }
 .bd-photo { display: block; width: 100%; padding: 0; background: none; border: 0; cursor: zoom-in; }

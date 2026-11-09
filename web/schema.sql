@@ -327,7 +327,9 @@ CREATE TABLE IF NOT EXISTS board_posts (
   body TEXT NOT NULL,
   pinned INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
-  edited_at INTEGER
+  edited_at INTEGER,
+  -- 건의함 익명 글 (2026-11-09): 쓴 사람은 author 에 그대로 두고, 앱개발자와 유어아너 말고는 '익명'으로 보인다 (server/board.ts canSeeAnon)
+  anon INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS board_posts_cat ON board_posts (cat, id);
 CREATE TABLE IF NOT EXISTS board_files (
@@ -347,7 +349,8 @@ CREATE TABLE IF NOT EXISTS board_comments (
   user_id TEXT NOT NULL,
   parent_id INTEGER,
   text TEXT NOT NULL,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  anon INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS board_comments_post ON board_comments (post_id, id);
 CREATE TABLE IF NOT EXISTS board_likes (

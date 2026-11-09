@@ -158,6 +158,7 @@ const PAGE_NAME: Record<string, string> = {
   "": "홈", places: "사냥터 목록", search: "검색", equip: "장비", chat: "챗봇", ranking: "길드 랭킹", market: "사파이어 중개인",
   requests: "길드원 의뢰소", alerts: "알림", shop: "플래티넘 할인 상점", board: "게시판", me: "내 정보", admin: "길드원 관리", app: "앱", password: "비밀번호 바꾸기", log: "사용 기록", patch: "패치 내역", odds: "공식 확률",
   match: "길드 던전", todo: "To do", rent: "장비대여", gaps: "챗봇 개선", info: "정보", as: "캐릭터 바꿔서 열기", trend: "시세 동향", enhance: "강화 비교", sim: "확률 시뮬레이터", simtest: "시뮬레이터 테스트", devreq: "개발 요청",
+  suggest: "건의함",
 };
 const RENT_VIEW: Record<string, string> = { apps: "신청함", staff: "운영", log: "기록" };
 
@@ -189,6 +190,12 @@ export function pageName(path: string, wiki: Wiki, detail?: string | null): stri
       return `게시판: 아이모 소식${t ? ` · ${t}` : ""}`;
     }
     return cat && cat in CAT_NAME ? `게시판: ${CAT_NAME[cat as Cat]}` : "게시판";
+  }
+  // 건의함 (내 익명 글과 글쓰기 화면은 서버가 남기지 않는다, server/board.ts anonView)
+  if (page === "suggest") {
+    if (arg === "write") return "건의함 글쓰기";
+    if (/^\d+$/.test(arg)) return raw.split("/")[2] === "edit" ? `건의함 글 고치기 #${arg}` : `건의함 글: ${detail ?? `#${arg}`}`;
+    return "건의함";
   }
   if (page === "official") return `아이모 소식 글: ${detail ?? `#${arg}`}`;
   if (page === "place") return `사냥터: ${wiki.places[arg]?.name ?? arg}`;
@@ -446,7 +453,7 @@ export function actionText(what: string, detail: string | null, at = Date.now())
  * 화면은 주소의 첫 칸, 한 일은 API 경로로 정한다. 접속은 묶지 않는다
  */
 const VIEW_SECTION: Record<string, string> = {
-  board: "게시판", official: "게시판", market: "중개인", rent: "장비대여", requests: "의뢰소", shop: "플래티넘 상점", chat: "챗봇",
+  board: "게시판", official: "게시판", suggest: "게시판", market: "중개인", rent: "장비대여", requests: "의뢰소", shop: "플래티넘 상점", chat: "챗봇",
   ranking: "길드 랭킹", admin: "길드원 관리", me: "내 정보", password: "내 정보", alerts: "알림", todo: "To do", log: "사용 기록",
   info: "정보", menu: "정보", post: "정보", place: "정보", places: "정보", monster: "정보", item: "정보", equip: "정보", odds: "정보", search: "검색",
 };

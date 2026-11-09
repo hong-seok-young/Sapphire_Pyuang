@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { ApiError, RANK, errorText } from "../auth";
 import type { Me } from "../auth";
 import {
-  CATS, CAT_ICON, CAT_NAME, URL_RE, createPost, deleteFile, deletePost, fetchPost, fetchPosts,
+  ANON_VIEWER, BOARD_CATS, CAT_ICON, CAT_NAME, URL_RE, createPost, deleteFile, deletePost, fetchPost, fetchPosts,
   fileUrl, linkPreview, polishPost, setLike, shrinkPhoto, sizeText, updatePost, uploadFile, youtubeId,
 } from "../board";
 import type { BoardFile, Cat, LinkPreview, PostDetail, PostSummary } from "../board";
@@ -17,7 +17,7 @@ import type { NewsKey } from "../news";
 import { OfficialList } from "./Official";
 import { KakaoButton, Nick } from "../kakao";
 import { isOfficialTab } from "../official";
-import { Comments } from "./Comments";
+import { AnonName, Comments } from "./Comments";
 import { ImageViewer } from "./ImageViewer";
 
 /** 공지사항과 이벤트는 오피서 이상만 쓴다 (서버 server/board.ts canWrite 와 같다) */
@@ -47,6 +47,22 @@ export function BoardPage({ me, arg, sub, query }: { me: Me; arg: string; sub: s
   return <List me={me} cat={(query.get("cat") as Cat | null) ?? null} />;
 }
 
+/**
+ * 건의함 (제작자 요청 2026-11-09, 개발 요청 #13 유어아너: '건의사항은 게시판에서 빼고 별도 버튼, 익명 기능, 익명은 유어아너와 나만 보게'):
+ * #/suggest 목록, #/suggest/:id 글, #/suggest/write, #/suggest/:id/edit. 게시판의 건의 사항(cat suggest)을 그대로 쓰고, 글과 댓글을 익명으로 올릴 수 있다.
+ * 익명 이름은 서버가 가려서 보낸다 (server/board.ts canSeeAnon). 열 때는 src/board.ts SUGGEST_OPEN
+ */
+export function SuggestPage({ me, arg, sub }: { me: Me; arg: string; sub: string }) {
+  if (arg === "write") return <Write me={me} cat="suggest" box />;
+  const id = Number(arg);
+  if (id && sub === "edit") return <Write me={me} editId={id} box />;
+  if (id) return <PostView me={me} id={id} box />;
+  return <List me={me} cat="suggest" box />;
+}
+
+/** 글 주소의 앞 (건의함은 #/suggest) */
+const baseOf = (box?: boolean) => (box ? "#/suggest" : "#/board");
+
 /** 게시판 칸 이름 (위 칸 줄에서 짧게) */
 const CAT_SHORT: Record<Cat, string> = { notice: "공지", event: "길드 이벤트", free: "자유", suggest: "건의" };
 
@@ -62,10 +78,10 @@ function BoardCats({ cat }: { cat: Cat | "imo" | null }) {
   // (제작자 2026-11-06 '끝까지 배지가 추적해서'). '전체'는 게시판 네 칸의 합, 아이모 소식은 Official.tsx
   const news = useNews();
   const countOf = (key: Cat | "imo" | null) =>
-    newsSum(news, key === null ? CATS.map((c) => `board.${c}` as NewsKey) : key === "imo" ? IMO_NEWS : [`board.${key}` as NewsKey]);
+    newsSum(news, key === null ? BOARD_CATS.map((c) => `board.${c}` as NewsKey) : key === "imo" ? IMO_NEWS : [`board.${key}` as NewsKey]);
   const tabs: { key: Cat | "imo" | null; icon: string; name: string; to: string }[] = [
     { key: null, icon: "📋", name: "전체", to: "#/board" },
-    ...CATS.map((c) => ({ key: c, icon: CAT_ICON[c], name: CAT_SHORT[c], to: `#/board?cat=${c}` })),
+    ...BOARD_CATS.map((c) => ({ key: c, icon: CAT_ICON[c], name: CAT_SHORT[c], to: `#/board?cat=${c}` })),
     { key: "imo", icon: "🎮", name: "아이모 소식", to: "#/board?cat=imo" },
   ];
   return (
@@ -88,7 +104,7 @@ function BoardCats({ cat }: { cat: Cat | "imo" | null }) {
   );
 }
 
-function List({ me, cat }: { me: Me; cat: Cat | null }) {
+function List({ me, cat, box }: { me: Me; cat: Cat | null; box?: boolean }) {
   const [posts, setPosts] = useState<PostSummary[] | null>(null);
   const [more, setMore] = useState(false);
   const [error, setError] = useState("");
@@ -133,10 +149,11 @@ function List({ me, cat }: { me: Me; cat: Cat | null }) {
   }
 
   const writeCat = cat && canWrite(me, cat) ? cat : "free";
+  const base = baseOf(box);
   return (
     <>
-      <TopBar title="게시판" />
-      <BoardCats cat={cat} />
+      <TopBar title={box ? "건의함" : "게시판"} />
+      {!box && <BoardCats cat={cat} />}
       <form
         className="bd-search"
         onSubmit={(e) => {
@@ -145,8 +162,8 @@ function List({ me, cat }: { me: Me; cat: Cat | null }) {
         }}
       >
         <input className="mk-input" value={text} onChange={(e) => setText(e.target.value)} placeholder="🔍 제목, 내용, 글쓴이" aria-label="글 찾기" />
-        <a className="btn bd-write" href={`#/board/write?cat=${writeCat}`}>
-          ✏️ 글쓰기
+        <a className="btn bd-write" href={box ? "#/suggest/write" : `#/board/write?cat=${writeCat}`}>
+          {box ? "✏️ 건의하기" : "✏️ 글쓰기"}
         </a>
       </form>
       {!posts ? (
@@ -157,17 +174,20 @@ function List({ me, cat }: { me: Me; cat: Cat | null }) {
         <ul className="bd-list">
           {posts.map((p) => (
             <li key={p.id}>
-              <a className={"bd-row" + (p.pinned ? " bd-pinned" : "")} href={`#/board/${p.id}`}>
+              <a className={"bd-row" + (p.pinned ? " bd-pinned" : "")} href={`${base}/${p.id}`}>
                 <span className="bd-row-main">
                   <span className="bd-row-title">
                     {p.pinned && <i className="bd-pin">고정</i>}
-                    <i className={"bd-cat bd-cat-" + p.cat}>{CAT_NAME[p.cat]}</i>
+                    {!box && <i className={"bd-cat bd-cat-" + p.cat}>{CAT_NAME[p.cat]}</i>}
                     {p.title}
                     <ThingDot k={`post:${p.id}`} />
                   </span>
                   {p.snippet && <span className="bd-row-snippet">{p.snippet.replace(/\s+/g, " ")}</span>}
                   <small>
-                    <Nick name={p.author} /> <KakaoButton name={p.author} nested /> · {ago(p.at)} · 👁 {p.views}
+                    <AnonName name={p.author} anon={p.anon} mine={p.mine}>
+                      <Nick name={p.author} /> <KakaoButton name={p.author} nested />
+                    </AnonName>{" "}
+                    · {ago(p.at)} · 👁 {p.views}
                     {p.likes > 0 && ` · ♥ ${p.likes}`}
                     {p.comments > 0 && ` · 💬 ${p.comments}`}
                     {p.files > 0 && ` · 📎 ${p.files}`}
@@ -264,7 +284,7 @@ function Body({ text }: { text: string }) {
   );
 }
 
-function PostView({ me, id }: { me: Me; id: number }) {
+function PostView({ me, id, box }: { me: Me; id: number; box?: boolean }) {
   const [d, setD] = useState<PostDetail | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -286,12 +306,13 @@ function PostView({ me, id }: { me: Me; id: number }) {
 
   if (!d) return (
     <>
-      <TopBar title="게시판" />
+      <TopBar title={box ? "건의함" : "게시판"} />
       <Loading error={error} />
     </>
   );
   const { post, files } = d;
-  const mine = post.author === me.id;
+  const mine = post.mine ?? post.author === me.id;
+  const base = baseOf(box);
   const photos = files.filter((f) => f.image);
   const attachments = files.filter((f) => !f.image);
 
@@ -309,18 +330,20 @@ function PostView({ me, id }: { me: Me; id: number }) {
 
   return (
     <>
-      <TopBar title={CAT_NAME[post.cat]} />
+      <TopBar title={box ? "건의함" : CAT_NAME[post.cat]} />
       <article className="panel bd-post">
         <h1 className="bd-title">
           {post.pinned && <i className="bd-pin">고정</i>}
           {post.title}
         </h1>
         <div className="bd-meta">
-          <b>
-            <Nick name={post.author} />
-          </b>
-          <KakaoButton name={post.author} mine={post.author === me.id} />
-          {d.roles[post.author] && <RoleBadge role={d.roles[post.author]} />}
+          <AnonName name={post.author} anon={post.anon} mine={mine}>
+            <b>
+              <Nick name={post.author} />
+            </b>
+            <KakaoButton name={post.author} mine={post.author === me.id} />
+            {d.roles[post.author] && <RoleBadge role={d.roles[post.author]} />}
+          </AnonName>
           <span>
             {ago(post.created_at)}
             {post.edited_at && " · 고침"} · 👁 {d.views}
@@ -366,7 +389,7 @@ function PostView({ me, id }: { me: Me; id: number }) {
             </button>
           )}
           {mine && (
-            <a className="pill" href={`#/board/${id}/edit`}>
+            <a className="pill" href={`${base}/${id}/edit`}>
               수정
             </a>
           )}
@@ -374,7 +397,7 @@ function PostView({ me, id }: { me: Me; id: number }) {
             (confirm ? (
               <button className="pill pill-danger" disabled={busy} onClick={() => run(async () => {
                 await deletePost(id);
-                go("#/board", true);
+                go(base, true);
               })}>
                 삭제 확인
               </button>
@@ -386,7 +409,15 @@ function PostView({ me, id }: { me: Me; id: number }) {
         </div>
         {error && <p className="form-error">{error}</p>}
       </article>
-      <Comments me={me} id={id} comments={d.comments} roles={d.roles} since={since} onChange={(comments) => setD({ ...d, comments })} />
+      <Comments
+        me={me}
+        id={id}
+        comments={d.comments}
+        roles={d.roles}
+        since={since}
+        onChange={(comments) => setD({ ...d, comments })}
+        anonOk={!!box && post.cat === "suggest"}
+      />
     </>
   );
 }
@@ -398,8 +429,10 @@ interface NewFile {
   preview: string | null;
 }
 
-function Write({ me, cat: startCat, editId }: { me: Me; cat?: Cat; editId?: number }) {
-  const [cat, setCat] = useState<Cat>(startCat && canWrite(me, startCat) ? startCat : "free");
+function Write({ me, cat: startCat, editId, box }: { me: Me; cat?: Cat; editId?: number; box?: boolean }) {
+  const [cat, setCat] = useState<Cat>(startCat && canWrite(me, startCat) && (box || BOARD_CATS.includes(startCat)) ? startCat : "free");
+  // 건의함 익명 글 (처음 올릴 때만 고른다)
+  const [anon, setAnon] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [old, setOld] = useState<BoardFile[]>([]);
@@ -487,7 +520,7 @@ function Write({ me, cat: startCat, editId }: { me: Me; cat?: Cat; editId?: numb
       let id = editId ?? created.current;
       if (id) await updatePost(id, { title, body });
       else {
-        id = (await createPost(cat, title, body)).id;
+        id = (await createPost(cat, title, body, !!box && cat === "suggest" && anon)).id;
         created.current = id;
       }
       // 한 단계씩 끝날 때마다 화면에서도 빼서, 실패한 뒤 다시 누르면 남은 것만 한다
@@ -504,7 +537,7 @@ function Write({ me, cat: startCat, editId }: { me: Me; cat?: Cat; editId?: numb
         await uploadFile(id, r.blob, r.name);
         dropAdded(r.key);
       }
-      go(`#/board/${id}`, true);
+      go(`${baseOf(box)}/${id}`, true);
     } catch (x) {
       setError(errorText(x));
       setBusy("");
@@ -513,17 +546,30 @@ function Write({ me, cat: startCat, editId }: { me: Me; cat?: Cat; editId?: numb
 
   if (!loaded) return (
     <>
-      <TopBar title="글 수정" />
+      <TopBar title={box ? "건의함" : "글 수정"} />
       <Loading error={error} />
     </>
   );
   return (
     <>
-      <TopBar title={editId ? "글 수정" : "글쓰기"} />
+      <TopBar title={box ? "건의함" : editId ? "글 수정" : "글쓰기"} />
       <section className="panel form bd-write-form">
-        {!editId && (
+        {box && !editId && (
+          <div className="sg-anon">
+            <div className="pill-row">
+              <button type="button" className={"pill" + (!anon ? " pill-on" : "")} aria-pressed={!anon} onClick={() => setAnon(false)}>
+                실명
+              </button>
+              <button type="button" className={"pill" + (anon ? " pill-on" : "")} aria-pressed={anon} onClick={() => setAnon(true)}>
+                익명
+              </button>
+            </div>
+            {anon && <small>이름은 {ANON_VIEWER} 님과 앱개발자만 봐요</small>}
+          </div>
+        )}
+        {!editId && !box && (
           <div className="pill-row">
-            {CATS.filter((c) => canWrite(me, c)).map((c) => (
+            {BOARD_CATS.filter((c) => canWrite(me, c)).map((c) => (
               <button key={c} type="button" className={"pill" + (cat === c ? " pill-on" : "")} aria-pressed={cat === c} onClick={() => setCat(c)}>
                 {/* 좁은 폰(320px)에서 '길드 이벤트'가 단추를 넘었다: 글자를 줄여 한 줄에 (화면 폭 대원칙) */}
                 <FitLine text={CAT_NAME[c]} wrap={false} />

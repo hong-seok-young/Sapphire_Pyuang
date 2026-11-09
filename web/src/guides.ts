@@ -165,6 +165,20 @@ export const GUIDES: Guide[] = [
     ],
   },
   {
+    // 건의함 (개발중, 2026-11-09): 익명이 누구에게 보이는지만
+    key: "suggest",
+    title: "건의함",
+    tutorial: [
+      { sel: ".bd-write", head: "건의하기", text: "글을 올리면 길드마스터와 오피서에게 알림이 가요." },
+      {
+        go: "#/suggest/write",
+        sel: ".sg-anon",
+        head: "익명",
+        text: "익명으로 올리면 이름은 유어아너 님과 앱개발자만 봐요. 다른 사람에게는 익명으로 보여요.\n수정과 삭제는 그대로 나만 할 수 있어요. 댓글도 익명으로 달 수 있어요.",
+      },
+    ],
+  },
+  {
     key: "shop",
     title: "플래티넘 할인 상점",
     tutorial: [

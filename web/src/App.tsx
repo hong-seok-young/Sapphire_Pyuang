@@ -58,6 +58,7 @@ import { GuideHost } from "./tutorial";
 import { BirthdaySticker } from "./birthday";
 import { Opening, shouldCelebrate } from "./pages/Opening";
 import { reportOpen, reportView } from "./activity";
+import { SUGGEST_OPEN } from "./board";
 import { markMenuVisit } from "./updates";
 import { ensurePush, reportPush } from "./push";
 import {
@@ -115,6 +116,7 @@ const AlertsPage = lazy(() => CHUNKS.Alerts().then((m) => ({ default: m.AlertsPa
 const ChatGapsPage = lazy(() => CHUNKS.ChatGaps().then((m) => ({ default: m.ChatGapsPage })));
 const PlatShopPage = lazy(() => CHUNKS.PlatShop().then((m) => ({ default: m.PlatShopPage })));
 const BoardPage = lazy(() => CHUNKS.Board().then((m) => ({ default: m.BoardPage })));
+const SuggestPage = lazy(() => CHUNKS.Board().then((m) => ({ default: m.SuggestPage })));
 const OfficialPostPage = lazy(() => CHUNKS.Official().then((m) => ({ default: m.OfficialPostPage })));
 const PatchNotesPage = lazy(() => CHUNKS.PatchNotes().then((m) => ({ default: m.PatchNotesPage })));
 const OddsPage = lazy(() => CHUNKS.Odds().then((m) => ({ default: m.OddsPage })));
@@ -448,6 +450,9 @@ function Wiki({
         query={route.query}
       />
     );
+  // 건의함 (개발중, 제작자 요청 2026-11-09 개발 요청 #13): 게시판의 건의 사항을 따로, 익명 글·댓글. 열면 src/board.ts SUGGEST_OPEN
+  else if (page === "suggest")
+    body = SUGGEST_OPEN || canPreview(me) ? <SuggestPage me={me} arg={arg} sub={route.parts[2] ?? ""} /> : <DevSoon title="건의함" />;
   else if (page === "") body = <Home me={me} />;
   else if (page === "info") body = <InfoPage me={me} />;
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
