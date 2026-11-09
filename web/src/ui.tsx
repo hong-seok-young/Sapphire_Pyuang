@@ -118,6 +118,7 @@ export const TITLE_EN: Record<string, string> = {
   "퀘스트 · 지도": "QUESTS · MAPS",
   "길드 던전": "GUILD DUNGEON",
   "헬스 루틴": "WORKOUT LOG",
+  "운영진 때리기": "STRESS RELIEF",
 };
 
 export function TopBar({

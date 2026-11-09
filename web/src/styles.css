@@ -3999,3 +3999,153 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
   .bday-line-wrap { animation: bd-line-still 2.6s linear both; }
 }
 @keyframes bd-line-still { 0%, 85% { opacity: 1; transform: translate(-50%, -100%); } 100% { opacity: 0; transform: translate(-50%, -100%); } }
+
+/* ---------- 운영진 때리기 (개발 요청 #10, 제작자 2026-11-09, src/pages/Smack.tsx) ---------- */
+.smk-canvas { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; z-index: 9; pointer-events: none; }
+.smk-hitme { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 10px; padding: 8px 10px; font-size: 12px; color: var(--muted); background: rgba(255, 107, 107, 0.1); border: 1px solid rgba(255, 107, 107, 0.45); }
+.smk-hitme b { color: #ffb3b3; font-size: 13px; }
+.smk-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+@media (min-width: 400px) { .smk-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.smk-card {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 18px 6px 8px;
+  color: var(--text); text-decoration: none; background: var(--panel);
+  border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 var(--hi), inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--lo);
+  -webkit-tap-highlight-color: transparent;
+}
+.smk-card:active { transform: translateY(1px); }
+.smk-card-tag { flex: none; padding: 1px 5px; font-size: 10px; line-height: 1.4; color: #1a1430; white-space: nowrap; }
+.smk-card .smk-card-tag { position: absolute; left: 0; top: 0; }
+.smk-tag-master { background: var(--gold); }
+.smk-tag-officer { background: #8fb0ff; }
+.smk-card-pic { display: flex; align-items: flex-end; justify-content: center; width: 100%; height: 80px; }
+.smk-pic { display: block; width: auto; max-width: 100%; object-fit: contain; object-position: 50% 100%; image-rendering: pixelated; }
+.smk-pic-none { line-height: 1; }
+.smk-card-name { max-width: 100%; font-size: 13px; text-align: center; }
+.smk-card-sub { font-size: 11px; color: var(--muted); text-align: center; }
+.smk-rank ol { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; margin: 0; padding: 0; list-style: none; }
+.smk-rank li { display: flex; align-items: center; gap: 8px; padding: 5px 6px; background: rgba(255, 255, 255, 0.04); }
+.smk-rank li.mine { background: rgba(255, 195, 92, 0.12); }
+.smk-rank-r { flex: none; width: 20px; text-align: center; font-size: 13px; color: var(--gold); }
+.smk-rank-n { flex: 1; min-width: 0; font-size: 13px; }
+.smk-rank-v { flex: none; display: flex; flex-direction: column; align-items: flex-end; font-size: 13px; color: #ffd0d0; }
+.smk-rank-v small { font-size: 10px; color: var(--muted); }
+.smk-rank-empty { padding: 10px 0; font-size: 12px; color: var(--muted); text-align: center; }
+
+.smk-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-bottom: 6px; }
+.smk-head-name { min-width: 0; font-size: 15px; }
+.smk-head-lv { font-size: 12px; color: var(--muted); }
+.smk-head-ko { margin-left: auto; font-size: 12px; color: var(--muted); }
+.smk-head-ko b { color: var(--gold); font-size: 14px; }
+.smk-hp { position: relative; height: 18px; margin-bottom: 8px; overflow: hidden; background: #160d1c; border: var(--px) solid var(--edge); box-shadow: inset 0 var(--px) 0 rgba(0, 0, 0, 0.5); }
+.smk-hp-ghost, .smk-hp-fill { position: absolute; inset: 0; transform-origin: left center; will-change: transform; }
+.smk-hp-ghost { background: #ffe9a8; transition: transform 0.45s ease-out 0.25s; }
+.smk-hp-fill { background: linear-gradient(180deg, #ff7a7a, #d62a2a 55%, #9c1414); transition: transform 0.08s linear; }
+.smk-hp-refill .smk-hp-fill, .smk-hp-refill .smk-hp-ghost { transition: transform 0.5s ease-out; }
+.smk-hp-low .smk-hp-fill { animation: smk-low 0.6s steps(2) infinite; }
+@keyframes smk-low { 50% { opacity: 0.55; } }
+.smk-hp-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000; }
+
+.smk-stage {
+  position: relative; display: flex; align-items: flex-end; justify-content: center; height: clamp(250px, 50vh, 360px); overflow: hidden;
+  background: radial-gradient(ellipse 60% 45% at 50% 62%, rgba(111, 143, 255, 0.22), transparent 70%), linear-gradient(180deg, #1b1e46, #121330 70%, #0d0e24);
+  border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 var(--hi), inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 var(--lo);
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; cursor: pointer;
+}
+.smk-stage:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.smk-body { position: relative; display: flex; flex-direction: column; align-items: center; max-width: 82%; padding-bottom: 22px; transform-origin: 50% 100%; pointer-events: none; }
+.smk-target { position: relative; display: flex; justify-content: center; max-width: 100%; }
+.smk-target .smk-pic { max-width: 100%; }
+.smk-shadow { position: absolute; left: 50%; bottom: 14px; width: 120px; height: 16px; margin-left: -60px; border-radius: 50%; background: rgba(0, 0, 0, 0.45); }
+.smk-nums { position: absolute; inset: 0; pointer-events: none; }
+.smk-combo { position: absolute; right: 8px; top: 6px; display: flex; flex-direction: column; align-items: flex-end; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+.smk-combo.on { opacity: 1; }
+.smk-combo b { font-size: 26px; line-height: 1; color: #fff27a; text-shadow: 2px 2px 0 #000; animation: smk-bump 0.18s ease-out both; }
+.smk-combo small { font-size: 9px; letter-spacing: 0.12em; color: #cfc8ff; }
+@keyframes smk-bump { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
+.smk-kotext {
+  position: absolute; left: 50%; top: 38%; font-size: 54px; line-height: 1; font-weight: 700; color: var(--gold); letter-spacing: 0.04em;
+  text-shadow: 3px 3px 0 #000, -2px 2px 0 #000, 2px -2px 0 #000, -2px -2px 0 #000, 0 0 18px rgba(255, 195, 92, 0.7);
+  transform: translate(-50%, -50%); opacity: 0; pointer-events: none;
+}
+.smk-ko-on { animation: smk-ko-in 1.3s ease-out both; }
+@keyframes smk-ko-in {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(2.6); }
+  14% { opacity: 1; transform: translate(-50%, -50%) scale(0.9); }
+  22% { transform: translate(-50%, -50%) scale(1.06); }
+  30%, 82% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -60%) scale(1); }
+}
+.smk-body.smk-ko { animation: smk-fall 0.5s cubic-bezier(0.3, 0.1, 0.6, 1) both; }
+@keyframes smk-fall { 0% { transform: rotate(0); opacity: 1; } 60% { transform: translateY(6px) rotate(-78deg); } 100% { transform: translateY(10px) rotate(-82deg); opacity: 0.55; } }
+.smk-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin-top: 8px; }
+.smk-stats div { display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 6px 2px; background: var(--panel); border: 1px solid var(--edge); }
+.smk-stats small { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.smk-stats b { font-size: 14px; color: var(--text); }
+
+/* 운영진 때리기 타격 모양: 일반 · 크리티컬 · 죽음의 일격 (src/smackFx.ts HIT_FX 와 짝).
+   제작자가 인게임 영상(데미지·크리티컬·죽음의 일격)을 주면 이 묶음만 그 모양으로 고친다 */
+.smk-num {
+  position: absolute; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%); white-space: nowrap; pointer-events: none;
+  font-weight: 700; line-height: 1; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000, 2px 2px 0 #000;
+}
+.smk-num small { font-size: 10px; letter-spacing: 0.06em; }
+.smk-num-normal { font-size: 18px; color: #fff; animation: smk-rise 0.8s ease-out both; }
+.smk-num-critical { z-index: 1; font-size: 28px; color: #ffcf4a; animation: smk-crit 1s ease-out both; }
+.smk-num-critical small { color: #ff8a3d; font-size: 11px; }
+.smk-num-deadly { z-index: 2; font-size: 40px; color: #ff3b3b; animation: smk-deadly 1.5s ease-out both; }
+.smk-num-deadly small { margin-bottom: 2px; padding: 2px 6px; font-size: 13px; color: #fff; background: #8a0000; border: 1px solid #ff8a8a; text-shadow: none; }
+@keyframes smk-rise {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(0.6); }
+  15% { opacity: 1; transform: translate(-50%, -60%) scale(1.15); }
+  30% { transform: translate(-50%, -70%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -190%) scale(1); }
+}
+@keyframes smk-crit {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(2.2); }
+  12% { opacity: 1; transform: translate(-50%, -60%) scale(0.92); }
+  22% { transform: translate(-50%, -64%) scale(1.08); }
+  70% { opacity: 1; transform: translate(-50%, -110%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -160%) scale(1); }
+}
+@keyframes smk-deadly {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(3); }
+  10% { opacity: 1; transform: translate(-50%, -55%) scale(0.85); }
+  16% { transform: translate(-48%, -55%) scale(1.12); }
+  22% { transform: translate(-52%, -55%) scale(1); }
+  75% { opacity: 1; transform: translate(-50%, -80%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -120%) scale(1.05); }
+}
+.smk-num-still { animation: smk-still 0.8s linear both; }
+.smk-num-deadly.smk-num-still { animation-duration: 1.5s; }
+@keyframes smk-still { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+.smk-recoil-normal { animation: smk-recoil-n 0.18s ease-out both; }
+.smk-recoil-critical { animation: smk-recoil-c 0.28s ease-out both; }
+.smk-recoil-deadly { animation: smk-recoil-d 0.5s ease-out both; }
+.smk-recoil-respawn { animation: smk-respawn 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+@keyframes smk-recoil-n { 0% { transform: none; } 30% { transform: translateX(5px) scale(1.03, 0.96); } 100% { transform: none; } }
+@keyframes smk-recoil-c { 0% { transform: none; } 25% { transform: translateX(10px) rotate(6deg) scale(1.06, 0.9); } 60% { transform: translateX(-3px) rotate(-2deg); } 100% { transform: none; } }
+@keyframes smk-recoil-d {
+  0% { transform: none; } 12% { transform: translateX(16px) rotate(12deg) scale(1.12, 0.8); } 30% { transform: translateX(-10px) rotate(-8deg) scale(0.95, 1.05); }
+  55% { transform: translateX(4px) rotate(3deg); } 100% { transform: none; }
+}
+@keyframes smk-respawn { 0% { opacity: 0; transform: scale(0.4); } 100% { opacity: 1; transform: none; } }
+.smk-shake-1 { animation: smk-shake1 0.2s steps(3) both; }
+.smk-shake-2 { animation: smk-shake2 0.45s steps(6) both; }
+@keyframes smk-shake1 { 0%, 100% { transform: none; } 33% { transform: translate(3px, -2px); } 66% { transform: translate(-3px, 2px); } }
+@keyframes smk-shake2 { 0%, 100% { transform: none; } 17% { transform: translate(-8px, 4px); } 33% { transform: translate(8px, -5px); } 50% { transform: translate(-6px, -3px); } 67% { transform: translate(5px, 4px); } 83% { transform: translate(-2px, -2px); } }
+.smk-flash { position: fixed; inset: 0; z-index: 8; pointer-events: none; opacity: 0; background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.5), rgba(255, 30, 30, 0.55) 45%, rgba(120, 0, 0, 0.7)); }
+.smk-flash-deadly { animation: smk-flash 0.55s ease-out both; }
+@keyframes smk-flash { 0% { opacity: 0; } 8% { opacity: 1; } 100% { opacity: 0; } }
+.smk-slash {
+  position: absolute; left: -20%; top: 42%; width: 140%; height: 5px; opacity: 0; pointer-events: none; transform-origin: 0 50%;
+  background: linear-gradient(90deg, transparent, #fff 20%, #ffd0d0 50%, #ff3b3b 80%, transparent); box-shadow: 0 0 10px #ff3b3b;
+  transform: rotate(-24deg) scaleX(0);
+}
+.smk-slash-on { animation: smk-slash 0.4s ease-out both; }
+@keyframes smk-slash { 0% { opacity: 1; transform: rotate(-24deg) scaleX(0); } 40% { opacity: 1; transform: rotate(-24deg) scaleX(1); } 100% { opacity: 0; transform: rotate(-24deg) scaleX(1) scaleY(0.3); } }
+@media (prefers-reduced-motion: reduce) {
+  .smk-hp-low .smk-hp-fill, .smk-combo b, .smk-body.smk-ko, .smk-card:active { animation: none; transform: none; }
+  .smk-ko-on { animation: smk-ko-still 1.3s linear both; }
+  .smk-hp-ghost, .smk-hp-fill { transition: none; }
+}
+@keyframes smk-ko-still { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }

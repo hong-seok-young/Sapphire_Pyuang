@@ -51,6 +51,11 @@ export interface LaunchItem {
   masters?: boolean;
 }
 
+/** 운영진 때리기를 모두에게 열었는지 (서버 server/smack.ts SMACK_OPEN 과 같이 바꾼다) */
+export const SMACK_OPEN = false;
+/** 운영진 때리기에 들어가는 사람: 열기 전에는 앱개발자(와 테스트 계정)만 */
+export const canSmack = (me: Me) => SMACK_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
+
 export const ITEMS: LaunchItem[] = [
   { key: "home", title: "홈", to: "#/", icon: "🏠", pic: "home", match: [""] },
   // 게시판 (제작자 요청): 공지사항, 길드 이벤트, 자유 게시판. 처음에는 아래 탭 홈 오른쪽 (제작자 요청 2026-11-01)
@@ -80,6 +85,9 @@ export const ITEMS: LaunchItem[] = [
   // 건의함 (개발중, 제작자 요청 2026-11-09 개발 요청 #13 유어아너 '건의사항은 게시판에서 빼고 별도 버튼, 익명 기능'): 게시판의 건의 사항을 따로, 익명 글·댓글.
   // 열면 src/board.ts SUGGEST_OPEN (그때 soon·badge 가 빠진다)
   { key: "suggest", title: "건의함", short: "건의", to: "#/suggest", icon: "💡", soon: !SUGGEST_OPEN, badge: "개발중", match: ["suggest"] },
+  // 운영진 때리기 (개발 요청 #10, 제작자 2026-11-09 '우선 나한테만 보이게'): 길마·오피서 캐릭터를 두드려 스트레스 풀기 (pages/Smack.tsx).
+  // 열 때는 developer·soon·badge 를 빼고 SMACK_OPEN (CLAUDE.md '운영진 때리기')
+  { key: "smack", title: "운영진 때리기", short: "때리기", to: "#/smack", icon: "🥊", developer: !SMACK_OPEN, soon: !SMACK_OPEN, badge: "개발중", match: ["smack"] },
   { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
   // 헬스 루틴 (개발중, 길드원 완뻔치 님 개발 요청 #8, 제작자 2026-11-09 '플릭 같은 헬스 어플'): 실제 헬스장 운동 기록 (pages/Fit.tsx). 게임과 상관없다
   { key: "fit", title: "헬스 루틴", short: "헬스", to: "#/fit", icon: "🏋️", soon: true, badge: "개발중", match: ["fit"] },
@@ -171,7 +179,7 @@ function build(dock: string[], slots: string[], search: boolean): Layout {
 /** 처음 배치 (제작자 요청 2026-11-02: 제작자 폰의 배치 그대로 '이걸 기본 배치로') */
 export const DEFAULT_LAYOUT: Layout = {
   dock: ["home", "board", "info", "search", "chat"],
-  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "trend", "enhance", "sim", "simtest", "devreq", "suggest", "fit", "app"],
+  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "trend", "enhance", "sim", "simtest", "devreq", "suggest", "fit", "app", "smack"],
 };
 
 /**

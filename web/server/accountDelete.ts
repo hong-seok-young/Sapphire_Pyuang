@@ -33,6 +33,10 @@ export async function deleteAccountData(env: Env, user: { id: string; main_id: s
     env.DB.prepare("DELETE FROM favorites WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM bday_combo WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM bday_resume WHERE user_id = ?").bind(user.id),
+    // 운영진 때리기: 그 사람이 때린 기록과 그 사람이 맞은 기록 (본캐를 지워 부캐가 이어받으면 맞은 기록은 새 본캐로)
+    env.DB.prepare("DELETE FROM smack_stats WHERE hitter = ?").bind(user.id),
+    ...(heir ? [env.DB.prepare("UPDATE OR IGNORE smack_stats SET target = ? WHERE target = ?").bind(heir.id, user.id)] : []),
+    env.DB.prepare("DELETE FROM smack_stats WHERE target = ?").bind(user.id),
     env.DB.prepare("DELETE FROM todo_checks WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM todo_custom WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM todo_edits WHERE user_id = ?").bind(user.id),
