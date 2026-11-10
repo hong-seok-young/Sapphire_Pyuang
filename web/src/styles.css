@@ -4766,7 +4766,9 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .hof-pod-face { position: relative; display: flex; align-items: center; justify-content: center; width: 76px; height: 76px; margin-bottom: 5px; }
 .hof-pod-1 .hof-pod-face { width: 104px; height: 108px; }
 /* 프로필 둘레 상장 리본 (Hall.tsx Rosette). 안의 것이 움직여서 svg 에 filter 는 두지 않는다 (빛은 hof-ro-glow 원) */
-.hof-frame { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; overflow: visible; }
+.hof-frame { position: absolute; z-index: 2; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; overflow: visible; }
+/* 그림 순서: 바닥 마법진·물결·빛기둥(z 1) < 상장 리본 테두리(z 2) < 반짝이 별·얼굴(z 3). 마법진이 테두리 앞으로 튀어나오지 않게 (제작자 2026-11-10) */
+.hof-pod-face .gh-spark { z-index: 3; }
 .hof-ro * { transform-box: view-box; }
 .hof-ro-glow { transform-origin: 50px 50px; animation: hof-ro-glow 3.2s ease-in-out infinite; }
 .hof-ro-rays { transform-origin: 50px 50px; animation: hof-spin 16s linear infinite; }
