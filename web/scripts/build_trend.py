@@ -832,6 +832,9 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
             rs.unknown[c] += 1
             unknown = True
     enh = enh or enh_word
+    if wiki and not enh and not lead_digits and not opts and len(num_words) == 1 and re.fullmatch(r"\d", num_words[0]) \
+            and _kinds().get(name) == "enhance" and re.search(r"(?<!\S)" + num_words[0] + r"\s+\+?" + re.escape(abbr), line):
+        enh, num_words = int(num_words[0]), []  # '7 하갑 6' = +7 하이가드갑옷 6만 원: 이름 바로 앞에 띄어 쓴 한 자리 숫자는 강화 (제작자 2026-11-10)
     if wiki and bare_is_option(name, num_words, bare):
         return None  # 가격 없는 목록의 옵션 숫자 ('5강 렌 바슬신 6 3 12')
     if wiki and not opts:
@@ -846,6 +849,8 @@ WIKI_STAT = {"크리티컬": "크리", "속성저항": "속저", "마나재생":
 _RANGE_OPTS: dict[str, tuple[list[str], str]] | None = None
 NUM_MISMATCH: dict[str, list[str]] = {}
 _RANGE_MAX: dict[tuple[str, str], int] = {}
+# 위키 범위보다 낮은 값이 실제로 있는 것 (위키 아래 끝이 틀린 듯, 실제 범위 확인 전): '6강 세계수가지갑 2 13 32' = 크리2 불저13 체력32 (제작자 2026-11-10, 위키 불저 26~34)
+RANGE_MIN_FIX: dict[tuple[str, str], int] = {("세계수가지갑옷", "불저"): 13}
 _RANGE_MIN: dict[tuple[str, str], int] = {}
 # 숫자만 적을 때 그 물건에 쓸모 있는 옵션(유효옵)만 적은 것: 물건마다 다르다 (제작자 2026-11-10 '유효옵만 적은 거라 레인저는 마재 빼고 크리 3 민 5',
 # '템마다 다를 듯 해서 그때그때 물어봐'). 확인받은 물건만 적고, 없는 물건은 숫자 수가 위키 옵션 수와 맞을 때만 읽는다
@@ -861,6 +866,8 @@ DIGIT_STATS = {
 EFFECTIVE_OPTS = {
     "데조르바의보우": ["크리", "민첩"],  # 35칠데조 = 크리3 민첩5 (마재는 안 적음)
     "샤도우보우": ["크리", "민첩"],  # '45 팔샤' = 크리4 민첩5 (제작자 2026-11-10 '투옵이면 이게 맞지')
+    "설원의저주장화": ["지능", "이속"],
+    "카이저소드": ["명중", "힘"],  # '97 칠카소 32장' = 명중9 힘7 +7 (제작자 2026-11-10)  # '37 5설원장 4' = 지능3 이속7 +5, 4장 (제작자 2026-11-10)
 }
 
 
@@ -888,6 +895,9 @@ def range_opts(name: str) -> tuple[list[str], str]:
                             _RANGE_MAX[(re.sub(r"\s", "", row.get("name", "")), st)] = int(m.group(2))
                             lo = re.search(r"\d+", part)
                             _RANGE_MIN[(re.sub(r"\s", "", row.get("name", "")), st)] = int(lo.group(0)) if lo else 0
+                    for (nm, st), lo_fix in RANGE_MIN_FIX.items():
+                        if nm == re.sub(r"\s", "", row.get("name", "")):
+                            _RANGE_MIN[(nm, st)] = min(_RANGE_MIN.get((nm, st), lo_fix), lo_fix)
                     job = cells[hs.index("직업")] if "직업" in hs and hs.index("직업") < len(cells) else ""
                     _RANGE_OPTS.setdefault(re.sub(r"\s", "", row.get("name", "")), (stats, job))
     return _RANGE_OPTS.get(re.sub(r"\s", "", name), ([], ""))
@@ -1017,6 +1027,16 @@ def load_kinds() -> dict[str, str]:
             for row in table["rows"]:
                 out.setdefault(row["name"], kind)
     return out
+
+
+_KINDS_CACHE: dict[str, str] | None = None
+
+
+def _kinds() -> dict[str, str]:
+    global _KINDS_CACHE
+    if _KINDS_CACHE is None:
+        _KINDS_CACHE = load_kinds()
+    return _KINDS_CACHE
 
 
 def item_kind(name: str, xs: list[dict], kinds: dict[str, str]) -> str:
