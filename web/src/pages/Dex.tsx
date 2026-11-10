@@ -52,7 +52,8 @@ function addUp(entries: DexEntry[]): Sum {
   return s;
 }
 const num = (v: number) => String(Math.round(v * 100) / 100);
-const effectText = ([stat, v, pct]: [string, number, boolean]) => `${stat} +${num(v)}${pct ? "%" : ""}`;
+/** 효과 글자 (긴 이름은 획득 옵션 칸과 같은 줄임말 SHORT, 제작자 2026-11-10 '아래쪽도 위처럼 줄임말') */
+const effectText = ([stat, v, pct]: [string, number, boolean]) => `${SHORT[stat] ?? stat} +${num(v)}${pct ? "%" : ""}`;
 
 /** 게임 도감 '획득 옵션' 창의 37줄 (제작자가 시세 동향 때 보낸 스샷 7장, 2026-11-03). 체력·마나·PVE 데미지 같은 것은 고정값 줄과 % 줄이 따로 있다.
  *  좌우 두 칸 짝으로 둔다 (제작자 2026-11-10 '바를 빼고 최대한 유사한 것들끼리 좌우 2열 배치'). null = 빈 칸. 37줄이 모두 한 번씩 들어 있다 */
