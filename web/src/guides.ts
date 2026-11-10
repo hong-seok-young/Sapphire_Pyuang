@@ -145,7 +145,6 @@ export const GUIDES: Guide[] = [
     key: "board",
     title: "게시판",
     tutorial: [
-      { sel: ".main-tabs *:has-text('건의')", head: "건의", text: "글을 올리면 길드마스터와 오피서에게 알림이 가요." },
       {
         sel: ".main-tabs *:has-text('아이모 소식')",
         head: "아이모 소식",
@@ -165,12 +164,12 @@ export const GUIDES: Guide[] = [
     ],
   },
   {
-    // 건의함 (개발중, 2026-11-09): 누가 보는지와 익명
+    // 건의함 (2026-11-10 오픈): 누가 보는지, 결재선, 익명
     key: "suggest",
     title: "건의함",
     tutorial: [
       { sel: ".sg-big", head: "건의하기", text: "글을 올리면 길드마스터와 오피서에게 알림이 가요.\n건의 글은 운영진과 쓴 사람만 볼 수 있어요." },
-      { sel: ".sg-tab-mine", head: "내 건의함", text: "보낸 건의와 운영진 답글은 여기서 봐요." },
+      { sel: ".sg-tab-mine", head: "내 건의함", text: "보낸 건의의 결재 상황과 운영진 답글은 여기서 봐요.\n단계마다 알림이 가고, 반려되면 고쳐서 다시 올릴 수 있어요." },
       { sel: ".sg-tab-inbox", who: "officer", head: "접수함", text: "길드원이 보낸 건의가 모두 모여요." },
       {
         go: "#/suggest/write",

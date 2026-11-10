@@ -13,7 +13,7 @@ export const CAT_ICON: Record<Cat, string> = { notice: "📌", event: "🎉", fr
  * 익명 글·댓글을 쓴다 (이름은 서버가 가린다). 건의 글은 운영진(오피서 이상)과 쓴 사람만 본다 (서버가 거른다). 서버 server/board.ts 의 SUGGEST_OPEN 과 같이 바꾼다:
  * false 인 동안 건의함은 개발 중(미리 보는 사람만)이고 게시판에 '건의' 칸이 그대로 있다. true 면 게시판에서 '건의' 칸을 빼고 건의함이 홈 칸으로
  */
-export const SUGGEST_OPEN = false;
+export const SUGGEST_OPEN = true;
 /** 게시판에 보이는 칸 (건의함을 열면 건의 사항은 건의함에만) */
 export const BOARD_CATS: Cat[] = SUGGEST_OPEN ? CATS.filter((c) => c !== "suggest") : CATS;
 /** 익명 글·댓글의 가린 이름 (서버 server/board.ts ANON_NAME) */
@@ -63,7 +63,7 @@ export interface BoardComment {
 
 /** 건의 결재선 (server/suggest.ts): agree 오피서 합의·길마 결재 대기 | accepted 건의 접수 완료 | done 건의 반영 완료 | rejected 반려 */
 export type SgStatus = "agree" | "accepted" | "done" | "rejected";
-export type SgKind = "agree" | "approve" | "skip" | "force" | "reject" | "done";
+export type SgKind = "agree" | "approve" | "skip" | "force" | "reject" | "done" | "resubmit";
 export interface SgStep {
   user_id: string;
   kind: SgKind;

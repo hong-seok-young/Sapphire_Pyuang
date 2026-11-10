@@ -5000,3 +5000,4 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .sg-chip-accepted { color: #6fd0ff; }
 .sg-chip-done { color: #6dff9a; }
 .sg-chip-rejected { color: #ff7a7a; }
+.sg-round { justify-self: start; padding: 0 6px; font-size: 11px; color: var(--gold); border: 1px solid var(--gold); }

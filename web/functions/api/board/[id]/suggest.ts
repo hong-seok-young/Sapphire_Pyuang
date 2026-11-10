@@ -5,10 +5,11 @@
 //   force    길드마스터 직권: 반려된 건의를 강제 결재 -> 접수 완료 (반려한 사람에게도 알림)
 //   reject   오피서·길드마스터: 반려 의견을 꼭 적는다 -> 반려 (올린 사람에게 알림)
 //   done     운영진 누구나: 접수 완료 -> 건의 반영 완료 (올린 사람에게 알림)
+//   resubmit 올린 사람: 반려된 건의를 (수정으로 고친 뒤) 다시 올린다 -> 합의 대기, 새 차례 (제작자 2026-11-10 '다시 올리기 ㄱ'). 오피서들에게 알림
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
 import { ANON_NAME, canSeePost, loadPost, postLink } from "../../../../server/board";
-import { SG_NOTE_MAX, peopleWithRoles, sgRole, sgStatusOf, sgSteps, sgTell } from "../../../../server/suggest";
+import { SG_NOTE_MAX, currentRound, peopleWithRoles, sgRole, sgStatusOf, sgSteps, sgTell } from "../../../../server/suggest";
 import type { SgKind, SgStatus } from "../../../../server/suggest";
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
@@ -22,7 +23,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   const b = await readJson<{ act: unknown; note: unknown }>(request);
   const note = typeof b.note === "string" ? b.note.trim().slice(0, SG_NOTE_MAX) : "";
   const role = sgRole(me);
-  const steps = await sgSteps(env, id);
+  // 이번 차례만 센다 (반려 뒤 다시 올리면 합의를 새로 받는다)
+  const steps = currentRound(await sgSteps(env, id));
   const agrees = steps.filter((s) => s.kind === "agree");
   const link = postLink("suggest", id);
   const title = `“${post.title}”`;
@@ -76,6 +78,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
     next = "done";
     kind = "done";
     after.push(() => sgTell(env, me, owner, `[건의 반영 완료] 건의가 반영됐어요 · ${title}${note ? ` · ${note}` : ""}`, link));
+  } else if (b.act === "resubmit") {
+    if (!(me.chars ?? [me.id]).includes(post.author)) return FORBIDDEN();
+    if (status !== "rejected") return json({ error: "반려된 건의가 아니에요" }, 409);
+    next = "agree";
+    kind = "resubmit";
+    after.push(async () =>
+      sgTell(
+        env,
+        me,
+        await peopleWithRoles(env, ["officer", "master", "developer"]),
+        `[건의 다시 접수 · 오피서 합의] ${who}: ${title} · 반려 뒤 고쳐서 다시 올렸어요${note ? ` · ${note}` : ""}`,
+        link,
+      ),
+    );
   } else return json({ error: "모르는 결재예요" }, 400);
 
   const now = Date.now();

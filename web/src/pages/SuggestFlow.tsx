@@ -31,7 +31,10 @@ const KIND_LINE: Record<SgKind, string> = {
   force: "길마 강제 결재",
   reject: "반려",
   done: "반영 완료",
+  resubmit: "고쳐서 다시 올림",
 };
+/** 이번 차례의 이력 (반려 뒤 다시 올리면 그 뒤부터, 서버 server/suggest.ts currentRound) */
+const currentRound = (steps: SgStep[]) => steps.slice(steps.map((s) => s.kind).lastIndexOf("resubmit") + 1);
 
 /** 결재란: 접수 · 오피서 합의 · 길마 결재 · 접수 완료 · 반영 완료 */
 function Line({ postId, author, status, steps }: { postId: number; author: string; status: SgStatus; steps: SgStep[] }) {
@@ -69,7 +72,7 @@ function Line({ postId, author, status, steps }: { postId: number; author: strin
             </span>
             <span className="dr-cell-box">
               {c.step ? (
-                <Stamp id={`${postId}:${c.key}:${c.stamp}:${c.step.user_id}`} text={c.stamp} red={c.red} grey={c.grey} />
+                <Stamp id={`${postId}:${steps.length ? steps[0].created_at : 0}:${c.key}:${c.stamp}:${c.step.user_id}`} text={c.stamp} red={c.red} grey={c.grey} />
               ) : c.wait && status !== "rejected" ? (
                 <span className="dr-wait">대기</span>
               ) : null}
@@ -85,7 +88,8 @@ function Line({ postId, author, status, steps }: { postId: number; author: strin
 }
 
 /** 내 결재: 오피서는 합의·반려, 길마는 결재(합의 없으면 직권 결재)·반려, 반려된 건의는 길마 강제 결재, 접수 완료는 운영진 누구나 반영 완료 */
-function Act({ me, postId, mine, status, steps, onDone }: { me: Me; postId: number; mine: boolean; status: SgStatus; steps: SgStep[]; onDone: () => void }) {
+function Act({ me, postId, mine, status, steps: all, onDone }: { me: Me; postId: number; mine: boolean; status: SgStatus; steps: SgStep[]; onDone: () => void }) {
+  const steps = currentRound(all);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -105,6 +109,10 @@ function Act({ me, postId, mine, status, steps, onDone }: { me: Me; postId: numb
       acts = [agrees.length ? ["approve", "결재"] : ["skip", "직권 결재"], ["reject", "반려"]];
       ph = "결재·반려 의견 (반려하면 꼭)";
     }
+  } else if (status === "rejected" && mine) {
+    // 올린 사람: 반려 의견을 보고 '수정'으로 고친 뒤 다시 올린다 (제작자 2026-11-10 '다시 올리기 ㄱ')
+    acts = [["resubmit", "다시 올리기"]];
+    ph = "다시 올리며 한마디 (선택)";
   } else if (status === "rejected" && me.role === "master") {
     acts = [["force", "강제 결재"]];
     ph = "결재 의견 (선택)";
@@ -167,15 +175,17 @@ export function SuggestFlow({
   flow: { status: SgStatus; steps: SgStep[] };
   onChanged: () => void;
 }) {
+  const round = flow.steps.filter((s) => s.kind === "resubmit").length + 1;
   return (
     <section className="panel sg-flow">
-      <Line postId={postId} author={author} status={flow.status} steps={flow.steps} />
+      {round > 1 && <span className="sg-round">{round}차</span>}
+      <Line postId={postId} author={author} status={flow.status} steps={currentRound(flow.steps)} />
       <Act me={me} postId={postId} mine={mine} status={flow.status} steps={flow.steps} onDone={onChanged} />
       {flow.steps.length > 0 && (
         <div className="dr-history">
           <b className="dr-sub-title">결재 이력</b>
           {flow.steps.map((s, i) => (
-            <div key={i} className={`dr-step dr-step-${s.kind === "skip" || s.kind === "force" ? "approve" : s.kind}`}>
+            <div key={i} className={`dr-step dr-step-${s.kind === "skip" || s.kind === "force" ? "approve" : s.kind === "resubmit" ? "resubmit" : s.kind}`}>
               <span className="dr-step-kind">{KIND_LINE[s.kind]}</span>
               <span className="dr-step-who">
                 <Nick name={s.user_id} />
