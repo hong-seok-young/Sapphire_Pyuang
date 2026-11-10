@@ -119,6 +119,26 @@ export function orderLabel(
   return `${name}${unit ? ` ${unit}` : ""}${qty > 1 ? ` x${qty}` : ""}`;
 }
 export const MAX_QTY = 20;
+
+/** 한 주(목요일 오전 10시부터, weekStart)에 한 사람이 신청할 수 있는 낱개 상한 (제작자 2026-11-10 '사멧은 1주에 구매 가능 상한을 30개로, 낱개 단위로 30개, 통 말고').
+ * 키는 띄어쓰기 없는 이름. 기다리는 중·지급 완료한 신청을 센다 (반려·취소는 빼서 다시 살 수 있다). 화면 src/gcoin.ts 는 /api/gcoin 의 caps 를 그대로 쓴다 */
+export const WEEKLY_CAP: Record<string, number> = { 사나운멧돼지인형: 30 };
+export const capKey = (name: string) => name.replace(/\s/g, "");
+export const unitCount = (unit: string | null) => Number(/(\d+)\s*개/.exec(unit ?? "")?.[1] ?? 1) || 1;
+/** 이번 주에 신청한 낱개 수 (상한이 있는 물건만, 띄어쓰기 없는 이름마다) */
+export async function weekBought(env: Env, userId: string, now = Date.now()): Promise<Record<string, number>> {
+  const { results } = await env.DB.prepare(
+    "SELECT name, unit, qty FROM gc_orders WHERE user_id = ? AND status IN ('pending', 'done') AND created_at >= ?",
+  )
+    .bind(userId, weekStart(now))
+    .all<{ name: string; unit: string | null; qty: number }>();
+  const out: Record<string, number> = {};
+  for (const r of results) {
+    const k = capKey(r.name);
+    if (WEEKLY_CAP[k] !== undefined) out[k] = (out[k] ?? 0) + unitCount(r.unit) * r.qty;
+  }
+  return out;
+}
 export const MAX_PRICE = 100_000;
 /** 담당자가 골드로 적는 값 (제작자 2026-11-09 '천 단위로 적게 하지 말고 그냥 원 단위로'): 1,000골드 = 성장코인 1개, 반올림 (1골드 이상이면 1코인부터) */
 export const MAX_GOLD = 100_000_000;

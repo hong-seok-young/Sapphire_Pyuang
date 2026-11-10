@@ -17,6 +17,7 @@ import { EVENT_EVERY, MAINT_EVERY, refreshEvents, refreshMaint } from "../../ser
 import { NEW_OFFICIAL_SQL, announceOfficial } from "../../server/officialAlert";
 import type { NewOfficial } from "../../server/officialAlert";
 import { canEnter, isManager } from "../../server/rental";
+import { canManageGcoin, canUseGcoin } from "../../server/gcoin";
 import { remindIfDue } from "../../server/gdungeon";
 import { announceApp } from "../../server/appNews";
 import { announceBday } from "../../server/birthday";
@@ -45,6 +46,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
   const owner = me.owner ?? me.id;
   const rent = canEnter(me);
   const manager = rent && isManager(me);
+  // 성장코인샵 담당자: 기다리는 구매 신청 수 (처리할 일이라 본 때와 상관없이 남은 만큼, 홈 칸 배지)
+  const gcoinStaff = canUseGcoin(me) && canManageGcoin(me);
   // 모든 문장이 같은 자리표를 쓴다 (?9 = 본캐 아이디). 문장에 있는 자리표 수만큼만 넣는다 (더 넣으면 D1 이 거절한다)
   const q = (sql: string, ...args: unknown[]) => {
     const count = Math.max(0, ...[...sql.matchAll(/\?(\d+)/g)].map((m) => Number(m[1])));
@@ -130,6 +133,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
           ),
         ]
       : []),
+    ...(gcoinStaff ? [q("SELECT COUNT(*) AS n FROM gc_orders WHERE status = 'pending'")] : []),
     // 점검 글 최근 3개 (색인 official_news_type, 본문은 점검 시간·서버·인던 제한이 있는 앞부분만)
     env.DB.prepare("SELECT id, title, start_date, substr(body, 1, 3000) AS body FROM official_news WHERE type = 'C' ORDER BY id DESC LIMIT 3"),
     env.DB.prepare("SELECT key, done_at FROM setup WHERE key IN ('official_maint_checked', 'official_event_checked')"),
@@ -158,6 +162,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
     counts["rent.apps"] = n(results[i++]);
   }
   if (manager) counts["rent.staff"] = n(results[i++]);
+  if (gcoinStaff) counts["gcoin.staff"] = n(results[i++]);
   const maint = results[i++];
   const checked = results[i++];
   const fresh = results[i++].results as unknown as NewOfficial[];

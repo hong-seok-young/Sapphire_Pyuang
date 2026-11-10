@@ -4,7 +4,7 @@
 import { FORBIDDEN, NEED_LOGIN, currentUser, json } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { raceData } from "../../../server/gcrace";
-import { LEVEL_COINS, gcoinOpen, openCleanup, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
+import { LEVEL_COINS, WEEKLY_CAP, weekBought, gcoinOpen, openCleanup, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
 import { weekStart } from "../../../server/week";
 
 interface OrderRow {
@@ -114,6 +114,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
   return json({
     open: gcoinOpen(),
+    // 한 주 상한 (낱개, 띄어쓰기 없는 이름마다)과 이번 주 내가 신청한 수
+    caps: WEEKLY_CAP,
+    weekBought: wallet ? await weekBought(env, me.id) : {},
     levelCoins: LEVEL_COINS,
     race,
     manage,

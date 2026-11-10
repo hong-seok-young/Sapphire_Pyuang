@@ -4890,3 +4890,13 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .dex-row-max { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dex-sum-foot { display: flex; gap: 6px; margin-top: 6px; }
 .dex-row-name small.dex-gain { display: block; margin: 0; line-height: 1.1; }
+
+/* 성장코인샵 담당자: 두 번 눌러야 하는 단추 (지급 완료·되돌리기) */
+.gc-sure { background: #b8323a !important; color: #fff !important; border-color: #ff8a8f !important; animation: gc-sure-blink 0.9s ease-in-out infinite; }
+@keyframes gc-sure-blink { 50% { opacity: 0.7; } }
+@media (prefers-reduced-motion: reduce) { .gc-sure { animation: none; } }
+.gc-more { display: block; width: 100%; margin: 6px 0 2px; }
+.gc-cap { flex-basis: 100%; text-align: right; font-size: 11px; color: var(--muted); }
+/* 빨간 새 글·신청 수 배지가 붙은 칸은 담당자 글자를 그 아래로 (성장코인샵: 기다리는 구매 신청 수) */
+.tile-corner.tile-corner-low { top: 22px; z-index: 4; text-shadow: -1px 0 var(--edge), 1px 0 var(--edge), 0 -1px var(--edge), 0 1px var(--edge); }
+.tile-soon > .tile-corner.tile-corner-low { top: 34px; }

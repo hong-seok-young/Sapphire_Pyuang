@@ -14,7 +14,7 @@ import { JobEmblem } from "../emblems";
 import { HeroHalo } from "../heroHalo";
 import { GrowthChart } from "./GrowthChart";
 import { useAsync } from "../data";
-import { Nick } from "../kakao";
+import { KakaoButton, Nick } from "../kakao";
 import { ago } from "../market";
 import { useEntryState } from "../router";
 import {
@@ -394,6 +394,14 @@ function ShopTab({
   useBackClose(picked !== null, () => setPicked(null));
   const balance = wallet?.balance ?? 0;
   const total = picked ? picked.price * qty : 0;
+  // 한 주 상한 (사나운 멧돼지 인형 30개, 제작자 2026-11-10): 남은 낱개 안에서만 묶음을 더한다
+  const capOf = (it: GcItem) => {
+    const k = it.name.replace(/\s/g, "");
+    const cap = data.caps?.[k];
+    return cap === undefined ? null : { cap, left: Math.max(0, cap - (data.weekBought?.[k] ?? 0)) };
+  };
+  const pickedCap = picked ? capOf(picked) : null;
+  const maxQty = picked && pickedCap ? Math.min(20, Math.floor(pickedCap.left / qtyOf(picked.unit))) : 20;
   const groups = new Map<string, GcItem[]>();
   for (const it of data.items.filter((i) => i.active && i.price > 0))
     groups.set(it.name, [...(groups.get(it.name) ?? []), it]);
@@ -476,8 +484,8 @@ function ShopTab({
             </span>
             <button
               className="pill"
-              disabled={qty >= 20}
-              onClick={() => setQty((q) => Math.min(20, q + 1))}
+              disabled={qty >= maxQty}
+              onClick={() => setQty((q) => Math.min(maxQty, q + 1))}
               aria-label="한 묶음 더"
             >
               +
@@ -486,16 +494,21 @@ function ShopTab({
           <button
             className={
               "pill gc-buy-btn" +
-              (wallet && total > balance ? " gc-over" : "") +
+              (wallet && (total > balance || maxQty < 1) ? " gc-over" : "") +
               (member ? "" : " gc-locked")
             }
-            disabled={busy || (!!wallet && total > balance)}
+            disabled={busy || (!!wallet && (total > balance || maxQty < 1))}
             onClick={buy}
           >
             <Coin />
             <PopNum n={total} />
-            &nbsp;{busy ? "…" : wallet && total > balance ? "부족" : "신청"}
+            &nbsp;{busy ? "…" : wallet && maxQty < 1 ? "이번 주 끝" : wallet && total > balance ? "부족" : "신청"}
           </button>
+          {pickedCap && (
+            <small className="gc-cap">
+              한 주 {pickedCap.cap}개까지{wallet ? ` · 남은 ${pickedCap.left}개` : ""}
+            </small>
+          )}
           {error && <p className="form-error">{error}</p>}
         </div>
       )}
@@ -651,7 +664,13 @@ function MineTab({
   );
 }
 
-/** 신청 칸 (오피서 이상): 게임 안에서 준 뒤 지급 완료, 아니면 반려 */
+/** '11/11 21:30' (처리 기록: 언제 건넸는지) */
+function dayTime(ms: number): string {
+  const d = new Date(ms + 9 * 3_600_000);
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+/** 신청 칸 (담당자: 유어아너·길드마스터·앱개발자): 게임 안에서 준 뒤 지급 완료, 아니면 반려 */
 function OrdersTab({
   admin,
   onChanged,
@@ -663,7 +682,15 @@ function OrdersTab({
   const [error, setError] = useState("");
   const [rejecting, setRejecting] = useState<number | null>(null);
   const [note, setNote] = useState("");
-  async function act(o: GcOrder, action: "done" | "reject") {
+  // 지급 완료·되돌리기는 두 번 눌러야 (잘못 눌러 신청한 사람에게 '지급 완료' 알림이 가지 않게)
+  const [sure, setSure] = useState<string | null>(null);
+  const [shown, setShown] = useState(20);
+  async function act(o: GcOrder, action: "done" | "reject" | "reopen") {
+    if ((action === "done" || action === "reopen") && sure !== `${action}:${o.id}`) {
+      setSure(`${action}:${o.id}`);
+      return;
+    }
+    setSure(null);
     setBusy(true);
     setError("");
     try {
@@ -693,7 +720,7 @@ function OrdersTab({
               <Pic name={o.name} small />
               <span className="gc-hist-main">
                 <span>
-                  <Nick name={o.user} /> · {itemLabel(o)}
+                  <Nick name={o.user} /> <KakaoButton name={o.user} /> · {itemLabel(o)}
                 </span>
                 <small>
                   <Coin />
@@ -720,11 +747,11 @@ function OrdersTab({
                 ) : (
                   <>
                     <button
-                      className="pill gc-mini gc-done-btn"
+                      className={"pill gc-mini gc-done-btn" + (sure === `done:${o.id}` ? " gc-sure" : "")}
                       disabled={busy}
                       onClick={() => act(o, "done")}
                     >
-                      지급 완료
+                      {sure === `done:${o.id}` ? "지급 확인" : "지급 완료"}
                     </button>
                     <button
                       className="pill gc-mini"
@@ -742,9 +769,9 @@ function OrdersTab({
       )}
       {admin.recent.length > 0 && (
         <>
-          <p className="gc-sub">최근 처리</p>
+          <p className="gc-sub">처리 기록</p>
           <ul className="gc-hist">
-            {admin.recent.slice(0, 20).map((o) => (
+            {admin.recent.slice(0, shown).map((o) => (
               <li key={o.id} className={"gc-hist-row gc-hist-" + o.status}>
                 <Pic name={o.name} small />
                 <span className="gc-hist-main">
@@ -753,7 +780,14 @@ function OrdersTab({
                   </span>
                   <small>
                     {STATUS_NAME[o.status]}
-                    {o.doneBy && ` · ${o.doneBy}`} · {ago(o.doneAt ?? o.at)}
+                    {o.doneBy && o.doneBy !== o.user && (
+                      <>
+                        {" · "}
+                        <Nick name={o.doneBy} />
+                      </>
+                    )}{" "}
+                    · {dayTime(o.doneAt ?? o.at)}
+                    {o.note && ` · “${o.note}”`}
                   </small>
                 </span>
                 <span
@@ -764,9 +798,23 @@ function OrdersTab({
                 >
                   −{o.price * o.qty}
                 </span>
+                {o.status === "done" && o.doneAt && Date.now() - o.doneAt < 86_400_000 && (
+                  <button
+                    className={"pill gc-mini" + (sure === `reopen:${o.id}` ? " gc-sure" : "")}
+                    disabled={busy}
+                    onClick={() => act(o, "reopen")}
+                  >
+                    {sure === `reopen:${o.id}` ? "되돌리기 확인" : "되돌리기"}
+                  </button>
+                )}
               </li>
             ))}
           </ul>
+          {admin.recent.length > shown && (
+            <button className="pill gc-more" onClick={() => setShown((n) => n + 20)}>
+              더 보기
+            </button>
+          )}
         </>
       )}
     </>

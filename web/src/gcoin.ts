@@ -114,6 +114,9 @@ export const RACE_EVENT = "sapphire:gcrace";
 
 export interface GcData {
   open: boolean;
+  /** 한 주 상한 (낱개, 띄어쓰기 없는 이름: 사나운멧돼지인형 30)과 이번 주 내가 신청한 수 */
+  caps?: Record<string, number>;
+  weekBought?: Record<string, number>;
   /** 레벨·경험치마다 코인 (지금 시범운영은 꺼짐: 2주 목표 선착순만) */
   levelCoins: boolean;
   race: GcRace;
@@ -153,7 +156,7 @@ export const buyItem = (itemId: number, qty: number) =>
   });
 export const actOrder = (
   id: number,
-  action: "done" | "reject" | "cancel",
+  action: "done" | "reject" | "cancel" | "reopen",
   note?: string | null,
 ) => api<{ ok: boolean }>(`/api/gcoin/orders/${id}`, "PATCH", { action, note });
 export const saveGcSettings = (input: {
