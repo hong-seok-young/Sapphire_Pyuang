@@ -391,6 +391,8 @@ ALIASES: dict[str, str | None] = {
     "레이븐": "레이븐목걸이", "맹독신": "맹독의장화", "오트윌갑": "오트윌의경갑", "철실": "철갑쉴드", "닼실": "다크스틸쉴드",
     # 제작자 2026-11-10 확인: 닥소 = 닼소, 오트갑 = 오트윌갑, 데조 = 데조르바의보우 (칠데조 = +7 데조)
     "닥소": "다크스틸소드", "오트갑": "오트윌의경갑", "데조": "데조르바의보우",
+    "설신": "설원의저주장화",  # 제작자 2026-11-10
+    "윙": "윙의날개",  # 팔윙 = +8 윙의날개 (짐작, 확인 전: 윙의날개 옵션이 명중·크리·민첩 셋이라 '434팔윙', '팔윙 옵333' 과 맞는다)
     "거뼈": "거미줄뼈갑옷", "황목": "황금목걸이", "닥스": "다크스컬", "글라": "글라디우스", "숲요장": "숲요정의장갑", "속모": "속전속결의모자", "속전모": "속전속결의모자", "사용장": "사막용병의장갑", "재벨": "재생의벨트", "데조모": "데조르바의모자", "강장": "강철골렘장갑",
 }
 
@@ -642,12 +644,18 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
     opts: list[str] = []
     names: list[str] = []
     enh_word = 0
+    num_words: list[str] = []  # 따로 떨어진 숫자들
+    lead_digits = ""  # 이름 앞에 붙은 옵션 숫자 ('35칠데조', '434팔윙', '236설신')
     costume = False
     for w in rest:
         if w in SKIP_WORDS or SELL.fullmatch(w) or BUY.fullmatch(w):
             continue
         if re.search(r"(플톡|풀톡|프로필톡)$", w):
             continue  # '표표플톡' = 프로필톡 (카카오톡 오픈채팅의 프로필로 연락, 제작자 2026-11-04). 물건 이름이 아니다
+        om = re.fullmatch(r"옵(?:션)?(\d{2,4})", w)
+        if om:  # '팔윙 옵333' = 옵션을 위키 순서대로 한 자리씩 (num_opts)
+            lead_digits = om.group(1)
+            continue
         if w in ("코튬", "코스튬"):
             costume = True  # '활발한 강아지 코튬' = 활발한 강아지라는 코스튬
             continue
@@ -656,7 +664,9 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
             opts.append(o)
             continue
         if re.fullmatch(r"\d+(?:\.\d+)?%?", w):
-            continue  # 옵션을 숫자만으로 적은 것 ('3 1 10 엘프의덧신')
+            if re.fullmatch(r"\d{1,4}", w):
+                num_words.append(w)  # 옵션을 숫자만으로 적은 것 ('3 1 10 엘프의덧신', '35 칠데조'): 물건을 찾은 뒤 위키 옵션 순서로 (num_opts)
+            continue
         em = re.fullmatch(r"\+?(\d{1,2}|[오육칠팔구십])강", w) or re.fullmatch(r"\+(\d{1,2})", w)
         if em:  # '6강', '육강' (제작자 지적), 따로 떨어진 '+6'
             enh_word = KNUM.get(em.group(1)) or int(em.group(1))
@@ -664,6 +674,14 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
         if re.search(r"[가-힣a-zA-Z]", w):
             w = re.sub(r"팝니다|삽니다|판매|구매|노강|노작", "", w)
             w = re.sub(r"^(\+?(?:\d{1,2}|[오육칠팔구십]))강(?=[가-힣])", r"\1", w)  # '6강바슬신' -> '6바슬신'
+            # 이름 앞의 옵션 숫자 한 자리씩 (제작자 2026-11-10 '35칠데조 이런 식으로 3 5 있는 건 옵션이야, 순서대로'): 뒤에 한글 강화(칠, 팔)가 오거나,
+            # 세 자리 이상이거나, 두 자리인데 20 넘으면(강화가 아니다) 옵션. '8헌보', '10헌보', '12번보석셋' 은 그대로
+            lm = re.match(r"^(\d{2,4})(?=[오육칠팔구십][가-힣]|[가-힣])", w)
+            if lm and "번" not in w[lm.end():lm.end() + 1] and (
+                re.match(r"[오육칠팔구십][가-힣]", w[lm.end():]) or len(lm.group(1)) >= 3 or int(lm.group(1)) > 20
+            ):
+                lead_digits = lm.group(1)
+                w = w[lm.end():]
             while True:  # 이름 앞에 붙은 옵션 ('지3대자')
                 g = OPT_GLUED.match(w)
                 if not g:
@@ -727,7 +745,7 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
                 tries.append((w[m.end():][m2.end():], m2))
         for c, em in tries:
             c = re.sub(r"[^가-힣a-zA-Z0-9]", "", c)
-            if (len(c) < 2 and c != "닼") or c in NOT_ITEM_WORDS:
+            if (len(c) < 2 and c not in ("닼", "윙")) or c in NOT_ITEM_WORDS:
                 continue
             found = rs.resolve(c)
             if found:
@@ -787,11 +805,75 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
             rs.unknown[c] += 1
             unknown = True
     enh = enh or enh_word
+    if wiki and not opts:
+        opts = num_opts(name, lead_digits, num_words)
     # unknown: 아무도 풀지 못한 것만 화면의 '정보 없음' (예전 이름 '모르는 줄임말') (제작자 2026-11-04: 알려 준 펫·완망·아드셋·코스튬이 아직 거기 있었다)
     return {"name": name, "wiki": wiki, "unknown": unknown, "enh": enh if enh <= 20 else 0, "opts": opts, "price": round(price, 2), "bare": bare, "abbr": abbr}
 
 
 EQUIP_JSON = ROOT / "web" / "public" / "data" / "equipment.json"
+# 위키 옵션 이름 -> 시세 동향 옵션 이름 (OPTS 의 값)
+WIKI_STAT = {"크리티컬": "크리", "속성저항": "속저", "마나재생": "마재", "체력재생": "체재", "이동속도": "이속", "불저항": "불저", "냉기저항": "냉저", "번개저항": "번저"}
+_RANGE_OPTS: dict[str, tuple[list[str], str]] | None = None
+# 숫자만 적을 때 그 직업에 쓸모없어서 안 적는 옵션 (제작자 2026-11-10 '유효옵만 적은 거라 레인저는 마재 빼고 크리 3 민 5'. 레인저 마재는 제작자 확인, 다른 직업은 짐작, 확인 전)
+NOT_EFFECTIVE = {
+    "레인저": {"마재", "마나", "체재", "불저", "냉저", "번저", "속저", "이속"},
+    "전사": {"마재", "마나", "체재", "불저", "냉저", "번저", "속저", "이속"},
+    "무도가": {"마재", "마나", "체재", "불저", "냉저", "번저", "속저", "이속"},
+    "마법사": {"체재", "불저", "냉저", "번저", "속저", "이속"},
+}
+
+
+def range_opts(name: str) -> tuple[list[str], str]:
+    """위키 장비의 범위 옵션 이름들(위키 순서대로, '명중 0~12 / 힘 0~9' -> ['명중', '힘'])과 직업"""
+    global _RANGE_OPTS
+    if _RANGE_OPTS is None:
+        _RANGE_OPTS = {}
+        if EQUIP_JSON.exists():
+            for table in json.loads(EQUIP_JSON.read_text(encoding="utf-8")):
+                hs = table.get("headers", [])
+                if "옵션" not in hs:
+                    continue
+                k = hs.index("옵션")
+                for row in table.get("rows", []):
+                    cells = row.get("cells", [])
+                    if k >= len(cells):
+                        continue
+                    stats = []
+                    for part in cells[k].split("/"):
+                        m = re.match(r"\s*([가-힣]+)\s*[\d\s&~]*~", part)
+                        if m:
+                            stats.append(WIKI_STAT.get(m.group(1), m.group(1)))
+                    job = cells[hs.index("직업")] if "직업" in hs and hs.index("직업") < len(cells) else ""
+                    _RANGE_OPTS.setdefault(re.sub(r"\s", "", row.get("name", "")), (stats, job))
+    return _RANGE_OPTS.get(re.sub(r"\s", "", name), ([], ""))
+
+
+def num_opts(name: str, lead: str, words: list[str]) -> list[str]:
+    """숫자만 적은 옵션을 위키 옵션 순서로 (제작자 2026-11-10 '35칠데조' = 첫 옵션 3, 둘째 옵션 5). 수가 옵션 수와 맞을 때만, 아니면 짐작하지 않고 뺀다"""
+    stats, job = range_opts(name)
+    if not stats:
+        return []
+    n = len(lead) if lead else (len(words[0]) if len(words) == 1 and len(words[0]) >= 2 else len(words))
+    if n != len(stats) and job in NOT_EFFECTIVE:
+        eff = [st for st in stats if st not in NOT_EFFECTIVE[job]]
+        if len(eff) == n:
+            stats = eff  # 그 직업에 쓸모 있는 옵션만 적은 것 ('35칠데조' = 크리3 민첩5, 마재는 안 적음)
+    if lead:
+        vals = list(lead)
+    elif len(words) == 1 and len(words[0]) == len(stats) and len(stats) >= 2:
+        vals = list(words[0])  # '35 칠데조'
+    elif len(words) == len(stats):
+        vals = words  # '3 1 10 엘프의덧신'
+    else:
+        return []
+    if len(vals) != len(stats):
+        return []
+    out = []
+    for st, v in zip(stats, vals):
+        o = norm_opt(f"{st}{v}")
+        out.append(o or f"{st}{int(v)}")
+    return out
 # 직업마다 이름이 다른 장비를 하나로 부르는 말 (유어 설명 2026-11-04, 제작자 1:1 카톡): 바슬신 = 바슬라프 상자에서 나오는 Lv.44 신발,
 # 세계갑·세계수갑·뿌리갑·뿌갑 = 모르포시즈 정원(뿌리)의 베로에게서 교환하는 Lv.44 갑옷이라 뿌리갑 (제작자 2026-11-04. 법사는 보통 세계수롭, 껍갑은 전사), 금서고신 = 금서고 Lv.46 신발 (법사 것은 기억단화),
 # 아요장 = 모르포시즈 뿌리의 아이요의수호병이 떨구는 Lv.46 장갑 (아요셋·아이요의장갑은 코스튬, 육아요장은 +6 장비). 이름은 위키 장비 표의 직업·레벨로 맞췄다.

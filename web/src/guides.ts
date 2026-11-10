@@ -208,6 +208,7 @@ export const GUIDES: Guide[] = [
     key: "rent",
     title: "장비대여",
     tutorial: [
+      { sel: ".rn-wrap", head: "전광판", text: "신청은 앱에서, 신청한 뒤 대화는 담당자 오픈채팅으로 해요. 전광판을 누르면 오픈채팅이 열려요." },
       { sel: "[data-tut-sample] .rent-main, .rent-main", head: "무기 줄", text: "왼쪽 네모는 신청 담기예요. 여러 개 담아 아래 대여 신청으로 한 번에 보내요.", tap: true, opens: ".rent-pop" },
       { sel: ".rent-pop", head: "보증금", text: "다이아 가격은 보증금이에요. 1다이아 = 10만 골드. 반납하면 마일리지와 골드를 돌려받아요." },
       { go: "#/rent?v=apps", sel: "main", head: "신청함", text: "쓰는 무기 줄에서 반납 신청과 대화를 해요. 기부한 장비의 마일리지도 여기 보여요." },

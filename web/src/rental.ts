@@ -5,6 +5,12 @@ import { JOBS, JOB_NAME } from "./auth";
 import type { Job } from "./auth";
 import type { Item, Wiki } from "./types";
 
+/**
+ * 대여 담당 (제작자 2026-11-02 '성민 님 ID 가 멍멍이야'). 서버 server/rental.ts RENT_STAFF, 홈 칸의 '담당자 멍멍'(launcher.ts corner)과 같이 고친다.
+ * 장비대여 안내(pages/RentNotice.tsx)의 이름과 오픈채팅 링크(그 계정의 카톡 링크)에 쓴다
+ */
+export const RENT_MANAGER = "멍멍";
+
 /** 대여 기한: 'none' 기한 없음, '3w' 3주 (1~52주. 제작자 요청 2026-11-02: 2주·4주로 고정하지 말고. 서버 server/rentalParse.ts 와 같은 값) */
 export type RentTerm = "none" | `${number}w`;
 export const MAX_WEEKS = 52;

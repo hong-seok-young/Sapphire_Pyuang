@@ -24,7 +24,7 @@ const persist = local && process.env.D1_PERSIST ? [`--persist-to=${process.env.D
 const CHUNK = 2000;
 const TEXT = /\.(md|txt|json|csv|tsv)$/i;
 // fandom/: 해외 팬 위키를 긁은 영어 원문·목록(articles.jsonl, index.json, images.json …)은 한국어 질문에 걸리지 않고 조각만 늘린다 -> 한국어 번역(fandom/ko/*.md)과 한국어 가이드(guide_ko.txt)만
-const SKIP = [/^\.git\//, /^scripts\//, /^이미지\//, /^도감\/작업\//, /^드랍표_원본\//, /^공식\/소식\.json$/, /^공식\/확률\//, /^저장할_글_/, /^2차_링크\.json$/, /^길드\/익명_보기\.txt$/, /^fandom\/(?!ko\/[^/]+\.md$|guide_ko\.txt$)/, /^링크\/.*\.json$/];
+const SKIP = [/^\.git\//, /^scripts\//, /^이미지\//, /^도감\/작업\//, /^드랍표_원본\//, /^공식\/소식\.json$/, /^공식\/확률\//, /^저장할_글_/, /^2차_링크\.json$/, /^길드\/익명_보기\.txt$/, /^fandom\/(?!ko\/[^/]+\.md$|guide_ko\.txt$)/, /^링크\/.*\.json$/, /^제공\/초보자톡방_정리\.json$/]; // 초보자톡방 정리는 같은 내용의 md 만 (조각이 겹치지 않게)
 
 if (!existsSync(ROOT)) {
   console.log("자료 저장소가 없어서 건너뛰어요");

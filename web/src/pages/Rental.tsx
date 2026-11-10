@@ -75,6 +75,7 @@ import { MARKET_PIC, itemFacts, rollHint } from "../market";
 import { readShot, shrinkShot } from "../shot";
 import { KakaoButton, useKakao, Nick } from "../kakao";
 import { useBackClose } from "../backClose";
+import { AppliedPopup, RentBoard, RentNotice } from "./RentNotice";
 
 const REASON: Record<LedgerLine["reason"], string> = {
   donate: "기부",
@@ -126,6 +127,8 @@ export function RentalPage({
   const news = useNews();
   useNewsSeen(view === "apps" ? ["rent.apps"] : view === "staff" ? ["rent.staff"] : []);
   const [showLedger, setShowLedger] = useState(false);
+  // 대여 신청을 보낸 뒤 '오픈채팅으로 이야기할까요?' 창 (제작자 2026-11-10, RentNotice.tsx)
+  const [applied, setApplied] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -221,6 +224,8 @@ export function RentalPage({
   return (
     <>
       <TopBar title="장비대여" />
+      {/* 맨 위 전광판: 신청은 앱에서, 대화는 담당자 오픈채팅으로 (제작자 2026-11-10, 누르면 오픈채팅) */}
+      <RentBoard />
       {/* 목록 · 신청함 · 운영 (제작자 요청 2026-11-02: 신청함과 운영의 신청 관리를 따로, 목록은 무기부터) */}
       <nav className="pill-row rent-views">
         {views.map((v) => (
@@ -469,9 +474,12 @@ export function RentalPage({
           mileage={data.mileage}
           rate={data.rate}
           onClear={() => setPicked([])}
-          onDone={() => (setPicked([]), void load(), go("#/rent?v=apps", true))}
+          onDone={() => (setPicked([]), setApplied(true), void load(), go("#/rent?v=apps", true))}
         />
       )}
+      {applied && <AppliedPopup onClose={() => setApplied(false)} />}
+      {/* 들어올 때 안내 창 ('다시 안 보기'를 누르면 이 기기·이 계정에서 다시 안 뜬다) */}
+      <RentNotice me={me.id} />
     </>
   );
 }
