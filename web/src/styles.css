@@ -5246,3 +5246,34 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 .ctl-line .ctl-mob-pic { width: 18px; height: 18px; object-fit: contain; }
 .ctl-board .ctl-foot { padding: 3px 10px 6px; border-top: 0; font-size: 10.5px; }
 @media (prefers-reduced-motion: reduce) { .ctl-seal { animation: none; } }
+
+/* 도감 계산기 시세 비교 (제작자 요청 2026-11-11): 도감 비용 판과 칸 상세의 골드 · 스탬프 값 */
+.dex-cost .dex-need-head { flex-wrap: wrap; }
+.dex-sale-dot { padding: 0 5px; font-size: 10px; color: #1a1430; background: var(--gold); border-radius: 8px; }
+.dex-cost-body { display: flex; flex-direction: column; gap: 8px; padding: 0 10px 8px; font-size: 12px; }
+.dex-sale { margin: 0; font-size: 11px; color: var(--muted); }
+.dex-sale-on { color: var(--gold); }
+.dex-cost-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.dex-cost-col { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 6px 8px; background: rgba(7, 6, 15, 0.35); border: 1px solid rgba(169, 162, 207, 0.2); }
+.dex-cost-col b { font-size: 15px; color: #fff; overflow-wrap: anywhere; }
+.dex-cost-col small { font-size: 10.5px; }
+.dex-cost-now { border-color: var(--gold); }
+.dex-cost-now b { color: var(--gold); }
+.dex-cost-note { margin: 0; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.dex-cost-note b { color: var(--gold); }
+.dex-cost-set { display: flex; flex-direction: column; gap: 4px; }
+.dex-cost-set > b { font-size: 11px; }
+.dex-cost-set > small { font-size: 10px; line-height: 1.4; }
+.dex-cost-inputs { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 4px 8px; }
+.dex-cost-inputs label { display: grid; grid-template-columns: minmax(0, 1fr) 70px; align-items: center; gap: 4px; font-size: 11px; }
+.dex-cost-inputs label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dex-need-scroll span { color: var(--gold); }
+.dex-cost-grid { display: grid; grid-template-columns: 44px repeat(3, minmax(0, 1fr)); align-items: center; gap: 3px 6px; }
+.dex-cost-grid .dex-stamp { justify-self: center; font-size: 10px; }
+.dex-cost-grid > small { font-size: 10.5px; }
+.dex-cost-plat { display: grid; grid-template-columns: auto 90px auto; align-items: center; justify-content: start; gap: 6px; font-size: 11px; }
+.dex-num-set { color: var(--gold); border-color: var(--gold); }
+.dex-price { flex-basis: 100%; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.dex-price small { font-size: 10.5px; color: var(--text); overflow-wrap: anywhere; }
+.dex-price b { color: #fff; }
+.dex-price .dex-rec { color: var(--gold); }

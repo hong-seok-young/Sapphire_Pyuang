@@ -6,8 +6,11 @@ import { useEntryState } from "../router";
 // - 지금 목록(칸 · 찾기 · 능력치 거르기)의 미완료 항목을 다 하면 더 오르는 값(+)과, 그러려면 필요한 재료 합계.
 // - 완료 표시는 이 기기에 계정별로 (localStorage sapphire.dex.done.<아이디>).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { loadDex, useAsync } from "../data";
-import type { Dex, DexEntry, DexItem } from "../data";
+import type { Dex, DexEntry, DexItem, DexPrice } from "../data";
+import { MODES, STAMP_GRADES, fmtGold, isCostSlot, pickWay, readPriceSet, saleOn, scrollLabel, slotCost, totals, wayText, writePriceSet } from "../dexPrice";
+import type { PriceSet, Totals } from "../dexPrice";
 import type { Me } from "../auth";
 import type { Wiki } from "../types";
 import { iconLookup } from "../simIcons";
@@ -145,6 +148,12 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
     setOverState(v);
     writeStats(me, v);
   };
+  // 시세 비교에서 손으로 고친 마법서·스탬프 값 (제작자 2026-11-11)
+  const [pset, setPsetState] = useState<PriceSet>(() => readPriceSet(me));
+  const setPset = (v: PriceSet) => {
+    setPsetState(v);
+    writePriceSet(me, v);
+  };
   // 슬라이더 끝 = 기록된 도감을 다 채웠을 때
   const full = useMemo(() => addUp(dex.entries), [dex]);
   const iconOf: IconOf = useMemo(() => (wiki ? iconLookup(wiki, null) : () => null), [wiki]);
@@ -194,6 +203,9 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
   const stamps = new Map<string, number>();
   for (const e of todoListed) for (const it of e.items) if (it.sg && it.sn) stamps.set(it.sg, (stamps.get(it.sg) ?? 0) + it.sn * it.n);
   const stampSum = ["S", "A", "B", ...[...stamps.keys()].filter((g) => !["S", "A", "B"].includes(g)).sort()].filter((g) => stamps.has(g));
+  // 지금 목록의 미완료를 다 채우는 값: 칸마다 골드로 사기 vs 스탬프 중 싼 쪽, 평소 · 아바돈 이벤트
+  const price = dex.price;
+  const tot = price ? totals(todoListed.flatMap((e) => e.items), price, pset) : null;
 
 
   return (
@@ -239,6 +251,8 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
         </div>
       )}
 
+      {price && tot && todoListed.length > 0 && tot.slots > 0 && <CostPanel price={price} tot={tot} pset={pset} setPset={setPset} n={todoListed.length} />}
+
       {todoListed.length > 0 && (
         <Panel className="dex-need">
           <button type="button" className="dex-need-head" onClick={() => setShowNeed(!showNeed)} aria-expanded={showNeed}>
@@ -276,7 +290,7 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
 
       <ul className="dex-list" ref={listRef}>
         {listed.map((e) => (
-          <EntryRow key={e.name} e={e} listW={listW} done={done.has(e.name)} onToggle={() => toggle(e.name)} iconOf={iconOf} stat={stat} onItem={(name) => setQ(name)} wiki={wiki} />
+          <EntryRow key={e.name} e={e} listW={listW} done={done.has(e.name)} onToggle={() => toggle(e.name)} iconOf={iconOf} stat={stat} onItem={(name) => setQ(name)} wiki={wiki} price={price} pset={pset} />
         ))}
       </ul>
       {!listed.length && <p className="muted dex-empty">맞는 항목이 없어요</p>}
@@ -392,7 +406,10 @@ function ItemInfo({ it, wiki }: { it: DexItem; wiki: Wiki | null }) {
   );
 }
 
-function EntryRow({ e, listW, done, onToggle, iconOf, stat, onItem, wiki }: { e: DexEntry; listW: number; done: boolean; onToggle: () => void; iconOf: IconOf; stat: string | null; onItem: (name: string) => void; wiki: Wiki | null }) {
+function EntryRow({ e, listW, done, onToggle, iconOf, stat, onItem, wiki, price, pset }: {
+  e: DexEntry; listW: number; done: boolean; onToggle: () => void; iconOf: IconOf; stat: string | null; onItem: (name: string) => void; wiki: Wiki | null;
+  price?: DexPrice; pset: PriceSet;
+}) {
   const [sel, setSel] = useState<number | null>(null);
   const it = sel === null ? null : e.items[sel];
   const ref = useRef<HTMLLIElement>(null);
@@ -439,6 +456,7 @@ function EntryRow({ e, listW, done, onToggle, iconOf, stat, onItem, wiki }: { e:
           <b>{itemLabel(it)}{it.est ? "?" : ""}</b>
           <span className="muted">×{it.n.toLocaleString("ko-KR")}</span>
           {stampText(it) && <small className={stampCls(it.sg)}>{it.sg === "불가" ? stampText(it) : `${it.sg?.startsWith("아바돈") ? "아바돈 " : ""}장비스탬프 ${it.sg?.replace("아바돈", "")} ${it.sn}개`}</small>}
+          {price && <SlotPrice it={it} price={price} pset={pset} />}
           <ItemInfo it={it} wiki={wiki} />
           {it.name && (
             <button type="button" className="sub-tab dex-find" onClick={() => onItem(it.name!.replace(/^\+\d+\s*/, ""))}>
@@ -448,5 +466,183 @@ function EntryRow({ e, listW, done, onToggle, iconOf, stat, onItem, wiki }: { e:
         </div>
       )}
     </li>
+  );
+}
+
+/** 숫자 칸: 비우면 자료 값으로 되돌린다. 손댄 칸은 금색 (획득 옵션 칸과 같은 방식) */
+function NumIn({ value, def, onSet, label }: { value: number | undefined; def: number | null; onSet: (v: number | null) => void; label: string }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <input className={"dex-row-num" + (value != null ? " dex-num-set" : "")} type="number" inputMode="decimal" min={0} aria-label={label}
+      value={draft ?? (value ?? def ?? "")} placeholder={def == null ? "값" : undefined}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        if (e.target.value === "") return onSet(null);
+        const n = parseFloat(e.target.value);
+        if (!Number.isNaN(n) && n >= 0) onSet(n);
+      }}
+      onBlur={() => setDraft(null)} />
+  );
+}
+
+/** 도감 비용 (제작자 요청 2026-11-11): 지금 목록의 미완료 칸을 다 채우는 골드. 칸마다 '골드로 장비 사기'와 '장비스탬프' 중 싼 쪽을 더한다.
+ *  평소와 아바돈 이벤트(스탬프가 싸진다)를 나란히, 이벤트 때 아끼는 골드. 아래에서 마법서·스탬프·플래티넘 값을 직접 고친다 */
+function CostPanel({ price, tot, pset, setPset, n }: { price: DexPrice; tot: Totals; pset: PriceSet; setPset: (v: PriceSet) => void; n: number }) {
+  const [open, setOpen] = useState(false);
+  const on = saleOn(price);
+  const save = tot.by.normal.sum - tot.by.event.sum;
+  const setScroll = (k: string, v: number | null) => {
+    const scroll = { ...pset.scroll };
+    if (v == null) delete scroll[k];
+    else scroll[k] = v;
+    setPset({ ...pset, scroll });
+  };
+  const setStamp = (k: string, v: number | null) => {
+    const stamp = { ...pset.stamp };
+    if (v == null) delete stamp[k];
+    else stamp[k] = v;
+    setPset({ ...pset, stamp });
+  };
+  const scrolls = [...new Set([...tot.scrolls.keys(), ...Object.keys(pset.scroll)])].sort();
+  const touched = Object.keys(pset.scroll).length + Object.keys(pset.stamp).length > 0 || pset.plat != null;
+  const missingN = [...tot.missing.values()].reduce((a, b) => a + b, 0);
+  return (
+    <Panel className="dex-need dex-cost">
+      <button type="button" className="dex-need-head" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <b>도감 비용</b>
+        <span className="muted">
+          평소 {fmtGold(tot.by.normal.sum)} · 이벤트 {fmtGold(tot.by.event.sum)}
+        </span>
+        {on && <span className="dex-sale-dot">판매 중</span>}
+        <span className="dex-caret">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div className="dex-cost-body">
+          {price.sale && (
+            <p className={"dex-sale" + (on ? " dex-sale-on" : "")}>
+              {on ? "아바돈 장비 스탬프 판매 중" : "지난 아바돈 장비 스탬프 판매"} · {price.sale.text}
+            </p>
+          )}
+          <div className="dex-cost-cols">
+            {MODES.map((m) => (
+              <div key={m.key} className={"dex-cost-col" + (m.key === "event" && on ? " dex-cost-now" : "")}>
+                <small>{m.label}</small>
+                <b>{fmtGold(tot.by[m.key].sum)} 골드</b>
+                <small className="muted">골드로 {tot.by[m.key].gold}칸 · 스탬프 {tot.by[m.key].stamp}칸</small>
+              </div>
+            ))}
+          </div>
+          <p className="dex-cost-note">
+            미완료 {n}개의 장비 {tot.slots}칸{save > 0 ? <> · 이벤트 때 채우면 <b>{fmtGold(save)}</b> 골드 아껴요</> : null}
+            {tot.none > 0 && <span className="muted"> · 값 없는 칸 {tot.none}개 (거래소 시세가 없고 스탬프로도 안 됨)</span>}
+            {missingN > 0 && <span className="muted"> · 마법서 값이 없어 골드로 못 센 칸 {missingN}개</span>}
+          </p>
+
+          {scrolls.length > 0 && (
+            <div className="dex-cost-set">
+              <b>마법서 1장 (골드)</b>
+              <div className="dex-cost-inputs">
+                {scrolls.map((k) => {
+                  const [kind, grade] = k.split(" ") as ["무기" | "갑옷", string];
+                  return (
+                    <label key={k} className={tot.missing.has(k) ? "dex-need-scroll" : ""}>
+                      <span>{scrollLabel(k)}</span>
+                      <NumIn value={pset.scroll[k]} def={price.scroll?.[kind]?.[grade] ?? null} onSet={(v) => setScroll(k, v)} label={`${scrollLabel(k)} 골드`} />
+                    </label>
+                  );
+                })}
+              </div>
+              <small className="muted">마법서 등급은 장비 요구 레벨로 (D 10 미만 · C 20 · B 30 · A 40 · S 50 미만). 값을 넣으면 강화 칸도 '노강 + 마법서'로 셈</small>
+            </div>
+          )}
+
+          {price.stamp && (
+            <div className="dex-cost-set">
+              <b>스탬프 1장 (플래티넘)</b>
+              <div className="dex-cost-grid">
+                <span />
+                {STAMP_GRADES.map((g) => (
+                  <small key={g} className={"dex-stamp dex-stamp-" + g}>{g}</small>
+                ))}
+                {MODES.map((m) => (
+                  <Row key={m.key} label={m.key === "normal" ? "평소" : "이벤트"}>
+                    {STAMP_GRADES.map((g) => (
+                      <NumIn key={g} value={pset.stamp[`${m.key} ${g}`]} def={price.stamp?.[m.key]?.[g] ?? null} onSet={(v) => setStamp(`${m.key} ${g}`, v)} label={`${m.label} 장비스탬프${g} 플래티넘`} />
+                    ))}
+                  </Row>
+                ))}
+              </div>
+              <label className="dex-cost-plat">
+                <span>플래티넘 100 =</span>
+                <NumIn value={pset.plat != null ? pset.plat * 100 : undefined} def={Math.round((price.stamp.platGold ?? 700) * 100)}
+                  onSet={(v) => setPset({ ...pset, plat: v == null ? undefined : v / 100 })} label="플래티넘 100 의 골드" />
+                <span>골드</span>
+              </label>
+              <small className="muted">아바돈 스탬프 1장 = 일반 {price.stamp.abaddon}장. 이벤트 값은 봉인된스탬프함 A/B 와 왜곡된수정구 평균으로 셈</small>
+            </div>
+          )}
+
+          <div className="dex-sum-foot">
+            {touched && (
+              <button type="button" className="sub-tab" onClick={() => setPset({ scroll: {}, stamp: {} })}>
+                자료 값으로
+              </button>
+            )}
+          </div>
+          <p className="dex-legend muted">
+            장비 시세 {price.date} {price.src} (옵션은 안 보고 가장 싼 매물){price.stamp?.date ? ` · 스탬프 상점 ${price.stamp.date}` : ""}
+          </p>
+        </div>
+      )}
+    </Panel>
+  );
+}
+function Row({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <>
+      <small className="muted">{label}</small>
+      {children}
+    </>
+  );
+}
+
+/** 칸 상세의 값: 골드로(어떻게 셌는지), 스탬프로(평소 · 이벤트), 싼 쪽 */
+function SlotPrice({ it, price, pset }: { it: DexItem; price: DexPrice; pset: PriceSet }) {
+  if (!isCostSlot(it, price)) return null;
+  const c = slotCost(it, price, pset);
+  const rec = MODES.map((m) => [m.label, pickWay(c, m.key)] as const);
+  const same = rec[0][1]?.by === rec[1][1]?.by;
+  const recText = (w: ReturnType<typeof pickWay>) => (w ? (w.by === "gold" ? "골드로 사기" : "스탬프") : "값 없음");
+  return (
+    <span className="dex-price">
+      <small>
+        골드{" "}
+        {c.gold != null && c.way ? (
+          <>
+            <b>{fmtGold(c.gold)}</b> = {wayText(c.way, c.scroll)}
+            {it.n > 1 ? ` × ${it.n}` : ""}
+          </>
+        ) : c.missing ? (
+          `${scrollLabel(c.missing)} 값을 넣으면 셈`
+        ) : (
+          "거래소 시세 없음"
+        )}
+      </small>
+      <small>
+        스탬프{" "}
+        {c.stamp.normal != null ? (
+          <>
+            평소 <b>{fmtGold(c.stamp.normal)}</b> · 이벤트 <b>{fmtGold(c.stamp.event ?? c.stamp.normal)}</b>
+          </>
+        ) : it.sg === "불가" ? (
+          "대체 불가"
+        ) : (
+          "값 없음"
+        )}
+      </small>
+      <small className="dex-rec">
+        추천 {same ? recText(rec[0][1]) : rec.map(([l, w]) => `${l} ${recText(w)}`).join(" · ")}
+      </small>
+    </span>
   );
 }
