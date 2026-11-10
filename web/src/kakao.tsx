@@ -10,8 +10,10 @@ interface Links {
   staff: string[];
   /** 고스펙 닉네임 (닉네임이 뜨는 곳마다 반짝임, Nick) */
   high: string[];
+  /** 한 번이라도 받아 봤는지 (장비대여 안내: 링크가 없는 것인지 아직 못 받은 것인지 가른다) */
+  ready: boolean;
 }
-let data: Links = { links: {}, staff: [], high: [] };
+let data: Links = { links: {}, staff: [], high: [], ready: false };
 let loading: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 const subscribe = (l: () => void) => {
@@ -23,10 +25,13 @@ const subscribe = (l: () => void) => {
 export function refreshKakao(): Promise<void> {
   loading = api<Links>("/api/kakao")
     .then((r) => {
-      data = { links: r.links ?? {}, staff: r.staff ?? [], high: r.high ?? [] };
+      data = { links: r.links ?? {}, staff: r.staff ?? [], high: r.high ?? [], ready: true };
       listeners.forEach((l) => l());
     })
-    .catch(() => undefined);
+    .catch(() => {
+      data = { ...data, ready: true };
+      listeners.forEach((l) => l());
+    });
   return loading;
 }
 

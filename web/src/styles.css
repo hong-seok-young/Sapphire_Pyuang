@@ -5132,3 +5132,58 @@ button.dex-cell-name:disabled { cursor: default; }
 .gr-add-list small { opacity: 0.75; font-size: 10px; }
 .gr-tg { justify-content: flex-end; }
 .gr-tg-name { flex: 1 1 96px; white-space: nowrap; }
+/* ---------- 장비대여 안내 (pages/RentNotice.tsx, 제작자 2026-11-10 · 대여 담당 요청 '신청하고 저한테 카톡 주세요'): 맨 위 퀘스트 줄, 들어올 때 NPC 대화창, 신청한 뒤 창.
+   초안 셋 중 제작자가 고른 '퀘스트 줄 + NPC 대화창'. 움직임은 transform·opacity 만 ('!' 표 들썩임, 단추 위로 빛, 체크 톡, 지금 단계 둘레 숨 쉬기) ---------- */
+.rn-wrap { margin: -4px -12px 8px; display: grid; grid-template-columns: minmax(0, 1fr); }
+.rn-wrap > a { text-decoration: none; cursor: pointer; }
+/* 퀘스트 줄: 금빛 그라데이션 띠에 들썩이는 '!' 표, 오른쪽 끝 작은 카톡 아이콘 */
+.rn-quest { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 8px; overflow: hidden; color: var(--text); background: linear-gradient(90deg, rgba(255, 195, 92, 0.2), rgba(255, 195, 92, 0.04)); border-top: 1px solid rgba(255, 195, 92, 0.4); border-bottom: 1px solid rgba(255, 195, 92, 0.4); }
+.rn-quest .maint-sub { font-size: 11px; }
+.rn-quest .kakao-bubble { flex: none; width: 12px; height: 12px; border: 1px solid var(--edge); }
+.rn-quest-mark { flex: none; width: 15px; height: 15px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; line-height: 1; color: #191600; background: var(--gold); border: 1px solid var(--edge); animation: rn-bob 1.2s ease-in-out infinite; }
+@keyframes rn-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+/* NPC 대화창 */
+.rn-back { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(5, 4, 15, 0.72); }
+.rn-card {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; width: min(100%, 320px); max-height: 88vh; overflow-y: auto; padding: 14px;
+  background: var(--panel); border: var(--px) solid var(--edge);
+  box-shadow: inset var(--px) var(--px) 0 var(--hi), inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #0b0a1a, 0 0 0 1px rgba(255, 195, 92, 0.35), 0 10px 30px rgba(0, 0, 0, 0.6);
+  animation: rn-in 0.16s ease-out;
+}
+@keyframes rn-in { from { opacity: 0; transform: translateY(8px) scale(0.97); } to { opacity: 1; transform: none; } }
+.rn-card p { margin: 0; font-size: 13px; line-height: 1.5; }
+.rn-card > .pill { justify-self: center; min-width: 96px; }
+/* 이름 줄: '!' 표, 담당자 이름(금색), 직책 */
+.rn-npc { display: flex; align-items: center; gap: 8px; margin: -14px -14px 0; padding: 8px 12px; background: linear-gradient(90deg, rgba(255, 195, 92, 0.22), transparent); border-bottom: 1px solid rgba(255, 195, 92, 0.35); }
+.rn-npc b { font-size: 15px; color: var(--gold); font-weight: 400; }
+.rn-npc small { font-size: 11px; color: var(--muted); }
+.rn-say { font-size: 14px; }
+/* 단계 셋: 끝낸 것 ✓(초록), 지금 것 금색 둘레가 숨 쉬듯, 남은 것 흐리게 */
+.rn-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.rn-steps li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; font-size: 13px; background: rgba(11, 10, 26, 0.45); border: 1px solid rgba(74, 63, 134, 0.6); }
+.rn-steps i { flex: none; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-size: 11px; font-weight: 700; color: #191600; background: var(--gold); border: 1px solid var(--edge); }
+.rn-steps .rn-done { color: var(--muted); text-decoration: line-through; }
+.rn-steps .rn-done i { background: #7dffb0; }
+.rn-steps .rn-now { border-color: var(--gold); animation: rn-glow 1.6s ease-in-out infinite; }
+@keyframes rn-glow { 50% { opacity: 0.7; } }
+.rn-steps .rn-dim { opacity: 0.45; }
+/* 오픈채팅 단추: 카톡 노랑, 빛이 한 번씩 지나간다 */
+.rn-kakao {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 8px 12px; overflow: hidden;
+  font-size: 14px; font-weight: 700; color: #191600; text-decoration: none; background: #fee500; border: var(--px) solid var(--edge);
+  box-shadow: inset var(--px) var(--px) 0 #fff7a8, inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #c9b400;
+}
+.rn-kakao .kakao-bubble { width: 16px; height: 16px; }
+.rn-kakao::after { content: ""; position: absolute; top: -40%; bottom: -40%; left: -30%; width: 24%; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent); transform: skewX(-20deg) translateX(0); animation: rn-shine 3s ease-in-out infinite; }
+@keyframes rn-shine { 0%, 60% { transform: skewX(-20deg) translateX(0); } 100% { transform: skewX(-20deg) translateX(560%); } }
+.rn-kakao:active { transform: translate(1px, 1px); }
+.rn-kakao-off { opacity: 0.5; pointer-events: none; }
+/* 다시 안 보기: 도트 체크 칸 */
+.rn-never { justify-self: start; display: inline-flex; align-items: center; gap: 8px; padding: 4px 2px; font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0; box-shadow: none; cursor: pointer; }
+.rn-box { flex: none; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; line-height: 1; color: var(--edge); background: var(--lo); border: var(--px) solid var(--edge); box-shadow: inset var(--px) var(--px) 0 #0b0a1a; }
+.rn-never-on { color: var(--text); }
+.rn-never-on .rn-box { font-weight: 700; background: var(--gold); box-shadow: inset var(--px) var(--px) 0 #fff1c9; animation: rn-pop 0.25s ease; }
+@keyframes rn-pop { 40% { transform: scale(1.25); } }
+@media (prefers-reduced-motion: reduce) {
+  .rn-quest-mark, .rn-card, .rn-kakao::after, .rn-never-on .rn-box, .rn-steps .rn-now { animation: none; }
+}

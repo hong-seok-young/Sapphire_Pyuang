@@ -10,7 +10,7 @@
 // 3, 4 의 계정은 처음 로그인하면 비밀번호를 바꾸게 한다. 그 밖의 길드원은 '길드원 관리'에서 만든다.
 // 공개 저장소라 실행 기록을 누구나 볼 수 있으므로 비밀번호, 해시, SQL 은 화면에 찍지 않는다.
 import { execFileSync } from "node:child_process";
-import { pbkdf2Sync, randomBytes } from "node:crypto";
+import { createHash, pbkdf2Sync, randomBytes } from "node:crypto";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 const DB = "sapphire-accounts";
@@ -358,6 +358,28 @@ runSql([
 wrangler("d1", "execute", DB, "--remote", "--yes", "--command", "CREATE INDEX IF NOT EXISTS official_news_added ON official_news (added_at)");
 
 // 아이모 소식 새 글 배지·알림 (제작자 요청 2026-11-02: '새 이벤트 수집했으니 게시판 배지 다시 띄워 줘, 웹 알림도'): added_at 칸이 생기기 전에 들어온 글 중
+// 장비대여 담당자 오픈채팅 링크 (제작자 2026-11-10 '멍멍 오픈채팅 이걸로 링크 연결해', 장비대여 안내 pages/RentNotice.tsx): 사람의 연락처라 공개 저장소에 적지 않고
+// 비공개 자료 길드/장비대여/담당자_오픈채팅.txt('닉네임 링크' 한 줄씩)를 그 계정의 카톡 링크(users.kakao: 안내 창·전광판·'담당자 카톡' 단추가 쓴다)로 넣는다.
+// 링크마다 한 번 (setup 'kakao_link_<닉네임>_<링크 해시>'): 그 뒤 본인이 '내 정보'에서 바꾼 것은 덮지 않고, 파일의 링크를 바꾸면 한 번 더 넣는다. 계정이 아직 없으면 다음 배포에. 실행 기록에는 개수만
+{
+  const file = "../자료/길드/장비대여/담당자_오픈채팅.txt";
+  const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+  if (existsSync(file)) {
+    let n = 0;
+    for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
+      const m = line.trim().match(/^([^\s#]+)\s+(https:\/\/open\.kakao\.com\/(?:o|me)\/[A-Za-z0-9_-]{4,40})\/?$/);
+      if (!m) continue;
+      const [, id, link] = m;
+      const key = `kakao_link_${id}_${createHash("sha256").update(link).digest("hex").slice(0, 10)}`;
+      if (queryFirst(`SELECT 1 AS done FROM setup WHERE key = ${q(key)}`)) continue;
+      if (!queryFirst(`SELECT 1 AS x FROM users WHERE id = ${q(id)}`)) continue;
+      runSql([`UPDATE users SET kakao = ${q(link)} WHERE id = ${q(id)};`, `INSERT OR IGNORE INTO setup (key, done_at) VALUES (${q(key)}, ${Date.now()});`]);
+      n++;
+    }
+    if (n) console.log(`장비대여 담당자 오픈채팅 링크를 넣었어요 (${n})`);
+  }
+}
+
 // 한국 PC 파일(자료/공식/소식.json)에 없는 글은 그 파일을 저장한 뒤에 새로 올라온 글이다. 한 번만 지금 들어온 것으로 적어 배지가 뜨게 하고,
 // 알림은 그 파일을 저장한 때 뒤에 들어온 글부터 보낸다 (setup 'official_announced', server/officialAlert.ts)
 if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'official_added_backfill'")) {
