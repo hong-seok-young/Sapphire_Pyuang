@@ -215,3 +215,27 @@ function runSql(lines) {
     console.log(`챗봇 개선 완료(2026-11-10 둘째 묶음) ${n}건`);
   }
 }
+
+// 챗봇 개선 완료 2026-11-11 (향단 오피서 오정보 제보, 제작자 '넣어둘게얌', '개선할거 개선하고'): #68 '닼쉴 낀 전사를 때릴 때와 전사가 법사를 공격했을 때 블락 확률'.
+// 챗봇이 '전사가 마법사를 칠 때 블럭 0%에 가까움'이라고 짐작했는데, PVP 에서는 모든 직업이 물리 블락 1%·회피 4% 를 가진다 (자료 저장소 제공/블락_회피.md, server/chatPrompt.ts 정해 둔 답).
+// 같은 답의 표 글자 겹침도 고쳤다 (styles.css .ans-table 첫 칸). #67(방패 강화도별 블락 증가)은 자료가 없어 그대로 둔다. setup 'gap_fix_block_20261111'
+{
+  const KEY = "gap_fix_block_20261111";
+  const done = queryFirst(`SELECT 1 AS d FROM setup WHERE key = '${KEY}'`)?.d;
+  if (!done) {
+    const now = Date.now();
+    const NOTE = "PVP 에서는 모든 직업(마법사 포함)이 물리 블락 1%·회피 4% 라 전사가 법사를 칠 때도 블락이 뜬다고 답하고, 답의 표·단추 글자가 겹치던 것도 고쳤어요";
+    const OPEN = `g.status = 'open' AND g.id = 68`;
+    const n = queryFirst(`SELECT COUNT(*) AS n FROM chat_gaps g WHERE ${OPEN}`)?.n ?? 0;
+    runSql([
+      "INSERT INTO alerts (user_id, kind, text, link, created_at) " +
+        `SELECT g.user_id, 'chat_fixed', '챗봇이 개선됐어요. 물어봤던 “' || substr(replace(replace(g.question, char(10), ' '), char(13), ' '), 1, 40) || '” · ${NOTE}', ` +
+        "CASE WHEN EXISTS (SELECT 1 FROM chat_threads t WHERE t.id = g.thread_id AND t.user_id = g.user_id) THEN '#/chat/' || g.thread_id || '?again=' || g.id ELSE '#/chat' END, " +
+        `${now} FROM chat_gaps g WHERE ${OPEN} AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = g.user_id AND u.role = 'developer') ` +
+        "AND COALESCE((SELECT p.enabled FROM alert_prefs p WHERE p.user_id = g.user_id AND p.kind = 'chat_fixed'), 1) = 1;",
+      `UPDATE chat_gaps SET status = 'fixed', note = '${NOTE}', fixed_at = ${now} WHERE id IN (SELECT g.id FROM chat_gaps g WHERE ${OPEN});`,
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+    ]);
+    console.log(`챗봇 개선 완료(블락) ${n}건`);
+  }
+}
