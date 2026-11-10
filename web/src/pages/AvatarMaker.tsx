@@ -460,13 +460,11 @@ async function autoCut(src: ImageData, stage: (text: string) => void): Promise<{
   // 잘못 지워진 캐릭터 부분(첫 검수가 지운 것, 배경 지우기가 뚫은 눈동자 같은 구멍)을 되살린다 (src/avatarCut.ts applyReview)
   const base = keepBiggest(alpha, w, h);
   alpha = cleanThin(base, w, h);
-  const keepAll: number[] = [];
   for (const again of [false, true]) {
     stage(again ? "AI 가 한 번 더 확인하는 중…" : "AI 가 캐릭터만 남기는 중…");
     try {
       const m = await aiReview(src, alpha, again);
-      keepAll.push(...m.keep);
-      alpha = applyReview(src, base, alpha, m, keepAll, again);
+      alpha = applyReview(src, base, alpha, m, again);
     } catch (e) {
       console.warn("avatar review", e);
       break;
