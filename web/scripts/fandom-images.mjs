@@ -95,13 +95,39 @@ const items = todo.map((x, i) => ({ id: "i" + String(i).padStart(5, "0"), file: 
 const byId = new Map(items.map((it) => [it.id, it.file]));
 const byFile = new Map(todo.map((x) => [x.file, x]));
 
+/** 지난번에 주소로 못 연 그림은 여기서 받아 줄여서 싣는다 (긴 변 1568px JPEG) */
+let sharp = null;
+try {
+  sharp = (await import("sharp")).default;
+} catch {
+  /* 없으면 받은 그대로 */
+}
+const inline = new Map();
+for (const x of todo.filter((x) => prev[x.file]?.failed)) {
+  try {
+    const res = await fetch(imageUrl(x), { signal: AbortSignal.timeout(30_000), headers: { "user-agent": "Mozilla/5.0 (sapphire guild wiki)" } });
+    if (!res.ok) continue;
+    let buf = Buffer.from(await res.arrayBuffer());
+    let type = res.headers.get("content-type") || "image/png";
+    if (sharp) {
+      buf = await sharp(buf, { animated: false }).resize({ width: 1568, height: 1568, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
+      type = "image/jpeg";
+    }
+    inline.set(x.file, { type, data: buf.toString("base64") });
+  } catch {
+    /* 이번에도 못 받으면 주소로 */
+  }
+}
+
 function userContent(x) {
   const where = (x.usedBy ?? [])
     .slice(0, 4)
     .map((t) => `${ko.get(t)?.ko ?? t} (${t})`)
     .join(", ");
   return [
-    { type: "image", source: { type: "url", url: imageUrl(x) } },
+    inline.has(x.file)
+      ? { type: "image", source: { type: "base64", media_type: inline.get(x.file).type, data: inline.get(x.file).data } }
+      : { type: "image", source: { type: "url", url: imageUrl(x) } },
     { type: "text", text: `위키 파일 이름: ${x.file}\n이 그림이 쓰인 위키 문서: ${where || "(없음)"}\n\n이 그림을 형식대로 판단하고 옮겨 줘.` },
   ];
 }
