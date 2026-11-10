@@ -328,7 +328,7 @@ CREATE TABLE IF NOT EXISTS board_posts (
   pinned INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
   edited_at INTEGER,
-  -- 건의함 익명 글 (2026-11-09): 쓴 사람은 author 에 그대로 두고, 앱개발자와 유어아너 말고는 '익명'으로 보인다 (server/board.ts canSeeAnon)
+  -- 건의함 익명 글 (2026-11-09): 쓴 사람은 author 에 그대로 두고 화면에는 '익명'으로 보인다 (server/board.ts canSeeAnon, shownName)
   anon INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS board_posts_cat ON board_posts (cat, id);

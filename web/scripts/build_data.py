@@ -881,6 +881,9 @@ def main():
     meta = {"source": SOURCE, "built": datetime.date.today().isoformat(),
             "counts": {"posts": len(posts), "places": len(places), "monsters": len(monsters),
                        "items": len(items), "images": len(list((OUT / "img").iterdir()))}}
+    control = control_list()
+    if control:
+        meta["control"] = control
     data = {"posts": posts, "menu": menu, "regions": regions, "places": places, "monsters": monsters,
             "items": items, "equipment": equipment, "meta": meta}
     for name, value in data.items():
@@ -961,6 +964,19 @@ def build_odds():
     odds = {"fetched": fetched, "page": f"https://lim.com2us.com/{ODDS_GAME}/{{key}}?lang=ko", "note": note, "tables": tables}
     (OUT / "data" / "odds.json").write_text(json.dumps(odds, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print("공식 확률 표", len(tables), "행", sum(len(s["r"]) for t in tables for s in t["sections"]))
+
+
+def control_list():
+    """길드 통제 리스트 (제작자 2026-11-10 '우리 길드는 중립길드야, 이 몹들을 잡으면 안 되는 통제 리스트'): 비공개 자료 길드/통제_리스트.json 을 meta.json 의 control 로.
+    챗봇 자료(src/chat.ts wikiContext)가 통제·중립이나 리스트의 곳·몹 이름이 나오면 붙인다. 공지사항 글은 배포가 한 번 올렸다 (scripts/controlNotice.mjs)"""
+    src = SRC / "길드" / "통제_리스트.json"
+    if not src.exists():
+        return None
+    d = json.loads(src.read_text(encoding="utf-8"))
+    groups = [{"place": g["곳"], "mark": g.get("표시", ""), "mobs": g.get("몹", [])} for g in d.get("목록", [])]
+    print("통제 리스트", sum(len(g["mobs"]) for g in groups))
+    return {"title": d.get("제목", "통제 리스트"), "server": d.get("서버", ""), "by": d.get("제작", ""), "date": d.get("수정", ""),
+            "rule": d.get("규칙", ""), "groups": groups}
 
 
 def place_guides(places: dict) -> None:

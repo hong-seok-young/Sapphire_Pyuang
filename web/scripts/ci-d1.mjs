@@ -12,6 +12,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash, pbkdf2Sync, randomBytes } from "node:crypto";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { CONTROL_KEY, controlNoticeSql } from "./controlNotice.mjs";
 
 const DB = "sapphire-accounts";
 const DEVELOPER = "퓨앙";
@@ -813,6 +814,22 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
     ]);
     const n = queryFirst(`SELECT COUNT(*) AS n FROM alerts WHERE kind = 'rent' AND created_at = ${now}`)?.n ?? 0;
     console.log(`예전 기부 마일리지 알림 ${n}명 (한 번)`);
+  }
+}
+
+// 시리온 통제 리스트를 공지사항으로 (제작자 2026-11-10 '우리 길드는 중립길드야, 이 몹들을 잡으면 안 되는 통제 리스트, 길드의 공지사항에 넣어줘, 글쓴이는 사파이어로').
+// 비공개 자료 길드/통제_리스트.json 과 표 그림으로 글(고정)·그림 첨부·모두에게 알림 (scripts/controlNotice.mjs). setup 'control_notice_20261110' 로 한 번만
+{
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${CONTROL_KEY}'`)) {
+    const now = Date.now();
+    const lines = controlNoticeSql("../자료", now);
+    if (!lines) console.log("통제 리스트 자료가 없어 공지를 건너뜀");
+    else {
+      runSql(lines);
+      const n = queryFirst(`SELECT COUNT(*) AS n FROM alerts WHERE kind = 'board_notice' AND created_at = ${now}`)?.n ?? 0;
+      const f = queryFirst(`SELECT COUNT(*) AS n, MAX(length(data)) AS b FROM board_files WHERE created_at = ${now}`);
+      console.log(`통제 리스트 공지를 올렸어요 (알림 ${n}명, 그림 ${f?.n ?? 0}장 ${f?.b ?? 0}바이트)`);
+    }
   }
 }
 
