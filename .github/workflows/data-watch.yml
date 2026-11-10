@@ -1,0 +1,66 @@
+# 자료 저장소가 바뀌면 다시 배포 (제작자 2026-11-10 '앞으로 내가 올리는 데이터들은 모조리 아이모 데이터 레포에 넣고, 챗봇은 새로운 데이터가 레포에 등록되면
+# 내가 별다른 말 안 해도 그걸 모조리 읽어서 답변하는 데 활용해').
+# 30분마다 비공개 자료 저장소(sapphire-imo-data) main 의 마지막 커밋만 보고(파일은 받지 않는다), 그 판을 아직 배포하지 않았으면 배포(deploy-web.yml)를 부른다.
+# 배포가 위키 자료·시세 동향·도감을 다시 만들고 자료 저장소의 글 자료를 챗봇 자료(D1 lib_chunks)로 넣은 뒤 setup 'data_ok_<커밋>' 을 적는다 (scripts/library-sync.mjs).
+# 부른 판은 'data_try_<커밋>' 으로 적어 90분 안에는 또 부르지 않는다 (배포가 실패하면 그 뒤에 다시 부른다). 공개 저장소라 실행 기록에는 커밋 앞 7자리만 찍는다.
+name: Data watch
+
+on:
+  schedule:
+    - cron: "17,47 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: data-watch
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      # 마지막 커밋만 (파일은 CLAUDE.md 하나만 받는다)
+      - name: Data repo head
+        uses: actions/checkout@v4
+        with:
+          repository: hong-seok-young/sapphire-imo-data
+          token: ${{ secrets.DATA_REPO_TOKEN || github.token }}
+          ssh-key: ${{ secrets.DATA_DEPLOY_KEY }}
+          path: 자료
+          fetch-depth: 1
+          sparse-checkout: CLAUDE.md
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        working-directory: web
+        run: npm ci
+
+      - name: Deploy if the data changed
+        working-directory: web
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha="$(git -C ../자료 rev-parse HEAD)"
+          if node scripts/data-watch.mjs "$sha"; then
+            gh workflow run deploy-web.yml --repo "$GITHUB_REPOSITORY" --ref main
+            echo "자료 저장소 ${sha:0:7} 이 바뀌어 배포를 불렀어요"
+          else
+            echo "자료 저장소 ${sha:0:7} 그대로예요"
+          fi

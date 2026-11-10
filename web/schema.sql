@@ -1099,3 +1099,7 @@ CREATE TABLE IF NOT EXISTS donate_grants (
   granted_to TEXT,
   dia INTEGER
 );
+
+-- 자료 저장소 전체를 챗봇이 읽게 (제작자 2026-11-10, scripts/library-sync.mjs 가 채우고 server/library.ts 가 찾는다). 길드/ 아래는 staff 1 (오피서 이상)
+CREATE TABLE IF NOT EXISTS lib_files (path TEXT PRIMARY KEY, hash TEXT NOT NULL, parts INTEGER NOT NULL, staff INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS lib_chunks (path TEXT NOT NULL, part INTEGER NOT NULL, staff INTEGER NOT NULL DEFAULT 0, text TEXT NOT NULL, PRIMARY KEY (path, part));
