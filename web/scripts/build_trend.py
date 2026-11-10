@@ -399,6 +399,7 @@ ALIASES: dict[str, str | None] = {
     # 뿌벨 = 모르포시즈 뿌리 Lv.40 벨트 (제작자 2026-11-10 '전사뿌벨 = 전사용 뿌리 벨트'. 다른 직업 말은 위키 같은 표의 벨트로, 짐작, 확인 전)
     "전사뿌벨": "거친뿌리의벨트", "렌저뿌벨": "서약자의벨트", "레인저뿌벨": "서약자의벨트", "법사뿌벨": "건조한마력의벨트", "무도가뿌벨": "청록의파편벨트", "무도뿌벨": "청록의파편벨트",
     "설신": "설원의저주장화",  # 제작자 2026-11-10
+    "샤": "샤도우보우",  # '45 팔샤' = +8 샤도우보우 (제작자 2026-11-10)
     "윙": "윙의날개",  # 팔윙 = +8 윙의날개 (제작자 2026-11-10 확인)
     "거뼈": "거미줄뼈갑옷", "황목": "황금목걸이", "닥스": "다크스컬", "글라": "글라디우스", "숲요장": "숲요정의장갑", "속모": "속전속결의모자", "속전모": "속전속결의모자", "사용장": "사막용병의장갑", "재벨": "재생의벨트", "데조모": "데조르바의모자", "강장": "강화가죽장갑",  # 제작자 2026-11-10 확인 (초보자도움방 "강장은 명중 1당 가격 3배")
 }
@@ -762,7 +763,7 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
                 tries.append((w[m.end():][m2.end():], m2))
         for c, em in tries:
             c = re.sub(r"[^가-힣a-zA-Z0-9]", "", c)
-            if (len(c) < 2 and c not in ("닼", "윙")) or c in NOT_ITEM_WORDS:
+            if (len(c) < 2 and c not in ("닼", "윙", "샤")) or c in NOT_ITEM_WORDS:
                 continue
             found = rs.resolve(c)
             if found:
@@ -787,6 +788,10 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
         if g:
             name, abbr, enh, wiki = g
             enh = enh or enh_word
+            if wiki and bare_is_option(name, num_words, bare):
+                return None  # 가격 없는 목록의 옵션 숫자
+            if wiki and not opts:
+                opts = num_opts(name, lead_digits, num_words)
             return {"name": name, "wiki": wiki, "enh": enh if enh <= 20 else 0, "opts": opts, "price": round(price, 2), "bare": bare, "abbr": abbr}
     hit = try_word(joined)
     if not hit and len(names) > 1:
@@ -822,6 +827,8 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
             rs.unknown[c] += 1
             unknown = True
     enh = enh or enh_word
+    if wiki and bare_is_option(name, num_words, bare):
+        return None  # 가격 없는 목록의 옵션 숫자 ('5강 렌 바슬신 6 3 12')
     if wiki and not opts:
         opts = num_opts(name, lead_digits, num_words)
     # unknown: 아무도 풀지 못한 것만 화면의 '정보 없음' (예전 이름 '모르는 줄임말') (제작자 2026-11-04: 알려 준 펫·완망·아드셋·코스튬이 아직 거기 있었다)
@@ -834,6 +841,7 @@ WIKI_STAT = {"크리티컬": "크리", "속성저항": "속저", "마나재생":
 _RANGE_OPTS: dict[str, tuple[list[str], str]] | None = None
 NUM_MISMATCH: dict[str, list[str]] = {}
 _RANGE_MAX: dict[tuple[str, str], int] = {}
+_RANGE_MIN: dict[tuple[str, str], int] = {}
 # 숫자만 적을 때 그 물건에 쓸모 있는 옵션(유효옵)만 적은 것: 물건마다 다르다 (제작자 2026-11-10 '유효옵만 적은 거라 레인저는 마재 빼고 크리 3 민 5',
 # '템마다 다를 듯 해서 그때그때 물어봐'). 확인받은 물건만 적고, 없는 물건은 숫자 수가 위키 옵션 수와 맞을 때만 읽는다
 # 숫자를 그대로 읽을 수 없어 제작자가 정해 준 것 (물건, 숫자) -> 옵션
@@ -843,9 +851,11 @@ NUM_FIXED = {
 # 숫자만 적을 때 위키 옵션 순서가 아닌 물건 (제작자 확인)
 DIGIT_STATS = {
     "약속의반지": ["지능", "속부"],  # '42약반' = 지능4 + 속성부여2, '3+2 약반' (제작자 2026-11-10)
+    "생명소생의반지": ["지능", "속부"],  # '생소반 6+3', '5+2 생소반': 약반과 같은 모양 (짐작, 확인 전)
 }
 EFFECTIVE_OPTS = {
     "데조르바의보우": ["크리", "민첩"],  # 35칠데조 = 크리3 민첩5 (마재는 안 적음)
+    "샤도우보우": ["크리", "민첩"],  # '45 팔샤' = 크리4 민첩5 (제작자 2026-11-10 '투옵이면 이게 맞지')
 }
 
 
@@ -871,9 +881,23 @@ def range_opts(name: str) -> tuple[list[str], str]:
                             st = WIKI_STAT.get(m.group(1), m.group(1))
                             stats.append(st)
                             _RANGE_MAX[(re.sub(r"\s", "", row.get("name", "")), st)] = int(m.group(2))
+                            lo = re.search(r"\d+", part)
+                            _RANGE_MIN[(re.sub(r"\s", "", row.get("name", "")), st)] = int(lo.group(0)) if lo else 0
                     job = cells[hs.index("직업")] if "직업" in hs and hs.index("직업") < len(cells) else ""
                     _RANGE_OPTS.setdefault(re.sub(r"\s", "", row.get("name", "")), (stats, job))
     return _RANGE_OPTS.get(re.sub(r"\s", "", name), ([], ""))
+
+
+def bare_is_option(name: str, words: list[str], bare: float | None) -> bool:
+    """가격 없는 목록 ('5강 렌 바슬신 6 3 12'): 끝 숫자까지 합쳐 위키 옵션 수와 같고 모두 범위 안이면 그 숫자는 가격이 아니라 옵션 (제작자 2026-11-10 '문맥 봐야 함')"""
+    if bare is None or not float(bare).is_integer():
+        return False
+    stats, _ = range_opts(name)
+    vals = [int(w) for w in words] + [int(bare)]
+    if not stats or len(vals) != len(stats):
+        return False
+    key = re.sub(r"\s", "", name)
+    return all(_RANGE_MIN.get((key, st), 0) <= v <= _RANGE_MAX.get((key, st), 99) for v, st in zip(vals, stats))
 
 
 def num_opts(name: str, lead: str, words: list[str]) -> list[str]:
@@ -944,7 +968,7 @@ GROUP_JOB = {"전사": "전사", "전": "전사", "렌저": "레인저", "레인
              "무도가": "무도가", "무도": "무도가", "무": "무도가"}
 GROUP_RE = re.compile(r"^(\+?(?:\d{1,2}|[오육칠팔구십]))?(전사|렌저|레인저|법사|마법사|무도가|무도|[전렌법무])?(\+?(?:\d{1,2}|[오육칠팔구십]))?("
                       + "|".join(sorted(JOB_GROUPS, key=len, reverse=True)) + r")$")
-JOB_IN_LINE = re.compile(r"전사|렌저|레인저|법사|마법사|무도가")
+JOB_IN_LINE = re.compile(r"전사|렌저|레인저|법사|마법사|무도가|(?<![가-힣])[렌법전](?![가-힣])")  # 따로 떨어진 한 글자 직업 말 ('5강 렌 바슬신')
 # 묶음마다 직업을 가르는 옵션 (옵션 하나로 한 직업만 남을 때만)
 GROUP_STAT_JOB = {
     "세계수갑": {"힘": "전사", "민첩": "레인저", "지능": "마법사", "마나": "마법사"},
