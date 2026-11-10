@@ -805,3 +805,28 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
     console.log("성장코인샵 칠면조 구이·송편 뺌 (한 번)");
   }
 }
+
+// 개발 요청 #13 (유어아너 '길드에 건의할 건의함좀 만들어주세여') 결재·완료 (제작자 2026-11-10 '유어아너 합의 길마결재 넣고 개발완료 처리해줘': 건의함은 이미 열었다).
+// 이번 차례에 유어아너 합의 · 마을모금함 결재 · 퓨앙 개발 완료를 결재 이력에 넣고 상태를 done 으로. 신청한 사람에게 개발 완료 알림. setup 'devreq13_done_20261110' 로 한 번만
+{
+  const KEY = "devreq13_done_20261110";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const row = queryFirst("SELECT id, round, status, user_id FROM dev_requests WHERE id = 13 AND body LIKE '%건의함%'");
+    if (row && row.status !== "done") {
+      const now = Date.now();
+      runSql([
+        `INSERT INTO dev_request_steps (req_id, round, user_id, kind, note, created_at) VALUES (13, ${row.round}, '유어아너', 'agree', NULL, ${now - 2000});`,
+        `INSERT INTO dev_request_steps (req_id, round, user_id, kind, note, created_at) VALUES (13, ${row.round}, '마을모금함', 'approve', NULL, ${now - 1000});`,
+        `INSERT INTO dev_request_steps (req_id, round, user_id, kind, note, created_at) VALUES (13, ${row.round}, '퓨앙', 'done', '건의함 오픈 (홈 칸 건의함)', ${now});`,
+        `UPDATE dev_requests SET status = 'done', updated_at = ${now} WHERE id = 13;`,
+        `INSERT INTO alerts (user_id, kind, text, link, created_at) SELECT user_id, 'devreq', '개발 완료 · “길드에 건의할 건의함좀 만들어주세여” · 건의함 오픈 (홈 칸 건의함)', '#/devreq?id=13', ${now} FROM dev_requests WHERE id = 13 AND user_id != '퓨앙';`,
+        `INSERT INTO push_queue (kind, created_at, last, claimed_at) VALUES ('devreq', ${now}, '', NULL);`,
+        `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+      ]);
+      console.log("개발 요청 #13 합의·결재·개발 완료 (한 번)");
+    } else {
+      runSql([`INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`]);
+      console.log(`개발 요청 #13 은 ${row ? "이미 완료" : "찾지 못함"} (건너뜀)`);
+    }
+  }
+}
