@@ -53,17 +53,33 @@ function addUp(entries: DexEntry[]): Sum {
 const num = (v: number) => String(Math.round(v * 100) / 100);
 const effectText = ([stat, v, pct]: [string, number, boolean]) => `${stat} +${num(v)}${pct ? "%" : ""}`;
 
-/** 게임 도감 '획득 옵션' 창의 줄 순서 (제작자가 시세 동향 때 보낸 스샷 7장 2026-11-03, 2026-11-10 '그거로 전체 능력치 세팅'):
- *  [능력치, % 줄인지]. 체력·마나·PVE 데미지 같은 것은 고정값 줄과 % 줄이 따로 있다 */
-const OPTION_ROWS: [string, boolean][] = [
-  ["명중", false], ["회피", false], ["크리티컬", false], ["불저항", false], ["냉기저항", false], ["번개저항", false], ["속성저항", false],
-  ["체력", false], ["마나", false], ["체력", true], ["마나", true], ["체력재생", false], ["마나재생", false], ["힘", false], ["지능", false], ["민첩", false],
-  ["이동속도", false], ["막기", false], ["아머", false], ["PVE 데미지", false], ["PVP 데미지", false], ["PVE 데미지", true], ["PVP 데미지", true],
-  ["PVE 데미지 감소", false], ["PVP 데미지 감소", false], ["PVE 데미지 감소", true], ["PVP 데미지 감소", true], ["아이템 드랍", false], ["골드 드랍", false],
-  ["보스 데미지", true], ["크리티컬 저항", true], ["크리티컬 데미지 감소", false], ["크리티컬 데미지 감소", true], ["데들리 저항", true],
-  ["데들리 데미지 감소", false], ["데들리 데미지 감소", true], ["경험치", true],
+/** 게임 도감 '획득 옵션' 창의 37줄 (제작자가 시세 동향 때 보낸 스샷 7장, 2026-11-03). 체력·마나·PVE 데미지 같은 것은 고정값 줄과 % 줄이 따로 있다.
+ *  좌우 두 칸 짝으로 둔다 (제작자 2026-11-10 '바를 빼고 최대한 유사한 것들끼리 좌우 2열 배치'). null = 빈 칸. 37줄이 모두 한 번씩 들어 있다 */
+type Row = [string, boolean];
+const OPTION_PAIRS: [Row | null, Row | null][] = [
+  [["체력", false], ["마나", false]],
+  [["체력", true], ["마나", true]],
+  [["체력재생", false], ["마나재생", false]],
+  [["힘", false], ["지능", false]],
+  [["민첩", false], ["이동속도", false]],
+  [["명중", false], ["회피", false]],
+  [["크리티컬", false], ["크리티컬 저항", true]],
+  [["아머", false], ["막기", false]],
+  [["불저항", false], ["냉기저항", false]],
+  [["번개저항", false], ["속성저항", false]],
+  [["PVE 데미지", false], ["PVP 데미지", false]],
+  [["PVE 데미지", true], ["PVP 데미지", true]],
+  [["PVE 데미지 감소", false], ["PVP 데미지 감소", false]],
+  [["PVE 데미지 감소", true], ["PVP 데미지 감소", true]],
+  [["크리티컬 데미지 감소", false], ["크리티컬 데미지 감소", true]],
+  [["데들리 데미지 감소", false], ["데들리 데미지 감소", true]],
+  [["데들리 저항", true], ["보스 데미지", true]],
+  [["아이템 드랍", false], ["골드 드랍", false]],
+  [["경험치", true], null],
 ];
 const rowKey = (s: string, pct: boolean) => s + (pct ? "%" : "");
+/** 두 칸 배치에서 잘리는 긴 이름은 줄여 보인다 (고정값 칸과 % 칸이 구분되게) */
+const SHORT: Record<string, string> = { "PVE 데미지 감소": "PVE 뎀감", "PVP 데미지 감소": "PVP 뎀감", "크리티컬 데미지 감소": "크리 뎀감", "크리티컬 저항": "크리 저항", "데들리 데미지 감소": "데들리 뎀감" };
 const pick = (sum: Sum, s: string, pct: boolean) => (pct ? sum.get(s)?.pct : sum.get(s)?.flat) ?? 0;
 
 /** 손으로 맞춘 내 능력치 (줄마다, 없으면 완료 합계). 이 기기에 계정별로 (localStorage sapphire.dex.stat.<아이디>) */
@@ -269,61 +285,65 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
   );
 }
 
-/** 획득 옵션: 게임 창의 줄마다 내 수치(0 ~ 기록된 도감을 다 채웠을 때)를 슬라이더로 움직이거나 숫자로 적는다.
- *  손대지 않은 줄은 완료로 누른 항목의 합. 초록 + = 지금 목록의 미완료를 다 하면 더 오르는 값 (제작자 2026-11-10) */
+/** 획득 옵션: 게임 창의 37줄을 비슷한 것끼리 좌우 두 칸으로 (OPTION_PAIRS). 칸마다 이름, 그 아래 초록 +(지금 목록의 미완료를 다 하면)와 회색 /(도감을 다 채웠을 때),
+ *  오른쪽 숫자 칸에 내 수치를 직접 적는다. 손대지 않은 칸은 완료로 누른 항목의 합 (제작자 2026-11-10, 슬라이더는 '바를 빼는 게 좋을 듯'으로 뺐다) */
 function StatPanel({ have, gain, full, over, setOver, stat, doneN, total, todoN }: {
   have: Sum; gain: Sum; full: Sum; over: Record<string, number>; setOver: (v: Record<string, number>) => void;
   stat: string | null; doneN: number; total: number; todoN: number;
 }) {
   const [all, setAll] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({});
-  const rows: [string, boolean][] = [...OPTION_ROWS];
-  for (const [s, x] of full) for (const pct of [false, true]) if ((pct ? x.pct : x.flat) && !rows.some(([a, b]) => a === s && b === pct)) rows.push([s, pct]);
+  const pairs: [Row | null, Row | null][] = [...OPTION_PAIRS];
+  // 짝 목록에 없는 능력치가 자료에 생기면 끝에 붙인다
+  const known = new Set(OPTION_PAIRS.flat().filter((r): r is Row => !!r).map(([a, b]) => rowKey(a, b)));
+  const extra: Row[] = [];
+  for (const [s, x] of full) for (const pct of [false, true]) if ((pct ? x.pct : x.flat) && !known.has(rowKey(s, pct))) extra.push([s, pct]);
+  for (let i = 0; i < extra.length; i += 2) pairs.push([extra[i], extra[i + 1] ?? null]);
   const valueOf = (s: string, pct: boolean) => over[rowKey(s, pct)] ?? pick(have, s, pct);
   const set = (k: string, v: number) => setOver({ ...over, [k]: Math.max(0, Math.round(v * 100) / 100) });
-  const shown = all ? rows : rows.filter(([s, pct]) => valueOf(s, pct) > 0 || pick(gain, s, pct) > 0 || rowKey(s, pct) in over);
+  const live = (r: Row | null) => !!r && (valueOf(r[0], r[1]) > 0 || pick(gain, r[0], r[1]) > 0 || rowKey(r[0], r[1]) in over);
+  const shown = all ? pairs : pairs.filter(([a, b]) => live(a) || live(b));
   const touched = Object.keys(over).length > 0;
+  const cell = (r: Row | null, i: number) => {
+    if (!r) return <div key={i} className="dex-cell dex-cell-empty" />;
+    const [s, pct] = r;
+    const k = rowKey(s, pct);
+    const v = valueOf(s, pct);
+    const mx = pick(full, s, pct);
+    const g = pick(gain, s, pct);
+    return (
+      <div key={k} className={"dex-cell" + (stat === s ? " dex-cell-on" : "") + (k in over ? " dex-cell-set" : "")}>
+        <span className="dex-cell-name">
+          <b title={s}>{SHORT[s] ?? s}{pct && <small>%</small>}</b>
+          <small>
+            {g > 0 && <span className="dex-gain">+{num(g)} </span>}
+            <span className="muted">/{mx ? num(mx) : "-"}</span>
+          </small>
+        </span>
+        <input className="dex-row-num" type="number" inputMode="decimal" min={0} step={mx > 50 ? 0.5 : 0.01} aria-label={`${s}${pct ? " %" : ""} 내 수치`}
+          value={draft[k] ?? num(v)}
+          onChange={(e) => {
+            setDraft({ ...draft, [k]: e.target.value });
+            const n = parseFloat(e.target.value);
+            if (!Number.isNaN(n)) set(k, n);
+          }}
+          onBlur={() => {
+            const d = { ...draft };
+            delete d[k];
+            setDraft(d);
+          }} />
+      </div>
+    );
+  };
   return (
     <Panel className="dex-sum" title={<>획득 옵션 <small className="muted">완료 {doneN} / {total}</small></>}>
       {shown.length ? (
-        <ul className="dex-rows">
-          {shown.map(([s, pct]) => {
-            const k = rowKey(s, pct);
-            const v = valueOf(s, pct);
-            const mx = pick(full, s, pct);
-            const g = pick(gain, s, pct);
-            const step = mx > 50 ? 0.5 : 0.01;
-            return (
-              <li key={k} className={"dex-row" + (stat === s ? " dex-row-on" : "") + (k in over ? " dex-row-set" : "")}>
-                <span className="dex-row-name">
-                  {s}
-                  {pct && <small>%</small>}
-                  {g > 0 && <small className="dex-gain">+{num(g)}</small>}
-                </span>
-                <input type="range" min={0} max={mx || 1} step={step} value={Math.min(v, mx || 1)} disabled={!mx} aria-label={`${s}${pct ? " %" : ""} 수치`}
-                  onChange={(e) => set(k, Number(e.target.value))} />
-                <input className="dex-row-num" type="number" inputMode="decimal" min={0} step={step} aria-label={`${s}${pct ? " %" : ""} 직접 적기`}
-                  value={draft[k] ?? num(v)}
-                  onChange={(e) => {
-                    setDraft({ ...draft, [k]: e.target.value });
-                    const n = parseFloat(e.target.value);
-                    if (!Number.isNaN(n)) set(k, n);
-                  }}
-                  onBlur={() => {
-                    const d = { ...draft };
-                    delete d[k];
-                    setDraft(d);
-                  }} />
-                <span className="dex-row-max muted">/{mx ? num(mx) : "-"}</span>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="dex-cells">{shown.map(([a, b], i) => [cell(a, i * 2), cell(b, i * 2 + 1)])}</div>
       ) : (
         <p className="muted dex-empty">아직 완료한 항목이 없어요</p>
       )}
       <div className="dex-sum-foot">
-        <button type="button" className="sub-tab" onClick={() => setAll(!all)}>{all ? "접기 ▲" : `전체 능력치 ${rows.length} ▼`}</button>
+        <button type="button" className="sub-tab" onClick={() => setAll(!all)}>{all ? "접기 ▲" : "전체 능력치 ▼"}</button>
         {touched && (
           <button type="button" className="sub-tab" onClick={() => { setOver({}); setDraft({}); }}>
             완료 합계로
@@ -331,7 +351,7 @@ function StatPanel({ have, gain, full, over, setOver, stat, doneN, total, todoN 
         )}
       </div>
       <p className="dex-legend muted">
-        끝 = 도감 {total}개를 다 채웠을 때 · <span className="dex-gain">+ 지금 목록의 미완료 {todoN}개를 다 하면</span>
+        <span className="dex-gain">+ 지금 목록의 미완료 {todoN}개를 다 하면</span> · / 도감 {total}개를 다 채웠을 때
       </p>
     </Panel>
   );
