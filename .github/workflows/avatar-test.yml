@@ -1,0 +1,40 @@
+# 캐릭터 사진 AI 검수 시험 (제작자 2026-11-10 '발밑 회색 동그라미가 누끼가 안 따진다, AI 보정 제대로 되게'). 손으로 돌린다:
+# 비공개 자료 이미지/캐릭터사진/시험/ 의 그림으로 진짜 검수(Claude)에 묻고 찍은 점만 실행 기록에 찍는다 (web/scripts/avatar-review-test.mjs).
+# 공개 저장소라 그림은 찍지 않는다.
+name: Avatar review test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test pictures
+        uses: actions/checkout@v4
+        with:
+          repository: hong-seok-young/sapphire-imo-data
+          token: ${{ secrets.DATA_REPO_TOKEN || github.token }}
+          ssh-key: ${{ secrets.DATA_DEPLOY_KEY }}
+          path: 자료
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        working-directory: web
+        run: npm ci
+      - name: Review
+        working-directory: web
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+        run: node --import ./scripts/ts-hooks.mjs --experimental-strip-types scripts/avatar-review-test.mjs ../자료/이미지/캐릭터사진/시험
