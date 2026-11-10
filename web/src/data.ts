@@ -110,6 +110,15 @@ export interface EnhanceWeapon { name: string; job: string; lv: number | null; m
 export interface Enhance { source: string; common: number[]; mage: Record<string, number[]>; weapons: EnhanceWeapon[] }
 export const loadEnhance = () => getJson<Enhance>("enhance");
 
+/** 도감 계산기 (개발중): scripts/build_dex.py 가 비공개 자료 도감/일반.json (제작자 도감 영상을 옮긴 것)에서 만든다.
+ *  effects = [능력치, 값, % 인지], items 의 n = 필요 개수, plus = 강화 단계, pic = 위키에 그림이 없을 때 영상에서 자른 그림 (/data/dex/…png),
+ *  name 이 null 이면 영상에서 칸을 누르지 않아 이름을 모르는 칸 (icon = 생김새), est = 같은 그림으로 이름을 추정한 칸,
+ *  sg·sn = 도감 등록 창의 대체 스탬프 (장비스탬프 등급 'S'·'A'·'B' 와 개수, 대체 안 되면 sg '불가') */
+export interface DexItem { name: string | null; n: number; plus: number | null; icon?: string | null; pic?: string | null; stamp?: string | null; est?: boolean; sg?: string; sn?: number }
+export interface DexEntry { name: string; effects: [string, number, boolean][]; period?: string | null; items: DexItem[] }
+export interface Dex { source: string; built: string; order: string[]; entries: DexEntry[] }
+export const loadDex = () => getJson<Dex>("dex");
+
 /** key 를 주면 이번에 연 동안 받은 것을 받는 동안 바로 보인다 (src/memo.ts) */
 export function useAsync<T>(fn: () => Promise<T>, key?: string): { data?: T; error?: string } {
   const [state, setState] = useState<{ data?: T; error?: string }>(() => {

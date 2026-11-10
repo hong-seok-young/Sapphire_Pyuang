@@ -94,6 +94,7 @@ const CHUNKS = {
   DevRequests: () => import("./pages/DevRequests"),
   Simulator: () => import("./pages/Simulator"),
   Trend: () => import("./pages/Trend"),
+  Dex: () => import("./pages/Dex"),
   ActivityLog: () => import("./pages/ActivityLog"),
   Alerts: () => import("./pages/Alerts"),
   ChatGaps: () => import("./pages/ChatGaps"),
@@ -122,6 +123,7 @@ const EnhancePage = lazy(() => CHUNKS.Enhance().then((m) => ({ default: m.Enhanc
 const DevRequestsPage = lazy(() => CHUNKS.DevRequests().then((m) => ({ default: m.DevRequestsPage })));
 const SimulatorPage = lazy(() => CHUNKS.Simulator().then((m) => ({ default: m.SimulatorPage })));
 const TrendPage = lazy(() => CHUNKS.Trend().then((m) => ({ default: m.TrendPage })));
+const DexPage = lazy(() => CHUNKS.Dex().then((m) => ({ default: m.DexPage })));
 const ActivityLogPage = lazy(() => CHUNKS.ActivityLog().then((m) => ({ default: m.ActivityLogPage })));
 const AlertsPage = lazy(() => CHUNKS.Alerts().then((m) => ({ default: m.AlertsPage })));
 const ChatGapsPage = lazy(() => CHUNKS.ChatGaps().then((m) => ({ default: m.ChatGapsPage })));
@@ -537,6 +539,8 @@ function Wiki({
   // 시세 동향 (개발중, 제작자 요청 2026-11-03): 거래 톡방 대화에서 모은 골드·물건·캐릭터 시세
   // 개발 중 칸은 미리 보는 사람(길드마스터, 오피서, 앱개발자, 테스트 계정)만. 길드원은 주소로 들어와도 개발 중 안내 (제작자 요청 2026-11-04)
   else if (page === "trend") body = canPreview(me) ? <TrendPage wiki={wiki} /> : <DevSoon title="시세 동향" />;
+  // 도감 계산기 (개발중, 제작자 요청 2026-11-10): 제작자 도감 영상을 옮긴 항목으로 완료 효과 합계와 필요 재료. 미리 보는 사람만
+  else if (page === "dex") body = canPreview(me) ? <DexPage wiki={wiki} me={me} /> : <DevSoon title="도감 계산기" />;
   // 강화 비교 (제작자 요청 2026-11-04, 2026-11-05 모두에게 열었다): 두 무기(+강)의 데미지와 몇 % 강해지는지
   else if (page === "enhance") body = <EnhancePage wiki={wiki} query={route.query} me={me} />;
   // 확률 시뮬레이터 개발 중판은 미리 보는 사람(길드마스터·오피서·달팽이·간다이, launcher.ts canPreview), 테스트판은 앱개발자(와 테스트 계정)만 (제작자 2026-11-04 '도플갱어로')
