@@ -143,9 +143,16 @@ export interface GcData {
   nextMilestone: GcMilestone | null;
   /** 연속 성장: 지난주까지 이어진 주 수, 이번 주도 벌면 받을 보너스 */
   streak: { count: number; next: number };
-  admin?: { pending: GcOrder[]; recent: GcOrder[]; members: GcWallet[]; results?: GcRoundResult[] };
+  admin?: { pending: GcOrder[]; recent: GcOrder[]; members: GcWallet[]; results?: GcRoundResult[]; people?: GcPerson[] };
 }
 
+/** 주간 목표 대상으로 고를 수 있는 사람 (레벨을 적은 계정 모두, guild main = 1군 · second = 2군, main = 본캐 아이디면 부캐) */
+export interface GcPerson {
+  id: string;
+  level: number;
+  guild: string | null;
+  main: string | null;
+}
 /** 끝난 판의 결과 한 줄 (담당자 > 기록) */
 export interface GcRoundResult {
   round: number;

@@ -1613,7 +1613,7 @@ export function GrowthShopPage({
       {shown === "staff" && cur.admin && staff === "targets" && (
         <TargetsTab
           key={reload}
-          members={cur.admin.members}
+          people={cur.admin.people ?? []}
           race={cur.race}
           onChanged={saved}
         />

@@ -1,8 +1,8 @@
 // PUT /api/gcoin/targets { userId, target } -> 이번 주간 판(쉬는 주면 다음 판)의 목표 레벨 정하기 (담당자: 오피서 이상, 김다혜 2026-11-09 '2주간의 목표 레벨은 담당자가 정해 주고').
-// target 이 null 이면 뺀다. 2군 본캐에게만, 목표는 지금 레벨보다 높게. 정할 때 레벨을 시작 레벨로 적는다 (달성률의 0%)
-import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
+// target 이 null 이면 뺀다. 대상은 담당자 재량(1군·2군 상관없이), 목표는 지금 레벨보다 높게. 정할 때 레벨을 시작 레벨로 적는다 (달성률의 0%)
+import { FORBIDDEN, NEED_LOGIN, TEST_IDS, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { canManageGcoin, canUseGcoin, int, isMember } from "../../../server/gcoin";
+import { canManageGcoin, canUseGcoin, int } from "../../../server/gcoin";
 import { targetRound } from "../../../server/gcrace";
 
 export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
@@ -11,7 +11,8 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   if (!canUseGcoin(me) || !canManageGcoin(me)) return FORBIDDEN();
   const b = await readJson<{ userId: unknown; target: unknown }>(request);
   const userId = typeof b.userId === "string" ? b.userId : "";
-  if (!userId || !(await isMember(env, userId))) return json({ error: "2군 본캐가 아니에요" }, 400);
+  // 대상은 담당자 재량 (제작자 2026-11-10 '대상자 추가·제거 자유롭게, 1군·2군 상관없이'): 레벨을 적은 계정이면 누구나 (테스트 계정 빼고)
+  if (!userId || TEST_IDS.includes(userId)) return json({ error: "없는 계정이에요" }, 400);
   const r = await targetRound(env);
   if (!r) return json({ error: "다음 판 기간을 먼저 정해 주세요" }, 409);
   const round = r.id;

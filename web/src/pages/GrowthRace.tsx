@@ -8,7 +8,7 @@ import { JobEmblem } from "../emblems";
 import { Nick } from "../kakao";
 import { useBackClose } from "../backClose";
 import { COIN_GOLD, setRound, setTarget } from "../gcoin";
-import type { GcRace, GcRaceEntry, GcRoundResult, GcWallet } from "../gcoin";
+import type { GcPerson, GcRace, GcRaceEntry, GcRoundResult } from "../gcoin";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 /** 앞 세 사람 선 색 (dataviz 검사기 --pairs all 로 어두운 바탕 #1b1d3a 에서 통과: 파랑 · 주황 · 청록) */
@@ -681,11 +681,11 @@ export const goldText = (coin: number) =>
  * 정한 사람은 '빼기'. 정할 때 레벨이 달성률의 0%
  */
 export function TargetsTab({
-  members,
+  people,
   race,
   onChanged,
 }: {
-  members: GcWallet[];
+  people: GcPerson[];
   race: GcRace;
   onChanged: (msg: string) => void;
 }) {
@@ -695,12 +695,23 @@ export function TargetsTab({
   const set = new Map<string, TargetEntry>(
     ended ? (race.upcoming ?? []).map((e) => [e.id, { ...e, doneAt: null, rank: 0 }]) : race.list.map((e) => [e.id, e]),
   );
-  const list = [...members].sort(
-    (a, b) =>
-      Number(set.has(b.id)) - Number(set.has(a.id)) ||
-      (b.level ?? 0) - (a.level ?? 0) ||
-      a.id.localeCompare(b.id),
-  );
+  // 대상은 담당자 재량 (제작자 2026-11-10 '대상자 추가·제거 자유롭게, 1군·2군 상관없이'): 정한 사람 + 이번에 찾아 넣은 사람만 보인다
+  const [adding, setAdding] = useState<string[]>([]);
+  const [q, setQ] = useState("");
+  const byId = new Map(people.map((p) => [p.id, p]));
+  const ids = [...new Set([...set.keys(), ...adding])];
+  const list = ids
+    .map((id) => byId.get(id) ?? { id, level: set.get(id)?.fromLevel ?? 1, guild: null, main: null })
+    .sort((a, b) => Number(set.has(b.id)) - Number(set.has(a.id)) || b.level - a.level || a.id.localeCompare(b.id));
+  const needle = q.trim().replace(/\s/g, "").toLowerCase();
+  const found = needle
+    ? people.filter((p) => !ids.includes(p.id) && p.id.replace(/\s/g, "").toLowerCase().includes(needle)).slice(0, 8)
+    : [];
+  const second = people.filter((p) => p.guild === "second" && !p.main && !ids.includes(p.id));
+  const add = (id: string) => {
+    setAdding((xs) => (xs.includes(id) ? xs : [...xs, id]));
+    setQ("");
+  };
   const period = !ended
     ? { start: race.start, end: race.end }
     : next && race.nextEnd
@@ -714,17 +725,43 @@ export function TargetsTab({
         <small>{set.size}명</small>
       </p>
       {!period && <p className="gc-empty">기간을 먼저 정해 주세요</p>}
-      {!list.length && <p className="gc-empty">2군 본캐가 없어요</p>}
-      <ul hidden={!period}>
-        {list.map((m) => (
-          <TargetRow
-            key={m.id}
-            m={m}
-            e={set.get(m.id) ?? null}
-            onChanged={onChanged}
+      <div hidden={!period}>
+        <ul>
+          {list.map((m) => (
+            <TargetRow
+              key={m.id}
+              m={m}
+              e={set.get(m.id) ?? null}
+              onChanged={onChanged}
+              onDrop={() => setAdding((xs) => xs.filter((x) => x !== m.id))}
+            />
+          ))}
+        </ul>
+        <div className="gr-add">
+          <input
+            className="mk-input"
+            value={q}
+            onChange={(e) => setQ(e.target.value.slice(0, 20))}
+            placeholder="대상자 추가 · 닉네임"
+            aria-label="대상자 추가"
           />
-        ))}
-      </ul>
+          {second.length > 0 && (
+            <button className="pill gc-mini" onClick={() => setAdding((xs) => [...xs, ...second.map((p) => p.id)])}>
+              2군 전체 {second.length}
+            </button>
+          )}
+        </div>
+        {found.length > 0 && (
+          <div className="gr-add-list">
+            {found.map((p) => (
+              <button key={p.id} className="pill gc-mini" onClick={() => add(p.id)}>
+                {p.id} <small>Lv.{p.level}{p.guild === "second" ? " · 2군" : p.guild === "main" ? " · 1군" : ""}</small>
+              </button>
+            ))}
+          </div>
+        )}
+        {needle && !found.length && <p className="gc-empty">찾는 닉네임이 없어요</p>}
+      </div>
     </div>
   );
 }
@@ -807,10 +844,13 @@ function TargetRow({
   m,
   e,
   onChanged,
+  onDrop,
 }: {
-  m: GcWallet;
+  m: { id: string; level: number | null };
   e: TargetEntry | null;
   onChanged: (msg: string) => void;
+  /** 아직 정하지 않은 줄을 목록에서 뺀다 */
+  onDrop: () => void;
 }) {
   const lv = m.level ?? 1;
   const base = e?.fromLevel ?? lv;
@@ -872,6 +912,11 @@ function TargetRow({
           onClick={() => run(null, `${m.id} 목표 뺌`)}
         >
           빼기
+        </button>
+      )}
+      {!e && (
+        <button className="pill gc-mini" disabled={busy} onClick={onDrop} aria-label={`${m.id} 목록에서 빼기`}>
+          ✕
         </button>
       )}
       {e?.doneAt && <small className="gr-tg-done">🏁 {e.rank}위</small>}

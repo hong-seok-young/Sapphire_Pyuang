@@ -1,7 +1,7 @@
 // GET /api/gcoin -> 2군 성장코인샵 (server/gcoin.ts, src/pages/GrowthShop.tsx)
 //   { open, manage, member, start, wallet, history, items, curve, rank, week: { start, top }, lastWinners, admin? }
 //   member: 내가 2군 본캐인지 (아니면 지갑이 없다). admin(오피서 이상): 기다리는 신청, 2군 본캐 모두의 지갑, 최근 처리한 신청
-import { FORBIDDEN, NEED_LOGIN, currentUser, json } from "../../../server/auth";
+import { FORBIDDEN, NEED_LOGIN, TEST_IDS, currentUser, json } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { raceData, roundResults, snapshotEnded } from "../../../server/gcrace";
 import { LEVEL_COINS, readCaps, weekBought, gcoinOpen, openCleanup, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
@@ -91,14 +91,18 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
   let admin: unknown;
   if (manage) {
-    const [pending, recent, members, results] = await Promise.all([
+    const [pending, recent, members, results, people] = await Promise.all([
       env.DB.prepare("SELECT * FROM gc_orders WHERE status = 'pending' ORDER BY created_at ASC").all<OrderRow>(),
       env.DB.prepare("SELECT * FROM gc_orders WHERE status != 'pending' ORDER BY COALESCE(done_at, created_at) DESC LIMIT 60").all<OrderRow>(),
       wallets(env, curve),
       roundResults(env),
+      // 주간 목표 대상으로 고를 수 있는 사람 (담당자 재량, 1군·2군 상관없이): 레벨을 적은 계정 모두
+      env.DB.prepare("SELECT p.user_id AS id, p.level AS level, p.guild AS guild, u.main_id AS main FROM profiles p JOIN users u ON u.id = p.user_id WHERE p.level IS NOT NULL")
+        .all<{ id: string; level: number; guild: string | null; main: string | null }>(),
     ]);
     admin = {
       results,
+      people: people.results.filter((p) => !TEST_IDS.includes(p.id)),
       pending: pending.results.map(orderOut),
       recent: recent.results.map(orderOut),
       members: members.sort((a, b) => b.balance - a.balance || (b.level ?? 0) - (a.level ?? 0) || a.id.localeCompare(b.id)),

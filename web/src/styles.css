@@ -5124,3 +5124,11 @@ button.dex-cell-name:disabled { cursor: default; }
 .place-guide-pics img { display: block; width: 100%; height: auto; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.12); }
 .place-guide-pics small { color: var(--muted); font-size: 11px; }
 .place-guide-pics button:active img { transform: scale(0.98); }
+
+/* 성장코인샵 담당자 > 목표의 대상자 추가 (제작자 2026-11-10 '대상자 추가·제거 자유롭게, 1군·2군 상관없이') */
+.gr-add { display: flex; gap: 6px; margin-top: 8px; }
+.gr-add .mk-input { flex: 1; min-width: 0; }
+.gr-add-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.gr-add-list small { opacity: 0.75; font-size: 10px; }
+.gr-tg { justify-content: flex-end; }
+.gr-tg-name { flex: 1 1 96px; white-space: nowrap; }

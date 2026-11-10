@@ -8,7 +8,7 @@
 // 달성한 사람은 그때 순서대로 1위 2위 … (확정), 아직인 사람은 달성률 순. 1~5위는 달성하는 순간 상금(gc_settings rank1~5)이 지갑에 들어간다 (gc_ledger kind race).
 import type { Env, User } from "./auth";
 import { notify } from "./alerts";
-import { canUseGcoin, gcoinOpen, isMember, readRank } from "./gcoin";
+import { canUseGcoin, gcoinOpen, readRank } from "./gcoin";
 
 const DAY = 86_400_000;
 /** 진행하는 날 수와 한 바퀴(진행 + 휴식): 담당자가 기간을 정하기 전의 기본 판 */
@@ -238,9 +238,11 @@ export interface RaceGain {
 
 /** 레벨을 저장하기 전 내 목표 (목표가 없거나 2군 본캐가 아니면 null) */
 export async function raceBefore(env: Env, me: User) {
-  if (!canUseGcoin(me) || !(await isMember(env, me.id))) return null;
+  // 대상은 담당자가 고른 누구나 (1군·2군 상관없이): 이번 판에 내 목표가 있을 때만
+  if (!canUseGcoin(me)) return null;
   const round = await currentRound(env);
   if (Date.now() < round.start || Date.now() >= round.end) return null;
+  if (!(await env.DB.prepare("SELECT 1 AS x FROM gc_targets WHERE round = ? AND user_id = ?").bind(round.id, me.id).first())) return null;
   const prizes = await readRank(env);
   const mine = (await raceState(env, round, prizes)).find((e) => e.id === me.id);
   return mine ? { round, prizes, mine } : null;
