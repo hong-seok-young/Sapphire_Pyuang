@@ -55,7 +55,7 @@ export function deletePostStmts(env: Env, id: number): D1PreparedStatement[] {
 /** 첨부 이름: 경로 글자를 빼고 100자까지 */
 export const cleanName = (n: string) => n.replace(/[\\/\u0000-\u001f]/g, "_").slice(0, 100) || "file";
 
-// ---------- 건의함 (제작자 요청 2026-11-09, 개발 요청 #13 유어아너: '건의사항은 게시판에서 빼고 별도 버튼, 익명 기능, 익명은 유어아너와 나만 보게') ----------
+// ---------- 건의함 (제작자 요청 2026-11-09) ----------
 // 건의함(#/suggest, 화면 pages/Board.tsx SuggestPage)은 게시판의 건의 사항(cat 'suggest')을 그대로 쓴다. 글과 댓글을 익명(board_posts.anon, board_comments.anon)으로 올릴 수 있다.
 
 /**
@@ -64,14 +64,30 @@ export const cleanName = (n: string) => n.replace(/[\\/\u0000-\u001f]/g, "_").sl
  */
 export const SUGGEST_OPEN = false;
 
-/** 익명 글·댓글의 이름을 보는 사람: 앱개발자와 이 사람(묶은 캐릭터 중 하나라도). 닉네임으로 정하므로 닉네임을 바꾸면 고친다 */
-export const ANON_VIEWERS = ["유어아너"];
 /** 익명이라고 보일 이름 */
 export const ANON_NAME = "익명";
-/** 익명 글·댓글을 쓴 사람이 누구인지 보는지 */
-export const canSeeAnon = (me: User) => me.role === "developer" || (me.chars ?? [me.id]).some((c) => ANON_VIEWERS.includes(c));
+/**
+ * 익명 글·댓글을 쓴 사람이 누구인지 보는지: Pages 비밀값 ANON_VIEWERS(쉼표로 이은 닉네임, 묶은 캐릭터 중 하나라도)에 든 사람만.
+ * 누구인지는 공개 저장소에 적지 않는다 (배포가 비공개 자료에서 넣는다, deploy-web.yml). 비밀값이 없으면 아무도 못 본다
+ */
+export const canSeeAnon = (env: Env, me: User) => {
+  const list = (env.ANON_VIEWERS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  return list.length > 0 && (me.chars ?? [me.id]).some((c) => list.includes(c));
+};
 /** 익명이고 볼 수 없는 사람이면 '익명' */
-export const shownName = (me: User, name: string, anon: number | boolean | null | undefined) => (anon && !canSeeAnon(me) ? ANON_NAME : name);
+export const shownName = (env: Env, me: User, name: string, anon: number | boolean | null | undefined) => (anon && !canSeeAnon(env, me) ? ANON_NAME : name);
+
+/** 건의 사항 글을 모두 보는 사람: 오피서 이상 (앱개발자 포함, 제작자 2026-11-10). 다른 사람은 내가 쓴 건의만 본다 */
+export const seesAllSuggest = (me: User) => isStaff(me.role);
+/** 이 글을 볼 수 있는지 (건의 사항은 운영진과 쓴 사람만) */
+export const canSeePost = (me: User, post: { cat: string; author: string }) =>
+  post.cat !== "suggest" || seesAllSuggest(me) || (me.chars ?? [me.id]).includes(post.author);
+/** SQL 조건 (별칭 p 의 board_posts): 이 사람에게 보이는 글. 모두 보면 빈 조건 */
+export function visiblePosts(me: User, alias = "p"): { sql: string; binds: string[] } {
+  if (seesAllSuggest(me)) return { sql: "", binds: [] };
+  const chars = me.chars?.length ? me.chars : [me.id];
+  return { sql: `(${alias}.cat != 'suggest' OR ${alias}.author IN (${chars.map(() => "?").join(", ")}))`, binds: chars };
+}
 /** 그 건의 글·댓글의 주소 (건의함을 열면 건의함으로) */
 export const postLink = (cat: string, id: number) => (SUGGEST_OPEN && cat === "suggest" ? `#/suggest/${id}` : `#/board/${id}`);
 

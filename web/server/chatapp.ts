@@ -14,7 +14,7 @@
 import { RANK, TEST_IDS } from "./auth";
 import { covering, fromLogs, logDbs, newestLogs } from "./logdb";
 import type { Env, Guild, Job, Role, User } from "./auth";
-import { CAT_NAME, shownName } from "./board";
+import { CAT_NAME, shownName, visiblePosts } from "./board";
 import type { Cat } from "./board";
 import { growthEntries } from "./growth";
 import type { Period } from "./growth";
@@ -108,6 +108,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
   const k = new Date(now + KST);
   const today = Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate()) - KST;
   const week = growthWeekStart(now);
+  const boardVis = visiblePosts(me);
 
   const [peopleR, listingsR, myWantersR, myBidsR, myWantsR, rateR, goldR, myGoldWantsR, requestsR, offersR, boardR, platR, myOrdersR, openOrdersR] =
     await env.DB.batch([
@@ -156,11 +157,12 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
         "SELECT request_id, user_id, note FROM request_offers WHERE status = 'pledged' " +
           "AND request_id IN (SELECT id FROM requests WHERE status != 'done') ORDER BY created_at",
       ),
+      // 건의 사항은 운영진(오피서 이상)과 쓴 사람에게만 (화면과 같게, server/board.ts visiblePosts)
       env.DB.prepare(
         "SELECT p.id, p.cat, p.author, p.title, p.body AS body, p.pinned, p.anon, p.created_at, " +
           "(SELECT COUNT(*) FROM board_comments c WHERE c.post_id = p.id) AS comments, (SELECT COUNT(*) FROM board_likes k WHERE k.post_id = p.id) AS likes, " +
-          "(SELECT COUNT(*) FROM board_views v WHERE v.post_id = p.id) AS views FROM board_posts p ORDER BY p.pinned DESC, p.id DESC LIMIT 20",
-      ),
+          `(SELECT COUNT(*) FROM board_views v WHERE v.post_id = p.id) AS views FROM board_posts p${boardVis.sql ? " WHERE " + boardVis.sql : ""} ORDER BY p.pinned DESC, p.id DESC LIMIT 20`,
+      ).bind(...boardVis.binds),
       env.DB.prepare("SELECT ratio, high_ratio, market, open, week_plat, high_week_plat FROM plat_settings WHERE id = 1"),
       env.DB.prepare("SELECT item_name, plat, gold, status, created_at FROM plat_orders WHERE user_id = ? ORDER BY id DESC LIMIT 10").bind(me.id),
       env.DB.prepare("SELECT user_id, item_name, plat, gold, created_at FROM plat_orders WHERE status = 'requested' ORDER BY id DESC LIMIT 20"),
@@ -341,8 +343,8 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
 
   // ---------- 게시판 ----------
   type Post = { id: number; cat: Cat; author: string; title: string; body: string; pinned: number; anon: number; created_at: number; comments: number; likes: number; views: number };
-  // 건의함 익명 글은 앱개발자·유어아너 말고는 글쓴이를 '익명'으로 (화면과 같게, server/board.ts shownName)
-  const posts = (boardR.results as Post[]).map((p) => ({ ...p, author: shownName(me, p.author, p.anon) }));
+  // 건의함 익명 글은 글쓴이를 '익명'으로 (화면과 같게, server/board.ts shownName)
+  const posts = (boardR.results as Post[]).map((p) => ({ ...p, author: shownName(env, me, p.author, p.anon) }));
   if (posts.length && (ASK.board.test(q) || posts.some((p) => mentioned.includes(p.author)))) {
     const lines = posts.map(
       (p) =>
@@ -367,7 +369,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
       ]);
       const body = (bodyR.results[0] as { body: string } | undefined)?.body ?? "";
       const comments = (commentsR.results as { user_id: string; parent_id: number | null; text: string; anon: number; created_at: number }[]).map(
-        (c) => `${c.parent_id ? "  └ 답글 " : "댓글 "}${shownName(me, c.user_id, c.anon)}: ${oneLine(c.text)} (${when(c.created_at)})`,
+        (c) => `${c.parent_id ? "  └ 답글 " : "댓글 "}${shownName(env, me, c.user_id, c.anon)}: ${oneLine(c.text)} (${when(c.created_at)})`,
       );
       parts.push(section(`게시판 글 #${p.id} "${oneLine(p.title)}" (${p.author}) 본문과 댓글`, [body, ...comments]));
     }

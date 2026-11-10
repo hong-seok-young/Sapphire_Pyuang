@@ -55,6 +55,22 @@ const STARS = Array.from({ length: 22 }, (_, i) => ({
   size: i % 5 === 0 ? 3 : 2,
 }));
 
+/**
+ * 마일리지: 쓸 수 있는 정수만 보이고 누르면(펼치면) 쌓인 소수 둘째 자리까지 (제작자 2026-11-10 '소수점 이하는 안 보이게, 클릭하면 소수점 숫자가 보이게').
+ * 소수는 내림 (정수 부분만 쓸 수 있어서 반올림하면 쓸 수 있는 양보다 커 보인다)
+ */
+function Mile({ m, full }: { m: number; full: boolean }) {
+  const cents = Math.floor(Math.round(m * 1e6) / 1e4);
+  const whole = Math.floor(cents / 100);
+  const dec = cents - whole * 100;
+  return (
+    <>
+      {whole.toLocaleString()}
+      {full && dec > 0 && <span className="hof-dec">.{String(dec).padStart(2, "0").replace(/0$/, "")}</span>}
+    </>
+  );
+}
+
 /** 그 사람의 기부 (누르면 펼침) */
 function Gifts({ lines }: { lines: GiftLine[] }) {
   if (!lines.length) return null;
@@ -101,7 +117,7 @@ function Podium({ rank, h, me, open, onToggle }: { rank: 1 | 2 | 3; h: HallRow; 
       </b>
       <span className="hof-pod-mile">
         <i>💎</i>
-        {mileText(h.earned)}
+        <Mile m={h.earned} full={open} />
       </span>
       <small className="hof-pod-sub">
         {goldText(h.gold)} · {h.count}건
@@ -117,6 +133,9 @@ function Podium({ rank, h, me, open, onToggle }: { rank: 1 | 2 | 3; h: HallRow; 
 export function HallPage({ me }: { me: Me }) {
   const [period, setPeriod] = useEntryState<"all" | "month">("hof.period", "all");
   const [open, setOpen] = useState<string | null>(null);
+  // 누적 마일리지 칸과 아래 내 순위 줄은 눌러서 소수까지
+  const [totalFull, setTotalFull] = useState(false);
+  const [mineFull, setMineFull] = useState(false);
   const { data: real, error } = useAsync(
     useCallback(() => fetchHall(period), [period]),
     `hall:${period}`,
@@ -158,10 +177,12 @@ export function HallPage({ me }: { me: Me }) {
           <i key={i} className="hof-star" style={{ left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size, animationDelay: `${s.delay}s` }} aria-hidden />
         ))}
         <div className="hof-total">
-          <span>
+          <button type="button" className="hof-total-mile" aria-pressed={totalFull} onClick={() => setTotalFull((v) => !v)}>
             <small>누적 마일리지</small>
-            <b>💎 {mileText(data.total.earned)}</b>
-          </span>
+            <b>
+              💎 <Mile m={data.total.earned} full={totalFull} />
+            </b>
+          </button>
           <span>
             <small>기부 가치</small>
             <b>{goldText(data.total.gold)}</b>
@@ -202,7 +223,9 @@ export function HallPage({ me }: { me: Me }) {
                   {goldText(h.gold)} · {h.count}건
                 </small>
               </span>
-              <span className="hof-row-mile">💎 {mileText(h.earned)}</span>
+              <span className="hof-row-mile">
+                💎 <Mile m={h.earned} full={open === h.name} />
+              </span>
               {i < 7 && <span className="hof-sheen" aria-hidden />}
             </button>
             {open === h.name && <Gifts lines={linesOf(h)} />}
@@ -211,13 +234,15 @@ export function HallPage({ me }: { me: Me }) {
       </ol>
 
       {myRank >= 0 && (
-        <div className="hof-mine">
+        <button type="button" className="hof-mine" aria-pressed={mineFull} onClick={() => setMineFull((v) => !v)}>
           <span className="hof-mine-rank">{myRank + 1}위</span>
           <span className="hof-mine-name">
             <Nick name={data.hall[myRank].name} />
           </span>
-          <span className="hof-mine-mile">💎 {mileText(data.hall[myRank].earned)}</span>
-        </div>
+          <span className="hof-mine-mile">
+            💎 <Mile m={data.hall[myRank].earned} full={mineFull} />
+          </span>
+        </button>
       )}
     </>
   );

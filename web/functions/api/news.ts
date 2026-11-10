@@ -21,6 +21,7 @@ import { canManageGcoin, canUseGcoin } from "../../server/gcoin";
 import { remindIfDue } from "../../server/gdungeon";
 import { announceApp } from "../../server/appNews";
 import { announceBday } from "../../server/birthday";
+import { seesAllSuggest } from "../../server/board";
 
 const IMO: Record<string, string> = { "imo.notice": "type IN ('N', 'I', 'D')", "imo.maint": "type = 'C'", "imo.event": "type = 'E'" };
 /** 아이모 소식은 올린 날이 이 날수 안인 것만 센다 (늦게 들어온 예전 글은 새 글이 아니다) */
@@ -57,16 +58,18 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
     return env.DB.prepare(sql).bind(...binds);
   };
   const boardSince = ["notice", "event", "free", "suggest"].map((c) => since(`board.${c}`));
+  // 건의 사항은 운영진(오피서 이상)과 쓴 사람만 본다 (server/board.ts seesAllSuggest): 다른 사람에게는 남의 건의 글을 세지 않고, 댓글은 내 건의 글에 달린 것만
+  const allSug = seesAllSuggest(me);
   const imoKeys = Object.keys(IMO);
   const imoSince = imoKeys.map(since);
   const imoFrom = new Date(now + 9 * 3_600_000 - IMO_DAYS * 86_400_000).toISOString().slice(0, 10);
   // 글·물건마다 따라가는 새 것 (things): 단추를 마지막으로 본 때와 14일 전 중 늦은 때부터
   const floor = (...keys: string[]) => Math.max(now - THING_DAYS * 86_400_000, Math.min(...keys.map(since)));
   const thingSql = [
-    q(`SELECT 'post:' || id AS k, 'board.' || cat AS c, created_at AS t, NULL AS s FROM board_posts WHERE created_at > ?1 AND author NOT IN ${MINE}`, floor(...boardSince.map((_, j) => `board.${["notice", "event", "free", "suggest"][j]}`))),
+    q(`SELECT 'post:' || id AS k, 'board.' || cat AS c, created_at AS t, NULL AS s FROM board_posts WHERE created_at > ?1 AND author NOT IN ${MINE}${allSug ? "" : " AND cat != 'suggest'"}`, floor(...boardSince.map((_, j) => `board.${["notice", "event", "free", "suggest"][j]}`))),
     q(
       `SELECT 'post:' || c.post_id AS k, 'board.' || p.cat AS c, c.created_at AS t, NULL AS s FROM board_comments c JOIN board_posts p ON p.id = c.post_id ` +
-        `WHERE c.created_at > ?1 AND c.user_id NOT IN ${MINE}`,
+        `WHERE c.created_at > ?1 AND c.user_id NOT IN ${MINE}${allSug ? "" : ` AND (p.cat != 'suggest' OR p.author IN ${MINE})`}`,
       floor("board.notice", "board.event", "board.free", "board.suggest"),
     ),
     q(
@@ -101,7 +104,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
     ...thingSql,
     q(
       "SELECT SUM(cat = 'notice' AND created_at > ?1) AS notice, SUM(cat = 'event' AND created_at > ?2) AS event, " +
-        "SUM(cat = 'free' AND created_at > ?3) AS free, SUM(cat = 'suggest' AND created_at > ?4) AS suggest " +
+        `SUM(cat = 'free' AND created_at > ?3) AS free, SUM(cat = 'suggest' AND created_at > ?4${allSug ? "" : " AND 0"}) AS suggest ` +
         `FROM board_posts WHERE created_at > ?5 AND author NOT IN ${MINE}`,
       ...boardSince,
       Math.min(...boardSince),

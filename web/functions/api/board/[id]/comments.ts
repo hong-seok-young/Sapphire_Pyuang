@@ -2,7 +2,7 @@
 // 글쓴이에게, 답글이면 원래 댓글 쓴 사람에게도 알림. 건의 사항 글에는 익명 댓글(anon)도 쓴다 (건의함, server/board.ts): 알림 글의 이름도 익명
 import { NEED_LOGIN, currentUser, json, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
-import { ANON_NAME, COMMENT_MAX, loadPost, postLink, shownName } from "../../../../server/board";
+import { ANON_NAME, COMMENT_MAX, canSeePost, loadPost, postLink, shownName } from "../../../../server/board";
 import { notify } from "../../../../server/alerts";
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
@@ -10,7 +10,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   if (!me) return NEED_LOGIN();
   const id = Number(params.id);
   const post = await loadPost(env, id);
-  if (!post) return json({ error: "없는 글이에요" }, 404);
+  if (!post || !canSeePost(me, post)) return json({ error: "없는 글이에요" }, 404);
   const b = await readJson<{ text: unknown; parent: unknown; anon: unknown }>(request);
   const anon = b.anon === true && post.cat === "suggest";
   const text = typeof b.text === "string" ? b.text.trim() : "";
@@ -37,5 +37,5 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   if (parent && parent.user_id !== me.id && parent.user_id !== post.author) {
     await notify(env, [parent.user_id], "board", `${who} 님의 답글: “${short}”`, link, me.id);
   }
-  return json({ id: row?.id, user: shownName(me, me.id, anon), parent: parent?.id ?? null, text, anon, mine: true, at: now }, 201);
+  return json({ id: row?.id, user: shownName(env, me, me.id, anon), parent: parent?.id ?? null, text, anon, mine: true, at: now }, 201);
 };
