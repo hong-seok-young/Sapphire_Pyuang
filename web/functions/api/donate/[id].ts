@@ -27,30 +27,30 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
   const now = Date.now();
 
   if (b.action === "edit") {
-    const v = readDonate({ item: row.item, qty: row.qty, enhance: row.enhance, note: row.note, ...b });
+    const v = readDonate({ item: row.item, qty: row.qty, enhance: row.enhance, note: row.note, options: row.options, enchant: row.enchant, ...b });
     if ("error" in v) return json({ error: v.error }, 400);
     if (!manage) {
       if (row.created_by !== me.id || row.status !== "request") return FORBIDDEN();
-      await env.DB.prepare("UPDATE donate_items SET item = ?, qty = ?, enhance = ?, note = ?, gold_ask = ? WHERE id = ?")
-        .bind(v.item, v.qty, v.enhance, v.note, v.gold, id)
+      await env.DB.prepare("UPDATE donate_items SET item = ?, qty = ?, enhance = ?, note = ?, options = ?, enchant = ?, gold_ask = ? WHERE id = ?")
+        .bind(v.item, v.qty, v.enhance, v.note, v.options, v.enchant, v.gold, id)
         .run();
       return json({ ok: true });
     }
     if (row.status === "rejected") return json({ error: "거절한 기부예요" }, 409);
     if (row.status === "request") {
-      await env.DB.prepare("UPDATE donate_items SET item = ?, qty = ?, enhance = ?, note = ?, gold_ask = ? WHERE id = ?")
-        .bind(v.item, v.qty, v.enhance, v.note, v.gold ?? row.gold_ask, id)
+      await env.DB.prepare("UPDATE donate_items SET item = ?, qty = ?, enhance = ?, note = ?, options = ?, enchant = ?, gold_ask = ? WHERE id = ?")
+        .bind(v.item, v.qty, v.enhance, v.note, v.options, v.enchant, v.gold ?? row.gold_ask, id)
         .run();
       return json({ ok: true });
     }
     if (v.gold === null) return json({ error: "골드 가치를 적어 주세요" }, 400);
-    await env.DB.prepare("UPDATE donate_items SET item = ?, qty = ?, enhance = ?, note = ?, gold = ? WHERE id = ?")
-      .bind(v.item, v.qty, v.enhance, v.note, v.gold, id)
+    await env.DB.prepare("UPDATE donate_items SET item = ?, qty = ?, enhance = ?, note = ?, options = ?, enchant = ?, gold = ? WHERE id = ?")
+      .bind(v.item, v.qty, v.enhance, v.note, v.options, v.enchant, v.gold, id)
       .run();
     const s = await syncDia(env, row.who, id, donateLabel(v), me.id);
     if (s.error) {
-      await env.DB.prepare("UPDATE donate_items SET item = ?, qty = ?, enhance = ?, note = ?, gold = ? WHERE id = ?")
-        .bind(row.item, row.qty, row.enhance, row.note, row.gold, id)
+      await env.DB.prepare("UPDATE donate_items SET item = ?, qty = ?, enhance = ?, note = ?, options = ?, enchant = ?, gold = ? WHERE id = ?")
+        .bind(row.item, row.qty, row.enhance, row.note, row.options, row.enchant, row.gold, id)
         .run();
       return json({ error: s.error }, 409);
     }
@@ -63,13 +63,13 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
 
   if (b.action === "confirm") {
     if (row.status !== "request") return json({ error: "이미 처리한 기부예요" }, 409);
-    const v = readDonate({ item: row.item, qty: row.qty, enhance: row.enhance, note: row.note, gold: row.gold_ask, ...b });
+    const v = readDonate({ item: row.item, qty: row.qty, enhance: row.enhance, note: row.note, options: row.options, enchant: row.enchant, gold: row.gold_ask, ...b });
     if ("error" in v) return json({ error: v.error }, 400);
     if (v.gold === null) return json({ error: "골드 가치를 적어 주세요" }, 400);
     const r = await env.DB.prepare(
-      "UPDATE donate_items SET item = ?, qty = ?, enhance = ?, note = ?, gold = ?, status = 'done', done_at = ?, done_by = ? WHERE id = ? AND status = 'request'",
+      "UPDATE donate_items SET item = ?, qty = ?, enhance = ?, note = ?, options = ?, enchant = ?, gold = ?, status = 'done', done_at = ?, done_by = ? WHERE id = ? AND status = 'request'",
     )
-      .bind(v.item, v.qty, v.enhance, v.note, v.gold, now, me.id, id)
+      .bind(v.item, v.qty, v.enhance, v.note, v.options, v.enchant, v.gold, now, me.id, id)
       .run();
     if (!r.meta.changes) return json({ error: "이미 처리한 기부예요" }, 409);
     const s = await syncDia(env, row.who, id, donateLabel(v), me.id);

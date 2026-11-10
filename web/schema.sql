@@ -1055,6 +1055,8 @@ CREATE TABLE IF NOT EXISTS donate_items (
   qty INTEGER NOT NULL DEFAULT 1,
   enhance INTEGER NOT NULL DEFAULT 0,
   note TEXT,
+  options TEXT,                           -- 위키 장비에 뜬 옵션 '명중 9 · 크리티컬 4' (ci-d1 ADDED_COLUMNS 로 더한 칸)
+  enchant TEXT,                           -- 장신구 속성부여 '힘 3'
   gold_ask INTEGER,                       -- 기부한 사람이 적은 골드 가치
   gold INTEGER,                           -- 운영진이 확정한 골드 가치
   dia INTEGER NOT NULL DEFAULT 0,         -- 이 줄로 rental_mileage 에 넣은 💎 (같은 사람 줄의 합 = 확정 골드 합 / 10만 내림)

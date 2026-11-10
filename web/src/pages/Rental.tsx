@@ -54,6 +54,7 @@ import {
   optionFull,
   optionParts,
   optionShort,
+  OPTION_SHORT,
   removeRent,
   requestReturn,
   returnRent,
@@ -1428,7 +1429,7 @@ function AddFromDonation({ wiki, data, job, onDone }: { wiki: Wiki; data: RentDa
                 </b>
                 <small>
                   기부 <Nick name={g.who} />
-                  {g.note ? ` · ${g.note}` : ""}
+                  {[g.options, g.enchant && `속성부여 ${g.enchant}`, g.note].filter(Boolean).map((t) => ` · ${t}`).join("")}
                 </small>
               </span>
             </button>
@@ -1441,6 +1442,14 @@ function AddFromDonation({ wiki, data, job, onDone }: { wiki: Wiki; data: RentDa
                   level: Number(it?.equip?.[0]?.info["레벨제한"]) || 1,
                   weapon: it?.name ?? g.item,
                   enhance: g.enhance,
+                  // 기부함에서 적은 옵션 ('명중 9 · 크리티컬 4') -> 장비대여 옵션 줄임말 ('명9크4')
+                  options: optionShort(
+                    (g.options ?? "")
+                      .split("·")
+                      .map((p) => /^(.+?)\s*(\d+)$/.exec(p.trim()))
+                      .filter((m): m is RegExpExecArray => !!m && !!OPTION_SHORT[m[1].trim()])
+                      .map((m) => [m[1].trim(), Number(m[2])] as [string, number]),
+                  ),
                   donor: g.who,
                 }}
                 onDone={() => (setPick(null), onDone())}

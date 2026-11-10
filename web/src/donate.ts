@@ -12,6 +12,10 @@ export interface DonateRow {
   qty: number;
   enhance: number;
   note: string | null;
+  /** 위키 장비에 뜬 옵션 ('명중 9 · 크리티컬 4') */
+  options: string | null;
+  /** 장신구 속성부여 ('힘 3') */
+  enchant: string | null;
   gold_ask: number | null;
   gold: number | null;
   dia: number;
@@ -79,6 +83,8 @@ export interface DonateInput {
   qty: number;
   enhance: number;
   note: string;
+  options: string;
+  enchant: string;
   gold: number | null;
 }
 export const askDonate = (v: DonateInput) => api<{ id: number }>("/api/donate", "POST", v);
@@ -97,6 +103,10 @@ export const removeDonate = (id: number) => api<{ dia?: number }>(`/api/donate/$
 /** '+7 헌터보우 x3' */
 export const donateLabel = (r: { item: string; qty: number; enhance: number }) =>
   `${r.enhance > 0 ? `+${r.enhance} ` : ""}${r.item}${r.qty > 1 ? ` x${r.qty}` : ""}`;
+
+/** 옵션·속성부여·메모 한 줄 ('명중 9 · 크리티컬 4 · 속성부여 힘 3 · 메모') */
+export const donateExtra = (r: { options?: string | null; enchant?: string | null; note?: string | null }) =>
+  [r.options, r.enchant ? `속성부여 ${r.enchant}` : "", r.note].filter(Boolean).join(" · ");
 
 /** 골드를 '12만', '1.5억', '5,000' 으로 */
 export function goldText(g: number): string {

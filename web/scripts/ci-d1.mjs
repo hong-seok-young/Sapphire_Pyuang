@@ -115,6 +115,7 @@ const ADDED_COLUMNS = [
   ["rental_items", "return_req_at", "INTEGER"], ["rental_items", "return_app_id", "INTEGER"],
   // 건의함 익명 글·댓글 (2026-11-09, server/board.ts)
   ["board_posts", "anon", "INTEGER NOT NULL DEFAULT 0"], ["board_comments", "anon", "INTEGER NOT NULL DEFAULT 0"],
+  ["donate_items", "options", "TEXT"], ["donate_items", "enchant", "TEXT"],
 ];
 for (const [table, column, type] of ADDED_COLUMNS) {
   const columns = parseJson(wrangler("d1", "execute", DB, "--remote", "--json", "--command", `PRAGMA table_info(${table})`))[0]?.results ?? [];
