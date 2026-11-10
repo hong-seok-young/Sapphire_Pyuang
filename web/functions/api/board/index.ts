@@ -50,6 +50,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const order = before === 0 && !q ? "p.pinned DESC, p.id DESC" : "p.id DESC";
   const { results } = await env.DB.prepare(
     "SELECT p.id, p.cat, p.author, p.title, substr(p.body, 1, 120) AS snippet, p.pinned, p.anon, p.created_at AS at, " +
+      "CASE WHEN p.cat = 'suggest' THEN COALESCE(p.sg_status, 'agree') END AS sg, (SELECT COUNT(*) FROM suggest_steps s WHERE s.post_id = p.id AND s.kind = 'agree') AS sgAgrees, " +
       "(SELECT COUNT(*) FROM board_comments c WHERE c.post_id = p.id) AS comments, " +
       "(SELECT COUNT(*) FROM board_likes l WHERE l.post_id = p.id) AS likes, " +
       "(SELECT COUNT(*) FROM board_views v WHERE v.post_id = p.id) AS views, " +
@@ -91,7 +92,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     await notify(env, "all", "board_notice", `[${CAT_NAME[b.cat]}] ${title} · ${me.id}${lead ? "\n" + lead : ""}`, `#/board/${row.id}`, me.id);
   } else if (b.cat === "suggest") {
     const { results } = await env.DB.prepare("SELECT DISTINCT COALESCE(main_id, id) AS id FROM users WHERE role IN ('developer', 'master', 'officer')").all<{ id: string }>();
-    await notify(env, results.map((r) => r.id), "board", `[건의 사항] ${title} · ${anon ? ANON_NAME : me.id}${lead ? "\n" + lead : ""}`, postLink("suggest", row.id), me.id);
+    // 건의는 결재선을 탄다 (server/suggest.ts): 먼저 본 오피서 누구든 합의·반려
+    await env.DB.prepare("UPDATE board_posts SET sg_status = 'agree' WHERE id = ?").bind(row.id).run();
+    await notify(
+      env,
+      results.map((r) => r.id),
+      "board",
+      `[건의 접수 · 오피서 합의] ${title} · ${anon ? ANON_NAME : me.id} · 먼저 보신 오피서 누구든 의견 달고 합의하거나 반려해 주세요${lead ? "\n" + lead : ""}`,
+      postLink("suggest", row.id),
+      me.id,
+    );
   }
   return json({ id: row.id }, 201);
 };

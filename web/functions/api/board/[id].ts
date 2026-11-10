@@ -4,6 +4,7 @@
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { BODY_MAX, TITLE_MAX, canSeePost, deletePostStmts, isStaff, loadPost, shownName } from "../../../server/board";
+import { sgStatusOf, sgSteps } from "../../../server/suggest";
 
 const postId = (params: Record<string, string | string[]>) => Number(params.id);
 
@@ -37,7 +38,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
   // 직책 표는 이름이 보이는 사람만 (익명 글쓴이의 아이디가 답에 남지 않게)
   const author = shownName(env, me, post.author, post.anon);
   const shown = new Set([author, ...list.map((c) => c.user)]);
+  // 건의 결재선 (server/suggest.ts): 상태와 이력
+  const flow =
+    post.cat === "suggest"
+      ? {
+          status: sgStatusOf((await env.DB.prepare("SELECT sg_status FROM board_posts WHERE id = ?").bind(id).first<{ sg_status: string | null }>())?.sg_status),
+          steps: await sgSteps(env, id),
+        }
+      : undefined;
   return json({
+    flow,
     post: { ...post, author, pinned: post.pinned === 1, anon: post.anon === 1, mine: post.author === me.id },
     files: (files.results as { image: number }[]).map((f) => ({ ...f, image: f.image === 1 })),
     comments: list,

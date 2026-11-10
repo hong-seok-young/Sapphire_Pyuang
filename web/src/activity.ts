@@ -352,6 +352,7 @@ const ACTIONS: [RegExp, (d: Rec, m: RegExpMatchArray, at: number) => string][] =
   [/^POST \/api\/board\/\d+\/files$/, () => "게시판 사진·파일 올림"],
   [/^POST \/api\/board\/\d+\/comments$/, (d) => join(d.parent ? "게시판 답글" : "게시판 댓글", quote(d.text))],
   [/^PUT \/api\/board\/\d+\/like$/, () => "게시판 좋아요"],
+  [/^POST \/api\/board\/\d+\/suggest$/, (d) => join(`건의 ${({ agree: "합의", approve: "길마 결재", skip: "길마 직권 결재", force: "길마 강제 결재", reject: "반려", done: "반영 완료" } as Record<string, string>)[String(d.act)] ?? "결재"}`, quote(d.note))],
   [/^DELETE \/api\/board\/\d+\/like$/, () => "게시판 좋아요 취소"],
   [/^DELETE \/api\/board\/comments\/\d+$/, () => "게시판 댓글 지움"],
   [/^POST \/api\/official\/\d+\/comments$/, (d) => join(d.parent ? "아이모 소식 답글" : "아이모 소식 댓글", quote(d.text))],

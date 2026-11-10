@@ -30,6 +30,9 @@ export interface PostSummary {
   anon?: boolean;
   /** 내가 쓴 글 (익명이어도) */
   mine?: boolean;
+  /** 건의 결재선 상태와 합의 수 (건의 사항 글만) */
+  sg?: SgStatus | null;
+  sgAgrees?: number;
   at: number;
   comments: number;
   likes: number;
@@ -58,7 +61,23 @@ export interface BoardComment {
   mine?: boolean;
 }
 
+/** 건의 결재선 (server/suggest.ts): agree 오피서 합의·길마 결재 대기 | accepted 건의 접수 완료 | done 건의 반영 완료 | rejected 반려 */
+export type SgStatus = "agree" | "accepted" | "done" | "rejected";
+export type SgKind = "agree" | "approve" | "skip" | "force" | "reject" | "done";
+export interface SgStep {
+  user_id: string;
+  kind: SgKind;
+  note: string | null;
+  created_at: number;
+}
+export const actSuggest = (id: number, act: SgKind, note: string) => api<{ ok: boolean; status: SgStatus }>(`/api/board/${id}/suggest`, "POST", { act, note });
+/** 목록·글의 건의 상태 이름 (합의가 있으면 '결재 대기') */
+export const sgName = (s: SgStatus, agrees: number) =>
+  s === "agree" ? (agrees ? "결재 대기" : "합의 대기") : s === "accepted" ? "접수 완료" : s === "done" ? "반영 완료" : "반려";
+
 export interface PostDetail {
+  /** 건의 결재선 (건의 사항 글만) */
+  flow?: { status: SgStatus; steps: SgStep[] };
   post: { id: number; cat: Cat; author: string; title: string; body: string; pinned: boolean; created_at: number; edited_at: number | null; anon?: boolean; mine?: boolean };
   files: BoardFile[];
   comments: BoardComment[];
