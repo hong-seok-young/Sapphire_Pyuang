@@ -1,7 +1,6 @@
 // 생일 스티커의 날 (화면 src/birthday.tsx 의 BIRTHDAYS 와 같은 key·때). 생일을 더하면 두 곳 모두 고친다
 import type { Env } from "./auth";
 import { notify } from "./alerts";
-import { pushNew } from "./push";
 
 export const BDAYS: Record<string, { start: number; end: number; notice: string }> = {
   "village-2026": {
@@ -13,8 +12,6 @@ export const BDAYS: Record<string, { start: number; end: number; notice: string 
 /** 콤보 한 번의 최대 (누르는 사람 화면이 세어 보내므로 터무니없는 값만 막는다).
  * 처음 2000 이었다가 백돼쥐 님 2140 콤보가 막혔다 (제작자 2026-11-08). 사람이 하루 내내 눌러도 닿지 않을 만큼으로 */
 export const MAX_COMBO = 1_000_000;
-/** 폰 알림 한 번에 보내는 수 (server/push.ts MAX_SENDS 와 같게) */
-const BATCH = 40;
 
 const has = async (env: Env, key: string) => !!(await env.DB.prepare("SELECT 1 AS x FROM setup WHERE key = ?").bind(key).first());
 const claim = async (env: Env, key: string, now: number) =>
@@ -35,22 +32,11 @@ export async function announceBday(env: Env, now = Date.now()): Promise<number> 
         // 그날 0시 전 기록(앱개발자 미리 보기)은 지운다 (제작자 2026-11-07 '자정이 되는 순간 내 기록 지우고 올리는 거야')
         await env.DB.prepare("DELETE FROM bday_combo WHERE bday = ? AND at < ?").bind(key, d.start).run();
         await notify(env, "all", "bday", d.notice, "#/", "");
-        sent += BATCH;
+        sent += 1;
       }
       continue;
     }
-    if (await has(env, `${base}_push_done`)) continue;
-    const at = await env.DB.prepare("SELECT MAX(created_at) AS at FROM alerts WHERE kind = 'bday' AND created_at >= ?").bind(d.start).first<{ at: number | null }>();
-    if (!at?.at) continue;
-    for (let part = 2; part <= 30; part++) {
-      const k = `${base}_push${part}`;
-      if (await has(env, k)) continue;
-      if (!(await claim(env, k, now))) break;
-      const n = await pushNew(env, "bday", at.at, (part - 1) * BATCH);
-      sent += n;
-      if (n < BATCH) await claim(env, `${base}_push_done`, now);
-      break;
-    }
+    // 나머지 폰은 server/push.ts 의 push_queue 가 40대씩 이어 보낸다 (예전에는 여기서 setup 키로 나눠 보냈다)
   }
   return sent;
 }

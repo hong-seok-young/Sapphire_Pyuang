@@ -117,6 +117,8 @@ const ADDED_COLUMNS = [
   ["board_posts", "anon", "INTEGER NOT NULL DEFAULT 0"], ["board_comments", "anon", "INTEGER NOT NULL DEFAULT 0"],
   ["donate_items", "options", "TEXT"], ["donate_items", "enchant", "TEXT"],
   ["board_posts", "sg_status", "TEXT"],
+  // 폰 알림을 마지막으로 보낸 때와 푸시 서버의 답 (server/push.ts pushOne, 어느 폰이 안 받는지 보려고)
+  ["push_subs", "last_status", "INTEGER"], ["push_subs", "last_at", "INTEGER"],
 ];
 for (const [table, column, type] of ADDED_COLUMNS) {
   const columns = parseJson(wrangler("d1", "execute", DB, "--remote", "--json", "--command", `PRAGMA table_info(${table})`))[0]?.results ?? [];
@@ -762,5 +764,16 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
       `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
     ]);
     console.log("기부함 마일리지 0.6 반영 (한 번)");
+  }
+}
+
+// 길드원 전원 알림 설정 모두 켜기 (제작자 2026-11-10 '길드원 전원 웹 내의 알림 설정은 다 켜버려'): 알림 종류마다 끈 줄(앱 알림함·폰 알림)을 지워 처음 값으로 되돌린다.
+// 처음 값은 모두 켜짐 (server/alerts.ts ALERT_KINDS, 새 물건·새 의뢰도 이때부터 켜짐). 이 폰의 폰 알림 스위치(브라우저 허락)는 폰마다라 여기서 켤 수 없다. setup 'alerts_all_on_20261110' 로 한 번만
+{
+  const KEY = "alerts_all_on_20261110";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const n = queryFirst("SELECT COUNT(*) AS n FROM alert_prefs WHERE enabled = 0 OR push = 0")?.n ?? 0;
+    runSql(["DELETE FROM alert_prefs;", `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`]);
+    console.log(`알림 설정 모두 켬 (꺼져 있던 줄 ${n}개, 한 번)`);
   }
 }

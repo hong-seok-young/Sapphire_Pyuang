@@ -11,7 +11,7 @@ const MAX_SENDS = 40;
 const b64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const text = (s: string) => new TextEncoder().encode(s);
 
-interface Keys {
+export interface Keys {
   publicKey: string;
   sign: CryptoKey;
 }
@@ -50,41 +50,86 @@ async function vapid(keys: Keys, endpoint: string): Promise<string> {
   return `vapid t=${head}.${body}.${b64url(sig)}, k=${keys.publicKey}`;
 }
 
-/** 방금 만든 알림을 받은 사람들의 폰에 신호를 보낸다. 실패해도 하던 일은 그대로. 없어진 구독은 지운다.
- *  한 번에 40대까지라 모두에게 가는 큰 알림(생일 알림, server/birthday.ts)은 offset 으로 40대씩 이어 보낸다. 보낸(보내려 한) 폰 수를 돌려준다 */
-export async function pushNew(env: Env, kind: string, createdAt: number, offset = 0): Promise<number> {
+/** 폰 하나에 신호 보내기. 푸시 서버의 답 코드를 돌려준다 (0 = 연결 실패). 없어진 구독(404·410)은 지우고, 결과는 push_subs 에 적는다 (어느 폰이 안 받는지 보려고) */
+export async function pushOne(env: Env, keys: Keys, endpoint: string, auth?: string): Promise<number> {
+  let status = 0;
   try {
-    const { results } = await env.DB.prepare(
-      // 받는 캐릭터와 같은 사람(부캐 묶기)의 어느 캐릭터로 켠 폰이든 보낸다
-      "SELECT DISTINCT s.endpoint FROM alerts a JOIN users ua ON ua.id = a.user_id " +
-        "JOIN users us ON COALESCE(us.main_id, us.id) = COALESCE(ua.main_id, ua.id) JOIN push_subs s ON s.user_id = us.id " +
-        "WHERE a.created_at = ?1 AND a.kind = ?2 " +
-        // 이 종류의 폰 알림을 끈 사람은 뺀다 (앱 알림함에는 그대로 남는다. 제작자 요청: 폰 알림은 따로 설정)
-        "AND COALESCE((SELECT p.push FROM alert_prefs p WHERE p.user_id = a.user_id AND p.kind = ?2), 1) = 1 ORDER BY s.endpoint LIMIT ?3 OFFSET ?4",
-    )
-      .bind(createdAt, kind, MAX_SENDS, offset)
-      .all<{ endpoint: string }>();
-    if (!results.length) return 0;
-    const keys = await vapidKeys(env);
-    await Promise.all(
-      results.map(async ({ endpoint }) => {
-        try {
-          const res = await fetch(endpoint, {
-            method: "POST",
-            headers: { TTL: "86400", Urgency: "normal", Authorization: await vapid(keys, endpoint), "Content-Length": "0" },
-            signal: AbortSignal.timeout(5000),
-          });
-          if (res.status === 404 || res.status === 410) {
-            await env.DB.prepare("DELETE FROM push_subs WHERE endpoint = ?").bind(endpoint).run();
-          }
-        } catch {
-          // 이 폰은 다음에
-        }
-      }),
-    );
-    return results.length;
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { TTL: "86400", Urgency: "high", Authorization: auth ?? (await vapid(keys, endpoint)), "Content-Length": "0" },
+      signal: AbortSignal.timeout(5000),
+    });
+    status = res.status;
+  } catch {
+    // 이 폰은 다음에
+  }
+  try {
+    if (status === 404 || status === 410) await env.DB.prepare("DELETE FROM push_subs WHERE endpoint = ?").bind(endpoint).run();
+    else await env.DB.prepare("UPDATE push_subs SET last_status = ?, last_at = ? WHERE endpoint = ?").bind(status, Date.now(), endpoint).run();
+  } catch {
+    // 기록은 못 해도 된다
+  }
+  return status;
+}
+
+/** 그 알림을 받은 사람들의 폰 중 after 다음(주소 순서) 40대에 보낸다. { 보낸 수, 마지막 주소 } */
+async function sendBatch(env: Env, kind: string, createdAt: number, after: string, offset: number): Promise<{ n: number; last: string }> {
+  const { results } = await env.DB.prepare(
+    // 받는 캐릭터와 같은 사람(부캐 묶기)의 어느 캐릭터로 켠 폰이든 보낸다
+    "SELECT DISTINCT s.endpoint FROM alerts a JOIN users ua ON ua.id = a.user_id " +
+      "JOIN users us ON COALESCE(us.main_id, us.id) = COALESCE(ua.main_id, ua.id) JOIN push_subs s ON s.user_id = us.id " +
+      "WHERE a.created_at = ?1 AND a.kind = ?2 AND s.endpoint > ?5 " +
+      // 이 종류의 폰 알림을 끈 사람은 뺀다 (앱 알림함에는 그대로 남는다. 제작자 요청: 폰 알림은 따로 설정)
+      "AND COALESCE((SELECT p.push FROM alert_prefs p WHERE p.user_id = a.user_id AND p.kind = ?2), 1) = 1 ORDER BY s.endpoint LIMIT ?3 OFFSET ?4",
+  )
+    .bind(createdAt, kind, MAX_SENDS, offset, after)
+    .all<{ endpoint: string }>();
+  if (!results.length) return { n: 0, last: after };
+  const keys = await vapidKeys(env);
+  // 같은 푸시 서버(구글, 애플 …)에는 같은 서명을 쓴다 (서명은 CPU 를 쓴다)
+  const signs = new Map<string, Promise<string>>();
+  const signFor = (endpoint: string) => {
+    const origin = new URL(endpoint).origin;
+    if (!signs.has(origin)) signs.set(origin, vapid(keys, endpoint));
+    return signs.get(origin)!;
+  };
+  await Promise.all(results.map(async ({ endpoint }) => pushOne(env, keys, endpoint, await signFor(endpoint))));
+  return { n: results.length, last: results[results.length - 1].endpoint };
+}
+
+/** 방금 만든 알림을 받은 사람들의 폰에 신호를 보낸다. 실패해도 하던 일은 그대로. 없어진 구독은 지운다.
+ *  무료 요금제는 요청 하나에 바깥 요청 50개까지라 한 번에 40대까지. 더 있으면 push_queue 에 적어 두고 /api/news(쓰는 사람마다 2분마다)가 40대씩 이어 보낸다
+ *  (2026-11-10 제작자 '갤럭시 아이폰 둘다 폰 자체 알림 뜨게 한 거 맞지?': 전에는 모두에게 가는 알림이 주소 순서로 앞의 40대에만 가서, 주소가 web.push.apple.com 인 아이폰이 늘 빠졌다).
+ *  offset 은 예전 생일 알림 방식 (queue false). 보낸(보내려 한) 폰 수를 돌려준다 */
+export async function pushNew(env: Env, kind: string, createdAt: number, offset = 0, queue = true): Promise<number> {
+  try {
+    const r = await sendBatch(env, kind, createdAt, "", offset);
+    if (queue && r.n === MAX_SENDS) {
+      await env.DB.prepare("INSERT INTO push_queue (kind, created_at, last, claimed_at) VALUES (?, ?, ?, NULL)").bind(kind, createdAt, r.last).run();
+    }
+    return r.n;
   } catch (e) {
     console.error("push failed", e);
     return 0;
   }
+}
+
+/** 밀린 폰 알림 40대 보내기 (/api/news 가 답한 뒤에 부른다). 한 줄을 맡아(claimed_at, 1분 지나면 다른 곳이 다시 맡는다) 보내고, 다 보냈으면 지운다 */
+export async function drainPushQueue(env: Env, now = Date.now()): Promise<number> {
+  const row = await env.DB.prepare(
+    "UPDATE push_queue SET claimed_at = ?1 WHERE id = (SELECT id FROM push_queue WHERE claimed_at IS NULL OR claimed_at < ?2 ORDER BY id LIMIT 1) " +
+      "RETURNING id, kind, created_at, last",
+  )
+    .bind(now, now - 60_000)
+    .first<{ id: number; kind: string; created_at: number; last: string }>();
+  if (!row) return 0;
+  // 하루 넘게 밀린 것은 버린다 (푸시 TTL 도 하루)
+  if (now - row.created_at > 86_400_000) {
+    await env.DB.prepare("DELETE FROM push_queue WHERE id = ?").bind(row.id).run();
+    return 0;
+  }
+  const r = await sendBatch(env, row.kind, row.created_at, row.last, 0);
+  if (r.n < MAX_SENDS) await env.DB.prepare("DELETE FROM push_queue WHERE id = ?").bind(row.id).run();
+  else await env.DB.prepare("UPDATE push_queue SET last = ?, claimed_at = NULL WHERE id = ?").bind(r.last, row.id).run();
+  return r.n;
 }

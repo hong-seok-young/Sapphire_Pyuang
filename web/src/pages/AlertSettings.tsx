@@ -6,7 +6,7 @@ import { errorText } from "../auth";
 import { ALERT_GROUPS, fetchAlerts, setAlertPref, setPushPref } from "../alerts";
 import type { AlertKind } from "../alerts";
 import { peekMemo, putMemo } from "../memo";
-import { disablePush, enablePush, markPushOff, pushState, reportPush } from "../push";
+import { disablePush, enablePush, markPushOff, pushState, reportPush, testPush } from "../push";
 import type { PushState } from "../push";
 
 type Loaded = Awaited<ReturnType<typeof fetchAlerts>>;
@@ -40,6 +40,7 @@ const PHONE_TEXT: Record<PushState, string> = {
 function PhoneSwitch({ state, onState }: { state: PushState | null; onState: (s: PushState) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [test, setTest] = useState<{ ok: boolean; text: string } | null>(null);
   if (!state) return null;
   const can = state === "on" || state === "off";
   async function toggle() {
@@ -56,13 +57,31 @@ function PhoneSwitch({ state, onState }: { state: PushState | null; onState: (s:
       setBusy(false);
     }
   }
+  /** 이 폰에 시험 알림 (길드원 문의 2026-11-10 '알림 켜 뒀는데 폰에 안 떠요': 서버 -> 알림 서버 -> 폰 중 어디서 막히는지) */
+  async function sendTest() {
+    setBusy(true);
+    setTest(null);
+    try {
+      setTest(await testPush());
+    } catch (x) {
+      setTest({ ok: false, text: errorText(x) });
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <div className={"ns-phone" + (state === "on" ? " ns-phone-on" : "")}>
       <span className="ns-phone-text">
         <b>폰 알림</b>
         <small>{PHONE_TEXT[state]}</small>
         {error && <small className="form-error">{error}</small>}
+        {test && <small className={test.ok ? "ns-test-ok" : "form-error"}>{test.text}</small>}
       </span>
+      {state === "on" && (
+        <button type="button" className="ns-test" disabled={busy} onClick={() => void sendTest()}>
+          시험
+        </button>
+      )}
       {can && <Switch on={state === "on"} disabled={busy} label="이 폰의 폰 알림" onClick={() => void toggle()} />}
     </div>
   );

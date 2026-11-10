@@ -144,3 +144,26 @@ export async function reportPush(userId: string, force = false): Promise<void> {
   }
 }
 
+
+/**
+ * 이 폰에 시험 알림 보내기 (내 정보 > 알림 설정). 서버가 푸시 서버에 보낸 답 코드로 결과 글을 돌려준다.
+ * 푸시 서버가 이 구독을 모른다고 하면(404·410: 오래되거나 지워진 구독) 새로 구독해서 한 번 더 보낸다
+ */
+export async function testPush(user?: string): Promise<{ ok: boolean; text: string }> {
+  const send = async () => {
+    const reg = await navigator.serviceWorker.getRegistration("/");
+    const sub = await reg?.pushManager.getSubscription();
+    if (!sub) return -1;
+    return (await api<{ status: number }>("/api/push", "POST", { endpoint: sub.endpoint })).status;
+  };
+  let status = await send();
+  if (status === 404 || status === 410 || status === -1) {
+    const reg = await navigator.serviceWorker.getRegistration("/");
+    await (await reg?.pushManager.getSubscription())?.unsubscribe();
+    if ((await enablePush(user)) !== "on") return { ok: false, text: "폰 알림을 다시 켜지 못했어요. 폰 설정에서 이 앱의 알림을 허용해 주세요" };
+    status = await send();
+  }
+  if (status >= 200 && status < 300) return { ok: true, text: "보냈어요 · 몇 초 안에 안 뜨면 폰 설정 > 알림에서 이 앱(브라우저) 알림과 방해 금지를 확인해 주세요" };
+  if (status === 0) return { ok: false, text: "알림 서버에 닿지 않았어요 · 잠시 뒤 다시 해 주세요" };
+  return { ok: false, text: `알림 서버가 받지 않았어요 (${status}) · 폰 알림을 껐다 켜 주세요` };
+}

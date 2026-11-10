@@ -5,7 +5,7 @@ import { GCOIN_OPEN } from "./launcher";
 
 export type AlertKind =
   | "market_want" | "market_bid" | "market_outbid" | "market_auction" | "market_new" | "gold_want" | "request" | "request_new" | "talk" | "account" | "shop"
-  | "board" | "board_notice" | "imo_news" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo" | "gdungeon" | "app_news" | "devreq" | "bday" | "gcoin" | "donate";
+  | "board" | "board_notice" | "imo_news" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo" | "gdungeon" | "app_news" | "devreq" | "bday" | "gcoin" | "donate" | "push_test";
 
 export interface Alert {
   id: number;
