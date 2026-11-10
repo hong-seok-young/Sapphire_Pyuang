@@ -4,7 +4,7 @@
 // - 완료로 표시한 항목의 효과를 게임 '획득 옵션' 창 순서(시세 동향 캐릭터의 도감 표와 같은 DEX_ORDER)로 합친다.
 // - 지금 목록(칸 · 찾기 · 능력치 거르기)의 미완료 항목을 다 하면 더 오르는 값(+)과, 그러려면 필요한 재료 합계.
 // - 완료 표시는 이 기기에 계정별로 (localStorage sapphire.dex.done.<아이디>).
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadDex, useAsync } from "../data";
 import type { Dex, DexEntry, DexItem } from "../data";
 import type { Me } from "../auth";
@@ -110,6 +110,17 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
   const [stat, setStat] = useState<string | null>(null);
   const [cat, setCat] = useState<string>("all");
   const [showNeed, setShowNeed] = useState(false);
+  // 목록 폭 (한 줄에 아이템 칸을 몇 px 로 넣을지 정한다)
+  const listRef = useRef<HTMLUListElement>(null);
+  const [listW, setListW] = useState(0);
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setListW(el.clientWidth));
+    ro.observe(el);
+    setListW(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
   const [over, setOverState] = useState<Record<string, number>>(() => readStats(me));
   const setOver = (v: Record<string, number>) => {
     setOverState(v);
@@ -247,9 +258,9 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
         </Panel>
       )}
 
-      <ul className="dex-list">
+      <ul className="dex-list" ref={listRef}>
         {listed.map((e) => (
-          <EntryRow key={e.name} e={e} done={done.has(e.name)} onToggle={() => toggle(e.name)} iconOf={iconOf} stat={stat} onItem={(name) => setQ(name)} />
+          <EntryRow key={e.name} e={e} listW={listW} done={done.has(e.name)} onToggle={() => toggle(e.name)} iconOf={iconOf} stat={stat} onItem={(name) => setQ(name)} />
         ))}
       </ul>
       {!listed.length && <p className="muted dex-empty">맞는 항목이 없어요</p>}
@@ -334,12 +345,34 @@ function ItemPic({ it, iconOf, size = 30 }: { it: DexItem; iconOf: IconOf; size?
 }
 
 /** 도감 한 줄 (제작자 2026-11-10 '한 행으로, 높이 높을 필요 없어, 템 크기 줄여도 되니 최대한 콤팩트하게 한눈에'):
- *  완료 칸 · 제목과 효과(작게, 넘치면 …) · 오른쪽에 작은 아이템 칸 (칸이 5개 이상이면 제목이 잘리지 않게 칸을 제목 아래 줄로). 칸을 누르면 그 줄 아래에 이름·개수·강화·대체 스탬프와 '이 템 찾기' */
-function EntryRow({ e, done, onToggle, iconOf, stat, onItem }: { e: DexEntry; done: boolean; onToggle: () => void; iconOf: IconOf; stat: string | null; onItem: (name: string) => void }) {
+ *  완료 칸 · 제목과 효과(작게, 넘치면 …) · 오른쪽에 작은 아이템 칸 (칸이 많으면 칸을 줄여 한 줄에, 그래도 안 들어가면 제목 아래 줄로). 칸을 누르면 그 줄 아래에 이름·개수·강화·대체 스탬프와 '이 템 찾기' */
+/** 한 줄에 아이템 칸을 넣을 크기: 제목이 TITLE_MIN px 는 남도록 28 → 26 → 24 → 22 → 20px 로 줄여 본다. 그래도 안 되면 칸을 제목 아래 줄로 (null)
+ *  (제작자 2026-11-10 '아이템을 왜 한 행에 안 했어? 최대한 한 행에 넣어 봐'. 줄 안쪽 = 목록 폭 - 테두리·여백 14 - 완료 칸 22 - 사이 12) */
+const TITLE_MIN = 100;
+const SLOT_SIZES = [28, 26, 24, 22, 20];
+function slotSize(n: number, listW: number): number | null {
+  if (!listW) return 28;
+  const room = listW - 14 - 22 - 12 - TITLE_MIN;
+  return SLOT_SIZES.find((sz) => n * (sz + 2) <= room) ?? null;
+}
+
+function EntryRow({ e, listW, done, onToggle, iconOf, stat, onItem }: { e: DexEntry; listW: number; done: boolean; onToggle: () => void; iconOf: IconOf; stat: string | null; onItem: (name: string) => void }) {
   const [sel, setSel] = useState<number | null>(null);
   const it = sel === null ? null : e.items[sel];
+  const ref = useRef<HTMLLIElement>(null);
+  // 칸을 연 채로 다른 곳을 누르면 닫는다 (제작자 2026-11-10)
+  useEffect(() => {
+    if (sel === null) return;
+    const close = (ev: PointerEvent) => {
+      if (!ref.current?.contains(ev.target as Node)) setSel(null);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [sel]);
+  const sz = slotSize(e.items.length, listW);
+  const box = sz ?? 28;
   return (
-    <li className={"dex-entry" + (done ? " dex-done" : "") + (e.items.length > 4 ? " dex-entry-wide" : "")}>
+    <li ref={ref} className={"dex-entry" + (done ? " dex-done" : "") + (sz === null ? " dex-entry-wide" : "")}>
       <button type="button" className="dex-check" onClick={onToggle} aria-pressed={done} aria-label={done ? "완료 취소" : "완료"}>
         {done ? "✓" : ""}
       </button>
@@ -356,9 +389,9 @@ function EntryRow({ e, done, onToggle, iconOf, stat, onItem }: { e: DexEntry; do
       </div>
       <div className="dex-items">
         {e.items.map((x, i) => (
-          <button key={i} type="button" className={"dex-slot" + (x.name ? "" : " dex-slot-unknown") + (sel === i ? " dex-slot-on" : "")}
+          <button key={i} type="button" className={"dex-slot" + (x.name ? "" : " dex-slot-unknown") + (sel === i ? " dex-slot-on" : "")} style={box === 28 ? undefined : { width: box, height: box }}
             aria-label={[plusLabel(x), itemLabel(x), x.n > 1 ? `${x.n}개` : ""].filter(Boolean).join(" ")} onClick={() => setSel(sel === i ? null : i)}>
-            <ItemPic it={x} iconOf={iconOf} size={22} />
+            <ItemPic it={x} iconOf={iconOf} size={box - 6} />
             {x.plus ? <i className="dex-plus">+{x.plus}</i> : null}
             {x.n > 1 && <i className="dex-n">{x.n >= 1000 ? `${Math.round(x.n / 100) / 10}k` : x.n}</i>}
           </button>

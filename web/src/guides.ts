@@ -328,13 +328,21 @@ export const GUIDES: Guide[] = [
       },
       { sel: ".me-row:has-text('닉네임 변경')", head: "닉네임 변경", text: "다른 캐릭터로 바꿨어요를 고르면 성장 기록을 새로 시작해서 랭킹이 튀지 않아요.", tap: true },
       { sel: ".me-row:has-text('카톡 오픈프로필')", head: "카톡 오픈프로필", text: "적어 두면 다른 길드원 화면의 내 이름 옆에 카톡 단추가 생겨요.", tap: true },
+      {
+        sel: ".me-row:has-text('알림 설정')",
+        head: "알림 설정",
+        text: "메뉴마다 알림함과 폰 알림을 따로 켜고 꺼요. 알림함을 끄면 폰 알림도 안 와요.\n맨 위 폰 알림은 이 폰에만 해당해요.",
+        tap: true,
+      },
       { sel: ".me-delete, .me-logout", head: "계정 삭제", text: "로그아웃 아래 회색 글씨예요. 운영진이 승낙하면 지워져요." },
     ],
   },
   {
     key: "alerts",
     title: "알림",
-    tutorial: [{ sel: ".alert-prefs", head: "알림 설정", text: "종류마다 끄고, 옆의 폰 표시로 폰 알림만 따로 끌 수 있어요. 새 알림은 1분마다, 홈의 새 글 숫자는 2분마다 다시 세요." }],
+    tutorial: [
+      { sel: ".alert-settings-link", head: "알림 설정", text: "종류마다 켜고 끄는 건 내 정보의 알림 설정에서 해요. 새 알림은 1분마다, 홈의 새 글 숫자는 2분마다 다시 세요." },
+    ],
   },
   {
     key: "search",
