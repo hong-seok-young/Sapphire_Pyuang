@@ -28,7 +28,7 @@ const GROUP_DOCS = 15;
 const PART_CHARS = 14000;
 
 const key = process.env.ANTHROPIC_API_KEY?.trim();
-if (!key && !process.argv.includes("--dry")) {
+if (!key && !process.argv.includes("--dry") && !process.argv.includes("--md")) {
   console.log("ANTHROPIC_API_KEY 가 없어서 건너뛰어요");
   process.exit(0);
 }
@@ -173,6 +173,12 @@ function userText(g) {
   );
 }
 
+if (process.argv.includes("--md")) {
+  // 자료/fandom/ko.jsonl 로 md 만 다시 만든다 (번역 없이)
+  writeOutputs(new Map());
+  console.log(`md 를 다시 만들었어요 (${prev.size}개)`);
+  process.exit(0);
+}
 if (process.argv.includes("--dry")) {
   const per = {};
   for (const a of todo) per[a.bucket] = (per[a.bucket] ?? 0) + 1;
@@ -320,7 +326,8 @@ function writeOutputs(fresh) {
             (r) =>
               `## ${r.ko} (${r.title})\n` +
               `원문: ${r.url}${r.timestamp ? ` (원문 고친 날 ${String(r.timestamp).slice(0, 10)})` : ""} · 분류: ${r.cats || r.bucket}${r.keys ? ` · 찾는 말: ${r.keys}` : ""}\n\n` +
-              r.body,
+              // 본문의 소제목은 두 단계 내린다: '## ' 는 문서 머리에만 (챗봇 자료 조각을 문서째로 나눈다, library-sync.mjs)
+              r.body.replace(/^(#{1,6}) /gm, (_m, h) => "#".repeat(Math.min(h.length + 2, 6)) + " "),
           )
           .join("\n\n");
       writeFileSync(join(OUT, "ko", `${bucket.replace(/[\\/:*?"<>|·]/g, "_")}_${n}.md`), md + "\n");
