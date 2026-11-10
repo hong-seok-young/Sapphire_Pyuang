@@ -8,6 +8,7 @@ import {
   RaceBoard,
   RaceCard,
   TargetsTab,
+  RecordsTab,
   goldText,
 } from "./GrowthRace";
 import { JobEmblem } from "../emblems";
@@ -57,7 +58,7 @@ import { useBackClose } from "../backClose";
 
 type Tab = "status" | "shop" | "mine" | "staff";
 /** 담당자 메뉴 안의 칸 */
-type Staff = "orders" | "items" | "targets" | "members" | "coins";
+type Staff = "orders" | "items" | "targets" | "members" | "coins" | "records";
 const MEDAL = ["🥇", "🥈", "🥉"];
 
 /** 바뀐 숫자가 톡 튄다 (처음 그릴 때는 안 튐) */
@@ -1528,6 +1529,7 @@ export function GrowthShopPage({
     ...(cur.levelCoins ? [] : [{ key: "targets" as Staff, label: "목표" }]),
     { key: "members", label: "현황" },
     { key: "coins", label: cur.levelCoins ? "코인표" : "보상" },
+    ...(cur.levelCoins ? [] : [{ key: "records" as Staff, label: "기록" }]),
   ];
   const saved = (m: string) => {
     setNotice(m);
@@ -1621,6 +1623,9 @@ export function GrowthShopPage({
       )}
       {shown === "staff" && cur.admin && staff === "members" && (
         <MembersTab admin={cur.admin} onChanged={refresh} />
+      )}
+      {shown === "staff" && cur.admin && staff === "records" && (
+        <RecordsTab results={cur.admin.results ?? []} />
       )}
       {shown === "staff" && cur.manage && staff === "coins" && (
         <CoinsTab key={reload} data={cur} onChanged={saved} />

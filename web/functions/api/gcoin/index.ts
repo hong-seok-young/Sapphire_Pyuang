@@ -3,7 +3,7 @@
 //   member: 내가 2군 본캐인지 (아니면 지갑이 없다). admin(오피서 이상): 기다리는 신청, 2군 본캐 모두의 지갑, 최근 처리한 신청
 import { FORBIDDEN, NEED_LOGIN, currentUser, json } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { raceData } from "../../../server/gcrace";
+import { raceData, roundResults, snapshotEnded } from "../../../server/gcrace";
 import { LEVEL_COINS, readCaps, weekBought, gcoinOpen, openCleanup, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
 import { weekStart } from "../../../server/week";
 
@@ -47,6 +47,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   await settleWeeks(env, curve);
   // 2주 목표 선착순 (시범운영, server/gcrace.ts): 순위·달성률·추월 차트. 달성한 1~5위 상금도 여기서 넣으므로 지갑보다 먼저
   const race = await raceData(env);
+  await snapshotEnded(env);
   const [start, rank, mine] = await Promise.all([startAt(env), readRank(env), wallets(env, curve, me.id)]);
   // 2군 본캐만 지갑이 있다 (wallets 는 프로필만 보고 세므로 여기서 2군 본캐인지 다시 본다)
   const wallet = (await isMember(env, me.id)) ? (mine[0] ?? null) : null;
@@ -90,12 +91,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
   let admin: unknown;
   if (manage) {
-    const [pending, recent, members] = await Promise.all([
+    const [pending, recent, members, results] = await Promise.all([
       env.DB.prepare("SELECT * FROM gc_orders WHERE status = 'pending' ORDER BY created_at ASC").all<OrderRow>(),
       env.DB.prepare("SELECT * FROM gc_orders WHERE status != 'pending' ORDER BY COALESCE(done_at, created_at) DESC LIMIT 60").all<OrderRow>(),
       wallets(env, curve),
+      roundResults(env),
     ]);
     admin = {
+      results,
       pending: pending.results.map(orderOut),
       recent: recent.results.map(orderOut),
       members: members.sort((a, b) => b.balance - a.balance || (b.level ?? 0) - (a.level ?? 0) || a.id.localeCompare(b.id)),

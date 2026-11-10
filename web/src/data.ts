@@ -115,7 +115,8 @@ export const loadEnhance = () => getJson<Enhance>("enhance");
  *  name 이 null 이면 영상에서 칸을 누르지 않아 이름을 모르는 칸 (icon = 생김새), est = 같은 그림으로 이름을 추정한 칸,
  *  sg·sn = 도감 등록 창의 대체 스탬프 (장비스탬프 등급 'S'·'A'·'B' 와 개수, 대체 안 되면 sg '불가') */
 export interface DexItem { name: string | null; n: number; plus: number | null; icon?: string | null; pic?: string | null; stamp?: string | null; est?: boolean; sg?: string; sn?: number }
-export interface DexEntry { name: string; effects: [string, number, boolean][]; period?: string | null; items: DexItem[] }
+/** cat: 코스튬 · 펫 (없으면 일반) */
+export interface DexEntry { name: string; effects: [string, number, boolean][]; period?: string | null; items: DexItem[]; cat?: string }
 export interface Dex { source: string; built: string; order: string[]; entries: DexEntry[] }
 export const loadDex = () => getJson<Dex>("dex");
 

@@ -1,9 +1,9 @@
 // PUT /api/gcoin/round { from: "2026-11-11", to: "2026-11-17" } -> 주간 목표 판의 기간 정하기 (담당자, 제작자 2026-11-10 '며칠 00시부터 며칠 24시까지 이벤트 기간 설정').
 // 한국 시간 from 날 0시 ~ to 날 24시. 진행 중이거나 시작 전인 판(targetRound)을 고치고, 끝난 뒤 다음 판을 안 정했으면 새 판을 만든다.
-// 오픈(11/11 11:00) 전으로는 시작하지 않는다. 처음 정할 때 지금까지의 기본 판도 적어 둔다 (끝난 판 결과가 그대로 보이게)
+// 시작은 늘 그날 0시 (제작자 2026-11-10 '00시부터라니까'). 처음 정할 때 지금까지의 기본 판도 적어 둔다 (끝난 판 결과가 그대로 보이게)
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { GCOIN_OPEN_AT, canManageGcoin, canUseGcoin } from "../../../server/gcoin";
+import { canManageGcoin, canUseGcoin } from "../../../server/gcoin";
 import { currentRound, readRounds, targetRound } from "../../../server/gcrace";
 
 const DAY = 86_400_000;
@@ -24,7 +24,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   const from = dayMs(b.from);
   const to = dayMs(b.to);
   if (from === null || to === null) return json({ error: "기간이 맞지 않아요" }, 400);
-  const start = Math.max(from, GCOIN_OPEN_AT);
+  const start = from;
   const end = to + DAY;
   const now = Date.now();
   if (end <= start) return json({ error: "끝나는 날이 시작하는 날보다 앞이에요" }, 400);
