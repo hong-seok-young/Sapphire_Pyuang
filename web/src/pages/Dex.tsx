@@ -195,7 +195,7 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
 
   return (
     <div className="dex">
-      <StatPanel have={have} gain={gain} full={full} over={over} setOver={setOver} stat={stat} doneN={doneEntries.length} total={dex.entries.length} todoN={todoListed.length} />
+      <StatPanel have={have} gain={gain} full={full} over={over} setOver={setOver} stat={stat} doneN={doneEntries.length} total={dex.entries.length} />
 
       <div className="mk-cats dex-cats">
         {["all", "일반", "코스튬", "펫"].map((c) => {
@@ -285,11 +285,11 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
   );
 }
 
-/** 획득 옵션: 게임 창의 37줄을 비슷한 것끼리 좌우 두 칸으로 (OPTION_PAIRS). 칸마다 이름, 그 아래 초록 +(지금 목록의 미완료를 다 하면)와 회색 /(도감을 다 채웠을 때),
+/** 획득 옵션: 게임 창의 37줄을 비슷한 것끼리 좌우 두 칸으로 (OPTION_PAIRS). 칸마다 이름, 그 아래 '최대'(도감을 다 채웠을 때, 제작자 2026-11-10 '최대치만'),
  *  오른쪽 숫자 칸에 내 수치를 직접 적는다. 손대지 않은 칸은 완료로 누른 항목의 합 (제작자 2026-11-10, 슬라이더는 '바를 빼는 게 좋을 듯'으로 뺐다) */
-function StatPanel({ have, gain, full, over, setOver, stat, doneN, total, todoN }: {
+function StatPanel({ have, gain, full, over, setOver, stat, doneN, total }: {
   have: Sum; gain: Sum; full: Sum; over: Record<string, number>; setOver: (v: Record<string, number>) => void;
-  stat: string | null; doneN: number; total: number; todoN: number;
+  stat: string | null; doneN: number; total: number;
 }) {
   const [all, setAll] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -310,15 +310,11 @@ function StatPanel({ have, gain, full, over, setOver, stat, doneN, total, todoN 
     const k = rowKey(s, pct);
     const v = valueOf(s, pct);
     const mx = pick(full, s, pct);
-    const g = pick(gain, s, pct);
     return (
       <div key={k} className={"dex-cell" + (stat === s ? " dex-cell-on" : "") + (k in over ? " dex-cell-set" : "")}>
         <span className="dex-cell-name">
           <b title={s}>{SHORT[s] ?? s}{pct && <small>%</small>}</b>
-          <small>
-            {g > 0 && <span className="dex-gain">+{num(g)} </span>}
-            <span className="muted">/{mx ? num(mx) : "-"}</span>
-          </small>
+          <small className="muted">{mx ? `최대 ${num(mx)}` : "최대 -"}</small>
         </span>
         <input className="dex-row-num" type="number" inputMode="decimal" min={0} step={mx > 50 ? 0.5 : 0.01} aria-label={`${s}${pct ? " %" : ""} 내 수치`}
           value={draft[k] ?? num(v)}
@@ -350,9 +346,7 @@ function StatPanel({ have, gain, full, over, setOver, stat, doneN, total, todoN 
           </button>
         )}
       </div>
-      <p className="dex-legend muted">
-        <span className="dex-gain">+ 지금 목록의 미완료 {todoN}개를 다 하면</span> · / 도감 {total}개를 다 채웠을 때
-      </p>
+      <p className="dex-legend muted">최대 = 도감 {total}개를 다 채웠을 때</p>
     </Panel>
   );
 }
