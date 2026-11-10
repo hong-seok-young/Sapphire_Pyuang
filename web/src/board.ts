@@ -78,9 +78,10 @@ export interface LinkPreview {
 
 export const fileUrl = (id: number) => `/api/board/files/${id}`;
 
-export function fetchPosts(q: { cat?: Cat | null; q?: string; before?: number }) {
+export function fetchPosts(q: { cat?: Cat | null; q?: string; before?: number; mine?: boolean }) {
   const p = new URLSearchParams();
   if (q.cat) p.set("cat", q.cat);
+  if (q.mine) p.set("mine", "1");
   if (q.q) p.set("q", q.q);
   if (q.before) p.set("before", String(q.before));
   return api<{ posts: PostSummary[]; more: boolean }>(`/api/board?${p}`);
