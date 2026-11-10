@@ -353,7 +353,7 @@ ENHANCE_RE = re.compile(r"^\+?(\d{1,2}|[오육칠팔구십])(?=[가-힣])")
 # 줄에서 물건이 아닌 말
 SKIP_WORDS = {"제국", "왕국", "중립", "팝니다", "삽니다", "팔아요", "판매", "구매", "구합니다", "급처", "흥정", "일괄", "가능", "플톡", "주세요", "문의", "떨이",
               "개당", "통당", "장당", "통", "노작", "노강", "싸게", "급매", "빠르게", "각개", "통매입", "매입", "노옵", "투옵", "쓰리옵", "이상", "이하", "판완", "완료", "예약", "골드", "현금", "보유", "각", "개"}
-NOT_ITEM_WORDS = {"아여", "땡구", "기본전",  # 제작자 2026-11-10: 오타·무시
+NOT_ITEM_WORDS = {"아여", "땡구", "기본전", "플티", "제이상",  # 플티 = 플래티넘, '40제이상' = 40제 이상  # 제작자 2026-11-10: 오타·무시
                   "보석", "코튬", "코스튬", "아이템", "장비", "무기", "방어구", "캐릭터", "계정", "통판매", "대리판매", "도감", "도감용",
                   "전사", "렌저", "레인저", "법사", "마법사", "무도가", "신발", "투구", "갑옷", "장갑", "모자", "반지", "벨트", "망토", "목걸이", "이상", "이하",
                   "아드", "아드골드", "아골", "싸게", "급매", "빠르게", "각개", "일괄", "통매입", "매입", "판완", "예약",
@@ -393,6 +393,7 @@ ALIASES: dict[str, str | None] = {
     # 제작자 2026-11-10 확인: 닥소 = 닼소, 오트갑 = 오트윌갑, 데조 = 데조르바의보우 (칠데조 = +7 데조)
     "닥소": "다크스틸소드", "오트갑": "오트윌의경갑", "데조": "데조르바의보우",
     "황솟": "황혼의송곳니", "신벨": "신념의벨트", "파글": "파워글러브",  # 제작자 2026-11-10
+    "오트윌": "오트윌의경갑", "약반": "약속의반지", "방랑자의화실집": "방랑자의 화살집", "써지": "써지싸이클", "써지사이클": "써지싸이클",  # 위키 이름 (화실집은 오타)
     "워투": "워로드투구",  # 문맥으로 정함 (제작자 2026-11-10 '앞뒤 문맥 필요'): 닥갑·닥쉴·백레와 같이 파는 전사 장비, '힘8 속8 6워투' = 워로드투구의 속성저항·힘
     "레인저껍갑": "세계수가지갑옷",  # 제작자 2026-11-10 '세계수 가지갑일걸' (껍갑은 전사 것인데 레인저라고 적음)
     # 뿌벨 = 모르포시즈 뿌리 Lv.40 벨트 (제작자 2026-11-10 '전사뿌벨 = 전사용 뿌리 벨트'. 다른 직업 말은 위키 같은 표의 벨트로, 짐작, 확인 전)
@@ -828,6 +829,7 @@ EQUIP_JSON = ROOT / "web" / "public" / "data" / "equipment.json"
 WIKI_STAT = {"크리티컬": "크리", "속성저항": "속저", "마나재생": "마재", "체력재생": "체재", "이동속도": "이속", "불저항": "불저", "냉기저항": "냉저", "번개저항": "번저"}
 _RANGE_OPTS: dict[str, tuple[list[str], str]] | None = None
 NUM_MISMATCH: dict[str, list[str]] = {}
+_RANGE_MAX: dict[tuple[str, str], int] = {}
 # 숫자만 적을 때 그 물건에 쓸모 있는 옵션(유효옵)만 적은 것: 물건마다 다르다 (제작자 2026-11-10 '유효옵만 적은 거라 레인저는 마재 빼고 크리 3 민 5',
 # '템마다 다를 듯 해서 그때그때 물어봐'). 확인받은 물건만 적고, 없는 물건은 숫자 수가 위키 옵션 수와 맞을 때만 읽는다
 EFFECTIVE_OPTS = {
@@ -852,9 +854,11 @@ def range_opts(name: str) -> tuple[list[str], str]:
                         continue
                     stats = []
                     for part in cells[k].split("/"):
-                        m = re.match(r"\s*([가-힣]+)\s*[\d\s&~]*~", part)
+                        m = re.match(r"\s*([가-힣]+)\s*[\d\s&~]*~\s*(\d+)", part)
                         if m:
-                            stats.append(WIKI_STAT.get(m.group(1), m.group(1)))
+                            st = WIKI_STAT.get(m.group(1), m.group(1))
+                            stats.append(st)
+                            _RANGE_MAX[(re.sub(r"\s", "", row.get("name", "")), st)] = int(m.group(2))
                     job = cells[hs.index("직업")] if "직업" in hs and hs.index("직업") < len(cells) else ""
                     _RANGE_OPTS.setdefault(re.sub(r"\s", "", row.get("name", "")), (stats, job))
     return _RANGE_OPTS.get(re.sub(r"\s", "", name), ([], ""))
@@ -865,13 +869,31 @@ def num_opts(name: str, lead: str, words: list[str]) -> list[str]:
     stats, job = range_opts(name)
     if not stats:
         return []
+    if not lead and len(words) == 1 and len(words[0]) >= 2:
+        lead, words = words[0], []  # '4311 5광부', '35 칠데조': 따로 떨어진 숫자 하나도 한 자리씩
     n = len(lead) if lead else (len(words[0]) if len(words) == 1 and len(words[0]) >= 2 else len(words))
     eff = EFFECTIVE_OPTS.get(re.sub(r"\s", "", name))
     if n != len(stats) and eff and len(eff) == n:
         stats = eff  # 그 물건에 쓸모 있는 옵션만 적은 것 ('35칠데조' = 크리3 민첩5, 마재는 안 적음)
-    elif n != len(stats) and n:
+    elif n != len(stats) and n and not (lead and len(lead) > len(stats)):
         NUM_MISMATCH.setdefault(name, []).append(lead or " ".join(words))  # 물어볼 것 (--unknown 에 찍는다)
-    if lead:
+    if lead and len(lead) > len(stats):
+        # '4311 5광부' = 불저4 힘3 이속11: 두 자리 값이 섞이면 위키 옵션 범위에 맞게 나뉘는 길이 하나뿐일 때만
+        key = re.sub(r"\s", "", name)
+        def splits(rest: str, k: int) -> list[list[str]]:
+            if k == 0:
+                return [[]] if not rest else []
+            out = []
+            for n in (1, 2):
+                if len(rest) >= n and not (n == 2 and rest[0] == "0"):
+                    out += [[rest[:n]] + t for t in splits(rest[n:], k - 1)]
+            return out
+        ok = [sp for sp in splits(lead, len(stats)) if all(int(v) <= _RANGE_MAX.get((key, st), 99) for v, st in zip(sp, stats))]
+        if len(ok) != 1:
+            NUM_MISMATCH.setdefault(name, []).append(lead)
+            return []
+        vals = ok[0]
+    elif lead:
         vals = list(lead)
     elif len(words) == 1 and len(words[0]) == len(stats) and len(stats) >= 2:
         vals = list(words[0])  # '35 칠데조'
