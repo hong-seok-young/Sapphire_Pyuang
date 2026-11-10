@@ -389,6 +389,8 @@ ALIASES: dict[str, str | None] = {
     "설원장": "설원의저주장화", "설원신": "설원의저주장화", "샤보": "샤도우보우", "하갑": "하이가드갑옷", "티벨": "티타늄벨트",  # 제작자 확인
     # 2026-11-10 정리 때 더함 (톡방 글로 짐작: '지2 레이븐 3', '5맹독신 민3 이속7', '크2 육오트윌갑 9', '6철실(속저x) 2.5장' 의 실 = 쉴드)
     "레이븐": "레이븐목걸이", "맹독신": "맹독의장화", "오트윌갑": "오트윌의경갑", "철실": "철갑쉴드", "닼실": "다크스틸쉴드",
+    # 제작자 2026-11-10 확인: 닥소 = 닼소, 오트갑 = 오트윌갑, 데조 = 데조르바의보우 (칠데조 = +7 데조)
+    "닥소": "다크스틸소드", "오트갑": "오트윌의경갑", "데조": "데조르바의보우",
     "거뼈": "거미줄뼈갑옷", "황목": "황금목걸이", "닥스": "다크스컬", "글라": "글라디우스", "숲요장": "숲요정의장갑", "속모": "속전속결의모자", "속전모": "속전속결의모자", "사용장": "사막용병의장갑", "재벨": "재생의벨트", "데조모": "데조르바의모자", "강장": "강철골렘장갑",
 }
 
@@ -718,13 +720,18 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
         if re.fullmatch(r"\+?(6|육)강?장", w):  # '명8 육강장' = 명중 8 의 +6 강화가죽장갑 (제작자 2026-11-04: 명중에 따라 값이 천차만별)
             return "강화가죽장갑", w, 6
         m = ENHANCE_RE.match(w)
-        for k, c in enumerate([w] + ([w[m.end():]] if m else [])):
+        tries = [(w, None)] + ([(w[m.end():], m)] if m else [])
+        if m:  # '35칠데조' (옵션 숫자 뒤에 '칠' 강화): 한 번 더 뗀다
+            m2 = ENHANCE_RE.match(w[m.end():])
+            if m2:
+                tries.append((w[m.end():][m2.end():], m2))
+        for c, em in tries:
             c = re.sub(r"[^가-힣a-zA-Z0-9]", "", c)
             if (len(c) < 2 and c != "닼") or c in NOT_ITEM_WORDS:
                 continue
             found = rs.resolve(c)
             if found:
-                return found, c, (_enh_value(m) if k == 1 and m else 0)
+                return found, c, (_enh_value(em) if em else 0)
         return None
 
     joined = "".join(names)
