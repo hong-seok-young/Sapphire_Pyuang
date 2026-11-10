@@ -87,6 +87,7 @@ export const TITLE_EN: Record<string, string> = {
   게시판: "NOTICE BOARD",
   "강화 비교": "WEAPON COMPARE",
   "개발 요청": "DEV REQUEST",
+  건의함: "SUGGESTION BOX",
   "확률 시뮬레이터": "LUCK SIMULATOR",
   장비대여: "EQUIPMENT RENTAL",
   "길드 랭킹": "RANKING",
@@ -116,6 +117,11 @@ export const TITLE_EN: Record<string, string> = {
   "전장 · 헌팅그라운드": "BATTLEFIELD",
   "퀘스트 · 지도": "QUESTS · MAPS",
   "길드 던전": "GUILD DUNGEON",
+  "헬스 루틴": "WORKOUT LOG",
+  "운영진 때리기": "STRESS RELIEF",
+  성장코인샵: "GROWTH COIN SHOP",
+  기부함: "DONATION BOX",
+  "명예의 전당": "HALL OF FAME",
 };
 
 export function TopBar({

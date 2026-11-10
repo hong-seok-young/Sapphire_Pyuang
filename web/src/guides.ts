@@ -92,7 +92,7 @@ export const GUIDES: Guide[] = [
       {
         sel: ".rank-views button:has-text('주간')",
         head: "주간 성장",
-        text: "목요일 오전 10시마다 새로 시작해요. 1등 카드의 사진은 내 정보의 캐릭터 사진이에요.",
+        text: "월요일 0시마다 새로 시작해요. 1등 카드의 사진은 내 정보의 캐릭터 사진이에요.",
         tap: true,
         opens: ".growth-hero",
         undo: false,
@@ -162,6 +162,20 @@ export const GUIDES: Guide[] = [
         who: "officer",
       },
       { go: "#/board?cat=imo", sel: ".off-row", head: "공식 글", text: "누르면 앱 안에서 읽어요. 처음 여는 사람 때 AI 가 핵심 요약을 만들고, 패치노트면 내 직업 변경점도 나와요.", tap: true },
+    ],
+  },
+  {
+    // 건의함 (개발중, 2026-11-09): 익명이 누구에게 보이는지만
+    key: "suggest",
+    title: "건의함",
+    tutorial: [
+      { sel: ".bd-write", head: "건의하기", text: "글을 올리면 길드마스터와 오피서에게 알림이 가요." },
+      {
+        go: "#/suggest/write",
+        sel: ".sg-anon",
+        head: "익명",
+        text: "익명으로 올리면 이름은 유어아너 님과 앱개발자만 봐요. 다른 사람에게는 익명으로 보여요.\n수정과 삭제는 그대로 나만 할 수 있어요. 댓글도 익명으로 달 수 있어요.",
+      },
     ],
   },
   {

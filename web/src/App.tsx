@@ -19,7 +19,13 @@ import { DevSoon, FitLine, PixelIcon, Loading, NotFound } from "./ui";
 import { Home, HomeCorner, InfoPage, TileIcon } from "./pages/Home";
 import { HomeWeather } from "./pages/Weather";
 import {
+  canFit,
   canPreview,
+  canGcoin,
+  GCOIN_OPEN,
+  canDonate,
+  canSmack,
+  canSuggest,
   canSee,
   clickItem,
   isLocked,
@@ -56,6 +62,7 @@ import {
 import { LoginPage, PasswordPage } from "./pages/Login";
 import { GuideHost } from "./tutorial";
 import { BirthdaySticker } from "./birthday";
+import { CoinToast, RaceToast } from "./coinToast";
 import { Opening, shouldCelebrate } from "./pages/Opening";
 import { reportOpen, reportView } from "./activity";
 import { markMenuVisit } from "./updates";
@@ -87,6 +94,7 @@ const CHUNKS = {
   DevRequests: () => import("./pages/DevRequests"),
   Simulator: () => import("./pages/Simulator"),
   Trend: () => import("./pages/Trend"),
+  Dex: () => import("./pages/Dex"),
   ActivityLog: () => import("./pages/ActivityLog"),
   Alerts: () => import("./pages/Alerts"),
   ChatGaps: () => import("./pages/ChatGaps"),
@@ -98,6 +106,11 @@ const CHUNKS = {
   Todo: () => import("./pages/Todo"),
   Rental: () => import("./pages/Rental"),
   GuildDungeon: () => import("./pages/GuildDungeon"),
+  Fit: () => import("./pages/Fit"),
+  Smack: () => import("./pages/Smack"),
+  GrowthShop: () => import("./pages/GrowthShop"),
+  Donate: () => import("./pages/Donate"),
+  Hall: () => import("./pages/Hall"),
 };
 const ChatPage = lazy(() => CHUNKS.Chat().then((m) => ({ default: m.ChatPage })));
 const AdminPage = lazy(() => CHUNKS.Admin().then((m) => ({ default: m.AdminPage })));
@@ -110,11 +123,13 @@ const EnhancePage = lazy(() => CHUNKS.Enhance().then((m) => ({ default: m.Enhanc
 const DevRequestsPage = lazy(() => CHUNKS.DevRequests().then((m) => ({ default: m.DevRequestsPage })));
 const SimulatorPage = lazy(() => CHUNKS.Simulator().then((m) => ({ default: m.SimulatorPage })));
 const TrendPage = lazy(() => CHUNKS.Trend().then((m) => ({ default: m.TrendPage })));
+const DexPage = lazy(() => CHUNKS.Dex().then((m) => ({ default: m.DexPage })));
 const ActivityLogPage = lazy(() => CHUNKS.ActivityLog().then((m) => ({ default: m.ActivityLogPage })));
 const AlertsPage = lazy(() => CHUNKS.Alerts().then((m) => ({ default: m.AlertsPage })));
 const ChatGapsPage = lazy(() => CHUNKS.ChatGaps().then((m) => ({ default: m.ChatGapsPage })));
 const PlatShopPage = lazy(() => CHUNKS.PlatShop().then((m) => ({ default: m.PlatShopPage })));
 const BoardPage = lazy(() => CHUNKS.Board().then((m) => ({ default: m.BoardPage })));
+const SuggestPage = lazy(() => CHUNKS.Board().then((m) => ({ default: m.SuggestPage })));
 const OfficialPostPage = lazy(() => CHUNKS.Official().then((m) => ({ default: m.OfficialPostPage })));
 const PatchNotesPage = lazy(() => CHUNKS.PatchNotes().then((m) => ({ default: m.PatchNotesPage })));
 const OddsPage = lazy(() => CHUNKS.Odds().then((m) => ({ default: m.OddsPage })));
@@ -122,6 +137,11 @@ const OddsTablePage = lazy(() => CHUNKS.Odds().then((m) => ({ default: m.OddsTab
 const TodoPage = lazy(() => CHUNKS.Todo().then((m) => ({ default: m.TodoPage })));
 const RentalPage = lazy(() => CHUNKS.Rental().then((m) => ({ default: m.RentalPage })));
 const GuildDungeonPage = lazy(() => CHUNKS.GuildDungeon().then((m) => ({ default: m.GuildDungeonPage })));
+const FitPage = lazy(() => CHUNKS.Fit().then((m) => ({ default: m.FitPage })));
+const SmackPage = lazy(() => CHUNKS.Smack().then((m) => ({ default: m.SmackPage })));
+const GrowthShopPage = lazy(() => CHUNKS.GrowthShop().then((m) => ({ default: m.GrowthShopPage })));
+const DonatePage = lazy(() => CHUNKS.Donate().then((m) => ({ default: m.DonatePage })));
+const HallPage = lazy(() => CHUNKS.Hall().then((m) => ({ default: m.HallPage })));
 
 /**
  * 홈이 뜬 뒤 쉬는 때에 자주 여는 화면의 조각을 하나씩 미리 받아 둔다 (제작자 2026-11-04 '화면 전환이나 버튼 동작별로 반응이 늦거나 렉').
@@ -131,6 +151,7 @@ function prefetchPages(staff: boolean, master: boolean) {
   const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
   if (conn?.saveData || /(^|-)2g$/.test(conn?.effectiveType ?? "")) return () => undefined;
   const list: (keyof typeof CHUNKS)[] = ["Board", "Ranking", "Market", "Todo", "GuildDungeon", "Requests", "Rental", "Enhance", "DevRequests", "Chat", "Profile", "Alerts", "PlatShop", "Official"];
+  if (GCOIN_OPEN) list.push("GrowthShop");
   if (staff) list.push("Admin");
   if (master) list.push("ActivityLog", "ChatGaps");
   let stop = false;
@@ -448,6 +469,10 @@ function Wiki({
         query={route.query}
       />
     );
+  // 건의함 (개발중, 제작자 요청 2026-11-09 개발 요청 #13, 2026-11-09 '일단 나만 보이게'): 게시판의 건의 사항을 따로, 익명 글·댓글.
+  // 열기 전에는 앱개발자(와 테스트 계정)만 (launcher.ts canSuggest). 게시판 안의 예전 '건의' 칸은 그대로 모두에게 열려 있다
+  else if (page === "suggest")
+    body = canSuggest(me) ? <SuggestPage me={me} arg={arg} sub={route.parts[2] ?? ""} /> : <DevSoon title="건의함" />;
   else if (page === "") body = <Home me={me} />;
   else if (page === "info") body = <InfoPage me={me} />;
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
@@ -468,6 +493,19 @@ function Wiki({
       ) : (
         <GuildDungeonPage me={me} />
       );
+  // 헬스 루틴 (개발중, 길드원 완뻔치 님 개발 요청 #8, 2026-11-09 '일단 나만 보이게'): 실제 헬스장 운동 기록. 열기 전에는 앱개발자(와 테스트 계정)만
+  // (launcher.ts canFit, 서버 server/fit.ts). 위키 자료를 쓰지 않아 기다리지 않는다
+  else if (page === "fit") body = canFit(me) ? <FitPage me={me} /> : <DevSoon title="헬스 루틴" />;
+  // 운영진 때리기 (개발 요청 #10, 제작자 2026-11-09 '우선 나한테만 보이게'): 열기 전에는 앱개발자(와 테스트 계정)만 (launcher.ts canSmack, 서버 server/smack.ts)
+  else if (page === "smack")
+    body = canSmack(me) ? <SmackPage me={me} arg={arg} /> : <DevSoon title="운영진 때리기" />;
+  // 2군 성장코인샵 (개발중, 제작자 2026-11-09 '오피서랑 길마 보게 열어 줘'): 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (launcher.ts canGcoin, 서버 server/gcoin.ts)
+  else if (page === "gcoin") body = canGcoin(me) ? <GrowthShopPage me={me} onMe={onMe} /> : <DevSoon title="성장코인샵" />;
+  // 기부함 (개발중, 제작자 2026-11-10): 모든 템 기부를 골드 가치로 매겨 장비대여와 같은 마일리지로, 명예의 전당. 위키를 기다리지 않는다 (아이템 그림·이름 찾기는 위키가 오면 붙는다)
+  // 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (launcher.ts canDonate, 서버 server/donate.ts)
+  else if (page === "donate") body = canDonate(me) ? <DonatePage wiki={wiki ?? null} me={me} /> : <DevSoon title="기부함" />;
+  // 명예의 전당 (개발중, 제작자 2026-11-10 '별도 버튼으로'): 기부함과 같은 사람이 본다
+  else if (page === "hall") body = canDonate(me) ? <HallPage me={me} /> : <DevSoon title="명예의 전당" />;
   else if (!wiki)
     body = (
       <Loading
@@ -501,6 +539,8 @@ function Wiki({
   // 시세 동향 (개발중, 제작자 요청 2026-11-03): 거래 톡방 대화에서 모은 골드·물건·캐릭터 시세
   // 개발 중 칸은 미리 보는 사람(길드마스터, 오피서, 앱개발자, 테스트 계정)만. 길드원은 주소로 들어와도 개발 중 안내 (제작자 요청 2026-11-04)
   else if (page === "trend") body = canPreview(me) ? <TrendPage wiki={wiki} /> : <DevSoon title="시세 동향" />;
+  // 도감 계산기 (개발중, 제작자 요청 2026-11-10): 제작자 도감 영상을 옮긴 항목으로 완료 효과 합계와 필요 재료. 미리 보는 사람만
+  else if (page === "dex") body = canPreview(me) ? <DexPage wiki={wiki} me={me} /> : <DevSoon title="도감 계산기" />;
   // 강화 비교 (제작자 요청 2026-11-04, 2026-11-05 모두에게 열었다): 두 무기(+강)의 데미지와 몇 % 강해지는지
   else if (page === "enhance") body = <EnhancePage wiki={wiki} query={route.query} me={me} />;
   // 확률 시뮬레이터 개발 중판은 미리 보는 사람(길드마스터·오피서·달팽이·간다이, launcher.ts canPreview), 테스트판은 앱개발자(와 테스트 계정)만 (제작자 2026-11-04 '도플갱어로')
@@ -558,6 +598,9 @@ function Wiki({
       <GuideHost me={me} />
       {/* 생일 스티커 (그날 한국 시간 하루, src/birthday.tsx) */}
       <BirthdaySticker me={me} />
+      {/* 2군 성장코인: 레벨·경험치를 적어 코인이 생기면 동전 팝업 (src/coinToast.tsx) */}
+      <CoinToast />
+      <RaceToast />
       <nav
         className={
           "tabbar" + (launcher.editing && editable ? " launch-editing" : "")

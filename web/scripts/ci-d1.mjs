@@ -89,6 +89,8 @@ const ADDED_COLUMNS = [
   ["profiles", "exp", "INTEGER"], ["listings", "options", "TEXT"], ["profiles", "guild", "TEXT"],
   ["listings", "mode", "TEXT NOT NULL DEFAULT 'sale'"], ["listings", "ends_at", "INTEGER"], ["listing_wants", "offer", "INTEGER"],
   ["listing_talk", "parent_id", "INTEGER"],
+  ["gc_items", "info", "TEXT"],
+  ["gc_items", "gold", "INTEGER"],
   ["users", "high_spec", "INTEGER NOT NULL DEFAULT 0"], ["plat_settings", "high_ratio", "REAL NOT NULL DEFAULT 4"],
   ["plat_items", "high_ratio", "REAL"],
   ["activity", "ip", "TEXT"],
@@ -111,6 +113,8 @@ const ADDED_COLUMNS = [
   ["rental_requests", "app_id", "INTEGER"],
   ["rental_requests", "gold", "INTEGER"],
   ["rental_items", "return_req_at", "INTEGER"], ["rental_items", "return_app_id", "INTEGER"],
+  // 건의함 익명 글·댓글 (2026-11-09, server/board.ts)
+  ["board_posts", "anon", "INTEGER NOT NULL DEFAULT 0"], ["board_comments", "anon", "INTEGER NOT NULL DEFAULT 0"],
 ];
 for (const [table, column, type] of ADDED_COLUMNS) {
   const columns = parseJson(wrangler("d1", "execute", DB, "--remote", "--json", "--command", `PRAGMA table_info(${table})`))[0]?.results ?? [];
@@ -597,4 +601,147 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
     `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
   ]);
   console.log(`생일 콤보 이어서 하기 넣음 ${has}명`);
+}
+
+// 2군 성장코인샵 (server/gcoin.ts, 개발중): 코인을 세기 시작한 때(setup 'gcoin_start', 처음 배포 때 한 번)와 기본값.
+// 레벨업 코인표·물건은 표가 비어 있을 때만, 순위 보너스는 없을 때만 넣는다 (오피서가 고친 값은 덮지 않는다). server/gcoin.ts 의 DEFAULT_* 와 같다
+{
+  const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+  const now = Date.now();
+  const LEVELS = [[1, 0], [21, 10], [26, 15], [31, 40], [34, 40], [36, 50], [37, 80], [38, 100], [39, 120], [45, 150]];
+  const ITEMS = [
+    ["사나운 멧돼지 인형", "20개", 120, null],
+    ["망고워터", "20개", 35, "쿨타임 60초 · 20분 동안 지속: 크리티컬 4 증가"],
+    ["자몽주스", "50개", 60, "쿨타임 5초"],
+    ["자몽케이크", "50개", 80, "쿨타임 5초"],
+    ["우파우파의노래", "20개", 0, null],
+    ["잠깬쿠이인형", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 데미지 20% 증가"],
+    ["별과자", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 크리티컬 5 증가"],
+    ["동그리사탕", "20개", 0, null],
+    ["데블랑사탕", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 크리티컬 5 증가"],
+    ["딸기빙수", "20개", 0, null],
+    ["꿀사과", "20개", 0, null],
+    ["알사탕", "20개", 0, null],
+    ["칠면조 구이", "20개", 0, null],
+    ["송편", "20개", 0, null],
+    ["자라의노래", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 경험치 30% 증가"],
+  ];
+  const RANK = [5, 4, 3, 2, 1];
+  const lines = [`INSERT OR IGNORE INTO setup (key, done_at) VALUES ('gcoin_start', ${now});`];
+  if (!queryFirst("SELECT 1 AS x FROM gc_levels")) for (const [lv, c] of LEVELS) lines.push(`INSERT INTO gc_levels (min_level, coin) VALUES (${lv}, ${c});`);
+  if (!queryFirst("SELECT 1 AS x FROM gc_items"))
+    ITEMS.forEach(([n, u, p, info], i) => lines.push(`INSERT INTO gc_items (name, unit, price, info, active, sort) VALUES (${q(n)}, ${q(u)}, ${p}, ${info ? q(info) : "NULL"}, 1, ${i});`));
+  RANK.forEach((v, i) => lines.push(`INSERT OR IGNORE INTO gc_settings (key, value) VALUES ('rank${i + 1}', ${v});`));
+  runSql(lines);
+  console.log("2군 성장코인샵 기본값 (비어 있을 때만)");
+}
+
+// 성장코인 Lv.31~33 레벨당 35 -> 39 (제작자 2026-11-09 '30에서 32 찍으면 사멧 10개 망고워터 10개 살 코인 수준': 39 x 2 = 78 = 60 + 18).
+// 처음 넣은 값(35) 그대로일 때만 바꾼다 (오피서가 고친 값은 그대로). setup 'gcoin_lv31_39_20261109' 로 한 번만
+{
+  const KEY = "gcoin_lv31_39_20261109";
+  const now = Date.now();
+  runSql([
+    `UPDATE gc_levels SET coin = 39 WHERE min_level = 31 AND coin = 35 AND NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}');`,
+    `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+  ]);
+}
+
+// 성장코인 Lv.31~33 레벨당 39 -> 40 (제작자 2026-11-09 '경험치 % 마다 딱 떨어지는 단위로 잘게 쪼개': 39 는 어느 % 로도 안 나눠져 레벨업 때 한꺼번에만 줄 수 있다.
+// 40 이면 2.5% 마다 1개, 30 -> 32 는 80 이라 사멧 10개 + 망고워터 10개(78)도 그대로). 39 그대로일 때만, setup 'gcoin_lv31_40_20261109' 로 한 번만
+{
+  const KEY = "gcoin_lv31_40_20261109";
+  runSql([
+    `UPDATE gc_levels SET coin = 40 WHERE min_level = 31 AND coin = 39 AND NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}');`,
+    `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
+  ]);
+}
+
+// 성장코인샵 물건 (제작자 2026-11-09 '자몽주스와 자몽케이크는 50개 단위, 나머지는 20개, 이미지 이거 써' -> '누르면 옵션 보여 줘, 스샷 골드 가격 무시해,
+// 골드 값어치는 관리자가 쓸 거야'): 처음 물건(사나운 멧돼지 10개·20개 …)을 지우고 거래소 스샷의 물건 15개로 바꾼다. 값은 제작자가 처음 준 넷만, 나머지는 0(값 정하기 전),
+// 옵션은 스샷 정보창에 보인 것. 아직 개발 중이라 관리자가 고친 물건이 없다. setup 'gcoin_items_v3_20261109' 로 한 번만 (그 전 판 'gcoin_items_tong_20261109' 는 스샷 값을 넣었다)
+{
+  const KEY = "gcoin_items_v3_20261109";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+    const ITEMS = [
+      ["사나운 멧돼지 인형", "20개", 120, null],
+      ["망고워터", "20개", 35, "쿨타임 60초 · 20분 동안 지속: 크리티컬 4 증가"],
+      ["자몽주스", "50개", 60, "쿨타임 5초"],
+      ["자몽케이크", "50개", 80, "쿨타임 5초"],
+      ["우파우파의노래", "20개", 0, null],
+      ["잠깬쿠이인형", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 데미지 20% 증가"],
+      ["별과자", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 크리티컬 5 증가"],
+      ["동그리사탕", "20개", 0, null],
+      ["데블랑사탕", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 크리티컬 5 증가"],
+      ["딸기빙수", "20개", 0, null],
+      ["꿀사과", "20개", 0, null],
+      ["알사탕", "20개", 0, null],
+      ["칠면조 구이", "20개", 0, null],
+      ["송편", "20개", 0, null],
+      ["자라의노래", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 경험치 30% 증가"],
+    ];
+    runSql([
+      "DELETE FROM gc_items;",
+      ...ITEMS.map(([n, u, p, info], i) => `INSERT INTO gc_items (name, unit, price, info, active, sort) VALUES (${q(n)}, ${q(u)}, ${p}, ${info ? q(info) : "NULL"}, 1, ${i});`),
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
+    ]);
+    console.log("성장코인샵 물건", ITEMS.length);
+  }
+}
+
+// 성장코인샵 시범운영 (김다혜 2026-11-09 '1코인당 3만 골드, 사멧 10개 2코인, 자몽주스·케이크 50개당 2코인, 크4물약 20개당 1코인', '1등부터 5등만, 37렙 먼저 찍으면 5코인'):
+// 사나운 멧돼지 인형은 10개 단위로, 넷의 골드 값을 그 코인만큼(3만 골드 x 코인), 나머지 물건의 코인은 골드 값으로 다시 셈한다 (1,000골드 -> 3만 골드).
+// 2주 목표 선착순 상금은 1~5위 5 · 4 · 3 · 2 · 1 (예전 주간 순위 보너스 100 · 60 · 30 · 20 · 10 그대로일 때만). setup 'gcoin_trial_20261109' 로 한 번만
+{
+  const KEY = "gcoin_trial_20261109";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    runSql([
+      "UPDATE gc_items SET unit = '10개', gold = 60000, price = 2 WHERE name = '사나운 멧돼지 인형';",
+      "UPDATE gc_items SET gold = 30000, price = 1 WHERE name = '망고워터';",
+      "UPDATE gc_items SET gold = 60000, price = 2 WHERE name IN ('자몽주스', '자몽케이크');",
+      "UPDATE gc_items SET price = MAX(1, CAST(ROUND(gold / 30000.0) AS INTEGER)) WHERE gold > 0 AND name NOT IN ('사나운 멧돼지 인형', '망고워터', '자몽주스', '자몽케이크');",
+      // 골드 칸이 생기기 전에 코인만 적은 물건(1코인 = 1,000골드 때)은 그 골드로 다시 셈한다
+      "UPDATE gc_items SET gold = price * 1000, price = MAX(1, CAST(ROUND(price * 1000 / 30000.0) AS INTEGER)) WHERE gold IS NULL AND price > 0 AND name NOT IN ('사나운 멧돼지 인형', '망고워터', '자몽주스', '자몽케이크');",
+      ...[[1, 100, 5], [2, 60, 4], [3, 30, 3], [4, 20, 2], [5, 10, 1]].map(([i, old, v]) => `UPDATE gc_settings SET value = ${v} WHERE key = 'rank${i}' AND value = ${old};`),
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
+    ]);
+    console.log("성장코인샵 시범운영 값 (한 번)");
+  }
+}
+
+// 성장코인샵 오픈 준비 (제작자 2026-11-10, 유어아너 공지 '2군 퀘스트 이벤트'): 1~5위 6 · 4 · 3 · 2 · 2, 피닉스의심장 5개 2코인(6만 골드),
+// 판을 1주 진행·1주 휴식으로 바꾸며 첫 판이 11/11(수) 11:00 시작이 되어(server/gcrace.ts), 11/9 판에 정해 둔 목표는 새 첫 판으로 옮기고 오픈 전 11/9 판 상금은 지운다. setup 'gcoin_open_prep_20261110' 로 한 번만
+{
+  const KEY = "gcoin_open_prep_20261110";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const OLD = 1794150000000; // 2026-11-09 00:00 KST
+    const NEW = 1794362400000; // 2026-11-11 11:00 KST
+    runSql([
+      ...[6, 4, 3, 2, 2].map((v, i) => `INSERT INTO gc_settings (key, value) VALUES ('rank${i + 1}', ${v}) ON CONFLICT (key) DO UPDATE SET value = excluded.value;`),
+      "INSERT INTO gc_items (name, unit, price, gold, active, sort) SELECT '피닉스의심장', '5개', 2, 60000, 1, (SELECT COALESCE(MAX(sort), 0) + 1 FROM gc_items) " +
+        "WHERE NOT EXISTS (SELECT 1 FROM gc_items WHERE REPLACE(name, ' ', '') = '피닉스의심장');",
+      `UPDATE gc_targets SET round = ${NEW} WHERE round = ${OLD} AND NOT EXISTS (SELECT 1 FROM gc_targets t WHERE t.round = ${NEW} AND t.user_id = gc_targets.user_id);`,
+      `DELETE FROM gc_ledger WHERE kind = 'race' AND ref = 'race:${OLD}';`,
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
+    ]);
+    console.log("성장코인샵 오픈 준비 (한 번)");
+  }
+}
+
+// 기부함 마일리지를 기부 골드 가치의 0.6 으로 (제작자 2026-11-10 '기부한 골드 가치의 x 0.6 이 마일리지로 쌓이는 거임, 10만 골드당 1, 소수점은 누적, 정수 부분만 사용').
+// 그 전에 확정한 기부(1.0 으로 넣은 💎)를 사람마다 floor(골드 합 x 0.6 / 10만) 에 맞춰 차이를 장부에 한 줄 넣고, 그 사람의 가장 최근 기부 줄 dia 에 더한다. setup 'donate_rate_06_20261110' 로 한 번만
+{
+  const KEY = "donate_rate_06_20261110";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const now = Date.now();
+    const target = "(SELECT CAST(SUM(CASE WHEN x.status = 'done' THEN x.gold ELSE 0 END) * 6 / 1000000 AS INTEGER) - SUM(x.dia) FROM donate_items x WHERE x.who = %W)";
+    runSql([
+      `INSERT INTO rental_mileage (who, delta, reason, note, by_user, created_at) SELECT who, diff, 'donate', '기부함 · 마일리지 0.6 반영', 'system', ${now} ` +
+        `FROM (SELECT d.who AS who, ${target.replace("%W", "d.who")} AS diff FROM donate_items d GROUP BY d.who) WHERE diff != 0;`,
+      `UPDATE donate_items SET dia = dia + ${target.replace("%W", "donate_items.who")} WHERE id IN (SELECT MAX(id) FROM donate_items GROUP BY who);`,
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+    ]);
+    console.log("기부함 마일리지 0.6 반영 (한 번)");
+  }
 }

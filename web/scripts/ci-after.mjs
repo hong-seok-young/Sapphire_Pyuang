@@ -71,3 +71,41 @@ function runSql(lines) {
     }
   }
 }
+
+// 챗봇 개선 완료 2026-11-09 (제작자 '바로 ㄱㄱ', '개선됐어요 알림 보내'): 2026-11-09 에 열려 있던 '모름' 35건(#6 ~ #42).
+// - 앱에 있는데 챗봇에 안 넘어가던 자료: 무기 강화 수치표(강화 비교), 거래 톡방 시세, 줄임말 (src/chatMarket.ts)
+// - 웹 찾기: 찾기 20번·읽기 15번, 네이버·다음·구글·나무위키·카페·블로그를 다 뒤지고 참고 링크를 단다 (server/chatPrompt.ts)
+// - 정해 둔 답: 마녀 버프는 길드 공지방, 월거 = 월드거래, 장비 옵션 확률은 공식 확률표
+// 항목마다 '챗봇이 개선됐어요' 알림(누르면 그 대화에서 같은 질문을 다시 묻기). 앱개발자 본인 항목은 알림 없이 완료로만. setup 'gap_fix_batch_20261109'
+{
+  const KEY = "gap_fix_batch_20261109";
+  const done = queryFirst(`SELECT 1 AS d FROM setup WHERE key = '${KEY}'`)?.d;
+  if (!done) {
+    const now = Date.now();
+    const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+    const APP = [16, 29, 26, 28, 31, 35, 23, 12, 17, 36];
+    const NOTE = {
+      app: "무기 강화 수치표·거래 톡방 시세·줄임말을 같이 보고, 모자라면 웹을 끝까지 찾아 링크까지 달아 답해요",
+      web: "아이모 자료에 없으면 네이버·다음·구글·나무위키·카페·블로그까지 웹을 끝까지 찾아 보고 참고 링크를 달아 답해요",
+      25: "마녀 버프 일정은 길드 공지방에 띄운다고 안내하고, 버프 효과는 자료·웹으로 답해요",
+      13: "월거를 월드거래로 알아듣고 답해요",
+      12: "월거를 월드거래로 알아듣고 답해요",
+      15: "장비 옵션 확률을 공식 확률표(옵션 재설정·과거의 유물)로 계산해서 답해요",
+    };
+    const noteOf = (id) => NOTE[id] ?? (APP.includes(id) ? NOTE.app : NOTE.web);
+    const ids = Array.from({ length: 37 }, (_, i) => i + 6); // 6 ~ 42 (열린 것만 바뀐다)
+    const CASE = (col) => `CASE ${col} ${ids.map((id) => `WHEN ${id} THEN ${q(noteOf(id))}`).join(" ")} END`;
+    const OPEN = `g.status = 'open' AND g.id BETWEEN 6 AND 42`;
+    const n = queryFirst(`SELECT COUNT(*) AS n FROM chat_gaps g WHERE ${OPEN}`)?.n ?? 0;
+    runSql([
+      "INSERT INTO alerts (user_id, kind, text, link, created_at) " +
+        "SELECT g.user_id, 'chat_fixed', '챗봇이 개선됐어요. 물어봤던 “' || substr(replace(replace(g.question, char(10), ' '), char(13), ' '), 1, 40) || '” · ' || " + CASE("g.id") + ", " +
+        "CASE WHEN EXISTS (SELECT 1 FROM chat_threads t WHERE t.id = g.thread_id AND t.user_id = g.user_id) THEN '#/chat/' || g.thread_id || '?again=' || g.id ELSE '#/chat' END, " +
+        `${now} FROM chat_gaps g WHERE ${OPEN} AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = g.user_id AND u.role = 'developer') ` +
+        "AND COALESCE((SELECT p.enabled FROM alert_prefs p WHERE p.user_id = g.user_id AND p.kind = 'chat_fixed'), 1) = 1;",
+      `UPDATE chat_gaps SET status = 'fixed', note = ${CASE("id")}, fixed_at = ${now} WHERE id IN (SELECT g.id FROM chat_gaps g WHERE ${OPEN});`,
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+    ]);
+    console.log(`챗봇 개선 완료(2026-11-09 묶음) ${n}건`);
+  }
+}

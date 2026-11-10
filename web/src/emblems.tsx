@@ -15,13 +15,15 @@ export function emblemTier(rank: number | undefined): "purple" | "gold" {
 }
 
 /** 직업 엠블럼. 아래 검은 칸에 그 사람의 레벨을 적는다 (그림의 숫자는 지워 두었다) */
-export function JobEmblem({ job, level, rank, size = 48 }: { job: Job; level: number; rank?: number; size?: number }) {
+export function JobEmblem({ job, level, rank, size = 48 }: { job: Job; level?: number; rank?: number; size?: number }) {
   return (
-    <span className="emblem" style={{ width: size, height: size }} title={`${JOB_NAME[job]} Lv.${level}`}>
+    <span className="emblem" style={{ width: size, height: size }} title={level === undefined ? JOB_NAME[job] : `${JOB_NAME[job]} Lv.${level}`}>
       <img src={`${PIC}emblem_${emblemTier(rank)}_${job}.png`} width={size} height={size} alt="" draggable={false} />
-      <b className="emblem-lv" style={{ fontSize: Math.max(9, Math.round(size * 0.19)) }}>
-        {level}
-      </b>
+      {level !== undefined && (
+        <b className="emblem-lv" style={{ fontSize: Math.max(9, Math.round(size * 0.19)) }}>
+          {level}
+        </b>
+      )}
     </span>
   );
 }

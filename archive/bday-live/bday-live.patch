@@ -1,0 +1,215 @@
+From 06fd2c00bfe267c6b511bafb78c9b516f752e2b5 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 17:07:30 +0000
+Subject: [PATCH] =?UTF-8?q?(=EC=9E=91=EC=97=85=20=EC=A4=91,=20main=20?=
+ =?UTF-8?q?=EC=97=90=20=EC=95=88=20=EC=98=AC=EB=A6=BC)=20=EC=83=9D?=
+ =?UTF-8?q?=EC=9D=BC=20=EC=BD=A4=EB=B3=B4=20=EC=8B=A4=EC=8B=9C=EA=B0=84=20?=
+ =?UTF-8?q?=EB=B3=B4=EA=B8=B0:=20Durable=20Object=20=EB=A1=9C=20=EB=88=84?=
+ =?UTF-8?q?=EB=A5=B4=EB=8A=94=20=EC=82=AC=EB=9E=8C=EC=9D=98=20=EC=A7=80?=
+ =?UTF-8?q?=EA=B8=88=20=EC=BD=A4=EB=B3=B4=EB=A5=BC=20=EB=AA=A8=EB=91=90?=
+ =?UTF-8?q?=EC=97=90=EA=B2=8C=20=ED=8D=BC=EB=9C=A8=EB=A6=AC=EB=8A=94=20?=
+ =?UTF-8?q?=EC=84=9C=EB=B2=84=20=EC=AA=BD=20(=ED=99=94=EB=A9=B4=20?=
+ =?UTF-8?q?=EC=AA=BD=EC=9D=80=20=EC=95=84=EC=A7=81)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0184q9rMDfoiStr8vJtMu1Rt
+---
+ .github/workflows/deploy-web.yml |  1 +
+ web/functions/api/bday/live.ts   | 18 +++++++
+ web/runner/index.ts              |  2 +
+ web/runner/wrangler.toml         |  9 ++++
+ web/server/auth.ts               |  2 +
+ web/server/bdayLive.ts           | 91 ++++++++++++++++++++++++++++++++
+ 6 files changed, 123 insertions(+)
+ create mode 100644 web/functions/api/bday/live.ts
+ create mode 100644 web/server/bdayLive.ts
+
+diff --git a/.github/workflows/deploy-web.yml b/.github/workflows/deploy-web.yml
+index 3e1e4a9..1e509ab 100644
+--- a/.github/workflows/deploy-web.yml
++++ b/.github/workflows/deploy-web.yml
+@@ -149,6 +149,7 @@ jobs:
+             exit 1
+           fi
+           printf '\n[[durable_objects.bindings]]\nname = "CHATRUN"\nclass_name = "ChatRun"\nscript_name = "sapphire-chat-runner"\n' >> wrangler.toml
++          printf '\n[[durable_objects.bindings]]\nname = "BDAYLIVE"\nclass_name = "BdayLive"\nscript_name = "sapphire-chat-runner"\n' >> wrangler.toml
+           echo "챗봇 답 받기 일꾼을 올렸어요"
+ 
+       - name: Deploy to Cloudflare Pages
+diff --git a/web/functions/api/bday/live.ts b/web/functions/api/bday/live.ts
+new file mode 100644
+index 0000000..96d4838
+--- /dev/null
++++ b/web/functions/api/bday/live.ts
+@@ -0,0 +1,18 @@
++// GET /api/bday/live?key=village-2026 (WebSocket): 생일 콤보 실시간 (server/bdayLive.ts). 로그인을 보고 그 사람 아이디를 붙여 Durable Object 로 넘긴다.
++// 일꾼이 없으면(배포 전) 501, 화면은 몇 번 다시 해 보고 그만둔다. 테스트 계정은 보기만 (누른 것을 퍼뜨리지 않는다)
++import { NEED_LOGIN, TEST_IDS, currentUser, json } from "../../../server/auth";
++import type { Env } from "../../../server/auth";
++import { BDAYS } from "../../../server/birthday";
++
++export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
++  const me = await currentUser(env, request);
++  if (!me) return NEED_LOGIN();
++  if (!env.BDAYLIVE) return json({ error: "준비 중이에요" }, 501);
++  if (request.headers.get("Upgrade") !== "websocket") return json({ error: "websocket 으로만" }, 426);
++  const key = new URL(request.url).searchParams.get("key") ?? "";
++  const d = BDAYS[key];
++  if (!d || Date.now() >= d.end + 3600_000) return json({ error: "없는 생일이에요" }, 404);
++  const u = new URL("https://bday-live/live");
++  u.searchParams.set("user", TEST_IDS.includes(me.id) ? "" : me.id);
++  return env.BDAYLIVE.get(env.BDAYLIVE.idFromName(key)).fetch(new Request(u, request));
++};
+diff --git a/web/runner/index.ts b/web/runner/index.ts
+index a1172db..eb9cc5f 100644
+--- a/web/runner/index.ts
++++ b/web/runner/index.ts
+@@ -2,6 +2,8 @@
+ // 사이트(Cloudflare Pages)는 Durable Object 를 직접 만들 수 없어서 따로 배포하고, 사이트의 wrangler.toml 이 CHATRUN 으로 이어 쓴다.
+ // 바깥 주소는 없다 (workers_dev = false). 사이트 안에서만 부른다.
+ export { ChatRun } from "../server/chatRun";
++// 생일 콤보 실시간 (server/bdayLive.ts): 사이트의 BDAYLIVE 바인딩
++export { BdayLive } from "../server/bdayLive";
+ 
+ export default {
+   async fetch(): Promise<Response> {
+diff --git a/web/runner/wrangler.toml b/web/runner/wrangler.toml
+index 1b8ae79..975b818 100644
+--- a/web/runner/wrangler.toml
++++ b/web/runner/wrangler.toml
+@@ -11,10 +11,19 @@ workers_dev = false
+ name = "CHATRUN"
+ class_name = "ChatRun"
+ 
++[[durable_objects.bindings]]
++name = "BDAYLIVE"
++class_name = "BdayLive"
++
+ [[migrations]]
+ tag = "v1"
+ new_sqlite_classes = ["ChatRun"]
+ 
++# 생일 콤보 실시간 (server/bdayLive.ts, 제작자 2026-11-08)
++[[migrations]]
++tag = "v2"
++new_sqlite_classes = ["BdayLive"]
++
+ # 답을 넣는 계정 DB (사이트와 같은 DB). 자동 배포가 진짜 database_id 로 바꾼다
+ [[d1_databases]]
+ binding = "DB"
+diff --git a/web/server/auth.ts b/web/server/auth.ts
+index 93fe584..d20d9a5 100644
+--- a/web/server/auth.ts
++++ b/web/server/auth.ts
+@@ -17,6 +17,8 @@ export interface Env {
+   ANTHROPIC_WORKSPACE_ID?: string;
+   /** 챗봇 답 받기 일꾼 (server/chatRun.ts, 따로 배포한 Worker sapphire-chat-runner 의 Durable Object). 배포가 붙이고, 없으면 예전 길 */
+   CHATRUN?: DurableObjectNamespace;
++  /** 생일 콤보 실시간 (server/bdayLive.ts, 답 받기 일꾼 Worker 안) */
++  BDAYLIVE?: DurableObjectNamespace;
+   /** 로컬 시험에서만: 챗봇이 부를 가짜 API 주소 (.dev.vars) */
+   CHAT_API_BASE?: string;
+   /** 사이트에 올라간 정적 파일 (플래티넘 상점 물건 목록을 서버 안에서 읽는다) */
+diff --git a/web/server/bdayLive.ts b/web/server/bdayLive.ts
+new file mode 100644
+index 0000000..5b6141f
+--- /dev/null
++++ b/web/server/bdayLive.ts
+@@ -0,0 +1,91 @@
++// 생일 콤보 실시간 (제작자 2026-11-08 '1위가 계속 누르고 있으면 그 수치가 남들한테도 계속 올라가는 걸로 보이게, 끝나고 반영하지 말고 실시간으로 몇 번 누르는지').
++// 생일마다 Durable Object 하나 (답 받기 일꾼 Worker sapphire-chat-runner 안). 보는 사람은 모두 WebSocket 으로 붙어 있고,
++// 누르는 사람은 지금 콤보를 1초에 한 번쯤 보낸다. 받을 때마다 지금 누르는 사람들의 콤보를 모두에게 그대로 퍼뜨린다.
++// D1 에 쓰지 않는다 (메모리만, 잠들면 비고 누르는 사람이 다시 채운다). 무료 요금제: WebSocket 은 쉬는 동안 잠드는 방식(acceptWebSocket),
++// 들어오는 글 20개가 요청 하나로 세어진다. 사이트는 /api/bday/live 가 로그인을 보고 user 를 붙여 넘긴다 (이 Worker 는 바깥 주소가 없다)
++import { DurableObject } from "cloudflare:workers";
++import type { Env } from "./auth";
++
++/** 이만큼 소식이 없으면 그만 누른 것으로 본다 */
++const STALE_MS = 4000;
++/** 퍼뜨리기는 이만큼에 한 번까지 (그 사이 것은 모아서) */
++const SEND_GAP = 250;
++
++interface Live {
++  combo: number;
++  at: number;
++}
++
++export class BdayLive extends DurableObject<Env> {
++  private live = new Map<string, Live>();
++  private lastSend = 0;
++  private pending = false;
++
++  async fetch(request: Request): Promise<Response> {
++    if (request.headers.get("Upgrade") !== "websocket") return new Response("websocket only", { status: 426 });
++    const user = new URL(request.url).searchParams.get("user") ?? "";
++    const pair = new WebSocketPair();
++    const [client, server] = Object.values(pair);
++    this.ctx.acceptWebSocket(server);
++    server.serializeAttachment({ user });
++    server.send(JSON.stringify({ live: this.snapshot() }));
++    return new Response(null, { status: 101, webSocket: client });
++  }
++
++  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
++    const { user } = (ws.deserializeAttachment() ?? {}) as { user?: string };
++    if (!user || typeof message !== "string" || message.length > 200) return;
++    let n = NaN;
++    try {
++      n = Number((JSON.parse(message) as { combo?: unknown }).combo);
++    } catch {
++      return;
++    }
++    if (!Number.isInteger(n) || n < 0 || n > 1_000_000) return;
++    if (n === 0) this.live.delete(user);
++    else this.live.set(user, { combo: n, at: Date.now() });
++    this.broadcast();
++  }
++
++  async webSocketClose(ws: WebSocket) {
++    const { user } = (ws.deserializeAttachment() ?? {}) as { user?: string };
++    if (user && this.live.delete(user)) this.broadcast();
++  }
++
++  async webSocketError(ws: WebSocket) {
++    await this.webSocketClose(ws);
++  }
++
++  private snapshot() {
++    const now = Date.now();
++    const out: { id: string; combo: number }[] = [];
++    for (const [id, v] of this.live) {
++      if (now - v.at > STALE_MS) this.live.delete(id);
++      else out.push({ id, combo: v.combo });
++    }
++    return out;
++  }
++
++  private broadcast() {
++    const now = Date.now();
++    if (now - this.lastSend < SEND_GAP) {
++      if (!this.pending) {
++        this.pending = true;
++        setTimeout(() => {
++          this.pending = false;
++          this.broadcast();
++        }, SEND_GAP);
++      }
++      return;
++    }
++    this.lastSend = now;
++    const text = JSON.stringify({ live: this.snapshot() });
++    for (const ws of this.ctx.getWebSockets()) {
++      try {
++        ws.send(text);
++      } catch {
++        /* 끊긴 것 */
++      }
++    }
++  }
++}
+-- 
+2.43.0
+

@@ -24,6 +24,8 @@ sys.stdout.reconfigure(encoding="utf-8")
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "자료" / "카톡"
 OUT = ROOT / "web" / "public" / "data" / "trend.json"
+# 챗봇이 쓰는 작은 시세·줄임말 자료 (챗봇 개선 2026-11-09: '시세', '돈벌이', '충격샷4 가격', '월거', '광부 신발'을 못 답했다)
+CHAT_OUT = ROOT / "web" / "public" / "data" / "chatmarket.json"
 ICON_DIR = ROOT / "자료" / "이미지" / "시세동향"
 # 세트·묶음 이름이면 그 코스튬의 몸통 부위 그림 (플랑 세트 -> 플랑의드레스)
 BODY = re.compile(r"갑옷|옷|로브|드레스|비늘|흉골|협의|화복|풍운의|경갑|경기의상|나들이복")
@@ -1239,6 +1241,61 @@ def char_prices(msgs: list[dict], rs: Resolver) -> dict:
             bands.append({"band": f"{lo}대", "n": len(xs), "med": round(statistics.median(xs), 1), "min": min(xs), "max": max(xs)})
     return {"rows": out, "bands": bands}
 
+# 톡방·게임 은어 (제작자가 알려 준 것). 물건 줄임말은 ALIASES·NON_WIKI·JOB_GROUPS·items 의 abbr 에서 저절로 모은다
+CHAT_SLANG = {"월거": "월드거래 (여러 서버가 같이 쓰는 월드 거래)", "캘": "캐릭터만 (템 없이)", "템통": "캐릭터 + 템까지 통째로",
+              "장": "현금 1만 원 (1장 = 1만 원)", "콩": "현금 1만 원 (1콩 = 1만 원)", "구올마": "신규 스킬 패치 전 스킬 올 마스터",
+              "신올마": "신규 스킬까지 올 마스터", "노도감": "도감을 거의 안 채움", "저도감": "도감을 조금 채움", "쟁캐": "전쟁(PVP)용 캐릭터",
+              "플톡": "카톡 오픈채팅 프로필로 연락", "풀톡": "카톡 오픈채팅 프로필로 연락", "노강": "강화 안 한 것 (+0)"}
+
+
+def write_chat_market(data: dict, rs: "Resolver") -> None:
+    """챗봇용 시세 요약과 줄임말 표 -> public/data/chatmarket.json (화면 src/chatMarket.ts 가 질문에 맞는 것만 붙인다)"""
+    def stat(it: dict) -> dict:
+        return {k: it.get(k) for k in ("med", "min", "max", "n", "sellers", "first", "last", "recent", "before")}
+
+    def item(it: dict) -> dict:
+        out = {"name": it["name"], "abbr": it.get("abbr") or [], "cat": it.get("cat"), **stat(it),
+               "other": it.get("other"),
+               "groups": [{"label": g["label"], **stat(g)} for g in (it.get("groups") or [])[:8]],
+               "samples": [f'{x["date"]} {x["raw"]}' for x in (it.get("samples") or [])[:4]]}
+        return out
+
+    slang: dict[str, str] = dict(CHAT_SLANG)
+    for k, v in ALIASES.items():
+        if v:
+            slang.setdefault(k, v)
+    for k, v in NON_WIKI.items():
+        slang.setdefault(k, v)
+    for k, (label, jobs) in JOB_GROUPS.items():
+        slang.setdefault(k, label + " = " + " · ".join(f"{j} {n}" for j, n in jobs.items()))
+    for k, v in SKILL_WORDS.items():
+        slang.setdefault(k, v)
+    for k, v in SKILL_BOOK.items():
+        if len(k) >= 2:
+            slang.setdefault(k, v + " (스킬)")
+            slang.setdefault(k + "북", v + " 스킬북")
+            slang.setdefault(k + "마북", v + " 마지막 단계 스킬북")
+    for it in data["items"] + data["itemsBuy"]:
+        for a in it.get("abbr") or []:
+            if len(a) >= 2:
+                slang.setdefault(a, it["name"])
+    gold = data["gold"]
+    week = [d for d in gold if d["date"] >= data["lastWeek"]]
+    meds = sorted(d["sell"]["med"] for d in week if d.get("sell"))
+    buys = sorted(d["buy"]["med"] for d in week if d.get("buy"))
+    chat = {
+        "source": data["source"],
+        "gold": {"sell7": meds[len(meds) // 2] if meds else None, "buy7": buys[len(buys) // 2] if buys else None,
+                 "days": [[d["date"], (d.get("sell") or {}).get("med"), (d.get("buy") or {}).get("med")] for d in gold[-14:]]},
+        "items": [item(it) for it in data["items"]],
+        "itemsBuy": [item(it) for it in data["itemsBuy"]],
+        "chars": data["chars"].get("bands", []),
+        "slang": slang,
+    }
+    CHAT_OUT.write_text(json.dumps(chat, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print("챗봇 시세 자료", {"items": len(chat["items"]), "slang": len(slang), "kb": CHAT_OUT.stat().st_size // 1024})
+
+
 def main() -> None:
     files = sorted(SRC.glob("*.txt")) if SRC.exists() else []
     if not files:
@@ -1284,6 +1341,7 @@ def main() -> None:
     OUT.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print("시세 동향", {"rooms": len(rooms), "messages": len(msgs), "days": len(gold), "items": len(items), "itemsBuy": len(items_buy), "chars": len(chars["rows"]),
                      "wiki": sum(1 for it in items if it["wiki"])})
+    write_chat_market(data, rs)
     if "--unknown" in sys.argv:
         print("위키에 없는 줄임말:", sorted(rs.unknown.items(), key=lambda kv: -kv[1])[:80])
 

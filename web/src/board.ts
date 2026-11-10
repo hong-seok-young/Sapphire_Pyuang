@@ -8,6 +8,19 @@ export const CATS: Cat[] = ["notice", "event", "free", "suggest"];
 export const CAT_NAME: Record<Cat, string> = { notice: "공지사항", event: "길드 이벤트", free: "자유", suggest: "건의 사항" };
 export const CAT_ICON: Record<Cat, string> = { notice: "📌", event: "🎉", free: "💬", suggest: "💡" };
 
+/**
+ * 건의함 (제작자 요청 2026-11-09, 개발 요청 #13 유어아너: '건의사항은 게시판에서 빼고 별도 버튼, 익명 기능'). 홈 칸 '건의함'(#/suggest)이 건의 사항(cat suggest)을 따로 보여 주고
+ * 익명 글·댓글을 쓴다 (이름은 앱개발자와 유어아너만 본다, 서버가 가린다). 서버 server/board.ts 의 SUGGEST_OPEN 과 같이 바꾼다:
+ * false 인 동안 건의함은 개발 중(미리 보는 사람만)이고 게시판에 '건의' 칸이 그대로 있다. true 면 게시판에서 '건의' 칸을 빼고 건의함이 홈 칸으로
+ */
+export const SUGGEST_OPEN = false;
+/** 게시판에 보이는 칸 (건의함을 열면 건의 사항은 건의함에만) */
+export const BOARD_CATS: Cat[] = SUGGEST_OPEN ? CATS.filter((c) => c !== "suggest") : CATS;
+/** 익명 글·댓글의 가린 이름 (서버 server/board.ts ANON_NAME) */
+export const ANON_NAME = "익명";
+/** 익명 이름을 보는 사람 (서버 server/board.ts ANON_VIEWERS 와 같다): 화면의 안내 글에만 쓴다 */
+export const ANON_VIEWER = "유어아너";
+
 export interface PostSummary {
   id: number;
   cat: Cat;
@@ -15,6 +28,10 @@ export interface PostSummary {
   title: string;
   snippet: string;
   pinned: boolean;
+  /** 익명 글 (author 는 이름을 볼 수 있는 사람에게만 실제 이름, 나머지에게는 '익명') */
+  anon?: boolean;
+  /** 내가 쓴 글 (익명이어도) */
+  mine?: boolean;
   at: number;
   comments: number;
   likes: number;
@@ -37,10 +54,14 @@ export interface BoardComment {
   parent: number | null;
   text: string;
   at: number;
+  /** 익명 댓글 (건의함) */
+  anon?: boolean;
+  /** 내가 쓴 댓글 (익명이어도) */
+  mine?: boolean;
 }
 
 export interface PostDetail {
-  post: { id: number; cat: Cat; author: string; title: string; body: string; pinned: boolean; created_at: number; edited_at: number | null };
+  post: { id: number; cat: Cat; author: string; title: string; body: string; pinned: boolean; created_at: number; edited_at: number | null; anon?: boolean; mine?: boolean };
   files: BoardFile[];
   comments: BoardComment[];
   likes: number;
@@ -67,14 +88,14 @@ export function fetchPosts(q: { cat?: Cat | null; q?: string; before?: number })
   return api<{ posts: PostSummary[]; more: boolean }>(`/api/board?${p}`);
 }
 export const fetchPost = (id: number) => api<PostDetail>(`/api/board/${id}`);
-export const createPost = (cat: Cat, title: string, body: string) => api<{ id: number }>("/api/board", "POST", { cat, title, body });
+export const createPost = (cat: Cat, title: string, body: string, anon = false) => api<{ id: number }>("/api/board", "POST", { cat, title, body, anon });
 export const updatePost = (id: number, p: { title?: string; body?: string; pinned?: boolean }) => api<{ ok: boolean }>(`/api/board/${id}`, "PATCH", p);
 export const deletePost = (id: number) => api<{ ok: boolean }>(`/api/board/${id}`, "DELETE");
 /** 공지·길드 이벤트 글을 AI 로 다듬기 (운영진, 제작자 요청 2026-11-02) */
 export const polishPost = (cat: Cat, title: string, body: string) => api<{ title: string; body: string }>("/api/board/polish", "POST", { cat, title, body });
 export const deleteFile = (id: number) => api<{ ok: boolean }>(`/api/board/files/${id}`, "DELETE");
-export const addComment = (id: number, text: string, parent: number | null) =>
-  api<BoardComment>(`/api/board/${id}/comments`, "POST", { text, parent });
+export const addComment = (id: number, text: string, parent: number | null, anon = false) =>
+  api<BoardComment>(`/api/board/${id}/comments`, "POST", { text, parent, anon });
 export const deleteComment = (id: number) => api<{ ok: boolean }>(`/api/board/comments/${id}`, "DELETE");
 export const setLike = (id: number, on: boolean) => api<{ likes: number; liked: boolean }>(`/api/board/${id}/like`, "PUT", { on });
 

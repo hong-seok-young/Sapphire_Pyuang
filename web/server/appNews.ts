@@ -24,6 +24,12 @@ export const APP_NEWS: AppNews[] = [
     text: "개발 요청 기능 추가 · 필요한 기능을 앱개발자에게 무료로 신청하고 결재 단계를 모두 함께 볼 수 있어요",
     link: "#/devreq",
   },
+  {
+    key: "app_news_gcoin_20261111",
+    at: Date.parse("2026-11-11T11:00:00+09:00"),
+    text: "성장코인샵 추가 · 2군 본캐는 주간 목표 레벨을 먼저 찍으면 성장코인, 코인으로 도핑템 교환",
+    link: "#/gcoin",
+  },
 ];
 
 const WINDOW = 2 * 86_400_000;

@@ -18,7 +18,7 @@ import { NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { appContext } from "../../../server/chatapp";
 import { officialContext } from "../../../server/official";
-import { CHAT_SYSTEM as SYSTEM } from "../../../server/chatPrompt";
+import { CHAT_SYSTEM as SYSTEM, WEB_TOOLS, portalSearch } from "../../../server/chatPrompt";
 import { costContext } from "../../../server/chatCost";
 import { addMsg, finishInBackground, newThread, ownThread, runStub, titleOf } from "../../../server/chatlog";
 import { errorCause, errorText, isWebOff } from "../../../server/chatErrors";
@@ -37,11 +37,7 @@ const MAX_FILES = 3;
 const MAX_PDF_B64 = 4_500_000; // PDF 하나 (약 3.3MB)
 const MAX_TEXT_FILE = 200_000; // 글 파일 하나의 글자 수
 
-/** 웹 찾기 도구 (서버에서 돈다). 한 번 답에 찾기 5번, 글 읽기 4번까지 */
-const WEB_TOOLS = [
-  { type: "web_search_20260209", name: "web_search", max_uses: 5 },
-  { type: "web_fetch_20260209", name: "web_fetch", max_uses: 4 },
-] as const;
+// 웹 찾기 도구(찾기 20번·읽기 15번, 한국에서)와 포털 검색 주소는 server/chatPrompt.ts (시험 스크립트와 같이 쓴다)
 
 interface ChatImage {
   type: (typeof IMAGE_TYPES)[number];
@@ -108,6 +104,8 @@ function toMessages(turns: ChatTurn[], context: string, app: string, official = 
     if (official) content.push({ type: "text", text: `<컴투스 공식 소식>\n${official}\n</컴투스 공식 소식>` });
     if (cost) content.push({ type: "text", text: `<과금 계산 자료>\n${cost}\n</과금 계산 자료>` });
     if (context) content.push({ type: "text", text: `<위키 자료>\n${context}\n</위키 자료>` });
+    const portals = portalSearch(t.text);
+    if (portals) content.push({ type: "text", text: `<포털 검색 주소>\n${portals}\n</포털 검색 주소>` });
     content.push({ type: "text", text: t.text.trim() || "첨부한 것을 보고 조언해 줘." });
     return { role: "user", content };
   });
@@ -118,7 +116,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
   if (!me) return NEED_LOGIN();
   if (!env.ANTHROPIC_API_KEY) return json({ error: "챗봇이 아직 준비 중이에요" }, 503);
 
-  const body = await readJson<{ messages: unknown; context: string; thread: unknown; again: unknown; found: unknown }>(request);
+  const body = await readJson<{ messages: unknown; context: string; thread: unknown; again: unknown; found: unknown; later: unknown }>(request);
   const turns = parseTurns(body.messages);
   if (!turns) return json({ error: "질문을 다시 보내 주세요 (사진 4장, 파일 3개까지)" }, 400);
   // 위키 자료는 자르지 않는다 (제작자 2026-11-03 '무조건 다 봐', '없애': 1만 6천 자 한도를 뺐다)
@@ -126,6 +124,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
   const thread = body.thread == null ? null : await ownThread(env, me.id, body.thread);
   if (body.thread != null && !thread) return json({ error: "대화를 찾지 못했어요" }, 404);
   const again = body.again === true && thread !== null;
+  // 위키 자료는 질문 뒤에 따라온다 (/api/chat/context, 답 받기 일꾼이 기다린다). 일꾼이 없으면 자료와 같이 다시 보내라고 한다 (아무것도 넣기 전에)
+  const later = body.later === true;
+  if (later && !env.CHATRUN) return json({ needContext: true }, 409);
 
   // 오늘(한국 시간) 몇 번째 질문인지. 답을 못 받으면 되돌린다
   const day = new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
@@ -210,6 +211,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
           found: typeof body.found === "string" ? body.found.slice(0, 400) : "",
           day,
           developer: me.role === "developer",
+          ...(later ? { waitContext: true } : {}),
         },
         params: params(true),
         key: env.ANTHROPIC_API_KEY,

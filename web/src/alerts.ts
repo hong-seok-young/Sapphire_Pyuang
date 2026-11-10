@@ -1,10 +1,11 @@
 // 알림 (서버 server/alerts.ts, functions/api/alerts): 앱 안 알림함 #/alerts 와 화면 위 🔔 의 안 읽은 수
 import { useEffect, useState } from "react";
 import { api } from "./auth";
+import { GCOIN_OPEN } from "./launcher";
 
 export type AlertKind =
   | "market_want" | "market_bid" | "market_outbid" | "market_auction" | "market_new" | "gold_want" | "request" | "request_new" | "talk" | "account" | "shop"
-  | "board" | "board_notice" | "imo_news" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo" | "gdungeon" | "app_news" | "devreq" | "bday";
+  | "board" | "board_notice" | "imo_news" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo" | "gdungeon" | "app_news" | "devreq" | "bday" | "gcoin" | "donate";
 
 export interface Alert {
   id: number;
@@ -47,6 +48,10 @@ export const ALERT_GROUPS: { menu: string; kinds: { kind: AlertKind; name: strin
   { menu: "앱", kinds: [{ kind: "app_news", name: "새 기능" }] },
   // 개발 요청 결재선 (server/devreq.ts)
   { menu: "개발 요청", kinds: [{ kind: "devreq", name: "신청·결재" }] },
+  // 2군 성장코인샵 (server/gcoin.ts, 개발중, 제작자 2026-11-09 '나한테만 보이게'): 구매 신청·지급, 순위 보너스
+  { menu: "성장코인샵", kinds: [{ kind: "gcoin", name: "신청·지급", preview: !GCOIN_OPEN }] },
+  // 기부함 (server/donate.ts, 개발중, 제작자 2026-11-10): 기부 신청·확정·거절
+  { menu: "기부함", kinds: [{ kind: "donate", name: "신청·확정", preview: true }] },
 ];
 
 export const fetchAlerts = () =>

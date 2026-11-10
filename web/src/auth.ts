@@ -66,6 +66,8 @@ export interface Me {
   characters?: Character[];
   /** 운영진 승낙을 기다리는 캐릭터 추가 요청 (닉네임) */
   pendingCharacters?: string[];
+  /** 플래티넘 할인 상점을 열었는지 (설정의 '오픈'). 열기 전에는 홈 칸이 운영진에게만 보인다 */
+  shopOpen?: boolean;
 }
 
 /** 같은 사람의 캐릭터 하나 (부캐 묶기, 제작자 요청 2026-11-01) */
@@ -238,7 +240,13 @@ export function errorText(e: unknown): string {
 export type ChangeKind = "grow" | "fix";
 
 export const saveMyProfile = (job: Job, level: number, exp: number | null, guild: Guild, change: ChangeKind = "grow") =>
-  api<{ job: Job; level: number; exp: number | null; guild: Guild }>("/api/profile", "PUT", { job, level, exp, guild, change });
+  api<{ job: Job; level: number; exp: number | null; guild: Guild; coin?: unknown; race?: unknown }>("/api/profile", "PUT", { job, level, exp, guild, change }).then((r) => {
+    // 2군 성장코인샵: 레벨·경험치를 적어 새 성장코인이 생기면 동전 팝업 (src/coinToast.tsx, 서버 server/gcoin.ts coinGain)
+    if (r.coin) window.dispatchEvent(new CustomEvent("sapphire:gcoin", { detail: r.coin }));
+    // 2주 목표 선착순: 달성률이 오르거나 목표를 찍으면 팝업 (src/coinToast.tsx RaceToast, 서버 server/gcrace.ts raceAfter)
+    if (r.race) window.dispatchEvent(new CustomEvent("sapphire:gcrace", { detail: r.race }));
+    return r;
+  });
 
 export interface LevelLogEntry {
   at: number;

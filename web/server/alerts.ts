@@ -31,6 +31,10 @@ export const ALERT_KINDS = {
   app_news: true,
   // 개발 요청 결재선 (server/devreq.ts, 개발중)
   devreq: true,
+  // 2군 성장코인샵 (server/gcoin.ts, 개발중): 구매 신청, 지급·반려, 주간 순위 보너스
+  gcoin: true,
+  // 기부함 (server/donate.ts, 개발중): 기부 신청(운영진에게), 확정·거절·가치 고침(기부한 사람에게)
+  donate: true,
   // 생일 축하 (server/birthday.ts, 제작자 2026-11-07 '11월 8일 되는 순간 알림 무조건'): 알림 설정에 줄을 두지 않아 끄지 못한다
   bday: true,
 } as const;

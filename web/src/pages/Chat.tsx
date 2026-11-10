@@ -23,6 +23,7 @@ import {
 import type { AskEvents, ChatFile, ChatImage, ChatResult, ChatSource, ChatStep, ChatTurn, SavedMsg, Seen, ThreadSummary } from "../chat";
 import { loadPosts, useAsync } from "../data";
 import { loadOdds } from "../odds";
+import { appDataContext } from "../chatMarket";
 import { inFloat } from "../platform";
 import { go } from "../router";
 import { Loading, TopBar } from "../ui";
@@ -331,24 +332,24 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
     // 물은 사람의 직업, 레벨 (질문에 없으면 이것으로 공략과 사냥터를 고른다. 사진만 보낸 질문 등)
     const asker = me ? { job: me.job ? JOB_NAME[me.job] : null, level: me.level } : undefined;
     const lastUser = base[base.length - 1];
-    // 사진 질문은 사진 속 직업, 레벨, 보이는 이름을 먼저 읽고 그 값으로 자료를 고른다 (챗봇 개선 2026-11-01, chat.ts Seen)
-    let seen: Seen | null = null;
-    // 자료를 고르는 동안에도 바로 답 자리와 '답하는 중'을 보인다 (그사이 두 번 눌러 같은 질문을 두 번 묻지 않게, 2026-11-01 검토)
-    setTurns([...base, { role: "assistant", text: "", thinking: "", phase: lastUser?.images?.length ? "사진 읽는 중" : "자료 찾는 중", streaming: true }]);
+    // 질문은 누르자마자 서버로 보낸다: 그 뒤로는 앱을 꺼도 서버의 답 받기 일꾼이 끝까지 답한다 (제작자 2026-11-09 '질문하자마자 웹을 꺼도 알아서 답을 끝까지').
+    // 위키 자료는 고르는 대로 뒤따라 보낸다 (askChat later, /api/chat/context). 사진 질문은 사진 속 직업, 레벨, 보이는 이름을 먼저 읽고 그 값으로 고른다 (chat.ts Seen)
+    const found: string[] = [];
+    const later = (async () => {
+      const seen: Seen | null = lastUser?.images?.length ? await peekPhotos(lastUser.images) : null;
+      // 공식 확률 표, 글 본문 (못 받으면 없이)
+      const odds = await loadOdds().catch(() => undefined);
+      const allPosts = posts ?? (await loadPosts().catch(() => undefined));
+      const wikiCtx = wikiContext(wiki, allPosts, question, asker, !!(lastUser?.images?.length || lastUser?.photos), odds, seen ?? undefined);
+      // 무기 강화 수치표, 거래 톡방 시세, 줄임말 (src/chatMarket.ts, 챗봇 개선 2026-11-09)
+      const extra = await appDataContext([question, ...(seen?.names ?? [])].join(" ")).catch(() => ({ text: "", found: [] as string[] }));
+      found.push(...extra.found, ...wikiCtx.found);
+      return { context: [extra.text, wikiCtx.text].filter(Boolean).join("\n\n"), found: found.join(" · ") };
+    })().catch(() => ({ context: "", found: "" }));
     setBusy(true);
-    if (lastUser?.images?.length) {
-      seen = await peekPhotos(lastUser.images);
-      if (!live()) return;
-    }
-    // 공식 확률 표 (못 받으면 없이 묻는다)
-    const odds = await loadOdds().catch(() => undefined);
     if (!live()) return;
-    // 글 본문은 아직 받는 중일 수 있어서 기다린다 (못 받으면 없이)
-    const allPosts = posts ?? (await loadPosts().catch(() => undefined));
-    if (!live()) return;
-    const ctx = wikiContext(wiki, allPosts, question, asker, !!(lastUser?.images?.length || lastUser?.photos), odds, seen ?? undefined);
-    await follow(run, base, ctx.found, (events, signal) =>
-      askChat({ turns: toHistory(base), context: ctx.text, thread: threadRef.current, again: reuse && lastUser.id !== undefined, found: ctx.found.join(" · ") }, events, signal),
+    await follow(run, base, found, (events, signal) =>
+      askChat({ turns: toHistory(base), context: "", thread: threadRef.current, again: reuse && lastUser.id !== undefined, later }, events, signal),
     );
   }
 

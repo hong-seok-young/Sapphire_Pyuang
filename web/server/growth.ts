@@ -1,8 +1,8 @@
 // 성장 랭킹 계산 (functions/api/growth.ts 와 챗봇의 길드 앱 자료 server/chatapp.ts 가 같이 쓴다).
-// 한국 시간으로 오늘 0시, 이번 주 목요일 오전 10시(server/week.ts), 이번 달 1일 0시부터 지금까지 오른 만큼 (레벨 1 = 100%, 경험치 % 그대로 더함).
+// 한국 시간으로 오늘 0시, 이번 주 월요일 0시(server/week.ts growthWeekStart), 이번 달 1일 0시부터 지금까지 오른 만큼 (레벨 1 = 100%, 경험치 % 그대로 더함).
 // 길드원이 레벨, 경험치를 적을 때마다 남긴 기록(level_log)으로 센다: 기간 시작 전 마지막 기록(없으면 기간 안 첫 기록)과 지금을 비교.
 import type { Env, Guild, Job, Role } from "./auth";
-import { weekStart } from "./week";
+import { growthWeekStart } from "./week";
 
 const KST = 9 * 3_600_000;
 export const PERIODS = ["day", "week", "month"] as const;
@@ -13,7 +13,7 @@ export function periodStart(period: Period, now: number): number {
   const k = new Date(now + KST);
   const today = Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate()) - KST;
   if (period === "day") return today;
-  if (period === "week") return weekStart(now);
+  if (period === "week") return growthWeekStart(now);
   return Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), 1) - KST;
 }
 

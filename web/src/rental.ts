@@ -143,6 +143,8 @@ export interface RentData {
   /** 운영진만: 사람마다 마일리지, 닉네임 고르기 목록 */
   /** 운영진: 기부 현황 (남은 💎, 기부로 적립한 💎, 기부 건수) */
   balances?: { person: string; dia: number; at: number; donated: number; count: number }[];
+  /** 운영진: 기부함에서 넘어와 아직 목록에 안 올린 기부 (물건 추가에서 고른다) */
+  donated?: { id: number; who: string; item: string; qty: number; enhance: number; gold: number | null; note: string | null; at: number }[];
   members?: string[];
 }
 
@@ -169,12 +171,10 @@ export interface RentFields {
   enhance: number;
   term: RentTerm;
   price: number;
-  donor: string;
-  /** 기부자에게 적립할 마일리지 💎 (고치면 차이만 장부에) */
-  donorDia: number;
   note: string;
 }
-export const addRent = (f: RentFields) => api<{ id: number; warning?: string }>("/api/rent", "POST", f);
+/** 물건 추가: 기부함에서 '장비대여 운용'으로 넘어온 기부(donateId)를 골라서만 (기부자·마일리지는 기부함, 제작자 2026-11-10) */
+export const addRent = (donateId: number, f: RentFields) => api<{ id: number }>("/api/rent", "POST", { ...f, donateId });
 /** dueAt: 대여 중인 물건의 반납 기한 (ms, 기한 없음은 null). 대여 중이 아니면 넣지 않는다 */
 export const editRent = (id: number, f: RentFields, dueAt?: number | null) =>
   api<{ ok: boolean }>(`/api/rent/${id}`, "PUT", dueAt === undefined ? f : { ...f, dueAt });

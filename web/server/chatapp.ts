@@ -14,11 +14,11 @@
 import { RANK, TEST_IDS } from "./auth";
 import { covering, fromLogs, logDbs, newestLogs } from "./logdb";
 import type { Env, Guild, Job, Role, User } from "./auth";
-import { CAT_NAME } from "./board";
+import { CAT_NAME, shownName } from "./board";
 import type { Cat } from "./board";
 import { growthEntries } from "./growth";
 import type { Period } from "./growth";
-import { weekStart } from "./week";
+import { growthWeekStart } from "./week";
 import { TODO_OPEN, doneKeys, eventTasks, todoExtras } from "./todo";
 import { ASK_MORE, mineExtras, newsNow, shopCatalog } from "./chatmine";
 import { canUseDevReq } from "./devreq";
@@ -107,7 +107,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
   const q = question;
   const k = new Date(now + KST);
   const today = Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate()) - KST;
-  const week = weekStart(now);
+  const week = growthWeekStart(now);
 
   const [peopleR, listingsR, myWantersR, myBidsR, myWantsR, rateR, goldR, myGoldWantsR, requestsR, offersR, boardR, platR, myOrdersR, openOrdersR] =
     await env.DB.batch([
@@ -157,7 +157,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
           "AND request_id IN (SELECT id FROM requests WHERE status != 'done') ORDER BY created_at",
       ),
       env.DB.prepare(
-        "SELECT p.id, p.cat, p.author, p.title, p.body AS body, p.pinned, p.created_at, " +
+        "SELECT p.id, p.cat, p.author, p.title, p.body AS body, p.pinned, p.anon, p.created_at, " +
           "(SELECT COUNT(*) FROM board_comments c WHERE c.post_id = p.id) AS comments, (SELECT COUNT(*) FROM board_likes k WHERE k.post_id = p.id) AS likes, " +
           "(SELECT COUNT(*) FROM board_views v WHERE v.post_id = p.id) AS views FROM board_posts p ORDER BY p.pinned DESC, p.id DESC LIMIT 20",
       ),
@@ -235,7 +235,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
 
   // ---------- 성장 랭킹 ----------
   if (ASK.growth.test(q) || mentioned.length) {
-    const periods: [Period, string][] = [["week", "이번 주(목요일 오전 10시부터)"]];
+    const periods: [Period, string][] = [["week", "이번 주(월요일 0시부터)"]];
     if (/오늘/.test(q)) periods.unshift(["day", "오늘(0시부터)"]);
     if (/이번 ?달|월간|한 ?달/.test(q)) periods.push(["month", "이번 달(1일 0시부터)"]);
     for (const [period, label] of periods) {
@@ -340,8 +340,9 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
   }
 
   // ---------- 게시판 ----------
-  type Post = { id: number; cat: Cat; author: string; title: string; body: string; pinned: number; created_at: number; comments: number; likes: number; views: number };
-  const posts = boardR.results as Post[];
+  type Post = { id: number; cat: Cat; author: string; title: string; body: string; pinned: number; anon: number; created_at: number; comments: number; likes: number; views: number };
+  // 건의함 익명 글은 앱개발자·유어아너 말고는 글쓴이를 '익명'으로 (화면과 같게, server/board.ts shownName)
+  const posts = (boardR.results as Post[]).map((p) => ({ ...p, author: shownName(me, p.author, p.anon) }));
   if (posts.length && (ASK.board.test(q) || posts.some((p) => mentioned.includes(p.author)))) {
     const lines = posts.map(
       (p) =>
@@ -362,11 +363,11 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
     for (const p of hit) {
       const [bodyR, commentsR] = await env.DB.batch([
         env.DB.prepare("SELECT body FROM board_posts WHERE id = ?").bind(p.id),
-        env.DB.prepare("SELECT user_id, parent_id, text, created_at FROM board_comments WHERE post_id = ? ORDER BY id LIMIT 40").bind(p.id),
+        env.DB.prepare("SELECT user_id, parent_id, text, anon, created_at FROM board_comments WHERE post_id = ? ORDER BY id LIMIT 40").bind(p.id),
       ]);
       const body = (bodyR.results[0] as { body: string } | undefined)?.body ?? "";
-      const comments = (commentsR.results as { user_id: string; parent_id: number | null; text: string; created_at: number }[]).map(
-        (c) => `${c.parent_id ? "  └ 답글 " : "댓글 "}${c.user_id}: ${oneLine(c.text)} (${when(c.created_at)})`,
+      const comments = (commentsR.results as { user_id: string; parent_id: number | null; text: string; anon: number; created_at: number }[]).map(
+        (c) => `${c.parent_id ? "  └ 답글 " : "댓글 "}${shownName(me, c.user_id, c.anon)}: ${oneLine(c.text)} (${when(c.created_at)})`,
       );
       parts.push(section(`게시판 글 #${p.id} "${oneLine(p.title)}" (${p.author}) 본문과 댓글`, [body, ...comments]));
     }

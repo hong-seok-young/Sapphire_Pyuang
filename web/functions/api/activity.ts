@@ -12,6 +12,7 @@ import { FORBIDDEN, NEED_LOGIN, RANK, currentUser, json, readJson } from "../../
 import type { Env } from "../../server/auth";
 import { record, whereOf } from "../../server/activity";
 import { canSim, earn } from "../../server/simcoin";
+import { anonView } from "../../server/board";
 import { LOG_FULL, LOG_NUMS, covering, fromLogs, logBinding, logDbs, newestLogs } from "../../server/logdb";
 import type { LogDb } from "../../server/logdb";
 
@@ -54,9 +55,9 @@ const DAY = 86_400_000;
  * 글 번호로 한 줄만 읽는다. 지운 글이면 비운다
  */
 async function viewTitle(env: Env, path: string): Promise<string | null> {
-  const m = /^#\/(board|official)\/(\d+)(?:$|[/?])/.exec(path);
+  const m = /^#\/(board|suggest|official)\/(\d+)(?:$|[/?])/.exec(path);
   if (!m || m[0].endsWith("/")) return null;
-  const table = m[1] === "board" ? "board_posts" : "official_news";
+  const table = m[1] === "official" ? "official_news" : "board_posts";
   try {
     const row = await env.DB.prepare(`SELECT title FROM ${table} WHERE id = ?`).bind(Number(m[2])).first<{ title: string }>();
     return row?.title ? row.title.slice(0, 120) : null;
@@ -127,6 +128,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return json({ ok: true });
   }
   if (typeof path !== "string" || !path.startsWith("#/") || path.length > 200) return json({ error: "화면 주소가 맞지 않아요" }, 400);
+  // 내 익명 건의 글과 건의함 글쓰기 화면은 남기지 않는다 (사용 기록으로 익명 글쓴이를 알아내지 못하게, server/board.ts)
+  if (await anonView(env, me, path).catch(() => false)) return json({ ok: true });
   await record(env, me.id, "view", path, await viewTitle(env, path), whereOf(request));
   return json({ ok: true });
 };

@@ -10,6 +10,8 @@ export const MENU_UPDATES: Record<string, string> = {
   "#/match": "2026-11-04T11:55+09:00",
   // 2026-11-07 게시판 (아이모 소식 찾기·댓글, 공식 글 그림 크게 보기·글자로 보기)
   "#/board": "2026-11-07T01:05+09:00",
+  // 2026-11-09 길드 랭킹 (맨 아래 '레벨업'으로 랭킹에서 바로 레벨·경험치 적기)
+  "#/ranking": "2026-11-09T22:00+09:00",
 };
 
 const DAY = 86_400_000;
@@ -22,12 +24,14 @@ export const MENU_NEW: Record<string, string> = {
   "#/enhance": "2026-11-05T16:30+09:00",
   // 2026-11-06 v1.4 개발 요청 오픈 (11/5 에 한 번 열었다가 닫았다)
   "#/devreq": "2026-11-06T09:15+09:00",
+  // 2026-11-11 v1.6 성장코인샵 오픈 (예약, 제작자 2026-11-10 '11/11 오전 11시 오픈')
+  "#/gcoin": "2026-11-11T11:00+09:00",
 };
 
 /** 홈 칸에 'NEW' 를 달지: 연 때(배포)부터 그 시각 + 하루까지 */
 export function showNew(to: string, now = Date.now()): boolean {
   const stamp = MENU_NEW[to];
-  return !!stamp && now - Date.parse(stamp) < DAY;
+  return !!stamp && now >= Date.parse(stamp) && now - Date.parse(stamp) < DAY;
 }
 
 interface Seen {

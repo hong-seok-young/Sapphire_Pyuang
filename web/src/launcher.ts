@@ -14,6 +14,7 @@ import type { Me } from "./auth";
 import { RANK, TEST_IDS } from "./auth";
 import { APP_OPEN, inApp, isAndroid } from "./platform";
 import { showUpdate } from "./updates";
+import { SUGGEST_OPEN } from "./board";
 
 export interface LaunchItem {
   key: string;
@@ -33,7 +34,7 @@ export interface LaunchItem {
   /** 칸 오른쪽 위 작은 글자 줄들 (상자 없이 글자만. 장비대여의 '담당자' / '멍멍', 제작자 요청 2026-11-03) */
   corner?: string[];
   /** 특정 사람만 들어가는 칸: 테두리에 빛이 돈다 (gold 1군 전용, blue 운영진, purple 개발자) */
-  ring?: "gold" | "blue" | "purple";
+  ring?: "gold" | "blue" | "purple" | "mint" | "silver";
   /** 개발 중·검토 후 오픈: 홈에서는 열린 칸 아래 접힌 '개발 중' 묶음에 들어간다 (제작자 요청 2026-11-02, Home.tsx) */
   soon?: boolean;
   /** soon 일 때 오른쪽 위 표 (없으면 '준비 중') */
@@ -48,7 +49,35 @@ export interface LaunchItem {
   developer?: boolean;
   /** 길드마스터와 앱개발자만 (사용 기록, 챗봇 개선: 제작자 요청 2026-11-02 '길드마스터도 보이게') */
   masters?: boolean;
+  /** 플래티넘 할인 상점: 상점 설정의 '오픈'을 켜기 전에는 운영진만 (개발 중 묶음에 넣지 않고 제자리) */
+  shopGate?: boolean;
 }
+
+/** 운영진 때리기를 모두에게 열었는지 (서버 server/smack.ts SMACK_OPEN 과 같이 바꾼다) */
+export const SMACK_OPEN = false;
+/** 운영진 때리기에 들어가는 사람: 열기 전에는 앱개발자(와 테스트 계정)만 */
+export const canSmack = (me: Me) => SMACK_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
+
+/** 2군 성장코인샵을 여는 때: 2026-11-11(수) 11:00 한국 시간 (제작자 2026-11-10 '11/11 오전 11시 오픈 예약', 서버 server/gcoin.ts GCOIN_OPEN_AT 과 같이 바꾼다).
+ * 화면을 연 때 한 번 본다 (그 전에 열어 둔 화면은 다시 열거나 업데이트로 새로 뜨면) */
+export const GCOIN_OPEN_AT = Date.UTC(2026, 10, 11, 2);
+export const GCOIN_OPEN = Date.now() >= GCOIN_OPEN_AT;
+/** 2군 성장코인샵에 들어가는 사람: 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (제작자 2026-11-09 '오피서랑 길마 보게 열어 줘, 개발 중으로 두고') */
+export const canGcoin = (me: Me) => GCOIN_OPEN || RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
+
+/** 기부함을 모두에게 열었는지 (서버 server/donate.ts DONATE_OPEN 과 같이 바꾼다) */
+export const DONATE_OPEN = false;
+/** 기부함에 들어가는 사람: 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (제작자 2026-11-10 '개발 중 (운영진만)') */
+export const canDonate = (me: Me) => DONATE_OPEN || RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
+
+/** 헬스 루틴을 모두에게 열었는지 (서버 server/fit.ts FIT_OPEN 과 같이 바꾼다) */
+export const FIT_OPEN = false;
+/** 헬스 루틴에 들어가는 사람: 열기 전에는 앱개발자(와 테스트 계정)만 (제작자 2026-11-09 '일단 나만 보이게 해줘') */
+export const canFit = (me: Me) => FIT_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
+
+/** 건의함(새 전용 화면, 익명 기능)을 모두에게 열었는지 (src/board.ts SUGGEST_OPEN 과 같이 바꾼다. 게시판 안의 예전 '건의' 칸은 그대로 열려 있다) */
+/** 건의함 전용 화면에 들어가는 사람: 열기 전에는 앱개발자(와 테스트 계정)만 (제작자 2026-11-09 '일단 나만 보이게 해줘') */
+export const canSuggest = (me: Me) => SUGGEST_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
 
 export const ITEMS: LaunchItem[] = [
   { key: "home", title: "홈", to: "#/", icon: "🏠", pic: "home", match: [""] },
@@ -59,7 +88,8 @@ export const ITEMS: LaunchItem[] = [
   { key: "info", title: "정보", to: "#/info", icon: "📚", pic: "info", match: ["info", "menu", "post", "places", "place", "equip", "odds"] },
   { key: "chat", title: "챗봇", to: "#/chat", icon: "💬", pic: "chat", match: ["chat"] },
   // 1군 전용 플래티넘 할인 상점 (제작자 요청). 아이콘은 게임 첫 화면의 상점 그림. '1군 전용'은 왼쪽 위 띠로
-  { key: "shop", title: "플래티넘 할인 상점", short: "상점", to: "#/shop", icon: "🏪", iconPic: "/data/shop/shop_icon.png", ribbon: "1군 전용", ring: "gold", match: ["shop"] },
+  // 계획 보류 (제작자 2026-11-10 '운영진하고 나만 보이게, 개발 중 탭으로 두지 말고 위에 두되 오픈하면 그때 길드원 전체에'): 상점 설정의 '오픈'을 켜기 전에는 운영진만 (shopGate, /api/me 의 shopOpen)
+  { key: "shop", title: "플래티넘 할인 상점", short: "상점", to: "#/shop", icon: "🏪", iconPic: "/data/shop/shop_icon.png", ribbon: "1군 전용", ring: "gold", shopGate: true, match: ["shop"] },
   // To do: 이벤트를 안 읽어도 내 직업·레벨에 맞는 오늘·이번 주 할 일 (제작자 요청 2026-11-01, pages/Todo.tsx)
   // To do: 2026-11-02 열었다 (제작자 요청 '투두도 오픈')
   { key: "todo", title: "To do", to: "#/todo", icon: "✅", match: ["todo"] },
@@ -76,7 +106,25 @@ export const ITEMS: LaunchItem[] = [
   { key: "simtest", title: "확률 시뮬레이터", short: "확률", to: "#/simtest", icon: "🎰", developer: true, soon: true, badge: "테스트", match: ["simtest"] },
   // 개발 요청 (개발중, 제작자 요청 2026-11-05 '개발 중 버튼 하나 더, 개발자한테 자유롭게 신청, 결재선'): src/pages/DevRequests.tsx
   { key: "devreq", title: "개발 요청", short: "요청", to: "#/devreq", icon: "📮", match: ["devreq"] },
+  // 건의함 (개발중, 제작자 요청 2026-11-09 개발 요청 #13 유어아너 '건의사항은 게시판에서 빼고 별도 버튼, 익명 기능'): 게시판의 건의 사항을 따로, 익명 글·댓글.
+  // 열면 src/board.ts SUGGEST_OPEN (그때 soon·badge 가 빠진다)
+  { key: "suggest", title: "건의함", short: "건의", to: "#/suggest", icon: "💡", developer: !SUGGEST_OPEN, soon: !SUGGEST_OPEN, badge: "개발중", match: ["suggest"] },
+  // 운영진 때리기 (개발 요청 #10, 제작자 2026-11-09 '우선 나한테만 보이게'): 길마·오피서 캐릭터를 두드려 스트레스 풀기 (pages/Smack.tsx).
+  // 열 때는 developer·soon·badge 를 빼고 SMACK_OPEN (CLAUDE.md '운영진 때리기')
+  { key: "smack", title: "운영진 때리기", short: "때리기", to: "#/smack", icon: "🥊", developer: !SMACK_OPEN, soon: !SMACK_OPEN, badge: "개발중", match: ["smack"] },
+  // 2군 성장코인샵 (개발중, 제작자 2026-11-09 '1군전용처럼 2군전용 성장코인샵, 개발중, 나한테만'): 레벨업마다 쌓이는 성장코인으로 산다 (pages/GrowthShop.tsx).
+  // 열 때는 managers·soon·badge 를 빼고 GCOIN_OPEN (CLAUDE.md '2군 성장코인샵')
+  // 기부함 (개발중, 제작자 2026-11-10 길드 톡방 '모든 템 기부하게 따로 기부함', '마일리지 순위표, 명예의 전당'). 열 때는 managers·soon·badge 를 빼고 DONATE_OPEN
+  { key: "donate", title: "기부함", to: "#/donate", icon: "🎁", managers: !DONATE_OPEN, soon: !DONATE_OPEN, badge: "개발중", match: ["donate"] },
+  // 명예의 전당 (개발중, 제작자 2026-11-10 '명예의 전당은 별도 버튼으로'): 기부로 쌓인 마일리지 순위. 기부함과 같이 연다 (DONATE_OPEN)
+  { key: "hall", title: "명예의 전당", short: "명예의 전당", to: "#/hall", icon: "🏆", managers: !DONATE_OPEN, soon: !DONATE_OPEN, badge: "개발중", match: ["hall"] },
+  // 담당자 유어아너 (제작자 2026-11-10 '장비대여 담당자처럼 버튼에 유어아너로')
+  { key: "gcoin", title: "성장코인샵", short: "코인샵", to: "#/gcoin", icon: "🪙", ribbon: "2군 전용", ring: "silver", corner: ["담당자", "유어아너"], managers: !GCOIN_OPEN, soon: !GCOIN_OPEN, badge: "개발중", match: ["gcoin"] },
   { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
+  // 도감 계산기 (개발중, 제작자 요청 2026-11-10: 게임 도감 항목을 웹에서 정리, 제작자 도감 영상에서 옮긴 자료). 개발 중 묶음 (미리 보는 사람만, pages/Dex.tsx)
+  { key: "dex", title: "도감 계산기", short: "도감", to: "#/dex", icon: "📖", soon: true, badge: "개발중", match: ["dex"] },
+  // 헬스 루틴 (개발중, 길드원 완뻔치 님 개발 요청 #8, 제작자 2026-11-09 '플릭 같은 헬스 어플'): 실제 헬스장 운동 기록 (pages/Fit.tsx). 게임과 상관없다
+  { key: "fit", title: "헬스 루틴", short: "헬스", to: "#/fit", icon: "🏋️", developer: !FIT_OPEN, soon: !FIT_OPEN, badge: "개발중", match: ["fit"] },
   // 장비대여 (2026-11-02 제작자 요청으로 열었다), 길드던전과 인던 같이 갈 사람 찾기 (칸만 먼저 두고 개발 중으로 막는다)
   // 오른쪽 위에 담당자 (제작자 요청 2026-11-03 '장비대여 담당자는 멍멍, 버튼 우측 상단에 텍스트로만 관리자 줄바꿈 멍멍'. 담당이 바뀌면 server/rental.ts RENT_STAFF 와 같이 고친다)
   { key: "rent", title: "장비대여", to: "#/rent", icon: "🤝", corner: ["담당자", "멍멍"], match: ["rent"] },
@@ -123,7 +171,7 @@ export const isLocked = (item: LaunchItem, me: Me) => !!item.locked && !canPrevi
 
 /** 이 사람에게 보이는 칸인지 */
 export const canSee = (item: LaunchItem, me: Me) =>
-  (!item.androidOnly || (isAndroid && !inApp)) && (!item.managers || RANK[me.role] >= 1) && (!item.developer || me.role === "developer") && (!item.masters || RANK[me.role] >= 2);
+  (!item.androidOnly || (isAndroid && !inApp)) && (!item.managers || RANK[me.role] >= 1) && (!item.shopGate || me.shopOpen === true || RANK[me.role] >= 1) && (!item.developer || me.role === "developer") && (!item.masters || RANK[me.role] >= 2);
 
 /** 'UPDATE' 를 달지 (updates.ts). '정보'는 안의 칸이 고쳐졌을 때도 */
 export const isUpdated = (user: string, item: LaunchItem) =>
@@ -165,7 +213,7 @@ function build(dock: string[], slots: string[], search: boolean): Layout {
 /** 처음 배치 (제작자 요청 2026-11-02: 제작자 폰의 배치 그대로 '이걸 기본 배치로') */
 export const DEFAULT_LAYOUT: Layout = {
   dock: ["home", "board", "info", "search", "chat"],
-  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "trend", "enhance", "sim", "simtest", "devreq", "app"],
+  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "trend", "dex", "enhance", "sim", "simtest", "devreq", "suggest", "fit", "app", "smack", "gcoin", "donate", "hall"],
 };
 
 /**

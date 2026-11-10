@@ -892,6 +892,9 @@ def main():
     # 강화 비교 (개발중): 자료/장비_강화·재설정 (카페 글 331665 첨부) + 위키 장비 표 -> data/enhance.json (없으면 건너뛴다)
     import build_enhance
     build_enhance.main()
+    # 도감 계산기 (개발중): 자료/도감/일반.json (제작자 도감 영상을 옮긴 것) -> data/dex.json (없으면 건너뛴다)
+    import build_dex
+    build_dex.main()
 
 
 def write_place_parts(posts: dict, places: dict) -> None:
@@ -960,7 +963,8 @@ def copy_rank_pictures():
     data/ 아래에 두어 위키 자료처럼 로그인한 길드원에게만 보인다 (functions/data/_middleware.ts)."""
     # 시세동향: 위키에 없는 물건(코스튬 등)의 그림, 제작자가 보낸 도감 스샷에서 자른 것 (자료/scripts/make_trend_icons.py)
     # 생일: 생일 스티커 (src/birthday.tsx, 자료/scripts/make_birthday_sticker.py)
-    for src, dst in (("랭킹", "rank"), ("중개인", "market"), ("상점", "shop"), ("시세동향", "trend"), ("생일", "birthday")):
+    # 성장코인샵: 2군 성장코인샵 물건 칸 그림, 제작자가 보낸 거래소 스샷에서 자른 것 (src/gcoin.ts itemPic, 자료/scripts/make_gcoin_icons.py)
+    for src, dst in (("랭킹", "rank"), ("중개인", "market"), ("상점", "shop"), ("시세동향", "trend"), ("생일", "birthday"), ("성장코인샵", "gcoin")):
         out = OUT / "data" / dst
         if out.exists():
             shutil.rmtree(out)

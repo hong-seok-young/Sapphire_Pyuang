@@ -2,7 +2,7 @@
 // 글에 사진과 첨부 파일(D1 board_files), 링크(유튜브는 화면이 미리보기, 다른 링크는 /api/board/preview 가 제목과 그림을 읽는다),
 // 댓글과 답글(한 단계), 좋아요, 본 사람 수, 공지 고정. 게임과는 상관없는 글이라 게임 안전 규칙에 맞는다.
 import { RANK } from "./auth";
-import type { Env, Role } from "./auth";
+import type { Env, Role, User } from "./auth";
 
 export const CATS = ["notice", "event", "free", "suggest"] as const;
 export type Cat = (typeof CATS)[number];
@@ -32,10 +32,11 @@ export interface PostRow {
   pinned: number;
   created_at: number;
   edited_at: number | null;
+  anon: number;
 }
 
 export async function loadPost(env: Env, id: number): Promise<PostRow | null> {
-  return env.DB.prepare("SELECT id, cat, author, title, body, pinned, created_at, edited_at FROM board_posts WHERE id = ?")
+  return env.DB.prepare("SELECT id, cat, author, title, body, pinned, created_at, edited_at, anon FROM board_posts WHERE id = ?")
     .bind(id)
     .first<PostRow>();
 }
@@ -53,3 +54,56 @@ export function deletePostStmts(env: Env, id: number): D1PreparedStatement[] {
 
 /** 첨부 이름: 경로 글자를 빼고 100자까지 */
 export const cleanName = (n: string) => n.replace(/[\\/\u0000-\u001f]/g, "_").slice(0, 100) || "file";
+
+// ---------- 건의함 (제작자 요청 2026-11-09, 개발 요청 #13 유어아너: '건의사항은 게시판에서 빼고 별도 버튼, 익명 기능, 익명은 유어아너와 나만 보게') ----------
+// 건의함(#/suggest, 화면 pages/Board.tsx SuggestPage)은 게시판의 건의 사항(cat 'suggest')을 그대로 쓴다. 글과 댓글을 익명(board_posts.anon, board_comments.anon)으로 올릴 수 있다.
+
+/**
+ * 건의함 오픈 (화면 src/board.ts 의 SUGGEST_OPEN 과 같이 바꾼다): false 인 동안 게시판에 '건의 사항' 칸이 그대로 있고 건의함은 개발 중(미리 보는 사람만).
+ * true 면 게시판 '전체'에서 건의 글을 빼고, 건의 알림이 건의함 글로 간다
+ */
+export const SUGGEST_OPEN = false;
+
+/** 익명 글·댓글의 이름을 보는 사람: 앱개발자와 이 사람(묶은 캐릭터 중 하나라도). 닉네임으로 정하므로 닉네임을 바꾸면 고친다 */
+export const ANON_VIEWERS = ["유어아너"];
+/** 익명이라고 보일 이름 */
+export const ANON_NAME = "익명";
+/** 익명 글·댓글을 쓴 사람이 누구인지 보는지 */
+export const canSeeAnon = (me: User) => me.role === "developer" || (me.chars ?? [me.id]).some((c) => ANON_VIEWERS.includes(c));
+/** 익명이고 볼 수 없는 사람이면 '익명' */
+export const shownName = (me: User, name: string, anon: number | boolean | null | undefined) => (anon && !canSeeAnon(me) ? ANON_NAME : name);
+/** 그 건의 글·댓글의 주소 (건의함을 열면 건의함으로) */
+export const postLink = (cat: string, id: number) => (SUGGEST_OPEN && cat === "suggest" ? `#/suggest/${id}` : `#/board/${id}`);
+
+/**
+ * 사용 기록에 남기지 않을 일인지 (길드마스터가 사용 기록으로 익명 글쓴이를 알아내지 못하게): 익명 글·댓글 쓰기, 내 익명 글 고치기·지우기·사진 올리기,
+ * 내 익명 댓글 지우기. 화면 보기는 functions/api/activity.ts 가 anonView 로 거른다
+ */
+export async function anonWrite(env: Env, me: User, method: string, path: string, body: unknown): Promise<boolean> {
+  if (!path.startsWith("/api/board")) return false;
+  const b = body as { anon?: unknown; cat?: unknown } | null;
+  const anon = b?.anon === true;
+  // 익명은 건의 사항에만 된다 (다른 칸 글에 anon 을 보내도 실명이라 그대로 남긴다)
+  if (method === "POST" && path === "/api/board") return anon && b?.cat === "suggest";
+  let m = /^\/api\/board\/(\d+)\/comments$/.exec(path);
+  if (method === "POST" && m)
+    return anon && !!(await env.DB.prepare("SELECT 1 AS x FROM board_posts WHERE id = ? AND cat = 'suggest'").bind(Number(m[1])).first());
+  m = /^\/api\/board\/(\d+)(?:\/|$)/.exec(path);
+  if (m) return !!(await env.DB.prepare("SELECT 1 AS x FROM board_posts WHERE id = ? AND anon = 1 AND author = ?").bind(Number(m[1]), me.id).first());
+  m = /^\/api\/board\/files\/(\d+)$/.exec(path);
+  if (m)
+    return !!(await env.DB.prepare("SELECT 1 AS x FROM board_files f JOIN board_posts p ON p.id = f.post_id WHERE f.id = ? AND p.anon = 1 AND p.author = ?")
+      .bind(Number(m[1]), me.id)
+      .first());
+  m = /^\/api\/board\/comments\/(\d+)$/.exec(path);
+  if (m) return !!(await env.DB.prepare("SELECT 1 AS x FROM board_comments WHERE id = ? AND anon = 1 AND user_id = ?").bind(Number(m[1]), me.id).first());
+  return false;
+}
+
+/** 사용 기록에 남기지 않을 화면인지: 내 익명 글(과 그 수정 화면), 건의함 글쓰기 화면 */
+export async function anonView(env: Env, me: User, path: string): Promise<boolean> {
+  if (/^#\/suggest\/write(?:$|[?/])/.test(path) || /^#\/board\/write\?(?:.*&)?cat=suggest/.test(path)) return true;
+  const m = /^#\/(?:board|suggest)\/(\d+)(?:$|[/?])/.exec(path);
+  if (!m) return false;
+  return !!(await env.DB.prepare("SELECT 1 AS x FROM board_posts WHERE id = ? AND anon = 1 AND author = ?").bind(Number(m[1]), me.id).first());
+}

@@ -27,6 +27,8 @@ export interface RunStart {
     /** 오늘(한국 날짜): 답을 못 받으면 질문 수를 되돌린다 */
     day: string;
     developer: boolean;
+    /** 위키 자료가 질문 뒤에 따라온다 (/context). 25초까지 기다렸다가 붙이고, 안 오면(앱을 껐다) 없이 답한다 */
+    waitContext?: boolean;
   };
   /** Claude API 요청 (stream 은 일꾼이 붙인다) */
   params: Record<string, unknown>;
@@ -46,10 +48,79 @@ interface Job {
   begun: boolean;
   done: boolean;
   stopped: boolean;
+  /** 뒤따라온 위키 자료 */
+  ctx: { text: string; found: string } | null;
+  ctxWait: (() => void) | null;
 }
+
+/** 위키 자료를 기다리는 가장 긴 때 */
+const CONTEXT_WAIT_MS = 25_000;
 
 /** 한 번 답에 쓰는 가장 긴 때 (알람은 15분까지) */
 const MAX_RUN_MS = 14 * 60_000;
+/** 마지막 질문의 맨 끝(질문 글) 바로 앞에 <위키 자료> 를 넣는다 */
+function withContext(params: Record<string, unknown>, text: string): Record<string, unknown> {
+  const messages = [...((params.messages ?? []) as { role: string; content: unknown }[])];
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== "user") return params;
+  const block = { type: "text", text: `<위키 자료>\n${text}\n</위키 자료>` };
+  const content = Array.isArray(last.content) ? [...last.content] : [{ type: "text", text: String(last.content) }];
+  content.splice(Math.max(0, content.length - 1), 0, block);
+  messages[messages.length - 1] = { ...last, content };
+  return { ...params, messages };
+}
+
+/** pause_turn 뒤 이어 묻는 횟수 (시간 14분이 실제 한도. 무한히 돌지 않게만) */
+const MAX_ROUNDS = 30;
+
+const joinText = (chunks: Uint8Array[]) => {
+  const d = new TextDecoder();
+  return chunks.map((c) => d.decode(c, { stream: true })).join("") + d.decode();
+};
+
+/**
+ * 한 회차 SSE 에서 답 블록을 그대로 다시 만든다 (pause_turn 뒤 assistant 로 돌려보내 이어 묻기).
+ * 생각(서명 포함), 글(인용 포함), 서버 도구 호출과 결과를 받은 그대로
+ */
+export function contentFromSse(raw: string): { blocks: Record<string, unknown>[]; stop: string | null } {
+  const blocks: Record<string, unknown>[] = [];
+  const json = new Map<number, string>();
+  let stop: string | null = null;
+  for (const chunk of raw.replace(/\r\n/g, "\n").split("\n\n")) {
+    const data = chunk
+      .split("\n")
+      .filter((l) => l.startsWith("data:"))
+      .map((l) => l.slice(5).replace(/^ /, ""))
+      .join("\n");
+    if (!data) continue;
+    let ev: { type: string; index?: number; content_block?: Record<string, unknown>; delta?: Record<string, unknown> };
+    try {
+      ev = JSON.parse(data);
+    } catch {
+      continue;
+    }
+    const i = ev.index ?? -1;
+    if (ev.type === "content_block_start" && ev.content_block) {
+      blocks[i] = { ...ev.content_block };
+      if (ev.content_block.type === "server_tool_use" || ev.content_block.type === "tool_use") json.set(i, "");
+    } else if (ev.type === "content_block_delta" && ev.delta && blocks[i]) {
+      const b = blocks[i];
+      const d = ev.delta;
+      if (d.type === "text_delta") b.text = String(b.text ?? "") + String(d.text ?? "");
+      else if (d.type === "thinking_delta") b.thinking = String(b.thinking ?? "") + String(d.thinking ?? "");
+      else if (d.type === "signature_delta") b.signature = d.signature;
+      else if (d.type === "citations_delta") b.citations = [...((b.citations as unknown[]) ?? []), d.citation];
+      else if (d.type === "input_json_delta") json.set(i, (json.get(i) ?? "") + String(d.partial_json ?? ""));
+    } else if (ev.type === "content_block_stop" && json.has(i) && blocks[i]) {
+      try {
+        blocks[i].input = JSON.parse(json.get(i) || "{}");
+      } catch {
+        blocks[i].input = {};
+      }
+    } else if (ev.type === "message_delta" && ev.delta?.stop_reason) stop = String(ev.delta.stop_reason);
+  }
+  return { blocks: blocks.filter(Boolean), stop };
+}
 
 const enc = new TextEncoder();
 const line = (obj: unknown) => enc.encode(`data: ${JSON.stringify(obj)}\n\n`);
@@ -177,6 +248,8 @@ export class ChatRun extends DurableObject<Env> {
         begun: false,
         done: false,
         stopped: false,
+        ctx: null,
+        ctxWait: null,
       };
       this.job = job;
       const res = this.watch(job);
@@ -187,6 +260,13 @@ export class ChatRun extends DurableObject<Env> {
     if (path === "/watch") {
       if (!this.job) return new Response(null, { status: 204 });
       return this.watch(this.job);
+    }
+    if (path === "/context" && request.method === "POST") {
+      const c = (await request.json()) as { text?: string; found?: string };
+      if (!this.job || this.job.done) return new Response("late", { status: 409 });
+      this.job.ctx = { text: String(c.text ?? ""), found: String(c.found ?? "") };
+      this.job.ctxWait?.();
+      return new Response("ok");
     }
     if (path === "/stop" && request.method === "POST") {
       if (this.job && !this.job.done) this.finish(this.job, true);
@@ -251,6 +331,22 @@ export class ChatRun extends DurableObject<Env> {
   private async run(job: Job): Promise<void> {
     const { start } = job;
     const { meta } = start;
+    // 위키 자료를 기다려 질문 바로 앞에 붙인다 (화면이 질문을 먼저 보냈다)
+    if (meta.waitContext) {
+      if (!job.ctx) {
+        await new Promise<void>((resolve) => {
+          const t = setTimeout(resolve, CONTEXT_WAIT_MS);
+          job.ctxWait = () => {
+            clearTimeout(t);
+            resolve();
+          };
+        });
+        job.ctxWait = null;
+      }
+      if (job.stopped) return;
+      if (job.ctx?.found) meta.found = job.ctx.found;
+      if (job.ctx?.text) start.params = withContext(start.params, job.ctx.text);
+    }
     const env = this.env;
     const timer = setTimeout(() => job.ctrl.abort(), MAX_RUN_MS);
     const client = new Anthropic({
@@ -294,17 +390,36 @@ export class ChatRun extends DurableObject<Env> {
     }
 
     const dec = new TextDecoder();
-    try {
-      const reader = upstream.body!.getReader();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (!value?.length) continue;
-        this.push(job, value);
-        if (job.firstTextAt === null && dec.decode(value, { stream: true }).includes('"text_delta"')) job.firstTextAt = Date.now();
+    // 웹 찾기를 오래 하면 API 가 답을 잠깐 멈춘다 (stop_reason pause_turn). 받은 내용을 그대로 붙여 다시 물어 이어 간다
+    // (챗봇 개선 2026-11-09, 제작자 '한도를 왜 두는 거야? 안 두면 안 돼?': 찾기·읽기 횟수 한도를 없애고, 멈추면 이어서. 14분이 넘으면 거기까지)
+    const sent = (start.params.messages ?? []) as unknown[];
+    const said: unknown[] = []; // 앞 회차들에 받은 답 블록 (이어 물을 때 assistant 로)
+    for (let round = 0; ; round++) {
+      const roundChunks: Uint8Array[] = [];
+      try {
+        const reader = upstream.body!.getReader();
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (!value?.length) continue;
+          this.push(job, value);
+          roundChunks.push(value);
+          if (job.firstTextAt === null && dec.decode(value, { stream: true }).includes('"text_delta"')) job.firstTextAt = Date.now();
+        }
+      } catch (e) {
+        if (!job.stopped) console.error("chat run stream broke", e instanceof Error ? e.message : e);
+        break;
       }
-    } catch (e) {
-      if (!job.stopped) console.error("chat run stream broke", e instanceof Error ? e.message : e);
+      if (job.stopped || round >= MAX_ROUNDS) break;
+      const got = contentFromSse(joinText(roundChunks));
+      if (got.stop !== "pause_turn" || !got.blocks.length) break;
+      said.push(...got.blocks);
+      try {
+        upstream = await ask({ ...start.params, messages: [...sent, { role: "assistant", content: said }] });
+      } catch (e) {
+        if (!job.stopped) console.error("chat run continue failed", e instanceof Anthropic.APIError ? e.status : e);
+        break;
+      }
     }
     clearTimeout(timer);
     if (job.stopped) return; // 화면이 중지했거나 같은 대화에 새로 물었다: 넣지 않는다

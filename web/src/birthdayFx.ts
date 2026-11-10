@@ -62,10 +62,11 @@ export class Fx {
   /** 지금 캔버스 배율 (느리면 1 로 낮춘다) */
   private lowRes = false;
 
-  mount() {
+  /** cls: 캔버스 모양 (운영진 때리기는 smk-canvas, src/smackFx.ts) */
+  mount(cls = "bday-canvas") {
     if (this.cv) return;
     const cv = document.createElement("canvas");
-    cv.className = "bday-canvas";
+    cv.className = cls;
     cv.setAttribute("aria-hidden", "true");
     document.body.appendChild(cv);
     this.cv = cv;

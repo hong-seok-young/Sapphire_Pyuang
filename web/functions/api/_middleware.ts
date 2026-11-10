@@ -6,6 +6,7 @@ import type { Env, User } from "../../server/auth";
 import { detailOf, record, subjectOf, whereOf } from "../../server/activity";
 import { withBackground } from "../../server/background";
 import { canSim, earnFor } from "../../server/simcoin";
+import { anonWrite } from "../../server/board";
 
 /** 본문이 JSON 이 아닌 곳: 캐릭터 사진, AI 지우기(그림 파일)는 크기만 적는다 */
 const BINARY = /^\/api\/(avatar(\/cutout)?|board\/\d+\/files)$/;
@@ -34,7 +35,8 @@ const handle: PagesFunction<Env> = async (context) => {
   const method = request.method;
   // 사진 질문의 사진 먼저 읽기(/api/chat/peek)는 바로 뒤의 챗봇 질문이 남으므로 따로 남기지 않는다 (사진 본문을 두 번 풀지 않게)
   // 생일 콤보 실시간 저장(?live=1, 콤보 중 3초마다)은 남기지 않는다 (콤보가 끝날 때 한 번 남는다)
-  if (method === "GET" || method === "HEAD" || method === "OPTIONS" || path === "/api/activity" || path === "/api/chat/peek" || path === "/api/push" || path === "/api/todo/digest" || path.startsWith("/api/alerts") || path.startsWith("/api/sim") || (path === "/api/bday" && new URL(request.url).searchParams.has("live"))) return context.next();
+  // 헬스 루틴의 하는 중인 운동 저장(/api/fit/draft, 세트를 누를 때마다)도 남기지 않는다 (운동 끝이 한 번 남는다). 운영진 때리기도 3초마다 모아 보내서 남기지 않는다
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS" || path === "/api/activity" || path === "/api/chat/peek" || path === "/api/push" || path === "/api/todo/digest" || path.startsWith("/api/alerts") || path.startsWith("/api/sim") || path === "/api/fit/draft" || path === "/api/smack" || (path === "/api/bday" && new URL(request.url).searchParams.has("live"))) return context.next();
 
   let me: User | null = null;
   let body: unknown = null;
@@ -48,6 +50,9 @@ const handle: PagesFunction<Env> = async (context) => {
   } catch {
     // 기록 준비가 안 돼도 하던 일은 한다
   }
+  // 건의함 익명 글·댓글을 쓰거나 고친 일은 남기지 않는다 (길드마스터가 사용 기록으로 글쓴이를 알아내지 못하게, server/board.ts). 지우기는 끝난 뒤엔 모르므로 먼저 본다
+  const anon = me ? await anonWrite(env, me, method, path, body).catch(() => false) : false;
+  if (anon) return context.next();
   const res = await context.next();
   // 로그인은 틀린 것도 남긴다 (누가 몇 번 틀렸는지). 다른 실패는 남기지 않는다
   if (!res.ok && path !== "/api/login") return res;

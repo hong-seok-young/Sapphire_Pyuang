@@ -327,7 +327,9 @@ CREATE TABLE IF NOT EXISTS board_posts (
   body TEXT NOT NULL,
   pinned INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
-  edited_at INTEGER
+  edited_at INTEGER,
+  -- 건의함 익명 글 (2026-11-09): 쓴 사람은 author 에 그대로 두고, 앱개발자와 유어아너 말고는 '익명'으로 보인다 (server/board.ts canSeeAnon)
+  anon INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS board_posts_cat ON board_posts (cat, id);
 CREATE TABLE IF NOT EXISTS board_files (
@@ -347,7 +349,8 @@ CREATE TABLE IF NOT EXISTS board_comments (
   user_id TEXT NOT NULL,
   parent_id INTEGER,
   text TEXT NOT NULL,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  anon INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS board_comments_post ON board_comments (post_id, id);
 CREATE TABLE IF NOT EXISTS board_likes (
@@ -886,3 +889,157 @@ CREATE TABLE IF NOT EXISTS bday_resume (
   used_at INTEGER,
   PRIMARY KEY (bday, user_id)
 );
+
+-- 헬스 루틴 (개발중, 길드원 완뻔치 님 개발 요청 #8, 제작자 2026-11-09 '플릭 같은 헬스 어플'): 실제 헬스장 운동 기록. 캐릭터마다 자기 것만 (server/fit.ts).
+-- 기록은 저절로 지우지 않는다 (사람이 지우는 것만)
+-- 내 종목 (기본 종목은 화면 src/fit.ts 의 LIBRARY, 키는 'c<번호>')
+CREATE TABLE IF NOT EXISTS fit_exercises (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  part TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS fit_exercises_user ON fit_exercises (user_id);
+-- 루틴: 종목 목록 JSON [{ key, name, part, kind, sets, goal }]
+CREATE TABLE IF NOT EXISTS fit_routines (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  items TEXT NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS fit_routines_user ON fit_routines (user_id, sort);
+-- 끝낸 운동 하나에 한 줄: day 는 한국 날짜, data 는 { title, started, ended, memo?, entries: [{ key, name, part, kind, sets: [{ kg, reps | sec | min, km }] }] } (끝낸 세트만)
+CREATE TABLE IF NOT EXISTS fit_workouts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  day TEXT NOT NULL,
+  started_at INTEGER NOT NULL,
+  ended_at INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  volume REAL NOT NULL DEFAULT 0,
+  sets INTEGER NOT NULL DEFAULT 0,
+  data TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS fit_workouts_user ON fit_workouts (user_id, started_at);
+-- 하는 중인 운동 (사람마다 한 줄, 새로 고쳐도 이어서)
+CREATE TABLE IF NOT EXISTS fit_drafts (
+  user_id TEXT PRIMARY KEY,
+  data TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+-- 운영진 때리기 (개발 요청 #10, 제작자 2026-11-09, server/smack.ts, src/pages/Smack.tsx): 때린 사람(캐릭터)마다 맞은 운영진(그 역할의 캐릭터)마다 한 줄.
+-- 화면이 3초마다 모아 더한다. 지우지 않는다 (기록은 평생). 닉네임 바꾸기·계정 삭제에 따라간다
+CREATE TABLE IF NOT EXISTS smack_stats (
+  hitter TEXT NOT NULL,
+  target TEXT NOT NULL,
+  hits INTEGER NOT NULL DEFAULT 0,
+  damage INTEGER NOT NULL DEFAULT 0,
+  kos INTEGER NOT NULL DEFAULT 0,
+  crits INTEGER NOT NULL DEFAULT 0,       -- 크리티컬 수
+  deadly INTEGER NOT NULL DEFAULT 0,      -- 죽음의 일격 수
+  best INTEGER NOT NULL DEFAULT 0,        -- 최고 콤보
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (hitter, target)
+);
+CREATE INDEX IF NOT EXISTS smack_stats_target ON smack_stats (target);
+
+
+-- 2군 성장코인샵 (개발중, 제작자 2026-11-09 '골드말고 성장코인이 쌓이게, 성장코인샵에서 구매', '대상은 2군 전원', '렙업당 성장코인', '성장 123위는 더 주자',
+-- server/gcoin.ts, src/pages/GrowthShop.tsx). 레벨업으로 버는 코인은 표에 쌓지 않고 level_log 로 그때그때 센다 (시작 때 레벨부터 오른 레벨마다 gc_levels 의 값).
+-- 오타 수정은 level_log 의 마지막 줄을 고치므로 저절로 빠진다. 시작 때는 setup 'gcoin_start'
+-- 레벨 하나 오를 때 주는 코인: 오른 레벨이 min_level 이상이고 다음 줄의 min_level 보다 작으면 coin (오피서가 조정)
+CREATE TABLE IF NOT EXISTS gc_levels (
+  min_level INTEGER PRIMARY KEY,
+  coin INTEGER NOT NULL
+);
+-- 그 밖의 설정 (rank1, rank2, rank3: 주간 2군 성장 1·2·3위 보너스 코인)
+CREATE TABLE IF NOT EXISTS gc_settings (
+  key TEXT PRIMARY KEY,
+  value INTEGER NOT NULL
+);
+-- 상점 물건 (실제로는 오피서가 게임 안에서 준다). price 는 성장코인
+CREATE TABLE IF NOT EXISTS gc_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  unit TEXT,                              -- 예: 20개 (자몽주스·자몽케이크는 50개)
+  price INTEGER NOT NULL,                 -- 성장코인 = gold / 1000 (반올림). 0 이면 값을 정하기 전 (상점에 안 보인다)
+  gold INTEGER,                           -- 담당자가 적은 골드 가치 (원 단위 그대로, 없던 예전 줄은 price x 1000)
+  info TEXT,                              -- 안 씀 (옵션은 고정이라 화면 src/gcoin.ts ITEM_INFO)
+  active INTEGER NOT NULL DEFAULT 1,      -- 0 이면 판매 중지 (상점에 안 보인다)
+  sort INTEGER NOT NULL DEFAULT 0
+);
+-- 구매 신청: 이름·단위·값은 신청 때 그대로 남긴다. 코인은 pending·done 인 동안 빠진다 (cancel·reject 면 돌아온다)
+CREATE TABLE IF NOT EXISTS gc_orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  item_id INTEGER,
+  name TEXT NOT NULL,
+  unit TEXT,
+  price INTEGER NOT NULL,                 -- 하나 값
+  qty INTEGER NOT NULL DEFAULT 1,
+  status TEXT NOT NULL DEFAULT 'pending', -- pending | done | reject | cancel
+  note TEXT,                              -- 반려 의견
+  created_at INTEGER NOT NULL,
+  done_at INTEGER,
+  done_by TEXT
+);
+CREATE INDEX IF NOT EXISTS gc_orders_user ON gc_orders (user_id, status);
+CREATE INDEX IF NOT EXISTS gc_orders_status ON gc_orders (status, created_at);
+-- 레벨업 말고 들어오고 나간 코인: rank (주간 성장 순위 보너스, ref 'w<주 시작 ms>'), adjust (오피서가 손으로 더하거나 뺌). 지우지 않는다
+CREATE TABLE IF NOT EXISTS gc_ledger (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  delta INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  ref TEXT NOT NULL,
+  note TEXT,
+  by_user TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS gc_ledger_once ON gc_ledger (user_id, kind, ref);
+-- 2주 목표 선착순 (시범운영, server/gcrace.ts): 판(시작 ms)마다 사람마다 목표 레벨. from_level 은 정할 때 레벨 (달성률 0%). 달성은 level_log 로 센다
+CREATE TABLE IF NOT EXISTS gc_targets (
+  round INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  from_level INTEGER NOT NULL,
+  target INTEGER NOT NULL,
+  set_at INTEGER NOT NULL,
+  set_by TEXT,
+  PRIMARY KEY (round, user_id)
+);
+-- 연속 성장 (server/gcoin.ts settleWeeks): 사람마다 마지막으로 코인을 번 주(시작 ms)와 그때까지 이어진 주 수. 2주째부터 연속 보너스 (gc_ledger kind streak)
+CREATE TABLE IF NOT EXISTS gc_streak (
+  user_id TEXT PRIMARY KEY,
+  week INTEGER NOT NULL,
+  count INTEGER NOT NULL
+);
+
+-- 기부함 (개발중, 제작자 2026-11-10 길드 톡방 '모든 템을 골드로 환산하고 마일리지 환산', '기부하게 따로 기부함 만들게', 마을모금함 '마일리지 순위표, 명예의 전당'):
+-- 길드원이 게임 안에서 운영진에게 넘긴 템(장비만이 아니라 모든 템)을 골드 가치로 매겨 장비대여와 같은 마일리지(💎 1 = 10만 골드, rental_mileage)로 쌓는다.
+-- 길드원이 기부 신청(가치를 적어서)하면 운영진이 고쳐 확정하거나, 운영진이 바로 적는다. 💎 는 그 사람이 확정받은 골드 합의 내림 (dia 는 이 줄로 장부에 넣은 몫)
+CREATE TABLE IF NOT EXISTS donate_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  who TEXT NOT NULL,                      -- 기부한 사람 닉네임 (앱에 없는 사람도)
+  item TEXT NOT NULL,                     -- 아이템 이름
+  qty INTEGER NOT NULL DEFAULT 1,
+  enhance INTEGER NOT NULL DEFAULT 0,
+  note TEXT,
+  gold_ask INTEGER,                       -- 기부한 사람이 적은 골드 가치
+  gold INTEGER,                           -- 운영진이 확정한 골드 가치
+  dia INTEGER NOT NULL DEFAULT 0,         -- 이 줄로 rental_mileage 에 넣은 💎 (같은 사람 줄의 합 = 확정 골드 합 / 10만 내림)
+  status TEXT NOT NULL,                   -- request(확인 전) | done(확정) | rejected | removed(지움)
+  place TEXT NOT NULL DEFAULT 'keep',     -- keep(보관) | rent(장비대여로 넘김) | used(나눔·사용)
+  rental_id INTEGER,
+  created_at INTEGER NOT NULL,
+  created_by TEXT NOT NULL,
+  done_at INTEGER,
+  done_by TEXT
+);
+CREATE INDEX IF NOT EXISTS donate_items_status ON donate_items (status, created_at);
+CREATE INDEX IF NOT EXISTS donate_items_who ON donate_items (who);

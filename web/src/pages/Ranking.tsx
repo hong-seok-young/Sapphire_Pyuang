@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { useEntryState } from "../router";
 import {
   GUILDS, GUILD_NAME, GUILD_TIER, JOBS, JOB_NAME, avatarUrl, errorText, expText, fetchGrowth, fetchRanking, growthText, saveMyProfile,
@@ -7,8 +7,9 @@ import type { ChangeKind, GrowthEntry, GrowthPeriod, Guild, Job, Me, RankEntry }
 import { useAsync } from "../data";
 import { JobEmblem, JobGlyph, MINE_TAG_PIC, RankMedal, RoleBadge } from "../emblems";
 import { ChangeAsk, FitLine, Loading, TopBar } from "../ui";
-import { weekStart } from "../week";
+import { growthWeekStart } from "../week";
 import { GrowthChart } from "./GrowthChart";
+import { LevelEditor } from "./LevelEditor";
 import { HeroHalo } from "../heroHalo";
 
 
@@ -81,9 +82,9 @@ function expUpText(v: number): string {
   return String(Math.max(0.01, Math.round(pct * 100) / 100));
 }
 
-/** 이번 주(목요일 오전 10시부터, 제작자 요청)에 오른 레벨 수 (없으면 0). 다음 목요일 10시에 표시가 사라진다 */
+/** 이번 주(월요일 0시부터, 제작자 2026-11-09)에 오른 레벨 수 (없으면 0). 다음 월요일 0시에 표시가 사라진다 */
 function recentUp(r: RankEntry, now: number): number {
-  return r.prevLevel !== null && r.level > r.prevLevel && r.levelAt >= weekStart(now) ? r.level - r.prevLevel : 0;
+  return r.prevLevel !== null && r.level > r.prevLevel && r.levelAt >= growthWeekStart(now) ? r.level - r.prevLevel : 0;
 }
 
 /** 닉네임. 고스펙은 글자 색은 그대로 두고 글자에만 반짝임이 늘 흐른다 (제작자 요청) */
@@ -142,6 +143,11 @@ function ExpBar({ r, mine, onMe, onSaved }: { r: Ranked; mine: boolean; onMe?: (
   const [error, setError] = useState("");
   const [asking, setAsking] = useState(false);
   const valid = /^\d{1,2}(\.\d{1,3})?$/.test(text.trim());
+  // 목록을 새로 받으면 그 값으로 (2026-11-09 제작자: 내 정보에서 36 0% 로 바꾸고 랭킹에 오니 35 때 경험치가 남아 있었다.
+  // 다시 열 때 받아 둔 예전 목록으로 먼저 그리는데, 처음 그린 값을 붙잡고 있어서 새 목록이 와도 안 바뀌었다)
+  useEffect(() => {
+    setExp(r.exp ?? null);
+  }, [r.exp, r.level]);
 
   async function save(change?: ChangeKind) {
     if (!valid || !r.guild) return;
@@ -205,7 +211,14 @@ function ExpBar({ r, mine, onMe, onSaved }: { r: Ranked; mine: boolean; onMe?: (
       <small className="rank-exp-none">경험치 미입력</small>
     );
   return mine ? (
-    <button className="rank-exp-btn" onClick={() => setEditing(true)} aria-label="경험치 입력">
+    <button
+      className="rank-exp-btn"
+      onClick={() => {
+        setText(exp !== null ? (exp / 1000).toFixed(3) : "");
+        setEditing(true);
+      }}
+      aria-label="경험치 입력"
+    >
       {bar}
     </button>
   ) : (
@@ -214,8 +227,10 @@ function ExpBar({ r, mine, onMe, onSaved }: { r: Ranked; mine: boolean; onMe?: (
 }
 
 /** 레벨 랭킹: 게임의 경험치 랭킹 목록처럼 (메달, 엠블럼, 맨 아래 '내순위'). 길드(통합/1군/2군)와 직업으로 거른다 */
-function LevelRanking({ me, data, guild, onGuild, onMe, onSaved, saved }: {
+function LevelRanking({ me, data, guild, onGuild, onMe, onSaved, saved, editOpen, onEdit }: {
   me: Me; data: RankEntry[]; guild: GuildFilter; onGuild: (g: GuildFilter) => void; onMe?: (p: Partial<Me>) => void;
+  /** 맨 아래 '성장반영' 칸 (레벨·경험치를 여기서 바로 적는다) */
+  editOpen: boolean; onEdit: (open: boolean) => void;
   /** 내 경험치를 저장했을 때 (목록 다시 받기), saved 는 저장한 횟수 (펼친 그래프도 다시 받는다) */
   onSaved?: () => void; saved?: number;
 }) {
@@ -302,6 +317,8 @@ function LevelRanking({ me, data, guild, onGuild, onMe, onSaved, saved }: {
         </ul>
       )}
 
+      <div className="rank-mine-wrap">
+      {editOpen && <LevelEditor me={me} onMe={onMe} onSaved={onSaved} onClose={() => onEdit(false)} />}
       <div className="rank-mine-bar">
         <img className="rank-mine-tag" src={MINE_TAG_PIC} alt="내 순위" draggable={false} />
         <span className="rank-cell">{mine ? <RankMedal rank={mine.rank} /> : <span className="rank-num">-</span>}</span>
@@ -311,12 +328,14 @@ function LevelRanking({ me, data, guild, onGuild, onMe, onSaved, saved }: {
           <Nick className="rank-nick" id={me.id} high={mine?.highSpec} />
           {me.exp !== null && <small className="rank-hint">{hint}</small>}
         </span>
-        <a className="pill rank-edit" href="#/me">
-          레벨업
-        </a>
+        {/* 레벨·경험치는 여기서 바로 (제작자 2026-11-09 '여기 자체에서 레벨업과 경치 둘 다 적게, 내 정보로 가게 하지 말고') */}
+        <button className={"pill rank-edit" + (editOpen ? " pill-on" : "")} onClick={() => onEdit(!editOpen)} disabled={!me.job || !me.guild}>
+          성장반영
+        </button>
+      </div>
       </div>
       <p className="rank-note">
-        닉네임을 누르면 레벨·경험치 그래프가 보여요. 레벨, 경험치, 캐릭터 사진은 각자 '내 정보'에서 바꿔요. 잘못 적힌 레벨은 오피서에게 말해 주세요.
+        닉네임을 누르면 레벨·경험치 그래프가 보여요. 내 레벨·경험치는 아래 '성장반영'이나 내 경험치 막대를 눌러 바로 적어요. 잘못 적힌 레벨은 오피서에게 말해 주세요.
       </p>
     </>
   );
@@ -338,7 +357,7 @@ function whenText(t: number): string {
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}(${"일월화수목금토"[d.getUTCDay()]}) ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
 }
 
-/** 기간이 끝나는 때: 오늘은 다음 날 0시, 주간은 다음 목요일 오전 10시, 월간은 다음 달 1일 0시 (한국 시간) */
+/** 기간이 끝나는 때: 오늘은 다음 날 0시, 주간은 다음 월요일 0시, 월간은 다음 달 1일 0시 (한국 시간) */
 function periodEnd(period: GrowthPeriod, start: number): number {
   if (period === "day") return start + 86_400_000;
   if (period === "week") return start + 7 * 86_400_000;
@@ -350,7 +369,7 @@ function periodEnd(period: GrowthPeriod, start: number): number {
  * 성장 랭킹: 오늘, 이번 주, 이번 달에 오른 만큼 (레벨 1 = 100%). 길드원이 레벨, 경험치를 적을 때마다 남긴 기록으로 센다.
  * 1등은 크게, 캐릭터 사진이 있으면 사진으로 보여 준다. 이 화면은 게임 그림 대신 이 앱 디자인으로 그린다.
  */
-function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthPeriod; guild: GuildFilter; onGuild: (g: GuildFilter) => void }) {
+function GrowthRanking({ me, period, guild, onGuild, onEdit }: { me: Me; period: GrowthPeriod; guild: GuildFilter; onGuild: (g: GuildFilter) => void; onEdit: () => void }) {
   const { data, error } = useAsync(useCallback(() => fetchGrowth(period), [period]), `growth:${period}`);
   const [openId, setOpenId] = useState<string | null>(null);
   const toggle = (id: string) => setOpenId(openId === id ? null : id);
@@ -368,7 +387,7 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
         {whenText(data.start)} ~ {whenText(periodEnd(period, data.start))}
       </p>
       {!first ? (
-        <div className="empty">{PERIOD_NAME[period]} 아직 오른 사람이 없어요. 레벨업 하면 '내 정보'에서 적어 주세요!</div>
+        <div className="empty">{PERIOD_NAME[period]} 아직 오른 사람이 없어요. 레벨업 하면 레벨 칸 아래 '성장반영'에서 적어 주세요!</div>
       ) : (
         <>
           <div className="growth-hero">
@@ -420,7 +439,9 @@ function GrowthRanking({ me, period, guild, onGuild }: { me: Me; period: GrowthP
         {mine >= 0
           ? `내 ${PERIOD_NAME[period]} 성장: ${mine + 1}등 ${growthText(entries[mine].growth)}`
           : `${PERIOD_NAME[period]} 내 성장은 아직 없어요.`}{" "}
-        <a href="#/me">레벨, 경험치 적기 ▸</a>
+        <button className="growth-me-edit" onClick={onEdit}>
+          레벨, 경험치 적기 ▸
+        </button>
       </p>
     </>
   );
@@ -439,6 +460,7 @@ export function RankingPage({ me, onMe }: { me: Me; onMe?: (p: Partial<Me>) => v
   const { data, error } = useAsync(useCallback(() => fetchRanking(), [saved]), "ranking");
   const [view, setView] = useEntryState<View>("view", "level");
   const [guild, setGuild] = useEntryState<GuildFilter>("guild", "all");
+  const [editMe, setEditMe] = useState(false);
   return (
     <>
       <TopBar title="길드 랭킹" />
@@ -456,9 +478,28 @@ export function RankingPage({ me, onMe }: { me: Me; onMe?: (p: Partial<Me>) => v
         ))}
       </div>
       {view !== "level" ? (
-        <GrowthRanking me={me} period={view} guild={guild} onGuild={setGuild} />
+        <GrowthRanking
+          me={me}
+          period={view}
+          guild={guild}
+          onGuild={setGuild}
+          onEdit={() => {
+            setView("level");
+            setEditMe(true);
+          }}
+        />
       ) : data ? (
-        <LevelRanking me={me} data={data} guild={guild} onGuild={setGuild} onMe={onMe} onSaved={() => setSaved((n) => n + 1)} saved={saved} />
+        <LevelRanking
+          me={me}
+          data={data}
+          guild={guild}
+          onGuild={setGuild}
+          onMe={onMe}
+          onSaved={() => setSaved((n) => n + 1)}
+          saved={saved}
+          editOpen={editMe}
+          onEdit={setEditMe}
+        />
       ) : (
         <Loading error={error} />
       )}

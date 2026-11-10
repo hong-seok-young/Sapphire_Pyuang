@@ -30,7 +30,7 @@ const SCREENS: Record<string, string> = {
   의뢰소: "#/requests", 게시판: "#/board", "플래티넘 할인 상점": "#/shop", 상점: "#/shop", 검색: "#/search", "내 정보": "#/me",
   알림: "#/alerts", 장비: "#/equip", 사냥터: "#/places", 챗봇: "#/chat", 정보: "#/info", "공식 확률": "#/odds", "패치 내역": "#/patch",
   "길드원 관리": "#/admin", "사용 기록": "#/log", "To do": "#/todo", 투두: "#/todo", "할 일": "#/todo", "아이모 소식": "#/board?cat=imo",
-  장비대여: "#/rent", "장비 대여": "#/rent", "길드 던전": "#/match", 길던: "#/match", "강화 비교": "#/enhance", "개발 요청": "#/devreq",
+  장비대여: "#/rent", "장비 대여": "#/rent", "길드 던전": "#/match", 길던: "#/match", "강화 비교": "#/enhance", "개발 요청": "#/devreq", 성장코인샵: "#/gcoin", "성장 코인샵": "#/gcoin",
 };
 
 interface Target {
@@ -44,7 +44,16 @@ interface Target {
   big?: ReactNode;
 }
 
-const TOKEN = /\[\[(아이템|몬스터|사냥터|메뉴|화면|질문|모름):([^\]\n]{1,200})\]\]/g;
+const TOKEN = /\[\[(아이템|몬스터|사냥터|메뉴|화면|질문|모름|링크):([^\]\n]{1,700})\]\]/g;
+/** 마크다운 링크 [제목](https://…) 도 링크 표시로 받는다 (챗봇 개선 2026-11-09: 웹에서 찾은 글의 링크를 달게) */
+const MD_LINK = /\[([^[\]\n]{1,120})\]\((https?:\/\/[^)\s]{1,600})\)/g;
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^(www|m)\./, "");
+  } catch {
+    return url;
+  }
+};
 const squash = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 
 function useResolver(wiki: Wiki) {
@@ -120,10 +129,24 @@ function inline(text: string, resolve: ReturnType<typeof useResolver>, seen: Tar
       );
     });
   };
+  text = text.replace(MD_LINK, (_all, title: string, url: string) => `[[링크:${url}|${title}]]`);
   for (const m of text.matchAll(TOKEN)) {
     pushText(text.slice(last, m.index));
     last = (m.index ?? 0) + m[0].length;
     n++;
+    if (m[1] === "링크") {
+      // 웹에서 찾은 글 (새 창으로. http(s) 주소만)
+      const [url, title] = m[2].split("|");
+      if (/^https?:\/\/[^\s]+$/.test(url.trim())) {
+        out.push(
+          <a key={`${keyBase}l${n}`} className="ans-chip ans-chip-link" href={url.trim()} target="_blank" rel="noopener noreferrer">
+            <span className="ans-chip-icon">🔗</span>
+            {(title || hostOf(url)).trim()}
+          </a>,
+        );
+      } else out.push(<Fragment key={`${keyBase}l${n}`}>{title || url}</Fragment>);
+      continue;
+    }
     if (m[1] === "질문" || m[1] === "모름") continue; // 추천 질문은 아래로, 모르는 부분은 개발자에게 (아래 한 줄로만 알린다)
     const t = resolve(m[1] as Kind, m[2]);
     if (!t) {

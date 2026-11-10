@@ -3,7 +3,7 @@
 // 경험치 숫자는 본인 줄에만 넣는다 (각자만 아는 값). avatar 는 캐릭터 그림을 올린 때 (없으면 null)
 import { NEED_LOGIN, currentUser, json } from "../../server/auth";
 import type { Env, Guild, Job, Role } from "../../server/auth";
-import { weekStart } from "../../server/week";
+import { growthWeekStart } from "../../server/week";
 import { periodPoints, realStart } from "../../server/growth";
 
 type Pt = { level: number; exp: number | null };
@@ -26,7 +26,7 @@ function expUp(base: Pt | undefined, during: Pt[], now: Pt): number {
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  const { base, during } = await periodPoints(env, weekStart());
+  const { base, during } = await periodPoints(env, growthWeekStart());
   const { results } = await env.DB.prepare(
     "SELECT u.id AS id, u.role AS role, p.job AS job, p.level AS level, p.prev_level AS prev_level, p.level_at AS level_at, " +
       "p.exp AS exp, p.guild AS guild, u.high_spec AS high_spec, a.updated_at AS avatar FROM profiles p JOIN users u ON u.id = p.user_id AND u.id NOT IN ('테스트1', '테스트2') " +

@@ -3,7 +3,7 @@
 // DELETE /api/board/:id -> 지우기 (쓴 사람 또는 오피서 이상)
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { BODY_MAX, TITLE_MAX, deletePostStmts, isStaff, loadPost } from "../../../server/board";
+import { BODY_MAX, TITLE_MAX, deletePostStmts, isStaff, loadPost, shownName } from "../../../server/board";
 
 const postId = (params: Record<string, string | string[]>) => Number(params.id);
 
@@ -18,7 +18,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
     .run();
   const [files, comments, likes, views, roles] = await env.DB.batch([
     env.DB.prepare("SELECT id, name, type, size, image FROM board_files WHERE post_id = ? ORDER BY id").bind(id),
-    env.DB.prepare("SELECT id, user_id AS user, parent_id AS parent, text, created_at AS at FROM board_comments WHERE post_id = ? ORDER BY id").bind(id),
+    env.DB.prepare("SELECT id, user_id AS user, parent_id AS parent, text, anon, created_at AS at FROM board_comments WHERE post_id = ? ORDER BY id").bind(id),
     env.DB.prepare("SELECT user_id AS user FROM board_likes WHERE post_id = ?").bind(id),
     env.DB.prepare("SELECT COUNT(*) AS n FROM board_views WHERE post_id = ?").bind(id),
     env.DB.prepare(
@@ -26,14 +26,24 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
     ).bind(post.author, id),
   ]);
   const likers = (likes.results as { user: string }[]).map((r) => r.user);
+  // 익명 글·댓글(건의함)은 앱개발자·유어아너 말고는 이름 대신 '익명' (server/board.ts shownName), 내 것인지는 mine 으로만
+  const list = (comments.results as { id: number; user: string; parent: number | null; text: string; anon: number; at: number }[]).map((c) => ({
+    ...c,
+    user: shownName(me, c.user, c.anon),
+    anon: c.anon === 1,
+    mine: c.user === me.id,
+  }));
+  // 직책 표는 이름이 보이는 사람만 (익명 글쓴이의 아이디가 답에 남지 않게)
+  const author = shownName(me, post.author, post.anon);
+  const shown = new Set([author, ...list.map((c) => c.user)]);
   return json({
-    post: { ...post, pinned: post.pinned === 1 },
+    post: { ...post, author, pinned: post.pinned === 1, anon: post.anon === 1, mine: post.author === me.id },
     files: (files.results as { image: number }[]).map((f) => ({ ...f, image: f.image === 1 })),
-    comments: comments.results,
+    comments: list,
     likes: likers.length,
     liked: likers.includes(me.id),
     views: (views.results[0] as { n: number } | undefined)?.n ?? 0,
-    roles: Object.fromEntries((roles.results as { id: string; role: string }[]).map((r) => [r.id, r.role])),
+    roles: Object.fromEntries((roles.results as { id: string; role: string }[]).filter((r) => shown.has(r.id)).map((r) => [r.id, r.role])),
   });
 };
 

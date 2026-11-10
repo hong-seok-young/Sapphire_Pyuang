@@ -28,6 +28,8 @@ const KIND_TITLE = {
   app_news: "✨ 새 기능",
   devreq: "📮 개발 요청",
   bday: "🎂 생일 축하해요!",
+  gcoin: "🪙 성장코인샵",
+  donate: "🎁 기부함",
 };
 
 self.addEventListener("install", () => self.skipWaiting());
