@@ -47,7 +47,12 @@ def main() -> None:
         for f in pics.values():
             shutil.copy2(f, out_pics / f.name)
     entries = []
+    # 기간이 있는 이벤트성 도감(특정 기간만 효과)은 계산기에서 다루지 않는다 (제작자 2026-11-10 '이벤트성 도감은 취급하지 않음').
+    # 자료 파일에는 기록으로 남겨 둔다
+    events = [e["name"] for e in raw["entries"] if e.get("period")]
     for e in raw["entries"]:
+        if e.get("period"):
+            continue
         items = []
         for it in e["items"]:
             name = it.get("name")
@@ -72,7 +77,7 @@ def main() -> None:
     unknown = sorted({s for e in entries for s, _, _ in e["effects"]} - set(order))
     data = {"source": raw.get("source", "게임 도감 퀘스트 (제작자 영상)"), "built": date.today().isoformat(), "order": order, "entries": entries}
     (OUT / "dex.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    print("도감 계산기", {"항목": len(entries), "아이템 칸": sum(len(e["items"]) for e in entries),
+    print("도감 계산기", {"항목": len(entries), "뺀 이벤트 도감": len(events), "아이템 칸": sum(len(e["items"]) for e in entries),
                      "이름 모름": sum(1 for e in entries for i in e["items"] if not i["name"]), "그림": len(pics),
                      "순서표에 없는 능력치": unknown})
 
