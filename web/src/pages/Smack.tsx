@@ -1,6 +1,6 @@
 // 운영진 때리기 (개발 요청 #10: 현금술사 님 신청, 길마 결재. 제작자 2026-11-09 '우선 나한테만 보이게 해줘, 알아서 만들고').
 // 길드마스터·오피서의 캐릭터 사진(없으면 직업 엠블럼)을 두드린다: 데미지 숫자, 크리티컬, 죽음의 일격, HP 가 0 이 되면 K.O. 와 다시 차오름, 콤보.
-// 타격 모양은 src/smackFx.ts HIT_FX 한 곳 (제작자가 줄 인게임 영상을 보고 고친다). 기록은 3초마다 모아 서버에 (functions/api/smack).
+// 타격 모양은 src/smackFx.ts HIT_FX 한 곳 (제작자가 보낸 인게임 영상을 따랐다, 숫자와 CRITICAL! · DEADLY! 는 영상에서 오린 그림). 기록은 3초마다 모아 서버에 (functions/api/smack).
 // 누를 때마다 React 를 다시 그리지 않고 DOM 을 바로 고친다 (초당 25번 눌러도 느린 폰에서 멈추지 않게, 생일 스티커와 같은 방법).
 // 게임과 상관없는 놀이라 게임 안전 규칙에 맞는다
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -11,7 +11,7 @@ import type { Job, Me, Role } from "../auth";
 import { JobEmblem } from "../emblems";
 import { Nick } from "../kakao";
 import { Fx } from "../birthdayFx";
-import { HIT_FX, hpOf, koBurst, restartAs, rollHit, spawnNumber, replayAnim } from "../smackFx";
+import { HIT_FX, hpOf, koBurst, loadSmackArt, restartAs, rollHit, spawnNumber, replayAnim } from "../smackFx";
 import { Loading, TopBar } from "../ui";
 
 interface Target {
@@ -113,6 +113,10 @@ export function SmackPage({ me, arg }: { me: Me; arg: string }) {
   const [tryN, setTryN] = useState(0);
   // 목록으로 돌아올 때마다 보내고 새로 받는다
   const listing = !arg;
+  // 영상에서 오린 숫자·글씨 그림을 미리 받아 둔다
+  useEffect(() => {
+    void loadSmackArt();
+  }, []);
   useEffect(() => {
     let live = true;
     setError(undefined);
