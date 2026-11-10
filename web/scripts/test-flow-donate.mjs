@@ -115,17 +115,20 @@ try {
   const h2 = await hallOf(MEMBER);
   ok(Math.abs(h2.earned - h0.earned - 15.3) < 1e-6, `명예의 전당 +${(h2.earned - h0.earned).toFixed(2)} (15.3)`);
 
-  // 7) 예전 기부(status hall, scripts/donate-hall-seed.mjs)는 명예의 전당에만: 그 사람이 새로 기부해도 예전 기부 골드로 마일리지가 생기지 않는다
+  // 7) 예전 기부(status hall, scripts/donate-hall-seed.mjs)도 마일리지에 든다: 예전 기부가 있는 사람에게 새로 확정하면 합으로 셈해 차이만 준다
   const old = (await api(STAFF, "/api/donate/hall?period=all")).j.hall.find((x) => x.gold >= 1_000_000 && x.names.every((n) => n !== MEMBER));
   if (old) {
     const name = old.names[0];
+    const usable = (g) => Math.floor((g * 6) / 1_000_000);
     const mBefore = (await api(STAFF, `/api/rent/mileage?who=${encodeURIComponent(name)}`)).j?.mileage;
-    const d = await api(STAFF, "/api/donate", "POST", { confirm: true, who: name, item: "시험 골드", qty: 1, gold: 100_000 });
+    const add = 1_000_000 - (old.gold % 1_000_000) + 50_000; // 정수 💎 경계를 넘게
+    const want = usable(old.gold + add) - usable(old.gold);
+    const d = await api(STAFF, "/api/donate", "POST", { confirm: true, who: name, item: "시험 골드", qty: 1, gold: add });
     made.donations.push(d.j?.id);
-    ok(d.s === 200 && d.j.dia === 0, `예전 기부가 있는 ${name} 님에게 10만 확정 -> 💎+${d.j?.dia} (0, 예전 기부는 마일리지에 안 듦)`);
+    ok(d.s === 200 && d.j.dia === want, `예전 기부가 있는 ${name} 님에게 ${add} 확정 -> 💎+${d.j?.dia} (${want}, 예전 기부와 합쳐 셈)`);
     const h = (await api(STAFF, "/api/donate/hall?period=all")).j.hall.find((x) => x.names.includes(name));
-    ok(h && h.gold === old.gold + 100_000, `명예의 전당 ${name} ${old.gold} -> ${h?.gold}`);
-    if (mBefore !== undefined) ok((await api(STAFF, `/api/rent/mileage?who=${encodeURIComponent(name)}`)).j?.mileage === mBefore, "장부 마일리지 그대로");
+    ok(h && h.gold === old.gold + add, `명예의 전당 ${name} ${old.gold} -> ${h?.gold}`);
+    if (mBefore !== undefined) ok((await api(STAFF, `/api/rent/mileage?who=${encodeURIComponent(name)}`)).j?.mileage === mBefore + want, `장부 마일리지 +${want}`);
   } else console.log("SKIP 예전 기부가 없어 건너뜀 (scripts/donate-hall-seed.mjs --local 로 넣으면 시험)");
 } finally {
   // 정리: 올린 물건 내리기, 기부 지우기 (마일리지는 기부 지울 때 같이 빠진다. 대여·반납 장부 줄은 남는다)
