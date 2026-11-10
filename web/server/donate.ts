@@ -32,7 +32,7 @@ export const earnedDia = (gold: number) => (gold * MILEAGE_RATE) / DIA_GOLD;
 /** 장부 줄 note 머리 (장비대여 기부와 가린다) */
 export const NOTE_HEAD = "기부함 · ";
 
-/** hall = 기부함 전의 예전 기부 (제작자가 준 기부자별 내역, 명예의 전당에만. 마일리지 장부와 syncDia 에는 들지 않는다, scripts/donate-hall-seed.mjs) */
+/** hall = 기부함 전의 예전 기부 (제작자가 준 기부자별 내역, scripts/donate-hall-seed.mjs). 확정 기부와 같이 마일리지에 들고(syncDia), 운영의 받은 템 목록에는 안 나온다 */
 export type DonateStatus = "request" | "done" | "rejected" | "removed" | "hall";
 export type DonatePlace = "keep" | "rent" | "used";
 export interface DonateRow {
@@ -93,7 +93,7 @@ export function readDonate(b: Record<string, unknown>): { error: string } | { it
  */
 export async function syncDia(env: Env, who: string, rowId: number, label: string, by: string): Promise<{ error?: string; diff: number; mileage: number }> {
   const s = await env.DB.prepare(
-    "SELECT COALESCE(SUM(CASE WHEN status = 'done' THEN gold ELSE 0 END), 0) AS gold, COALESCE(SUM(dia), 0) AS dia FROM donate_items WHERE who = ?",
+    "SELECT COALESCE(SUM(CASE WHEN status IN ('done', 'hall') THEN gold ELSE 0 END), 0) AS gold, COALESCE(SUM(dia), 0) AS dia FROM donate_items WHERE who = ?",
   )
     .bind(who)
     .first<{ gold: number; dia: number }>();
