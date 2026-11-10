@@ -832,6 +832,10 @@ NUM_MISMATCH: dict[str, list[str]] = {}
 _RANGE_MAX: dict[tuple[str, str], int] = {}
 # 숫자만 적을 때 그 물건에 쓸모 있는 옵션(유효옵)만 적은 것: 물건마다 다르다 (제작자 2026-11-10 '유효옵만 적은 거라 레인저는 마재 빼고 크리 3 민 5',
 # '템마다 다를 듯 해서 그때그때 물어봐'). 확인받은 물건만 적고, 없는 물건은 숫자 수가 위키 옵션 수와 맞을 때만 읽는다
+# 숫자를 그대로 읽을 수 없어 제작자가 정해 준 것 (물건, 숫자) -> 옵션
+NUM_FIXED = {
+    ("샤쿤그리브", "226"): ["힘2", "이속6"],  # 제작자 2026-11-10 '그냥 2 6 인듯' (공식 확률표도 힘·이동속도 둘뿐)
+}
 EFFECTIVE_OPTS = {
     "데조르바의보우": ["크리", "민첩"],  # 35칠데조 = 크리3 민첩5 (마재는 안 적음)
 }
@@ -871,6 +875,9 @@ def num_opts(name: str, lead: str, words: list[str]) -> list[str]:
         return []
     if not lead and len(words) == 1 and len(words[0]) >= 2:
         lead, words = words[0], []  # '4311 5광부', '35 칠데조': 따로 떨어진 숫자 하나도 한 자리씩
+    fixed = NUM_FIXED.get((re.sub(r"\s", "", name), lead))
+    if fixed:
+        return list(fixed)
     n = len(lead) if lead else (len(words[0]) if len(words) == 1 and len(words[0]) >= 2 else len(words))
     eff = EFFECTIVE_OPTS.get(re.sub(r"\s", "", name))
     if n != len(stats) and eff and len(eff) == n:
