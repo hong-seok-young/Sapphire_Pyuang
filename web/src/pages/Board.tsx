@@ -70,9 +70,6 @@ export function SuggestPage({ me, arg, sub, query }: { me: Me; arg: string; sub:
       {tab === "write" ? (
         <section className="sg-home">
           <a className="sg-big" href="#/suggest/write">
-            <span className="sg-big-icon" aria-hidden>
-              💡
-            </span>
             <b>건의하기</b>
             <span className="sg-big-shine" aria-hidden />
           </a>
@@ -159,6 +156,7 @@ function List({ me, cat, box }: { me: Me; cat: Cat | null; box?: "mine" | "inbox
   const [busy, setBusy] = useState(false);
   // 건의함(내 건의함·접수함)은 보는 동안 30초마다·다시 볼 때 새로 받아 결재 상황이 바로 바뀐다
   const [tick, setTick] = useState(0);
+  const [open, setOpen] = useState<number | null>(null);
   useEffect(() => {
     if (!box) return;
     const bump = () => document.visibilityState === "visible" && setTick((t) => t + 1);
@@ -245,8 +243,17 @@ function List({ me, cat, box }: { me: Me; cat: Cat | null; box?: "mine" | "inbox
       ) : (
         <ul className="bd-list">
           {posts.map((p) => (
-            <li key={p.id}>
-              <a className={"bd-row" + (p.pinned ? " bd-pinned" : "")} href={`${base}/${p.id}`}>
+            <li key={p.id} className={box && open === p.id ? "sg-open" : undefined}>
+              <a
+                className={"bd-row" + (p.pinned ? " bd-pinned" : "")}
+                href={`${base}/${p.id}`}
+                aria-expanded={box ? open === p.id : undefined}
+                onClick={(e) => {
+                  if (!box) return;
+                  e.preventDefault();
+                  setOpen(open === p.id ? null : p.id);
+                }}
+              >
                 <span className="bd-row-main">
                   <span className="bd-row-title">
                     {p.pinned && <i className="bd-pin">고정</i>}
@@ -255,7 +262,7 @@ function List({ me, cat, box }: { me: Me; cat: Cat | null; box?: "mine" | "inbox
                     {p.title}
                     <ThingDot k={`post:${p.id}`} />
                   </span>
-                  {p.snippet && <span className="bd-row-snippet">{p.snippet.replace(/\s+/g, " ")}</span>}
+                  {p.snippet && !(box && open === p.id) && <span className="bd-row-snippet">{p.snippet.replace(/\s+/g, " ")}</span>}
                   <small>
                     <AnonName name={p.author} anon={p.anon} mine={p.mine}>
                       <Nick name={p.author} /> <KakaoButton name={p.author} nested />
@@ -268,6 +275,20 @@ function List({ me, cat, box }: { me: Me; cat: Cat | null; box?: "mine" | "inbox
                 </span>
                 {p.thumb && <img className="bd-thumb" src={fileUrl(p.thumb)} alt="" loading="lazy" decoding="async" width={56} height={56} />}
               </a>
+              {box && open === p.id && (
+                <div className="sg-inline">
+                  <PostView
+                    me={me}
+                    id={p.id}
+                    box
+                    inline
+                    onGone={() => {
+                      setOpen(null);
+                      setTick((t) => t + 1);
+                    }}
+                  />
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -357,7 +378,8 @@ function Body({ text }: { text: string }) {
   );
 }
 
-function PostView({ me, id, box }: { me: Me; id: number; box?: boolean }) {
+/** 글 하나. inline 이면 건의함 목록 줄 아래에 그 자리에서 펼친다 (위 줄·제목 없이, 제작자 2026-11-10 '개발 요청처럼 여기서 누르면 이 화면에서 결재 진행 상황, 대화') */
+function PostView({ me, id, box, inline, onGone }: { me: Me; id: number; box?: boolean; inline?: boolean; onGone?: () => void }) {
   const [d, setD] = useState<PostDetail | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -389,7 +411,9 @@ function PostView({ me, id, box }: { me: Me; id: number; box?: boolean }) {
     };
   }, [watching, reload]);
 
-  if (!d) return (
+  if (!d) return inline ? (
+    <Loading error={error} />
+  ) : (
     <>
       <TopBar title={box ? "건의함" : "게시판"} />
       <Loading error={error} />
@@ -415,12 +439,14 @@ function PostView({ me, id, box }: { me: Me; id: number; box?: boolean }) {
 
   return (
     <>
-      <TopBar title={box ? "건의함" : CAT_NAME[post.cat]} />
-      <article className="panel bd-post">
-        <h1 className="bd-title">
-          {post.pinned && <i className="bd-pin">고정</i>}
-          {post.title}
-        </h1>
+      {!inline && <TopBar title={box ? "건의함" : CAT_NAME[post.cat]} />}
+      <article className={"panel bd-post" + (inline ? " bd-post-inline" : "")}>
+        {!inline && (
+          <h1 className="bd-title">
+            {post.pinned && <i className="bd-pin">고정</i>}
+            {post.title}
+          </h1>
+        )}
         <div className="bd-meta">
           <AnonName name={post.author} anon={post.anon} mine={mine}>
             <b>
@@ -465,7 +491,7 @@ function PostView({ me, id, box }: { me: Me; id: number; box?: boolean }) {
           >
             {d.liked ? "♥" : "♡"} {d.likes}
           </button>
-          {staff(me) && (
+          {staff(me) && !box && (
             <button className="pill" disabled={busy} onClick={() => run(async () => {
               await updatePost(id, { pinned: !post.pinned });
               reload();
@@ -482,7 +508,8 @@ function PostView({ me, id, box }: { me: Me; id: number; box?: boolean }) {
             (confirm ? (
               <button className="pill pill-danger" disabled={busy} onClick={() => run(async () => {
                 await deletePost(id);
-                // 건의함은 내 건의함이나 접수함으로
+                // 목록 안에서 펼친 것이면 목록을 다시, 건의함은 내 건의함이나 접수함으로
+                if (onGone) return onGone();
                 go(box ? (mine || !staff(me) ? "#/suggest?v=mine" : "#/suggest?v=inbox") : base, true);
               })}>
                 삭제 확인
@@ -504,6 +531,7 @@ function PostView({ me, id, box }: { me: Me; id: number; box?: boolean }) {
         since={since}
         onChange={(comments) => setD({ ...d, comments })}
         anonOk={!!box && post.cat === "suggest"}
+        noun={box ? "대화" : "댓글"}
       />
     </>
   );

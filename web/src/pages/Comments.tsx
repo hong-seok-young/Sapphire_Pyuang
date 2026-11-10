@@ -31,7 +31,7 @@ export function AnonName({ name, anon, mine, children }: { name: string; anon?: 
   );
 }
 
-export function Comments({ me, id, comments, roles, since, onChange, add = addComment, remove: removeApi = deleteComment, anonOk = false }: {
+export function Comments({ me, id, comments, roles, since, onChange, add = addComment, remove: removeApi = deleteComment, anonOk = false, noun = "댓글" }: {
   me: Me;
   id: number;
   comments: BoardComment[];
@@ -44,6 +44,8 @@ export function Comments({ me, id, comments, roles, since, onChange, add = addCo
   remove?: (commentId: number) => Promise<unknown>;
   /** 익명 댓글을 쓸 수 있는지 (건의함 글) */
   anonOk?: boolean;
+  /** 칸 이름 (건의함은 '대화', 제작자 2026-11-10 '개발 요청처럼 대화도') */
+  noun?: string;
 }) {
   const [text, setText] = useState("");
   const [anon, setAnon] = useState(false);
@@ -108,7 +110,9 @@ export function Comments({ me, id, comments, roles, since, onChange, add = addCo
 
   return (
     <section className="panel bd-comments">
-      <h2 className="panel-title">댓글 {comments.length}</h2>
+      <h2 className="panel-title">
+        {noun} {comments.length}
+      </h2>
       <ul>
         {top.map((c) => (
           <Fragment key={c.id}>
@@ -134,7 +138,7 @@ export function Comments({ me, id, comments, roles, since, onChange, add = addCo
             익명
           </button>
         )}
-        <input className="mk-input" value={text} maxLength={500} onChange={(e) => setText(e.target.value)} placeholder={reply ? "답글" : "댓글"} />
+        <input className="mk-input" value={text} maxLength={500} onChange={(e) => setText(e.target.value)} placeholder={reply ? "답글" : noun} />
         <button className="pill" disabled={busy || !text.trim()}>
           등록
         </button>
