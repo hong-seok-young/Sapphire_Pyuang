@@ -111,6 +111,8 @@ export const ITEMS: LaunchItem[] = [
   // 열 때는 managers·soon·badge 를 빼고 GCOIN_OPEN (CLAUDE.md '2군 성장코인샵')
   // 기부함 (개발중, 제작자 2026-11-10 길드 톡방 '모든 템 기부하게 따로 기부함', '마일리지 순위표, 명예의 전당'). 열 때는 managers·soon·badge 를 빼고 DONATE_OPEN
   { key: "donate", title: "기부함", to: "#/donate", icon: "🎁", managers: !DONATE_OPEN, soon: !DONATE_OPEN, badge: "개발중", match: ["donate"] },
+  // 명예의 전당 (개발중, 제작자 2026-11-10 '명예의 전당은 별도 버튼으로'): 기부로 쌓인 마일리지 순위. 기부함과 같이 연다 (DONATE_OPEN)
+  { key: "hall", title: "명예의 전당", short: "명예의 전당", to: "#/hall", icon: "🏆", managers: !DONATE_OPEN, soon: !DONATE_OPEN, badge: "개발중", match: ["hall"] },
   { key: "gcoin", title: "성장코인샵", short: "코인샵", to: "#/gcoin", icon: "🪙", ribbon: "2군 전용", ring: "silver", managers: !GCOIN_OPEN, soon: !GCOIN_OPEN, badge: "개발중", match: ["gcoin"] },
   { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
   // 헬스 루틴 (개발중, 길드원 완뻔치 님 개발 요청 #8, 제작자 2026-11-09 '플릭 같은 헬스 어플'): 실제 헬스장 운동 기록 (pages/Fit.tsx). 게임과 상관없다
@@ -203,7 +205,7 @@ function build(dock: string[], slots: string[], search: boolean): Layout {
 /** 처음 배치 (제작자 요청 2026-11-02: 제작자 폰의 배치 그대로 '이걸 기본 배치로') */
 export const DEFAULT_LAYOUT: Layout = {
   dock: ["home", "board", "info", "search", "chat"],
-  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "trend", "enhance", "sim", "simtest", "devreq", "suggest", "fit", "app", "smack", "gcoin", "donate"],
+  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "trend", "enhance", "sim", "simtest", "devreq", "suggest", "fit", "app", "smack", "gcoin", "donate", "hall"],
 };
 
 /**

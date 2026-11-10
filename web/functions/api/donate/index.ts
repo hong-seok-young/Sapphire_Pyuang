@@ -1,27 +1,22 @@
 // GET /api/donate?period=all|month -> 기부함 (server/donate.ts, src/pages/Donate.tsx)
-//   { manage, hall: 명예의 전당, lines: 최근 기부 120건, mine: 내 기부(신청 포함), staff?: { pending, store } }
+//   { manage, me: 내 명예의 전당 줄(쌓인 마일리지·남은 💎), lines: 최근 기부 120건, mine: 내 기부(신청 포함), staff?: { pending, store } }
+//   명예의 전당은 따로 (functions/api/donate/hall.ts, 화면 #/hall)
 // POST /api/donate { item, qty, enhance, note, gold, who?, confirm? }
 //   길드원: 기부 신청 (gold 는 내가 적은 가치, 운영진이 고쳐서 확정). 운영진이 confirm 이면 who 의 기부로 바로 확정하고 마일리지를 준다
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { canManageDonate, canUseDonate, donateLabel, goldText, hallOfFame, notifyDonateStaff, notifyDonor, readDonate, syncDia } from "../../../server/donate";
+import { canManageDonate, canUseDonate, donateLabel, earnedDia, goldText, hallOfFame, notifyDonateStaff, notifyDonor, readDonate, syncDia } from "../../../server/donate";
 import type { DonateRow } from "../../../server/donate";
-
-/** 한국 시간 이번 달 1일 0시 */
-function monthStart(now = Date.now()): number {
-  const d = new Date(now + 9 * 3_600_000);
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1) - 9 * 3_600_000;
-}
+import { mileageOfName } from "../../../server/rental";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!canUseDonate(me)) return FORBIDDEN();
-  const period = new URL(request.url).searchParams.get("period") === "month" ? "month" : "all";
   const manage = canManageDonate(me);
   const chars = me.chars ?? [me.id];
   const [hall, mine, pending, store] = await Promise.all([
-    hallOfFame(env, period === "month" ? monthStart() : 0),
+    hallOfFame(env, 0),
     env.DB.prepare(
       `SELECT * FROM donate_items WHERE who IN (SELECT value FROM json_each(?)) AND status != 'removed' ORDER BY created_at DESC LIMIT 100`,
     )
@@ -32,10 +27,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       ? env.DB.prepare("SELECT * FROM donate_items WHERE status = 'done' ORDER BY COALESCE(done_at, created_at) DESC LIMIT 300").all<DonateRow>()
       : null,
   ]);
+  const mineRow = hall.rows.find((h) => h.names.some((n) => chars.includes(n))) ?? null;
+  // 남은 💎 는 앞 30명만 세어 두므로 내 것은 따로 (장비대여 보증금으로 쓴 것까지 뺀 지금 값)
+  if (mineRow) mineRow.mileage = await mileageOfName(env, mineRow.name);
   return json({
     manage,
-    period,
-    hall: hall.rows,
+    me: mineRow,
     lines: hall.lines.slice(0, 120),
     mine: mine.results,
     ...(manage ? { staff: { pending: pending?.results ?? [], store: store?.results ?? [] } } : {}),
@@ -68,7 +65,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     await notifyDonor(
       env,
       who,
-      `🎁 기부 확정 · ${label} ${goldText(v.gold)} 골드${s.diff ? ` · 마일리지 💎+${s.diff}` : ""} · 지금 💎${s.mileage}`,
+      `🎁 기부 확정 · ${label} ${goldText(v.gold)} 골드 · 마일리지 +${earnedDia(v.gold).toFixed(1)}${s.diff ? ` (쓸 수 있는 💎+${s.diff})` : ""} · 지금 💎${s.mileage}`,
       me.id,
     );
     return json({ id, dia: s.diff, mileage: s.mileage });

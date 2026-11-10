@@ -121,6 +121,7 @@ export const TITLE_EN: Record<string, string> = {
   "운영진 때리기": "STRESS RELIEF",
   성장코인샵: "GROWTH COIN SHOP",
   기부함: "DONATION BOX",
+  "명예의 전당": "HALL OF FAME",
 };
 
 export function TopBar({

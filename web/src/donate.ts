@@ -27,7 +27,10 @@ export interface DonateRow {
 export interface HallRow {
   name: string;
   names: string[];
+  /** 기부 골드 가치 합 */
   gold: number;
+  /** 기부로 쌓인 마일리지 (소수, 순위는 이것으로) */
+  earned: number;
   count: number;
   mileage: number;
   last: number;
@@ -49,8 +52,8 @@ export interface GiftLine {
 
 export interface DonateData {
   manage: boolean;
-  period: "all" | "month";
-  hall: HallRow[];
+  /** 내 명예의 전당 줄 (쌓인 마일리지, 남은 💎) */
+  me: HallRow | null;
   lines: GiftLine[];
   mine: DonateRow[];
   staff?: { pending: DonateRow[]; store: DonateRow[] };
@@ -58,8 +61,18 @@ export interface DonateData {
 
 /** 💎 1개 = 10만 골드 (장비대여와 같다) */
 export const DIA_GOLD = 100_000;
+/** 기부 골드 가치의 0.6 이 마일리지 (서버 server/donate.ts MILEAGE_RATE 와 같다. 제작자 2026-11-10) */
+export const MILEAGE_RATE = 0.6;
 
-export const fetchDonate = (period: "all" | "month") => api<DonateData>(`/api/donate?period=${period}`);
+export const fetchDonate = () => api<DonateData>("/api/donate");
+
+export interface HallData {
+  period: "all" | "month";
+  hall: HallRow[];
+  lines: GiftLine[];
+  total: { earned: number; gold: number; count: number; people: number };
+}
+export const fetchHall = (period: "all" | "month") => api<HallData>(`/api/donate/hall?period=${period}`);
 
 export interface DonateInput {
   item: string;
@@ -92,11 +105,13 @@ export function goldText(g: number): string {
   return g.toLocaleString();
 }
 
-/** 확정 골드에 들어 있는 💎 (소수 한 자리, '💎 1.5') */
-export const diaText = (gold: number) => {
-  const d = gold / DIA_GOLD;
-  return Number.isInteger(d) ? `${d}` : d.toFixed(1);
+/** 마일리지 글자 (소수 둘째 자리까지, 끝의 0 은 뺀다: '3', '1.5', '0.36') */
+export const mileText = (m: number) => {
+  const r = Math.round(m * 100) / 100;
+  return Number.isInteger(r) ? r.toLocaleString() : r.toFixed(2).replace(/0$/, "");
 };
+/** 골드 가치로 쌓이는 마일리지 글자 (x 0.6 / 10만) */
+export const diaText = (gold: number) => mileText((gold * MILEAGE_RATE) / DIA_GOLD);
 
 export const STATUS_NAME: Record<DonateStatus, string> = { request: "확인 전", done: "확정", rejected: "거절", removed: "지움" };
 export const PLACE_NAME: Record<DonatePlace, string> = { keep: "보관", rent: "장비대여로", used: "나눔·사용" };

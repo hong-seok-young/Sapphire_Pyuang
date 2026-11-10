@@ -709,3 +709,20 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
     console.log("성장코인샵 시범운영 값 (한 번)");
   }
 }
+
+// 기부함 마일리지를 기부 골드 가치의 0.6 으로 (제작자 2026-11-10 '기부한 골드 가치의 x 0.6 이 마일리지로 쌓이는 거임, 10만 골드당 1, 소수점은 누적, 정수 부분만 사용').
+// 그 전에 확정한 기부(1.0 으로 넣은 💎)를 사람마다 floor(골드 합 x 0.6 / 10만) 에 맞춰 차이를 장부에 한 줄 넣고, 그 사람의 가장 최근 기부 줄 dia 에 더한다. setup 'donate_rate_06_20261110' 로 한 번만
+{
+  const KEY = "donate_rate_06_20261110";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const now = Date.now();
+    const target = "(SELECT CAST(SUM(CASE WHEN x.status = 'done' THEN x.gold ELSE 0 END) * 6 / 1000000 AS INTEGER) - SUM(x.dia) FROM donate_items x WHERE x.who = %W)";
+    runSql([
+      `INSERT INTO rental_mileage (who, delta, reason, note, by_user, created_at) SELECT who, diff, 'donate', '기부함 · 마일리지 0.6 반영', 'system', ${now} ` +
+        `FROM (SELECT d.who AS who, ${target.replace("%W", "d.who")} AS diff FROM donate_items d GROUP BY d.who) WHERE diff != 0;`,
+      `UPDATE donate_items SET dia = dia + ${target.replace("%W", "donate_items.who")} WHERE id IN (SELECT MAX(id) FROM donate_items GROUP BY who);`,
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+    ]);
+    console.log("기부함 마일리지 0.6 반영 (한 번)");
+  }
+}

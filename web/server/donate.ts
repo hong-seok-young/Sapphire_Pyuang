@@ -2,8 +2,8 @@
 // 마을모금함 '마일리지 순위표 뭐 이런 거 명예의 전당'). 화면 src/pages/Donate.tsx, API functions/api/donate.
 // - 길드원이 게임 안에서 운영진에게 템을 넘기면, 길드원이 웹으로 기부 신청(골드 가치를 적어서)하거나 운영진이 직접 적는다.
 //   운영진이 골드 가치를 고쳐 확정하면 장비대여와 같은 마일리지(💎 1 = 10만 골드, rental_mileage reason 'donate')로 쌓인다.
-// - 💎 는 줄마다 내림하지 않고 그 사람이 확정받은 골드 합의 내림으로 센다 (5만 + 5만 = 💎1). donate_items.dia 는 그 줄로 장부에 넣은 몫이고,
-//   한 사람의 dia 합 = floor(확정 골드 합 / 10만) 을 늘 지킨다 (syncDia).
+// - 마일리지는 기부 골드 가치의 0.6 (10만 골드당 💎1, MILEAGE_RATE). 소수점은 줄마다 버리지 않고 그 사람이 확정받은 골드 합으로 누적하고 정수 부분만 쓴다
+//   (10만 + 10만 + 10만 + 10만 + 10만 = 💎3). donate_items.dia 는 그 줄로 장부에 넣은 몫이고, 한 사람의 dia 합 = floor(확정 골드 합 x 0.6 / 10만) 을 늘 지킨다 (syncDia).
 // - 장비대여 쪽은 건드리지 않는다 (제작자): 장비대여 '물건 추가·기부 현황'에서 적립한 기부는 그대로 두고 여기 명예의 전당·내역에 같이 보인다.
 //   여기서 넣은 장부 줄은 note 가 '기부함 · ' 으로 시작해서 장비대여 기부와 가린다.
 // - 받은 템을 장비대여용으로 쓰면 '장비대여로' 로 rental_items 에 물건을 만든다 (마일리지는 여기서 이미 줬으니 장비대여 기부 💎 는 0).
@@ -18,6 +18,15 @@ export const DONATE_OPEN = false;
 export const canUseDonate = (me: User) => DONATE_OPEN || RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
 /** 확정·고치기·장비대여로 넘기기: 운영진 (제작자 '그 운영진이나 길마가 골드값을 매겨서 마일리지를 지급') */
 export const canManageDonate = (me: User) => RANK[me.role] >= 1;
+/**
+ * 기부 골드 가치의 0.6 이 마일리지 (10만 골드당 💎1. 제작자 2026-11-10 '장비 기부든 뭐 기부든 기부한 골드 가치의 x 0.6 이 마일리지로 쌓이는 거임,
+ * 소수점은 누적시켜 놓고 정수 부분만 사용 가능하게'). 소수점은 사람마다 확정 골드 합으로 누적되고, 장부(rental_mileage)에는 정수 부분만 들어간다
+ */
+export const MILEAGE_RATE = 0.6;
+/** 골드 합 -> 쓸 수 있는 💎 (정수, 내림). 정수로만 셈해 소수 오차가 없게 */
+export const usableDia = (gold: number) => Math.floor((gold * 6) / 1_000_000);
+/** 골드 -> 쌓인 마일리지 (소수 그대로) */
+export const earnedDia = (gold: number) => (gold * MILEAGE_RATE) / DIA_GOLD;
 /** 장부 줄 note 머리 (장비대여 기부와 가린다) */
 export const NOTE_HEAD = "기부함 · ";
 
@@ -65,7 +74,7 @@ export function readDonate(b: Record<string, unknown>): { error: string } | { it
 }
 
 /**
- * 그 사람의 마일리지를 확정 골드 합에 맞춘다: 목표 💎 = floor(확정 골드 합 / 10만), 지금까지 이 기부함으로 넣은 💎 = dia 합.
+ * 그 사람의 마일리지를 확정 골드 합에 맞춘다: 목표 💎 = floor(확정 골드 합 x 0.6 / 10만), 지금까지 이 기부함으로 넣은 💎 = dia 합.
  * 차이를 장부(rental_mileage)에 한 줄로 넣고 그 차이를 바뀐 줄(rowId)의 dia 에 더한다. 빼서 남는 마일리지가 0 아래가 되면(이미 대여에 썼으면) 오류 글
  */
 export async function syncDia(env: Env, who: string, rowId: number, label: string, by: string): Promise<{ error?: string; diff: number; mileage: number }> {
@@ -74,7 +83,7 @@ export async function syncDia(env: Env, who: string, rowId: number, label: strin
   )
     .bind(who)
     .first<{ gold: number; dia: number }>();
-  const target = Math.floor((s?.gold ?? 0) / DIA_GOLD);
+  const target = usableDia(s?.gold ?? 0);
   const diff = target - (s?.dia ?? 0);
   const now = await mileageOfName(env, who);
   if (diff === 0) return { diff, mileage: now };
@@ -111,7 +120,10 @@ export interface HallRow {
   name: string;
   /** 합친 닉네임들 */
   names: string[];
+  /** 기부 골드 가치 합 (장비대여 기부는 💎 / 0.6 x 10만 으로 되돌려 센다) */
   gold: number;
+  /** 기부로 쌓인 마일리지 (소수 그대로: 기부함은 골드 x 0.6 / 10만, 장비대여 기부는 적은 💎). 순위는 이것으로 */
+  earned: number;
   count: number;
   /** 지금 남은 마일리지 💎 */
   mileage: number;
@@ -127,6 +139,7 @@ export interface GiftLine {
   who: string;
   label: string;
   gold: number;
+  /** 이 기부로 쌓인 마일리지 (소수) */
   dia: number;
   at: number;
   from: "box" | "rent";
@@ -152,8 +165,9 @@ export async function hallOfFame(env: Env, since = 0): Promise<{ rows: HallRow[]
       .all<{ id: number; who: string; delta: number; note: string | null; at: number }>(),
   ]);
   const lines: GiftLine[] = [
-    ...box.results.map((r) => ({ id: `b${r.id}`, who: r.who, label: donateLabel(r), gold: r.gold ?? 0, dia: r.dia, at: r.at, from: "box" as const, place: r.place })),
-    ...rent.results.map((r) => ({ id: `r${r.id}`, who: r.who, label: (r.note ?? "장비 기부").replace(/ 기부( \(고침\))?$/, "$1"), gold: r.delta * DIA_GOLD, dia: r.delta, at: r.at, from: "rent" as const })),
+    ...box.results.map((r) => ({ id: `b${r.id}`, who: r.who, label: donateLabel(r), gold: r.gold ?? 0, dia: earnedDia(r.gold ?? 0), at: r.at, from: "box" as const, place: r.place })),
+    // 장비대여 기부는 운영진이 💎 를 바로 적었다: 마일리지는 그대로, 골드 가치는 0.6 으로 되돌려 어림한다
+    ...rent.results.map((r) => ({ id: `r${r.id}`, who: r.who, label: (r.note ?? "장비 기부").replace(/ 기부( \(고침\))?$/, "$1"), gold: Math.round((r.delta * DIA_GOLD) / MILEAGE_RATE), dia: r.delta, at: r.at, from: "rent" as const })),
   ].sort((a, b) => b.at - a.at);
 
   const who = [...new Set(lines.map((l) => l.who))];
@@ -176,6 +190,7 @@ export async function hallOfFame(env: Env, since = 0): Promise<{ rows: HallRow[]
       name: key,
       names: [],
       gold: 0,
+      earned: 0,
       count: 0,
       mileage: 0,
       last: 0,
@@ -185,11 +200,13 @@ export async function hallOfFame(env: Env, since = 0): Promise<{ rows: HallRow[]
     };
     if (!h.names.includes(l.who)) h.names.push(l.who);
     h.gold += l.gold;
+    h.earned += l.dia;
     if (l.gold > 0) h.count++;
     h.last = Math.max(h.last, l.at);
     hall.set(key, h);
   }
-  const rows = [...hall.values()].filter((h) => h.gold > 0).sort((a, b) => b.gold - a.gold || a.last - b.last);
+  for (const h of hall.values()) h.earned = Math.round(h.earned * 100) / 100;
+  const rows = [...hall.values()].filter((h) => h.earned > 0).sort((a, b) => b.earned - a.earned || b.gold - a.gold || a.last - b.last);
   // 남은 마일리지 (앞 30명만, D1 읽기를 아끼려고)
   await Promise.all(rows.slice(0, 30).map(async (h) => (h.mileage = await mileageOfName(env, h.name))));
   return { rows, lines };

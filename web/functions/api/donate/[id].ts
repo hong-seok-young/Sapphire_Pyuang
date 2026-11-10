@@ -7,7 +7,7 @@
 // DELETE /api/donate/:id  운영진: 지우기 (확정한 줄이면 그만큼 마일리지를 뺀다). 신청한 사람: 확인 전 내 신청 취소
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { canManageDonate, canUseDonate, donateLabel, goldText, notifyDonor, readDonate, syncDia } from "../../../server/donate";
+import { canManageDonate, canUseDonate, donateLabel, earnedDia, goldText, notifyDonor, readDonate, syncDia } from "../../../server/donate";
 import type { DonateRow } from "../../../server/donate";
 import { checkItem } from "../../../server/rental";
 
@@ -76,7 +76,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
     await notifyDonor(
       env,
       row.who,
-      `🎁 기부 확정 · ${donateLabel(v)} ${goldText(v.gold)} 골드${s.diff ? ` · 마일리지 💎+${s.diff}` : ""} · 지금 💎${s.mileage}`,
+      `🎁 기부 확정 · ${donateLabel(v)} ${goldText(v.gold)} 골드 · 마일리지 +${earnedDia(v.gold).toFixed(1)}${s.diff ? ` (쓸 수 있는 💎+${s.diff})` : ""} · 지금 💎${s.mileage}`,
       me.id,
     );
     return json({ ok: true, dia: s.diff, mileage: s.mileage });

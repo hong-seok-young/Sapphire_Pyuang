@@ -1,10 +1,9 @@
 // 기부함 (개발중, 제작자 2026-11-10 길드 톡방: '모든 템을 골드로 환산하고 마일리지 환산', '기부하게 따로 기부함', 마을모금함 '마일리지 순위표, 명예의 전당').
 // 칸: 명예의 전당(전체·이번 달) · 기부 내역 · 기부하기(신청과 내 기부) · 운영(신청 확정·직접 등록·받은 템). 서버 server/donate.ts
 import { useCallback, useMemo, useState } from "react";
-import { JOBS, JOB_NAME, avatarUrl, errorText } from "../auth";
+import { JOBS, JOB_NAME, errorText } from "../auth";
 import type { Job, Me } from "../auth";
 import { useAsync } from "../data";
-import { JobEmblem, RankMedal } from "../emblems";
 import { Nick } from "../kakao";
 import { useEntryState } from "../router";
 import { wikiJobs, weaponOf } from "../rental";
@@ -18,6 +17,7 @@ import {
   confirmDonate,
   dayText,
   diaText,
+  mileText,
   donateLabel,
   editDonate,
   fetchDonate,
@@ -27,9 +27,9 @@ import {
   removeDonate,
   rentDonate,
 } from "../donate";
-import type { DonateData, DonateInput, DonateRow, HallRow } from "../donate";
+import type { DonateData, DonateInput, DonateRow } from "../donate";
 
-type Tab = "hall" | "lines" | "give" | "staff";
+type Tab = "lines" | "give" | "staff";
 type Staff = "pending" | "add" | "store";
 type StoreFilter = "keep" | "rent" | "used" | "all";
 
@@ -147,76 +147,6 @@ function DonateFields({ wiki, f, set, goldLabel = "골드 가치" }: { wiki: Wik
   );
 }
 
-function Face({ h, size }: { h: HallRow; size: number }) {
-  if (h.avatar) return <img className="growth-face" src={avatarUrl(h.name, h.avatar)} alt="" style={{ maxWidth: size, maxHeight: size }} draggable={false} />;
-  if (h.job) return <JobEmblem job={h.job} size={size} />;
-  return <span className="dn-face-none">🎁</span>;
-}
-
-/** 명예의 전당: 1~3위 단상과 그 아래 한 줄씩 */
-function Hall({ data, me, period, setPeriod }: { data: DonateData; me: Me; period: "all" | "month"; setPeriod: (p: "all" | "month") => void }) {
-  const mine = (h: HallRow) => h.names.includes(me.id) || h.name === me.id;
-  const top = data.hall.slice(0, 3);
-  const order = top.length === 3 ? [top[1], top[0], top[2]] : top;
-  return (
-    <>
-      <nav className="sub-tabs">
-        {(["all", "month"] as const).map((p) => (
-          <button key={p} className={"sub-tab" + (period === p ? " sub-tab-on" : "")} onClick={() => setPeriod(p)}>
-            {p === "all" ? "전체" : "이번 달"}
-          </button>
-        ))}
-      </nav>
-      {!data.hall.length ? (
-        <p className="empty">아직 기부가 없어요</p>
-      ) : (
-        <>
-          <div className="dn-podium">
-            {order.map((h) => {
-              const rank = data.hall.indexOf(h) + 1;
-              return (
-                <div key={h.name} className={`dn-pod dn-pod-${rank}` + (mine(h) ? " dn-me" : "")}>
-                  {rank === 1 && <span className="dn-crown">👑</span>}
-                  <span className="dn-pod-face">
-                    <Face h={h} size={rank === 1 ? 52 : 40} />
-                  </span>
-                  <RankMedal rank={rank} />
-                  <b className="dn-pod-name">
-                    <Nick name={h.name} />
-                  </b>
-                  <span className="dn-pod-gold">{goldText(h.gold)}</span>
-                  <small>
-                    {h.count}건 · 💎{diaText(h.gold)}
-                  </small>
-                  <span className="dn-pod-base" />
-                </div>
-              );
-            })}
-          </div>
-          <ol className="dn-list">
-            {data.hall.slice(3).map((h, i) => (
-              <li key={h.name} className={"dn-line" + (mine(h) ? " dn-me" : "")}>
-                <span className="dn-rank">{i + 4}</span>
-                <span className="dn-line-face">
-                  <Face h={h} size={24} />
-                </span>
-                <span className="dn-line-name">
-                  <Nick name={h.name} />
-                  <small>{h.count}건</small>
-                </span>
-                <span className="dn-line-gold">
-                  {goldText(h.gold)}
-                  <small>💎{diaText(h.gold)}</small>
-                </span>
-              </li>
-            ))}
-          </ol>
-        </>
-      )}
-    </>
-  );
-}
-
 /** 기부 내역: 기부함 확정과 장비대여 기부를 최근 것부터 */
 function Lines({ data, wiki }: { data: DonateData; wiki: Wiki | null }) {
   if (!data.lines.length) return <p className="empty">아직 기부가 없어요</p>;
@@ -237,7 +167,7 @@ function Lines({ data, wiki }: { data: DonateData; wiki: Wiki | null }) {
           <span className="dn-line-gold">
             {l.gold < 0 ? "−" : ""}
             {goldText(Math.abs(l.gold))}
-            <small>💎{l.dia > 0 ? "+" : ""}{l.dia}</small>
+            <small>💎{l.dia > 0 ? "+" : ""}{mileText(l.dia)}</small>
           </span>
         </li>
       ))}
@@ -279,8 +209,24 @@ function Give({ data, wiki, me, done }: { data: DonateData; wiki: Wiki | null; m
       setErr(errorText(e));
     }
   }
+  const m = data.me;
   return (
     <>
+      {/* 내 마일리지: 기부 골드 가치 x 0.6 이 쌓이고(소수 누적) 정수 부분만 쓴다 (제작자 2026-11-10) */}
+      <div className="dn-mile">
+        <span>
+          <small>쌓인 마일리지</small>
+          <b>{mileText(m?.earned ?? 0)}</b>
+        </span>
+        <span>
+          <small>쓸 수 있는 💎</small>
+          <b className="dn-mile-use">{m?.mileage ?? 0}</b>
+        </span>
+        <span>
+          <small>기부 가치</small>
+          <b>{goldText(m?.gold ?? 0)}</b>
+        </span>
+      </div>
       <section className="panel dn-form">
         <DonateFields wiki={wiki} f={f} set={setF} goldLabel="골드 가치 (내가 생각하는 값)" />
         {err && <p className="form-error">{err}</p>}
@@ -668,24 +614,22 @@ function Store({ rows, wiki, done }: { rows: DonateRow[]; wiki: Wiki | null; don
 
 export function DonatePage({ wiki, me }: { wiki: Wiki | null; me: Me }) {
   const asked = new URLSearchParams(location.hash.split("?")[1] ?? "").get("t");
-  const [tab, setTab] = useEntryState<Tab>("dn.tab", asked === "staff" ? "staff" : asked === "mine" ? "give" : "hall");
+  const [tab, setTab] = useEntryState<Tab>("dn.tab", asked === "staff" ? "staff" : asked === "lines" ? "lines" : "give");
   const [staff, setStaff] = useEntryState<Staff>("dn.staff", "pending");
-  const [period, setPeriod] = useEntryState<"all" | "month">("dn.period", "all");
   const [reload, setReload] = useState(0);
   const [notice, setNotice] = useState("");
   const { data, error } = useAsync(
-    useCallback(() => fetchDonate(period), [period, reload]),
-    `donate:${period}`,
+    useCallback(() => fetchDonate(), [reload]),
+    "donate",
   );
   if (!data) return <Loading error={error} />;
   const pending = data.staff?.pending.length ?? 0;
   const tabs: { key: Tab; label: string }[] = [
-    { key: "hall", label: "명예의 전당" },
-    { key: "lines", label: "기부 내역" },
     { key: "give", label: "기부하기" },
+    { key: "lines", label: "기부 내역" },
     ...(data.manage ? [{ key: "staff" as Tab, label: `운영${pending ? ` ${pending}` : ""}` }] : []),
   ];
-  const shown = tabs.some((t) => t.key === tab) ? tab : "hall";
+  const shown = tabs.some((t) => t.key === tab) ? tab : "give";
   const done = (msg: string) => {
     setNotice(msg);
     setReload((n) => n + 1);
@@ -730,7 +674,6 @@ export function DonatePage({ wiki, me }: { wiki: Wiki | null; me: Me }) {
         </nav>
       )}
       {notice && <p className="form-note dn-notice">{notice}</p>}
-      {shown === "hall" && <Hall data={data} me={me} period={period} setPeriod={setPeriod} />}
       {shown === "lines" && <Lines data={data} wiki={wiki} />}
       {shown === "give" && <Give key={reload} data={data} wiki={wiki} me={me} done={done} />}
       {shown === "staff" && data.staff && staff === "pending" && <Pending key={reload} rows={data.staff.pending} wiki={wiki} done={done} />}
