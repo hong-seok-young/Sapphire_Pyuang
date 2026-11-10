@@ -4,7 +4,8 @@
 //   운영진이 골드 가치를 고쳐 확정하면 장비대여와 같은 마일리지(💎 1 = 10만 골드, rental_mileage reason 'donate')로 쌓인다.
 // - 마일리지는 기부 골드 가치의 0.6 (10만 골드당 💎1, MILEAGE_RATE). 소수점은 줄마다 버리지 않고 그 사람이 확정받은 골드 합으로 누적하고 정수 부분만 쓴다
 //   (10만 + 10만 + 10만 + 10만 + 10만 = 💎3). donate_items.dia 는 그 줄로 장부에 넣은 몫이고, 한 사람의 dia 합 = floor(확정 골드 합 x 0.6 / 10만) 을 늘 지킨다 (syncDia).
-// - 장비대여 쪽은 건드리지 않는다 (제작자): 장비대여 '물건 추가·기부 현황'에서 적립한 기부는 그대로 두고 여기 명예의 전당·내역에 같이 보인다.
+// - 장비대여 쪽은 건드리지 않는다 (제작자): 장비대여 '물건 추가·기부 현황'에서 적립한 기부 💎 는 마일리지로 그대로 쓴다. 명예의 전당에는 넣지 않는다
+//   (2026-11-10 기부함 전의 기부는 제작자가 준 기부자별 내역을 예전 기부(status hall)로 넣었다: 그 내역에 장비 기부도 다 있다).
 //   여기서 넣은 장부 줄은 note 가 '기부함 · ' 으로 시작해서 장비대여 기부와 가린다.
 // - 받은 템을 장비대여용으로 쓰면 '장비대여로' 로 rental_items 에 물건을 만든다 (마일리지는 여기서 이미 줬으니 장비대여 기부 💎 는 0).
 // 게임을 읽거나 게임에 무엇을 보내지 않는다 (사람이 적는 장부).
@@ -31,7 +32,8 @@ export const earnedDia = (gold: number) => (gold * MILEAGE_RATE) / DIA_GOLD;
 /** 장부 줄 note 머리 (장비대여 기부와 가린다) */
 export const NOTE_HEAD = "기부함 · ";
 
-export type DonateStatus = "request" | "done" | "rejected" | "removed";
+/** hall = 기부함 전의 예전 기부 (제작자가 준 기부자별 내역, 명예의 전당에만. 마일리지 장부와 syncDia 에는 들지 않는다, scripts/donate-hall-seed.mjs) */
+export type DonateStatus = "request" | "done" | "rejected" | "removed" | "hall";
 export type DonatePlace = "keep" | "rent" | "used";
 export interface DonateRow {
   id: number;
@@ -159,28 +161,27 @@ export interface GiftLine {
 }
 
 /**
- * 명예의 전당: 사람마다 기부한 골드 가치 합 (기부함 확정 + 장비대여 기부 💎 x 10만). since 를 주면 그때부터.
- * 같은 사람의 캐릭터는 본캐 이름으로 합친다
+ * 명예의 전당: 사람마다 기부한 골드 가치 합 (기부함 확정 + 예전 기부(status hall)). since 를 주면 그때부터.
+ * 같은 사람의 캐릭터는 본캐 이름으로 합친다.
+ * 장비대여 '물건 추가·기부 현황'에서 적은 기부 💎(rental_mileage reason 'donate')는 넣지 않는다 (제작자 2026-11-10 '기부자별 내역 이거로 적용해줘':
+ * 기부함 전의 기부는 그 내역(예전 기부)이 다 갖고 있어서 같이 세면 겹친다. 그 장부 줄은 마일리지로는 그대로 쓴다)
  */
 export async function hallOfFame(env: Env, since = 0): Promise<{ rows: HallRow[]; lines: GiftLine[] }> {
-  const [box, rent] = await Promise.all([
-    env.DB.prepare(
-      "SELECT id, who, item, qty, enhance, gold, dia, place, COALESCE(done_at, created_at) AS at FROM donate_items WHERE status = 'done' AND COALESCE(done_at, created_at) >= ? ORDER BY at DESC",
-    )
-      .bind(since)
-      .all<{ id: number; who: string; item: string; qty: number; enhance: number; gold: number; dia: number; place: DonatePlace; at: number }>(),
-    // 장비대여 기부 (물건 추가의 기부 💎, 기부 현황의 기부 적립). 고침(-) 줄도 같이 더해 순수한 합으로
-    env.DB.prepare(
-      "SELECT id, who, delta, note, created_at AS at FROM rental_mileage WHERE reason = 'donate' AND (note IS NULL OR note NOT LIKE ?) AND created_at >= ? ORDER BY created_at DESC",
-    )
-      .bind(`${NOTE_HEAD}%`, since)
-      .all<{ id: number; who: string; delta: number; note: string | null; at: number }>(),
-  ]);
-  const lines: GiftLine[] = [
-    ...box.results.map((r) => ({ id: `b${r.id}`, who: r.who, label: donateLabel(r), gold: r.gold ?? 0, dia: earnedDia(r.gold ?? 0), at: r.at, from: "box" as const, place: r.place })),
-    // 장비대여 기부는 운영진이 💎 를 바로 적었다: 마일리지는 그대로, 골드 가치는 0.6 으로 되돌려 어림한다
-    ...rent.results.map((r) => ({ id: `r${r.id}`, who: r.who, label: (r.note ?? "장비 기부").replace(/ 기부( \(고침\))?$/, "$1"), gold: Math.round((r.delta * DIA_GOLD) / MILEAGE_RATE), dia: r.delta, at: r.at, from: "rent" as const })),
-  ].sort((a, b) => b.at - a.at);
+  const box = await env.DB.prepare(
+    "SELECT id, who, item, qty, enhance, gold, dia, place, COALESCE(done_at, created_at) AS at FROM donate_items WHERE status IN ('done', 'hall') AND COALESCE(done_at, created_at) >= ? ORDER BY at DESC",
+  )
+    .bind(since)
+    .all<{ id: number; who: string; item: string; qty: number; enhance: number; gold: number; dia: number; place: DonatePlace; at: number }>();
+  const lines: GiftLine[] = box.results.map((r) => ({
+    id: `b${r.id}`,
+    who: r.who,
+    label: donateLabel(r),
+    gold: r.gold ?? 0,
+    dia: earnedDia(r.gold ?? 0),
+    at: r.at,
+    from: "box" as const,
+    place: r.place,
+  }));
 
   const who = [...new Set(lines.map((l) => l.who))];
   const { results: users } = who.length
@@ -213,7 +214,7 @@ export async function hallOfFame(env: Env, since = 0): Promise<{ rows: HallRow[]
     if (!h.names.includes(l.who)) h.names.push(l.who);
     h.gold += l.gold;
     h.earned += l.dia;
-    if (l.gold > 0) h.count++;
+    h.count++;
     h.last = Math.max(h.last, l.at);
     hall.set(key, h);
   }

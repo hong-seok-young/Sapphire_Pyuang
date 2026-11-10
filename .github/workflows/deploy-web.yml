@@ -107,6 +107,11 @@ jobs:
         working-directory: web
         run: node --experimental-strip-types scripts/rental-seed.mjs || echo "::warning::장비대여 처음 목록을 넣지 못했어요"
 
+      # 명예의 전당 예전 기부: 비공개 자료의 기부자별 내역을 한 번 넣는다 (마일리지 장부와 상관없이 명예의 전당에만, setup 키로 한 번, scripts/donate-hall-seed.mjs)
+      - name: Hall of fame (old donations)
+        working-directory: web
+        run: node scripts/donate-hall-seed.mjs || echo "::warning::명예의 전당 예전 기부를 넣지 못했어요"
+
       # 컴투스 공식 소식: 최근 글을 새로 받고(30분마다 도는 공식 소식 작업과 같다), 한국 전용 글은 한국 PC에서 받아 둔 파일로 넣는다
       # (withhive 는 한국 밖 서버에는 빼고 준다. 파일은 저장한 때보다 늦게 새로 받은 글을 덮지 않는다, scripts/fetch-official.mjs)
       - name: Official news (Korea snapshot)

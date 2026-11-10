@@ -114,6 +114,19 @@ try {
   ok((await mileage(MEMBER)) === m0 + 15, `기부 지움 -> 마일리지 ${(await mileage(MEMBER)) - m0} (15)`);
   const h2 = await hallOf(MEMBER);
   ok(Math.abs(h2.earned - h0.earned - 15.3) < 1e-6, `명예의 전당 +${(h2.earned - h0.earned).toFixed(2)} (15.3)`);
+
+  // 7) 예전 기부(status hall, scripts/donate-hall-seed.mjs)는 명예의 전당에만: 그 사람이 새로 기부해도 예전 기부 골드로 마일리지가 생기지 않는다
+  const old = (await api(STAFF, "/api/donate/hall?period=all")).j.hall.find((x) => x.gold >= 1_000_000 && x.names.every((n) => n !== MEMBER));
+  if (old) {
+    const name = old.names[0];
+    const mBefore = (await api(STAFF, `/api/rent/mileage?who=${encodeURIComponent(name)}`)).j?.mileage;
+    const d = await api(STAFF, "/api/donate", "POST", { confirm: true, who: name, item: "시험 골드", qty: 1, gold: 100_000 });
+    made.donations.push(d.j?.id);
+    ok(d.s === 200 && d.j.dia === 0, `예전 기부가 있는 ${name} 님에게 10만 확정 -> 💎+${d.j?.dia} (0, 예전 기부는 마일리지에 안 듦)`);
+    const h = (await api(STAFF, "/api/donate/hall?period=all")).j.hall.find((x) => x.names.includes(name));
+    ok(h && h.gold === old.gold + 100_000, `명예의 전당 ${name} ${old.gold} -> ${h?.gold}`);
+    if (mBefore !== undefined) ok((await api(STAFF, `/api/rent/mileage?who=${encodeURIComponent(name)}`)).j?.mileage === mBefore, "장부 마일리지 그대로");
+  } else console.log("SKIP 예전 기부가 없어 건너뜀 (scripts/donate-hall-seed.mjs --local 로 넣으면 시험)");
 } finally {
   // 정리: 올린 물건 내리기, 기부 지우기 (마일리지는 기부 지울 때 같이 빠진다. 대여·반납 장부 줄은 남는다)
   for (const id of made.items) if (id) await api(STAFF, `/api/rent/${id}`, "DELETE");
