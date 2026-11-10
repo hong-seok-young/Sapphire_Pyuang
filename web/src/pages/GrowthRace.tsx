@@ -7,7 +7,7 @@ import { JOB_NAME, avatarUrl, errorText } from "../auth";
 import { JobEmblem } from "../emblems";
 import { Nick } from "../kakao";
 import { useBackClose } from "../backClose";
-import { COIN_GOLD, setTarget } from "../gcoin";
+import { COIN_GOLD, setRound, setTarget } from "../gcoin";
 import type { GcRace, GcRaceEntry, GcWallet } from "../gcoin";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
@@ -458,8 +458,10 @@ export function RaceBoard({
           ))}
         </span>
       </div>
-      {now >= race.end && race.next && race.next > race.start && (
-        <p className="gr-next">다음 판 {atText(race.next)}</p>
+      {now >= race.end && (
+        <p className="gr-next">
+          {race.next ? `다음 판 ${atText(race.next)}` : "다음 판 미정"}
+        </p>
       )}
       <RaceChart race={race} me={me} pick={pick} onPick={toggle} now={now} />
       <ol className="gr-list">
@@ -685,10 +687,11 @@ export function TargetsTab({
   race: GcRace;
   onChanged: (msg: string) => void;
 }) {
-  // 쉬는 주면 다음 판 목표를 정한다 (server/gcrace.ts targetRound)
-  const next = race.upcoming && race.next ? race.next : null;
+  // 끝났으면 다음 판 목표를 정한다 (server/gcrace.ts targetRound). 다음 판을 안 정했으면 기간부터
+  const ended = Date.now() >= race.end;
+  const next = ended && race.next ? race.next : null;
   const set = new Map<string, TargetEntry>(
-    next ? (race.upcoming ?? []).map((e) => [e.id, { ...e, doneAt: null, rank: 0 }]) : race.list.map((e) => [e.id, e]),
+    ended ? (race.upcoming ?? []).map((e) => [e.id, { ...e, doneAt: null, rank: 0 }]) : race.list.map((e) => [e.id, e]),
   );
   const list = [...members].sort(
     (a, b) =>
@@ -696,16 +699,21 @@ export function TargetsTab({
       (b.level ?? 0) - (a.level ?? 0) ||
       a.id.localeCompare(b.id),
   );
+  const period = !ended
+    ? { start: race.start, end: race.end }
+    : next && race.nextEnd
+      ? { start: next, end: race.nextEnd }
+      : null;
   return (
     <div className="panel gr-targets">
+      <PeriodEditor key={`${period?.start}-${period?.end}`} period={period} after={race.end} onChanged={onChanged} />
       <p className="gc-week-head">
-        <b>{next ? "다음 판 목표" : "주간 목표"}</b>
-        <small>
-          {next ? periodText({ ...race, start: next, end: next + (race.end - race.start) }) : periodText(race)} · {set.size}명
-        </small>
+        <b>{ended ? "다음 판 목표" : "주간 목표"}</b>
+        <small>{set.size}명</small>
       </p>
+      {!period && <p className="gc-empty">기간을 먼저 정해 주세요</p>}
       {!list.length && <p className="gc-empty">2군 본캐가 없어요</p>}
-      <ul>
+      <ul hidden={!period}>
         {list.map((m) => (
           <TargetRow
             key={m.id}
@@ -715,6 +723,80 @@ export function TargetsTab({
           />
         ))}
       </ul>
+    </div>
+  );
+}
+
+const KST = 9 * 3600_000;
+/** 한국 시간 그날 0시 */
+const dayStart = (ms: number) => Math.floor((ms + KST) / DAY) * DAY - KST;
+/** '2026-11-11' */
+const dayKey = (ms: number) => new Date(ms + KST).toISOString().slice(0, 10);
+
+/**
+ * 이벤트 기간 (제작자 2026-11-10 '며칠 00시부터 며칠 24시까지 이벤트 기간 설정'): 시작 날 0시 ~ 끝 날 24시를 − + 로.
+ * period 가 없으면(다음 판 미정) 끝난 판 다음 주로 새 판을 권한다
+ */
+function PeriodEditor({
+  period,
+  after,
+  onChanged,
+}: {
+  period: { start: number; end: number } | null;
+  after: number;
+  onChanged: (msg: string) => void;
+}) {
+  const s0 = period ? dayStart(period.start) : dayStart(Math.max(after, Date.now()) + 7 * DAY);
+  const e0 = period ? dayStart(period.end - 1) : s0 + 6 * DAY;
+  const [from, setFrom] = useState(s0);
+  const [to, setTo] = useState(e0);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const dirty = !period || from !== s0 || to !== e0;
+  // 오픈 때(11:00)처럼 0시가 아닌 시작은 그 시각 그대로
+  const startAt = period && from === s0 && period.start !== s0 ? whenText(period.start).split(" ")[1] : "00:00";
+  async function save() {
+    setBusy(true);
+    setError("");
+    try {
+      await setRound(dayKey(from), dayKey(to));
+      onChanged(`기간 ${dayText(from)} ~ ${dayText(to)}`);
+    } catch (x) {
+      setError(errorText(x));
+    } finally {
+      setBusy(false);
+    }
+  }
+  const step = (v: number, set: (n: number) => void, lo: number, label: string) => (
+    <span className="gc-step gr-pd-step">
+      <button className="pill" disabled={busy || v - DAY < lo} onClick={() => set(v - DAY)} aria-label={`${label} 하루 앞으로`}>
+        −
+      </button>
+      <b key={v} className="gc-pop">{dayText(v)}</b>
+      <button className="pill" disabled={busy} onClick={() => set(v + DAY)} aria-label={`${label} 하루 뒤로`}>
+        +
+      </button>
+    </span>
+  );
+  return (
+    <div className="gr-pd">
+      <p className="gc-week-head">
+        <b>{period ? "기간" : "다음 판 기간"}</b>
+        <small>
+          {dayText(from)} {startAt} ~ {dayText(to)} 24:00 · {Math.round((to - from) / DAY) + 1}일
+        </small>
+      </p>
+      <div className="gr-pd-row">
+        {step(from, (n) => { setFrom(n); if (n > to) setTo(n); }, -Infinity, "시작")}
+        <span className="gr-pd-sep">~</span>
+        {step(to, setTo, from, "끝")}
+        {dirty && (
+          <button className="pill gc-mini gc-done-btn" disabled={busy} onClick={save}>
+            {period ? "저장" : "정하기"}
+          </button>
+        )}
+      </div>
+      {error && <p className="form-error">{error}</p>}
     </div>
   );
 }

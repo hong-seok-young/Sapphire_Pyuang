@@ -1,13 +1,13 @@
-// PUT /api/gcoin/settings { levels?: [{ minLevel, coin }], rank?: [1위 ~ 5위] } -> 레벨업 코인 표와 주간 순위 보너스 바꾸기 (오피서 이상)
+// PUT /api/gcoin/settings { levels?: [{ minLevel, coin }], rank?: [1위 ~ 5위], cap?: { name, n } (n 낱개, 0 = 한도 없음) } -> 레벨업 코인 표와 주간 순위 보너스 바꾸기 (오피서 이상)
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { canManageGcoin, canUseGcoin, int } from "../../../server/gcoin";
+import { MAX_CAP, canManageGcoin, canUseGcoin, capKey, int } from "../../../server/gcoin";
 
 export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!canUseGcoin(me) || !canManageGcoin(me)) return FORBIDDEN();
-  const b = await readJson<{ levels: unknown; rank: unknown }>(request);
+  const b = await readJson<{ levels: unknown; rank: unknown; cap: unknown }>(request);
   const stmts: D1PreparedStatement[] = [];
   if (b.levels !== undefined) {
     if (!Array.isArray(b.levels) || !b.levels.length || b.levels.length > 60) return json({ error: "레벨 표가 맞지 않아요" }, 400);
@@ -31,6 +31,13 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
       if (n === null) return json({ error: "순위 보너스가 맞지 않아요" }, 400);
       stmts.push(env.DB.prepare("INSERT INTO gc_settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value").bind(`rank${i + 1}`, n));
     }
+  }
+  if (b.cap !== undefined) {
+    const c = b.cap as { name?: unknown; n?: unknown } | null;
+    const key = typeof c?.name === "string" ? capKey(c.name) : "";
+    const n = int(c?.n, 0, MAX_CAP);
+    if (!key || key.length > 40 || n === null) return json({ error: "주간 한도가 맞지 않아요" }, 400);
+    stmts.push(env.DB.prepare("INSERT INTO gc_settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value").bind(`cap:${key}`, n));
   }
   if (stmts.length) await env.DB.batch(stmts);
   return json({ ok: true });

@@ -106,7 +106,7 @@ export const ITEMS: LaunchItem[] = [
   { key: "simtest", title: "확률 시뮬레이터", short: "확률", to: "#/simtest", icon: "🎰", developer: true, soon: true, badge: "테스트", match: ["simtest"] },
   // 개발 요청 (개발중, 제작자 요청 2026-11-05 '개발 중 버튼 하나 더, 개발자한테 자유롭게 신청, 결재선'): src/pages/DevRequests.tsx
   { key: "devreq", title: "개발 요청", short: "요청", to: "#/devreq", icon: "📮", match: ["devreq"] },
-  // 건의함 (개발중, 제작자 요청 2026-11-09 개발 요청 #13 유어아너 '건의사항은 게시판에서 빼고 별도 버튼, 익명 기능'): 게시판의 건의 사항을 따로, 익명 글·댓글.
+  // 건의함 (개발중, 제작자 요청 2026-11-09 '건의사항은 게시판에서 빼고 별도 버튼, 익명 기능'): 게시판의 건의 사항을 따로, 익명 글·댓글.
   // 열면 src/board.ts SUGGEST_OPEN (그때 soon·badge 가 빠진다)
   { key: "suggest", title: "건의함", short: "건의", to: "#/suggest", icon: "💡", developer: !SUGGEST_OPEN, soon: !SUGGEST_OPEN, badge: "개발중", match: ["suggest"] },
   // 운영진 때리기 (개발 요청 #10, 제작자 2026-11-09 '우선 나한테만 보이게'): 길마·오피서 캐릭터를 두드려 스트레스 풀기 (pages/Smack.tsx).

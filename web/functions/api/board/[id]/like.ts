@@ -1,13 +1,14 @@
 // PUT /api/board/:id/like { on } -> 좋아요 누르기 / 취소 { likes, liked }
 import { NEED_LOGIN, currentUser, json, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
-import { loadPost } from "../../../../server/board";
+import { canSeePost, loadPost } from "../../../../server/board";
 
 export const onRequestPut: PagesFunction<Env> = async ({ request, env, params }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   const id = Number(params.id);
-  if (!(await loadPost(env, id))) return json({ error: "없는 글이에요" }, 404);
+  const post = await loadPost(env, id);
+  if (!post || !canSeePost(me, post)) return json({ error: "없는 글이에요" }, 404);
   const { on } = await readJson<{ on: unknown }>(request);
   if (typeof on !== "boolean") return json({ error: "on 은 true/false 예요" }, 400);
   await (on

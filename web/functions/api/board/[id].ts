@@ -3,7 +3,7 @@
 // DELETE /api/board/:id -> 지우기 (쓴 사람 또는 오피서 이상)
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { BODY_MAX, TITLE_MAX, deletePostStmts, isStaff, loadPost, shownName } from "../../../server/board";
+import { BODY_MAX, TITLE_MAX, canSeePost, deletePostStmts, isStaff, loadPost, shownName } from "../../../server/board";
 
 const postId = (params: Record<string, string | string[]>) => Number(params.id);
 
@@ -12,7 +12,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
   if (!me) return NEED_LOGIN();
   const id = postId(params);
   const post = await loadPost(env, id);
-  if (!post) return json({ error: "없는 글이에요" }, 404);
+  // 건의 사항은 운영진(오피서 이상)과 쓴 사람만 (다른 사람에게는 없는 글로)
+  if (!post || !canSeePost(me, post)) return json({ error: "없는 글이에요" }, 404);
   await env.DB.prepare("INSERT INTO board_views (post_id, user_id, at) VALUES (?, ?, ?) ON CONFLICT (post_id, user_id) DO NOTHING")
     .bind(id, me.id, Date.now())
     .run();
@@ -26,15 +27,15 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
     ).bind(post.author, id),
   ]);
   const likers = (likes.results as { user: string }[]).map((r) => r.user);
-  // 익명 글·댓글(건의함)은 앱개발자·유어아너 말고는 이름 대신 '익명' (server/board.ts shownName), 내 것인지는 mine 으로만
+  // 익명 글·댓글(건의함)은 이름 대신 '익명' (server/board.ts shownName), 내 것인지는 mine 으로만
   const list = (comments.results as { id: number; user: string; parent: number | null; text: string; anon: number; at: number }[]).map((c) => ({
     ...c,
-    user: shownName(me, c.user, c.anon),
+    user: shownName(env, me, c.user, c.anon),
     anon: c.anon === 1,
     mine: c.user === me.id,
   }));
   // 직책 표는 이름이 보이는 사람만 (익명 글쓴이의 아이디가 답에 남지 않게)
-  const author = shownName(me, post.author, post.anon);
+  const author = shownName(env, me, post.author, post.anon);
   const shown = new Set([author, ...list.map((c) => c.user)]);
   return json({
     post: { ...post, author, pinned: post.pinned === 1, anon: post.anon === 1, mine: post.author === me.id },

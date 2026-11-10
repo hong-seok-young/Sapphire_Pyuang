@@ -26,6 +26,8 @@ export const KEYS = [
   "rent.list",
   "rent.apps",
   "rent.staff",
+  // 성장코인샵 담당자: 기다리는 구매 신청 수 (처리하면 줄어든다, 서버가 본 때와 상관없이 센다)
+  "gcoin.staff",
 ] as const;
 export type NewsKey = (typeof KEYS)[number];
 /** 홈 칸(launcher.ts 의 key)마다 더하는 단추들 */
@@ -36,6 +38,7 @@ const GROUPS: Record<string, string[]> = {
   market: ["market."],
   requests: ["requests"],
   rent: ["rent."],
+  gcoin: ["gcoin."],
 };
 const POLL_MS = 120_000;
 /**

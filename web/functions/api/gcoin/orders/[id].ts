@@ -1,11 +1,12 @@
 // PATCH /api/gcoin/orders/:id { action, note? }
 //   done   오피서 이상: 게임 안에서 준 뒤 지급 완료 (신청한 사람에게 알림)
 //   reject 오피서 이상: 반려 (코인이 돌아간다, 의견은 신청한 사람에게)
-//   cancel 신청한 사람: 기다리는 동안 취소 (코인이 돌아간다)
+//   cancel 신청한 사람: 기다리는 동안 취소 (코인이 돌아간다, 담당자에게 알림: 게임에서 건네기 전에 알게)
+//   reopen 담당자: 지급 완료를 잘못 눌렀을 때 기다리는 중으로 되돌리기 (하루 안, 신청한 사람에게 알림)
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, paramId, readJson } from "../../../../server/auth";
 import { notify } from "../../../../server/alerts";
 import type { Env } from "../../../../server/auth";
-import { MAX_NOTE, canManageGcoin, canUseGcoin, text, orderLabel } from "../../../../server/gcoin";
+import { MAX_NOTE, canManageGcoin, canUseGcoin, notifyStaff, text, orderLabel } from "../../../../server/gcoin";
 
 export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params }) => {
   const me = await currentUser(env, request);
@@ -21,10 +22,20 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
     price: number;
     qty: number;
     status: string;
+    done_at: number | null;
   }>();
   if (!o) return json({ error: "없는 신청이에요" }, 404);
-  if (o.status !== "pending") return json({ error: "이미 처리됐어요" }, 409);
   const b = await readJson<{ action: string; note: unknown }>(request);
+  if (b.action === "reopen") {
+    if (!canManageGcoin(me)) return FORBIDDEN();
+    if (o.status !== "done") return json({ error: "지급 완료한 신청만 되돌려요" }, 409);
+    if (Date.now() - (o.done_at ?? 0) > 86_400_000) return json({ error: "하루가 지나 되돌릴 수 없어요" }, 409);
+    const r = await env.DB.prepare("UPDATE gc_orders SET status = 'pending', note = NULL, done_at = NULL, done_by = NULL WHERE id = ? AND status = 'done'").bind(o.id).run();
+    if (r.meta.changes)
+      await notify(env, [o.user_id], "gcoin", `성장코인샵 지급 완료 취소 · ${orderLabel(o.name, o.unit, o.qty)} · 아직 기다리는 중이에요`, "#/gcoin?t=mine", me.id);
+    return json({ ok: true });
+  }
+  if (o.status !== "pending") return json({ error: "이미 처리됐어요" }, 409);
   const now = Date.now();
   const label = orderLabel(o.name, o.unit, o.qty);
   // 상태가 pending 일 때만 바꾼다 (두 사람이 같이 눌러도 한 번만)
@@ -35,7 +46,8 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
 
   if (b.action === "cancel") {
     if (o.user_id !== me.id) return FORBIDDEN();
-    await set("cancel", null);
+    const r = await set("cancel", null);
+    if (r.meta.changes) await notifyStaff(env, `${me.id}님이 성장코인 구매 신청을 취소했어요 · ${label}`, me.id);
     return json({ ok: true });
   }
   if (!canManageGcoin(me)) return FORBIDDEN();

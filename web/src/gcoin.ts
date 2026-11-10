@@ -90,8 +90,9 @@ export interface GcRaceEntry {
 export interface GcRace {
   start: number;
   end: number;
-  /** 담당자가 목표를 정하는 판 (쉬는 주면 다음 판) */
-  next?: number;
+  /** 끝난 뒤 다음 판의 시작·끝 (안 정했으면 null) */
+  next?: number | null;
+  nextEnd?: number | null;
   /** 쉬는 주에 다음 판에 정해 둔 목표 */
   upcoming?: { id: string; fromLevel: number; target: number }[] | null;
   /** 1~5위 상금 */
@@ -114,6 +115,9 @@ export const RACE_EVENT = "sapphire:gcrace";
 
 export interface GcData {
   open: boolean;
+  /** 한 주 상한 (낱개, 띄어쓰기 없는 이름: 사나운멧돼지인형 30)과 이번 주 내가 신청한 수 */
+  caps?: Record<string, number>;
+  weekBought?: Record<string, number>;
   /** 레벨·경험치마다 코인 (지금 시범운영은 꺼짐: 2주 목표 선착순만) */
   levelCoins: boolean;
   race: GcRace;
@@ -144,6 +148,9 @@ export interface GcData {
 
 export const fetchGcoin = () => api<GcData>("/api/gcoin");
 /** 담당자: 이번 2주 목표 레벨 (null 이면 뺀다) */
+/** 판 기간 정하기: 한국 시간 from 날 0시 ~ to 날 24시 ('2026-11-11') */
+export const setRound = (from: string, to: string) =>
+  api<{ ok: boolean }>("/api/gcoin/round", "PUT", { from, to });
 export const setTarget = (userId: string, target: number | null) =>
   api<{ ok: boolean }>("/api/gcoin/targets", "PUT", { userId, target });
 export const buyItem = (itemId: number, qty: number) =>
@@ -153,12 +160,13 @@ export const buyItem = (itemId: number, qty: number) =>
   });
 export const actOrder = (
   id: number,
-  action: "done" | "reject" | "cancel",
+  action: "done" | "reject" | "cancel" | "reopen",
   note?: string | null,
 ) => api<{ ok: boolean }>(`/api/gcoin/orders/${id}`, "PATCH", { action, note });
 export const saveGcSettings = (input: {
   levels?: GcCurve[];
   rank?: number[];
+  cap?: { name: string; n: number };
 }) => api<{ ok: boolean }>("/api/gcoin/settings", "PUT", input);
 export const addGcItem = (input: {
   name: string;

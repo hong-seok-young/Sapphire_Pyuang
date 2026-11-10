@@ -89,7 +89,7 @@ function TileCell({
       {/* 오른쪽 위 글자만 (장비대여 담당자 '담당자' / '멍멍', 제작자 요청 2026-11-03). UPDATE 표와 자리가 같아 표가 붙어 있는 동안은 숨기고,
           표가 사라지면(한 번 들어가면) 보인다 (제작자: '업데이트는 어차피 한 번 누르면 사라지니까 우측 위로 해도 돼') */}
       {t.corner && !updated && !fresh && (
-        <span className="tile-corner">
+        <span className={"tile-corner" + (newsFor(news, t.key) > 0 ? " tile-corner-low" : "")}>
           {t.corner.map((line) => (
             <span key={line}>{line}</span>
           ))}

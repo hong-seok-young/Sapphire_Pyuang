@@ -17,9 +17,11 @@ import { EVENT_EVERY, MAINT_EVERY, refreshEvents, refreshMaint } from "../../ser
 import { NEW_OFFICIAL_SQL, announceOfficial } from "../../server/officialAlert";
 import type { NewOfficial } from "../../server/officialAlert";
 import { canEnter, isManager } from "../../server/rental";
+import { canManageGcoin, canUseGcoin } from "../../server/gcoin";
 import { remindIfDue } from "../../server/gdungeon";
 import { announceApp } from "../../server/appNews";
 import { announceBday } from "../../server/birthday";
+import { seesAllSuggest } from "../../server/board";
 
 const IMO: Record<string, string> = { "imo.notice": "type IN ('N', 'I', 'D')", "imo.maint": "type = 'C'", "imo.event": "type = 'E'" };
 /** 아이모 소식은 올린 날이 이 날수 안인 것만 센다 (늦게 들어온 예전 글은 새 글이 아니다) */
@@ -45,6 +47,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
   const owner = me.owner ?? me.id;
   const rent = canEnter(me);
   const manager = rent && isManager(me);
+  // 성장코인샵 담당자: 기다리는 구매 신청 수 (처리할 일이라 본 때와 상관없이 남은 만큼, 홈 칸 배지)
+  const gcoinStaff = canUseGcoin(me) && canManageGcoin(me);
   // 모든 문장이 같은 자리표를 쓴다 (?9 = 본캐 아이디). 문장에 있는 자리표 수만큼만 넣는다 (더 넣으면 D1 이 거절한다)
   const q = (sql: string, ...args: unknown[]) => {
     const count = Math.max(0, ...[...sql.matchAll(/\?(\d+)/g)].map((m) => Number(m[1])));
@@ -54,16 +58,18 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
     return env.DB.prepare(sql).bind(...binds);
   };
   const boardSince = ["notice", "event", "free", "suggest"].map((c) => since(`board.${c}`));
+  // 건의 사항은 운영진(오피서 이상)과 쓴 사람만 본다 (server/board.ts seesAllSuggest): 다른 사람에게는 남의 건의 글을 세지 않고, 댓글은 내 건의 글에 달린 것만
+  const allSug = seesAllSuggest(me);
   const imoKeys = Object.keys(IMO);
   const imoSince = imoKeys.map(since);
   const imoFrom = new Date(now + 9 * 3_600_000 - IMO_DAYS * 86_400_000).toISOString().slice(0, 10);
   // 글·물건마다 따라가는 새 것 (things): 단추를 마지막으로 본 때와 14일 전 중 늦은 때부터
   const floor = (...keys: string[]) => Math.max(now - THING_DAYS * 86_400_000, Math.min(...keys.map(since)));
   const thingSql = [
-    q(`SELECT 'post:' || id AS k, 'board.' || cat AS c, created_at AS t, NULL AS s FROM board_posts WHERE created_at > ?1 AND author NOT IN ${MINE}`, floor(...boardSince.map((_, j) => `board.${["notice", "event", "free", "suggest"][j]}`))),
+    q(`SELECT 'post:' || id AS k, 'board.' || cat AS c, created_at AS t, NULL AS s FROM board_posts WHERE created_at > ?1 AND author NOT IN ${MINE}${allSug ? "" : " AND cat != 'suggest'"}`, floor(...boardSince.map((_, j) => `board.${["notice", "event", "free", "suggest"][j]}`))),
     q(
       `SELECT 'post:' || c.post_id AS k, 'board.' || p.cat AS c, c.created_at AS t, NULL AS s FROM board_comments c JOIN board_posts p ON p.id = c.post_id ` +
-        `WHERE c.created_at > ?1 AND c.user_id NOT IN ${MINE}`,
+        `WHERE c.created_at > ?1 AND c.user_id NOT IN ${MINE}${allSug ? "" : ` AND (p.cat != 'suggest' OR p.author IN ${MINE})`}`,
       floor("board.notice", "board.event", "board.free", "board.suggest"),
     ),
     q(
@@ -98,7 +104,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
     ...thingSql,
     q(
       "SELECT SUM(cat = 'notice' AND created_at > ?1) AS notice, SUM(cat = 'event' AND created_at > ?2) AS event, " +
-        "SUM(cat = 'free' AND created_at > ?3) AS free, SUM(cat = 'suggest' AND created_at > ?4) AS suggest " +
+        `SUM(cat = 'free' AND created_at > ?3) AS free, SUM(cat = 'suggest' AND created_at > ?4${allSug ? "" : " AND 0"}) AS suggest ` +
         `FROM board_posts WHERE created_at > ?5 AND author NOT IN ${MINE}`,
       ...boardSince,
       Math.min(...boardSince),
@@ -130,6 +136,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
           ),
         ]
       : []),
+    ...(gcoinStaff ? [q("SELECT COUNT(*) AS n FROM gc_orders WHERE status = 'pending'")] : []),
     // 점검 글 최근 3개 (색인 official_news_type, 본문은 점검 시간·서버·인던 제한이 있는 앞부분만)
     env.DB.prepare("SELECT id, title, start_date, substr(body, 1, 3000) AS body FROM official_news WHERE type = 'C' ORDER BY id DESC LIMIT 3"),
     env.DB.prepare("SELECT key, done_at FROM setup WHERE key IN ('official_maint_checked', 'official_event_checked')"),
@@ -158,6 +165,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
     counts["rent.apps"] = n(results[i++]);
   }
   if (manager) counts["rent.staff"] = n(results[i++]);
+  if (gcoinStaff) counts["gcoin.staff"] = n(results[i++]);
   const maint = results[i++];
   const checked = results[i++];
   const fresh = results[i++].results as unknown as NewOfficial[];

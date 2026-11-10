@@ -9,8 +9,8 @@ export const CAT_NAME: Record<Cat, string> = { notice: "공지사항", event: "�
 export const CAT_ICON: Record<Cat, string> = { notice: "📌", event: "🎉", free: "💬", suggest: "💡" };
 
 /**
- * 건의함 (제작자 요청 2026-11-09, 개발 요청 #13 유어아너: '건의사항은 게시판에서 빼고 별도 버튼, 익명 기능'). 홈 칸 '건의함'(#/suggest)이 건의 사항(cat suggest)을 따로 보여 주고
- * 익명 글·댓글을 쓴다 (이름은 앱개발자와 유어아너만 본다, 서버가 가린다). 서버 server/board.ts 의 SUGGEST_OPEN 과 같이 바꾼다:
+ * 건의함 (제작자 요청 2026-11-09). 홈 칸 '건의함'(#/suggest)이 건의 사항(cat suggest)을 따로 보여 주고
+ * 익명 글·댓글을 쓴다 (이름은 서버가 가린다). 건의 글은 운영진(오피서 이상)과 쓴 사람만 본다 (서버가 거른다). 서버 server/board.ts 의 SUGGEST_OPEN 과 같이 바꾼다:
  * false 인 동안 건의함은 개발 중(미리 보는 사람만)이고 게시판에 '건의' 칸이 그대로 있다. true 면 게시판에서 '건의' 칸을 빼고 건의함이 홈 칸으로
  */
 export const SUGGEST_OPEN = false;
@@ -18,8 +18,6 @@ export const SUGGEST_OPEN = false;
 export const BOARD_CATS: Cat[] = SUGGEST_OPEN ? CATS.filter((c) => c !== "suggest") : CATS;
 /** 익명 글·댓글의 가린 이름 (서버 server/board.ts ANON_NAME) */
 export const ANON_NAME = "익명";
-/** 익명 이름을 보는 사람 (서버 server/board.ts ANON_VIEWERS 와 같다): 화면의 안내 글에만 쓴다 */
-export const ANON_VIEWER = "유어아너";
 
 export interface PostSummary {
   id: number;

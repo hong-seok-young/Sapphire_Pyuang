@@ -133,6 +133,20 @@ jobs:
             echo "챗봇 워크스페이스 ID를 넣었어요"
           fi
 
+      # 건의함 익명 글쓴이를 보는 사람 (server/board.ts canSeeAnon): 공개 저장소에 적지 않고 비공개 자료 길드/익명_보기.txt(한 줄에 닉네임 하나)에서
+      # Cloudflare Pages 비밀값 ANON_VIEWERS 로 넣는다. 실행 기록이 공개라 닉네임은 찍지 않는다. 파일이 없으면 아무도 못 본다
+      - name: Anonymous viewers
+        working-directory: web
+        run: |
+          f="../자료/길드/익명_보기.txt"
+          if [ -f "$f" ]; then
+            v=$(grep -v '^[[:space:]]*#' "$f" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' | paste -sd, -)
+            if [ -n "$v" ]; then
+              printf '%s' "$v" | npx wrangler pages secret put ANON_VIEWERS --project-name sapphire-guild > /dev/null
+              echo "건의함 설정을 넣었어요"
+            fi
+          fi
+
       # 챗봇 답 받기 일꾼 (web/runner, server/chatRun.ts): 앱을 닫아도 답을 끝까지 받아 대화에 넣는 Durable Object (Cloudflare 무료 요금제).
       # 사이트는 Durable Object 를 직접 만들 수 없어서 따로 올리고, 됐으면 사이트 wrangler.toml 에 CHATRUN 바인딩을 붙인다.
       # 못 올리면(토큰에 Workers Scripts 권한이 없는 등) 바인딩 없이 예전처럼 배포한다 (챗봇은 화면이 끊긴 뒤 30초까지만 받는다)

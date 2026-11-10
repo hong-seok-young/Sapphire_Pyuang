@@ -1004,6 +1004,14 @@ CREATE TABLE IF NOT EXISTS gc_ledger (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS gc_ledger_once ON gc_ledger (user_id, kind, ref);
 -- 2주 목표 선착순 (시범운영, server/gcrace.ts): 판(시작 ms)마다 사람마다 목표 레벨. from_level 은 정할 때 레벨 (달성률 0%). 달성은 level_log 로 센다
+-- 주간 목표 판의 기간 (담당자가 '며칠 00시 ~ 며칠 24시'로 정한다, server/gcrace.ts). id 는 처음 정한 시작 때, 목표·상금이 id 로 잇는다. 없으면 기본 판(1주 진행 1주 휴식)
+CREATE TABLE IF NOT EXISTS gc_rounds (
+  id INTEGER PRIMARY KEY,
+  start INTEGER NOT NULL,
+  end_at INTEGER NOT NULL,
+  set_at INTEGER NOT NULL,
+  set_by TEXT
+);
 CREATE TABLE IF NOT EXISTS gc_targets (
   round INTEGER NOT NULL,
   user_id TEXT NOT NULL,

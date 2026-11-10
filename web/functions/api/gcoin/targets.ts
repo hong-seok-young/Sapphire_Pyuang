@@ -12,7 +12,9 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   const b = await readJson<{ userId: unknown; target: unknown }>(request);
   const userId = typeof b.userId === "string" ? b.userId : "";
   if (!userId || !(await isMember(env, userId))) return json({ error: "2군 본캐가 아니에요" }, 400);
-  const round = targetRound();
+  const r = await targetRound(env);
+  if (!r) return json({ error: "다음 판 기간을 먼저 정해 주세요" }, 409);
+  const round = r.id;
   if (b.target === null) {
     await env.DB.prepare("DELETE FROM gc_targets WHERE round = ? AND user_id = ?").bind(round, userId).run();
     return json({ ok: true });
