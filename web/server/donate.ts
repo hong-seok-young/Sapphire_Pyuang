@@ -225,3 +225,37 @@ export async function hallOfFame(env: Env, since = 0): Promise<{ rows: HallRow[]
   await Promise.all(rows.slice(0, 30).map(async (h) => (h.mileage = await mileageOfName(env, h.name))));
   return { rows, lines };
 }
+
+/**
+ * 장비대여에만 있는 기부자의 마일리지 (제작자 2026-11-10 '장비대여에만 있는 기부자, 웹 로그인 했을 때 줘'): 명예의 전당에 넣은 장비대여 기부(status 'honor', 보증금 ÷ 1.5 = 골드)도
+ * 기부 골드 x 0.6 / 10만 마일리지로 친다. 그 기부자 이름(대소문자 무시)의 캐릭터가 앱을 열면(/api/me) 한 번만:
+ * 넣을 💎 = floor((기부함 확정 + 예전 기부 + 장비대여 기부 골드) x 0.6 / 10만) - 이미 받은 기부 마일리지 합(장부 reason 'donate': 운영진이 장비대여에서 적어 준 기부 💎 포함, 그래서 겹치지 않는다).
+ * 장부에 '기부함 · 장비대여 기부 (기부함 전)' 줄과 장비대여 알림. donate_items.dia 는 건드리지 않아 기부함 확정(syncDia)과 따로 간다
+ */
+export async function grantRentDonation(env: Env, me: User, now = Date.now()): Promise<void> {
+  const ids = me.chars?.length ? me.chars : [me.id];
+  const { results } = await env.DB.prepare(
+    "SELECT g.who AS who, u.id AS id FROM donate_grants g JOIN users u ON lower(u.id) = lower(g.who) WHERE g.granted_at IS NULL AND u.id IN (SELECT value FROM json_each(?))",
+  )
+    .bind(JSON.stringify(ids))
+    .all<{ who: string; id: string }>();
+  for (const r of results) {
+    const claimed = await env.DB.prepare("UPDATE donate_grants SET granted_at = ?, granted_to = ? WHERE who = ? AND granted_at IS NULL").bind(now, r.id, r.who).run();
+    if (!claimed.meta.changes) continue;
+    const gold = await env.DB.prepare("SELECT COALESCE(SUM(gold), 0) AS n FROM donate_items WHERE lower(who) = lower(?) AND status IN ('done', 'hall', 'honor')")
+      .bind(r.who)
+      .first<{ n: number }>();
+    const had = await env.DB.prepare("SELECT COALESCE(SUM(delta), 0) AS n FROM rental_mileage WHERE reason = 'donate' AND (lower(who) = lower(?1) OR who = ?2)")
+      .bind(r.who, r.id)
+      .first<{ n: number }>();
+    const give = Math.max(0, usableDia(Number(gold?.n) || 0) - (Number(had?.n) || 0));
+    await env.DB.prepare("UPDATE donate_grants SET dia = ? WHERE who = ?").bind(give, r.who).run();
+    if (give <= 0) continue;
+    await env.DB.prepare(
+      "INSERT INTO rental_mileage (who, delta, reason, note, by_user, created_at) VALUES (?, ?, 'donate', '기부함 · 장비대여 기부 (기부함 전)', 'system', ?)",
+    )
+      .bind(r.id, give, now)
+      .run();
+    await notify(env, [r.id], "rent", `[장비대여] 기부하신 장비로 마일리지 💎${give} 가 들어왔어요 · 대여 보증금으로 쓸 수 있어요`, "#/rent?v=apps", "");
+  }
+}

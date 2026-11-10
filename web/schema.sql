@@ -1089,3 +1089,13 @@ CREATE TABLE IF NOT EXISTS suggest_steps (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS suggest_steps_post ON suggest_steps (post_id, id);
+
+-- 장비대여에만 있는 기부자의 마일리지 (제작자 2026-11-10 '장비대여에만 있는 기부자, 웹 로그인 했을 때 줘', server/donate.ts grantRentDonation):
+-- who = 명예의 전당 장비대여 기부(status 'honor')의 기부자 이름. 그 이름의 캐릭터가 앱을 열면(/api/me) 한 번 마일리지를 넣고 granted_at 을 적는다
+CREATE TABLE IF NOT EXISTS donate_grants (
+  who TEXT PRIMARY KEY,
+  created_at INTEGER NOT NULL,
+  granted_at INTEGER,
+  granted_to TEXT,
+  dia INTEGER
+);
