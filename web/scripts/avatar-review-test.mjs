@@ -9,7 +9,7 @@ import sharp from "sharp";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { reviewPoints } from "../server/avatarReview.ts";
-import { cleanThin, cutWithMarks, keepBiggest, markIndex, onMagenta, reviewScale } from "../src/avatarCut.ts";
+import { cleanThin, cutWithMarks, fillHoles, keepBiggest, markBox, markIndex, onMagenta, reviewScale } from "../src/avatarCut.ts";
 
 const dir = process.argv[2];
 const key = process.env.ANTHROPIC_API_KEY?.trim();
@@ -39,14 +39,14 @@ for (const file of readdirSync(dir).filter((f) => f.endsWith(".png") && !f.endsW
       .then((b) => b.toString("base64"));
   const own = new Uint8Array(w * h).fill(255);
   const original = await encode(onMagenta(src, own), "jpeg");
-  const marks = { keep: [], remove: [] };
+  const marks = { keep: [], remove: [], boxes: [] };
   for (const again of [false, true]) {
     const t = Date.now();
     const r = await reviewPoints(client, original, await encode(onMagenta(src, alpha), "png"), rw, rh, again);
     console.log(JSON.stringify({ name, again, w, h, k, rw, rh, seconds: Math.round((Date.now() - t) / 1000), ...r }));
-    if (!again && !r.remove.length) break;
     marks.keep.push(...r.keep.map((p) => markIndex(p, k, w, h)));
     marks.remove.push(...r.remove.map((p) => markIndex(p, k, w, h)));
-    alpha = cutWithMarks(src, base, marks) ?? alpha;
+    marks.boxes.push(...r.remove.map((p) => markBox(p, k, w, h)));
+    alpha = cutWithMarks(src, fillHoles(base, w, h, marks.keep), marks) ?? alpha;
   }
 }

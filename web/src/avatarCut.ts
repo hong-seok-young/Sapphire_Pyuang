@@ -10,6 +10,8 @@ export interface Pixels {
 export interface Marks {
   keep: number[];
   remove: number[];
+  /** remove 점마다 그 물체를 감싸는 네모 [x0, y0, x1, y1] (그림 칸 좌표). 지우는 범위는 이 네모 안까지만 */
+  boxes: number[][];
 }
 
 /**
@@ -90,7 +92,12 @@ export function separate(src: Pixels, mask: Uint8Array, marks: Marks): Uint8Arra
   const total = mask.reduce((s, v) => s + (v ? 1 : 0), 0);
   const reach = Math.max(3, Math.round(Math.max(w, h) * 0.04));
   const keep = marks.keep.map((i) => nearest(mask, w, h, i, reach)).filter((i) => i >= 0);
-  const remove = marks.remove.map((i) => nearest(mask, w, h, i, 1)).filter((i) => i >= 0);
+  // 지울 점은 남은 칸 위(1칸 안)에 있어야 한다. 점마다 번호를 달아 그 점의 네모 안에서만 지운다
+  const remove: { at: number; box: number[] }[] = [];
+  marks.remove.forEach((i, j) => {
+    const at = nearest(mask, w, h, i, 1);
+    if (at >= 0 && remove.length < 250) remove.push({ at, box: marks.boxes[j] ?? [0, 0, w - 1, h - 1] });
+  });
   if (!keep.length || !remove.length || !total) return null;
 
   const dist = new Int32Array(n).fill(0x7fffffff);
@@ -118,15 +125,13 @@ export function separate(src: Pixels, mask: Uint8Array, marks: Marks): Uint8Arra
     hi[k] = i;
     hd[k] = d;
   };
-  const seed = (list: number[], s: number) => {
-    for (const i of list) {
-      dist[i] = 0;
-      side[i] = s;
-      push(i, 0);
-    }
+  const seed = (i: number, s: number) => {
+    dist[i] = 0;
+    side[i] = s;
+    push(i, 0);
   };
-  seed(remove, 2);
-  seed(keep, 1); // 같은 칸이면 남기는 쪽
+  remove.forEach((r, j) => seed(r.at, 2 + j));
+  keep.forEach((i) => seed(i, 1)); // 같은 칸이면 남기는 쪽
   while (size) {
     const i = hi[0];
     const d = hd[0];
@@ -165,11 +170,16 @@ export function separate(src: Pixels, mask: Uint8Array, marks: Marks): Uint8Arra
       }
     }
   }
+  // 네모는 조금 넓혀 본다 (Claude 가 그린 네모가 물체 끝을 살짝 못 덮어도)
+  const pad = Math.max(2, Math.round(Math.max(w, h) * 0.015));
   const out = new Uint8Array(n);
   let gone = 0;
   for (let i = 0; i < n; i++) {
     if (!mask[i]) continue;
-    if (side[i] === 2) gone++;
+    const r = side[i] >= 2 ? remove[side[i] - 2] : null;
+    const x = i % w;
+    const y = (i - x) / w;
+    if (r && x >= r.box[0] - pad && x <= r.box[2] + pad && y >= r.box[1] - pad && y <= r.box[3] + pad) gone++;
     else out[i] = 255;
   }
   return gone > 0 && gone <= total * 0.7 ? out : null;
@@ -218,6 +228,7 @@ export function cleanThin(a: Uint8Array, w: number, h: number): Uint8Array {
 /** 배경 지우기 결과(base)에서 검수 점대로 캐릭터가 아닌 덩어리를 지우고 떨어진 조각과 가는 줄을 걷은 것. 점이 맞지 않으면 null */
 export function cutWithMarks(src: Pixels, base: Uint8Array, marks: Marks): Uint8Array | null {
   const { width: w, height: h } = src;
+  if (!marks.remove.length) return cleanThin(keepBiggest(base, w, h), w, h);
   const cut = separate(src, base, marks);
   return cut && cleanThin(keepBiggest(cut, w, h), w, h);
 }
@@ -245,4 +256,43 @@ export function markIndex(p: { x: number; y: number }, k: number, w: number, h: 
   const x = Math.min(w - 1, Math.max(0, Math.floor((p.x + 0.5) / k)));
   const y = Math.min(h - 1, Math.max(0, Math.floor((p.y + 0.5) / k)));
   return y * w + x;
+}
+
+/** 검수 그림 위의 네모 -> 원래 그림 칸 좌표의 네모 [x0, y0, x1, y1] */
+export function markBox(p: { x0: number; y0: number; x1: number; y1: number }, k: number, w: number, h: number): number[] {
+  const at = (v: number, max: number) => Math.min(max - 1, Math.max(0, Math.floor((v + 0.5) / k)));
+  return [at(p.x0, w), at(p.y0, h), at(p.x1, w), at(p.y1, h)];
+}
+
+/**
+ * 배경 지우기 AI 가 캐릭터 안에 낸 구멍(눈동자, 흰 반짝임)을 메운다. 검수가 '되살리기'로 keep 점을 찍은 구멍만:
+ * 그 점에서 이어진 빈 칸이 그림 가장자리에 닿지 않고(캐릭터에 둘러싸였고) 작으면(남은 칸의 5% 안) 채운다
+ */
+export function fillHoles(base: Uint8Array, w: number, h: number, keep: number[]): Uint8Array {
+  const total = base.reduce((s, v) => s + (v ? 1 : 0), 0);
+  const out = base.slice();
+  const seen = new Uint8Array(base.length);
+  for (const start of keep) {
+    if (out[start] || seen[start]) continue;
+    const hole: number[] = [];
+    const stack = [start];
+    seen[start] = 1;
+    let open = false;
+    while (stack.length && !open && hole.length <= total * 0.05) {
+      const i = stack.pop()!;
+      hole.push(i);
+      const x = i % w;
+      const y = (i - x) / w;
+      if (x === 0 || y === 0 || x === w - 1 || y === h - 1) open = true;
+      for (const j of [i - 1, i + 1, i - w, i + w]) {
+        if (j < 0 || j >= base.length || (j === i - 1 && x === 0) || (j === i + 1 && x === w - 1)) continue;
+        if (!out[j] && !seen[j]) {
+          seen[j] = 1;
+          stack.push(j);
+        }
+      }
+    }
+    if (!open && !stack.length) for (const i of hole) out[i] = 255;
+  }
+  return out;
 }

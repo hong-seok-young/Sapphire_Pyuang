@@ -12,9 +12,24 @@ const POINT = {
   required: ["x", "y", "what"],
   additionalProperties: false,
 };
+/** 지울 것은 점과 함께 그 물체를 감싸는 네모: 화면이 지우는 범위를 이 네모 안으로 막는다 (색이 비슷한 캐릭터 얼굴까지 번지지 않게) */
+const REMOVE = {
+  type: "object",
+  properties: {
+    x: { type: "integer" },
+    y: { type: "integer" },
+    x0: { type: "integer" },
+    y0: { type: "integer" },
+    x1: { type: "integer" },
+    y1: { type: "integer" },
+    what: { type: "string" },
+  },
+  required: ["x", "y", "x0", "y0", "x1", "y1", "what"],
+  additionalProperties: false,
+};
 export const REVIEW_SCHEMA = {
   type: "object",
-  properties: { remove: { type: "array", items: POINT }, keep: { type: "array", items: POINT } },
+  properties: { remove: { type: "array", items: REMOVE }, keep: { type: "array", items: POINT } },
   required: ["remove", "keep"],
   additionalProperties: false,
 };
@@ -28,8 +43,10 @@ export const reviewPrompt = (w: number, h: number, again = false) => `두 그림
 - 캐릭터가 아닌 것: 바닥 타일, 풀, 꽃, 돌, 바닥에 놓인 둥근 물체나 원판, 뒤에 있는 동상·건물·나무·울타리, 다른 캐릭터·NPC·몬스터·펫,
   이름표·길드 마크와 그 테두리·깃대, 말풍선, 숫자, 글자, 게임 화면의 단추. 캐릭터와 붙어 있어도 캐릭터가 아니면 찾는다.
 
-remove: 둘째 그림에 남아 있는(자홍색이 아닌) 것 중 캐릭터가 아닌 것마다 그 물체의 안쪽(가장자리 말고)에 점 하나.
-  한 물체가 크거나 색이 여러 가지로 나뉘어 있으면 색 덩어리마다 점. 가는 선(테두리, 깃대, 풀잎)은 선 위에 정확히. 남아 있지 않으면 빈 목록.
+remove: 둘째 그림에 남아 있는(자홍색이 아닌) 것 중 캐릭터가 아닌 것마다 그 물체의 안쪽(가장자리 말고)에 점 하나(x, y)와,
+  그 물체에서 둘째 그림에 남아 있는 부분을 딱 맞게 감싸는 네모(왼쪽 위 x0, y0 ~ 오른쪽 아래 x1, y1). 네모 밖은 지우지 않으니 캐릭터는 되도록 네모에 넣지 않는다.
+  한 물체가 크거나 색이 여러 가지로 나뉘어 있으면 색 덩어리마다 점과 네모. 가는 선(테두리, 깃대, 풀잎)은 선 위에 정확히. 남아 있지 않으면 빈 목록.
+  캐릭터 바깥의 검은·갈색 테두리 선(외곽선)은 캐릭터의 일부다. 지우지 않는다.
 keep: 캐릭터의 각 부분(머리, 얼굴, 몸, 팔, 다리·발, 무기, 날개·효과, 그림자 등) 안쪽에 점, 5~12개. 특히 remove 점과 붙어 있는 캐릭터 부분에는 꼭 찍는다.${
   again
     ? "\n  캐릭터의 일부인데 잘못 지워져 자홍색이 된 곳이 있으면, 첫째 그림에서 그 자리를 보고 그 자리에도 keep 점을 찍는다 (자홍색 위여도 된다). 그러면 되살린다."
@@ -42,6 +59,15 @@ export interface Point {
   y: number;
   what: string;
 }
+/** 지울 것: 점과 그 물체를 감싸는 네모 */
+export interface RemovePoint extends Point {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+const int = (v: unknown, max: number) => Math.min(max - 1, Math.max(0, Math.round(Number(v))));
 
 export function points(raw: unknown, w: number, h: number): Point[] {
   if (!Array.isArray(raw)) return [];
@@ -52,8 +78,29 @@ export function points(raw: unknown, w: number, h: number): Point[] {
     .slice(0, MAX_POINTS);
 }
 
+/** 지울 것: 네모가 없거나 점을 안 감싸면 점 둘레를 조금 넓혀 쓴다 */
+export function removePoints(raw: unknown, w: number, h: number): RemovePoint[] {
+  if (!Array.isArray(raw)) return [];
+  const pad = Math.round(Math.max(w, h) * 0.04);
+  const out: RemovePoint[] = [];
+  for (const r of raw as Record<string, unknown>[]) {
+    const [p] = points([r], w, h);
+    if (!p) continue;
+    let [x0, y0, x1, y1] = [int(r.x0, w), int(r.y0, h), int(r.x1, w), int(r.y1, h)];
+    if (x0 > x1) [x0, x1] = [x1, x0];
+    if (y0 > y1) [y0, y1] = [y1, y0];
+    const boxed = [r.x0, r.y0, r.x1, r.y1].every((v) => v !== null && v !== "" && Number.isFinite(Number(v)));
+    if (!boxed || p.x < x0 || p.x > x1 || p.y < y0 || p.y > y1) {
+      [x0, y0, x1, y1] = [Math.max(0, p.x - pad), Math.max(0, p.y - pad), Math.min(w - 1, p.x + pad), Math.min(h - 1, p.y + pad)];
+    }
+    out.push({ ...p, x0, y0, x1, y1 });
+    if (out.length >= MAX_POINTS) break;
+  }
+  return out;
+}
+
 /** 원래 그림(JPEG base64)과 배경을 지운 그림(PNG base64, 지운 곳은 자홍색)을 보여 주고 점을 받는다. 거절이면 빈 목록 */
-export async function reviewPoints(client: Anthropic, original: string, cutout: string, w: number, h: number, again = false): Promise<{ remove: Point[]; keep: Point[] }> {
+export async function reviewPoints(client: Anthropic, original: string, cutout: string, w: number, h: number, again = false): Promise<{ remove: RemovePoint[]; keep: Point[] }> {
   const res = await client.messages.create({
     model: MODEL,
     max_tokens: 16000,
@@ -72,5 +119,5 @@ export async function reviewPoints(client: Anthropic, original: string, cutout: 
   if (res.stop_reason === "refusal") return { remove: [], keep: [] };
   const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
   const raw = JSON.parse(text) as { remove?: unknown; keep?: unknown };
-  return { remove: points(raw.remove, w, h), keep: points(raw.keep, w, h) };
+  return { remove: removePoints(raw.remove, w, h), keep: points(raw.keep, w, h) };
 }
