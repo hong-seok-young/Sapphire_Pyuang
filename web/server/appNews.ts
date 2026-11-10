@@ -25,6 +25,12 @@ export const APP_NEWS: AppNews[] = [
     link: "#/devreq",
   },
   {
+    key: "app_news_suggest_20261110",
+    at: Date.parse("2026-11-10T19:20:00+09:00"),
+    text: "건의함 추가 · 실명이나 익명으로 건의하고 내 건의함에서 결재 진행 상황을 볼 수 있어요",
+    link: "#/suggest",
+  },
+  {
     key: "app_news_gcoin_20261111",
     at: Date.parse("2026-11-11T11:00:00+09:00"),
     text: "성장코인샵 추가 · 2군 본캐는 주간 목표 레벨을 먼저 찍으면 성장코인, 코인으로 도핑템 교환",

@@ -3,10 +3,13 @@
 // 앱이 열릴 때마다 부르므로 여기서 로그인을 400일로 다시 늘린다 (로그아웃하기 전까지 로그인 유지)
 import { NEED_LOGIN, currentUser, json, meInfo, renewSession } from "../../server/auth";
 import type { Env } from "../../server/auth";
+import { grantRentDonation } from "../../server/donate";
 
-export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
+export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
+  // 장비대여에만 있는 기부자의 마일리지: 앱을 열면 한 번 (server/donate.ts, 답한 뒤에)
+  waitUntil(grantRentDonation(env, me).catch((e) => console.error("rent donor grant", e instanceof Error ? e.message : e)));
   const renewed = await renewSession(env, request);
   return json(await meInfo(env, me), 200, renewed ? { "set-cookie": renewed } : {});
 };

@@ -25,6 +25,8 @@ const FILE = "../자료/길드/기부함/예전_기부.json";
 const KEY_SEED = "donate_hall_seed_20261110";
 const KEY = "donate_hall_mileage_20261110";
 const KEY_RENT = "donate_hall_rent_20261110";
+// 장비대여에만 있는 기부자의 마일리지는 그 사람이 앱을 열 때 넣는다 (server/donate.ts grantRentDonation). 기부자 이름을 donate_grants 에 한 번 적는다
+const KEY_GRANT = "donate_rent_grant_20261110";
 const RENT_NOTE = "장비대여 기부 (기부함 전)";
 const DEV = "퓨앙";
 const TESTERS = [DEV, "테스트1", "테스트2"];
@@ -64,9 +66,9 @@ const data = JSON.parse(readFileSync(FILE, "utf8"));
 // JSON 의 값을 고치면(valuesRev 를 바꾸면) 예전 기부 줄과 마일리지를 한 번 다시 맞춘다 (제작자 2026-11-10 '큐브라떼는 5000원 현금, 별모양브로치 24개는 다른 별모양브로치에서 계산')
 const KEY_VAL = data.valuesRev ? `donate_hall_values_${data.valuesRev}` : "";
 const done = new Set(
-  query(`SELECT key FROM setup WHERE key IN (${q(KEY_SEED)}, ${q(KEY)}, ${q(KEY_RENT)}, ${q(KEY_VAL)})`).map((r) => r.key),
+  query(`SELECT key FROM setup WHERE key IN (${q(KEY_SEED)}, ${q(KEY)}, ${q(KEY_RENT)}, ${q(KEY_VAL)}, ${q(KEY_GRANT)})`).map((r) => r.key),
 );
-if (done.has(KEY) && done.has(KEY_RENT) && (!KEY_VAL || done.has(KEY_VAL))) {
+if (done.has(KEY) && done.has(KEY_RENT) && done.has(KEY_GRANT) && (!KEY_VAL || done.has(KEY_VAL))) {
   console.log("예전 기부 마일리지와 장비대여 기부는 이미 넣었어요");
   process.exit(0);
 }
@@ -88,6 +90,13 @@ const now = Date.now();
 if (!done.has(KEY)) seedOld();
 if (!done.has(KEY_RENT)) seedRent();
 if (KEY_VAL && !done.has(KEY_VAL)) resync();
+if (!done.has(KEY_GRANT)) {
+  runSql([
+    `INSERT OR IGNORE INTO donate_grants (who, created_at) SELECT DISTINCT who, ${now} FROM donate_items WHERE status = 'honor';`,
+    `INSERT OR IGNORE INTO setup (key, done_at) VALUES (${q(KEY_GRANT)}, ${now});`,
+  ]);
+  console.log(`장비대여 기부자 ${query("SELECT COUNT(*) AS n FROM donate_grants WHERE granted_at IS NULL")[0]?.n ?? 0}명은 앱을 열 때 마일리지를 넣어요`);
+}
 
 /** 예전 기부 값 다시 맞추기: 예전 기부 줄을 JSON 그대로 다시 넣고, 사람마다 마일리지를 새 골드 합으로 셈해 이미 넣은 만큼과의 차이만 장부에 더하거나 뺀다 */
 function resync() {
