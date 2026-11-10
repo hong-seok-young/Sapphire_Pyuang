@@ -664,6 +664,10 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
             continue
         if re.search(r"(플톡|풀톡|프로필톡)$", w):
             continue  # '표표플톡' = 프로필톡 (카카오톡 오픈채팅의 프로필로 연락, 제작자 2026-11-04). 물건 이름이 아니다
+        pm = re.fullmatch(r"(?:지|지능)?(\d)\+(\d)", w)
+        if pm:  # '3+2 약반', '지3+1 약반' = 지능 + 속성부여 (num_opts 의 DIGIT_STATS)
+            lead_digits = pm.group(1) + pm.group(2)
+            continue
         om = re.fullmatch(r"옵(?:션)?(\d{2,4})", w)
         if om:  # '팔윙 옵333' = 옵션을 위키 순서대로 한 자리씩 (num_opts)
             lead_digits = om.group(1)
@@ -836,6 +840,10 @@ _RANGE_MAX: dict[tuple[str, str], int] = {}
 NUM_FIXED = {
     ("샤쿤그리브", "226"): ["힘2", "이속6"],  # 제작자 2026-11-10 '그냥 2 6 인듯' (공식 확률표도 힘·이동속도 둘뿐)
 }
+# 숫자만 적을 때 위키 옵션 순서가 아닌 물건 (제작자 확인)
+DIGIT_STATS = {
+    "약속의반지": ["지능", "속부"],  # '42약반' = 지능4 + 속성부여2, '3+2 약반' (제작자 2026-11-10)
+}
 EFFECTIVE_OPTS = {
     "데조르바의보우": ["크리", "민첩"],  # 35칠데조 = 크리3 민첩5 (마재는 안 적음)
 }
@@ -871,6 +879,7 @@ def range_opts(name: str) -> tuple[list[str], str]:
 def num_opts(name: str, lead: str, words: list[str]) -> list[str]:
     """숫자만 적은 옵션을 위키 옵션 순서로 (제작자 2026-11-10 '35칠데조' = 첫 옵션 3, 둘째 옵션 5). 수가 옵션 수와 맞을 때만, 아니면 짐작하지 않고 뺀다"""
     stats, job = range_opts(name)
+    stats = DIGIT_STATS.get(re.sub(r"\s", "", name), stats)
     if not stats:
         return []
     if not lead and len(words) == 1 and len(words[0]) >= 2:
@@ -898,7 +907,7 @@ def num_opts(name: str, lead: str, words: list[str]) -> list[str]:
         ok = [sp for sp in splits(lead, len(stats)) if all(int(v) <= _RANGE_MAX.get((key, st), 99) for v, st in zip(sp, stats))]
         if len(ok) != 1:
             NUM_MISMATCH.setdefault(name, []).append(lead)
-            return []
+            return ["옵" + lead]
         vals = ok[0]
     elif lead:
         vals = list(lead)
@@ -907,9 +916,10 @@ def num_opts(name: str, lead: str, words: list[str]) -> list[str]:
     elif len(words) == len(stats):
         vals = words  # '3 1 10 엘프의덧신'
     else:
-        return []
+        vals = []  # 아래에서 적힌 그대로
     if len(vals) != len(stats):
-        return []
+        # 읽을 수 없는 숫자는 짐작하지 않고 적힌 그대로 (제작자 2026-11-10 '모르겠어, 그냥 36 7임페로만 기록')
+        return ["옵" + (lead or "".join(words))] if (lead or words) else []
     out = []
     for st, v in zip(stats, vals):
         o = norm_opt(f"{st}{v}")
