@@ -48,6 +48,167 @@ function Laurel({ size }: { size: number }) {
   );
 }
 
+/* ---------- 프로필 둘레 초안 다섯 (제작자 2026-11-10 '월계수 관 별로, 5개 안'). 이 기기 localStorage sapphire.hof.frame 1~5, 없으면 예전 월계관 ---------- */
+const METAL: Record<1 | 2 | 3, [string, string, string]> = {
+  1: ["#fff6cf", "#f2c14e", "#9a6a14"],
+  2: ["#ffffff", "#c6cfe0", "#6f7a92"],
+  3: ["#ffe1c6", "#d8894b", "#74401c"],
+};
+function MetalGrad({ id, rank }: { id: string; rank: 1 | 2 | 3 }) {
+  const [a, b, c] = METAL[rank];
+  return (
+    <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stopColor={a} />
+      <stop offset="0.5" stopColor={b} />
+      <stop offset="1" stopColor={c} />
+    </linearGradient>
+  );
+}
+function SapphireGrad({ id }: { id: string }) {
+  return (
+    <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stopColor="#bfe0ff" />
+      <stop offset="0.45" stopColor="#4f86ff" />
+      <stop offset="1" stopColor="#1c2f9e" />
+    </linearGradient>
+  );
+}
+const frameKind = () => {
+  try {
+    return Number(localStorage.getItem("sapphire.hof.frame")) || 0;
+  } catch {
+    return 0;
+  }
+};
+
+/** 1안 도트 액자: 계단 모서리 금속 테두리, 위에 도트 사파이어 */
+function PixelFrame({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
+  const m = `hofPx${rank}`;
+  const outer = "6,1 26,1 26,2 28,2 28,4 30,4 30,6 31,6 31,26 30,26 30,28 28,28 28,30 26,30 26,31 6,31 6,30 4,30 4,28 2,28 2,26 1,26 1,6 2,6 2,4 4,4 4,2 6,2";
+  const inner = "7,4 25,4 25,5 27,5 27,7 28,7 28,25 27,25 27,27 25,27 25,28 7,28 7,27 5,27 5,25 4,25 4,7 5,7 5,5 7,5";
+  return (
+    <svg className="hof-frame hof-frame-px" width={size} height={size} viewBox="0 0 32 32" shapeRendering="crispEdges" aria-hidden>
+      <defs>
+        <MetalGrad id={m} rank={rank} />
+      </defs>
+      <polygon points={outer} fill={`url(#${m})`} />
+      <polygon points={inner} fill="#191433" fillOpacity="0.82" />
+      <rect x="7" y="4" width="18" height="1" fill="#fff" fillOpacity="0.35" />
+      <rect x="4" y="7" width="1" height="18" fill="#fff" fillOpacity="0.25" />
+      <rect x="2" y="15" width="1" height="2" fill="#191433" fillOpacity="0.5" />
+      <rect x="29" y="15" width="1" height="2" fill="#191433" fillOpacity="0.5" />
+      <g className="hof-px-gem">
+        <rect x="15" y="0" width="2" height="1" fill="#1c2f9e" />
+        <rect x="14" y="1" width="4" height="1" fill="#4f86ff" />
+        <rect x="13" y="2" width="6" height="1" fill="#2f5ce0" />
+        <rect x="14" y="3" width="4" height="1" fill="#1c2f9e" />
+        <rect x="15" y="4" width="2" height="1" fill="#14217a" />
+        <rect x="15" y="1" width="1" height="1" fill="#e6f2ff" />
+      </g>
+    </svg>
+  );
+}
+
+/** 2안 육각 보석 액자: 금속 육각 테두리, 위 꼭짓점에 사파이어, 아래 작은 보석 */
+function HexFrame({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
+  const m = `hofHx${rank}`;
+  const g = `hofHxG${rank}`;
+  const hex = (r: number) =>
+    Array.from({ length: 6 }, (_, i) => {
+      const a = ((-90 + i * 60) * Math.PI) / 180;
+      return `${(50 + Math.cos(a) * r).toFixed(1)},${(52 + Math.sin(a) * r).toFixed(1)}`;
+    }).join(" ");
+  return (
+    <svg className="hof-frame" width={size} height={size} viewBox="0 0 100 100" aria-hidden>
+      <defs>
+        <MetalGrad id={m} rank={rank} />
+        <SapphireGrad id={g} />
+      </defs>
+      <polygon points={hex(43)} fill="#191433" fillOpacity="0.78" stroke={`url(#${m})`} strokeWidth="6" strokeLinejoin="round" />
+      <polygon points={hex(36)} fill="none" stroke={`url(#${m})`} strokeWidth="1.2" strokeOpacity="0.7" />
+      <polygon points="50,0 59,9 50,19 41,9" fill={`url(#${g})`} stroke="#0e1650" strokeWidth="1" />
+      <polygon points="50,2 54,9 50,9" fill="#fff" fillOpacity="0.55" />
+      <polygon points="50,90 55,95 50,100 45,95" fill={`url(#${g})`} stroke="#0e1650" strokeWidth="0.8" />
+    </svg>
+  );
+}
+
+/** 3안 빛 링: 두 겹 금속 고리와 눈금, 빛 하나가 고리를 돈다 */
+function RingFrame({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
+  const m = `hofRg${rank}`;
+  const ticks = Array.from({ length: 24 }, (_, i) => i * 15);
+  return (
+    <svg className="hof-frame" width={size} height={size} viewBox="0 0 100 100" aria-hidden>
+      <defs>
+        <MetalGrad id={m} rank={rank} />
+        <radialGradient id={`${m}s`}>
+          <stop offset="0" stopColor="#fff" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <circle cx="50" cy="50" r="43" fill="#191433" fillOpacity="0.7" stroke={`url(#${m})`} strokeWidth="4" />
+      <circle cx="50" cy="50" r="37" fill="none" stroke={`url(#${m})`} strokeWidth="1" strokeOpacity="0.6" />
+      {ticks.map((t) => (
+        <rect key={t} x="49.4" y="7.5" width="1.2" height={t % 90 === 0 ? 5 : 2.5} fill={`url(#${m})`} transform={`rotate(${t} 50 50)`} />
+      ))}
+      <g className="hof-orbit">
+        <circle cx="50" cy="7" r="7" fill={`url(#${m}s)`} />
+        <circle cx="50" cy="7" r="2" fill="#fff" />
+      </g>
+    </svg>
+  );
+}
+
+/** 4안 방패 문장: 금속 테두리 방패와 아래 순위 리본 */
+function ShieldFrame({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
+  const m = `hofSh${rank}`;
+  const label = rank === 1 ? "1ST" : rank === 2 ? "2ND" : "3RD";
+  return (
+    <svg className="hof-frame" width={size} height={size} viewBox="0 0 100 100" aria-hidden>
+      <defs>
+        <MetalGrad id={m} rank={rank} />
+      </defs>
+      <path d="M50 3 L89 15 L89 48 C89 72 72 88 50 97 C28 88 11 72 11 48 L11 15 Z" fill="#191433" fillOpacity="0.8" stroke={`url(#${m})`} strokeWidth="5" strokeLinejoin="round" />
+      <path d="M50 10 L82 20 L82 48 C82 67 68 81 50 89 C32 81 18 67 18 48 L18 20 Z" fill="none" stroke={`url(#${m})`} strokeWidth="1" strokeOpacity="0.6" />
+      <polygon points="2,80 14,74 86,74 98,80 92,86 98,92 86,90 14,90 2,92 8,86" fill={`url(#${m})`} stroke="#3a2a10" strokeOpacity="0.5" strokeWidth="0.8" />
+      <text x="50" y="86" textAnchor="middle" fontSize="11" fontWeight="900" fill="#2a1d08" fillOpacity="0.85" letterSpacing="1">
+        {label}
+      </text>
+    </svg>
+  );
+}
+
+/** 5안 상장 리본(로제트): 주름진 둥근 리본과 아래로 늘어진 두 꼬리 */
+function RosetteFrame({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
+  const m = `hofRo${rank}`;
+  const tail = rank === 1 ? "#d64545" : rank === 2 ? "#4f86ff" : "#3fae7a";
+  const petals = Array.from({ length: 22 }, (_, i) => (i * 360) / 22);
+  return (
+    <svg className="hof-frame hof-frame-rosette" width={size} height={size} viewBox="0 0 100 100" aria-hidden>
+      <defs>
+        <MetalGrad id={m} rank={rank} />
+      </defs>
+      <polygon points="36,78 28,116 36,110 42,118 48,82" fill={tail} stroke="#000" strokeOpacity="0.25" strokeWidth="0.8" />
+      <polygon points="64,78 72,116 64,110 58,118 52,82" fill={tail} stroke="#000" strokeOpacity="0.25" strokeWidth="0.8" />
+      {petals.map((a) => (
+        <circle key={a} cx="50" cy="8" r="7.5" fill={`url(#${m})`} stroke="#000" strokeOpacity="0.18" strokeWidth="0.6" transform={`rotate(${a} 50 50)`} />
+      ))}
+      <circle cx="50" cy="50" r="38" fill={`url(#${m})`} />
+      <circle cx="50" cy="50" r="33" fill="#191433" fillOpacity="0.85" stroke="#fff" strokeOpacity="0.35" strokeWidth="1" />
+    </svg>
+  );
+}
+
+function Frame({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
+  const k = frameKind();
+  if (k === 1) return <PixelFrame rank={rank} size={size} />;
+  if (k === 2) return <HexFrame rank={rank} size={size} />;
+  if (k === 3) return <RingFrame rank={rank} size={size} />;
+  if (k === 4) return <ShieldFrame rank={rank} size={size} />;
+  if (k === 5) return <RosetteFrame rank={rank} size={size} />;
+  return <Laurel size={size} />;
+}
+
 const STARS = Array.from({ length: 22 }, (_, i) => ({
   left: (i * 37) % 100,
   top: (i * 53) % 92,
@@ -107,7 +268,7 @@ function Podium({ rank, h, me, open, onToggle }: { rank: 1 | 2 | 3; h: HallRow; 
       )}
       <span className="hof-pod-face">
         {rank === 1 && <HeroHalo />}
-        <Laurel size={rank === 1 ? 92 : 70} />
+        <Frame rank={rank} size={rank === 1 ? 92 : 70} />
         <span className="hof-pod-pic">
           <Face h={h} size={rank === 1 ? 54 : 40} />
         </span>
