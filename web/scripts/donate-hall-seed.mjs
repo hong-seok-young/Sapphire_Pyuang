@@ -60,13 +60,17 @@ const runSql = (lines) => {
   }
 };
 
-const done = new Set(query(`SELECT key FROM setup WHERE key IN (${q(KEY_SEED)}, ${q(KEY)}, ${q(KEY_RENT)})`).map((r) => r.key));
-if (done.has(KEY) && done.has(KEY_RENT)) {
+const data = JSON.parse(readFileSync(FILE, "utf8"));
+// JSON 의 값을 고치면(valuesRev 를 바꾸면) 예전 기부 줄과 마일리지를 한 번 다시 맞춘다 (제작자 2026-11-10 '큐브라떼는 5000원 현금, 별모양브로치 24개는 다른 별모양브로치에서 계산')
+const KEY_VAL = data.valuesRev ? `donate_hall_values_${data.valuesRev}` : "";
+const done = new Set(
+  query(`SELECT key FROM setup WHERE key IN (${q(KEY_SEED)}, ${q(KEY)}, ${q(KEY_RENT)}, ${q(KEY_VAL)})`).map((r) => r.key),
+);
+if (done.has(KEY) && done.has(KEY_RENT) && (!KEY_VAL || done.has(KEY_VAL))) {
   console.log("예전 기부 마일리지와 장비대여 기부는 이미 넣었어요");
   process.exit(0);
 }
 
-const data = JSON.parse(readFileSync(FILE, "utf8"));
 const donors = (data.donors ?? []).filter((d) => d.names?.length);
 // 한국 시간 그날 낮 12시 (이번 달 거르기·날짜 표시가 하루 밀리지 않게)
 const atOf = (date) => {
@@ -83,6 +87,58 @@ const now = Date.now();
 
 if (!done.has(KEY)) seedOld();
 if (!done.has(KEY_RENT)) seedRent();
+if (KEY_VAL && !done.has(KEY_VAL)) resync();
+
+/** 예전 기부 값 다시 맞추기: 예전 기부 줄을 JSON 그대로 다시 넣고, 사람마다 마일리지를 새 골드 합으로 셈해 이미 넣은 만큼과의 차이만 장부에 더하거나 뺀다 */
+function resync() {
+  const a = [`DELETE FROM donate_items WHERE status = 'hall' AND note = ${q(NOTE)} AND created_by = ${q(DEV)};`];
+  for (const d of donors) {
+    for (const g of d.gifts ?? []) {
+      const at = atOf(g.date);
+      a.push(
+        "INSERT INTO donate_items (who, item, qty, enhance, note, gold, gold_ask, dia, status, place, created_at, created_by, done_at, done_by) VALUES (" +
+          [whoSql(d.names), q(g.item), 1, 0, q(NOTE), Math.round(g.gold), Math.round(g.gold), 0, "'hall'", "'keep'", at, q(DEV), at, q(DEV)].join(", ") +
+          ");",
+      );
+    }
+  }
+  runSql(a);
+  const people = query(
+    "SELECT who, COALESCE(SUM(CASE WHEN status IN ('done', 'hall') THEN gold ELSE 0 END), 0) AS gold, COALESCE(SUM(dia), 0) AS dia, " +
+      "MAX(CASE WHEN status = 'hall' THEN id END) AS hall_id FROM donate_items " +
+      "WHERE who IN (SELECT who FROM donate_items WHERE status = 'hall') GROUP BY who",
+  );
+  const sums = (sql) => new Map(query(sql).map((r) => [r.who, Number(r.n) || 0]));
+  const prior = sums(
+    "SELECT who, COALESCE(SUM(delta), 0) AS n FROM rental_mileage WHERE reason = 'donate' AND (note IS NULL OR note NOT LIKE '기부함 · %') " +
+      "AND who IN (SELECT who FROM donate_items WHERE status = 'hall') GROUP BY who",
+  );
+  const already = sums("SELECT who, COALESCE(SUM(delta), 0) AS n FROM rental_mileage WHERE reason = 'donate' AND note LIKE '기부함 · 예전 기부%' GROUP BY who");
+  const usable = (gold) => Math.floor((gold * 6) / 1_000_000);
+  const b = [];
+  const lines = [];
+  for (const p of people) {
+    const target = usable(Number(p.gold) || 0);
+    const had = Number(p.dia) || 0;
+    const want = Math.max(0, target - had - Math.max(0, prior.get(p.who) ?? 0));
+    const diff = want - (already.get(p.who) ?? 0);
+    if (p.hall_id) b.push(`UPDATE donate_items SET dia = ${target - had} WHERE id = ${p.hall_id};`);
+    if (diff !== 0) {
+      b.push(
+        `INSERT INTO rental_mileage (who, delta, reason, note, by_user, created_at) VALUES (${q(p.who)}, ${diff}, 'donate', '기부함 · 예전 기부 값 고침', ${q(DEV)}, ${now});`,
+      );
+      lines.push(`${p.who} 💎${diff > 0 ? "+" : ""}${diff}`);
+    }
+  }
+  b.push(
+    `INSERT INTO alerts (user_id, kind, text, link, created_at) SELECT ${q(DEV)}, 'donate', ` +
+      `${q(`[기부함] 예전 기부 값 고침 (${data.valuesRev}) · ${lines.length ? lines.join(" · ") : "마일리지 바뀐 사람 없음"}`)}, '#/hall', ${now} ` +
+      `WHERE EXISTS (SELECT 1 FROM users WHERE id = ${q(DEV)});`,
+    `INSERT OR IGNORE INTO setup (key, done_at) VALUES (${q(KEY_VAL)}, ${now});`,
+  );
+  runSql(b);
+  console.log(`예전 기부 값을 다시 맞췄어요 (마일리지 바뀐 사람 ${lines.length}명)`);
+}
 
 function seedOld() {
 // 1) 예전 기부 줄을 JSON 그대로 다시 맞춘다 (처음이면 기부함 시험 줄도 정리)
