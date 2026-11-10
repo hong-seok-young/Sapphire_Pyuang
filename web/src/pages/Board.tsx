@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { ApiError, RANK, errorText } from "../auth";
 import type { Me } from "../auth";
 import {
-  ANON_VIEWER, BOARD_CATS, CAT_ICON, CAT_NAME, URL_RE, createPost, deleteFile, deletePost, fetchPost, fetchPosts,
+  BOARD_CATS, CAT_ICON, CAT_NAME, URL_RE, createPost, deleteFile, deletePost, fetchPost, fetchPosts,
   fileUrl, linkPreview, polishPost, setLike, shrinkPhoto, sizeText, updatePost, uploadFile, youtubeId,
 } from "../board";
 import type { BoardFile, Cat, LinkPreview, PostDetail, PostSummary } from "../board";
@@ -48,7 +48,7 @@ export function BoardPage({ me, arg, sub, query }: { me: Me; arg: string; sub: s
 }
 
 /**
- * 건의함 (제작자 요청 2026-11-09, 개발 요청 #13 유어아너: '건의사항은 게시판에서 빼고 별도 버튼, 익명 기능, 익명은 유어아너와 나만 보게'):
+ * 건의함 (제작자 요청 2026-11-09):
  * #/suggest 목록, #/suggest/:id 글, #/suggest/write, #/suggest/:id/edit. 게시판의 건의 사항(cat suggest)을 그대로 쓰고, 글과 댓글을 익명으로 올릴 수 있다.
  * 익명 이름은 서버가 가려서 보낸다 (server/board.ts canSeeAnon). 열 때는 src/board.ts SUGGEST_OPEN
  */
@@ -169,7 +169,7 @@ function List({ me, cat, box }: { me: Me; cat: Cat | null; box?: boolean }) {
       {!posts ? (
         <Loading error={error} />
       ) : posts.length === 0 ? (
-        <div className="empty">{q ? `"${q}" 글이 없어요.` : "아직 글이 없어요."}</div>
+        <div className="empty">{q ? `"${q}" 글이 없어요.` : (box || cat === "suggest") && RANK[me.role] < 1 ? "건의는 운영진과 쓴 사람만 봐요." : "아직 글이 없어요."}</div>
       ) : (
         <ul className="bd-list">
           {posts.map((p) => (
@@ -564,7 +564,7 @@ function Write({ me, cat: startCat, editId, box }: { me: Me; cat?: Cat; editId?:
                 익명
               </button>
             </div>
-            {anon && <small>이름은 {ANON_VIEWER} 님과 앱개발자만 봐요</small>}
+            {anon && <small>익명 보장 · 이름이 공개되지 않아요</small>}
           </div>
         )}
         {!editId && !box && (

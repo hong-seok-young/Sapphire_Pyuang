@@ -1,9 +1,10 @@
 // GET  /api/board?cat=&q=&before= -> 글 목록 (로그인한 길드원 누구나). 첫 쪽에는 고정 글을 위에. 30개씩
 // POST /api/board { cat, title, body, anon? } -> 글 쓰기 { id }. 사진과 파일은 그다음 /api/board/:id/files 로 하나씩 올린다
-// 건의 사항은 익명(anon)으로 올릴 수 있다 (건의함, server/board.ts): 앱개발자·유어아너 말고는 글쓴이가 '익명'으로 보이고(mine 으로 내 글인지만), 글쓴이로 찾아지지 않는다
+// 건의 사항은 익명(anon)으로 올릴 수 있다 (건의함, server/board.ts): 글쓴이가 '익명'으로 보이고(mine 으로 내 글인지만), 글쓴이로 찾아지지 않는다.
+// 건의 사항 글은 오피서 이상(앱개발자 포함)과 쓴 사람만 본다 (visiblePosts)
 import { NEED_LOGIN, FORBIDDEN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { ANON_NAME, BODY_MAX, CAT_NAME, SUGGEST_OPEN, TITLE_MAX, canSeeAnon, canWrite, isCat, postLink, shownName } from "../../../server/board";
+import { ANON_NAME, BODY_MAX, CAT_NAME, SUGGEST_OPEN, TITLE_MAX, canSeeAnon, canWrite, isCat, postLink, shownName, visiblePosts } from "../../../server/board";
 import { notify } from "../../../server/alerts";
 
 const PAGE = 30;
@@ -21,9 +22,15 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     where.push("p.cat = ?");
     binds.push(cat);
   } else if (SUGGEST_OPEN) where.push("p.cat != 'suggest'"); // 건의함을 열면 게시판 '전체'에는 건의 글을 빼고 건의함에서만
+  // 건의 사항은 운영진(오피서 이상)과 쓴 사람만
+  const vis = visiblePosts(me);
+  if (vis.sql) {
+    where.push(vis.sql);
+    binds.push(...vis.binds);
+  }
   if (q) {
     // 익명 글은 글쓴이로 찾지 않는다 (이름을 볼 수 있는 사람만)
-    where.push(`(p.title LIKE ? OR p.body LIKE ? OR (p.author LIKE ?${canSeeAnon(me) ? "" : " AND p.anon = 0"}))`);
+    where.push(`(p.title LIKE ? OR p.body LIKE ? OR (p.author LIKE ?${canSeeAnon(env, me) ? "" : " AND p.anon = 0"}))`);
     const like = `%${q.replace(/[%_]/g, "")}%`;
     binds.push(like, like, like);
   }
@@ -47,7 +54,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     .bind(...binds)
     .all<{ id: number; pinned: number; author: string; anon: number }>();
   return json({
-    posts: results.map((r) => ({ ...r, author: shownName(me, r.author, r.anon), pinned: r.pinned === 1, anon: r.anon === 1, mine: r.author === me.id })),
+    posts: results.map((r) => ({ ...r, author: shownName(env, me, r.author, r.anon), pinned: r.pinned === 1, anon: r.anon === 1, mine: r.author === me.id })),
     more: results.length === PAGE,
   });
 };

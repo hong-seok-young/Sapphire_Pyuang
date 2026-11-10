@@ -89,6 +89,8 @@ const norm = (s: string) => s.replace(/\s/g, "").toLowerCase();
 const isGear = (it: DexItem) => !!it.plus || (!!it.sg && it.sg !== "불가");
 const plusLabel = (it: DexItem) => (it.plus ? `+${it.plus}` : isGear(it) ? "노강" : "");
 const stampText = (it: DexItem) => (it.sg === "불가" ? "대체 불가" : it.sg ? `${it.sg} ${it.sn}` : "");
+/** 스탬프 색: S 금색, A 보라, B 파랑, 아바돈 빨강, 대체 불가 회색 */
+const stampCls = (g?: string) => "dex-stamp dex-stamp-" + (!g ? "" : g.startsWith("아바돈") ? "AB" : g === "불가" ? "no" : g);
 const itemLabel = (it: DexItem) => it.name ?? `이름 모름 · ${it.icon ?? ""}`;
 
 export function DexPage({ wiki, me }: { wiki: Wiki | null; me: Me }) {
@@ -106,6 +108,7 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
   const [tab, setTab] = useState<Tab>("todo");
   const [q, setQ] = useState("");
   const [stat, setStat] = useState<string | null>(null);
+  const [cat, setCat] = useState<string>("all");
   const [showNeed, setShowNeed] = useState(false);
   const [over, setOverState] = useState<Record<string, number>>(() => readStats(me));
   const setOver = (v: Record<string, number>) => {
@@ -128,7 +131,8 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
   const matchQ = (e: DexEntry) =>
     !query || norm(e.name).includes(query) || e.items.some((it) => it.name && norm(it.name).replace(/^\+\d+/, "").includes(query.replace(/^\+\d+/, "")));
   const matchStat = (e: DexEntry) => !stat || e.effects.some(([s]) => s === stat);
-  const inTab = (e: DexEntry) => (tab === "all" ? true : tab === "done" ? done.has(e.name) : !done.has(e.name));
+  const inCat = (e: DexEntry) => cat === "all" || (e.cat ?? "일반") === cat;
+  const inTab = (e: DexEntry) => inCat(e) && (tab === "all" ? true : tab === "done" ? done.has(e.name) : !done.has(e.name));
   const listed = dex.entries.filter((e) => inTab(e) && matchQ(e) && matchStat(e));
   const doneEntries = dex.entries.filter((e) => done.has(e.name));
   const have = useMemo(() => addUp(doneEntries), [done, dex]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -159,12 +163,23 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
   // 장비를 모두 장비스탬프로 대체하면 드는 스탬프 (등급별 합)
   const stamps = new Map<string, number>();
   for (const e of todoListed) for (const it of e.items) if (it.sg && it.sn) stamps.set(it.sg, (stamps.get(it.sg) ?? 0) + it.sn * it.n);
-  const stampSum = ["S", "A", "B", ...[...stamps.keys()].filter((g) => !["S", "A", "B"].includes(g))].filter((g) => stamps.has(g));
+  const stampSum = ["S", "A", "B", ...[...stamps.keys()].filter((g) => !["S", "A", "B"].includes(g)).sort()].filter((g) => stamps.has(g));
 
 
   return (
     <div className="dex">
       <StatPanel have={have} gain={gain} full={full} over={over} setOver={setOver} stat={stat} doneN={doneEntries.length} total={dex.entries.length} todoN={todoListed.length} />
+
+      <div className="mk-cats dex-cats">
+        {["all", "일반", "코스튬", "펫"].map((c) => {
+          const n = c === "all" ? dex.entries.length : dex.entries.filter((e) => (e.cat ?? "일반") === c).length;
+          return n ? (
+            <button key={c} type="button" className={"sub-tab" + (cat === c ? " sub-tab-on" : "")} onClick={() => setCat(c)}>
+              {c === "all" ? "전체" : c} <small>{n}</small>
+            </button>
+          ) : null;
+        })}
+      </div>
 
       <nav className="pill-row" role="tablist">
         {TABS.map((x) => (
@@ -207,7 +222,7 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
             <p className="dex-stampsum">
               장비스탬프로 대체하면{" "}
               {stampSum.map((g) => (
-                <span key={g} className={"dex-stamp dex-stamp-" + g}>{g} {stamps.get(g)!.toLocaleString("ko-KR")}</span>
+                <span key={g} className={stampCls(g)}>{g} {stamps.get(g)!.toLocaleString("ko-KR")}</span>
               ))}
             </p>
           )}
@@ -220,7 +235,7 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
                     <span className="dex-need-name">
                       {plusLabel(it) && <em className={"dex-need-plus" + (it.plus ? "" : " dex-noplus")}>{plusLabel(it)}</em>}
                       {itemLabel(it)}
-                      {stampText(it) && <small className={"dex-stamp dex-stamp-" + it.sg}>{stampText(it)}</small>}
+                      {stampText(it) && <small className={stampCls(it.sg)}>{stampText(it)}</small>}
                     </span>
                     <span className="muted">{entries}칸</span>
                     <b>×{n.toLocaleString("ko-KR")}</b>
@@ -327,11 +342,12 @@ function EntryRow({ e, done, onToggle, iconOf, stat, onItem }: { e: DexEntry; do
       <div className="dex-main">
         <div className="dex-title">
           <b>{e.name}</b>
+          {e.cat && <small className="dex-cat">{e.cat}</small>}
           {e.period && <small className="dex-period">{e.period}</small>}
         </div>
         <div className="dex-effects">
-          {e.effects.map((f) => (
-            <span key={f[0]} className={"dex-eff" + (stat === f[0] ? " dex-eff-on" : "")}>{effectText(f)}</span>
+          {e.effects.map((f, i) => (
+            <span key={i} className={"dex-eff" + (stat === f[0] ? " dex-eff-on" : "")}>{effectText(f)}</span>
           ))}
         </div>
         <div className="dex-items">
@@ -344,7 +360,7 @@ function EntryRow({ e, done, onToggle, iconOf, stat, onItem }: { e: DexEntry; do
                 {it.n > 1 && <i className="dex-n">{it.n.toLocaleString("ko-KR")}</i>}
               </span>
               <span className="dex-iname">{it.name ? it.name.replace(/^\+\d+\s*/, "") + (it.est ? "?" : "") : "이름 모름"}</span>
-              {stampText(it) && <span className={"dex-stamp dex-stamp-" + it.sg}>{stampText(it)}</span>}
+              {stampText(it) && <span className={stampCls(it.sg)}>{stampText(it)}</span>}
             </button>
           ))}
         </div>

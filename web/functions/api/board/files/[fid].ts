@@ -2,14 +2,18 @@
 // DELETE /api/board/files/:fid -> 지우기 (글 쓴 사람만)
 import { FORBIDDEN, NEED_LOGIN, blobBytes, currentUser, json } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
+import { canSeePost } from "../../../../server/board";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env, params }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  const row = await env.DB.prepare("SELECT name, type, image, data FROM board_files WHERE id = ?")
+  const row = await env.DB.prepare(
+    "SELECT f.name, f.type, f.image, f.data, p.cat, p.author FROM board_files f JOIN board_posts p ON p.id = f.post_id WHERE f.id = ?",
+  )
     .bind(Number(params.fid))
-    .first<{ name: string; type: string; image: number; data: unknown }>();
-  if (!row) return json({ error: "없는 파일이에요" }, 404);
+    .first<{ name: string; type: string; image: number; data: unknown; cat: string; author: string }>();
+  // 건의 사항의 사진·파일은 운영진(오피서 이상)과 쓴 사람만
+  if (!row || !canSeePost(me, row)) return json({ error: "없는 파일이에요" }, 404);
   const headers: Record<string, string> = {
     "cache-control": "private, max-age=31536000, immutable",
     "x-content-type-options": "nosniff",

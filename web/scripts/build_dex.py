@@ -64,16 +64,17 @@ def main() -> None:
                 d["est"] = True  # 툴팁은 못 보고 다른 항목에서 이름이 확인된 같은 그림으로 정한 칸
             # 도감 등록 창: '…는 장비스탬프B 11개로 대체 등록이 가능합니다' -> sg 'B', sn 11 / '대체 등록이 불가능한 수집 품목' -> sg '불가'
             st = it.get("stamp") or ""
-            m = re.search(r"장비스탬프\s*([A-Za-z가-힣]+)\s*(\d+)", st)
+            # '아바돈장비스탬프A 7개' 는 일반 장비스탬프와 다른 스탬프라 등급 앞에 '아바돈' 을 붙인다 (제작자 2026-11-10 'B A 아바돈 등등')
+            m = re.search(r"(아바돈)?\s*장비스탬프\s*([A-Za-z]+)\s*(\d+)", st)
             if m:
-                d["sg"], d["sn"] = m.group(1).upper(), int(m.group(2))
+                d["sg"], d["sn"] = (m.group(1) or "") + m.group(2).upper(), int(m.group(3))
             elif "불가" in st:
                 d["sg"] = "불가"
             if base and base in pics:
                 d["pic"] = f"/data/dex/{base}.png"
             items.append(d)
         entries.append({"name": e["name"], "effects": [effect(s, v) for s, v in e["effects"]],
-                        "period": e.get("period"), "items": items})
+                        "period": e.get("period"), "items": items, **({"cat": e["category"]} if e.get("category") else {})})
     unknown = sorted({s for e in entries for s, _, _ in e["effects"]} - set(order))
     data = {"source": raw.get("source", "게임 도감 퀘스트 (제작자 영상)"), "built": date.today().isoformat(), "order": order, "entries": entries}
     (OUT / "dex.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
