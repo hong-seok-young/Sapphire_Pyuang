@@ -49,15 +49,59 @@ export function BoardPage({ me, arg, sub, query }: { me: Me; arg: string; sub: s
 
 /**
  * 건의함 (제작자 요청 2026-11-09):
- * #/suggest 목록, #/suggest/:id 글, #/suggest/write, #/suggest/:id/edit. 게시판의 건의 사항(cat suggest)을 그대로 쓰고, 글과 댓글을 익명으로 올릴 수 있다.
- * 익명 이름은 서버가 가려서 보낸다 (server/board.ts canSeeAnon). 열 때는 src/board.ts SUGGEST_OPEN
+ * #/suggest 글 칸, #/suggest/:id 글, #/suggest/write, #/suggest/:id/edit. 게시판의 건의 사항(cat suggest)을 그대로 쓰고, 글과 댓글을 익명으로 올릴 수 있다.
+ * 익명 이름은 서버가 가려서 보낸다 (server/board.ts canSeeAnon). 열 때는 src/board.ts SUGGEST_OPEN.
+ * 칸 (제작자 2026-11-10 '길드원 화면은 건의하기 버튼만 크게, 보낸 뒤엔 내 건의함에서, 운영진은 건의하기·내 건의함·접수함'):
+ * 건의하기(#/suggest, 큰 단추 하나) · 내 건의함(?v=mine, 내가 보낸 건의와 답글) · 접수함(?v=inbox, 운영진만: 받은 건의 모두와 찾기)
  */
-export function SuggestPage({ me, arg, sub }: { me: Me; arg: string; sub: string }) {
+type SuggestTab = "write" | "mine" | "inbox";
+export function SuggestPage({ me, arg, sub, query }: { me: Me; arg: string; sub: string; query: URLSearchParams }) {
   if (arg === "write") return <Write me={me} cat="suggest" box />;
   const id = Number(arg);
   if (id && sub === "edit") return <Write me={me} editId={id} box />;
   if (id) return <PostView me={me} id={id} box />;
-  return <List me={me} cat="suggest" box />;
+  const v = query.get("v");
+  const tab: SuggestTab = v === "mine" ? "mine" : v === "inbox" && staff(me) ? "inbox" : "write";
+  return (
+    <>
+      <TopBar title="건의함" />
+      <SuggestTabs me={me} tab={tab} />
+      {tab === "write" ? (
+        <section className="sg-home">
+          <a className="sg-big" href="#/suggest/write">
+            <span className="sg-big-icon" aria-hidden>
+              💡
+            </span>
+            <b>건의하기</b>
+            <span className="sg-big-shine" aria-hidden />
+          </a>
+        </section>
+      ) : (
+        <List key={tab} me={me} cat="suggest" box={tab} />
+      )}
+    </>
+  );
+}
+
+/** 건의함 칸 줄: 건의하기 · 내 건의함 · 접수함(운영진). 새 답글·새 건의 수는 내 건의함(길드원)·접수함(운영진) 모서리에 */
+function SuggestTabs({ me, tab }: { me: Me; tab: SuggestTab }) {
+  const news = useNews();
+  const n = newsSum(news, ["board.suggest"]);
+  const tabs: { key: SuggestTab; name: string; to: string }[] = [
+    { key: "write", name: "건의하기", to: "#/suggest" },
+    { key: "mine", name: "내 건의함", to: "#/suggest?v=mine" },
+    ...(staff(me) ? [{ key: "inbox" as const, name: "접수함", to: "#/suggest?v=inbox" }] : []),
+  ];
+  return (
+    <nav className="pill-row sg-tabs">
+      {tabs.map((t) => (
+        <button key={t.key} className={`pill sg-tab-${t.key}` + (tab === t.key ? " pill-on" : "")} aria-pressed={tab === t.key} onClick={() => go(t.to, true)}>
+          {t.name}
+          {t.key === (staff(me) ? "inbox" : "mine") && <NewsDot n={n} />}
+        </button>
+      ))}
+    </nav>
+  );
 }
 
 /** 글 주소의 앞 (건의함은 #/suggest) */
@@ -104,7 +148,8 @@ function BoardCats({ cat }: { cat: Cat | "imo" | null }) {
   );
 }
 
-function List({ me, cat, box }: { me: Me; cat: Cat | null; box?: boolean }) {
+/** 글 목록. box 는 건의함의 칸: 'mine' 내 건의만, 'inbox' 받은 건의 모두 (위 줄과 칸 줄은 SuggestPage 가 그린다) */
+function List({ me, cat, box }: { me: Me; cat: Cat | null; box?: "mine" | "inbox" }) {
   const [posts, setPosts] = useState<PostSummary[] | null>(null);
   const [more, setMore] = useState(false);
   const [error, setError] = useState("");
@@ -115,12 +160,12 @@ function List({ me, cat, box }: { me: Me; cat: Cat | null; box?: boolean }) {
   useEffect(() => {
     let alive = true;
     // 이번에 연 동안 본 목록은 새로 받는 동안 바로 보인다 (src/memo.ts)
-    const key = `board:${cat}|${q}`;
+    const key = `board:${cat}|${q}|${box ?? ""}`;
     const had = peekMemo<{ posts: PostSummary[]; more: boolean }>(key);
     setPosts(had?.posts ?? null);
     setMore(had?.more ?? false);
     setError("");
-    fetchPosts({ cat, q }).then(
+    fetchPosts({ cat, q, mine: box === "mine" }).then(
       (r) => {
         putMemo(key, { posts: r.posts, more: r.more });
         if (!alive) return;
@@ -132,13 +177,13 @@ function List({ me, cat, box }: { me: Me; cat: Cat | null; box?: boolean }) {
     return () => {
       alive = false;
     };
-  }, [cat, q]);
+  }, [cat, q, box]);
 
   async function loadMore() {
     if (!posts?.length) return;
     setBusy(true);
     try {
-      const r = await fetchPosts({ cat, q, before: posts[posts.length - 1].id });
+      const r = await fetchPosts({ cat, q, before: posts[posts.length - 1].id, mine: box === "mine" });
       setPosts([...posts, ...r.posts.filter((p) => !posts.some((x) => x.id === p.id))]);
       setMore(r.more);
     } catch (x) {
@@ -149,11 +194,12 @@ function List({ me, cat, box }: { me: Me; cat: Cat | null; box?: boolean }) {
   }
 
   const writeCat = cat && canWrite(me, cat) ? cat : "free";
-  const base = baseOf(box);
+  const base = baseOf(!!box);
   return (
     <>
-      <TopBar title={box ? "건의함" : "게시판"} />
+      {!box && <TopBar title="게시판" />}
       {!box && <BoardCats cat={cat} />}
+      {box !== "mine" && (
       <form
         className="bd-search"
         onSubmit={(e) => {
@@ -162,14 +208,27 @@ function List({ me, cat, box }: { me: Me; cat: Cat | null; box?: boolean }) {
         }}
       >
         <input className="mk-input" value={text} onChange={(e) => setText(e.target.value)} placeholder="🔍 제목, 내용, 글쓴이" aria-label="글 찾기" />
-        <a className="btn bd-write" href={box ? "#/suggest/write" : `#/board/write?cat=${writeCat}`}>
-          {box ? "✏️ 건의하기" : "✏️ 글쓰기"}
-        </a>
+        {!box && (
+          <a className="btn bd-write" href={`#/board/write?cat=${writeCat}`}>
+            ✏️ 글쓰기
+          </a>
+        )}
       </form>
+      )}
       {!posts ? (
         <Loading error={error} />
       ) : posts.length === 0 ? (
-        <div className="empty">{q ? `"${q}" 글이 없어요.` : (box || cat === "suggest") && RANK[me.role] < 1 ? "건의는 운영진과 쓴 사람만 봐요." : "아직 글이 없어요."}</div>
+        <div className="empty">
+          {q
+            ? `"${q}" 글이 없어요.`
+            : box === "mine"
+              ? "아직 보낸 건의가 없어요."
+              : box === "inbox"
+                ? "아직 받은 건의가 없어요."
+                : cat === "suggest" && RANK[me.role] < 1
+                  ? "건의는 운영진과 쓴 사람만 봐요."
+                  : "아직 글이 없어요."}
+        </div>
       ) : (
         <ul className="bd-list">
           {posts.map((p) => (
@@ -397,7 +456,8 @@ function PostView({ me, id, box }: { me: Me; id: number; box?: boolean }) {
             (confirm ? (
               <button className="pill pill-danger" disabled={busy} onClick={() => run(async () => {
                 await deletePost(id);
-                go(base, true);
+                // 건의함은 내 건의함이나 접수함으로
+                go(box ? (mine || !staff(me) ? "#/suggest?v=mine" : "#/suggest?v=inbox") : base, true);
               })}>
                 삭제 확인
               </button>
@@ -537,7 +597,8 @@ function Write({ me, cat: startCat, editId, box }: { me: Me; cat?: Cat; editId?:
         await uploadFile(id, r.blob, r.name);
         dropAdded(r.key);
       }
-      go(`${baseOf(box)}/${id}`, true);
+      // 건의함에서 새로 보낸 건의는 내 건의함으로 (제작자 2026-11-10 '보내고 그 뒤론 내 건의함에서'), 고친 글은 그 글로
+      go(box && !editId ? "#/suggest?v=mine" : `${baseOf(box)}/${id}`, true);
     } catch (x) {
       setError(errorText(x));
       setBusy("");

@@ -169,7 +169,9 @@ export const GUIDES: Guide[] = [
     key: "suggest",
     title: "건의함",
     tutorial: [
-      { sel: ".bd-write", head: "건의하기", text: "글을 올리면 길드마스터와 오피서에게 알림이 가요.\n건의 글은 운영진과 쓴 사람만 볼 수 있어요." },
+      { sel: ".sg-big", head: "건의하기", text: "글을 올리면 길드마스터와 오피서에게 알림이 가요.\n건의 글은 운영진과 쓴 사람만 볼 수 있어요." },
+      { sel: ".sg-tab-mine", head: "내 건의함", text: "보낸 건의와 운영진 답글은 여기서 봐요." },
+      { sel: ".sg-tab-inbox", who: "officer", head: "접수함", text: "길드원이 보낸 건의가 모두 모여요." },
       {
         go: "#/suggest/write",
         sel: ".sg-anon",

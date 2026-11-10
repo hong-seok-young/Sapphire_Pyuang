@@ -472,7 +472,7 @@ function Wiki({
   // 건의함 (개발중, 제작자 요청 2026-11-09 개발 요청 #13, 2026-11-09 '일단 나만 보이게'): 게시판의 건의 사항을 따로, 익명 글·댓글.
   // 열기 전에는 앱개발자(와 테스트 계정)만 (launcher.ts canSuggest). 게시판 안의 예전 '건의' 칸은 그대로 모두에게 열려 있다
   else if (page === "suggest")
-    body = canSuggest(me) ? <SuggestPage me={me} arg={arg} sub={route.parts[2] ?? ""} /> : <DevSoon title="건의함" />;
+    body = canSuggest(me) ? <SuggestPage me={me} arg={arg} sub={route.parts[2] ?? ""} query={route.query} /> : <DevSoon title="건의함" />;
   else if (page === "") body = <Home me={me} />;
   else if (page === "info") body = <InfoPage me={me} />;
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
