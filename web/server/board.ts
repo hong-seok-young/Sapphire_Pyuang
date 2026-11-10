@@ -46,6 +46,7 @@ export function deletePostStmts(env: Env, id: number): D1PreparedStatement[] {
   return [
     env.DB.prepare("DELETE FROM board_files WHERE post_id = ?").bind(id),
     env.DB.prepare("DELETE FROM board_comments WHERE post_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM suggest_steps WHERE post_id = ?").bind(id),
     env.DB.prepare("DELETE FROM board_likes WHERE post_id = ?").bind(id),
     env.DB.prepare("DELETE FROM board_views WHERE post_id = ?").bind(id),
     env.DB.prepare("DELETE FROM board_posts WHERE id = ?").bind(id),

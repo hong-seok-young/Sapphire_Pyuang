@@ -1070,3 +1070,14 @@ CREATE TABLE IF NOT EXISTS donate_items (
 );
 CREATE INDEX IF NOT EXISTS donate_items_status ON donate_items (status, created_at);
 CREATE INDEX IF NOT EXISTS donate_items_who ON donate_items (who);
+
+-- 건의 결재선 이력 (server/suggest.ts, 제작자 2026-11-10 '건의함이 게시판이 아니잖아, 결재선'). 상태는 board_posts.sg_status (ci-d1 ADDED_COLUMNS), 지우지 않는다 (글을 지우면 같이)
+CREATE TABLE IF NOT EXISTS suggest_steps (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  post_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  kind TEXT NOT NULL,                     -- agree | approve | skip(길마 직권) | force(반려 뒤 강제) | reject | done(반영 완료)
+  note TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS suggest_steps_post ON suggest_steps (post_id, id);

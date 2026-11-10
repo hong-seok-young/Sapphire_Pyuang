@@ -4992,3 +4992,11 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .dn-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .dn-chips .pill { padding: 4px 9px; font-size: 12px; }
 .dn-extra { display: block; font-size: 11px; color: #ffcf8a; overflow-wrap: anywhere; }
+
+/* 건의 결재선 (SuggestFlow.tsx, 제작자 2026-11-10): 결재란은 개발 요청(.dr-*) 그대로, 목록 줄의 상태 표 */
+.sg-flow { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.sg-chip { display: inline-block; margin-right: 4px; padding: 0 5px; font-size: 10px; font-style: normal; line-height: 16px; vertical-align: 1px; border: 1px solid currentColor; }
+.sg-chip-agree { color: #ffcf6a; }
+.sg-chip-accepted { color: #6fd0ff; }
+.sg-chip-done { color: #6dff9a; }
+.sg-chip-rejected { color: #ff7a7a; }

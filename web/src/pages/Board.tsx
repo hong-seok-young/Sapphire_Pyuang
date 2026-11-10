@@ -5,7 +5,7 @@ import { ApiError, RANK, errorText } from "../auth";
 import type { Me } from "../auth";
 import {
   BOARD_CATS, CAT_ICON, CAT_NAME, URL_RE, createPost, deleteFile, deletePost, fetchPost, fetchPosts,
-  fileUrl, linkPreview, polishPost, setLike, shrinkPhoto, sizeText, updatePost, uploadFile, youtubeId,
+  fileUrl, linkPreview, polishPost, setLike, sgName, shrinkPhoto, sizeText, updatePost, uploadFile, youtubeId,
 } from "../board";
 import type { BoardFile, Cat, LinkPreview, PostDetail, PostSummary } from "../board";
 import { RoleBadge } from "../emblems";
@@ -19,6 +19,7 @@ import { KakaoButton, Nick } from "../kakao";
 import { isOfficialTab } from "../official";
 import { AnonName, Comments } from "./Comments";
 import { ImageViewer } from "./ImageViewer";
+import { SuggestFlow } from "./SuggestFlow";
 
 /** 공지사항과 이벤트는 오피서 이상만 쓴다 (서버 server/board.ts canWrite 와 같다) */
 const canWrite = (me: Me, cat: Cat) => cat === "free" || cat === "suggest" || RANK[me.role] >= 1;
@@ -156,6 +157,18 @@ function List({ me, cat, box }: { me: Me; cat: Cat | null; box?: "mine" | "inbox
   const [text, setText] = useEntryState("text", "");
   const [q, setQ] = useEntryState("q", "");
   const [busy, setBusy] = useState(false);
+  // 건의함(내 건의함·접수함)은 보는 동안 30초마다·다시 볼 때 새로 받아 결재 상황이 바로 바뀐다
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!box) return;
+    const bump = () => document.visibilityState === "visible" && setTick((t) => t + 1);
+    const t = window.setInterval(bump, 30_000);
+    document.addEventListener("visibilitychange", bump);
+    return () => {
+      window.clearInterval(t);
+      document.removeEventListener("visibilitychange", bump);
+    };
+  }, [box]);
 
   useEffect(() => {
     let alive = true;
@@ -177,7 +190,7 @@ function List({ me, cat, box }: { me: Me; cat: Cat | null; box?: "mine" | "inbox
     return () => {
       alive = false;
     };
-  }, [cat, q, box]);
+  }, [cat, q, box, tick]);
 
   async function loadMore() {
     if (!posts?.length) return;
@@ -238,6 +251,7 @@ function List({ me, cat, box }: { me: Me; cat: Cat | null; box?: "mine" | "inbox
                   <span className="bd-row-title">
                     {p.pinned && <i className="bd-pin">고정</i>}
                     {!box && <i className={"bd-cat bd-cat-" + p.cat}>{CAT_NAME[p.cat]}</i>}
+                    {p.sg && <i className={"sg-chip sg-chip-" + p.sg}>{sgName(p.sg, p.sgAgrees ?? 0)}</i>}
                     {p.title}
                     <ThingDot k={`post:${p.id}`} />
                   </span>
@@ -362,6 +376,18 @@ function PostView({ me, id, box }: { me: Me; id: number; box?: boolean }) {
     );
   }, [id]);
   useEffect(reload, [reload]);
+  // 건의 결재선은 보는 동안 20초마다·다시 볼 때 새로 받는다 (제작자 2026-11-10 '실시간으로 결재 상황을 볼 수 있게')
+  const watching = !!d?.flow && d.flow.status !== "done";
+  useEffect(() => {
+    if (!watching) return;
+    const tick = () => document.visibilityState === "visible" && reload();
+    const t = window.setInterval(tick, 20_000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      window.clearInterval(t);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [watching, reload]);
 
   if (!d) return (
     <>
@@ -469,6 +495,7 @@ function PostView({ me, id, box }: { me: Me; id: number; box?: boolean }) {
         </div>
         {error && <p className="form-error">{error}</p>}
       </article>
+      {d.flow && <SuggestFlow me={me} postId={id} author={post.author} mine={mine} flow={d.flow} onChanged={reload} />}
       <Comments
         me={me}
         id={id}
