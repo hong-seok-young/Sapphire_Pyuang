@@ -4841,7 +4841,29 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
   .hof-ro-spark { animation: none; opacity: 0.7; }
 }
 .hof-pod-pic { position: relative; z-index: 3; display: flex; align-items: center; justify-content: center; line-height: 0; }
-.hof-face-none { font-size: 26px; line-height: 1; }
+/* 사진·직업 없는 기부자 자리의 보석 (Hall.tsx GemFace). 보석 svg 는 가만히, 움직이는 것은 따로 된 층이 transform·opacity 로만 */
+.hof-lux { position: relative; display: block; flex: none; }
+.hof-lux-layer, .hof-lux-gem { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.hof-lux-sheen-clip { overflow: hidden; pointer-events: none; }
+.hof-lux-sheen { position: absolute; top: -10%; left: -30%; width: 22%; height: 120%;
+  background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.75), rgba(255,255,255,0));
+  transform: skewX(-20deg); will-change: transform; animation: hof-lux-sheen 3.2s ease-in-out infinite; }
+@keyframes hof-lux-sheen { 0% { transform: translateX(0) skewX(-20deg); } 55%, 100% { transform: translateX(760%) skewX(-20deg); } }
+.hof-lux-float { will-change: transform; animation: hof-lux-float 3s ease-in-out infinite; }
+@keyframes hof-lux-float { 0%, 100% { transform: translateY(3%); } 50% { transform: translateY(-4%); } }
+.hof-lux-glow { inset: 4%; width: 92%; height: 92%; border-radius: 50%; will-change: transform, opacity; animation: hof-lux-glow 2.6s ease-in-out infinite; }
+@keyframes hof-lux-glow { 0%, 100% { opacity: .45; transform: scale(.88); } 50% { opacity: 1; transform: scale(1.06); } }
+.hof-lux-rays { will-change: transform; animation: hof-lux-spin 14s linear infinite; }
+.hof-lux-halo { will-change: transform; animation: hof-lux-spin 24s linear infinite; }
+@keyframes hof-lux-spin { to { transform: rotate(360deg); } }
+.hof-lux-spark { position: absolute; display: block; opacity: 0; transform: translate(-50%, -50%) scale(.2); will-change: transform, opacity;
+  animation: hof-lux-spark 2.4s ease-in-out infinite; pointer-events: none; }
+.hof-lux-spark > svg { display: block; width: 100%; height: 100%; }
+@keyframes hof-lux-spark { 0%, 60%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(.2) rotate(0deg); } 75% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(45deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .hof-lux-sheen, .hof-lux-float, .hof-lux-glow, .hof-lux-rays, .hof-lux-halo, .hof-lux-spark { animation: none; }
+  .hof-lux-sheen, .hof-lux-spark { opacity: 0; }
+}
 .hof-pod-1 .gh-pillar { bottom: 18px; }
 .hof-pod-1 .gh-circle, .hof-pod-1 .gh-ripple { bottom: -57px; }
 .hof-crown { position: absolute; z-index: 4; top: -2px; left: 50%; font-size: 22px; line-height: 1; transform: translateX(-50%); animation: hof-crown 2s ease-in-out infinite; }
