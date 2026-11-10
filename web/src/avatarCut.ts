@@ -296,3 +296,43 @@ export function fillHoles(base: Uint8Array, w: number, h: number, keep: number[]
   }
   return out;
 }
+
+/** prev 에서 지워졌지만 base 에는 있던 덩어리 중 keep 점이 든 것을 되살린다 (둘째 검수가 '잘못 지워졌다'고 짚은 캐릭터 부분) */
+export function restoreParts(prev: Uint8Array, base: Uint8Array, keep: number[], w: number, h: number): Uint8Array {
+  const out = prev.slice();
+  const seen = new Uint8Array(prev.length);
+  for (const start of keep) {
+    if (!base[start] || out[start] || seen[start]) continue;
+    const stack = [start];
+    seen[start] = 1;
+    while (stack.length) {
+      const i = stack.pop()!;
+      out[i] = 255;
+      const x = i % w;
+      const y = (i - x) / w;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const j = ny * w + nx;
+          if (base[j] && !out[j] && !seen[j]) {
+            seen[j] = 1;
+            stack.push(j);
+          }
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * 검수 한 번을 지금 결과(cur)에 적용한다. 둘째 검수(again)는 첫 결과 위에서만 고친다: 짚은 캐릭터 부분을 base 에서 되살리고,
+ * 구멍을 메우고, 이번에 찍은 지울 것만 지운다 (첫 검수에서 지운 것을 다시 가르면 지웠던 꽃이 되살아났다). keepAll 은 지금까지의 keep 점 모두
+ */
+export function applyReview(src: Pixels, base: Uint8Array, cur: Uint8Array, review: Marks, keepAll: number[], again: boolean): Uint8Array {
+  const { width: w, height: h } = src;
+  const mask = fillHoles(again ? restoreParts(cur, base, review.keep, w, h) : cur, w, h, review.keep);
+  return cutWithMarks(src, mask, { keep: keepAll, remove: review.remove, boxes: review.boxes }) ?? mask;
+}
