@@ -143,7 +143,23 @@ export interface GcData {
   nextMilestone: GcMilestone | null;
   /** 연속 성장: 지난주까지 이어진 주 수, 이번 주도 벌면 받을 보너스 */
   streak: { count: number; next: number };
-  admin?: { pending: GcOrder[]; recent: GcOrder[]; members: GcWallet[] };
+  admin?: { pending: GcOrder[]; recent: GcOrder[]; members: GcWallet[]; results?: GcRoundResult[] };
+}
+
+/** 끝난 판의 결과 한 줄 (담당자 > 기록) */
+export interface GcRoundResult {
+  round: number;
+  start: number;
+  end: number;
+  rank: number;
+  userId: string;
+  fromLevel: number;
+  target: number;
+  level: number;
+  exp: number | null;
+  doneAt: number | null;
+  pct: number;
+  coins: number;
 }
 
 export const fetchGcoin = () => api<GcData>("/api/gcoin");

@@ -1012,6 +1012,23 @@ CREATE TABLE IF NOT EXISTS gc_rounds (
   set_at INTEGER NOT NULL,
   set_by TEXT
 );
+-- 끝난 주간 목표 판의 결과 (담당자 > 기록). 판이 끝나면 한 번 남기고 지우지 않는다 (계정을 지워도 남음)
+CREATE TABLE IF NOT EXISTS gc_round_results (
+  round INTEGER NOT NULL,
+  start INTEGER NOT NULL,
+  end_at INTEGER NOT NULL,
+  rank INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  from_level INTEGER NOT NULL,
+  target INTEGER NOT NULL,
+  level INTEGER NOT NULL,
+  exp INTEGER,
+  done_at INTEGER,
+  pct REAL NOT NULL,
+  coins INTEGER NOT NULL,
+  saved_at INTEGER NOT NULL,
+  PRIMARY KEY (round, user_id)
+);
 CREATE TABLE IF NOT EXISTS gc_targets (
   round INTEGER NOT NULL,
   user_id TEXT NOT NULL,

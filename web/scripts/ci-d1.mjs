@@ -729,6 +729,23 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
   }
 }
 
+// 성장코인샵 주간 목표 첫 판을 11/16(월) 0시부터로 (제작자 2026-11-10 '00시부터, 월요일부터야 다음 주'): 11/11 11:00 판에 정해 둔 목표·상금 장부를 새 첫 판 번호로 옮기고,
+// 그 전에 정해 둔 기간(gc_rounds)은 지운다 (기본 판 11/16 0시 ~ 11/22 24시, 쉬고 11/30 …). setup 'gcoin_round_mon_20261110' 로 한 번만
+{
+  const KEY = "gcoin_round_mon_20261110";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const OLD = 1794362400000; // 2026-11-11 11:00 KST
+    const NEW = 1794754800000; // 2026-11-16 00:00 KST
+    runSql([
+      `UPDATE gc_targets SET round = ${NEW} WHERE round = ${OLD} AND NOT EXISTS (SELECT 1 FROM gc_targets t WHERE t.round = ${NEW} AND t.user_id = gc_targets.user_id);`,
+      `UPDATE gc_ledger SET ref = 'race:${NEW}' WHERE kind = 'race' AND ref = 'race:${OLD}';`,
+      `DELETE FROM gc_rounds WHERE start < ${NEW};`,
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
+    ]);
+    console.log("성장코인샵 첫 판을 11/16(월) 0시부터 (한 번)");
+  }
+}
+
 // 기부함 마일리지를 기부 골드 가치의 0.6 으로 (제작자 2026-11-10 '기부한 골드 가치의 x 0.6 이 마일리지로 쌓이는 거임, 10만 골드당 1, 소수점은 누적, 정수 부분만 사용').
 // 그 전에 확정한 기부(1.0 으로 넣은 💎)를 사람마다 floor(골드 합 x 0.6 / 10만) 에 맞춰 차이를 장부에 한 줄 넣고, 그 사람의 가장 최근 기부 줄 dia 에 더한다. setup 'donate_rate_06_20261110' 로 한 번만
 {

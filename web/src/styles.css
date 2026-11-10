@@ -4912,3 +4912,16 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .gr-pd-step .pill { min-width: 26px; height: 26px; padding: 0; }
 .gr-pd-sep { color: var(--muted); }
 .gr-pd-row .gc-done-btn { margin-left: auto; }
+
+/* 성장코인샵 담당자 > 기록 (제작자 2026-11-10): 끝난 판마다 한 칸, 줄마다 순위 · 닉네임(Lv.시작 → 목표) · 달성한 때 또는 % · 상금 */
+.gr-rec { margin-bottom: 8px; }
+.gr-rec-sum { margin: 0 0 6px; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 2px; }
+.gr-rec-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; }
+.gr-rec-list li { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto 38px; align-items: center; gap: 6px; padding: 4px 6px; font-size: 13px; background: var(--panel2, rgba(255,255,255,0.04)); border: 1px solid var(--edge); }
+.gr-rec-done { border-color: rgba(255, 207, 92, 0.45) !important; }
+.gr-rec-rank { text-align: center; font-weight: 700; }
+.gr-rec-name { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; }
+.gr-rec-name small { color: var(--muted); font-size: 11px; }
+.gr-rec-when { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.gr-rec-done .gr-rec-when { color: var(--gold); }
+.gr-rec-coin { display: flex; align-items: center; justify-content: flex-end; color: var(--gold); font-size: 13px; }

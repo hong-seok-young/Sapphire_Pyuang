@@ -1,20 +1,21 @@
 // 2군 성장코인샵 시범운영: 주간 목표 레벨 선착순 (제작자·김다혜 2026-11-09, 유어아너 공지 2026-11-10 '격주: 일주일 하고 일주일 쉬고').
 // '2주간의 목표 레벨은 담당자가 정해 주고, 월요일부터 다음 주 일요일까지가 기본 2주', '그 2주 동안 목표 레벨을 먼저 달성하면 1위, 선착순 제도',
 // '1등부터 5등만 주는 걸로', '37렙 먼저 찍으면 5코인', '누군가 딱 달성하면 1위로 확정', '상점의 성장 카드는 달성률이 나오게, 그 달성률로 순위를 매기다가'.
-// 판은 2026-11-11(수) 11:00(한국 시간, 오픈 때)부터 7일 진행하고 7일 쉰다 (11/11 11:00 ~ 11/18 11:00, 쉬고, 11/25 11:00 ~ …). 목표는 판마다 사람마다 (D1 gc_targets).
+// 판은 담당자가 정한 기간(그날 0시 ~ 끝 날 24시, D1 gc_rounds), 안 정했으면 2026-11-16(월) 0시부터 7일 진행하고 7일 쉰다 (제작자 2026-11-10 '00시부터, 월요일부터야 다음 주':
+// 11/16(월) 0시 ~ 11/22(일) 24시, 쉬고, 11/30(월) 0시 ~ …). 끝난 판은 결과를 D1 gc_round_results 에 남긴다 (담당자 > 기록). 목표는 판마다 사람마다 (D1 gc_targets).
 // 쉬는 주에는 끝난 판 결과를 보이고, 담당자가 정하는 목표는 다음 판 것이다 (targetRound).
 // 달성은 길드 랭킹·내 정보에 적은 레벨 기록(level_log)에서 그 판 안에 처음 목표 레벨 이상을 적은 때로 센다 (게임을 읽지 않는다).
 // 달성한 사람은 그때 순서대로 1위 2위 … (확정), 아직인 사람은 달성률 순. 1~5위는 달성하는 순간 상금(gc_settings rank1~5)이 지갑에 들어간다 (gc_ledger kind race).
 import type { Env, User } from "./auth";
 import { notify } from "./alerts";
-import { GCOIN_OPEN_AT, canUseGcoin, gcoinOpen, isMember, readRank } from "./gcoin";
+import { canUseGcoin, gcoinOpen, isMember, readRank } from "./gcoin";
 
 const DAY = 86_400_000;
 /** 진행하는 날 수와 한 바퀴(진행 + 휴식): 담당자가 기간을 정하기 전의 기본 판 */
 export const RACE_DAYS = 7;
 export const RACE_CYCLE = 14;
-/** 첫 판 시작 = 오픈 때 (2026-11-11 11:00 한국 시간) */
-const RACE_ANCHOR = GCOIN_OPEN_AT;
+/** 첫 판 시작 = 2026-11-16(월) 0시 한국 시간 (판은 늘 그날 0시부터) */
+export const RACE_ANCHOR = Date.UTC(2026, 10, 15, 15);
 
 /** 판 하나. id 는 처음 정한 시작 때로, 목표(gc_targets.round)와 상금 장부(ref 'race:<id>')가 이것으로 잇는다 (기간을 고쳐도 그대로) */
 export interface Round {
@@ -262,4 +263,66 @@ export async function raceAfter(env: Env, me: User, before: { round: Round; priz
     rank: mine.rank,
     coins: justDone ? mine.coins : 0,
   };
+}
+
+/** 끝난 판의 결과 한 줄 (담당자 > 기록, 제작자 2026-11-10 '이벤트 종료하면 1차 이벤트 결과를 기록으로 남겨') */
+export interface RoundResult {
+  round: number;
+  start: number;
+  end: number;
+  rank: number;
+  userId: string;
+  fromLevel: number;
+  target: number;
+  level: number;
+  exp: number | null;
+  doneAt: number | null;
+  pct: number;
+  coins: number;
+}
+
+/** id 로 판 찾기 (담당자가 정한 판, 없으면 기본 판) */
+function roundOf(id: number, rounds: Round[] | null): Round {
+  return rounds?.find((r) => r.id === id) ?? defaultRound(id);
+}
+
+/**
+ * 끝났는데 아직 결과를 안 남긴 판(목표가 있는 판)을 끝날 때 레벨로 셈해 gc_round_results 에 남긴다. 판마다 한 번 (round, user_id 키).
+ * 상금은 실제로 넣은 장부(gc_ledger ref 'race:<id>')로. 계정을 지워도 결과 줄은 남는다 (기록은 평생)
+ */
+export async function snapshotEnded(env: Env, now = Date.now()): Promise<void> {
+  const { results } = await env.DB.prepare(
+    "SELECT DISTINCT round FROM gc_targets WHERE round NOT IN (SELECT round FROM gc_round_results)",
+  ).all<{ round: number }>();
+  if (!results.length) return;
+  const rounds = await readRounds(env);
+  const prizes = await readRank(env);
+  for (const { round: id } of results) {
+    const r = roundOf(id, rounds);
+    if (now < r.end) continue;
+    const list = await raceState(env, r, prizes, now);
+    if (!list.length) continue;
+    await awardRace(env, r, list);
+    const paid = await env.DB.prepare("SELECT user_id AS id, delta FROM gc_ledger WHERE kind = 'race' AND ref = ?")
+      .bind(`race:${r.id}`)
+      .all<{ id: string; delta: number }>();
+    const coin = new Map(paid.results.map((p) => [p.id, p.delta]));
+    await env.DB.batch(
+      list.map((e) =>
+        env.DB.prepare(
+          "INSERT OR IGNORE INTO gc_round_results (round, start, end_at, rank, user_id, from_level, target, level, exp, done_at, pct, coins, saved_at) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ).bind(r.id, r.start, r.end, e.rank, e.id, e.fromLevel, e.target, e.level, e.exp, e.doneAt, e.pct, coin.get(e.id) ?? 0, now),
+      ),
+    );
+  }
+}
+
+/** 남긴 결과들 (최근 판부터 20판) */
+export async function roundResults(env: Env): Promise<RoundResult[]> {
+  const { results } = await env.DB.prepare(
+    "SELECT round, start, end_at AS end, rank, user_id AS userId, from_level AS fromLevel, target, level, exp, done_at AS doneAt, pct, coins " +
+      "FROM gc_round_results WHERE round IN (SELECT DISTINCT round FROM gc_round_results ORDER BY start DESC LIMIT 20) ORDER BY start DESC, rank",
+  ).all<RoundResult>();
+  return results;
 }

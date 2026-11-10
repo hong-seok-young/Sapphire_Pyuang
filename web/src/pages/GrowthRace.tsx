@@ -8,7 +8,7 @@ import { JobEmblem } from "../emblems";
 import { Nick } from "../kakao";
 import { useBackClose } from "../backClose";
 import { COIN_GOLD, setRound, setTarget } from "../gcoin";
-import type { GcRace, GcRaceEntry, GcWallet } from "../gcoin";
+import type { GcRace, GcRaceEntry, GcRoundResult, GcWallet } from "../gcoin";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 /** 앞 세 사람 선 색 (dataviz 검사기 --pairs all 로 어두운 바탕 #1b1d3a 에서 통과: 파랑 · 주황 · 청록) */
@@ -31,8 +31,10 @@ function whenText(ms: number): string {
 }
 /** '11/11(수) 11:00' */
 const atText = (ms: number) => `${dayText(ms)} ${whenText(ms).split(" ")[1]}`;
-/** 판 기간 (1주 진행, 오픈 때 시각부터) */
-export const periodText = (race: GcRace) => `${atText(race.start)} ~ ${atText(race.end)}`;
+/** 끝나는 때: 0시면 그 전날 24:00 ('11/22(일) 24:00') */
+const endText = (ms: number) => (whenText(ms).endsWith(" 00:00") ? `${dayText(ms - 1)} 24:00` : atText(ms));
+/** 판 기간 '11/16(월) 00:00 ~ 11/22(일) 24:00' */
+export const periodText = (race: { start: number; end: number }) => `${atText(race.start)} ~ ${endText(race.end)}`;
 const pctShow = (p: number) => (Number.isInteger(p) ? String(p) : p.toFixed(1));
 
 function Face({ e, size }: { e: GcRaceEntry; size: number }) {
@@ -753,8 +755,6 @@ function PeriodEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const dirty = !period || from !== s0 || to !== e0;
-  // 오픈 때(11:00)처럼 0시가 아닌 시작은 그 시각 그대로
-  const startAt = period && from === s0 && period.start !== s0 ? whenText(period.start).split(" ")[1] : "00:00";
   async function save() {
     setBusy(true);
     setError("");
@@ -783,7 +783,7 @@ function PeriodEditor({
       <p className="gc-week-head">
         <b>{period ? "기간" : "다음 판 기간"}</b>
         <small>
-          {dayText(from)} {startAt} ~ {dayText(to)} 24:00 · {Math.round((to - from) / DAY) + 1}일
+          {dayText(from)} 00:00 ~ {dayText(to)} 24:00 · {Math.round((to - from) / DAY) + 1}일
         </small>
       </p>
       <div className="gr-pd-row">
@@ -877,5 +877,63 @@ function TargetRow({
       {e?.doneAt && <small className="gr-tg-done">🏁 {e.rank}위</small>}
       {error && <small className="form-error">{error}</small>}
     </li>
+  );
+}
+
+/**
+ * 담당자 > 기록 (제작자 2026-11-10 '이벤트 종료하면 1차 이벤트 결과를 기록으로 남겨, 담당자 -> 기록 메뉴, 보상 버튼 오른쪽'):
+ * 끝난 판마다 'N차 · 기간 · 명', 순위 · 닉네임 · Lv.시작 → 목표 · 달성한 때(못 했으면 끝날 때 달성률) · 받은 상금. 서버 gc_round_results
+ */
+export function RecordsTab({ results }: { results: GcRoundResult[] }) {
+  const rounds = new Map<number, GcRoundResult[]>();
+  for (const r of results) rounds.set(r.round, [...(rounds.get(r.round) ?? []), r]);
+  // 차수는 오래된 판부터 1차 (화면은 최근 판이 위)
+  const order = [...rounds.keys()].sort((a, b) => rounds.get(a)![0].start - rounds.get(b)![0].start);
+  if (!rounds.size) return <div className="empty">아직 끝난 판이 없어요</div>;
+  return (
+    <>
+      {[...order].reverse().map((id) => {
+        const list = rounds.get(id)!;
+        const head = list[0];
+        const done = list.filter((e) => e.doneAt !== null).length;
+        const paid = list.reduce((n, e) => n + e.coins, 0);
+        return (
+          <div key={id} className="panel gr-rec">
+            <p className="gc-week-head">
+              <b>{order.indexOf(id) + 1}차</b>
+              <small>{periodText(head)}</small>
+            </p>
+            <p className="gr-rec-sum">
+              {list.length}명 · 달성 {done}명 · 상금 <Coin />
+              {paid}
+            </p>
+            <ol className="gr-rec-list">
+              {list.map((e) => (
+                <li key={e.userId} className={e.doneAt !== null ? "gr-rec-done" : ""}>
+                  <span className="gr-rec-rank">{e.doneAt !== null && e.rank <= 3 ? MEDAL[e.rank - 1] : e.rank}</span>
+                  <span className="gr-rec-name">
+                    <Nick name={e.userId} />
+                    <small>
+                      Lv.{e.fromLevel} → {e.target}
+                    </small>
+                  </span>
+                  <span className="gr-rec-when">{e.doneAt !== null ? whenText(e.doneAt) : `${pctShow(e.pct)}%`}</span>
+                  <b className="gr-rec-coin">
+                    {e.coins ? (
+                      <>
+                        <Coin />
+                        {e.coins}
+                      </>
+                    ) : (
+                      ""
+                    )}
+                  </b>
+                </li>
+              ))}
+            </ol>
+          </div>
+        );
+      })}
+    </>
   );
 }
