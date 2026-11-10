@@ -109,6 +109,17 @@ export interface Meta {
   source: { 제목: string; 작성자: string; 글: string; 패치: string };
   built: string;
   counts: Record<string, number>;
+  /** 길드 통제 리스트 (중립 길드라 잡지 않는 몹, 비공개 자료 길드/통제_리스트.json) */
+  control?: ControlList;
+}
+
+export interface ControlList {
+  title: string;
+  server: string;
+  by: string;
+  date: string;
+  rule: string;
+  groups: { place: string; mark: string; mobs: string[] }[];
 }
 
 export interface Wiki {

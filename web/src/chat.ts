@@ -296,6 +296,9 @@ function monsterLine(m: Monster): string {
  * 맞는 공략을 못 붙였다). 레벨만 물으면 직업은 물은 사람 것, 사진만 보내면 둘 다 물은 사람 것.
  * 사진에서 먼저 읽은 값(seen)이 있으면 사진 속 캐릭터의 직업, 레벨을 먼저 쓰고, 사진에 보이는 이름도 질문 낱말처럼 찾는다.
  */
+/** 통제 리스트를 붙일 질문 (잡아도 되는지, 통제·중립·쟁) */
+const CONTROL_ASK = /통제|중립|잡아도|잡으면|잡지 ?말|잡아 ?돼|건드려도|양보제|쟁 ?길드/;
+
 export function wikiContext(
   wiki: Wiki,
   posts: Record<string, Post> | undefined,
@@ -329,6 +332,19 @@ export function wikiContext(
     const who = [seen.job, seen.level && `Lv.${seen.level}`].filter(Boolean).join(" ");
     if (who) found.push(`사진: ${who}`);
     add(`[사진에서 읽음] ${who ? `사진 속 캐릭터 ${who}` : "캐릭터 직업·레벨은 안 보임"}${seen.names.length ? ` · 보이는 이름: ${seen.names.join(", ")}` : ""} (자료는 이 값으로 골랐다)`);
+  }
+
+  // 길드 통제 리스트 (제작자 2026-11-10: 중립 길드라 잡지 않는 몹, 공지사항에도 있음): 통제·중립·잡아도 되는지를 묻거나 리스트의 곳·몹 이름이 나오면 통째로
+  const control = wiki.meta.control;
+  if (control) {
+    const words = control.groups.flatMap((g) => [g.place, ...g.mobs.flatMap((m) => m.split(/[/·,]/))]).map((w) => norm(w.trim())).filter((w) => w.length >= 2);
+    if (CONTROL_ASK.test(question) || words.some((w) => q.includes(w))) {
+      add(
+        `[길드 통제 리스트 · ${control.server} · ${control.rule} · 표 제작 ${control.by} · 수정 ${control.date} · 게시판 공지사항에 있음]\n` +
+          control.groups.map((g) => `- ${g.place}${g.mark ? ` (${g.mark})` : ""}: ${g.mobs.join(", ")}`).join("\n"),
+      );
+      found.push("길드 통제 리스트");
+    }
   }
 
   // 1. 질문에 이름이 그대로 나온 것 (긴 이름부터, 짧은 이름이 긴 이름 안에 든 경우는 뺀다)
