@@ -109,3 +109,27 @@ function runSql(lines) {
     console.log(`챗봇 개선 완료(2026-11-09 묶음) ${n}건`);
   }
 }
+
+// 챗봇 개선 완료 2026-11-10 (제작자 '힘 vs 크리 … 챗봇 개선중에 이걸로 해결가능한거 잇으면 개선 완료 시켜'): 제작자가 알려 준 힘 vs 크리 설명
+// (server/chatPrompt.ts 정해 둔 답, 자료 제공/스탯_힘크리.md)으로 풀리는 #49 '전사는 크리가 좋아 힘이 좋아?', #50 '힘은 어떤 역할을 하는지?'.
+// 힘·지능 1당 수치를 묻는 #51·#64 는 수치 자료가 없어 그대로 둔다. setup 'gap_fix_str_crit_20261110'
+{
+  const KEY = "gap_fix_str_crit_20261110";
+  const done = queryFirst(`SELECT 1 AS d FROM setup WHERE key = '${KEY}'`)?.d;
+  if (!done) {
+    const now = Date.now();
+    const NOTE = "원휩이 안 나면 힘으로 최저 데미지 보완, 원휩이 나면 크포·지속딜에 유리한 크리로 답해요";
+    const OPEN = `g.status = 'open' AND g.id IN (49, 50)`;
+    const n = queryFirst(`SELECT COUNT(*) AS n FROM chat_gaps g WHERE ${OPEN}`)?.n ?? 0;
+    runSql([
+      "INSERT INTO alerts (user_id, kind, text, link, created_at) " +
+        `SELECT g.user_id, 'chat_fixed', '챗봇이 개선됐어요. 물어봤던 “' || substr(replace(replace(g.question, char(10), ' '), char(13), ' '), 1, 40) || '” · ${NOTE}', ` +
+        "CASE WHEN EXISTS (SELECT 1 FROM chat_threads t WHERE t.id = g.thread_id AND t.user_id = g.user_id) THEN '#/chat/' || g.thread_id || '?again=' || g.id ELSE '#/chat' END, " +
+        `${now} FROM chat_gaps g WHERE ${OPEN} AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = g.user_id AND u.role = 'developer') ` +
+        "AND COALESCE((SELECT p.enabled FROM alert_prefs p WHERE p.user_id = g.user_id AND p.kind = 'chat_fixed'), 1) = 1;",
+      `UPDATE chat_gaps SET status = 'fixed', note = '${NOTE}', fixed_at = ${now} WHERE id IN (SELECT g.id FROM chat_gaps g WHERE ${OPEN});`,
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+    ]);
+    console.log(`챗봇 개선 완료(힘 vs 크리) ${n}건`);
+  }
+}
