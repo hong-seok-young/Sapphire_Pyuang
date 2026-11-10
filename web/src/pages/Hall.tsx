@@ -20,11 +20,13 @@ function Face({ h, size, rank }: { h: HallRow; size: number; rank: number }) {
 }
 
 /* 사진·직업이 없는 사람(앱에 없는 기부자)의 자리: 보석 (제작자 2026-11-10 선물 상자 '별론데' -> 초안 5개 중 보석 -> 브릴리언트 컷 -> '고급진 초호화 보석 느낌의 실제 다이아로'
- * -> '오로라는 빼고 1 2 3위를 다른 색상으로 애니메이션 잔뜩 넣어서 알아서 색상 배치'). 1위 사파이어 + 다이아 헤일로, 2위 화이트 다이아, 3위 핑크 다이아, 4위부터 로열 블루 사파이어.
+ * -> '오로라는 빼고 1 2 3위를 다른 색상으로 애니메이션 잔뜩 넣어서 알아서 색상 배치'). 1위 사파이어 + 다이아 헤일로, 2위 화이트 다이아, 3위 핑크 다이아, 4위부터 에메랄드.
  * 움직임(transform·opacity 만, 움직임 줄이기면 멈춘다): 보석이 살짝 떠 있고, 빛 띠가 지나가고, 면이 차례로 반짝이고, 둘레에 별이 돈다.
  * 1·2·3위는 뒤에 숨 쉬는 빛과 도는 빛살, 1위는 헤일로 다이아가 천천히 돌며 차례로 반짝인다. 4위부터는 빛 띠만 (줄이 많아서) */
 type Lux = { shades: string[]; fire?: boolean; halo?: boolean; edge: string; glow: string };
 const SAPPHIRE: Lux = { shades: ["#d6e7ff", "#7aa8ff", "#2f62e6", "#1a3aa8", "#0a1a5e"], edge: "#bcd6ff", glow: "#4f86ff" };
+/** 4위부터: 1위 사파이어와 헷갈리지 않게 에메랄드 (제작자 2026-11-10 '1위랑 4위부터랑 같으면 안 될 듯, 색 조정') */
+const EMERALD: Lux = { shades: ["#dcfbea", "#72e3ab", "#1faf70", "#137a4c", "#0a3f28"], edge: "#c9f6df", glow: "#3fd28a" };
 const LUX: Record<1 | 2 | 3, Lux> = {
   1: { ...SAPPHIRE, halo: true },
   2: { shades: ["#ffffff", "#eef7ff", "#cfe0f5", "#9fb4d4", "#6a80a8"], fire: true, edge: "#ffffff", glow: "#dfeeff" },
@@ -104,7 +106,7 @@ function GemSvg({ v, box }: { v: Lux; box: [number, number, number] }) {
  * svg 안에서 움직이면 매 프레임 svg 전체를 다시 그려 폰에서 버벅였다 (CPU 4배 느리게 31fps -> 층으로 나눈 뒤 아래 시험) */
 function GemFace({ size, rank }: { size: number; rank: number }) {
   const kind = rank === 1 ? "halo" : rank <= 3 ? "top" : "row";
-  const v = rank <= 3 ? LUX[rank as 1 | 2 | 3] : SAPPHIRE;
+  const v = rank <= 3 ? LUX[rank as 1 | 2 | 3] : EMERALD;
   const box = GEM_BOX[kind];
   const sheen = (
     <span className="hof-lux-layer hof-lux-sheen-clip" style={{ clipPath: clipOf(box) }}>
