@@ -1818,7 +1818,7 @@ function ItemForm({
           />
         </label>
       )}
-      {start.donor && <p className="rent-muted">기부 <Nick name={start.donor} /></p>}
+      {start.id && start.donor && <p className="rent-muted">기부 <Nick name={start.donor} /></p>}
       <label className="mk-field">
         <span>메모</span>
         <input
