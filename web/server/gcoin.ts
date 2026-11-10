@@ -202,9 +202,12 @@ export async function startAt(env: Env): Promise<number> {
   return now;
 }
 
-/** 대상: 2군 본캐 (부캐 빼고, 테스트 계정 빼고). 제작자 '2군 전원', 공지 '본캐이신 분들만' */
+/**
+ * 대상: 2군 본캐 (부캐 빼고, 테스트 계정 빼고). 제작자 '2군 전원', 공지 '본캐이신 분들만'.
+ * 그리고 담당자가 주간 목표를 정해 준 사람은 1군·부캐여도 (제작자 2026-11-10 '목표가 정해진 사람들은 다 출입 가능하게'): 어느 판이든 목표가 남아 있으면 지갑·신청을 쓴다 (받은 상금을 판이 끝난 뒤에도 쓰게, 담당자가 '빼기'하면 끝)
+ */
 const MEMBERS_SQL =
-  "SELECT p.user_id FROM profiles p JOIN users u ON u.id = p.user_id WHERE p.guild = 'second' AND u.main_id IS NULL AND u.id NOT IN ('테스트1', '테스트2')";
+  "SELECT p.user_id FROM profiles p JOIN users u ON u.id = p.user_id WHERE ((p.guild = 'second' AND u.main_id IS NULL) OR p.user_id IN (SELECT user_id FROM gc_targets)) AND u.id NOT IN ('테스트1', '테스트2')";
 
 interface Point {
   user_id: string;
@@ -398,10 +401,10 @@ export async function wallets(
   });
 }
 
-/** 코인을 쌓고 쓰는 사람인지: 2군 본캐 (테스트 계정도: 앱개발자가 2군 쪽 화면을 시험하려고. 순위·현황에서는 빠진다) */
+/** 코인을 쌓고 쓰는 사람인지: 2군 본캐, 또는 담당자가 주간 목표를 정해 준 적 있는 사람 (1군·부캐여도. 테스트 계정도: 앱개발자가 2군 쪽 화면을 시험하려고. 순위·현황에서는 빠진다) */
 export async function isMember(env: Env, id: string): Promise<boolean> {
   return !!(await env.DB.prepare(
-    "SELECT 1 AS x FROM profiles p JOIN users u ON u.id = p.user_id WHERE p.user_id = ? AND p.guild = 'second' AND u.main_id IS NULL",
+    "SELECT 1 AS x FROM profiles p JOIN users u ON u.id = p.user_id WHERE p.user_id = ? AND ((p.guild = 'second' AND u.main_id IS NULL) OR EXISTS (SELECT 1 FROM gc_targets t WHERE t.user_id = p.user_id))",
   )
     .bind(id)
     .first());

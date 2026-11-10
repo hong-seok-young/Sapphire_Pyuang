@@ -9,7 +9,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!me) return NEED_LOGIN();
   if (!canUseGcoin(me)) return FORBIDDEN();
   await openCleanup(env);
-  if (!(await isMember(env, me.id))) return json({ error: "2군 본캐만 성장코인으로 살 수 있어요" }, 403);
+  if (!(await isMember(env, me.id))) return json({ error: "2군 전용이에요" }, 403);
   const b = await readJson<{ itemId: unknown; qty: unknown }>(request);
   const itemId = int(b.itemId, 1, Number.MAX_SAFE_INTEGER);
   const qty = int(b.qty ?? 1, 1, MAX_QTY);
