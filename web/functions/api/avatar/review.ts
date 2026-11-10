@@ -1,4 +1,5 @@
-// POST /api/avatar/review { original, cutout, w, h } -> { remove: [{x, y, what}], keep: [{x, y, what}] }
+// POST /api/avatar/review { original, cutout, w, h, again } -> { remove: [{x, y, what}], keep: [{x, y, what}] }
+// again: 첫 검수대로 지운 뒤 한 번 더 (남은 것은 remove, 잘못 지워진 캐릭터 부분은 keep 으로 되살린다)
 // 캐릭터 사진 AI 보정의 둘째 단계 (제작자 2026-11-10: '왼쪽 발밑 회색 동그라미가 누끼가 안 따진다, AI 보정 제대로 되게').
 // 배경 지우기 AI(cutout/index.ts, BiRefNet)는 캐릭터에 붙은 바닥 물체, 뒤의 동상, 꽃, 이름표를 같이 남긴다.
 // 원래 스샷과 배경을 지운 결과를 Claude 가 보고, 캐릭터가 아닌 것마다 그 안쪽에 점(remove), 캐릭터의 각 부분에 점(keep)을 찍는다.
@@ -17,7 +18,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!me) return NEED_LOGIN();
   const empty = { remove: [], keep: [] };
   if (!env.ANTHROPIC_API_KEY) return json(empty);
-  const body = await readJson<{ original?: unknown; cutout?: unknown; w?: unknown; h?: unknown }>(request);
+  const body = await readJson<{ original?: unknown; cutout?: unknown; w?: unknown; h?: unknown; again?: unknown }>(request);
   const w = Number(body.w);
   const h = Number(body.h);
   const ok = (s: unknown): s is string => typeof s === "string" && s.length > 100 && s.length < MAX_B64;
@@ -28,7 +29,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     ...(workspace ? { defaultHeaders: { "anthropic-workspace-id": workspace } } : {}),
   });
   try {
-    return json(await reviewPoints(client, body.original, body.cutout, w, h));
+    return json(await reviewPoints(client, body.original, body.cutout, w, h, body.again === true));
   } catch (e) {
     console.error("avatar review", String((e as Error).message).slice(0, 300));
     return json(empty);
