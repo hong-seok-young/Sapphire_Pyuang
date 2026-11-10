@@ -23,7 +23,8 @@ const where = local ? "--local" : "--remote";
 const persist = local && process.env.D1_PERSIST ? [`--persist-to=${process.env.D1_PERSIST}`] : [];
 const CHUNK = 2000;
 const TEXT = /\.(md|txt|json|csv|tsv)$/i;
-const SKIP = [/^\.git\//, /^scripts\//, /^이미지\//, /^도감\/작업\//, /^드랍표_원본\//, /^공식\/소식\.json$/, /^공식\/확률\//, /^저장할_글_/, /^2차_링크\.json$/, /^길드\/익명_보기\.txt$/];
+// fandom/: 해외 팬 위키를 긁은 영어 원문·목록(articles.jsonl, index.json, images.json …)은 한국어 질문에 걸리지 않고 조각만 늘린다 -> 한국어 번역(fandom/ko/*.md)과 한국어 가이드(guide_ko.txt)만
+const SKIP = [/^\.git\//, /^scripts\//, /^이미지\//, /^도감\/작업\//, /^드랍표_원본\//, /^공식\/소식\.json$/, /^공식\/확률\//, /^저장할_글_/, /^2차_링크\.json$/, /^길드\/익명_보기\.txt$/, /^fandom\/(?!ko\/[^/]+\.md$|guide_ko\.txt$)/, /^링크\/.*\.json$/];
 
 if (!existsSync(ROOT)) {
   console.log("자료 저장소가 없어서 건너뛰어요");
@@ -107,6 +108,32 @@ function chunksOf(path, raw) {
       .replace(/^\[([^\]\n]*?)\s?\(\d{4}\)\] (?=\[(오전|오후) )/gm, "[$1] ")
       .replace(/^(\d{4}년 [^,\n]+, [^:\n]*?)\s?\(\d{4}\) : /gm, "$1 : ");
   const out = [];
+  // 해외 위키 번역은 문서('## 이름 (영문)')를 자르지 않고 묶는다: 이름이 든 머리와 본문이 한 조각에, 긴 문서의 다음 조각에는 '## 이름 (이어서)'
+  if (path.startsWith("fandom/ko/")) {
+    const docs = text.split(/\n(?=## )/);
+    let pack = "";
+    for (const doc of docs) {
+      if (doc.length > CHUNK) {
+        if (pack) out.push(pack);
+        pack = "";
+        const head = doc.slice(0, doc.indexOf("\n") + 1 || doc.length).trim();
+        let cur = "";
+        for (const line of doc.split("\n")) {
+          if (cur && cur.length + line.length + 1 > CHUNK) {
+            out.push(cur);
+            cur = head + " (이어서)";
+          }
+          cur += (cur ? "\n" : "") + line;
+        }
+        if (cur.trim()) out.push(cur);
+      } else if (pack && pack.length + doc.length + 2 > CHUNK) {
+        out.push(pack);
+        pack = doc;
+      } else pack = pack ? pack + "\n\n" + doc : doc;
+    }
+    if (pack.trim()) out.push(pack);
+    return out;
+  }
   let cur = "";
   for (const line of text.split("\n")) {
     if (cur && cur.length + line.length + 1 > CHUNK) {
