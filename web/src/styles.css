@@ -4725,11 +4725,34 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
   color: var(--text); background: none; border: none; font: inherit; cursor: pointer;
 }
 .hof-pod:active { transform: scale(0.97); }
-.hof-pod-face { position: relative; display: flex; align-items: center; justify-content: center; width: 76px; height: 76px; }
+.hof-pod-face { position: relative; display: flex; align-items: center; justify-content: center; width: 76px; height: 76px; margin-bottom: 5px; }
 .hof-pod-1 .hof-pod-face { width: 104px; height: 108px; }
-.hof-laurel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; filter: drop-shadow(0 0 3px rgba(255, 200, 90, 0.6)); }
-.hof-pod-2 .hof-laurel { filter: grayscale(1) brightness(1.35) drop-shadow(0 0 3px rgba(220, 230, 255, 0.6)); }
-.hof-pod-3 .hof-laurel { filter: sepia(1) hue-rotate(-18deg) saturate(1.6) brightness(0.9) drop-shadow(0 0 3px rgba(230, 150, 80, 0.5)); }
+/* 프로필 둘레 상장 리본 (Hall.tsx Rosette). 안의 것이 움직여서 svg 에 filter 는 두지 않는다 (빛은 hof-ro-glow 원) */
+.hof-frame { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; overflow: visible; }
+.hof-ro * { transform-box: view-box; }
+.hof-ro-glow { transform-origin: 50px 50px; animation: hof-ro-glow 3.2s ease-in-out infinite; }
+.hof-ro-rays { transform-origin: 50px 50px; animation: hof-spin 16s linear infinite; }
+.hof-ro-petals { transform-origin: 50px 50px; animation: hof-spin 28s linear infinite; }
+.hof-ro-petals2 { transform-origin: 50px 50px; animation: hof-spin 20s linear infinite reverse; }
+.hof-ro-dash { transform-origin: 50px 50px; animation: hof-spin 12s linear infinite reverse; }
+.hof-ro-sheen { animation: hof-ro-sheen 3.6s ease-in-out infinite; }
+.hof-ro-2 .hof-ro-sheen { animation-delay: 1.2s; }
+.hof-ro-3 .hof-ro-sheen { animation-delay: 2.4s; }
+.hof-ro-tail-l { transform-origin: 43px 78px; animation: hof-ro-sway-l 2.6s ease-in-out infinite; }
+.hof-ro-tail-r { transform-origin: 57px 78px; animation: hof-ro-sway-r 2.6s ease-in-out infinite; }
+.hof-ro-spark { transform-box: fill-box; transform-origin: center; opacity: 0; animation: hof-ro-spark 4.2s ease-in-out infinite; }
+.hof-ro-core { transform-origin: 50px 50px; }
+.hof-open .hof-ro-core { animation: hof-ro-pop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes hof-ro-glow { 0%, 100% { opacity: 0.45; transform: scale(0.94); } 50% { opacity: 1; transform: scale(1.06); } }
+@keyframes hof-ro-sheen { 0% { transform: translateX(0); } 60%, 100% { transform: translateX(150px); } }
+@keyframes hof-ro-sway-l { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(4deg); } }
+@keyframes hof-ro-sway-r { 0%, 100% { transform: rotate(3deg); } 50% { transform: rotate(-4deg); } }
+@keyframes hof-ro-spark { 0%, 70%, 100% { opacity: 0; transform: scale(0.2) rotate(0deg); } 80% { opacity: 1; transform: scale(1.25) rotate(45deg); } 90% { opacity: 0.6; transform: scale(0.8) rotate(90deg); } }
+@keyframes hof-ro-pop { 0% { transform: scale(1); } 40% { transform: scale(1.14) rotate(-6deg); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .hof-ro-glow, .hof-ro-rays, .hof-ro-petals, .hof-ro-petals2, .hof-ro-dash, .hof-ro-sheen, .hof-ro-tail-l, .hof-ro-tail-r, .hof-open .hof-ro-core { animation: none; }
+  .hof-ro-spark { animation: none; opacity: 0.7; }
+}
 .hof-pod-pic { position: relative; z-index: 3; display: flex; align-items: center; justify-content: center; line-height: 0; }
 .hof-face-none { font-size: 26px; line-height: 1; }
 .hof-pod-1 .gh-pillar { bottom: 18px; }

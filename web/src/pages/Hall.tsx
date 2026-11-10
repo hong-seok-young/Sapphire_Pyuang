@@ -1,7 +1,7 @@
 // 명예의 전당 (개발중, 제작자 2026-11-10 마을모금함 '마일리지 순위표, 명예의 전당' -> 퓨앙 '명예의 전당은 별도 버튼으로, 최대한 고급지고 화려하고 가장 임팩트 있게').
-// 기부(기부함 확정 + 장비대여 기부)로 쌓인 마일리지 순. 1~3위 단상(빛기둥·마법진·월계관·왕관), 4위부터 금속 명판, 누르면 그 사람의 기부.
+// 기부(기부함 확정 + 장비대여 기부)로 쌓인 마일리지 순. 1~3위 단상(빛기둥·마법진·상장 리본·왕관), 4위부터 금속 명판, 누르면 그 사람의 기부.
 // 서버 functions/api/donate/hall.ts (server/donate.ts hallOfFame). 움직임은 보는 동안만 transform·opacity, 움직임 줄이기면 멈춘다
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { avatarUrl } from "../auth";
 import type { Me } from "../auth";
 import { useAsync } from "../data";
@@ -19,30 +19,88 @@ function Face({ h, size }: { h: HallRow; size: number }) {
   return <span className="hof-face-none">🎁</span>;
 }
 
-/** 월계관 (잎 열한 장씩 양쪽 호를 따라) */
-function Laurel({ size }: { size: number }) {
-  const leaves = useMemo(() => {
-    const out: { x: number; y: number; r: number }[] = [];
-    for (const side of [-1, 1])
-      for (let i = 0; i < 11; i++) {
-        const a = ((200 - i * 15) * Math.PI) / 180;
-        const x = 50 + side * Math.cos(a) * -44;
-        const y = 54 + Math.sin(a) * -44;
-        out.push({ x, y, r: side * (i * 15 - 65) });
-      }
-    return out;
-  }, []);
+/* ---------- 프로필 둘레: 상장 리본(로제트) (제작자 2026-11-10 '월계수 관 별로' -> 5개 안 중 '상장 리본으로, 애니메이션 고급지고 화려하게') ----------
+ * 주름진 금속 꽃잎 고리(천천히 돈다)와 빛이 지나가는 금속 테, 반대로 도는 점선 고리, 숨 쉬는 빛, 흔들리는 리본 꼬리, 둘레에 반짝이는 별.
+ * 1위는 뒤에 도는 빛살과 꽃잎 두 겹. 누르면(펼치면) 톡 튄다. 움직임은 transform·opacity 만, 움직임 줄이기면 멈춘다 */
+const METAL: Record<1 | 2 | 3, [string, string, string]> = {
+  1: ["#fff6cf", "#f2c14e", "#9a6a14"],
+  2: ["#ffffff", "#c6cfe0", "#6f7a92"],
+  3: ["#ffe1c6", "#d8894b", "#74401c"],
+};
+/** 리본 꼬리 색: 1위 빨강, 2위 파랑, 3위 초록 (밝은 쪽, 어두운 쪽) */
+const TAIL: Record<1 | 2 | 3, [string, string]> = { 1: ["#ff6b6b", "#b02a2a"], 2: ["#6fa0ff", "#2a4fb8"], 3: ["#5fd39b", "#1f7a4e"] };
+/** 꽃잎 둘레에서 반짝이는 별 자리 (x, y, 크기, 늦춤) */
+const SPARKS: [number, number, number, number][] = [
+  [12, 20, 5, 0], [90, 26, 4, 0.7], [94, 66, 5, 1.4], [8, 62, 4, 2.1], [70, 4, 3.5, 2.8], [28, 6, 3, 3.5],
+];
+const star = (x: number, y: number, r: number) => `M${x} ${y - r} L${x + r * 0.28} ${y - r * 0.28} L${x + r} ${y} L${x + r * 0.28} ${y + r * 0.28} L${x} ${y + r} L${x - r * 0.28} ${y + r * 0.28} L${x - r} ${y} L${x - r * 0.28} ${y - r * 0.28} Z`;
+
+function Rosette({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
+  const m = `hofRo${rank}`;
+  const [a, b, c] = METAL[rank];
+  const [tl, td] = TAIL[rank];
+  const petals = Array.from({ length: 22 }, (_, i) => (i * 360) / 22);
   return (
-    <svg className="hof-laurel" width={size} height={size} viewBox="0 0 100 100" aria-hidden>
+    <svg className={`hof-frame hof-ro hof-ro-${rank}`} width={size} height={size} viewBox="0 0 100 100" aria-hidden>
       <defs>
-        <linearGradient id="hofLeaf" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#fff4c2" />
-          <stop offset="0.5" stopColor="#f2c14e" />
-          <stop offset="1" stopColor="#a8741a" />
+        <linearGradient id={m} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={a} />
+          <stop offset="0.5" stopColor={b} />
+          <stop offset="1" stopColor={c} />
         </linearGradient>
+        <linearGradient id={`${m}t`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor={td} />
+          <stop offset="0.5" stopColor={tl} />
+          <stop offset="1" stopColor={td} />
+        </linearGradient>
+        <radialGradient id={`${m}g`}>
+          <stop offset="0.55" stopColor={b} stopOpacity="0.75" />
+          <stop offset="1" stopColor={b} stopOpacity="0" />
+        </radialGradient>
+        <clipPath id={`${m}c`}>
+          <circle cx="50" cy="50" r="38" />
+        </clipPath>
       </defs>
-      {leaves.map((l, i) => (
-        <ellipse key={i} cx={l.x} cy={l.y} rx="3.2" ry="7" fill="url(#hofLeaf)" transform={`rotate(${l.r} ${l.x} ${l.y})`} />
+      <circle className="hof-ro-glow" cx="50" cy="50" r="58" fill={`url(#${m}g)`} />
+      {rank === 1 && (
+        <g className="hof-ro-rays">
+          {Array.from({ length: 12 }, (_, i) => (
+            <polygon key={i} points="48.5,-8 51.5,-8 50.6,30 49.4,30" fill={a} fillOpacity="0.5" transform={`rotate(${i * 30} 50 50)`} />
+          ))}
+        </g>
+      )}
+      <g className="hof-ro-tail hof-ro-tail-l">
+        <polygon points="37,76 29,108 37,102 43,110 49,80" fill={`url(#${m}t)`} />
+        <polygon points="37,76 33,95 41,80" fill="#fff" fillOpacity="0.25" />
+      </g>
+      <g className="hof-ro-tail hof-ro-tail-r">
+        <polygon points="63,76 71,108 63,102 57,110 51,80" fill={`url(#${m}t)`} />
+        <polygon points="63,76 67,95 59,80" fill="#000" fillOpacity="0.18" />
+      </g>
+      <g className="hof-ro-core">
+        {rank === 1 && (
+          <g className="hof-ro-petals2">
+            {petals.map((p) => (
+              <circle key={p} cx="50" cy="3" r="6" fill={c} fillOpacity="0.9" transform={`rotate(${p + 8} 50 50)`} />
+            ))}
+          </g>
+        )}
+        <g className="hof-ro-petals">
+          {petals.map((p) => (
+            <circle key={p} cx="50" cy="8" r="7.5" fill={`url(#${m})`} stroke="#000" strokeOpacity="0.18" strokeWidth="0.6" transform={`rotate(${p} 50 50)`} />
+          ))}
+        </g>
+        <circle cx="50" cy="50" r="38" fill={`url(#${m})`} />
+        <g clipPath={`url(#${m}c)`}>
+          <g transform="rotate(24 50 50)">
+            <rect className="hof-ro-sheen" x="-30" y="-20" width="14" height="140" fill="#fff" fillOpacity="0.55" />
+          </g>
+        </g>
+        <circle className="hof-ro-dash" cx="50" cy="50" r="35.5" fill="none" stroke="#fff" strokeOpacity="0.5" strokeWidth="1" strokeDasharray="2.2 2.6" />
+        <circle cx="50" cy="50" r="33" fill="#191433" fillOpacity="0.88" stroke="#fff" strokeOpacity="0.35" strokeWidth="1" />
+      </g>
+      {SPARKS.map(([x, y, r, d], i) => (
+        <path key={i} className="hof-ro-spark" d={star(x, y, r)} fill="#fff" style={{ animationDelay: `${d}s` }} />
       ))}
     </svg>
   );
@@ -107,7 +165,7 @@ function Podium({ rank, h, me, open, onToggle }: { rank: 1 | 2 | 3; h: HallRow; 
       )}
       <span className="hof-pod-face">
         {rank === 1 && <HeroHalo />}
-        <Laurel size={rank === 1 ? 92 : 70} />
+        <Rosette rank={rank} size={rank === 1 ? 92 : 70} />
         <span className="hof-pod-pic">
           <Face h={h} size={rank === 1 ? 54 : 40} />
         </span>
