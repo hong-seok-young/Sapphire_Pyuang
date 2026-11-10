@@ -14,11 +14,13 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   const now = Date.now();
+  // 프로필이 필요 없는 것은 기다리지 않고 같이 (2026-11-10 렉 검토)
+  const restP = Promise.all([doneKeys(env, me.id, now), pendingCount(env, now), todoExtras(env, me.id, now)]);
   const profile = (await env.DB.prepare("SELECT job, level FROM profiles WHERE user_id = ?").bind(me.id).first<{ job: string; level: number }>()) ?? {
     job: null,
     level: null,
   };
-  const [tasks, done, count, extras] = await Promise.all([eventTasks(env, profile, now), doneKeys(env, me.id, now), pendingCount(env, now), todoExtras(env, me.id, now)]);
+  const [tasks, [done, count, extras]] = await Promise.all([eventTasks(env, profile, now), restP]);
   return json({ tasks, done, ...count, ...extras, dayEnd: dayEnd(now), weekEnd: weekStart(now) + WEEK, now }, 200, { "cache-control": "no-store" });
 };
 

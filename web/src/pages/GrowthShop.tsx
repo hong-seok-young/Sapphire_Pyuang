@@ -1612,8 +1612,8 @@ export function GrowthShopPage({
       )}
       {shown === "staff" && cur.admin && staff === "targets" && (
         <TargetsTab
-          key={reload}
           people={cur.admin.people ?? []}
+          hidden={cur.admin.hidden ?? []}
           race={cur.race}
           onChanged={saved}
         />

@@ -10,10 +10,11 @@ import { notify } from "../../../server/alerts";
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  if (!(await canUseGd(env, me))) return json({ error: "1군 전용이에요" }, 403);
   const now = Date.now();
   const { week, prev, end } = weeks(now);
-  await carryWeeks(env, now);
+  // 1군인지 보기와 지난주 시간표 이어 적기를 한꺼번에 (2026-11-10 렉 검토)
+  const [ok] = await Promise.all([canUseGd(env, me), carryWeeks(env, now)]);
+  if (!ok) return json({ error: "1군 전용이에요" }, 403);
   const [parties, mineR, people] = await Promise.all([
     allParties(env, week, now, true),
     env.DB.prepare("SELECT week, slots, confirmed_at FROM gd_avail WHERE user_id = ? AND week IN (?, ?, ?)").bind(me.id, week, prev, end).all<{ week: number; slots: string; confirmed_at: number | null }>(),

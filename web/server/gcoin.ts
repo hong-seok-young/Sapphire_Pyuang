@@ -334,8 +334,10 @@ export async function wallets(
   env: Env,
   curve: Curve[],
   one?: string,
+  /** 미리 읽은 시작 때 (한 번 덜 다녀오게) */
+  started?: number,
 ): Promise<Wallet[]> {
-  const start = await startAt(env);
+  const start = started ?? (await startAt(env));
   const where = one === undefined ? `IN (${MEMBERS_SQL})` : "= ?";
   const bind = one === undefined ? [] : [one];
   const [base, now, logs, ledger, spent] = await Promise.all([

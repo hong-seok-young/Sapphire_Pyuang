@@ -5,7 +5,7 @@
 // 제작자 요청 2026-11-01, 신청서·줄·대화창 2026-11-02. 2026-11-02 길드원에게 열었다 (server/rental.ts RENT_OPEN)
 import { FORBIDDEN, NEED_LOGIN, TEST_IDS, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { DIA_GOLD, termDays, canEnter, checkItem, donations, expectedTimes, isManager, mileageOf } from "../../../server/rental";
+import { DIA_GOLD, termDays, canEnter, checkItem, donations, expectedTimes, isManager, mileageOf, mileageOfNames } from "../../../server/rental";
 import type { QueueRow, RentalRow } from "../../../server/rental";
 
 interface ReqRow {
@@ -34,6 +34,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const manager = isManager(me);
   const owner = me.owner ?? me.id;
   const now = Date.now();
+  // 아래 목록과 기다리지 않고 같이 (2026-11-10 렉 검토)
+  const myMileageP = mileageOf(env, owner);
+  const donatedP = manager ? donations(env) : Promise.resolve(new Map<number, Map<string, number>>());
   const [itemsR, queueR, depositR, charsR, ledgerR, myAppsR] = await env.DB.batch([
     env.DB.prepare(
       "SELECT id, job, level, weapon, options, enhance, term, price, donor, renter, rented_at, due_at, note, return_req_at, return_app_id FROM rental_items WHERE status = 'open' ORDER BY job, level, weapon, enhance, id",
@@ -69,7 +72,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   };
 
   // 운영진: 물건마다 기부자에게 적립한 💎 (물건 고치기 칸에 채운다)
-  const donated = manager ? await donations(env) : new Map<number, Map<string, number>>();
+  const donated = await donatedP;
   const items = rows.map((it) => {
     const line = lines.get(it.id) ?? [];
     const my = line.find((q) => mine.has(q.user_id));
@@ -127,11 +130,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const talk = talkR.results as { id: number; app_id: number; user_id: string; text: string; created_at: number }[];
     // 운영진에게는 신청한 사람의 마일리지도 (건넬 때 쓸 💎 를 고르게)
     const people = manager ? [...new Set((appsR.results as AppRow[]).map((a) => a.user_id))] : [];
-    const mileage = new Map<string, number>();
-    for (const who of people) {
-      const u = await env.DB.prepare("SELECT COALESCE(main_id, id) AS owner FROM users WHERE id = ?").bind(who).first<{ owner: string }>();
-      mileage.set(who, await mileageOf(env, u?.owner ?? who));
-    }
+    // 사람마다 따로 묻지 않고 한 번에 (2026-11-10 렉 검토: 신청한 사람 수만큼 DB 를 차례로 다녀왔다)
+    const mileage = await mileageOfNames(env, people);
     apps = (appsR.results as AppRow[])
       .sort((a, b) => b.updated_at - a.updated_at)
       .map((a) => ({
@@ -172,7 +172,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     manager,
     rate: DIA_GOLD,
     mine: [...mine],
-    mileage: await mileageOf(env, owner),
+    mileage: await myMileageP,
     ledger: ledgerR.results,
   };
   if (manager) {

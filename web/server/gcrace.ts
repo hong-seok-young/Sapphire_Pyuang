@@ -196,20 +196,22 @@ async function raceSeries(env: Env, round: Round, list: RaceEntry[]): Promise<Re
 }
 
 /** 화면에 주는 판 자료. 끝났으면 next(다음 판, 안 정했으면 null)와 그 판에 정해 둔 목표(upcoming)도. target = 담당자가 목표·기간을 정하는 판 */
-export async function raceData(env: Env, now = Date.now()) {
-  const rounds = await readRounds(env);
+export async function raceData(env: Env, now = Date.now(), pre?: { rounds: Round[] | null; prizes: number[] }) {
+  // DB 를 다녀오는 횟수를 줄인다 (제작자 2026-11-10 '전반적으로 렉'): 판·상금은 미리 읽은 것을, 차트·상금 넣기·다음 판 목표는 한꺼번에
+  const [rounds, prizes] = pre ? [pre.rounds, pre.prizes] : await Promise.all([readRounds(env), readRank(env)]);
   const round = await currentRound(env, now, rounds);
-  const prizes = await readRank(env);
-  const list = await raceState(env, round, prizes, now);
-  const [series] = await Promise.all([raceSeries(env, round, list), awardRace(env, round, list)]);
   const nx = await nextRound(env, now, rounds);
-  const upcoming = nx
-    ? (
-        await env.DB.prepare("SELECT user_id AS id, from_level AS fromLevel, target FROM gc_targets WHERE round = ?")
+  const list = await raceState(env, round, prizes, now);
+  const [series, , up] = await Promise.all([
+    raceSeries(env, round, list),
+    awardRace(env, round, list),
+    nx
+      ? env.DB.prepare("SELECT user_id AS id, from_level AS fromLevel, target FROM gc_targets WHERE round = ?")
           .bind(nx.id)
           .all<{ id: string; fromLevel: number; target: number }>()
-      ).results
-    : null;
+      : null,
+  ]);
+  const upcoming = up ? up.results : null;
   return {
     id: round.id,
     start: round.start,
@@ -292,13 +294,12 @@ function roundOf(id: number, rounds: Round[] | null): Round {
  * 끝났는데 아직 결과를 안 남긴 판(목표가 있는 판)을 끝날 때 레벨로 셈해 gc_round_results 에 남긴다. 판마다 한 번 (round, user_id 키).
  * 상금은 실제로 넣은 장부(gc_ledger ref 'race:<id>')로. 계정을 지워도 결과 줄은 남는다 (기록은 평생)
  */
-export async function snapshotEnded(env: Env, now = Date.now()): Promise<void> {
+export async function snapshotEnded(env: Env, now = Date.now(), pre?: { rounds: Round[] | null; prizes: number[] }): Promise<void> {
   const { results } = await env.DB.prepare(
     "SELECT DISTINCT round FROM gc_targets WHERE round NOT IN (SELECT round FROM gc_round_results)",
   ).all<{ round: number }>();
   if (!results.length) return;
-  const rounds = await readRounds(env);
-  const prizes = await readRank(env);
+  const [rounds, prizes] = pre ? [pre.rounds, pre.prizes] : await Promise.all([readRounds(env), readRank(env)]);
   for (const { round: id } of results) {
     const r = roundOf(id, rounds);
     if (now < r.end) continue;
