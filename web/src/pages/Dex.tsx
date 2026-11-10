@@ -157,21 +157,21 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
   const query = norm(q);
   const matchQ = (e: DexEntry) =>
     !query || norm(e.name).includes(query) || e.items.some((it) => it.name && norm(it.name).replace(/^\+\d+/, "").includes(query.replace(/^\+\d+/, "")));
-  const matchStat = (e: DexEntry) => !stat || e.effects.some(([s]) => s === stat);
+  // 능력치 칸을 누르면 그 능력치(고정값·% 따로)를 주는 항목만 (제작자 2026-11-10 '해당 속성 누르면 해당하는 리스트가 아래에 뜨게, 밑에 필터링 버튼들 없애고')
+  const matchStat = (e: DexEntry) => !stat || e.effects.some(([s, , pct]) => rowKey(s, pct) === stat);
+  const statBar = useRef<HTMLDivElement>(null);
+  const pickStat = (k: string) => {
+    const next = stat === k ? null : k;
+    setStat(next);
+    if (next) window.setTimeout(() => statBar.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  };
   const inCat = (e: DexEntry) => cat === "all" || (e.cat ?? "일반") === cat;
   const inTab = (e: DexEntry) => inCat(e) && (tab === "all" ? true : tab === "done" ? done.has(e.name) : !done.has(e.name));
   const listed = dex.entries.filter((e) => inTab(e) && matchQ(e) && matchStat(e));
   const doneEntries = dex.entries.filter((e) => done.has(e.name));
   const have = useMemo(() => addUp(doneEntries), [done, dex]); // eslint-disable-line react-hooks/exhaustive-deps
   const todoListed = listed.filter((e) => !done.has(e.name));
-  const gain = addUp(todoListed);
 
-  // 나오는 능력치 (게임 '획득 옵션' 순서, 순서표에 없는 것은 뒤에)
-  const stats = useMemo(() => {
-    const seen = new Set(dex.entries.flatMap((e) => e.effects.map(([s]) => s)));
-    return [...dex.order.filter((s) => seen.has(s)), ...[...seen].filter((s) => !dex.order.includes(s))];
-  }, [dex]);
-  const countOf = (s: string) => dex.entries.filter((e) => inTab(e) && matchQ(e) && e.effects.some(([x]) => x === s)).length;
 
   // 지금 목록의 미완료를 다 하려면 필요한 재료 (같은 이름·강화끼리 더한다)
   const need = useMemo(() => {
@@ -195,7 +195,7 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
 
   return (
     <div className="dex">
-      <StatPanel have={have} gain={gain} full={full} over={over} setOver={setOver} stat={stat} doneN={doneEntries.length} total={dex.entries.length} />
+      <StatPanel have={have} full={full} over={over} setOver={setOver} stat={stat} onPick={pickStat} doneN={doneEntries.length} total={dex.entries.length} />
 
       <div className="mk-cats dex-cats">
         {["all", "일반", "코스튬", "펫"].map((c) => {
@@ -225,19 +225,16 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
         )}
       </div>
 
-      <div className="mk-cats dex-stats">
-        <button type="button" className={"sub-tab" + (!stat ? " sub-tab-on" : "")} onClick={() => setStat(null)}>
-          전체 능력치
-        </button>
-        {stats.map((s) => {
-          const n = countOf(s);
-          return n || stat === s ? (
-            <button key={s} type="button" className={"sub-tab" + (stat === s ? " sub-tab-on" : "")} onClick={() => setStat(stat === s ? null : s)}>
-              {s} <small>{n}</small>
-            </button>
-          ) : null;
-        })}
-      </div>
+      {stat && (
+        <div className="dex-statbar" ref={statBar}>
+          <span>
+            <b>{SHORT[stat.replace(/%$/, "")] ?? stat.replace(/%$/, "")}{stat.endsWith("%") ? "%" : ""}</b> 주는 항목 <b>{listed.length}</b>개
+          </span>
+          <button type="button" className="sub-tab" onClick={() => setStat(null)}>
+            ✕ 전체 보기
+          </button>
+        </div>
+      )}
 
       {todoListed.length > 0 && (
         <Panel className="dex-need">
@@ -287,9 +284,9 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
 
 /** 획득 옵션: 게임 창의 37줄을 비슷한 것끼리 좌우 두 칸으로 (OPTION_PAIRS). 칸마다 이름, 그 아래 '최대'(도감을 다 채웠을 때, 제작자 2026-11-10 '최대치만'),
  *  오른쪽 숫자 칸에 내 수치를 직접 적는다. 손대지 않은 칸은 완료로 누른 항목의 합 (제작자 2026-11-10, 슬라이더는 '바를 빼는 게 좋을 듯'으로 뺐다) */
-function StatPanel({ have, gain, full, over, setOver, stat, doneN, total }: {
-  have: Sum; gain: Sum; full: Sum; over: Record<string, number>; setOver: (v: Record<string, number>) => void;
-  stat: string | null; doneN: number; total: number;
+function StatPanel({ have, full, over, setOver, stat, onPick, doneN, total }: {
+  have: Sum; full: Sum; over: Record<string, number>; setOver: (v: Record<string, number>) => void;
+  stat: string | null; onPick: (k: string) => void; doneN: number; total: number;
 }) {
   const [all, setAll] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -301,7 +298,7 @@ function StatPanel({ have, gain, full, over, setOver, stat, doneN, total }: {
   for (let i = 0; i < extra.length; i += 2) pairs.push([extra[i], extra[i + 1] ?? null]);
   const valueOf = (s: string, pct: boolean) => over[rowKey(s, pct)] ?? pick(have, s, pct);
   const set = (k: string, v: number) => setOver({ ...over, [k]: Math.max(0, Math.round(v * 100) / 100) });
-  const live = (r: Row | null) => !!r && (valueOf(r[0], r[1]) > 0 || pick(gain, r[0], r[1]) > 0 || rowKey(r[0], r[1]) in over);
+  const live = (r: Row | null) => !!r && (valueOf(r[0], r[1]) > 0 || pick(full, r[0], r[1]) > 0 || rowKey(r[0], r[1]) in over);
   const shown = all ? pairs : pairs.filter(([a, b]) => live(a) || live(b));
   const touched = Object.keys(over).length > 0;
   const cell = (r: Row | null, i: number) => {
@@ -311,11 +308,11 @@ function StatPanel({ have, gain, full, over, setOver, stat, doneN, total }: {
     const v = valueOf(s, pct);
     const mx = pick(full, s, pct);
     return (
-      <div key={k} className={"dex-cell" + (stat === s ? " dex-cell-on" : "") + (k in over ? " dex-cell-set" : "")}>
-        <span className="dex-cell-name">
+      <div key={k} className={"dex-cell" + (stat === k ? " dex-cell-on" : "") + (k in over ? " dex-cell-set" : "")}>
+        <button type="button" className="dex-cell-name" onClick={() => onPick(k)} disabled={!mx} aria-pressed={stat === k}>
           <b title={s}>{SHORT[s] ?? s}{pct && <small>%</small>}</b>
           <small className="muted">{mx ? `최대 ${num(mx)}` : "최대 -"}</small>
-        </span>
+        </button>
         <input className="dex-row-num" type="number" inputMode="decimal" min={0} step={mx > 50 ? 0.5 : 0.01} aria-label={`${s}${pct ? " %" : ""} 내 수치`}
           value={draft[k] ?? num(v)}
           onChange={(e) => {
@@ -397,7 +394,7 @@ function EntryRow({ e, listW, done, onToggle, iconOf, stat, onItem }: { e: DexEn
         </div>
         <div className="dex-effects">
           {e.effects.map((f, i) => (
-            <span key={i} className={"dex-eff" + (stat === f[0] ? " dex-eff-on" : "")}>{effectText(f)}</span>
+            <span key={i} className={"dex-eff" + (stat === rowKey(f[0], f[2]) ? " dex-eff-on" : "")}>{effectText(f)}</span>
           ))}
         </div>
       </div>
