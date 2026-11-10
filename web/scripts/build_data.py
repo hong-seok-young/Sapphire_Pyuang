@@ -816,6 +816,7 @@ def main():
                 "monsters": [m["key"] for m in mons], "above": above, "below": below,
             }
         regions.append({"name": region["이름"], "pic": region_pics.get(region["이름"]), "places": ids})
+    place_guides(places)
 
     print("장비")
     equipment = []
@@ -956,6 +957,41 @@ def build_odds():
     odds = {"fetched": fetched, "page": f"https://lim.com2us.com/{ODDS_GAME}/{{key}}?lang=ko", "note": note, "tables": tables}
     (OUT / "data" / "odds.json").write_text(json.dumps(odds, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print("공식 확률 표", len(tables), "행", sum(len(s["r"]) for t in tables for s in t["sections"]))
+
+
+def place_guides(places: dict) -> None:
+    """사냥터 자리 안내 (제작자 2026-11-10 '데이터에 넣어 챗봇 등등이 활용하게', 길드 잡담방에서 마을모금함이 공유한 신전·루나프 자리 나누기).
+    비공개 자료 길드/사냥터_자리.json 을 사냥터마다 guide 로 붙이고 그림(이미지/사냥터자리/)을 data/guide/ 로 복사한다 (로그인한 길드원에게만).
+    사냥터 화면 맨 위 '자리 안내'(Places.tsx GuideBox)와 챗봇 자료(src/chat.ts wikiContext)가 쓴다. 기록은 자료 제공/사냥터_자리.md"""
+    src = SRC / "길드" / "사냥터_자리.json"
+    out = OUT / "data" / "guide"
+    if out.exists():
+        shutil.rmtree(out)
+    if not src.exists():
+        return
+    out.mkdir(parents=True)
+    data = json.loads(src.read_text(encoding="utf-8"))
+    count = 0
+    for aid, g in (data.get("사냥터") or {}).items():
+        if aid not in places:
+            print("  자리 안내: 위키에 없는 사냥터", aid)
+            continue
+        pics = []
+        for pic in g.get("그림", []):
+            f = SRC / "이미지" / "사냥터자리" / pic["파일"]
+            if not f.exists():
+                print("  자리 안내: 그림 없음", pic["파일"])
+                continue
+            shutil.copy2(f, out / f.name)
+            with Image.open(f) as im:
+                w, h = im.size
+            pics.append({"src": f"data/guide/{f.name}", "w": w, "h": h, "caption": pic.get("설명", "")})
+        places[aid]["guide"] = {
+            "title": g.get("제목", "자리 안내"), "by": g.get("알린사람", ""), "notes": g.get("글", []),
+            "words": g.get("찾는말", []), "pics": pics,
+        }
+        count += 1
+    print("사냥터 자리 안내", count)
 
 
 def copy_rank_pictures():

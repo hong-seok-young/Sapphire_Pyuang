@@ -5107,3 +5107,15 @@ button.dex-cell-name:disabled { cursor: default; }
 .dex-statbar { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 0 0 6px; padding: 5px 8px; font-size: 12px;
   background: rgba(255, 179, 92, 0.12); border: 1px solid rgba(255, 179, 92, 0.45); scroll-margin-top: 64px; }
 .dex-statbar b { color: var(--gold); }
+
+/* 사냥터 자리 안내 (Places.tsx GuideBox): 길드가 정한 자리 나누기 글과 구역 그림 */
+.place-guide { margin: 8px 0 10px; padding: 10px 12px; background: var(--panel); border: 1px solid #8a6a2e; border-radius: 6px; }
+.place-guide-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-bottom: 6px; }
+.place-guide-head b { color: var(--gold); font-size: 14px; font-weight: 400; }
+.place-guide-head small { color: var(--muted); font-size: 11px; }
+.place-guide-notes { margin: 0; padding-left: 16px; display: grid; gap: 3px; font-size: 13px; line-height: 1.5; }
+.place-guide-pics { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 8px; }
+.place-guide-pics button { display: grid; gap: 3px; padding: 0; background: none; border: 0; cursor: zoom-in; text-align: left; font: inherit; color: inherit; }
+.place-guide-pics img { display: block; width: 100%; height: auto; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.12); }
+.place-guide-pics small { color: var(--muted); font-size: 11px; }
+.place-guide-pics button:active img { transform: scale(0.98); }

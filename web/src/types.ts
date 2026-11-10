@@ -53,6 +53,18 @@ export interface Place {
   /** 원글(posts.json)에서 그대로 그릴 칸 번호. above 는 몬스터 위(옆 사냥터로 가는 길), below 는 아래(지도, 퀘스트, 참고 등) */
   above: number[];
   below: number[];
+  /** 길드가 정한 자리 나누기 (비공개 자료 길드/사냥터_자리.json, build_data.py place_guides): 화면 맨 위 '자리 안내'와 챗봇 자료 */
+  guide?: PlaceGuide;
+}
+
+export interface PlaceGuide {
+  title: string;
+  /** 누가 알렸는지 ('마을모금함 (길드 잡담방, 2026-11-10)') */
+  by: string;
+  notes: string[];
+  /** 챗봇이 이 안내를 붙이는 말 ('신전', '루나프' …) */
+  words: string[];
+  pics: { src: string; w: number; h: number; caption: string }[];
 }
 
 export interface Monster {
