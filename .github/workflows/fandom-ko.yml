@@ -18,6 +18,10 @@ on:
         description: "이어 받을 Batch ID (지난번에 시간이 모자랐을 때)"
         required: false
         default: ""
+      job:
+        description: "translate = 문서 번역, images = 그림 가려내기·글자로 옮기기"
+        required: false
+        default: "translate"
 
 permissions:
   contents: read
@@ -56,11 +60,12 @@ jobs:
           ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
           LIMIT: ${{ inputs.limit }}
           BATCH: ${{ inputs.batch }}
+          JOB: ${{ inputs.job }}
         run: |
           set -- --out out-fandom --wait 320
           [ -n "$LIMIT" ] && set -- "$@" --limit "$LIMIT"
           [ -n "$BATCH" ] && set -- "$@" --batch "$BATCH"
-          node scripts/translate-fandom.mjs "$@"
+          if [ "$JOB" = "images" ]; then node scripts/fandom-images.mjs "$@"; else node scripts/translate-fandom.mjs "$@"; fi
       - name: Encrypt
         env:
           PUBKEY: ${{ inputs.pubkey }}
