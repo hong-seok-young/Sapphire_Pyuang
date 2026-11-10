@@ -133,3 +133,40 @@ function runSql(lines) {
     console.log(`챗봇 개선 완료(힘 vs 크리) ${n}건`);
   }
 }
+
+// 챗봇 개선 완료 2026-11-10 (제작자 '챗봇 개선중에 … 해결가능한거 잇으면 개선 완료 시켜'): 같은 날 자료 저장소에 넣은 자료로 풀리는 질문.
+// 해외 팬 위키 imotwom.fandom.com 한국어 번역 4,637개(fandom/ko), 아이모 초보자도움방 카톡 정리(제공/초보자톡방_정리.md)와 톡방 링크(링크/: 조합책 리메이크, 블로그 레벨별 사냥터).
+// 챗봇은 이 배포의 'Data library (chatbot)' 단계가 넣은 자료를 읽는다 (그래서 배포 끝에서 알린다). setup 'gap_fix_library_20261110'
+{
+  const KEY = "gap_fix_library_20261110";
+  const done = queryFirst(`SELECT 1 AS d FROM setup WHERE key = '${KEY}'`)?.d;
+  if (!done) {
+    const now = Date.now();
+    const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+    const NOTE = {
+      43: "레벨별 골드 벌이(44 전 우몰, 44 뒤 루나프)와 해외 위키 돈벌이 가이드를 같이 보고 답해요",
+      48: "대천사·티타늄벨트·황금목걸이 조합 재료와 강철골렘장갑 얻는 곳(해외 위키 번역)으로 답해요",
+      51: "힘은 3마다 근접 데미지·받는 피해 감소, 민첩 1당 크리 0.2(해외 위키·톡방)로 답하고 정확한 공식은 없다고 말해요",
+      52: "요새·미로·죽늪 몬스터와 레벨별 사냥 루트(해외 위키 번역, 톡방 링크 블로그)로 답해요",
+      54: "40대 초반 이슬롯신전, 44 뒤 루나프 같은 레벨별 사냥터(초보자 톡방, 블로그 루트)로 답해요",
+      55: "물약·버프 소모품 효과와 파는 곳(해외 위키 번역)으로 답해요",
+      61: "인던30 침묵의 제단 보스 공략(해외 위키 번역)으로 답해요",
+      63: "백색레이피어는 스미드에게 한철주괴 5·고대의피 5·세르앙의눈물로 교환(해외 위키 번역)으로 답해요",
+      64: "지능은 3마다 마법 데미지·2마다 힐량(해외 위키 옛 자료)으로 답하고 정확한 공식은 없다고 말해요",
+    };
+    const ids = Object.keys(NOTE).map(Number);
+    const CASE = (col) => `CASE ${col} ${ids.map((id) => `WHEN ${id} THEN ${q(NOTE[id])}`).join(" ")} END`;
+    const OPEN = `g.status = 'open' AND g.id IN (${ids.join(", ")})`;
+    const n = queryFirst(`SELECT COUNT(*) AS n FROM chat_gaps g WHERE ${OPEN}`)?.n ?? 0;
+    runSql([
+      "INSERT INTO alerts (user_id, kind, text, link, created_at) " +
+        "SELECT g.user_id, 'chat_fixed', '챗봇이 개선됐어요. 물어봤던 “' || substr(replace(replace(g.question, char(10), ' '), char(13), ' '), 1, 40) || '” · ' || " + CASE("g.id") + ", " +
+        "CASE WHEN EXISTS (SELECT 1 FROM chat_threads t WHERE t.id = g.thread_id AND t.user_id = g.user_id) THEN '#/chat/' || g.thread_id || '?again=' || g.id ELSE '#/chat' END, " +
+        `${now} FROM chat_gaps g WHERE ${OPEN} AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = g.user_id AND u.role = 'developer') ` +
+        "AND COALESCE((SELECT p.enabled FROM alert_prefs p WHERE p.user_id = g.user_id AND p.kind = 'chat_fixed'), 1) = 1;",
+      `UPDATE chat_gaps SET status = 'fixed', note = ${CASE("id")}, fixed_at = ${now} WHERE id IN (SELECT g.id FROM chat_gaps g WHERE ${OPEN});`,
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+    ]);
+    console.log(`챗봇 개선 완료(자료 저장소 새 자료) ${n}건`);
+  }
+}
