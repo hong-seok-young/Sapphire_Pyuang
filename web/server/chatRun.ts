@@ -27,7 +27,7 @@ export interface RunStart {
     /** 오늘(한국 날짜): 답을 못 받으면 질문 수를 되돌린다 */
     day: string;
     developer: boolean;
-    /** 위키 자료가 질문 뒤에 따라온다 (/context). 25초까지 기다렸다가 붙이고, 안 오면(앱을 껐다) 없이 답한다 */
+    /** 위키 자료가 질문 뒤에 따라온다 (/context). CONTEXT_WAIT_MS 까지 기다렸다가 붙이고, 안 오면(앱을 껐다) 없이 답한다 */
     waitContext?: boolean;
   };
   /** Claude API 요청 (stream 은 일꾼이 붙인다) */
@@ -53,8 +53,12 @@ interface Job {
   ctxWait: (() => void) | null;
 }
 
-/** 위키 자료를 기다리는 가장 긴 때 */
-const CONTEXT_WAIT_MS = 25_000;
+/**
+ * 위키 자료를 기다리는 가장 긴 때. 화면이 자료를 고르는 데 걸리는 시간(사진 읽기 10~30초, 느린 폰·망에서 글 본문 1.4MB 받기)보다 길어야 한다
+ * (챗봇 개선 2026-11-10: 25초였을 때 사진 질문과 느린 폰의 질문이 자료 없이 답해 '요새·미로·죽늪 몬스터 자료 없음' 같은 [[모름]]이 쌓였다).
+ * 앱을 껐으면(자료가 안 오면) 이만큼 기다린 뒤 자료 없이 답한다. 화면은 자료 고르기가 실패해도 빈 자료를 바로 보내 기다리지 않게 한다
+ */
+const CONTEXT_WAIT_MS = 120_000;
 
 /** 한 번 답에 쓰는 가장 긴 때 (알람은 15분까지) */
 const MAX_RUN_MS = 14 * 60_000;
@@ -331,6 +335,8 @@ export class ChatRun extends DurableObject<Env> {
   private async run(job: Job): Promise<void> {
     const { start } = job;
     const { meta } = start;
+    // 알람은 15분까지라 자료를 기다린 시간도 한 번 답의 한도(MAX_RUN_MS)에 넣는다
+    const deadline = Date.now() + MAX_RUN_MS;
     // 위키 자료를 기다려 질문 바로 앞에 붙인다 (화면이 질문을 먼저 보냈다)
     if (meta.waitContext) {
       if (!job.ctx) {
@@ -348,7 +354,7 @@ export class ChatRun extends DurableObject<Env> {
       if (job.ctx?.text) start.params = withContext(start.params, job.ctx.text);
     }
     const env = this.env;
-    const timer = setTimeout(() => job.ctrl.abort(), MAX_RUN_MS);
+    const timer = setTimeout(() => job.ctrl.abort(), Math.max(1000, deadline - Date.now()));
     const client = new Anthropic({
       apiKey: start.key,
       ...(start.baseURL ? { baseURL: start.baseURL } : {}),

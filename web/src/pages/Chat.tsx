@@ -157,9 +157,10 @@ const whenVisible = () =>
 
 export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; query: URLSearchParams; me?: Me }) {
   const { data: posts, error: postsError } = useAsync(useCallback(() => loadPosts(), []));
-  // 공식 확률 표는 첫 질문 전에 미리 받아 둔다 (첫 질문이 늦게 시작하지 않게)
+  // 공식 확률 표와 강화 수치표·시세 자료는 첫 질문 전에 미리 받아 둔다 (첫 질문의 자료 고르기가 늦지 않게: 일꾼은 자료를 기다린다)
   useEffect(() => {
     void loadOdds().catch(() => undefined);
+    void appDataContext("").catch(() => undefined);
   }, []);
   const listing = arg === "list";
   const wanted = /^\d+$/.test(arg) ? Number(arg) : null;

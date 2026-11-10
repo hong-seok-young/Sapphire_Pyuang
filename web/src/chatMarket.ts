@@ -139,7 +139,8 @@ function marketText(m: ChatMarket, question: string): { text: string; found: str
   };
   const sells = m.items.filter(hit);
   const buys = m.itemsBuy.filter(hit);
-  if (!askPrice && !sells.length && !buys.length && !ASK_CHAR.test(question)) return parts.length ? { text: parts.join("\n\n"), found } : null;
+  const askCostume = /코스튬|코튬|의상|꾸미기|치장/.test(question);
+  if (!askPrice && !sells.length && !buys.length && !ASK_CHAR.test(question) && !askCostume) return parts.length ? { text: parts.join("\n\n"), found } : null;
   const head = `[사파이어 앱 시세 동향 · 시리온 거래 톡방 ${m.source.from} ~ ${m.source.to} 글에서 센 값. 단위는 현금(만 원), 파는 사람이 부른 값(팝니다)과 사는 사람이 부른 값(삽니다)을 따로 셌다. 골드 시세: 최근 7일 팝니다 중간값 ${m.gold.sell7 ?? "-"}:1, 삽니다 ${m.gold.buy7 ?? "-"}:1 (1만 원에 N만 골드). 실제 거래가가 아니라 부른 값이다]`;
   const body: string[] = [];
   for (const it of sells.slice(0, 6)) body.push(itemText(it, "팝니다"));
@@ -157,6 +158,14 @@ function marketText(m: ChatMarket, question: string): { text: string; found: str
     );
     body.push(`골드 시세 날짜별 (날짜, 팝니다, 삽니다 N:1): ${m.gold.days.map(([d, s, b]) => `${d.slice(5)} ${s ?? "-"}/${b ?? "-"}`).join(", ")}`);
     found.push("톡방 시세");
+  }
+  // 코스튬을 물으면(어떤 코스튬인지 안 적어도) 톡방에 올라온 코스튬 시세를 글 수 순으로 (챗봇 개선 2026-11-10: '코스튬 코인 남는 건 랜덤 코스튬 상자를 만들어 팔까'에 코스튬 시세가 없다고 했다)
+  if (/코스튬|코튬|의상|꾸미기|치장/.test(question)) {
+    const costumes = m.items.filter((it) => it.cat === "코스튬" && !sells.includes(it)).sort((a, b) => b.n - a.n).slice(0, 30);
+    if (costumes.length) {
+      body.push("코스튬 시세 (팝니다, 글 수 순, 중간값 · 범위 · 글 수):\n" + costumes.map((it) => `${it.name} ${won(it.med)} (${won(it.min)} ~ ${won(it.max)}, ${it.n})`).join(", "));
+      found.push("톡방 코스튬 시세");
+    }
   }
   if (ASK_CHAR.test(question) && m.chars.length) {
     body.push("캐릭터 시세 (팝니다, 레벨대별 중간값, 만 원): " + m.chars.map((c) => `${c.band} ${won(c.med)} (범위 ${won(c.min)} ~ ${won(c.max)}, ${c.n}개)`).join(", "));

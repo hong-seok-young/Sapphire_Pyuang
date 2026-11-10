@@ -170,3 +170,48 @@ function runSql(lines) {
     console.log(`챗봇 개선 완료(자료 저장소 새 자료) ${n}건`);
   }
 }
+
+// 챗봇 개선 완료 2026-11-10 (둘째 묶음, 제작자 '챗봇 개선'): 2026-11-10 저녁에 열려 있던 '모름' 20건 중 10건 (#44 #46 #47 #56 #57 #58 #59 #60 #62 #65).
+// 같은 때 다른 세션이 해외 위키 번역·초보자 톡방 자료로 9건(#43 #48 #51 #52 #54 #55 #61 #63 #64)을 위 'gap_fix_library_20261110' 로 닫았다 (열린 것만 바꾸니 겹쳐도 두 번 알리지 않는다).
+// - 위키 자료 고르기 (src/chat.ts wikiContext): 사냥터·인던을 물으면 몬스터마다 레벨·HP·선공·재부활·드랍·스킬, '41레인저'·'32렙부터 36렙' 읽기, 사냥터 줄임말(요새·미로·중사·타신·인던30),
+//   사냥·돈벌이 질문은 물은 사람 레벨로 근처 사냥터 자세히, 직업·레벨에 맞는 공략, 조합·제작 질문은 글의 둘레를 넓게
+// - 답 받기 일꾼이 위키 자료를 25초가 아니라 120초까지 기다린다 (사진 질문·느린 폰은 자료 없이 답했다, server/chatRun.ts)
+// - 코스튬 시세·랜덤 코스튬 상자 확률표, 11/10 톡방까지 다시 센 시세 (반죽망·세계껍갑·죽망), [[모름]]은 핵심을 못 답했을 때만 (드랍률 없음 같은 곁가지는 아님)
+// 남긴 것: #45 (마녀 버프를 받는 조건은 자료가 없다, 앱개발자 질문). 사람·대화마다 알림은 하나(가장 최근 항목), 앱개발자 본인 항목은 알림 없이 완료로만. setup 'gap_fix_batch_20261110'
+{
+  const KEY = "gap_fix_batch_20261110";
+  const done = queryFirst(`SELECT 1 AS d FROM setup WHERE key = '${KEY}'`)?.d;
+  if (!done) {
+    const now = Date.now();
+    const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+    const NOTE = {
+      44: "사냥터를 물으면 몬스터마다 레벨·HP·선공·재부활·드랍까지 붙여 답해요",
+      46: "텔레포트2는 해변 유리병 드랍, 텔레포트3은 노을숲 성숙한여우·라노스평원 까막이 드랍과 해변 우파루파토템 교환으로 답해요 (드랍률은 공개 자료 없음)",
+      47: "텔레포트2는 해변 유리병 드랍, 텔레포트3은 노을숲 성숙한여우·라노스평원 까막이 드랍과 해변 우파루파토템 교환으로 답해요 (드랍률은 공개 자료 없음)",
+      56: "반죽음의망토 시세를 11/10 톡방까지 힘·민첩·지능 묶음마다 답하고, 노작은 톡방에 글이 없다고 말해요",
+      57: "반죽음의망토 시세를 11/10 톡방까지 힘·민첩·지능 묶음마다 답하고, 노작은 톡방에 글이 없다고 말해요",
+      58: "코스튬 질문에 톡방 코스튬 시세와 공식 랜덤 코스튬 상자 확률표 8개를 붙여 답해요",
+      59: "반죽음의망토 시세를 11/10 톡방까지 힘·민첩·지능 묶음마다 답하고, 노작은 톡방에 글이 없다고 말해요",
+      60: "세계수껍질갑옷 시세를 11/10 톡방까지 강화별로 셌어요",
+      62: "죽음의망토 시세를 11/10 톡방까지 힘·민첩·지능·체력30·노작 묶음으로 셌어요",
+      65: "레벨 근처 사냥터마다 몬스터 드랍까지 붙여 답해요",
+    };
+    const ids = Object.keys(NOTE).map(Number);
+    const IN = `(${ids.join(", ")})`;
+    const CASE = (col) => `CASE ${col} ${ids.map((id) => `WHEN ${id} THEN ${q(NOTE[id])}`).join(" ")} END`;
+    const OPEN = `g.status = 'open' AND g.id IN ${IN}`;
+    const n = queryFirst(`SELECT COUNT(*) AS n FROM chat_gaps g WHERE ${OPEN}`)?.n ?? 0;
+    runSql([
+      // 같은 사람의 같은 대화에는 알림 하나 (가장 최근 항목으로)
+      "INSERT INTO alerts (user_id, kind, text, link, created_at) " +
+        "SELECT g.user_id, 'chat_fixed', '챗봇이 개선됐어요. 물어봤던 “' || substr(replace(replace(g.question, char(10), ' '), char(13), ' '), 1, 40) || '” · ' || " + CASE("g.id") + ", " +
+        "CASE WHEN EXISTS (SELECT 1 FROM chat_threads t WHERE t.id = g.thread_id AND t.user_id = g.user_id) THEN '#/chat/' || g.thread_id || '?again=' || g.id ELSE '#/chat' END, " +
+        `${now} FROM chat_gaps g WHERE ${OPEN} AND g.id = (SELECT MAX(g2.id) FROM chat_gaps g2 WHERE g2.status = 'open' AND g2.id IN ${IN} AND g2.thread_id = g.thread_id AND g2.user_id = g.user_id) ` +
+        "AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = g.user_id AND u.role = 'developer') " +
+        "AND COALESCE((SELECT p.enabled FROM alert_prefs p WHERE p.user_id = g.user_id AND p.kind = 'chat_fixed'), 1) = 1;",
+      `UPDATE chat_gaps SET status = 'fixed', note = ${CASE("id")}, fixed_at = ${now} WHERE id IN (SELECT g.id FROM chat_gaps g WHERE ${OPEN});`,
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+    ]);
+    console.log(`챗봇 개선 완료(2026-11-10 둘째 묶음) ${n}건`);
+  }
+}
