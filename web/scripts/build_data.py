@@ -892,6 +892,9 @@ def main():
     # 강화 비교 (개발중): 자료/장비_강화·재설정 (카페 글 331665 첨부) + 위키 장비 표 -> data/enhance.json (없으면 건너뛴다)
     import build_enhance
     build_enhance.main()
+    # 도감 계산기 (개발중): 자료/도감/일반.json (제작자 도감 영상을 옮긴 것) -> data/dex.json (없으면 건너뛴다)
+    import build_dex
+    build_dex.main()
 
 
 def write_place_parts(posts: dict, places: dict) -> None:

@@ -4819,3 +4819,57 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .rent-gift-name { min-width: 0; display: flex; flex-direction: column; }
 .rent-gift-name small { font-size: 11px; color: var(--muted); }
 .rent-gift .rent-form { padding: 0 9px 9px; }
+
+/* 도감 계산기 (개발중, 제작자 요청 2026-11-10): 완료 합계(시세 동향 도감 표와 같은 모양) + 미완료를 다 하면 더 오르는 값, 항목마다 효과와 재료 칸 */
+.dex-sum .panel-title small { font-size: 11px; margin-left: 4px; }
+.dex-grid { margin-top: 0; }
+.dex-grid .dex-grid-on dt { color: var(--gold); }
+.dex-gain { color: #3fe0a0; }
+.dex-legend { margin: 6px 0 0; font-size: 10px; }
+.dex-empty { margin: 6px 0; font-size: 12px; }
+.dex-stats { gap: 4px; }
+.dex-stats .sub-tab { border-color: rgba(169, 162, 207, 0.25); }
+.dex-need { padding: 0; }
+.dex-need-head { display: flex; align-items: center; gap: 6px; width: 100%; padding: 8px 10px; font: inherit; font-size: 13px; color: var(--text); background: none; border: 0; cursor: pointer; text-align: left; }
+.dex-need-head .muted { font-size: 11px; }
+.dex-caret { margin-left: auto; font-size: 10px; color: var(--muted); }
+.dex-need-list { list-style: none; margin: 0; padding: 0 6px 6px; max-height: 300px; overflow-y: auto; }
+.dex-need-list button { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto auto; align-items: center; gap: 6px; width: 100%; min-height: 32px; padding: 2px 4px;
+  font: inherit; font-size: 12px; color: var(--text); background: none; border: 0; border-bottom: 1px dashed rgba(169, 162, 207, 0.2); text-align: left; cursor: pointer; }
+.dex-need-list .muted { font-size: 10px; }
+.dex-need-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dex-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.dex-entry { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px; padding: 7px 8px; background: var(--panel); border: var(--px) solid var(--edge); }
+.dex-done { opacity: 0.62; }
+.dex-check { width: 28px; height: 28px; align-self: start; font: inherit; font-size: 16px; line-height: 1; color: var(--edge); background: var(--night-2);
+  border: 2px solid rgba(169, 162, 207, 0.5); cursor: pointer; }
+.dex-done .dex-check { background: #3fe0a0; border-color: #3fe0a0; }
+.dex-main { min-width: 0; }
+.dex-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 13px; }
+.dex-period { font-size: 10px; color: #ff7a6b; }
+.dex-effects { display: flex; flex-wrap: wrap; gap: 2px 8px; margin: 2px 0 4px; font-size: 11px; color: #8fb4ff; }
+.dex-eff-on { color: var(--gold); font-weight: bold; }
+.dex-items { display: flex; flex-wrap: wrap; gap: 4px; }
+.dex-item { display: flex; flex-direction: column; align-items: center; width: 50px; padding: 0; font: inherit; color: var(--text); background: none; border: 0; cursor: pointer; }
+.dex-slot { position: relative; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; background: rgba(7, 6, 15, 0.45); border: 1px solid rgba(169, 162, 207, 0.3); }
+.dex-slot img { image-rendering: pixelated; }
+.dex-pic { max-width: 30px; max-height: 30px; image-rendering: pixelated; }
+.dex-noimg { font-size: 14px; color: var(--muted); }
+.dex-plus { position: absolute; top: 0; right: 1px; font-style: normal; font-size: 9px; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000; }
+.dex-n { position: absolute; bottom: 0; right: 1px; font-style: normal; font-size: 9px; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000; }
+.dex-iname { width: 100%; margin-top: 1px; font-size: 9px; line-height: 1.15; color: var(--muted); text-align: center; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: keep-all; overflow-wrap: anywhere; }
+.dex-src { margin: 10px 2px 0; font-size: 10px; }
+.dex-item-unknown .dex-slot { border-style: dashed; }
+.dex-item-unknown .dex-iname { color: #ff9b6b; }
+/* 도감 계산기: 장비 칸의 강화 단계(노강도 표시, 같은 강화로만 등록)와 대체 장비스탬프 (도감 등록 창) */
+.dex-noplus { color: #c9c3e6 !important; }
+.dex-stamp { display: inline-block; margin-top: 1px; padding: 0 3px; font-size: 9px; font-style: normal; line-height: 1.4; white-space: nowrap; border: 1px solid currentColor; }
+.dex-stamp-S { color: #ffb35c; }
+.dex-stamp-A { color: #c9b8ff; }
+.dex-stamp-B { color: #8fb4ff; }
+.dex-stamp-불가 { color: var(--muted); border-style: dashed; }
+.dex-stampsum { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0; padding: 0 10px 6px; font-size: 11px; color: var(--muted); }
+.dex-stampsum .dex-stamp { font-size: 11px; }
+.dex-need-name { display: flex; align-items: center; gap: 4px; }
+.dex-need-name small.dex-stamp { margin: 0; }
+.dex-need-plus { font-style: normal; color: #fff; }
