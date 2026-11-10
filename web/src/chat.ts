@@ -1,6 +1,6 @@
 // 챗봇: 질문에 맞는 위키 자료 고르기, 고른 스샷 줄이기, /api/chat 부르기 (서버는 functions/api/chat/index.ts), 대화 기록.
 // 위키 자료는 이미 화면에 받아 둔 것에서 고른다. 서버는 길이만 자르고 질문 앞에 붙인다.
-import type { Block, Monster, Place, Post, Run, Wiki } from "./types";
+import type { Block, ControlMob, Monster, Place, Post, Run, Wiki } from "./types";
 import { api } from "./auth";
 import { search } from "./search";
 import { levelText } from "./ui";
@@ -334,17 +334,25 @@ export function wikiContext(
     add(`[사진에서 읽음] ${who ? `사진 속 캐릭터 ${who}` : "캐릭터 직업·레벨은 안 보임"}${seen.names.length ? ` · 보이는 이름: ${seen.names.join(", ")}` : ""} (자료는 이 값으로 골랐다)`);
   }
 
-  // 길드 통제 리스트 (제작자 2026-11-10: 중립 길드라 잡지 않는 몹, 공지사항에도 있음): 통제·중립·잡아도 되는지를 묻거나 리스트의 곳·몹 이름이 나오면 통째로
+  // 길드 통제 리스트 (제작자 2026-11-10: 중립 길드라 잡지 않는 몹, 공지사항에도 있음, '다 DB 화 해서 챗봇이 읽을 수 있게').
+  // 작아서 늘 붙인다 (사냥터를 추천할 때 그곳의 통제 몹을 알리게). 물은 말에 곳·몹 이름이 나오거나 통제·잡아도 되는지를 물으면 찾은 자료에도 적는다
   const control = wiki.meta.control;
   if (control) {
-    const words = control.groups.flatMap((g) => [g.place, ...g.mobs.flatMap((m) => m.split(/[/·,]/))]).map((w) => norm(w.trim())).filter((w) => w.length >= 2);
-    if (CONTROL_ASK.test(question) || words.some((w) => q.includes(w))) {
-      add(
-        `[길드 통제 리스트 · ${control.server} · ${control.rule} · 표 제작 ${control.by} · 수정 ${control.date} · 게시판 공지사항에 있음]\n` +
-          control.groups.map((g) => `- ${g.place}${g.mark ? ` (${g.mark})` : ""}: ${g.mobs.join(", ")}`).join("\n"),
-      );
-      found.push("길드 통제 리스트");
-    }
+    const mobName = (m: ControlMob) => {
+      const wikiName = m.key ? wiki.monsters[m.key]?.name : "";
+      return m.name + (wikiName && norm(wikiName) !== norm(m.name) ? ` (위키 이름 ${wikiName})` : "") + (m.note ? ` (${m.note})` : "");
+    };
+    add(
+      `[길드 통제 리스트 · ${control.server} 서버 · ${control.rule} · 표 제작 ${control.by} · 수정 ${control.date} · 게시판 공지사항에 있음]\n` +
+        control.groups
+          .map((g) => `- ${g.place}${g.placeId && wiki.places[g.placeId] ? ` (위키 사냥터 ${wiki.places[g.placeId].name})` : ""}${g.mark ? ` [${g.mark}]` : ""}: ${g.mobs.map(mobName).join(", ")}`)
+          .join("\n"),
+    );
+    const words = control.groups
+      .flatMap((g) => [g.place, g.placeId ? wiki.places[g.placeId]?.name ?? "" : "", ...g.mobs.flatMap((m) => [m.name, m.key ? wiki.monsters[m.key]?.name ?? "" : ""])])
+      .map((w) => norm(w))
+      .filter((w) => w.length >= 2);
+    if (CONTROL_ASK.test(question) || words.some((w) => q.includes(w))) found.push("길드 통제 리스트");
   }
 
   // 1. 질문에 이름이 그대로 나온 것 (긴 이름부터, 짧은 이름이 긴 이름 안에 든 경우는 뺀다)

@@ -1,5 +1,5 @@
 // PUT /api/gcoin/targets { userId, target } -> 이번 주간 판(쉬는 주면 다음 판)의 목표 레벨 정하기 (담당자: 오피서 이상, 김다혜 2026-11-09 '2주간의 목표 레벨은 담당자가 정해 주고').
-// target 이 null 이면 뺀다. 대상은 담당자 재량(1군·2군 상관없이), 목표는 지금 레벨보다 높게. 정할 때 레벨을 시작 레벨로 적는다 (달성률의 0%)
+// target 이 null 이면 뺀다. 대상은 담당자 재량(1군·2군 상관없이). from(시작 레벨, 달성률 0%)은 담당자가 고치고, 없으면 정해 둔 값이나 지금 레벨. 목표는 시작 레벨보다 높게
 import { FORBIDDEN, NEED_LOGIN, TEST_IDS, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { canManageGcoin, canUseGcoin, int } from "../../../server/gcoin";
@@ -9,7 +9,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!canUseGcoin(me) || !canManageGcoin(me)) return FORBIDDEN();
-  const b = await readJson<{ userId: unknown; target: unknown; hide?: unknown }>(request);
+  const b = await readJson<{ userId: unknown; target: unknown; hide?: unknown; from?: unknown }>(request);
   const userId = typeof b.userId === "string" ? b.userId : "";
   // 대상은 담당자 재량 (제작자 2026-11-10 '대상자 추가·제거 자유롭게, 1군·2군 상관없이'): 레벨을 적은 계정이면 누구나 (테스트 계정 빼고)
   if (!userId || TEST_IDS.includes(userId)) return json({ error: "없는 계정이에요" }, 400);
@@ -43,13 +43,16 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   const target = int(b.target, 2, 99);
   if (target === null) return json({ error: "목표 레벨이 맞지 않아요" }, 400);
   // 이미 정한 목표를 고치면 시작 레벨은 그대로 (달성률이 튀지 않게), 처음이면 지금 레벨
+  // 시작 레벨: 담당자가 정한 값 (공지의 시작 레벨이 사이트 레벨과 다를 수 있다), 없으면 정해 둔 값, 처음이면 지금 레벨
   const had = mine.results.find((t) => t.round === round);
-  const from = had?.from_level ?? p.level;
+  const given = b.from === undefined || b.from === null ? null : int(b.from, 1, 98);
+  if (b.from !== undefined && b.from !== null && given === null) return json({ error: "시작 레벨이 맞지 않아요" }, 400);
+  const from = given ?? had?.from_level ?? p.level;
   if (target <= from) return json({ error: `목표는 Lv.${from} 보다 높게 정해 주세요` }, 400);
   await env.DB.batch([
     env.DB.prepare(
       "INSERT INTO gc_targets (round, user_id, from_level, target, set_at, set_by) VALUES (?, ?, ?, ?, ?, ?) " +
-        "ON CONFLICT (round, user_id) DO UPDATE SET target = excluded.target, set_at = excluded.set_at, set_by = excluded.set_by",
+        "ON CONFLICT (round, user_id) DO UPDATE SET from_level = excluded.from_level, target = excluded.target, set_at = excluded.set_at, set_by = excluded.set_by",
     ).bind(round, userId, from, target, Date.now(), me.id),
     env.DB.prepare("DELETE FROM gc_settings WHERE key = ?").bind(hideKey),
   ]);

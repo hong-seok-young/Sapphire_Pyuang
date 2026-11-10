@@ -1,3 +1,4 @@
+import { useEntryState } from "../router";
 // 도감 계산기 (개발중, 제작자 요청 2026-11-10: '도감 항목 정리가 인게임에서 안 되어 있어서 이 웹에서', '영상 찍어서 하나하나 클릭했어, 다 보고 기록해').
 // 자료는 제작자가 찍은 게임 도감 퀘스트 영상(일반 > 전체 > 미완료)을 사람이(Claude) 장면마다 보고 옮긴 것: 비공개 자료 `도감/일반.json`
 // -> web/scripts/build_dex.py -> data/dex.json. 앱은 게임을 읽지 않는다. 사람이 '완료'를 직접 누르는 계산기 (게임 안전 규칙에 맞는다).
@@ -123,10 +124,10 @@ export function DexPage({ wiki, me }: { wiki: Wiki | null; me: Me }) {
 
 function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
   const [done, setDone] = useState<Set<string>>(() => readDone(me));
-  const [tab, setTab] = useState<Tab>("todo");
-  const [q, setQ] = useState("");
-  const [stat, setStat] = useState<string | null>(null);
-  const [cat, setCat] = useState<string>("all");
+  const [tab, setTab] = useEntryState<Tab>("dex.tab", "todo");
+  const [q, setQ] = useEntryState("dex.q", "");
+  const [stat, setStat] = useEntryState<string | null>("dex.stat", null);
+  const [cat, setCat] = useEntryState<string>("dex.cat", "all");
   const [showNeed, setShowNeed] = useState(false);
   // 목록 폭 (한 줄에 아이템 칸을 몇 px 로 넣을지 정한다)
   const listRef = useRef<HTMLUListElement>(null);

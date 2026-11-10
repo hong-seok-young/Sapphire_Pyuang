@@ -174,8 +174,8 @@ export const fetchGcoin = () => api<GcData>("/api/gcoin");
 /** 판 기간 정하기: 한국 시간 from 날 0시 ~ to 날 24시 ('2026-11-11') */
 export const setRound = (from: string, to: string) =>
   api<{ ok: boolean }>("/api/gcoin/round", "PUT", { from, to });
-export const setTarget = (userId: string, target: number | null) =>
-  api<{ ok: boolean }>("/api/gcoin/targets", "PUT", { userId, target });
+export const setTarget = (userId: string, target: number | null, from?: number) =>
+  api<{ ok: boolean }>("/api/gcoin/targets", "PUT", { userId, target, from });
 /** 담당자: 목표 목록에서 빼기 (2군 본캐가 저절로 다시 들어오지 않게) */
 export const hideTarget = (userId: string) => api<{ ok: boolean }>("/api/gcoin/targets", "PUT", { userId, hide: true });
 export const buyItem = (itemId: number, qty: number) =>

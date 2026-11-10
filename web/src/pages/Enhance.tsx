@@ -1,3 +1,4 @@
+import { useEntryState } from "../router";
 // 강화 비교 (개발중, 제작자 요청 2026-11-04: '8윙의날개와 8헌터보우 입력하면 이제 몇 퍼센트가 강해지는지', 같은 날 '콤팩트하게, 고도화').
 // 자료는 data/enhance.json (scripts/build_enhance.py: 카페 글 331665 첨부 '무기 강화수치 26.10' 의 무기 42개만, 제작자 2026-11-04 '내가 준 강화 데이터에 있는 무기들만').
 // 강화 데미지 = 기본 데미지 x (1 + 가산값 / 100): 전사·레인저·무도가는 공통 가산치, 마법사는 무기마다 다른 가산치.
@@ -714,7 +715,7 @@ export function EnhancePage({ wiki, query, me }: { wiki: Wiki; query: URLSearchP
   // 다른 직업끼리는 견주지 않는다 (제작자 2026-11-05 '타 직업군끼리 ㄴㄴ, 직업 넘어가면 무기 입력한 거 초기화'): 주소의 두 무기 직업이 다르면 바꿀 무기는 비운다
   const pb1 = b ?? initial(d, query.get("b"));
   const pb0 = pa0.w && pb1.w && pa0.w.job !== pb1.w.job ? EMPTY : pb1;
-  const [jobPick, setJob] = useState<string | null>(null);
+  const [jobPick, setJob] = useEntryState<string | null>("enh.job", null);
   const job = jobPick ?? pa0.w?.job ?? (me.job ? JOB_OF[me.job] : null) ?? "전사";
   // 튜토리얼 동안 무기를 안 골랐으면 예시 두 무기로 결과·비슷한 무기·기준선을 보인다 (고른 것과 주소는 그대로, src/tutorialState.ts)
   const sample = useSample();

@@ -711,7 +711,8 @@ export function TargetsTab({
   const [q, setQ] = useState("");
   const byId = new Map(people.map((p) => [p.id, p]));
   const off = new Set([...hidden, ...dropped]);
-  const auto = people.filter((p) => p.guild === "second" && !p.main && !off.has(p.id)).map((p) => p.id);
+  // 2군이면 본캐·부캐 모두 (2군 캐릭터를 1군 본캐에 묶어 둔 사람이 많다)
+  const auto = people.filter((p) => p.guild === "second" && !off.has(p.id)).map((p) => p.id);
   const ids = [...new Set([...set.keys(), ...auto, ...adding.filter((id) => !dropped.includes(id))])];
   const list = ids
     .map((id) => byId.get(id) ?? { id, level: set.get(id)?.fromLevel ?? 1, guild: null, main: null })
@@ -730,13 +731,13 @@ export function TargetsTab({
     setAdding((xs) => xs.filter((x) => x !== id));
     if (server) hideTarget(id).catch(() => undefined);
   };
-  async function save(id: string, level: number, target: number | null) {
+  async function save(id: string, from: number, target: number | null) {
     const had = set.get(id) ?? null;
     const back = over[id];
-    setOver((o) => ({ ...o, [id]: target === null ? null : { fromLevel: had?.fromLevel ?? level, target, doneAt: had?.doneAt ?? null, rank: had?.rank ?? 0 } }));
+    setOver((o) => ({ ...o, [id]: target === null ? null : { fromLevel: from, target, doneAt: had?.doneAt ?? null, rank: had?.rank ?? 0 } }));
     if (target === null) drop(id, false);
     try {
-      await setTarget(id, target);
+      await setTarget(id, target, from);
       onChanged(target === null ? `${id} 목표 뺌` : `${id} 목표 Lv.${target}`);
     } catch (x) {
       setOver((o) => {
@@ -769,7 +770,7 @@ export function TargetsTab({
               key={m.id}
               m={m}
               e={set.get(m.id) ?? null}
-              onSave={(t) => save(m.id, m.level ?? 1, t)}
+              onSave={(t, f) => save(m.id, f, t)}
               onDrop={() => drop(m.id)}
             />
           ))}
@@ -881,19 +882,25 @@ function TargetRow({
   m: { id: string; level: number | null };
   e: TargetEntry | null;
   /** 바로 화면에 바꾸고 서버에 보낸다 (실패하면 던진다) */
-  onSave: (target: number | null) => Promise<void>;
+  onSave: (target: number | null, from: number) => Promise<void>;
   /** 아직 정하지 않은 줄을 목록에서 뺀다 */
   onDrop: () => void;
 }) {
   const lv = m.level ?? 1;
-  const base = e?.fromLevel ?? lv;
-  const [t, setT] = useState(e?.target ?? lv + 2);
+  // 시작 레벨도 담당자가 고친다 (2026-11-10 담당자 '목표 레벨 정한 거 저장이 안 돼요': 공지의 시작 레벨보다 사이트 레벨이 높으면 목표를 그 위로만 정할 수 있었다)
+  const [f, setF] = useState(e?.fromLevel ?? lv);
+  const [t, setT] = useState(e?.target ?? Math.max(lv, e?.fromLevel ?? lv) + 2);
   const busy = false;
   const [error, setError] = useState("");
-  const dirty = !e || t !== e.target;
+  const [ok, setOk] = useState(false);
+  const dirty = !e || t !== e.target || f !== e.fromLevel;
   function run(target: number | null) {
     setError("");
-    onSave(target).catch((x) => setError(errorText(x)));
+    setOk(false);
+    onSave(target, f).then(
+      () => target !== null && setOk(true),
+      (x) => setError(errorText(x)),
+    );
   }
   return (
     <li className={"gr-tg" + (e ? " gr-tg-set" : "")}>
@@ -901,10 +908,22 @@ function TargetRow({
         <Nick name={m.id} />
         <small>Lv.{lv}</small>
       </span>
+      <span className="gc-step gr-tg-step gr-tg-from">
+        <button className="pill" disabled={busy || f <= 1} onClick={() => setF((x) => x - 1)} aria-label="시작 레벨 내리기">
+          −
+        </button>
+        <b key={f} className="gc-pop">
+          {f}
+        </b>
+        <button className="pill" disabled={busy || f >= t - 1} onClick={() => setF((x) => x + 1)} aria-label="시작 레벨 올리기">
+          +
+        </button>
+      </span>
+      <span className="gr-tg-arrow">→</span>
       <span className="gc-step gr-tg-step">
         <button
           className="pill"
-          disabled={busy || t <= base + 1}
+          disabled={busy || t <= f + 1}
           onClick={() => setT((x) => x - 1)}
           aria-label="목표 내리기"
         >
@@ -945,6 +964,7 @@ function TargetRow({
         </button>
       )}
       {e?.doneAt && <small className="gr-tg-done">🏁 {e.rank}위</small>}
+      {ok && !dirty && !error && <small className="gr-tg-ok">저장됨</small>}
       {error && <small className="form-error">{error}</small>}
     </li>
   );
