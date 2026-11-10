@@ -392,7 +392,7 @@ ALIASES: dict[str, str | None] = {
     # 제작자 2026-11-10 확인: 닥소 = 닼소, 오트갑 = 오트윌갑, 데조 = 데조르바의보우 (칠데조 = +7 데조)
     "닥소": "다크스틸소드", "오트갑": "오트윌의경갑", "데조": "데조르바의보우",
     "설신": "설원의저주장화",  # 제작자 2026-11-10
-    "윙": "윙의날개",  # 팔윙 = +8 윙의날개 (짐작, 확인 전: 윙의날개 옵션이 명중·크리·민첩 셋이라 '434팔윙', '팔윙 옵333' 과 맞는다)
+    "윙": "윙의날개",  # 팔윙 = +8 윙의날개 (제작자 2026-11-10 확인)
     "거뼈": "거미줄뼈갑옷", "황목": "황금목걸이", "닥스": "다크스컬", "글라": "글라디우스", "숲요장": "숲요정의장갑", "속모": "속전속결의모자", "속전모": "속전속결의모자", "사용장": "사막용병의장갑", "재벨": "재생의벨트", "데조모": "데조르바의모자", "강장": "강화가죽장갑",  # 제작자 2026-11-10 확인 (초보자도움방 "강장은 명중 1당 가격 3배")
 }
 
@@ -815,12 +815,11 @@ EQUIP_JSON = ROOT / "web" / "public" / "data" / "equipment.json"
 # 위키 옵션 이름 -> 시세 동향 옵션 이름 (OPTS 의 값)
 WIKI_STAT = {"크리티컬": "크리", "속성저항": "속저", "마나재생": "마재", "체력재생": "체재", "이동속도": "이속", "불저항": "불저", "냉기저항": "냉저", "번개저항": "번저"}
 _RANGE_OPTS: dict[str, tuple[list[str], str]] | None = None
-# 숫자만 적을 때 그 직업에 쓸모없어서 안 적는 옵션 (제작자 2026-11-10 '유효옵만 적은 거라 레인저는 마재 빼고 크리 3 민 5'. 레인저 마재는 제작자 확인, 다른 직업은 짐작, 확인 전)
-NOT_EFFECTIVE = {
-    "레인저": {"마재", "마나", "체재", "불저", "냉저", "번저", "속저", "이속"},
-    "전사": {"마재", "마나", "체재", "불저", "냉저", "번저", "속저", "이속"},
-    "무도가": {"마재", "마나", "체재", "불저", "냉저", "번저", "속저", "이속"},
-    "마법사": {"체재", "불저", "냉저", "번저", "속저", "이속"},
+NUM_MISMATCH: dict[str, list[str]] = {}
+# 숫자만 적을 때 그 물건에 쓸모 있는 옵션(유효옵)만 적은 것: 물건마다 다르다 (제작자 2026-11-10 '유효옵만 적은 거라 레인저는 마재 빼고 크리 3 민 5',
+# '템마다 다를 듯 해서 그때그때 물어봐'). 확인받은 물건만 적고, 없는 물건은 숫자 수가 위키 옵션 수와 맞을 때만 읽는다
+EFFECTIVE_OPTS = {
+    "데조르바의보우": ["크리", "민첩"],  # 35칠데조 = 크리3 민첩5 (마재는 안 적음)
 }
 
 
@@ -855,10 +854,11 @@ def num_opts(name: str, lead: str, words: list[str]) -> list[str]:
     if not stats:
         return []
     n = len(lead) if lead else (len(words[0]) if len(words) == 1 and len(words[0]) >= 2 else len(words))
-    if n != len(stats) and job in NOT_EFFECTIVE:
-        eff = [st for st in stats if st not in NOT_EFFECTIVE[job]]
-        if len(eff) == n:
-            stats = eff  # 그 직업에 쓸모 있는 옵션만 적은 것 ('35칠데조' = 크리3 민첩5, 마재는 안 적음)
+    eff = EFFECTIVE_OPTS.get(re.sub(r"\s", "", name))
+    if n != len(stats) and eff and len(eff) == n:
+        stats = eff  # 그 물건에 쓸모 있는 옵션만 적은 것 ('35칠데조' = 크리3 민첩5, 마재는 안 적음)
+    elif n != len(stats) and n:
+        NUM_MISMATCH.setdefault(name, []).append(lead or " ".join(words))  # 물어볼 것 (--unknown 에 찍는다)
     if lead:
         vals = list(lead)
     elif len(words) == 1 and len(words[0]) == len(stats) and len(stats) >= 2:
@@ -1505,6 +1505,7 @@ def main() -> None:
     write_chat_market(data, rs)
     if "--unknown" in sys.argv:
         print("위키에 없는 줄임말:", sorted(rs.unknown.items(), key=lambda kv: -kv[1])[:80])
+        print("숫자 옵션 수가 안 맞는 물건:", [(k, range_opts(k)[0], sorted(set(v))[:6], len(v)) for k, v in sorted(NUM_MISMATCH.items(), key=lambda kv: -len(kv[1]))])
 
 
 if __name__ == "__main__":
