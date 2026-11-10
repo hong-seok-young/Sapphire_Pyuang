@@ -629,6 +629,11 @@ def parse_line(line: str, rs: Resolver) -> dict | None:
         return None  # '아드24.6/23.95' = 계정 글의 아이템 드랍율 / 골드 드랍율 (제작자 2026-11-04). 물건이 아니다
     s = re.sub(r"\(.*?\)|\[.*?\]", " ", line)
     s = NUMBERING.sub("", s.strip())
+    # 끝의 값 범위 '8임페 80-95', '8임페 #80-100' = 80~95 (삽니다 목록, 2026-11-10 문맥): 가운데 값 하나로. '-' 를 띄우기 전에
+    s = re.sub(r"#(?=\d)", "", s)
+    rm = re.search(r"(?<![\d.가-힣A-Za-z])(\d+(?:\.\d+)?)\s*[-~]\s*(\d+(?:\.\d+)?)(장|콩|만원|만골|만)?\s*$", s)
+    if rm and float(rm.group(1)) < float(rm.group(2)):
+        s = s[:rm.start()] + f"{(float(rm.group(1)) + float(rm.group(2))) / 2:g}" + (rm.group(3) or "")
     s = re.sub(r"[•■□▶\-–—ㅡ·*~♡❤️🤍,/:]", " ", s)
     s = re.sub(r"(?<=\S)(or|OR|혹은)(?=\S)", " or ", s)
     s = re.sub(r"(?<![가-힣])(" + OPT_KEYS + r") (?=\d)", r"", s)  # '체 446' -> '체446'
@@ -894,10 +899,14 @@ def bare_is_option(name: str, words: list[str], bare: float | None) -> bool:
         return False
     stats, _ = range_opts(name)
     vals = [int(w) for w in words] + [int(bare)]
-    if not stats or len(vals) != len(stats):
-        return False
     key = re.sub(r"\s", "", name)
-    return all(_RANGE_MIN.get((key, st), 0) <= v <= _RANGE_MAX.get((key, st), 99) for v, st in zip(vals, stats))
+    # 그 물건에 쓸모 있는 옵션만 적은 것도 ('7샤도 3 9' = 크리3 민첩9, 가격 없는 팝니다 목록)
+    for cand in (stats, EFFECTIVE_OPTS.get(key)):
+        if cand and len(vals) == len(cand) and all(
+            _RANGE_MIN.get((key, st), 0) <= v <= _RANGE_MAX.get((key, st), 99) for v, st in zip(vals, cand)
+        ):
+            return True
+    return False
 
 
 def num_opts(name: str, lead: str, words: list[str]) -> list[str]:
