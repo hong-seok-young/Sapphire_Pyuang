@@ -53,7 +53,7 @@
   길드/ 아래(장비대여·기부 장부)는 오피서 이상에게만. 카톡은 방마다 가장 새 파일만, 닉네임 뒤 휴대폰 뒷자리는 지운다. 그래서 자료 저장소에 올리기만 하면 30분 안에 배포되고 챗봇이 쓴다
   (새 종류의 자료를 화면·서버에 쓰는 일은 여전히 그 기능에 반영한다).
 - 해외 팬 위키 (제작자 2026-11-10 '이 사이트 모조리 긁어서 우리 db화 하자 챗봇 답변에 활용해', '해외 사이트는 한글화 잘해봐'): imotwom.fandom.com(글로벌 서버 팬 위키, CC BY-SA) 문서 4,719개를
-  자료 저장소 `fandom/articles.jsonl`(원문, `자료/scripts/fetch_fandom.py`), 문서에 쓰인 그림·소리 파일은 크기 제한 없이 모두 `이미지/fandom/`(처음엔 200KB 넘는 것을 뺐다가 제작자 '왜 빼'로 모두, 1GB 넘음. 배포·시험 작업은 sparse-checkout 으로 이 폴더를 받지 않는다), 한국어 정리판 원문 'Complete IMO Guide (in Korean)'(2011년쯤)은 `fandom/guide_ko.txt`.
+  자료 저장소 `fandom/articles.jsonl`(원문, `자료/scripts/fetch_fandom.py`), 문서에 쓰인 그림은 가려서 `이미지/fandom/`에 (제작자 '쓸만한 거만 추리거나 텍스트화', '우리 DB 에 있는 거면 중복': 큰 그림 1,804장을 `web/scripts/fandom-images.mjs`(같은 Actions, job=images, Batch)로 Claude 가 한 장씩 판정해 쓸모 900장(아이템 정보창·몬스터 정보·지도·공략·드랍 표)만 WebP 90 으로, 인증샷·홍보·잡담 901장과 커뮤니티·팬아트 464장·우리 위키와 이름이 같은 아이콘 85개·소리 46개는 뺌, 작은 아이콘 3,486개는 그대로. 1.18GB → 111MB, `자료/scripts/fandom_images_finish.py`. 그림 속 글자는 `fandom/그림글.md`(문서 579개, 챗봇이 읽음)·판정은 `fandom/그림글.json`. 배포·시험 작업은 sparse-checkout 으로 이 폴더를 받지 않는다), 한국어 정리판 원문 'Complete IMO Guide (in Korean)'(2011년쯤)은 `fandom/guide_ko.txt`.
   한국어 번역은 `web/scripts/translate-fandom.mjs`(Claude Opus 5.5 effort high, Batch API, 게임 속 이름은 우리 위키 이름 `fandom/우리_이름.json` 그대로·없으면 한국 서버에서 부를 이름)를
   GitHub Actions `fandom-ko.yml`(손으로, 입력에 세션이 만든 RSA 공개키)이 돌려 결과를 암호화해 올리고(공개 저장소 첨부는 누구나 받고, 자료 저장소 토큰은 읽기 전용) 세션이 풀어서
   `fandom/ko.jsonl`·`fandom/ko/<묶음>_NN.md`(문서마다 '## 한국어 이름 (영문)', 원문 주소·찾는 말)로 넣는다. 2026-11-10 4,637개(가이드·몬스터·NPC·지역·퀘스트·스킬·장비·소모품·펫·코스튬 …).
