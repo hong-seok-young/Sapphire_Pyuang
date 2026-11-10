@@ -157,7 +157,7 @@ export function reportOpen(userId: string) {
 const PAGE_NAME: Record<string, string> = {
   "": "홈", places: "사냥터 목록", search: "검색", equip: "장비", chat: "챗봇", ranking: "길드 랭킹", market: "사파이어 중개인",
   requests: "길드원 의뢰소", alerts: "알림", shop: "플래티넘 할인 상점", board: "게시판", me: "내 정보", admin: "길드원 관리", app: "앱", password: "비밀번호 바꾸기", log: "사용 기록", patch: "패치 내역", odds: "공식 확률",
-  match: "길드 던전", todo: "To do", rent: "장비대여", gaps: "챗봇 개선", info: "정보", as: "캐릭터 바꿔서 열기", trend: "시세 동향", enhance: "강화 비교", sim: "확률 시뮬레이터", simtest: "시뮬레이터 테스트", devreq: "개발 요청", fit: "헬스 루틴",
+  match: "길드 던전", todo: "To do", rent: "장비대여", gaps: "챗봇 개선", info: "정보", as: "캐릭터 바꿔서 열기", trend: "시세 동향", enhance: "강화 비교", sim: "확률 시뮬레이터", simtest: "시뮬레이터 테스트", devreq: "개발 요청", fit: "헬스 루틴", donate: "기부함",
   suggest: "건의함",
 };
 const RENT_VIEW: Record<string, string> = { apps: "신청함", staff: "운영", log: "기록" };
@@ -239,7 +239,7 @@ const TODO_NAME: Record<string, string> = {
 const ALERT_NAME: Record<string, string> = {
   market_want: "중개인 살래요", market_bid: "경매 입찰", market_outbid: "더 높은 입찰", market_auction: "경매 전환", market_new: "새 물건", gold_want: "골드 거래",
   request: "의뢰", request_new: "새 의뢰", talk: "토론방", account: "계정", shop: "상점", board: "게시판 댓글", board_notice: "새 공지·이벤트", imo_news: "아이모 소식",
-  chat_fixed: "챗봇 개선됨", chat_gap: "챗봇 모르는 질문", chat_done: "챗봇 답변 완료", rent: "장비대여", todo: "To do 함께", gdungeon: "길드 던전", app_news: "새 기능", devreq: "개발 요청", bday: "생일 축하",
+  chat_fixed: "챗봇 개선됨", chat_gap: "챗봇 모르는 질문", chat_done: "챗봇 답변 완료", rent: "장비대여", todo: "To do 함께", gdungeon: "길드 던전", app_news: "새 기능", devreq: "개발 요청", bday: "생일 축하", donate: "기부함",
 };
 const RENT_ACTION: Record<string, string> = { accept: "대여 신청 수락", reject: "대여 신청 거절", cancel: "대여 신청 취소", hand: "대여 완료 (건네줌)" };
 
@@ -247,6 +247,7 @@ const RENT_ACTION: Record<string, string> = { accept: "대여 신청 수락", re
  * 한 일을 누구나 읽는 말로 (제작자 요청 2026-11-02 '이런 코드 말고 비개발자가 봐도 얘가 들어가서 뭐 했는지 알게'):
  * 경로와 보낸 자료 대신 '길드 던전 시간표 저장 · 8.5시간', '홈 배치 바꿈 · 아래 탭 …' 처럼. at 은 그 기록의 때 (길드 던전 후보 시각을 쓰려고)
  */
+const DONATE_ACTION: Record<string, string> = { confirm: "기부 확정", edit: "기부 고침", reject: "기부 거절", place: "기부 템 보관·사용", rent: "기부 템 장비대여로" };
 const ACTIONS: [RegExp, (d: Rec, m: RegExpMatchArray, at: number) => string][] = [
   // 계정·내 정보
   [/^POST \/api\/login$/, (d) => (d.failed ? `로그인 실패 (${d.failed === 401 ? "비밀번호 틀림" : String(d.failed)})` : "로그인")],
@@ -368,6 +369,10 @@ const ACTIONS: [RegExp, (d: Rec, m: RegExpMatchArray, at: number) => string][] =
   [/^POST \/api\/rent\/apply$/, (d) => join("장비대여 신청", names(d.items).length || Array.isArray(d.items) ? `무기 ${(d.items as unknown[]).length}개` : null, quote(d.note))],
   [/^POST \/api\/rent\/requests\/\d+$/, (d) => join(RENT_ACTION[String(d.action)] ?? "대여 신청 처리", deposit(d))],
   [/^POST \/api\/rent\/apps\/\d+\/talk$/, (d) => join("장비대여 대화", quote(d.text))],
+  // 기부함 (server/donate.ts)
+  [/^POST \/api\/donate$/, (d) => join(d.confirm ? `기부 등록 (${str(d.who) ?? ""})` : "기부 신청", str(d.item), typeof d.gold === "number" ? `${d.gold.toLocaleString()} 골드` : null)],
+  [/^PUT \/api\/donate\/\d+$/, (d) => join(DONATE_ACTION[String(d.action)] ?? "기부함에서 고침", str(d.item), typeof d.gold === "number" ? `${d.gold.toLocaleString()} 골드` : null)],
+  [/^DELETE \/api\/donate\/\d+$/, () => "기부 기록 지움"],
   [/^POST \/api\/rent$/, (d) => join("장비대여 물건 추가", rentItem(d), str(d.donor) ? `기부 ${d.donor}` : null)],
   [/^PUT \/api\/rent\/\d+$/, (d) => join("장비대여 물건 정보 수정", rentItem(d))],
   [/^DELETE \/api\/rent\/\d+$/, () => "장비대여 물건 내림"],
@@ -469,7 +474,7 @@ export function actionText(what: string, detail: string | null, at = Date.now())
  * 화면은 주소의 첫 칸, 한 일은 API 경로로 정한다. 접속은 묶지 않는다
  */
 const VIEW_SECTION: Record<string, string> = {
-  board: "게시판", official: "게시판", suggest: "게시판", market: "중개인", rent: "장비대여", requests: "의뢰소", shop: "플래티넘 상점", chat: "챗봇",
+  board: "게시판", official: "게시판", suggest: "게시판", market: "중개인", rent: "장비대여", donate: "기부함", requests: "의뢰소", shop: "플래티넘 상점", chat: "챗봇",
   ranking: "길드 랭킹", admin: "길드원 관리", me: "내 정보", password: "내 정보", alerts: "알림", todo: "To do", log: "사용 기록",
   info: "정보", menu: "정보", post: "정보", place: "정보", places: "정보", monster: "정보", item: "정보", equip: "정보", odds: "정보", search: "검색",
   fit: "헬스 루틴",

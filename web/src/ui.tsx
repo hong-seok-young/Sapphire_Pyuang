@@ -120,6 +120,7 @@ export const TITLE_EN: Record<string, string> = {
   "헬스 루틴": "WORKOUT LOG",
   "운영진 때리기": "STRESS RELIEF",
   성장코인샵: "GROWTH COIN SHOP",
+  기부함: "DONATION BOX",
 };
 
 export function TopBar({

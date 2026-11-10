@@ -1019,3 +1019,27 @@ CREATE TABLE IF NOT EXISTS gc_streak (
   week INTEGER NOT NULL,
   count INTEGER NOT NULL
 );
+
+-- 기부함 (개발중, 제작자 2026-11-10 길드 톡방 '모든 템을 골드로 환산하고 마일리지 환산', '기부하게 따로 기부함 만들게', 마을모금함 '마일리지 순위표, 명예의 전당'):
+-- 길드원이 게임 안에서 운영진에게 넘긴 템(장비만이 아니라 모든 템)을 골드 가치로 매겨 장비대여와 같은 마일리지(💎 1 = 10만 골드, rental_mileage)로 쌓는다.
+-- 길드원이 기부 신청(가치를 적어서)하면 운영진이 고쳐 확정하거나, 운영진이 바로 적는다. 💎 는 그 사람이 확정받은 골드 합의 내림 (dia 는 이 줄로 장부에 넣은 몫)
+CREATE TABLE IF NOT EXISTS donate_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  who TEXT NOT NULL,                      -- 기부한 사람 닉네임 (앱에 없는 사람도)
+  item TEXT NOT NULL,                     -- 아이템 이름
+  qty INTEGER NOT NULL DEFAULT 1,
+  enhance INTEGER NOT NULL DEFAULT 0,
+  note TEXT,
+  gold_ask INTEGER,                       -- 기부한 사람이 적은 골드 가치
+  gold INTEGER,                           -- 운영진이 확정한 골드 가치
+  dia INTEGER NOT NULL DEFAULT 0,         -- 이 줄로 rental_mileage 에 넣은 💎 (같은 사람 줄의 합 = 확정 골드 합 / 10만 내림)
+  status TEXT NOT NULL,                   -- request(확인 전) | done(확정) | rejected | removed(지움)
+  place TEXT NOT NULL DEFAULT 'keep',     -- keep(보관) | rent(장비대여로 넘김) | used(나눔·사용)
+  rental_id INTEGER,
+  created_at INTEGER NOT NULL,
+  created_by TEXT NOT NULL,
+  done_at INTEGER,
+  done_by TEXT
+);
+CREATE INDEX IF NOT EXISTS donate_items_status ON donate_items (status, created_at);
+CREATE INDEX IF NOT EXISTS donate_items_who ON donate_items (who);

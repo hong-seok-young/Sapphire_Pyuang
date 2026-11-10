@@ -22,6 +22,7 @@ import {
   canFit,
   canPreview,
   canGcoin,
+  canDonate,
   canSmack,
   canSuggest,
   canSee,
@@ -106,6 +107,7 @@ const CHUNKS = {
   Fit: () => import("./pages/Fit"),
   Smack: () => import("./pages/Smack"),
   GrowthShop: () => import("./pages/GrowthShop"),
+  Donate: () => import("./pages/Donate"),
 };
 const ChatPage = lazy(() => CHUNKS.Chat().then((m) => ({ default: m.ChatPage })));
 const AdminPage = lazy(() => CHUNKS.Admin().then((m) => ({ default: m.AdminPage })));
@@ -134,6 +136,7 @@ const GuildDungeonPage = lazy(() => CHUNKS.GuildDungeon().then((m) => ({ default
 const FitPage = lazy(() => CHUNKS.Fit().then((m) => ({ default: m.FitPage })));
 const SmackPage = lazy(() => CHUNKS.Smack().then((m) => ({ default: m.SmackPage })));
 const GrowthShopPage = lazy(() => CHUNKS.GrowthShop().then((m) => ({ default: m.GrowthShopPage })));
+const DonatePage = lazy(() => CHUNKS.Donate().then((m) => ({ default: m.DonatePage })));
 
 /**
  * 홈이 뜬 뒤 쉬는 때에 자주 여는 화면의 조각을 하나씩 미리 받아 둔다 (제작자 2026-11-04 '화면 전환이나 버튼 동작별로 반응이 늦거나 렉').
@@ -492,6 +495,9 @@ function Wiki({
     body = canSmack(me) ? <SmackPage me={me} arg={arg} /> : <DevSoon title="운영진 때리기" />;
   // 2군 성장코인샵 (개발중, 제작자 2026-11-09 '오피서랑 길마 보게 열어 줘'): 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (launcher.ts canGcoin, 서버 server/gcoin.ts)
   else if (page === "gcoin") body = canGcoin(me) ? <GrowthShopPage me={me} onMe={onMe} /> : <DevSoon title="성장코인샵" />;
+  // 기부함 (개발중, 제작자 2026-11-10): 모든 템 기부를 골드 가치로 매겨 장비대여와 같은 마일리지로, 명예의 전당. 위키를 기다리지 않는다 (아이템 그림·이름 찾기는 위키가 오면 붙는다)
+  // 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (launcher.ts canDonate, 서버 server/donate.ts)
+  else if (page === "donate") body = canDonate(me) ? <DonatePage wiki={wiki ?? null} me={me} /> : <DevSoon title="기부함" />;
   else if (!wiki)
     body = (
       <Loading

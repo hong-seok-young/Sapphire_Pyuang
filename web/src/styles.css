@@ -4604,3 +4604,76 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
   .gr-dday, .gr-finish, .gr-spark, .gr-end::after, .gr-crown, .gr-ot-star, .gr-podium::after, .gr-stamp, .gr-edit-btn::after, .gr-track > i::after, .gr-flag-me::before { animation: none; }
 }
 .gr-plot { position: relative; }
+
+/* 기부함 (pages/Donate.tsx, 개발중) */
+.dn-notice { margin: 0 4px 8px; color: var(--gold); }
+.dn-h { margin: 14px 4px 6px; font-size: 13px; color: var(--muted); }
+.dn-ic { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; font-size: 16px; }
+.dn-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.dn-line { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; background: var(--panel); }
+.dn-line-flat { background: none; padding: 0; }
+.dn-line-btn { width: 100%; text-align: left; border: none; color: inherit; font: inherit; cursor: pointer; }
+.dn-line-btn:active { transform: scale(0.98); }
+.dn-line-name { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.dn-line-name small { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; color: var(--muted); font-size: 11px; }
+.dn-label { font-size: 13px; }
+.dn-line-gold { flex: none; display: flex; flex-direction: column; align-items: flex-end; color: var(--gold); font-size: 13px; font-weight: 700; }
+.dn-line-gold small { color: var(--muted); font-size: 11px; font-weight: 400; }
+.dn-day { flex: none; width: 34px; color: var(--muted); font-size: 11px; }
+.dn-tag { padding: 0 4px; font-style: normal; font-size: 10px; color: var(--sapphire); border: 1px solid currentColor; }
+.dn-rank { flex: none; width: 22px; text-align: center; color: var(--muted); font-weight: 700; }
+.dn-line-face { flex: none; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; }
+.dn-face-none { font-size: 20px; }
+.dn-me { box-shadow: inset 0 0 0 1px var(--gold); }
+.dn-card { background: var(--panel); }
+.dn-card > .dn-line { background: none; }
+.dn-card-on { box-shadow: inset 0 0 0 1px var(--sunset); }
+.dn-edit { padding: 0 8px 8px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.dn-acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; padding: 0 8px 8px; }
+.dn-edit .dn-acts { padding: 0; }
+.dn-danger { color: #fff; background: var(--red); }
+.dn-st { font-weight: 700; }
+.dn-st-request { color: var(--sunset) !important; }
+.dn-st-done { color: var(--gold) !important; }
+.dn-st-rejected { color: var(--red) !important; }
+.dn-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.dn-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.dn-row1 { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.dn-name { position: relative; flex: 1; min-width: 0; }
+.dn-name input, .dn-who, .dn-note { width: 100%; }
+.dn-hits { position: absolute; z-index: 5; left: 0; right: 0; top: 100%; display: grid; grid-template-columns: minmax(0, 1fr); background: var(--night-2); box-shadow: 0 0 0 1px var(--edge); }
+.dn-hits button { display: flex; align-items: center; gap: 6px; padding: 6px 8px; text-align: left; color: var(--text); background: none; border: none; font: inherit; font-size: 13px; cursor: pointer; }
+.dn-hits button:active { background: var(--panel-2); }
+.dn-row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.dn-row2 label, .dn-gold { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; color: var(--muted); }
+.dn-row2 input { flex: 1; min-width: 0; width: 100%; }
+.dn-gold { flex-wrap: wrap; }
+.dn-gold-in { flex: 1; display: flex; align-items: center; gap: 4px; min-width: 140px; }
+.dn-gold-in input { flex: 1; min-width: 0; }
+.dn-gold small { flex-basis: 100%; text-align: right; color: var(--gold); }
+.dn-send { justify-self: end; padding-left: 18px; padding-right: 18px; }
+.dn-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 8px; }
+.dn-chip { padding: 2px 8px; font-size: 12px; color: var(--muted); background: var(--night-2); border: 1px solid transparent; cursor: pointer; }
+.dn-chip-on { color: var(--gold); border-color: var(--gold); }
+.dn-rent { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 6px; background: rgba(11, 10, 26, 0.5); }
+.dn-jobs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.dn-term { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: 12px; color: var(--muted); }
+.dn-term b { min-width: 64px; text-align: center; color: var(--text); }
+/* 명예의 전당 단상 */
+.dn-podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 6px; margin: 4px 0 10px; }
+.dn-pod { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 22px 4px 0; text-align: center; }
+.dn-pod-face { display: flex; align-items: flex-end; justify-content: center; height: 56px; }
+.dn-pod .medal { width: 22px; height: auto; }
+.dn-pod-name { max-width: 100%; font-size: 13px; overflow-wrap: anywhere; }
+.dn-pod-gold { color: var(--gold); font-size: 16px; font-weight: 700; }
+.dn-pod small { color: var(--muted); font-size: 11px; }
+.dn-pod-base { display: block; width: 100%; margin-top: 4px; background: linear-gradient(180deg, rgba(255, 210, 90, 0.25), rgba(255, 210, 90, 0.05)); }
+.dn-pod-1 .dn-pod-base { height: 46px; }
+.dn-pod-2 .dn-pod-base { height: 30px; background: linear-gradient(180deg, rgba(200, 210, 230, 0.25), rgba(200, 210, 230, 0.05)); }
+.dn-pod-3 .dn-pod-base { height: 18px; background: linear-gradient(180deg, rgba(210, 140, 80, 0.25), rgba(210, 140, 80, 0.05)); }
+.dn-pod-1 .dn-pod-gold { font-size: 18px; }
+.dn-pod-1::before { content: ""; position: absolute; left: 10%; right: 10%; top: 16px; height: 70px; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 210, 90, 0.35), transparent); animation: dn-glow 2.6s ease-in-out infinite; pointer-events: none; }
+.dn-crown { position: absolute; top: 0; left: 50%; font-size: 18px; transform: translateX(-50%); animation: dn-crown 1.8s ease-in-out infinite; }
+@keyframes dn-glow { 50% { opacity: 0.45; transform: scale(1.08); } }
+@keyframes dn-crown { 50% { transform: translate(-50%, -3px) rotate(-6deg); } }
+@media (prefers-reduced-motion: reduce) { .dn-pod-1::before, .dn-crown { animation: none; } }
