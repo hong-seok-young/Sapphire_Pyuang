@@ -2,7 +2,7 @@
 import { api } from "./auth";
 import type { Job } from "./auth";
 
-export type DonateStatus = "request" | "done" | "rejected" | "removed";
+export type DonateStatus = "request" | "done" | "rejected" | "removed" | "hall";
 export type DonatePlace = "keep" | "rent" | "used";
 
 export interface DonateRow {
@@ -123,7 +123,7 @@ export const mileText = (m: number) => {
 /** 골드 가치로 쌓이는 마일리지 글자 (x 0.6 / 10만) */
 export const diaText = (gold: number) => mileText((gold * MILEAGE_RATE) / DIA_GOLD);
 
-export const STATUS_NAME: Record<DonateStatus, string> = { request: "확인 전", done: "확정", rejected: "거절", removed: "지움" };
+export const STATUS_NAME: Record<DonateStatus, string> = { request: "확인 전", done: "확정", rejected: "거절", removed: "지움", hall: "예전 기부" };
 export const PLACE_NAME: Record<DonatePlace, string> = { keep: "보관", rent: "장비대여", used: "나눔·사용" };
 
 /** '11/10' */
