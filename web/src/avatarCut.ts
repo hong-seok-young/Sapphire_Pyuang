@@ -329,10 +329,11 @@ export function restoreParts(prev: Uint8Array, base: Uint8Array, keep: number[],
 
 /**
  * 검수 한 번을 지금 결과(cur)에 적용한다. 둘째 검수(again)는 첫 결과 위에서만 고친다: 짚은 캐릭터 부분을 base 에서 되살리고,
- * 구멍을 메우고, 이번에 찍은 지울 것만 지운다 (첫 검수에서 지운 것을 다시 가르면 지웠던 꽃이 되살아났다). keepAll 은 지금까지의 keep 점 모두
+ * 구멍을 메우고, 이번에 찍은 지울 것만 지운다 (첫 검수에서 지운 것을 다시 가르면 지웠던 꽃이 되살아났다).
+ * keep 점도 이번 검수 것만 쓴다 (첫 검수가 풀잎을 캐릭터로 짚었다가 둘째가 지우라고 하면 첫 keep 점이 막았다)
  */
-export function applyReview(src: Pixels, base: Uint8Array, cur: Uint8Array, review: Marks, keepAll: number[], again: boolean): Uint8Array {
+export function applyReview(src: Pixels, base: Uint8Array, cur: Uint8Array, review: Marks, again: boolean): Uint8Array {
   const { width: w, height: h } = src;
   const mask = fillHoles(again ? restoreParts(cur, base, review.keep, w, h) : cur, w, h, review.keep);
-  return cutWithMarks(src, mask, { keep: keepAll, remove: review.remove, boxes: review.boxes }) ?? mask;
+  return cutWithMarks(src, mask, review) ?? mask;
 }

@@ -39,13 +39,11 @@ for (const file of readdirSync(dir).filter((f) => f.endsWith(".png") && !f.endsW
       .then((b) => b.toString("base64"));
   const own = new Uint8Array(w * h).fill(255);
   const original = await encode(onMagenta(src, own), "jpeg");
-  const keepAll = [];
   for (const again of [false, true]) {
     const t = Date.now();
     const r = await reviewPoints(client, original, await encode(onMagenta(src, alpha), "png"), rw, rh, again);
     console.log(JSON.stringify({ name, again, w, h, k, rw, rh, seconds: Math.round((Date.now() - t) / 1000), ...r }));
     const m = { keep: r.keep.map((p) => markIndex(p, k, w, h)), remove: r.remove.map((p) => markIndex(p, k, w, h)), boxes: r.remove.map((p) => markBox(p, k, w, h)) };
-    keepAll.push(...m.keep);
-    alpha = applyReview(src, base, alpha, m, keepAll, again);
+    alpha = applyReview(src, base, alpha, m, again);
   }
 }
