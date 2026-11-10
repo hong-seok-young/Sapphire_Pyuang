@@ -171,3 +171,43 @@ export function optionParts(options: string): [string, number][] {
   for (let m = re.exec(options); m; m = re.exec(options)) out.push([OPTION_NAME.find(([k]) => k === m![1])![1], Number(m[2])]);
   return out;
 }
+
+/**
+ * 옵션 글 통일 (제작자 2026-11-10 '지3 마재2 로 적으나 지능3 마나재생 2 로 적으나 대여 리스트 적는 방식과 통일되게'): 줄임말·긴 이름·띄어쓰기·'·'·':'·'+' 어느 것이든
+ * 장비대여 목록의 줄임말('지3마재2')로. 알아보는 옵션이 하나도 없으면 띄어쓰기만 뺀 그대로. 화면 src/rental.ts 와 서버 server/rentalParse.ts 에 같은 표
+ */
+const OPTION_ALIAS: [RegExp, string, string][] = [
+  [/^(마나재생|마재)$/, "마재", "마나재생"],
+  [/^(이동속도|이속)$/, "이속", "이동속도"],
+  [/^(속성저항|속저)$/, "속저", "속성저항"],
+  [/^(크리티컬|크리|크)$/, "크", "크리티컬"],
+  [/^(명중|명|면)$/, "명", "명중"],
+  [/^(민첩|민)$/, "민", "민첩"],
+  [/^(지능|지)$/, "지", "지능"],
+  [/^(체력|체)$/, "체", "체력"],
+  [/^(마나|마)$/, "마", "마나"],
+  [/^힘$/, "힘", "힘"],
+];
+const OPTION_TOKEN = /(마나재생|마재|이동속도|이속|속성저항|속저|크리티컬|크리|크|명중|면|명|민첩|민|지능|지|체력|체|마나|마|힘)\s*[:：+]?\s*(\d{1,3})/g;
+/** 옵션 글 -> [줄임말, 긴 이름, 값] 목록과 알아보지 못한 글자 */
+function optionTokens(text: string): { list: [string, string, number][]; rest: string } {
+  const list: [string, string, number][] = [];
+  const rest = text.replace(OPTION_TOKEN, (_, name: string, v: string) => {
+    const a = OPTION_ALIAS.find(([re]) => re.test(name))!;
+    list.push([a[1], a[2], Number(v)]);
+    return " ";
+  });
+  return { list, rest: rest.replace(/[\s·,/|]+/g, "") };
+}
+/** '지능 3 · 마나재생 2', '지3 마재2', '지능3마나재생2' -> '지3마재2' */
+export function normalizeOptions(text: string): string {
+  const { list, rest } = optionTokens(text ?? "");
+  // 알아보지 못한 글자는 버리지 않고 뒤에 붙인다 ('명9 좋음' -> '명9좋음')
+  return list.length ? list.map(([s, , v]) => `${s}${v}`).join("") + rest : (text ?? "").replace(/\s+/g, "");
+}
+/** 기부함에 보일 옵션: 모두 알아보면 '지능 3 · 마나재생 2', 알아보지 못한 글자가 있으면 적은 그대로 */
+export function optionsDisplay(text: string): string {
+  const t = (text ?? "").replace(/\s+/g, " ").trim();
+  const { list, rest } = optionTokens(t);
+  return list.length && !rest ? list.map(([, f, v]) => `${f} ${v}`).join(" · ") : t;
+}

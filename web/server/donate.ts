@@ -12,6 +12,7 @@ import type { Env, User } from "./auth";
 import { RANK, TEST_IDS } from "./auth";
 import { notify } from "./alerts";
 import { DIA_GOLD, mileageOfName } from "./rental";
+import { optionsDisplay } from "./rentalParse";
 
 /** 모두에게 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (제작자 2026-11-10 '개발 중 (운영진만)'). 화면 launcher.ts 의 DONATE_OPEN 과 같이 바꾼다 */
 export const DONATE_OPEN = false;
@@ -71,7 +72,8 @@ export function readDonate(b: Record<string, unknown>): { error: string } | { it
   const enhance = b.enhance === undefined || b.enhance === null || b.enhance === "" ? 0 : Number(b.enhance);
   const note = typeof b.note === "string" && b.note.trim() ? b.note.trim() : null;
   const gold = b.gold === undefined || b.gold === null || b.gold === "" ? null : Number(b.gold);
-  const options = typeof b.options === "string" && b.options.trim() ? b.options.replace(/\s+/g, " ").trim() : null;
+  // 옵션은 알아보는 것이면 '지능 3 · 마나재생 2' 로 통일 (server/rentalParse.ts optionsDisplay)
+  const options = typeof b.options === "string" && b.options.trim() ? optionsDisplay(b.options) : null;
   const enchant = typeof b.enchant === "string" && b.enchant.trim() ? b.enchant.trim() : null;
   if (options && options.length > 120) return { error: "옵션이 너무 길어요" };
   if (enchant && !ENCHANT_RE.test(enchant)) return { error: "속성부여가 맞지 않아요" };

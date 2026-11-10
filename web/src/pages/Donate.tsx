@@ -96,11 +96,13 @@ interface FormState {
   note: string;
   /** 위키 장비의 범위 옵션마다 적은 값 (옵션 이름 -> 글자) */
   opts: Record<string, string>;
+  /** 범위 옵션이 없는 것(위키에 없는 물건 등)의 옵션 줄글 ('지3 마재2', 서버가 '지능 3 · 마나재생 2' 로 통일) */
+  optText: string;
   /** 속성부여 ('힘', 값) */
   ench: Enchant | null;
   enchVal: number | null;
 }
-const EMPTY: FormState = { item: "", qty: "1", enhance: "0", gold: "", note: "", opts: {}, ench: null, enchVal: null };
+const EMPTY: FormState = { item: "", qty: "1", enhance: "0", gold: "", note: "", opts: {}, optText: "", ench: null, enchVal: null };
 /** '명중 9 · 크리티컬 4' -> { 명중: '9', 크리티컬: '4' } */
 const optsOf = (s: string | null) =>
   Object.fromEntries(
@@ -120,6 +122,7 @@ const fromRow = (r: DonateRow, gold: number | null): FormState => {
     gold: gold === null ? "" : String(gold),
     note: r.note ?? "",
     opts: optsOf(r.options),
+    optText: r.options ?? "",
     ench: ench?.key ?? null,
     enchVal: ench && em ? Number(em[2]) : null,
   };
@@ -148,13 +151,13 @@ function toInput(f: FormState, wiki: Wiki | null): DonateInput | string {
   if (!Number.isInteger(enhance) || enhance < 0 || enhance > 20) return "강화는 0~20 이에요";
   if (gold !== null && (!Number.isInteger(gold) || gold < 0)) return "골드 가치가 맞지 않아요";
   // 옵션은 위키 장비의 범위 옵션 중 적은 것만 (0 은 뺀다), 이름도 위키 이름으로
-  const options = gear
+  const options = gear?.facts.options.rolls.length
     ? gear.facts.options.rolls
         .map((r) => [r.name, num(f.opts[r.name] ?? ""), r.unit] as const)
         .filter(([, v]) => v !== null && Number.isFinite(v) && v > 0)
         .map(([n, v, u]) => `${n} ${v}${u}`)
         .join(" · ")
-    : "";
+    : f.optText.trim();
   const e = gear?.enchant && f.ench && f.enchVal !== null ? `${ENCHANTS.find((x) => x.key === f.ench)!.name} ${f.enchVal}` : "";
   return { item: gear ? gear.it.name : f.item.trim(), qty, enhance, gold, note: f.note.trim(), options, enchant: e };
 }
@@ -251,7 +254,10 @@ function DonateFields({ wiki, f, set, goldLabel = "골드 가치" }: { wiki: Wik
           </small>
         )}
       </label>
-      <input className="dn-note" value={f.note} maxLength={100} placeholder={gear ? "메모" : "옵션·메모 (줄글)"} onChange={(e) => set({ ...f, note: e.target.value })} />
+      {rolls.length === 0 && (
+        <input className="dn-note" value={f.optText} maxLength={100} placeholder="옵션 (예: 지3 마재2)" onChange={(e) => set({ ...f, optText: e.target.value })} />
+      )}
+      <input className="dn-note" value={f.note} maxLength={100} placeholder="메모" onChange={(e) => set({ ...f, note: e.target.value })} />
     </div>
   );
 }
