@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useEntryState } from "../router";
 import { errorText } from "../auth";
 import { KIND_NAME, VIA_NAME, actionText, fetchActivity, fetchUsage, pageName, sectionOf } from "../activity";
 import type { ActivityRow, DeviceInfo, Kind, LogDbInfo, OverlapInfo, Person, Storage } from "../activity";
@@ -75,8 +76,8 @@ export function ActivityLogPage({ wiki, role }: { wiki: Wiki; role: string }) {
     r.kind === "view" ? pageName(r.what, wiki, r.detail).replace(/^(게시판|게시판 글|아이모 소식 글|글|사냥터|몬스터|아이템|메뉴|장비|검색): /, "") : actionText(r.what, r.detail, r.at);
   const lineText = (r: ActivityRow) =>
     r.kind === "visit" ? "🟢 접속" : r.kind === "view" ? `📖 ${pageName(r.what, wiki, r.detail)}` : `✏️ ${actionText(r.what, r.detail, r.at)}`;
-  const [user, setUser] = useState<string | null>(null);
-  const [kind, setKind] = useState<Kind | null>(null);
+  const [user, setUser] = useEntryState<string | null>("log.user", null);
+  const [kind, setKind] = useEntryState<Kind | null>("log.kind", null);
   const [rows, setRows] = useState<ActivityRow[] | null>(null);
   const [devices, setDevices] = useState<DeviceInfo[] | null>(null);
   const [overlaps, setOverlaps] = useState<OverlapInfo[] | null>(null);

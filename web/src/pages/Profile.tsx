@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useEntryState } from "../router";
 import { createPortal } from "react-dom";
 import { KakaoBubble, KakaoButton, KakaoField, useKakao } from "../kakao";
 import type { FormEvent, ReactNode } from "react";
@@ -257,10 +258,11 @@ function MeGroup({ title, children }: { title: string; children: ReactNode }) {
 export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) => void; onLogout: () => void }) {
   const [saved, setSaved] = useState(false);
   // '#/me?open=kakao' 처럼 줄을 펼친 채로 연다 (내 글의 흐린 '카톡'을 누르면 카톡 오픈프로필로)
-  const [open, setOpen] = useState<MenuKey | null>(() => {
-    const k = new URLSearchParams(location.hash.split("?")[1] ?? "").get("open");
-    return k === "kakao" || k === "photo" || k === "info" || k === "weather" || k === "alerts" ? k : null;
-  });
+  const asked = new URLSearchParams(location.hash.split("?")[1] ?? "").get("open");
+  const [open, setOpen] = useEntryState<MenuKey | null>(
+    "me.open",
+    asked === "kakao" || asked === "photo" || asked === "info" || asked === "weather" || asked === "alerts" ? asked : null,
+  );
   const { links } = useKakao();
   const [wxOn, setWxOn] = useState(weatherOn);
   const [phone, setPhone] = useState<PushState | null>(null);
