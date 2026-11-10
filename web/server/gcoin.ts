@@ -14,7 +14,7 @@ import type { Env, User } from "./auth";
 import { RANK, TEST_IDS } from "./auth";
 import { notify } from "./alerts";
 import { realStart } from "./growth";
-import { WEEK, weekStart } from "./week";
+import { WEEK, growthWeekStart, weekStart } from "./week";
 
 /** 2026-11-11(수) 11:00 한국 시간에 모두에게 연다 (제작자 2026-11-10 '11/11 오전 11시 오픈 예약'). 그 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만.
  * 화면 launcher.ts 의 GCOIN_OPEN_AT·canGcoin 과 같이 바꾼다. 첫 주간 목표 판도 이때 시작한다 (server/gcrace.ts) */
@@ -120,7 +120,7 @@ export function orderLabel(
 }
 export const MAX_QTY = 20;
 
-/** 한 주(목요일 오전 10시부터, weekStart)에 한 사람이 신청할 수 있는 낱개 상한 (제작자 2026-11-10 '사멧은 1주에 구매 가능 상한을 30개로, 낱개 단위로 30개, 통 말고').
+/** 한 주(월요일 0시 ~ 일요일 24시, growthWeekStart. 제작자 2026-11-10 '한 주는 월요일 0시부터 일요일 24시')에 한 사람이 신청할 수 있는 낱개 상한 (제작자 2026-11-10 '사멧은 1주에 구매 가능 상한을 30개로, 낱개 단위로 30개, 통 말고').
  * 키는 띄어쓰기 없는 이름. 기다리는 중·지급 완료한 신청을 센다 (반려·취소는 빼서 다시 살 수 있다). 화면 src/gcoin.ts 는 /api/gcoin 의 caps 를 그대로 쓴다 */
 export const WEEKLY_CAP: Record<string, number> = { 사나운멧돼지인형: 30 };
 export const capKey = (name: string) => name.replace(/\s/g, "");
@@ -130,7 +130,7 @@ export async function weekBought(env: Env, userId: string, now = Date.now()): Pr
   const { results } = await env.DB.prepare(
     "SELECT name, unit, qty FROM gc_orders WHERE user_id = ? AND status IN ('pending', 'done') AND created_at >= ?",
   )
-    .bind(userId, weekStart(now))
+    .bind(userId, growthWeekStart(now))
     .all<{ name: string; unit: string | null; qty: number }>();
   const out: Record<string, number> = {};
   for (const r of results) {

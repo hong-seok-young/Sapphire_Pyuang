@@ -394,7 +394,7 @@ function ShopTab({
   useBackClose(picked !== null, () => setPicked(null));
   const balance = wallet?.balance ?? 0;
   const total = picked ? picked.price * qty : 0;
-  // 한 주 상한 (사나운 멧돼지 인형 30개, 제작자 2026-11-10): 남은 낱개 안에서만 묶음을 더한다
+  // 한 주(월 0시 ~ 일 24시) 상한 (사나운 멧돼지 인형 30개, 제작자 2026-11-10): 남은 낱개 안에서만 묶음을 더한다
   const capOf = (it: GcItem) => {
     const k = it.name.replace(/\s/g, "");
     const cap = data.caps?.[k];
@@ -502,11 +502,11 @@ function ShopTab({
           >
             <Coin />
             <PopNum n={total} />
-            &nbsp;{busy ? "…" : wallet && maxQty < 1 ? "이번 주 끝" : wallet && total > balance ? "부족" : "신청"}
+            &nbsp;{busy ? "…" : wallet && maxQty < 1 ? "한도 끝" : wallet && total > balance ? "부족" : "신청"}
           </button>
           {pickedCap && (
             <small className="gc-cap">
-              한 주 {pickedCap.cap}개까지{wallet ? ` · 남은 ${pickedCap.left}개` : ""}
+              이번주 구매한도 ({Math.ceil((pickedCap.cap - pickedCap.left) / qtyOf(picked.unit))}/{Math.floor(pickedCap.cap / qtyOf(picked.unit))})
             </small>
           )}
           {error && <p className="form-error">{error}</p>}

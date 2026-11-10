@@ -27,7 +27,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const want = unitCount(item.unit) * qty;
   if (cap !== undefined) {
     const had = (await weekBought(env, me.id))[key] ?? 0;
-    if (had + want > cap) return json({ error: `${item.name}은 한 주에 ${cap}개까지예요 (이번 주 ${had}개 신청)` }, 409);
+    const u = unitCount(item.unit);
+    if (had + want > cap) return json({ error: `이번주 구매한도 (${Math.ceil(had / u)}/${Math.floor(cap / u)})` }, 409);
   }
   const [w] = await wallets(env, await readCurve(env), me.id);
   const cost = item.price * qty;
@@ -40,7 +41,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const over = cap !== undefined && ((await weekBought(env, me.id))[key] ?? 0) > cap;
   if (!after || after.balance < 0 || over) {
     await env.DB.prepare("DELETE FROM gc_orders WHERE id = ?").bind(Number(ins.meta.last_row_id)).run();
-    return json({ error: over ? `${item.name}은 한 주에 ${cap}개까지예요` : `성장코인이 모자라요 (가진 코인 ${w.balance}, 필요 ${cost})` }, 409);
+    return json({ error: over ? "이번주 구매한도를 넘었어요" : `성장코인이 모자라요 (가진 코인 ${w.balance}, 필요 ${cost})` }, 409);
   }
   const label = orderLabel(item.name, item.unit, qty);
   await notifyStaff(env, `${me.id}님의 성장코인 구매 신청 · ${label} (${cost}코인)`, me.id);
