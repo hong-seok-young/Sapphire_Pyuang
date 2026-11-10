@@ -62,6 +62,17 @@ def main() -> None:
         for n, f in pics.items():
             shutil.copy2(f, out_pics / f"{n}.png")
     no_pic = sorted(n for n in names if n not in wiki and n not in pics)
+    # 영상 툴팁에서 받아 적은 아이템 정보(요구 레벨·방어력·옵션, 재료면 설명). 같은 이름의 다른 칸에만 적힌 것도 쓴다 (제작자 2026-11-10 '이미지랑 내용 장비옵션 다 db화')
+    def clean_info(t: str) -> str:
+        return re.sub(r"\s*\([^)]*(파란|글씨|색)[^)]*\)", "", t or "").strip()
+    infos: dict[str, str] = {}
+    for e in raw["entries"]:
+        for it in e["items"]:
+            n, t = it.get("name"), clean_info(it.get("info"))
+            if n and t:
+                k = key(re.sub(r"^\+\d+\s*", "", n))
+                if len(t) > len(infos.get(k, "")):
+                    infos[k] = t
     entries = []
     # 기간이 있는 이벤트성 도감(특정 기간만 효과)은 계산기에서 다루지 않는다 (제작자 2026-11-10 '이벤트성 도감은 취급하지 않음').
     # 자료 파일에는 기록으로 남겨 둔다
@@ -88,6 +99,9 @@ def main() -> None:
                 d["sg"] = "불가"
             if base and key(base) in pics:
                 d["pic"] = f"/data/dex/{key(base)}.png"
+            info = clean_info(it.get("info")) or (infos.get(key(base)) if base else None)
+            if info:
+                d["info"] = info
             items.append(d)
         entries.append({"name": e["name"], "effects": [effect(s, v) for s, v in e["effects"]],
                         "period": e.get("period"), "items": items, **({"cat": e["category"]} if e.get("category") else {})})
@@ -95,7 +109,8 @@ def main() -> None:
     data = {"source": raw.get("source", "게임 도감 퀘스트 (제작자 영상)"), "built": date.today().isoformat(), "order": order, "entries": entries}
     (OUT / "dex.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print("도감 계산기", {"항목": len(entries), "뺀 이벤트 도감": len(events), "아이템 칸": sum(len(e["items"]) for e in entries),
-                     "이름 모름": sum(1 for e in entries for i in e["items"] if not i["name"]), "그림": len(pics), "그림 없음": no_pic,
+                     "이름 모름": sum(1 for e in entries for i in e["items"] if not i["name"]), "그림": len(pics),
+                     "정보 없는 칸": sum(1 for e in entries for i in e["items"] if i["name"] and not i.get("info")), "그림 없음": no_pic,
                      "순서표에 없는 능력치": unknown})
 
 

@@ -5056,6 +5056,8 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 /* 도감 계산기: 칸을 누르면 그 줄 아래 상세 (이름 · 개수 · 강화 · 대체 스탬프) */
 .dex-detail { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; padding: 3px 0 1px 28px; font-size: 11px; border-top: 1px dashed rgba(169, 162, 207, 0.2); }
 .dex-detail .dex-stamp { font-size: 10px; margin: 0; }
+.dex-info { flex-basis: 100%; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.dex-info small { font-size: 10.5px; color: var(--muted, #a9a2cf); overflow-wrap: anywhere; }
 .dex-find { margin-left: auto; padding: 1px 6px; font-size: 10px; border-color: rgba(169, 162, 207, 0.35); }
 .dex-entry-wide .dex-items { grid-column: 2 / -1; flex-wrap: wrap; justify-content: flex-start; }
 /* 도감 계산기: 획득 옵션 좌우 두 칸 (비슷한 능력치끼리 짝, 슬라이더 없음) */
