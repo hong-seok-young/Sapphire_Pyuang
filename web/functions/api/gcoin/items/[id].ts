@@ -7,7 +7,7 @@ import { MAX_GOLD, MAX_NAME, MAX_UNIT, coinOfGold, canManageGcoin, canUseGcoin, 
 async function guard(env: Env, request: Request, params: Record<string, string | string[]>) {
   const me = await currentUser(env, request);
   if (!me) return { res: NEED_LOGIN() };
-  if (!canUseGcoin(me) || !canManageGcoin(me.role)) return { res: FORBIDDEN() };
+  if (!canUseGcoin(me) || !canManageGcoin(me)) return { res: FORBIDDEN() };
   const id = Number(paramId(params));
   const it = Number.isInteger(id)
     ? await env.DB.prepare("SELECT id, name, unit, price, gold, active FROM gc_items WHERE id = ?").bind(id).first<{

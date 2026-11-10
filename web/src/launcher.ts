@@ -49,6 +49,8 @@ export interface LaunchItem {
   developer?: boolean;
   /** 길드마스터와 앱개발자만 (사용 기록, 챗봇 개선: 제작자 요청 2026-11-02 '길드마스터도 보이게') */
   masters?: boolean;
+  /** 플래티넘 할인 상점: 상점 설정의 '오픈'을 켜기 전에는 운영진만 (개발 중 묶음에 넣지 않고 제자리) */
+  shopGate?: boolean;
 }
 
 /** 운영진 때리기를 모두에게 열었는지 (서버 server/smack.ts SMACK_OPEN 과 같이 바꾼다) */
@@ -86,7 +88,8 @@ export const ITEMS: LaunchItem[] = [
   { key: "info", title: "정보", to: "#/info", icon: "📚", pic: "info", match: ["info", "menu", "post", "places", "place", "equip", "odds"] },
   { key: "chat", title: "챗봇", to: "#/chat", icon: "💬", pic: "chat", match: ["chat"] },
   // 1군 전용 플래티넘 할인 상점 (제작자 요청). 아이콘은 게임 첫 화면의 상점 그림. '1군 전용'은 왼쪽 위 띠로
-  { key: "shop", title: "플래티넘 할인 상점", short: "상점", to: "#/shop", icon: "🏪", iconPic: "/data/shop/shop_icon.png", ribbon: "1군 전용", ring: "gold", match: ["shop"] },
+  // 계획 보류 (제작자 2026-11-10 '운영진하고 나만 보이게, 개발 중 탭으로 두지 말고 위에 두되 오픈하면 그때 길드원 전체에'): 상점 설정의 '오픈'을 켜기 전에는 운영진만 (shopGate, /api/me 의 shopOpen)
+  { key: "shop", title: "플래티넘 할인 상점", short: "상점", to: "#/shop", icon: "🏪", iconPic: "/data/shop/shop_icon.png", ribbon: "1군 전용", ring: "gold", shopGate: true, match: ["shop"] },
   // To do: 이벤트를 안 읽어도 내 직업·레벨에 맞는 오늘·이번 주 할 일 (제작자 요청 2026-11-01, pages/Todo.tsx)
   // To do: 2026-11-02 열었다 (제작자 요청 '투두도 오픈')
   { key: "todo", title: "To do", to: "#/todo", icon: "✅", match: ["todo"] },
@@ -166,7 +169,7 @@ export const isLocked = (item: LaunchItem, me: Me) => !!item.locked && !canPrevi
 
 /** 이 사람에게 보이는 칸인지 */
 export const canSee = (item: LaunchItem, me: Me) =>
-  (!item.androidOnly || (isAndroid && !inApp)) && (!item.managers || RANK[me.role] >= 1) && (!item.developer || me.role === "developer") && (!item.masters || RANK[me.role] >= 2);
+  (!item.androidOnly || (isAndroid && !inApp)) && (!item.managers || RANK[me.role] >= 1) && (!item.shopGate || me.shopOpen === true || RANK[me.role] >= 1) && (!item.developer || me.role === "developer") && (!item.masters || RANK[me.role] >= 2);
 
 /** 'UPDATE' 를 달지 (updates.ts). '정보'는 안의 칸이 고쳐졌을 때도 */
 export const isUpdated = (user: string, item: LaunchItem) =>

@@ -25,9 +25,12 @@ export const gcoinOpen = (now = Date.now()) => now >= GCOIN_OPEN_AT;
 export const LEVEL_COINS = false;
 export const canUseGcoin = (me: User) =>
   gcoinOpen() || RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
-/** 신청 처리, 설정, 코인 조정: 오피서 이상 */
-export const canManageGcoin = (role: User["role"]) =>
-  role === "developer" || role === "master" || role === "officer";
+/** 담당자 (제작자 2026-11-10 '담당자는 유어아너', '유어아너만 조정 가능하게 해 줘 담당자 메뉴는', '길마도 할 수 있게'). 사람(묶은 캐릭터 모두)으로 정한다:
+ * 담당이 바뀌거나 닉네임을 바꾸면 여기와 화면 launcher.ts gcoin 칸의 corner 를 고친다 */
+export const GCOIN_STAFF = ["유어아너"];
+/** 신청 처리, 목표, 보상, 물건, 코인 조정: 담당자·길드마스터·앱개발자만 (다른 오피서는 아니다) */
+export const canManageGcoin = (me: User) =>
+  me.role === "developer" || me.role === "master" || (me.chars ?? [me.id, me.owner ?? me.id]).some((c) => GCOIN_STAFF.includes(c));
 
 /** 레벨 하나 오를 때의 코인 기본값 (min 레벨 이상이면 그 값). 20 아래는 신경 쓰지 않는다 (제작자) */
 export const DEFAULT_LEVELS: { minLevel: number; coin: number }[] = [
@@ -519,7 +522,9 @@ export async function notifyStaff(
   from: string,
 ): Promise<void> {
   const { results } = await env.DB.prepare(
-    "SELECT DISTINCT COALESCE(main_id, id) AS id FROM users WHERE role IN ('officer', 'master', 'developer')",
+    "SELECT DISTINCT COALESCE(main_id, id) AS id FROM users WHERE role IN ('developer', 'master') OR COALESCE(main_id, id) IN (SELECT COALESCE(main_id, id) FROM users WHERE id IN (" +
+      GCOIN_STAFF.map((n) => `'${n.replace(/'/g, "''")}'`).join(", ") +
+      "))",
   ).all<{ id: string }>();
   await notify(
     env,

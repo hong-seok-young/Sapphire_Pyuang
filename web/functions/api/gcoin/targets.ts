@@ -8,7 +8,7 @@ import { targetRound } from "../../../server/gcrace";
 export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  if (!canUseGcoin(me) || !canManageGcoin(me.role)) return FORBIDDEN();
+  if (!canUseGcoin(me) || !canManageGcoin(me)) return FORBIDDEN();
   const b = await readJson<{ userId: unknown; target: unknown }>(request);
   const userId = typeof b.userId === "string" ? b.userId : "";
   if (!userId || !(await isMember(env, userId))) return json({ error: "2군 본캐가 아니에요" }, 400);

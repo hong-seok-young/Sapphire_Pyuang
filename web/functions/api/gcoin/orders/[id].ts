@@ -38,7 +38,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
     await set("cancel", null);
     return json({ ok: true });
   }
-  if (!canManageGcoin(me.role)) return FORBIDDEN();
+  if (!canManageGcoin(me)) return FORBIDDEN();
   if (b.action === "done") {
     const r = await set("done", null);
     if (r.meta.changes) await notify(env, [o.user_id], "gcoin", `성장코인샵 지급 완료 · ${label}`, "#/gcoin?t=mine", me.id);

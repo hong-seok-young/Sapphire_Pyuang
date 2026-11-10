@@ -66,6 +66,8 @@ export interface Me {
   characters?: Character[];
   /** 운영진 승낙을 기다리는 캐릭터 추가 요청 (닉네임) */
   pendingCharacters?: string[];
+  /** 플래티넘 할인 상점을 열었는지 (설정의 '오픈'). 열기 전에는 홈 칸이 운영진에게만 보인다 */
+  shopOpen?: boolean;
 }
 
 /** 같은 사람의 캐릭터 하나 (부캐 묶기, 제작자 요청 2026-11-01) */

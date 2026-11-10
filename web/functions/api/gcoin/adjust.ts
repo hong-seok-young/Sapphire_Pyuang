@@ -7,7 +7,7 @@ import { MAX_NOTE, canManageGcoin, canUseGcoin, gcoinOpen, int, isMember, text }
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  if (!canUseGcoin(me) || !canManageGcoin(me.role)) return FORBIDDEN();
+  if (!canUseGcoin(me) || !canManageGcoin(me)) return FORBIDDEN();
   const b = await readJson<{ userId: unknown; delta: unknown; note: unknown }>(request);
   const userId = typeof b.userId === "string" ? b.userId : "";
   const delta = int(b.delta, -100_000, 100_000);

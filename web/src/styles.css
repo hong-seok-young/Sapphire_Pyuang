@@ -1168,6 +1168,9 @@ button { font: inherit; color: inherit; }
 .tile-ring.tile-soon > .tile-ribbon, .tile-ring.tile-soon > .tile-badge { padding: 0 3px; font-size: 9px; line-height: 14px; }
 .tile-ring.tile-soon > .tile-ribbon { left: 3px; }
 .tile-ring.tile-soon > .tile-badge { right: 3px; }
+/* 오른쪽 위 담당자 글자 (성장코인샵 '담당자 유어아너'): 띠·빛 칸에서도 제자리에, 개발 중 표가 있으면 그 아래 */
+.tile-ring > .tile-corner { position: absolute; z-index: 3; }
+.tile-soon > .tile-corner { top: 19px; right: 4px; z-index: 4; text-shadow: -1px 0 var(--edge), 1px 0 var(--edge), 0 -1px var(--edge), 0 1px var(--edge); }
 .tile-ring::before {
   content: ""; position: absolute; z-index: 0; left: 50%; top: 50%; width: 220%; aspect-ratio: 1; pointer-events: none;
   background: conic-gradient(transparent 0 62%, var(--ring-a) 74%, var(--ring-b) 80%, var(--ring-a) 86%, transparent 96%);

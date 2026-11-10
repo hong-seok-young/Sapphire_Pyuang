@@ -6,7 +6,7 @@ import { MAX_GOLD, MAX_NAME, MAX_UNIT, canManageGcoin, canUseGcoin, coinOfGold, 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  if (!canUseGcoin(me) || !canManageGcoin(me.role)) return FORBIDDEN();
+  if (!canUseGcoin(me) || !canManageGcoin(me)) return FORBIDDEN();
   const b = await readJson<{ name: unknown; unit: unknown; gold: unknown }>(request);
   const name = text(b.name, MAX_NAME);
   const unit = text(b.unit, MAX_UNIT);

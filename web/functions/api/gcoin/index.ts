@@ -40,7 +40,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!canUseGcoin(me)) return FORBIDDEN();
-  const manage = canManageGcoin(me.role);
+  const manage = canManageGcoin(me);
   const curve = await readCurve(env);
   // 끝난 주의 순위 보너스 (아직이면 지금 한 번)
   await settleWeeks(env, curve);

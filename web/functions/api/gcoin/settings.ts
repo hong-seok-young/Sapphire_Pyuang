@@ -6,7 +6,7 @@ import { canManageGcoin, canUseGcoin, int } from "../../../server/gcoin";
 export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  if (!canUseGcoin(me) || !canManageGcoin(me.role)) return FORBIDDEN();
+  if (!canUseGcoin(me) || !canManageGcoin(me)) return FORBIDDEN();
   const b = await readJson<{ levels: unknown; rank: unknown }>(request);
   const stmts: D1PreparedStatement[] = [];
   if (b.levels !== undefined) {
