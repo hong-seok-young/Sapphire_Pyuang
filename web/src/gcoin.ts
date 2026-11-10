@@ -252,7 +252,8 @@ export function itemPic(name: string): string | null {
   let key = name.replace(/\s/g, "");
   if (/멧돼지/.test(key)) key = "사나운멧돼지인형";
   if (/피닉스|피닉|피심/.test(key)) key = "피닉스의심장";
-  return PICS.has(key) ? `/data/gcoin/${encodeURIComponent(key)}.png` : null;
+  // ?v=2: 밝은 칸으로 바꾼 그림 (2026-11-10, 하루 캐시라 바로 새 그림을 받게. 그림을 다시 바꾸면 올린다)
+  return PICS.has(key) ? `/data/gcoin/${encodeURIComponent(key)}.png?v=2` : null;
 }
 
 /** 물건 옵션 (게임 정보창 그대로, 고정이라 관리자가 적지 않는다. 제작자 2026-11-09 '옵션은 고정인데, 상점에서 템을 누르면 옵션이 뜨게').
