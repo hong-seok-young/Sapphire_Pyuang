@@ -4884,7 +4884,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .dex-item { display: flex; flex-direction: column; align-items: center; width: 50px; padding: 0; font: inherit; color: var(--text); background: none; border: 0; cursor: pointer; }
 .dex-slot { position: relative; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; background: rgba(7, 6, 15, 0.45); border: 1px solid rgba(169, 162, 207, 0.3); }
 .dex-slot img { image-rendering: pixelated; }
-.dex-pic { max-width: 30px; max-height: 30px; image-rendering: pixelated; }
+.dex-pic { width: 30px; height: 30px; object-fit: contain; image-rendering: pixelated; }
 .dex-noimg { font-size: 14px; color: var(--muted); }
 .dex-plus { position: absolute; top: 0; right: 1px; font-style: normal; font-size: 9px; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000; }
 .dex-n { position: absolute; bottom: 0; right: 1px; font-style: normal; font-size: 9px; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000; }

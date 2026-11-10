@@ -38,14 +38,30 @@ def main() -> None:
     import build_trend
     order = [name for name, _ in build_trend.DEX_ORDER]
     raw = json.loads(SRC.read_text(encoding="utf-8"))
-    pics = {f.stem: f for f in PICS.glob("*.png")} if PICS.exists() else {}
+    # 위키 아이템 표(items.json · equipment.json)에 그림이 없는 아이템의 그림 (제작자 2026-11-10 '이미지 왜 없어? 다 영상에 있는데'):
+    # 영상의 도감 등록 창에서 자른 것(자료/이미지/도감) -> 자료/이미지/아이템/<이름>.png (카페 글 그림, 위키 표에는 안 올라간 것)
+    key = lambda s: re.sub(r"\[[^\]]*\]|\([^)]*\)|\s", "", s or "")
+    wiki = set()
+    for name, fn in (("items.json", lambda d: d.values()), ("equipment.json", lambda d: (r for t in d for r in t["rows"]))):
+        p = OUT / name
+        if p.exists():
+            wiki |= {key(r["name"]) for r in fn(json.loads(p.read_text(encoding="utf-8"))) if r.get("icon")}
+    crops = {key(f.stem): f for f in PICS.glob("*.png")} if PICS.exists() else {}
+    item_dir = ROOT / "자료" / "이미지" / "아이템"
+    cafe = {}
+    if item_dir.exists():
+        for f in item_dir.glob("*.png"):
+            cafe.setdefault(key(f.stem.rstrip("(")), f)
+    names = {key(re.sub(r"^\+\d+\s*", "", it["name"])) for e in raw["entries"] for it in e["items"] if it.get("name")}
+    pics = {n: crops.get(n) or cafe.get(n) for n in names if n not in wiki and (crops.get(n) or cafe.get(n))}
     out_pics = OUT / "dex"
     if out_pics.exists():
         shutil.rmtree(out_pics)
     if pics:
         out_pics.mkdir(parents=True)
-        for f in pics.values():
-            shutil.copy2(f, out_pics / f.name)
+        for n, f in pics.items():
+            shutil.copy2(f, out_pics / f"{n}.png")
+    no_pic = sorted(n for n in names if n not in wiki and n not in pics)
     entries = []
     # 기간이 있는 이벤트성 도감(특정 기간만 효과)은 계산기에서 다루지 않는다 (제작자 2026-11-10 '이벤트성 도감은 취급하지 않음').
     # 자료 파일에는 기록으로 남겨 둔다
@@ -70,8 +86,8 @@ def main() -> None:
                 d["sg"], d["sn"] = (m.group(1) or "") + m.group(2).upper(), int(m.group(3))
             elif "불가" in st:
                 d["sg"] = "불가"
-            if base and base in pics:
-                d["pic"] = f"/data/dex/{base}.png"
+            if base and key(base) in pics:
+                d["pic"] = f"/data/dex/{key(base)}.png"
             items.append(d)
         entries.append({"name": e["name"], "effects": [effect(s, v) for s, v in e["effects"]],
                         "period": e.get("period"), "items": items, **({"cat": e["category"]} if e.get("category") else {})})
@@ -79,7 +95,7 @@ def main() -> None:
     data = {"source": raw.get("source", "게임 도감 퀘스트 (제작자 영상)"), "built": date.today().isoformat(), "order": order, "entries": entries}
     (OUT / "dex.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print("도감 계산기", {"항목": len(entries), "뺀 이벤트 도감": len(events), "아이템 칸": sum(len(e["items"]) for e in entries),
-                     "이름 모름": sum(1 for e in entries for i in e["items"] if not i["name"]), "그림": len(pics),
+                     "이름 모름": sum(1 for e in entries for i in e["items"] if not i["name"]), "그림": len(pics), "그림 없음": no_pic,
                      "순서표에 없는 능력치": unknown})
 
 
