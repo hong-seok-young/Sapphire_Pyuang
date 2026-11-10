@@ -15,6 +15,7 @@ import {
   setMyCharacters,
 } from "./characters";
 import { resetFavorites } from "./favorites";
+import { peekMemo, putMemo } from "./memo";
 import { DevSoon, FitLine, PixelIcon, Loading, NotFound } from "./ui";
 import { Home, HomeCorner, InfoPage, TileIcon } from "./pages/Home";
 import { HomeWeather } from "./pages/Weather";
@@ -160,6 +161,28 @@ function prefetchPages(staff: boolean, master: boolean) {
     if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(fn, { timeout: 3000 });
     else window.setTimeout(fn, 300);
   };
+  // 자주 여는 목록의 자료를 먼저 미리 받아 두고 그다음 화면 조각을 받는다 (제작자 2026-11-10 '화면 전환·진입이 반응이 늦어'):
+  // 처음 들어갈 때도 받아 둔 것을 바로 보이고 뒤에서 새로 받는다 (src/memo.ts, 각 화면의 useAsync·peekMemo 와 같은 이름)
+  const data: [string, () => Promise<unknown>][] = [
+    ["board:null||", () => import("./board").then((m) => m.fetchPosts({ cat: null, q: "", mine: false })).then((r) => ({ posts: r.posts, more: r.more }))],
+    ["ranking", () => import("./auth").then((m) => m.fetchRanking())],
+    ["market", () => import("./market").then((m) => m.fetchMarket())],
+    ["gold", () => import("./gold").then((m) => m.fetchGold())],
+    ["requests", () => import("./requests").then((m) => m.fetchRequests())],
+  ];
+  const warm = () => {
+    const d = data.shift();
+    if (stop) return;
+    if (!d) return idle(next);
+    const [key, get] = d;
+    if (peekMemo(key) !== undefined) return warm();
+    void get()
+      .then((v) => peekMemo(key) === undefined && putMemo(key, v))
+      .catch(() => undefined)
+      .then(() => {
+        timer = window.setTimeout(() => idle(warm), 150);
+      });
+  };
   const next = () => {
     const k = list.shift();
     if (stop || !k) return;
@@ -169,7 +192,7 @@ function prefetchPages(staff: boolean, master: boolean) {
         timer = window.setTimeout(() => idle(next), 150);
       });
   };
-  timer = window.setTimeout(() => idle(next), 1500);
+  timer = window.setTimeout(() => idle(warm), 1500);
   return () => {
     stop = true;
     window.clearTimeout(timer);

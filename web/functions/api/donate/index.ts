@@ -29,7 +29,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   ]);
   const mineRow = hall.rows.find((h) => h.names.some((n) => chars.includes(n))) ?? null;
   // 남은 💎 는 앞 30명만 세어 두므로 내 것은 따로 (장비대여 보증금으로 쓴 것까지 뺀 지금 값)
-  if (mineRow) mineRow.mileage = await mileageOfName(env, mineRow.name);
+  // 앞 30명은 명예의 전당이 이미 셈했다
+  if (mineRow && hall.rows.indexOf(mineRow) >= 30) mineRow.mileage = await mileageOfName(env, mineRow.name);
   return json({
     manage,
     me: mineRow,

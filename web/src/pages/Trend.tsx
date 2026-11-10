@@ -733,3 +733,49 @@ export function TrendPage({ wiki }: { wiki: Wiki }) {
     </>
   );
 }
+
+/**
+ * 챗봇 답 속 시세 칸 (제작자 2026-11-10 '챗봇에서 시세를 물어보면 시세 동향 화면 그대로 띄워 줄 수 있나'): [[시세:물건 이름]] · [[시세:골드]].
+ * 시세 동향 화면과 같은 칸(물건 줄을 펼친 채로 날짜 그림 · 묶음 표 · 올린 사람 · 원글, 골드는 골드 시세 칸)을 그대로 그린다. 이름은 물건 이름이나 톡방 줄임말, 못 찾으면 아무것도 안 그린다
+ */
+let trendOnce: Promise<Trend> | null = null;
+const loadTrendOnce = () => (trendOnce ??= loadTrend().catch((e) => { trendOnce = null; throw e; }));
+const keyOf = (x: string) => x.replace(/\s*\(.*\)\s*$/, "").replace(/\s/g, "").toLowerCase();
+function findItem(list: TrendItem[], q: string): TrendItem | undefined {
+  const k = keyOf(q);
+  return (
+    list.find((it) => keyOf(it.name) === k) ??
+    list.find((it) => it.name.replace(/\s/g, "").toLowerCase() === q.replace(/\s/g, "").toLowerCase()) ??
+    list.find((it) => it.abbr.some((a) => a.toLowerCase() === k))
+  );
+}
+export function TrendSnippet({ query, wiki }: { query: string; wiki: Wiki }) {
+  const { data: t } = useAsync(useCallback(() => loadTrendOnce(), []));
+  const sellIt = t ? findItem(t.items, query) : undefined;
+  const buyIt = t ? findItem(t.itemsBuy, query) : undefined;
+  const [side, setSide] = useState<"sell" | "buy">("sell");
+  const [open, setOpen] = useState(true);
+  if (!t) return null;
+  if (/^골드$|골드\s*시세/.test(query.trim())) return <div className="trend-snip"><GoldPanel t={t} /></div>;
+  const shown = side === "sell" ? (sellIt ?? buyIt) : (buyIt ?? sellIt);
+  if (!shown) return null;
+  const nowSide = shown === sellIt ? "sell" : "buy";
+  return (
+    <div className="trend-snip">
+      {sellIt && buyIt && (
+        <div className="mk-sub trend-strip">
+          <div className="mk-side" role="tablist">
+            {(["sell", "buy"] as const).map((x) => (
+              <button key={x} type="button" role="tab" aria-selected={nowSide === x} className={"sub-tab" + (nowSide === x ? " sub-tab-on" : "")} onClick={() => setSide(x)}>
+                {x === "sell" ? "팝니다" : "삽니다"} <small>{(x === "sell" ? sellIt : buyIt).n}</small>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <ul className="mk-list trend-list">
+        <ItemRow key={nowSide} it={shown} t={t} wiki={wiki} side={nowSide} open={open} onToggle={() => setOpen(!open)} />
+      </ul>
+    </div>
+  );
+}

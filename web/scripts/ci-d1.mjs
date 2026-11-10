@@ -10,8 +10,9 @@
 // 3, 4 의 계정은 처음 로그인하면 비밀번호를 바꾸게 한다. 그 밖의 길드원은 '길드원 관리'에서 만든다.
 // 공개 저장소라 실행 기록을 누구나 볼 수 있으므로 비밀번호, 해시, SQL 은 화면에 찍지 않는다.
 import { execFileSync } from "node:child_process";
-import { pbkdf2Sync, randomBytes } from "node:crypto";
+import { createHash, pbkdf2Sync, randomBytes } from "node:crypto";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { CONTROL_KEY, controlNoticeSql } from "./controlNotice.mjs";
 
 const DB = "sapphire-accounts";
 const DEVELOPER = "퓨앙";
@@ -358,6 +359,28 @@ runSql([
 wrangler("d1", "execute", DB, "--remote", "--yes", "--command", "CREATE INDEX IF NOT EXISTS official_news_added ON official_news (added_at)");
 
 // 아이모 소식 새 글 배지·알림 (제작자 요청 2026-11-02: '새 이벤트 수집했으니 게시판 배지 다시 띄워 줘, 웹 알림도'): added_at 칸이 생기기 전에 들어온 글 중
+// 장비대여 담당자 오픈채팅 링크 (제작자 2026-11-10 '멍멍 오픈채팅 이걸로 링크 연결해', 장비대여 안내 pages/RentNotice.tsx): 사람의 연락처라 공개 저장소에 적지 않고
+// 비공개 자료 길드/장비대여/담당자_오픈채팅.txt('닉네임 링크' 한 줄씩)를 그 계정의 카톡 링크(users.kakao: 안내 창·전광판·'담당자 카톡' 단추가 쓴다)로 넣는다.
+// 링크마다 한 번 (setup 'kakao_link_<닉네임>_<링크 해시>'): 그 뒤 본인이 '내 정보'에서 바꾼 것은 덮지 않고, 파일의 링크를 바꾸면 한 번 더 넣는다. 계정이 아직 없으면 다음 배포에. 실행 기록에는 개수만
+{
+  const file = "../자료/길드/장비대여/담당자_오픈채팅.txt";
+  const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+  if (existsSync(file)) {
+    let n = 0;
+    for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
+      const m = line.trim().match(/^([^\s#]+)\s+(https:\/\/open\.kakao\.com\/(?:o|me)\/[A-Za-z0-9_-]{4,40})\/?$/);
+      if (!m) continue;
+      const [, id, link] = m;
+      const key = `kakao_link_${id}_${createHash("sha256").update(link).digest("hex").slice(0, 10)}`;
+      if (queryFirst(`SELECT 1 AS done FROM setup WHERE key = ${q(key)}`)) continue;
+      if (!queryFirst(`SELECT 1 AS x FROM users WHERE id = ${q(id)}`)) continue;
+      runSql([`UPDATE users SET kakao = ${q(link)} WHERE id = ${q(id)};`, `INSERT OR IGNORE INTO setup (key, done_at) VALUES (${q(key)}, ${Date.now()});`]);
+      n++;
+    }
+    if (n) console.log(`장비대여 담당자 오픈채팅 링크를 넣었어요 (${n})`);
+  }
+}
+
 // 한국 PC 파일(자료/공식/소식.json)에 없는 글은 그 파일을 저장한 뒤에 새로 올라온 글이다. 한 번만 지금 들어온 것으로 적어 배지가 뜨게 하고,
 // 알림은 그 파일을 저장한 때 뒤에 들어온 글부터 보낸다 (setup 'official_announced', server/officialAlert.ts)
 if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'official_added_backfill'")) {
@@ -791,6 +814,22 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
     ]);
     const n = queryFirst(`SELECT COUNT(*) AS n FROM alerts WHERE kind = 'rent' AND created_at = ${now}`)?.n ?? 0;
     console.log(`예전 기부 마일리지 알림 ${n}명 (한 번)`);
+  }
+}
+
+// 시리온 통제 리스트를 공지사항으로 (제작자 2026-11-10 '우리 길드는 중립길드야, 이 몹들을 잡으면 안 되는 통제 리스트, 길드의 공지사항에 넣어줘, 글쓴이는 사파이어로').
+// 비공개 자료 길드/통제_리스트.json 과 표 그림으로 글(고정)·그림 첨부·모두에게 알림 (scripts/controlNotice.mjs). setup 'control_notice_20261110' 로 한 번만
+{
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${CONTROL_KEY}'`)) {
+    const now = Date.now();
+    const lines = controlNoticeSql("../자료", now);
+    if (!lines) console.log("통제 리스트 자료가 없어 공지를 건너뜀");
+    else {
+      runSql(lines);
+      const n = queryFirst(`SELECT COUNT(*) AS n FROM alerts WHERE kind = 'board_notice' AND created_at = ${now}`)?.n ?? 0;
+      const f = queryFirst(`SELECT COUNT(*) AS n, MAX(length(data)) AS b FROM board_files WHERE created_at = ${now}`);
+      console.log(`통제 리스트 공지를 올렸어요 (알림 ${n}명, 그림 ${f?.n ?? 0}장 ${f?.b ?? 0}바이트)`);
+    }
   }
 }
 

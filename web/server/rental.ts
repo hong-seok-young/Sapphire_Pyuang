@@ -122,6 +122,24 @@ export async function mileageOf(env: Env, owner: string): Promise<number> {
   return r?.dia ?? 0;
 }
 
+/**
+ * 여러 닉네임의 마일리지를 한 번에 (mileageOfName 과 같은 셈). 사람마다 따로 부르면 DB 를 사람 수만큼 다녀오고
+ * 무료 요금제의 요청 하나 D1 50번 한도에도 닿는다 (2026-11-10 렉 검토)
+ */
+export async function mileageOfNames(env: Env, names: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (!names.length) return out;
+  const { results } = await env.DB.prepare(
+    "WITH o AS (SELECT n.value AS name, (SELECT COALESCE(main_id, id) FROM users WHERE id = n.value) AS owner FROM json_each(?) n) " +
+      "SELECT o.name AS name, COALESCE((SELECT SUM(m.delta) FROM rental_mileage m WHERE CASE WHEN o.owner IS NULL THEN m.who = o.name " +
+      "ELSE (m.who = o.owner OR m.who IN (SELECT id FROM users WHERE main_id = o.owner)) END), 0) AS dia FROM o",
+  )
+    .bind(JSON.stringify([...new Set(names)]))
+    .all<{ name: string; dia: number }>();
+  for (const r of results) out.set(r.name, r.dia);
+  return out;
+}
+
 /** 닉네임(앱 계정이면 그 사람의 묶은 캐릭터 모두)의 마일리지 💎 */
 export async function mileageOfName(env: Env, who: string): Promise<number> {
   const u = await env.DB.prepare("SELECT COALESCE(main_id, id) AS owner FROM users WHERE id = ?").bind(who).first<{ owner: string }>();

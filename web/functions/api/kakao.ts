@@ -18,12 +18,15 @@ export function readKakao(v: unknown): string | null | "bad" {
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  const { results } = await env.DB.prepare(
-    "SELECT u.id AS id, u.role AS role, COALESCE(NULLIF(u.kakao, ''), NULLIF(m.kakao, '')) AS link FROM users u LEFT JOIN users m ON m.id = u.main_id " +
-      "WHERE COALESCE(NULLIF(u.kakao, ''), NULLIF(m.kakao, '')) IS NOT NULL",
-  ).all<{ id: string; role: Role; link: string }>();
+  // 둘을 한꺼번에 (제작자 2026-11-10 '전반적으로 렉': 닉네임이 뜨는 화면마다 부른다)
+  const [{ results }, high] = await Promise.all([
+    env.DB.prepare(
+      "SELECT u.id AS id, u.role AS role, COALESCE(NULLIF(u.kakao, ''), NULLIF(m.kakao, '')) AS link FROM users u LEFT JOIN users m ON m.id = u.main_id " +
+        "WHERE COALESCE(NULLIF(u.kakao, ''), NULLIF(m.kakao, '')) IS NOT NULL",
+    ).all<{ id: string; role: Role; link: string }>(),
+    env.DB.prepare("SELECT id FROM users WHERE high_spec = 1").all<{ id: string }>(),
+  ]);
   const rows = results.filter((r) => !TEST_IDS.includes(r.id));
-  const high = await env.DB.prepare("SELECT id FROM users WHERE high_spec = 1").all<{ id: string }>();
   return json(
     {
       links: Object.fromEntries(rows.map((r) => [r.id, r.link])),

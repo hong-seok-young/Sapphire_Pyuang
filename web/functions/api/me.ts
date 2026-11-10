@@ -10,6 +10,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
   if (!me) return NEED_LOGIN();
   // 장비대여에만 있는 기부자의 마일리지: 앱을 열면 한 번 (server/donate.ts, 답한 뒤에)
   waitUntil(grantRentDonation(env, me).catch((e) => console.error("rent donor grant", e instanceof Error ? e.message : e)));
-  const renewed = await renewSession(env, request);
-  return json(await meInfo(env, me), 200, renewed ? { "set-cookie": renewed } : {});
+  // 세션 늘리기와 내 정보를 한꺼번에 (앱을 열 때마다 부른다)
+  const [renewed, info] = await Promise.all([renewSession(env, request), meInfo(env, me)]);
+  return json(info, 200, renewed ? { "set-cookie": renewed } : {});
 };

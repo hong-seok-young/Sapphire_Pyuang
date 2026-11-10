@@ -12,7 +12,7 @@
 import type { Env, User } from "./auth";
 import { RANK, TEST_IDS } from "./auth";
 import { notify } from "./alerts";
-import { DIA_GOLD, mileageOfName } from "./rental";
+import { DIA_GOLD, mileageOfName, mileageOfNames } from "./rental";
 import { optionsDisplay } from "./rentalParse";
 
 /** 모두에게 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (제작자 2026-11-10 '개발 중 (운영진만)'). 화면 launcher.ts 의 DONATE_OPEN 과 같이 바꾼다 */
@@ -222,7 +222,8 @@ export async function hallOfFame(env: Env, since = 0): Promise<{ rows: HallRow[]
   for (const h of hall.values()) h.earned = Math.round(h.earned * 100) / 100;
   const rows = [...hall.values()].filter((h) => h.earned > 0).sort((a, b) => b.earned - a.earned || b.gold - a.gold || a.last - b.last);
   // 남은 마일리지 (앞 30명만, D1 읽기를 아끼려고)
-  await Promise.all(rows.slice(0, 30).map(async (h) => (h.mileage = await mileageOfName(env, h.name))));
+  const left = await mileageOfNames(env, rows.slice(0, 30).map((h) => h.name));
+  for (const h of rows.slice(0, 30)) h.mileage = left.get(h.name) ?? 0;
   return { rows, lines };
 }
 

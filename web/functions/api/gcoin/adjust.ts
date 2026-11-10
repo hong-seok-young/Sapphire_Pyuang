@@ -12,7 +12,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const userId = typeof b.userId === "string" ? b.userId : "";
   const delta = int(b.delta, -100_000, 100_000);
   const note = text(b.note, MAX_NOTE);
-  if (!userId || !(await isMember(env, userId))) return json({ error: "2군 본캐가 아니에요" }, 400);
+  if (!userId || !(await isMember(env, userId))) return json({ error: "성장코인 대상자가 아니에요" }, 400);
   if (delta === null || delta === 0) return json({ error: "코인이 맞지 않아요" }, 400);
   if (!note) return json({ error: `왜 바꾸는지 ${MAX_NOTE}자 안으로 적어 주세요` }, 400);
   const now = Date.now();

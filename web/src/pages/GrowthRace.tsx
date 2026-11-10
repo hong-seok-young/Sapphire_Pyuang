@@ -7,8 +7,8 @@ import { JOB_NAME, avatarUrl, errorText } from "../auth";
 import { JobEmblem } from "../emblems";
 import { Nick } from "../kakao";
 import { useBackClose } from "../backClose";
-import { COIN_GOLD, setRound, setTarget } from "../gcoin";
-import type { GcRace, GcRaceEntry, GcRoundResult, GcWallet } from "../gcoin";
+import { COIN_GOLD, hideTarget, setRound, setTarget } from "../gcoin";
+import type { GcPerson, GcRace, GcRaceEntry, GcRoundResult } from "../gcoin";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 /** 앞 세 사람 선 색 (dataviz 검사기 --pairs all 로 어두운 바탕 #1b1d3a 에서 통과: 파랑 · 주황 · 청록) */
@@ -681,26 +681,74 @@ export const goldText = (coin: number) =>
  * 정한 사람은 '빼기'. 정할 때 레벨이 달성률의 0%
  */
 export function TargetsTab({
-  members,
+  people,
+  hidden,
   race,
   onChanged,
 }: {
-  members: GcWallet[];
+  people: GcPerson[];
+  /** 담당자가 목록에서 뺀 사람 (2군 본캐도 저절로 다시 안 들어온다) */
+  hidden: string[];
   race: GcRace;
   onChanged: (msg: string) => void;
 }) {
   // 끝났으면 다음 판 목표를 정한다 (server/gcrace.ts targetRound). 다음 판을 안 정했으면 기간부터
   const ended = Date.now() >= race.end;
   const next = ended && race.next ? race.next : null;
+  // 정하기·빼기는 서버를 기다리지 않고 바로 화면에 (제작자 2026-11-10 '명단 넣고 빼는 것도 반응이 늦다'). 실패하면 되돌린다
+  const [over, setOver] = useState<Record<string, TargetEntry | null>>({});
   const set = new Map<string, TargetEntry>(
     ended ? (race.upcoming ?? []).map((e) => [e.id, { ...e, doneAt: null, rank: 0 }]) : race.list.map((e) => [e.id, e]),
   );
-  const list = [...members].sort(
-    (a, b) =>
-      Number(set.has(b.id)) - Number(set.has(a.id)) ||
-      (b.level ?? 0) - (a.level ?? 0) ||
-      a.id.localeCompare(b.id),
-  );
+  for (const [id, e] of Object.entries(over)) {
+    if (e) set.set(id, e);
+    else set.delete(id);
+  }
+  // 대상은 담당자 재량 (제작자 2026-11-10 '대상자 추가·제거 자유롭게, 1군·2군 상관없이'): 정한 사람 + 2군 본캐(저절로, 뺀 사람 빼고) + 찾아 넣은 사람.
+  // ✕·빼기는 바로 목록에서 사라지고 서버에 적는다 (제작자 '2군은 자동으로 명단에, 새로운 인원 추가될 때만')
+  const [adding, setAdding] = useState<string[]>([]);
+  const [dropped, setDropped] = useState<string[]>([]);
+  const [q, setQ] = useState("");
+  const byId = new Map(people.map((p) => [p.id, p]));
+  const off = new Set([...hidden, ...dropped]);
+  const auto = people.filter((p) => p.guild === "second" && !p.main && !off.has(p.id)).map((p) => p.id);
+  const ids = [...new Set([...set.keys(), ...auto, ...adding.filter((id) => !dropped.includes(id))])];
+  const list = ids
+    .map((id) => byId.get(id) ?? { id, level: set.get(id)?.fromLevel ?? 1, guild: null, main: null })
+    .sort((a, b) => Number(set.has(b.id)) - Number(set.has(a.id)) || b.level - a.level || a.id.localeCompare(b.id));
+  const needle = q.trim().replace(/\s/g, "").toLowerCase();
+  const found = needle
+    ? people.filter((p) => !ids.includes(p.id) && p.id.replace(/\s/g, "").toLowerCase().includes(needle)).slice(0, 8)
+    : [];
+  const add = (id: string) => {
+    setAdding((xs) => (xs.includes(id) ? xs : [...xs, id]));
+    setDropped((xs) => xs.filter((x) => x !== id));
+    setQ("");
+  };
+  const drop = (id: string, server = true) => {
+    setDropped((xs) => [...xs, id]);
+    setAdding((xs) => xs.filter((x) => x !== id));
+    if (server) hideTarget(id).catch(() => undefined);
+  };
+  async function save(id: string, level: number, target: number | null) {
+    const had = set.get(id) ?? null;
+    const back = over[id];
+    setOver((o) => ({ ...o, [id]: target === null ? null : { fromLevel: had?.fromLevel ?? level, target, doneAt: had?.doneAt ?? null, rank: had?.rank ?? 0 } }));
+    if (target === null) drop(id, false);
+    try {
+      await setTarget(id, target);
+      onChanged(target === null ? `${id} 목표 뺌` : `${id} 목표 Lv.${target}`);
+    } catch (x) {
+      setOver((o) => {
+        const n = { ...o };
+        if (back === undefined) delete n[id];
+        else n[id] = back;
+        return n;
+      });
+      if (target === null) setDropped((xs) => xs.filter((d) => d !== id));
+      throw x;
+    }
+  }
   const period = !ended
     ? { start: race.start, end: race.end }
     : next && race.nextEnd
@@ -714,17 +762,38 @@ export function TargetsTab({
         <small>{set.size}명</small>
       </p>
       {!period && <p className="gc-empty">기간을 먼저 정해 주세요</p>}
-      {!list.length && <p className="gc-empty">2군 본캐가 없어요</p>}
-      <ul hidden={!period}>
-        {list.map((m) => (
-          <TargetRow
-            key={m.id}
-            m={m}
-            e={set.get(m.id) ?? null}
-            onChanged={onChanged}
+      <div hidden={!period}>
+        <ul>
+          {list.map((m) => (
+            <TargetRow
+              key={m.id}
+              m={m}
+              e={set.get(m.id) ?? null}
+              onSave={(t) => save(m.id, m.level ?? 1, t)}
+              onDrop={() => drop(m.id)}
+            />
+          ))}
+        </ul>
+        <div className="gr-add">
+          <input
+            className="mk-input"
+            value={q}
+            onChange={(e) => setQ(e.target.value.slice(0, 20))}
+            placeholder="대상자 추가 · 닉네임"
+            aria-label="대상자 추가"
           />
-        ))}
-      </ul>
+        </div>
+        {found.length > 0 && (
+          <div className="gr-add-list">
+            {found.map((p) => (
+              <button key={p.id} className="pill gc-mini" onClick={() => add(p.id)}>
+                {p.id} <small>Lv.{p.level}{p.guild === "second" ? " · 2군" : p.guild === "main" ? " · 1군" : ""}</small>
+              </button>
+            ))}
+          </div>
+        )}
+        {needle && !found.length && <p className="gc-empty">찾는 닉네임이 없어요</p>}
+      </div>
     </div>
   );
 }
@@ -806,29 +875,25 @@ type TargetEntry = { fromLevel: number; target: number; doneAt: number | null; r
 function TargetRow({
   m,
   e,
-  onChanged,
+  onSave,
+  onDrop,
 }: {
-  m: GcWallet;
+  m: { id: string; level: number | null };
   e: TargetEntry | null;
-  onChanged: (msg: string) => void;
+  /** 바로 화면에 바꾸고 서버에 보낸다 (실패하면 던진다) */
+  onSave: (target: number | null) => Promise<void>;
+  /** 아직 정하지 않은 줄을 목록에서 뺀다 */
+  onDrop: () => void;
 }) {
   const lv = m.level ?? 1;
   const base = e?.fromLevel ?? lv;
   const [t, setT] = useState(e?.target ?? lv + 2);
-  const [busy, setBusy] = useState(false);
+  const busy = false;
   const [error, setError] = useState("");
   const dirty = !e || t !== e.target;
-  async function run(target: number | null, msg: string) {
-    setBusy(true);
+  function run(target: number | null) {
     setError("");
-    try {
-      await setTarget(m.id, target);
-      onChanged(msg);
-    } catch (x) {
-      setError(errorText(x));
-    } finally {
-      setBusy(false);
-    }
+    onSave(target).catch((x) => setError(errorText(x)));
   }
   return (
     <li className={"gr-tg" + (e ? " gr-tg-set" : "")}>
@@ -861,7 +926,7 @@ function TargetRow({
         <button
           className="pill gc-mini gc-done-btn"
           disabled={busy}
-          onClick={() => run(t, `${m.id} 목표 Lv.${t}`)}
+          onClick={() => run(t)}
         >
           {e ? "저장" : "정하기"}
         </button>
@@ -869,9 +934,14 @@ function TargetRow({
         <button
           className="pill gc-mini"
           disabled={busy}
-          onClick={() => run(null, `${m.id} 목표 뺌`)}
+          onClick={() => run(null)}
         >
           빼기
+        </button>
+      )}
+      {!e && (
+        <button className="pill gc-mini" disabled={busy} onClick={onDrop} aria-label={`${m.id} 목록에서 빼기`}>
+          ✕
         </button>
       )}
       {e?.doneAt && <small className="gr-tg-done">🏁 {e.rank}위</small>}

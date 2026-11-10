@@ -328,7 +328,7 @@ CREATE TABLE IF NOT EXISTS board_posts (
   pinned INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
   edited_at INTEGER,
-  -- 건의함 익명 글 (2026-11-09): 쓴 사람은 author 에 그대로 두고, 앱개발자와 유어아너 말고는 '익명'으로 보인다 (server/board.ts canSeeAnon)
+  -- 건의함 익명 글 (2026-11-09): 쓴 사람은 author 에 그대로 두고 화면에는 '익명'으로 보인다 (server/board.ts canSeeAnon, shownName)
   anon INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS board_posts_cat ON board_posts (cat, id);
@@ -1099,3 +1099,7 @@ CREATE TABLE IF NOT EXISTS donate_grants (
   granted_to TEXT,
   dia INTEGER
 );
+
+-- 자료 저장소 전체를 챗봇이 읽게 (제작자 2026-11-10, scripts/library-sync.mjs 가 채우고 server/library.ts 가 찾는다). 길드/ 아래는 staff 1 (오피서 이상)
+CREATE TABLE IF NOT EXISTS lib_files (path TEXT PRIMARY KEY, hash TEXT NOT NULL, parts INTEGER NOT NULL, staff INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS lib_chunks (path TEXT NOT NULL, part INTEGER NOT NULL, staff INTEGER NOT NULL DEFAULT 0, text TEXT NOT NULL, PRIMARY KEY (path, part));

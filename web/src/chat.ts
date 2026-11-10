@@ -1,6 +1,6 @@
 // 챗봇: 질문에 맞는 위키 자료 고르기, 고른 스샷 줄이기, /api/chat 부르기 (서버는 functions/api/chat/index.ts), 대화 기록.
 // 위키 자료는 이미 화면에 받아 둔 것에서 고른다. 서버는 길이만 자르고 질문 앞에 붙인다.
-import type { Block, Place, Post, Run, Wiki } from "./types";
+import type { Block, Monster, Place, Post, Run, Wiki } from "./types";
 import { api } from "./auth";
 import { search } from "./search";
 import { levelText } from "./ui";
@@ -142,11 +142,17 @@ function words(q: string): string[] {
   return q.split(/[\s,.?!~·()[\]"'“”‘’]+/).map((w) => w.replace(/(은|는|이|가|을|를|에|에서|으로|로|랑|하고|의|도|만)$/, "")).filter((w) => w.length >= 2);
 }
 
+/** 흔한 말 (제목·본문 찾기에 쓰지 않는다) */
+const STOP_WORD = /^(좋아|좋은|좋을|올라|오르|오른|얼마|궁금|알려|해도|되나|될까|같아|같은|뭐가|그리고|아니면|그래서|때문|지금|이제|그냥|다시|한번|정도|쯤|부터|까지|사이|하면|하는|하고|해서|근데|진짜|혹시|요즘|요새|제일|가장|제대로|어느|무슨|어떤|어떻게|이거|저거|그거|그건|이건|나|내|제|저|우리)/;
 /** 묻는 말 (본문 찾기에 쓰지 않는다): '어디서', '사냥해', '추천해줘', '뭐가' ... */
 const ASK_WORD = /^(어디|어디서|어디가|어떻게|어떤|무엇|뭐|뭐가|뭘|언제|누가|왜|좋은|좋아|추천|가면|사냥|사냥해|사냥하|사냥터|해야|해줘|알려|알려줘|있어|있나|있나요|되나|되나요|할까|하나요|가요|해요|돼|좀|지금|이제|그럼|이거|저거|이건|나|내|제)$|(해|해요|해줘|할까|하나|하나요|나요|까요|줘|요)$/;
 
 /** 자기 캐릭터를 묻는 말 ('내가 지금 할 것', '나 뭐 해', '내 렙에 맞는 사냥터', '추천') */
 const ABOUT_ME = /(^|[\s,.])(나|내|난|내가|제가|저|전|제)(는|가|한테|에게|게)?(\s|$)|내 ?(렙|레벨|직업|캐릭|장비|스펙)|할 ?것|할 ?거|해야|뭐 ?(하|해|할)|뭘 ?(하|해|할)|추천|다음 ?(목표|단계)|어디서 ?사냥|사냥 ?어디/;
+/** 골드·돈 벌이를 묻는 말 (챗봇 개선 2026-11-10: '골드는 어디서 벌어야될까'에 레벨에 맞는 사냥터·드랍이 안 붙었다). 물은 사람의 레벨로 사냥터를 고른다 */
+const MONEY_WORD = /(골드|돈|용돈|자금|재화).{0,8}(벌|모으|모아|부족|모자|필요)|벌이|벌어|벌까|벌려|벌기|벌만|돈 ?되|뭐 ?팔|팔 ?만한|팔아서|팔면 ?(돈|골드)/;
+/** 사냥터·육성·템 세팅을 묻는 말 (레벨을 안 적었으면 물은 사람의 레벨로 사냥터·공략을 고른다). '어디서 얻어' 같은 아이템 질문은 아니다 */
+const HUNT_ASK = /사냥터|사냥|렙업|레벨업|육성|키우|템 ?세팅|세팅|장비 ?(추천|세팅|뭐|뭘|맞)|뭘 ?(맞|입|끼|들)|어디서 ?(렙|키|잡)|추천|공략/;
 
 /** 사냥터, 장비, 육성을 묻는 말. 이런 질문에서는 홀로 선 숫자를 레벨로 본다 */
 const HUNT_WORD = /사냥|어디|렙업|레벨업|육성|장비|세팅|추천|스킬|퀘스트|전사|레인저|마법사|무도가|법사|궁수/;
@@ -159,9 +165,30 @@ function levelOf(question: string): number | null {
   const m =
     question.match(/(\d{1,3})\s*(?:레벨|렙|lv)/i) ??
     question.match(/(?:lv|레벨)\.?\s*(\d{1,3})/i) ??
+    // '41레인저', '35법사', '40무도' 처럼 숫자 뒤에 직업이 바로 붙은 것 (챗봇 개선 2026-11-10: '41레인저 사냥터'의 41 을 몰라 사냥터 자료가 빠졌다)
+    question.match(/(?:^|[\s,.(])(\d{1,2})\s*(?:레인저|렌저|궁수|전사|워리어|마법사|법사|무도가|무도)/) ??
     (HUNT_WORD.test(question) ? question.match(/(?:^|\s)(\d{1,2})(?=\s|$|에서|에|이면|인데|쯤|짜리)/) : null);
   const n = m ? Number(m[1]) : NaN;
   return n >= 1 && n <= 200 ? n : null;
+}
+
+/**
+ * 질문의 레벨 구간 ('32렙부터 36렙사이', 'Lv.34~40'). 레벨이 둘 이상 나오고 20 안이면 [낮은, 높은]
+ * (챗봇 개선 2026-11-10: '32렙부터 36렙사이 템 세팅'에 초급 공략(~33)만 붙고 중급(34~)이 빠졌다)
+ */
+function levelRangeOf(question: string): [number, number] | null {
+  const found = new Set<number>();
+  for (const m of question.matchAll(/(\d{1,3})\s*(?:레벨|렙|lv)/gi)) found.add(Number(m[1]));
+  for (const m of question.matchAll(/(?:lv|레벨)\.?\s*(\d{1,3})/gi)) found.add(Number(m[1]));
+  for (const m of question.matchAll(/(\d{1,3})\s*[~～-]\s*(\d{1,3})\s*(?:레벨|렙|lv|까지|사이)/gi)) {
+    found.add(Number(m[1]));
+    found.add(Number(m[2]));
+  }
+  const levels = [...found].filter((n) => n >= 1 && n <= 200).sort((a, b) => a - b);
+  if (levels.length < 2) return null;
+  const lo = levels[0];
+  const hi = levels[levels.length - 1];
+  return hi - lo <= 20 ? [lo, hi] : null;
 }
 
 /** 공략 제목의 레벨 범위 ('초급 전사 육성 공략 Lv. 1～33' -> [1, 33]) */
@@ -199,6 +226,69 @@ export interface WikiContext {
 }
 
 /**
+ * 사냥터를 부르는 다른 말 (카페 글 해시태그 '#오숲 #죽늪 #미궁 #정원 #뿌리 #금서고 #성채', 톡방·길드원 말) -> 사냥터 이름 (data/places.json 의 name).
+ * 띄어쓰기를 뺀 질문(q)에 맞춘다. 이름 그대로 나온 것은 위에서 먼저 잡는다 (챗봇 개선 2026-11-10: '요새·미로·중사·타신' 같은 말을 사냥터로 못 알아봤다)
+ */
+const PLACE_ALIAS: [RegExp, string[]][] = [
+  [/숲의?미궁|숲미궁|(?<![가-힣])미궁/, ["숲의미궁"]],
+  [/돌무더기|요새/, ["하늘성채 돌무더기요새"]],
+  [/알수없는|(?<![가-힣])미로(?!찾)/, ["하늘성채 알수없는미로"]],
+  [/하늘성채동부|(?<![가-힣])동부/, ["하늘성채 동부"]],
+  [/하늘성채서부|(?<![가-힣])서부/, ["하늘성채 서부"]],
+  [/(?<![가-힣])성채(?!동부|서부|돌무더기|알수없는)|하늘성채(?!동부|서부|돌무더기|알수없는)/, ["하늘성채 서부", "하늘성채 동부"]],
+  [/타락한?신전|타신|타락/, ["타락한신전"]],
+  [/이슬롯의?신전|이슬롯(?!의?실험실)/, ["이슬롯신전"]],
+  [/이슬롯의?실험실/, ["실험실"]],
+  [/비탄의?제단|비탄/, ["비탄"]],
+  [/빛의?신전|빛이들지않는신전|빛신|빛들신/, ["빛신"]],
+  [/고대의?누각|(?<![가-힣])누각/, ["고대의누각"]],
+  [/제국사막|제사막|모래무덤|(?<![가-힣])제사(?![가-힣])/, ["제국사막"]],
+  [/왕국사막|왕사막|건조한초원|(?<![가-힣])왕사(?![가-힣])/, ["왕국사막"]],
+  [/중앙사막|뜨거운모래사막|뜨사|(?<![가-힣])중사/, ["중사"]],
+  [/죽음의?늪|죽늪/, ["죽늪"]],
+  [/오염된?숲|오숲/, ["오숲"]],
+  [/폐허/, ["폐허숲"]],
+  [/라노스평원|라평/, ["라노스평원"]],
+  [/노을/, ["노을숲"]],
+  [/카타르/, ["카타르"]],
+  [/등대섬|등섬/, ["해변"]],
+  [/등대(?!\s*[1-5]|던전\s*[1-5]|[1-5]층)/, ["등대1층", "등대2층", "등대3층", "등대4층", "등대5층"]],
+  [/버섯늪|(?<![가-힣])버섯(?!돌이|늪지)/, ["버섯늪지"]],
+  [/스포어/, ["머쉬룸스포어"]],
+  [/우디숲|우디위디|우디워디(?!마을)/, ["우디숲"]],
+  [/해적/, ["해적선"]],
+  [/모르포시즈뿌리|(?<![가-힣])뿌리(?!갑|뿌리)/, ["뿌리"]],
+  [/모르포시즈정원/, ["정원"]],
+  [/금서고/, ["금서고"]],
+  [/길던|길드던전|리에티|전지의관/, ["길드던전"]],
+  [/헌팅그라운드|헌그|퉁카|테멘/, ["헌팅그라운드 퉁카", "시나르 평야", "비툼 습지"]],
+  [/시나르/, ["시나르 평야"]],
+  [/비툼/, ["비툼 습지"]],
+  [/(?<![가-힣])전장|이노티아워|언더크라운/, ["이노티아워"]],
+];
+/** '인던30', '인던 30', '30인던', '등대2층', '등대 2' -> 사냥터 이름 */
+function numberedPlace(q: string): string[] {
+  const out: string[] = [];
+  for (const m of q.matchAll(/인던(\d{2})|(\d{2})인던/g)) out.push(`인던${m[1] ?? m[2]}`);
+  for (const m of q.matchAll(/등대(?:던전)?([1-5])층?/g)) out.push(`등대${m[1]}층`);
+  return out;
+}
+
+/** 몬스터 한 줄 (레벨, HP, 선공·속도·거리, 재부활, 드랍, 스킬, 참고). 사냥터·인던을 물으면 몬스터마다 이것을 붙인다 */
+function monsterLine(m: Monster): string {
+  return [
+    `- ${m.name}` + (m.level ? ` Lv.${m.level}` : "") + (m.hp ? ` HP ${m.hp.toLocaleString("ko-KR")}` : m.hps?.length ? ` HP ${m.hps.join("/")}` : ""),
+    m.traits,
+    m.respawn && `재부활 ${m.respawn}`,
+    m.drops.length && `드랍: ${m.drops.join(", ")}`,
+    m.skill && `스킬: ${m.skill}`,
+    m.note && `참고: ${m.note}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/**
  * 질문에 맞는 위키 자료를 짧은 글로 만든다.
  * 질문에 이름이 나온 아이템, 몬스터, 사냥터 → 레벨을 물으면 그 레벨 근처 사냥터와 직업 장비 → 없으면 낱말로 검색 →
  * 제목이 맞는 글(육성 공략 등) → 사냥터 목록 순서로 채운다.
@@ -206,6 +296,9 @@ export interface WikiContext {
  * 맞는 공략을 못 붙였다). 레벨만 물으면 직업은 물은 사람 것, 사진만 보내면 둘 다 물은 사람 것.
  * 사진에서 먼저 읽은 값(seen)이 있으면 사진 속 캐릭터의 직업, 레벨을 먼저 쓰고, 사진에 보이는 이름도 질문 낱말처럼 찾는다.
  */
+/** 통제 리스트를 붙일 질문 (잡아도 되는지, 통제·중립·쟁) */
+const CONTROL_ASK = /통제|중립|잡아도|잡으면|잡지 ?말|잡아 ?돼|건드려도|양보제|쟁 ?길드/;
+
 export function wikiContext(
   wiki: Wiki,
   posts: Record<string, Post> | undefined,
@@ -224,16 +317,34 @@ export function wikiContext(
     if (s) parts.push(s);
   };
   const askedLevel = levelOf(question);
+  const askedRange = levelRangeOf(question);
   const askedJob = jobOf(question);
-  // '내가 지금 할 것', '나 어디서 사냥해' 처럼 자기를 물으면 레벨·직업을 안 말해도 물은 사람의 값으로 고른다 (제작자 요청 2026-11-02)
-  const aboutMe = ABOUT_ME.test(question);
+  // '내가 지금 할 것', '나 어디서 사냥해' 처럼 자기를 물으면 레벨·직업을 안 말해도 물은 사람의 값으로 고른다 (제작자 요청 2026-11-02).
+  // 사냥터·육성·장비를 묻거나 골드 벌이를 물을 때도 레벨을 안 적었으면 물은 사람의 레벨로 (챗봇 개선 2026-11-10: '골드는 어디서 벌어야될까', '사냥터 알려주라')
+  const aboutMe = ABOUT_ME.test(question) || MONEY_WORD.test(question) || HUNT_ASK.test(question);
   const level = askedLevel ?? (photo ? (seen?.level ?? asker?.level ?? null) : aboutMe ? (asker?.level ?? null) : null);
+  // 레벨 구간을 물었으면 그 구간 전체 ('32렙부터 36렙'), 아니면 그 레벨 하나
+  const lo = askedRange?.[0] ?? level;
+  const hi = askedRange?.[1] ?? level;
   const job = askedJob ?? (photo ? (seen?.job ?? asker?.job ?? null) : askedLevel !== null || aboutMe ? (asker?.job ?? null) : null);
   if (asker?.job || asker?.level) add(`[물은 사람] ${[asker.job, asker.level && `Lv.${asker.level}`].filter(Boolean).join(" ")} (길드원이 스스로 적은 값)`);
   if (seen) {
     const who = [seen.job, seen.level && `Lv.${seen.level}`].filter(Boolean).join(" ");
     if (who) found.push(`사진: ${who}`);
     add(`[사진에서 읽음] ${who ? `사진 속 캐릭터 ${who}` : "캐릭터 직업·레벨은 안 보임"}${seen.names.length ? ` · 보이는 이름: ${seen.names.join(", ")}` : ""} (자료는 이 값으로 골랐다)`);
+  }
+
+  // 길드 통제 리스트 (제작자 2026-11-10: 중립 길드라 잡지 않는 몹, 공지사항에도 있음): 통제·중립·잡아도 되는지를 묻거나 리스트의 곳·몹 이름이 나오면 통째로
+  const control = wiki.meta.control;
+  if (control) {
+    const words = control.groups.flatMap((g) => [g.place, ...g.mobs.flatMap((m) => m.split(/[/·,]/))]).map((w) => norm(w.trim())).filter((w) => w.length >= 2);
+    if (CONTROL_ASK.test(question) || words.some((w) => q.includes(w))) {
+      add(
+        `[길드 통제 리스트 · ${control.server} · ${control.rule} · 표 제작 ${control.by} · 수정 ${control.date} · 게시판 공지사항에 있음]\n` +
+          control.groups.map((g) => `- ${g.place}${g.mark ? ` (${g.mark})` : ""}: ${g.mobs.join(", ")}`).join("\n"),
+      );
+      found.push("길드 통제 리스트");
+    }
   }
 
   // 1. 질문에 이름이 그대로 나온 것 (긴 이름부터, 짧은 이름이 긴 이름 안에 든 경우는 뺀다)
@@ -247,11 +358,23 @@ export function wikiContext(
     else if (p.guide?.words.some((w) => q.includes(norm(w)))) names.push({ kind: "place", name: p.name, id: p.id });
   names.sort((a, b) => b.name.length - a.name.length);
   const picked = names.filter((n, i) => !names.slice(0, i).some((m) => norm(m.name).includes(norm(n.name)))).slice(0, 8);
+  // 사냥터를 다른 말로 불렀으면 ('요새', '미로', '중사', '타신', '인던30', '등대 2층') 그 사냥터도 (이름으로 잡힌 것은 빼고)
+  const byName = new Map(Object.values(wiki.places).map((p) => [p.name, p]));
+  const aliased = [...PLACE_ALIAS.filter(([re]) => re.test(q)).flatMap(([, ns]) => ns), ...numberedPlace(q)];
+  for (const name of new Set(aliased)) {
+    const p = byName.get(name);
+    if (p && !picked.some((n) => n.kind === "place" && n.name === p.name) && picked.length < 12) picked.push({ kind: "place", name: p.name, id: p.id });
+  }
 
   // 2. 없으면 질문 낱말로 검색해서 맞는 것 몇 개 (레벨을 물으면 아래 레벨 자료로 충분하다)
+  // 숫자가 든 말('힘1'), 묻는 말, 직업 이름, '아이모'로는 찾지 않고, 오타 짐작(자모 비교)으로 걸린 것은 쓰지 않는다
+  // (챗봇 개선 2026-11-10: '힘1 당 뭐가 좋아져'에 힘센 샤쿤·힘의 띠·나른함1 이 붙었다)
   if (!picked.length && askedLevel === null) {
     for (const w of words(asked)) {
+      if (/\d/.test(w) || ASK_WORD.test(w) || JOB_WORDS.includes(w) || w === "아이모") continue;
       for (const h of search(wiki, w, 3)) {
+        // 이름 처음부터 맞는 것만 ('상자'로 깜짝상자·허름한상자가 다 걸리지 않게). 네 글자 넘는 말은 이름 안에 든 것도 ('용병의장갑' -> 사막용병의장갑)
+        if (h.score < ([...w].length >= 4 ? 1 : 3)) continue;
         if (picked.length >= 6 || picked.some((p) => p.kind === h.kind && p.name === h.name)) continue;
         picked.push({ kind: h.kind, name: h.name, id: h.kind === "place" ? h.to.split("/").pop() : undefined });
       }
@@ -279,16 +402,20 @@ export function wikiContext(
       }
     } else if (n.kind === "item") {
       const it = wiki.items[n.name];
-      const from = it.from
+      const from = (it.from ?? [])
         .map((k) => wiki.monsters[k])
         .filter(Boolean)
         .map((m) => `${m.name}(${wiki.places[m.place]?.name ?? "?"})`);
-      const equip = it.equip.map((e) => `${e.slot}: ` + Object.entries(e.info).filter(([k, v]) => v && k !== "이미지").map(([k, v]) => `${k} ${v}`).join(", "));
+      const equip = (it.equip ?? []).map((e) => `${e.slot}: ` + Object.entries(e.info).filter(([k, v]) => v && k !== "이미지").map(([k, v]) => `${k} ${v}`).join(", "));
       add([`[아이템] ${it.name}`, from.length && `떨구는 몬스터: ${[...new Set(from)].join(", ")}`, ...equip].filter(Boolean).join(" · "));
     } else if (n.id && wiki.places[n.id]) {
       const p = wiki.places[n.id];
-      const mons = p.monsters.map((k) => wiki.monsters[k]).filter(Boolean).map((m) => m.name + (m.level ? ` Lv.${m.level}` : ""));
-      add(`[사냥터] ${p.name} (${p.region}${levelText(p.level) ? ", " + levelText(p.level) : ""}) 몬스터: ${mons.join(", ")}`);
+      const mons = p.monsters.map((k) => wiki.monsters[k]).filter(Boolean);
+      // 몬스터마다 레벨·HP·선공·재부활·드랍·스킬·참고까지 (챗봇 개선 2026-11-10: '비탄', '인던30' 을 물었는데 몬스터 이름만 붙어 HP·선공·보스 공략·드랍이 없다고 했다)
+      add(
+        `[사냥터] ${p.name} (${p.region}${levelText(p.level) ? ", " + levelText(p.level) : ""})${p.title && norm(p.title) !== norm(p.name) ? ` · 글 제목: ${p.title.replace(/\s*_ReMAKE$/, "")}` : ""}` +
+          (mons.length ? `\n몬스터 ${mons.length}:\n` + mons.map(monsterLine).join("\n") : " 몬스터 자료 없음"),
+      );
       // 길드가 정한 자리 나누기 (제작자 2026-11-10, 마을모금함이 길드 잡담방에 공유한 것). 그림 주소는 답에 [[그림:주소|설명]] 으로 넣을 수 있다
       if (p.guide)
         add(
@@ -301,27 +428,29 @@ export function wikiContext(
     }
   }
 
-  // 레벨을 물으면: 그 레벨 근처 사냥터(몬스터, 장비 드랍)와 직업 장비 (제작자 요청: 답을 더 알차게)
-  if (level !== null) {
+  // 레벨을 물으면: 그 레벨 근처 사냥터(몬스터, 장비 드랍)와 직업 장비 (제작자 요청: 답을 더 알차게). 레벨 구간이면 그 구간 전체
+  if (level !== null && lo !== null && hi !== null) {
     // 끝이 없는 레벨('Lv.30 이상', 길드던전)은 시작 레벨에서 10 위까지만 맞는 곳으로 친다
     const top = (p: Place) => p.level![1] ?? p.level![0] + 10;
+    const inside = (p: Place) => p.level![0] <= hi && lo <= top(p);
     const around = Object.values(wiki.places)
-      .filter((p) => p.level && p.level[0] - 3 <= level && level <= top(p) + 3)
-      .map((p) => ({ p, gap: p.level![0] <= level && level <= top(p) ? 0 : Math.min(Math.abs(p.level![0] - level), Math.abs(top(p) - level)) }));
+      .filter((p) => p.level && p.level[0] - 3 <= hi && lo <= top(p) + 3)
+      .map((p) => ({ p, gap: inside(p) ? 0 : Math.min(Math.abs(p.level![0] - hi), Math.abs(top(p) - lo)) }));
     // 막 들어갈 만한 곳(시작 레벨이 지금 레벨에 가까운 곳)부터
     const fromStart = (x: { p: Place }) => Math.abs(level - x.p.level![0]);
-    const near = [...around].sort((a, b) => a.gap - b.gap || fromStart(a) - fromStart(b)).slice(0, 8);
-    // 레벨이 딱 맞는 곳 4곳은 몬스터 드랍과 가는 길까지: 시작 레벨이 가깝고 레벨 폭이 좁은(그 레벨에 맞춘) 곳부터
+    const near = [...around].sort((a, b) => a.gap - b.gap || fromStart(a) - fromStart(b)).slice(0, askedRange ? 10 : 8);
+    // 레벨이 딱 맞는 곳 4곳은 원글 안내(가는 길, 퀘스트, NPC)까지: 시작 레벨이 가깝고 레벨 폭이 좁은(그 레벨에 맞춘) 곳부터
     // (챗봇 개선 2026-11-01: 시작 레벨이 낮은 2곳만 골라 Lv.35 에 30~36 사막이 들고 34~40 죽늪이 빠졌다)
     const width = (x: { p: Place }) => top(x.p) - x.p.level![0];
     const exact = around
       .filter((x) => x.gap === 0)
       .sort((a, b) => fromStart(a) - fromStart(b) || width(a) - width(b))
-      .slice(0, 4);
+      .slice(0, askedRange ? 6 : 4);
+    const levelName = askedRange ? `${lo}~${hi}` : String(level);
     if (near.length) {
-      found.push(`Lv.${level} 근처 사냥터 ${near.length}곳`);
+      found.push(`Lv.${levelName} 근처 사냥터 ${near.length}곳`);
       add(
-        `[레벨 ${level} 근처 사냥터]\n` +
+        `[레벨 ${levelName} 근처 사냥터]\n` +
           near
             .map(({ p }) => {
               const mons = p.monsters.map((k) => wiki.monsters[k]).filter(Boolean);
@@ -334,27 +463,28 @@ export function wikiContext(
             })
             .join("\n"),
       );
-      // 레벨이 딱 맞는 사냥터는 몬스터마다 드랍과 원글 안내까지 (챗봇 개선 2026-10-31: '정원·금서고 몬스터와 드랍 자료 없음')
-      for (const { p } of exact) {
+      // 근처 사냥터마다 몬스터 자세히(레벨·HP·선공·재부활·드랍·스킬), 레벨이 딱 맞는 곳은 원글 안내까지
+      // (챗봇 개선 2026-10-31: '정원·금서고 몬스터와 드랍 자료 없음'. 2026-11-10: 딱 맞는 4곳만 자세히 붙여 '중사·숲의미궁 드랍 자료 없음'이라고 했다)
+      const exactIds = new Set(exact.map((x) => x.p.id));
+      const seenPlace = new Set(picked.filter((n) => n.kind === "place" && n.id).map((n) => n.id));
+      // 사냥터를 이름으로 물었으면('비탄에서 사냥해도 돼?') 그 사냥터는 위에서 자세히 붙였고, 근처 사냥터는 견줄 목록만
+      for (const { p } of seenPlace.size ? [] : near) {
+        if (seenPlace.has(p.id)) continue;
         const mons = p.monsters.map((k) => wiki.monsters[k]).filter(Boolean);
-        const post = posts?.[p.id];
-        add(
-          `[${p.name} 자세히]\n` +
-            mons.map((m) => `${m.name}${m.level ? ` Lv.${m.level}` : ""}${m.drops.length ? ` 드랍: ${m.drops.join(", ")}` : ""}`).join("\n") +
-            (post ? "\n" + postText(post, [...p.above, ...p.below]) : ""),
-        );
+        const post = exactIds.has(p.id) ? posts?.[p.id] : undefined;
+        add(`[${p.name} 자세히]\n` + mons.map(monsterLine).join("\n") + (post ? "\n" + postText(post, [...p.above, ...p.below]) : ""));
       }
     }
     if (job) {
       const gear = Object.values(wiki.items)
-        .flatMap((it) => it.equip.map((e) => ({ it, e })))
-        .filter(({ e }) => (e.info["직업"] === job || e.info["직업"] === "공용") && Math.abs(Number(e.info["레벨제한"]) - level) <= 5)
+        .flatMap((it) => (it.equip ?? []).map((e) => ({ it, e })))
+        .filter(({ e }) => (e.info["직업"] === job || e.info["직업"] === "공용") && Number(e.info["레벨제한"]) >= lo - 5 && Number(e.info["레벨제한"]) <= hi + 5)
         .sort((a, b) => Number(b.e.info["레벨제한"]) - Number(a.e.info["레벨제한"]))
-        .slice(0, 16);
+        .slice(0, askedRange ? 24 : 16);
       if (gear.length) {
         found.push(`${job} 장비 ${gear.length}개`);
         add(
-          `[직업 장비: ${job}, Lv.${level - 5}~${level + 5}]\n` +
+          `[직업 장비: ${job}, Lv.${lo - 5}~${hi + 5}]\n` +
             gear
               .map(({ it, e }) =>
                 [
@@ -377,20 +507,25 @@ export function wikiContext(
   // 제목에 레벨 범위가 있는 공략(초급 Lv.1~33, 중급 34~43, 고급 44~55)은 레벨이 맞는 것만 (챗봇 개선 2026-10-31:
   // '48렙 레인저'에 초급, 중급 공략이 붙고 고급이 빠졌다)
   if (posts) {
-    const ws = words(asked);
+    // '아이모', 묻는 말, 흔한 말('좋아져', '올라', '얼마나', '그리고')로는 제목·본문을 찾지 않는다 (챗봇 개선 2026-11-10: '아이모 에서 힘1 당'에 제목에 아이모가 든 글 셋이 붙었다)
+    const ws = words(asked).filter((w) => w !== "아이모" && !ASK_WORD.test(w) && !STOP_WORD.test(w));
     const scored = wiki.menu
       .flatMap((s) => s.posts)
       .filter((p) => !wiki.places[p.id] && posts[p.id])
       .map((p) => {
         let score = ws.filter((w) => norm(p.title).includes(norm(w))).length;
-        if (job && !askedJob && p.title.includes(job)) score++;
+        const jobTitle = !!job && p.title.includes(job);
+        if (jobTitle && !askedJob) score++;
+        // 직업을 알면 다른 직업의 공략·스킬 글은 붙이지 않는다 (챗봇 개선 2026-11-10: '인던30 공략'에 전사·레인저 초급 공략까지 셋이 붙었다)
+        if (job && !jobTitle && JOBS.some((j) => p.title.includes(j))) return { p, score: -1 };
         const r = titleRange(p.title);
-        if (r && level !== null) score = r[0] <= level && level <= r[1] ? (score > 0 ? score + 3 : 0) : -1;
+        // 레벨(구간)이 맞는 그 직업의 공략은 제목 낱말이 없어도 붙인다 (챗봇 개선 2026-11-10: '41레인저 사냥터 알려주라'에 레인저 중급 공략이 안 붙었다)
+        if (r && lo !== null && hi !== null) score = r[0] <= hi && lo <= r[1] ? (score > 0 ? score + 3 : jobTitle ? 3 : 0) : -1;
         return { p, score };
       })
       .filter((x) => x.score > 0)
       .sort((a, b) => b.score - a.score)
-      .slice(0, photo ? 3 : 2); // 사진 질문은 공략과 직업 스킬 글을 같이 (장비, 스킬 우선순위를 묻는 일이 많다)
+      .slice(0, 3); // 공략과 직업 스킬 글을 같이 (장비, 스킬 우선순위를 묻는 일이 많다). 레벨 구간이면 초급·중급 공략이 둘 다 든다
     for (const { p } of scored) {
       found.push(p.title);
       add(`[${p.title}]\n` + postText(posts[p.id]));
@@ -400,17 +535,27 @@ export function wikiContext(
     // 이름이 든 섹션을 먼저, 표 전체 (자르지 않는다, 제작자 2026-11-03)
     if (odds) {
       const askOdds = /확률|가챠|뽑기|깡|상자|합성|세공|재설정|염색|퍼센트|%/.test(question);
-      const terms = [...new Set([...picked.map((n) => n.name), ...ws.filter((w) => !/\d/.test(w) && !ASK_WORD.test(w) && !JOB_WORDS.includes(w) && w !== "확률")])].filter((w) => w.length >= 2);
+      // 'lv' 같은 짧은 영문과 '상자', '옵션' 같은 흔한 말로는 표를 고르지 않는다 (챗봇 개선 2026-11-10: 'Lv.40' 의 lv 가 레벨제한 칸에 걸려 엉뚱한 표가 붙었다)
+      const ODDS_STOP = /^(상자|확률|이벤트|아이템|획득|개별|옵션|무기|갑옷|장비|레벨|등급|단계|성공|실패|종류|이름|lv|[a-z]{1,2})$/i;
+      const terms = [...new Set([...picked.map((n) => n.name), ...ws.filter((w) => !/\d/.test(w) && !ASK_WORD.test(w) && !JOB_WORDS.includes(w) && !ODDS_STOP.test(w))])].filter((w) => w.length >= 2);
+      // 확률을 묻지 않은 질문에서는 이름이 나온 것(아이템, 상자)이 표 안에 있을 때만 (낱말 하나가 칸에 든 것으로는 안 고른다: '지능'이 옵션 표 수십 줄에 걸렸다)
+      const secTerms = askOdds ? terms : picked.map((n) => n.name);
       const scoredOdds = odds.tables
         .map((t) => {
           const name = norm(t.path.join(""));
           const nameHits = terms.filter((w) => name.includes(norm(w))).length;
-          const secs = [...new Set(terms.flatMap((w) => matchedSections(t, w)))];
+          const secs = [...new Set(secTerms.flatMap((w) => matchedSections(t, w)))];
           return { t, secs, score: nameHits * 3 + Math.min(secs.length, 3) };
         })
         .filter((x) => x.score >= (askOdds ? 1 : 3))
         .sort((a, b) => b.score - a.score)
-        .slice(0, 2);
+        .slice(0, 4);
+      // 질문에 분류 이름이 그대로 나오면('랜덤 코스튬 상자', '신비로운 코스튬 상자') 그 분류의 표를 모두 (챗봇 개선 2026-11-10: 랜덤 코스튬 상자 8개 표 중 둘만 붙었다)
+      for (const t of odds.tables) {
+        if (scoredOdds.length >= 12 || scoredOdds.some((x) => x.t === t)) continue;
+        const cat = t.path.length > 1 ? t.path.slice(0, -1).map(norm) : [];
+        if (cat.some((c) => c.length >= 4 && q.includes(c))) scoredOdds.push({ t, secs: [], score: 0 });
+      }
       for (const { t, secs } of scoredOdds) {
         const order = [...secs, ...t.sections.map((_, i) => i).filter((i) => !secs.includes(i))];
         const body = order
@@ -433,16 +578,30 @@ export function wikiContext(
       .filter((k) => k.length >= 2);
     const taken = new Set([...scored.map((x) => x.p.id), ...picked.map((n) => n.id).filter(Boolean)]);
     const texts = allPostTexts(wiki, posts);
+    const otherJob = (title: string) => !!job && !title.includes(job) && JOBS.some((j) => title.includes(j));
     const hits = keys
-      .map((k) => ({ k, posts: texts.filter((t) => !taken.has(t.id) && t.flat.includes(k)) }))
+      .map((k) => ({ k, posts: texts.filter((t) => !taken.has(t.id) && !otherJob(t.title) && t.flat.includes(k)) }))
       .filter((h) => h.posts.length > 0 && h.posts.length <= 25) // 너무 흔한 낱말은 자리를 못 짚는다
       .sort((a, b) => a.posts.length - b.posts.length);
+    // 조합·제작·퀘스트·얻는 곳을 물으면 재료와 재료 얻는 곳(제작소 NPC, 퀘스트)이 글의 다른 자리에 있어 둘레를 넓게 (챗봇 개선 2026-11-10: '백색레이피어 어떻게 만들어'에 세르앙의눈물 얻는 법이 빠졌다)
+    const craft = /만들|만드|제작|조합|재료|레시피|퀘스트|얻(어|나|는|을|고)|구하|구해|구함|교환|어디서|획득/.test(question);
+    const [before, after] = craft ? [1200, 1600] : [300, 900];
     let more = 0;
     for (const h of hits) {
       for (const t of h.posts) {
-        if (more >= 5 || taken.has(t.id)) continue;
-        const at = textPos(t.text, t.flat.indexOf(h.k));
-        const around = t.text.slice(Math.max(0, at - 300), at + 900);
+        if (more >= 6 || taken.has(t.id)) continue;
+        // 나온 자리마다(5번까지) 둘레를 잘라 이어 붙인다 (예전에는 처음 나온 자리 하나만)
+        const spots: number[] = [];
+        for (let i = t.flat.indexOf(h.k); i >= 0 && spots.length < 5; i = t.flat.indexOf(h.k, i + h.k.length)) spots.push(textPos(t.text, i));
+        const ranges: [number, number][] = [];
+        for (const at of spots) {
+          const s = Math.max(0, at - before);
+          const e = Math.min(t.text.length, at + after);
+          const last = ranges[ranges.length - 1];
+          if (last && s <= last[1]) last[1] = Math.max(last[1], e);
+          else ranges.push([s, e]);
+        }
+        const around = ranges.map(([s, e]) => t.text.slice(s, e)).join("\n…\n").slice(0, 6000);
         taken.add(t.id);
         more++;
         found.push(t.title);
@@ -596,15 +755,16 @@ export async function askChat(
         res = await post({ ...base, context: c.context, found: c.found });
       } else if (res.ok) {
         const thread = Number(res.headers.get("x-chat-thread"));
-        void req.later.then((c) =>
+        // 자료 보내기가 망 오류로 실패하면 조금 뒤 두 번 더 (일꾼은 자료를 2분까지 기다린다. 자료 고르기가 실패하면 빈 자료가 바로 가서 기다리지 않는다)
+        const send = (c: { context: string; found: string }, tries: number): Promise<unknown> =>
           fetch("/api/chat/context", {
             method: "POST",
             credentials: "same-origin",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ thread, context: c.context, found: c.found }),
             keepalive: c.context.length < 60_000, // 앱을 닫는 중이어도 가게 (64KB 한도)
-          }).catch(() => undefined),
-        );
+          }).catch(() => (tries > 0 ? new Promise((r) => setTimeout(r, 2500)).then(() => send(c, tries - 1)) : undefined));
+        void req.later.then((c) => send(c, 2));
       }
     } else res = await post({ ...base, context: req.context, found: req.found ?? "" });
   } catch {

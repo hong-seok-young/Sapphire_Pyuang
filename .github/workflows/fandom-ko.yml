@@ -1,0 +1,85 @@
+# 해외 아이모 팬 위키(imotwom.fandom.com) 한국어 번역 (제작자 2026-11-10 '이 사이트 모조리 긁어서 우리 db화', '해외 사이트는 한글화 잘해봐').
+# 손으로만 돈다. 비공개 자료 저장소의 fandom/articles.jsonl 을 읽어 web/scripts/translate-fandom.mjs 가 Claude(Batch API)로 옮기고,
+# 결과는 세션이 넘겨준 공개키로 암호화해 올린다 (공개 저장소라 첨부 파일을 누구나 받을 수 있고, 자료 저장소 토큰은 읽기 전용이라 여기서 올리지 못한다).
+# 세션이 받아 풀어서 자료 저장소 fandom/ko.jsonl, fandom/ko/*.md 로 넣는다. 실행 기록에는 개수만 찍는다.
+name: Fandom Korean
+
+on:
+  workflow_dispatch:
+    inputs:
+      pubkey:
+        description: "결과를 암호화할 RSA 공개키 (PEM 을 base64 한 줄로)"
+        required: true
+      limit:
+        description: "옮길 문서 수 (비우면 전부)"
+        required: false
+        default: ""
+      batch:
+        description: "이어 받을 Batch ID (지난번에 시간이 모자랐을 때)"
+        required: false
+        default: ""
+      job:
+        description: "translate = 문서 번역, images = 그림 가려내기·글자로 옮기기"
+        required: false
+        default: "translate"
+
+permissions:
+  contents: read
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out data repo
+        uses: actions/checkout@v4
+        with:
+          repository: hong-seok-young/sapphire-imo-data
+          token: ${{ secrets.DATA_REPO_TOKEN || github.token }}
+          ssh-key: ${{ secrets.DATA_DEPLOY_KEY }}
+          path: 자료
+          fetch-depth: 1
+          # 번역에는 fandom/ 만 쓴다 (그림 1GB 넘음)
+          sparse-checkout: |
+            /fandom/
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        working-directory: web
+        run: npm ci
+      - name: Translate
+        working-directory: web
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+          LIMIT: ${{ inputs.limit }}
+          BATCH: ${{ inputs.batch }}
+          JOB: ${{ inputs.job }}
+        run: |
+          set -- --out out-fandom --wait 320
+          [ -n "$LIMIT" ] && set -- "$@" --limit "$LIMIT"
+          [ -n "$BATCH" ] && set -- "$@" --batch "$BATCH"
+          if [ "$JOB" = "images" ]; then node scripts/fandom-images.mjs "$@"; else node scripts/translate-fandom.mjs "$@"; fi
+      - name: Encrypt
+        env:
+          PUBKEY: ${{ inputs.pubkey }}
+        run: |
+          echo "$PUBKEY" | base64 -d > "$RUNNER_TEMP/pub.pem"
+          tar czf "$RUNNER_TEMP/out.tgz" -C web out-fandom
+          mkdir -p enc
+          openssl rand -hex 32 > "$RUNNER_TEMP/k.txt"
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in "$RUNNER_TEMP/out.tgz" -out enc/out.tgz.enc -pass "file:$RUNNER_TEMP/k.txt"
+          openssl pkeyutl -encrypt -pubin -inkey "$RUNNER_TEMP/pub.pem" -pkeyopt rsa_padding_mode:oaep -in "$RUNNER_TEMP/k.txt" -out enc/k.enc
+          rm -f "$RUNNER_TEMP/out.tgz" "$RUNNER_TEMP/k.txt"
+          ls -la enc
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fandom-ko
+          path: enc/
+          retention-days: 7

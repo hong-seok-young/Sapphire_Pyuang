@@ -20,6 +20,7 @@ import { appContext } from "../../../server/chatapp";
 import { officialContext } from "../../../server/official";
 import { CHAT_SYSTEM as SYSTEM, WEB_TOOLS, portalSearch } from "../../../server/chatPrompt";
 import { costContext } from "../../../server/chatCost";
+import { libraryContext } from "../../../server/library";
 import { addMsg, finishInBackground, newThread, ownThread, runStub, titleOf } from "../../../server/chatlog";
 import { errorCause, errorText, isWebOff } from "../../../server/chatErrors";
 import type { RunStart } from "../../../server/chatRun";
@@ -85,7 +86,7 @@ function parseTurns(raw: unknown): ChatTurn[] | null {
   return turns;
 }
 
-function toMessages(turns: ChatTurn[], context: string, app: string, official = "", cost = ""): Anthropic.Beta.BetaMessageParam[] {
+function toMessages(turns: ChatTurn[], context: string, app: string, official = "", cost = "", library = ""): Anthropic.Beta.BetaMessageParam[] {
   return turns.map((t, i) => {
     if (i < turns.length - 1) return { role: t.role, content: t.text || "(첨부)" };
     const content: Anthropic.Beta.BetaContentBlockParam[] = [
@@ -103,6 +104,7 @@ function toMessages(turns: ChatTurn[], context: string, app: string, official = 
     if (app) content.push({ type: "text", text: `<길드 앱 자료>\n${app}\n</길드 앱 자료>` });
     if (official) content.push({ type: "text", text: `<컴투스 공식 소식>\n${official}\n</컴투스 공식 소식>` });
     if (cost) content.push({ type: "text", text: `<과금 계산 자료>\n${cost}\n</과금 계산 자료>` });
+    if (library) content.push({ type: "text", text: `<길드 자료 저장소>\n${library}\n</길드 자료 저장소>` });
     if (context) content.push({ type: "text", text: `<위키 자료>\n${context}\n</위키 자료>` });
     const portals = portalSearch(t.text);
     if (portals) content.push({ type: "text", text: `<포털 검색 주소>\n${portals}\n</포털 검색 주소>` });
@@ -146,7 +148,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
 
   // 길드 앱 자료 (앞 질문까지 보고 고른다: '그 사람 레벨은?' 같은 이어 묻기). 못 읽어도 답은 한다
   const asked = turns.filter((t) => t.role === "user").slice(-2).map((t) => t.text).join("\n");
-  const [app, official, cost] = await Promise.all([
+  const [app, official, cost, library] = await Promise.all([
     appContext(env, me, asked, Date.now(), request).catch((e) => {
       console.error("chat app context failed", e);
       return "";
@@ -159,6 +161,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
     // 확률형 상품의 기대값·비용 계산 자료 (플래티넘 충전표, 골드 시세. server/chatCost.ts)
     costContext(env, asked).catch((e) => {
       console.error("chat cost context failed", e);
+      return "";
+    }),
+    // 제작자가 자료 저장소에 올린 모든 글 자료 (카톡, 정리 글, 대화로 준 설명 …, server/library.ts)
+    libraryContext(env, me, asked).catch((e) => {
+      console.error("chat library context failed", e);
       return "";
     }),
   ]);
@@ -182,7 +189,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
     output_config: { effort: "high" }, // 제작자 요청 2026-11-02 '비용 신경 쓰지 말고 무조건 퀄리티' (전에는 medium)
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     ...(web ? { tools: WEB_TOOLS } : {}),
-    messages: toMessages(turns, context, app, official, cost),
+    messages: toMessages(turns, context, app, official, cost, library),
   });
   const last = turns[turns.length - 1];
 

@@ -143,9 +143,16 @@ export interface GcData {
   nextMilestone: GcMilestone | null;
   /** 연속 성장: 지난주까지 이어진 주 수, 이번 주도 벌면 받을 보너스 */
   streak: { count: number; next: number };
-  admin?: { pending: GcOrder[]; recent: GcOrder[]; members: GcWallet[]; results?: GcRoundResult[] };
+  admin?: { pending: GcOrder[]; recent: GcOrder[]; members: GcWallet[]; results?: GcRoundResult[]; people?: GcPerson[]; hidden?: string[] };
 }
 
+/** 주간 목표 대상으로 고를 수 있는 사람 (레벨을 적은 계정 모두, guild main = 1군 · second = 2군, main = 본캐 아이디면 부캐) */
+export interface GcPerson {
+  id: string;
+  level: number;
+  guild: string | null;
+  main: string | null;
+}
 /** 끝난 판의 결과 한 줄 (담당자 > 기록) */
 export interface GcRoundResult {
   round: number;
@@ -169,6 +176,8 @@ export const setRound = (from: string, to: string) =>
   api<{ ok: boolean }>("/api/gcoin/round", "PUT", { from, to });
 export const setTarget = (userId: string, target: number | null) =>
   api<{ ok: boolean }>("/api/gcoin/targets", "PUT", { userId, target });
+/** 담당자: 목표 목록에서 빼기 (2군 본캐가 저절로 다시 들어오지 않게) */
+export const hideTarget = (userId: string) => api<{ ok: boolean }>("/api/gcoin/targets", "PUT", { userId, hide: true });
 export const buyItem = (itemId: number, qty: number) =>
   api<{ ok: boolean; balance: number }>("/api/gcoin/orders", "POST", {
     itemId,

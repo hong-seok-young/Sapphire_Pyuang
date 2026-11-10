@@ -73,6 +73,11 @@ jobs:
           ssh-key: ${{ secrets.DATA_DEPLOY_KEY }}
           path: 자료
           fetch-depth: 1
+          # 해외 위키 그림(이미지/fandom, 1GB 넘음)은 배포에 안 쓰여서 받지 않는다 (2026-11-10)
+          sparse-checkout: |
+            /*
+            !/이미지/fandom/
+          sparse-checkout-cone-mode: false
           persist-credentials: false
 
       - uses: actions/setup-python@v5
@@ -111,6 +116,12 @@ jobs:
       - name: Hall of fame (old donations)
         working-directory: web
         run: node scripts/donate-hall-seed.mjs || echo "::warning::명예의 전당 예전 기부를 넣지 못했어요"
+
+      # 자료 저장소의 모든 글 자료를 챗봇이 읽게 D1 lib_chunks 에 (제작자 2026-11-10 '새로운 데이터가 레포에 등록되면 모조리 읽어서 답변에'. 바뀐 파일만, scripts/library-sync.mjs).
+      # 자료 저장소 main 이 바뀌면 data-watch.yml 이 이 배포를 다시 부른다
+      - name: Data library (chatbot)
+        working-directory: web
+        run: node scripts/library-sync.mjs --sha "$(git -C ../자료 rev-parse HEAD)" || echo "::warning::자료 저장소를 챗봇 자료로 넣지 못했어요"
 
       # 컴투스 공식 소식: 최근 글을 새로 받고(30분마다 도는 공식 소식 작업과 같다), 한국 전용 글은 한국 PC에서 받아 둔 파일로 넣는다
       # (withhive 는 한국 밖 서버에는 빼고 준다. 파일은 저장한 때보다 늦게 새로 받은 글을 덮지 않는다, scripts/fetch-official.mjs)
