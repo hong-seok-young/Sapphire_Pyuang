@@ -381,6 +381,14 @@ CREATE TABLE IF NOT EXISTS push_subs (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS push_subs_user ON push_subs (user_id);
+-- 모두에게 가는 알림처럼 40대 넘게 보낼 폰 알림 (server/push.ts drainPushQueue): /api/news 가 40대씩 이어 보낸다. last = 마지막으로 보낸 폰 주소
+CREATE TABLE IF NOT EXISTS push_queue (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  last TEXT NOT NULL,
+  claimed_at INTEGER
+);
 -- 폰 알림 서명 키 (서버가 처음 쓸 때 만든다. 한 줄)
 CREATE TABLE IF NOT EXISTS push_keys (
   id INTEGER PRIMARY KEY,
