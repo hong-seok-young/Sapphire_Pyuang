@@ -36,6 +36,10 @@ jobs:
           ssh-key: ${{ secrets.DATA_DEPLOY_KEY }}
           path: 자료
           fetch-depth: 1
+          # 번역에는 fandom/ 만 쓴다 (그림 1GB 넘음)
+          sparse-checkout: |
+            /fandom/
+          sparse-checkout-cone-mode: false
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:

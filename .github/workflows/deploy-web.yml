@@ -73,6 +73,11 @@ jobs:
           ssh-key: ${{ secrets.DATA_DEPLOY_KEY }}
           path: 자료
           fetch-depth: 1
+          # 해외 위키 그림(이미지/fandom, 1GB 넘음)은 배포에 안 쓰여서 받지 않는다 (2026-11-10)
+          sparse-checkout: |
+            /*
+            !/이미지/fandom/
+          sparse-checkout-cone-mode: false
           persist-credentials: false
 
       - uses: actions/setup-python@v5
