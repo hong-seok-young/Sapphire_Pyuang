@@ -10,6 +10,7 @@ import type { Dex, DexEntry, DexItem } from "../data";
 import type { Me } from "../auth";
 import type { Wiki } from "../types";
 import { iconLookup } from "../simIcons";
+import { weaponOf } from "../rental";
 import type { IconOf } from "../simIcons";
 import { Loading, Panel, PicImg, TopBar } from "../ui";
 
@@ -51,7 +52,8 @@ function addUp(entries: DexEntry[]): Sum {
   return s;
 }
 const num = (v: number) => String(Math.round(v * 100) / 100);
-const effectText = ([stat, v, pct]: [string, number, boolean]) => `${stat} +${num(v)}${pct ? "%" : ""}`;
+/** 효과 글자 (긴 이름은 획득 옵션 칸과 같은 줄임말 SHORT, 제작자 2026-11-10 '아래쪽도 위처럼 줄임말') */
+const effectText = ([stat, v, pct]: [string, number, boolean]) => `${SHORT[stat] ?? stat} +${num(v)}${pct ? "%" : ""}`;
 
 /** 게임 도감 '획득 옵션' 창의 37줄 (제작자가 시세 동향 때 보낸 스샷 7장, 2026-11-03). 체력·마나·PVE 데미지 같은 것은 고정값 줄과 % 줄이 따로 있다.
  *  좌우 두 칸 짝으로 둔다 (제작자 2026-11-10 '바를 빼고 최대한 유사한 것들끼리 좌우 2열 배치'). null = 빈 칸. 37줄이 모두 한 번씩 들어 있다 */
@@ -273,7 +275,7 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
 
       <ul className="dex-list" ref={listRef}>
         {listed.map((e) => (
-          <EntryRow key={e.name} e={e} listW={listW} done={done.has(e.name)} onToggle={() => toggle(e.name)} iconOf={iconOf} stat={stat} onItem={(name) => setQ(name)} />
+          <EntryRow key={e.name} e={e} listW={listW} done={done.has(e.name)} onToggle={() => toggle(e.name)} iconOf={iconOf} stat={stat} onItem={(name) => setQ(name)} wiki={wiki} />
         ))}
       </ul>
       {!listed.length && <p className="muted dex-empty">맞는 항목이 없어요</p>}
@@ -367,7 +369,29 @@ function slotSize(n: number, listW: number): number | null {
   return SLOT_SIZES.find((sz) => n * (sz + 2) <= room) ?? null;
 }
 
-function EntryRow({ e, listW, done, onToggle, iconOf, stat, onItem }: { e: DexEntry; listW: number; done: boolean; onToggle: () => void; iconOf: IconOf; stat: string | null; onItem: (name: string) => void }) {
+/** 칸 상세의 아이템 정보: 영상 툴팁에서 받아 적은 것(요구 레벨·방어력·옵션, 재료면 설명) + 위키의 옵션 범위·직업·얻는 곳 (제작자 2026-11-10 '이미지랑 내용 장비옵션 다') */
+function ItemInfo({ it, wiki }: { it: DexItem; wiki: Wiki | null }) {
+  const base = it.name?.replace(/^\+\d+\s*/, "");
+  const w = wiki && base ? weaponOf(wiki, base) : undefined;
+  const eq = w?.equip?.[0]?.info;
+  const from = (eq?.["획득처"] ? [eq["획득처"]] : (w?.from ?? []).map((f) => f.split("@")[0])).filter(Boolean);
+  const lines = [
+    it.info,
+    eq?.["옵션"] ? `옵션 ${eq["옵션"]}` : "",
+    eq?.["직업"] ? `직업 ${eq["직업"]}` : "",
+    from.length ? `얻는 곳 ${[...new Set(from)].slice(0, 6).join(", ")}` : "",
+  ].filter(Boolean);
+  if (!lines.length) return null;
+  return (
+    <span className="dex-info">
+      {lines.map((l, i) => (
+        <small key={i}>{l}</small>
+      ))}
+    </span>
+  );
+}
+
+function EntryRow({ e, listW, done, onToggle, iconOf, stat, onItem, wiki }: { e: DexEntry; listW: number; done: boolean; onToggle: () => void; iconOf: IconOf; stat: string | null; onItem: (name: string) => void; wiki: Wiki | null }) {
   const [sel, setSel] = useState<number | null>(null);
   const it = sel === null ? null : e.items[sel];
   const ref = useRef<HTMLLIElement>(null);
@@ -414,6 +438,7 @@ function EntryRow({ e, listW, done, onToggle, iconOf, stat, onItem }: { e: DexEn
           <b>{itemLabel(it)}{it.est ? "?" : ""}</b>
           <span className="muted">×{it.n.toLocaleString("ko-KR")}</span>
           {stampText(it) && <small className={stampCls(it.sg)}>{it.sg === "불가" ? stampText(it) : `${it.sg?.startsWith("아바돈") ? "아바돈 " : ""}장비스탬프 ${it.sg?.replace("아바돈", "")} ${it.sn}개`}</small>}
+          <ItemInfo it={it} wiki={wiki} />
           {it.name && (
             <button type="button" className="sub-tab dex-find" onClick={() => onItem(it.name!.replace(/^\+\d+\s*/, ""))}>
               이 템 찾기

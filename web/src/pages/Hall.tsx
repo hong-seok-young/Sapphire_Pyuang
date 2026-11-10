@@ -13,10 +13,147 @@ import { Loading, TopBar } from "../ui";
 import { PLACE_NAME, dayText, fetchHall, goldText, mileText, sampleHall } from "../donate";
 import type { GiftLine, HallRow } from "../donate";
 
-function Face({ h, size }: { h: HallRow; size: number }) {
+function Face({ h, size, rank }: { h: HallRow; size: number; rank: number }) {
   if (h.avatar) return <img className="growth-face" src={avatarUrl(h.name, h.avatar)} alt="" style={{ maxWidth: size, maxHeight: size }} draggable={false} />;
   if (h.job) return <JobEmblem job={h.job} size={size} />;
-  return <span className="hof-face-none">🎁</span>;
+  return <GemFace size={Math.round(size * 0.92)} rank={rank} />;
+}
+
+/* 사진·직업이 없는 사람(앱에 없는 기부자)의 자리: 보석 (제작자 2026-11-10 선물 상자 '별론데' -> 초안 5개 중 보석 -> 브릴리언트 컷 -> '고급진 초호화 보석 느낌의 실제 다이아로'
+ * -> '오로라는 빼고 1 2 3위를 다른 색상으로 애니메이션 잔뜩 넣어서 알아서 색상 배치'). 1위 사파이어 + 다이아 헤일로, 2위 화이트 다이아, 3위 핑크 다이아, 4위부터 로열 블루 사파이어.
+ * 움직임(transform·opacity 만, 움직임 줄이기면 멈춘다): 보석이 살짝 떠 있고, 빛 띠가 지나가고, 면이 차례로 반짝이고, 둘레에 별이 돈다.
+ * 1·2·3위는 뒤에 숨 쉬는 빛과 도는 빛살, 1위는 헤일로 다이아가 천천히 돌며 차례로 반짝인다. 4위부터는 빛 띠만 (줄이 많아서) */
+type Lux = { shades: string[]; fire?: boolean; halo?: boolean; edge: string; glow: string };
+const SAPPHIRE: Lux = { shades: ["#d6e7ff", "#7aa8ff", "#2f62e6", "#1a3aa8", "#0a1a5e"], edge: "#bcd6ff", glow: "#4f86ff" };
+const LUX: Record<1 | 2 | 3, Lux> = {
+  1: { ...SAPPHIRE, halo: true },
+  2: { shades: ["#ffffff", "#eef7ff", "#cfe0f5", "#9fb4d4", "#6a80a8"], fire: true, edge: "#ffffff", glow: "#dfeeff" },
+  3: { shades: ["#fff2f8", "#ffc6df", "#f584b6", "#c4467f", "#7a1f4a"], edge: "#ffe0ee", glow: "#ff8fc0" },
+};
+const T = [30, 40, 50, 60, 70];
+const G = [6, 22, 38, 50, 62, 78, 94];
+const pt = (x: number, y: number) => `${x},${y}`;
+/** 브릴리언트 컷 면 [점들, 밝기 0(밝음)~4(어두움)] */
+const FACETS: [string, number][] = (() => {
+  const f: [string, number][] = [];
+  // 테이블 (위에서 비스듬히 본 윗면)
+  f.push([[pt(30, 28), pt(38, 18), pt(62, 18), pt(70, 28)].join(" "), 1]);
+  f.push([[pt(38, 18), pt(50, 23), pt(62, 18)].join(" "), 0]);
+  f.push([[pt(30, 28), pt(50, 23), pt(70, 28)].join(" "), 2]);
+  // 크라운
+  const crown = [0, 2, 1, 3, 0, 2, 1, 3, 0, 2, 1];
+  const tris: number[][][] = [];
+  tris.push([[G[0], 42], [T[0], 28], [G[1], 42]]);
+  for (let i = 0; i < 4; i++) {
+    tris.push([[G[i + 1], 42], [T[i], 28], [T[i + 1], 28]]);
+    tris.push([[G[i + 1], 42], [T[i + 1], 28], [G[i + 2], 42]]);
+  }
+  tris.push([[G[5], 42], [T[4], 28], [G[6], 42]]);
+  tris.forEach((t, i) => f.push([t.map(([x, y]) => pt(x, y)).join(" "), crown[i % crown.length]]));
+  // 거들
+  f.push([[pt(6, 42), pt(94, 42), pt(94, 45), pt(6, 45)].join(" "), 0]);
+  // 파빌리언
+  const pav = [3, 1, 4, 2, 3, 1];
+  for (let i = 0; i < 6; i++) {
+    const m = (G[i] + G[i + 1]) / 2;
+    f.push([[pt(G[i], 45), pt(m, 45), pt(50, 92)].join(" "), pav[i]]);
+    f.push([[pt(m, 45), pt(G[i + 1], 45), pt(50, 92)].join(" "), pav[(i + 3) % 6]]);
+  }
+  return f;
+})();
+const OUTLINE = [pt(6, 42), pt(30, 28), pt(38, 18), pt(62, 18), pt(70, 28), pt(94, 42), pt(94, 45), pt(50, 92), pt(6, 45)].join(" ");
+const FIRE = ["#ff6b8b", "#ffd166", "#7cf2c2", "#6fb8ff", "#c79bff"];
+const SPARK = "M0,-7 L1.4,-1.4 L7,0 L1.4,1.4 L0,7 L-1.4,1.4 L-7,0 L-1.4,-1.4 Z";
+const RAYS = Array.from({ length: 12 }, (_, i) => i * 30);
+const HALO_DOTS = Array.from({ length: 14 }, (_, i) => {
+  const a = (i / 14) * Math.PI * 2;
+  return [60 + Math.cos(a) * 54, 60 + Math.sin(a) * 54];
+});
+/** 보석 svg 의 viewBox [x, y, 너비] (정사각형): 1위는 헤일로 안쪽에 작게, 2·3위는 둘레 빛 자리를 두고, 줄은 꽉 차게 */
+const GEM_BOX: Record<"halo" | "top" | "row", [number, number, number]> = { halo: [-15.2, -13, 130.4], top: [-10, -5, 120], row: [-4, 1, 108] };
+/** 빛 띠가 보석 밖으로 나가지 않게 자르는 모양 (보석 svg 칸의 %) */
+const clipOf = ([vx, vy, vw]: [number, number, number]) =>
+  `polygon(${OUTLINE.split(" ")
+    .map((p) => {
+      const [x, y] = p.split(",").map(Number);
+      return `${(((x - vx) / vw) * 100).toFixed(1)}% ${(((y - vy) / vw) * 100).toFixed(1)}%`;
+    })
+    .join(", ")})`;
+/** 반짝이 자리 [왼쪽 %, 위 %, 크기 %, 늦춤 초, 색 쓸지] */
+const SPARKS_AT: Record<"halo" | "top", [number, number, number, number, boolean][]> = {
+  halo: [[24, 24, 20, 0, false], [78, 36, 15, 0.6, false], [50, 82, 13, 1.2, false], [84, 78, 11, 1.8, true], [14, 62, 10, 2.4, true]],
+  top: [[20, 22, 20, 0, false], [80, 30, 15, 0.6, false], [52, 70, 12, 1.2, false], [12, 58, 10, 1.8, true]],
+};
+
+function GemSvg({ v, box }: { v: Lux; box: [number, number, number] }) {
+  return (
+    <svg className="hof-lux-gem" viewBox={`${box[0]} ${box[1]} ${box[2]} ${box[2]}`}>
+      {FACETS.map(([p, k], i) => (
+        <polygon key={i} points={p} fill={v.shades[k]} />
+      ))}
+      {v.fire && FACETS.filter((_, i) => i % 4 === 1).map(([p], i) => <polygon key={`f${i}`} points={p} fill={FIRE[i % FIRE.length]} opacity={0.35} />)}
+      {FACETS.map(([p], i) => (
+        <polygon key={`e${i}`} points={p} fill="none" stroke={v.edge} strokeOpacity={0.55} strokeWidth={0.6} strokeLinejoin="round" />
+      ))}
+      <polygon points={OUTLINE} fill="none" stroke={v.shades[4]} strokeWidth={1.2} strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** 보석은 가만히 있는 svg 하나로 그리고, 움직이는 것(빛 띠, 반짝이, 빛살, 둘레 빛, 헤일로 돌기, 떠 있기)은 그 위아래의 따로 된 층이 transform·opacity 로만 움직인다.
+ * svg 안에서 움직이면 매 프레임 svg 전체를 다시 그려 폰에서 버벅였다 (CPU 4배 느리게 31fps -> 층으로 나눈 뒤 아래 시험) */
+function GemFace({ size, rank }: { size: number; rank: number }) {
+  const kind = rank === 1 ? "halo" : rank <= 3 ? "top" : "row";
+  const v = rank <= 3 ? LUX[rank as 1 | 2 | 3] : SAPPHIRE;
+  const box = GEM_BOX[kind];
+  const sheen = (
+    <span className="hof-lux-layer hof-lux-sheen-clip" style={{ clipPath: clipOf(box) }}>
+      <span className="hof-lux-sheen" style={kind === "row" ? { animationDuration: "4.6s", animationDelay: `${(rank % 5) * 0.7}s` } : undefined} />
+    </span>
+  );
+  if (kind === "row")
+    return (
+      <span className="hof-lux" style={{ width: size, height: size }}>
+        <GemSvg v={v} box={box} />
+        {sheen}
+      </span>
+    );
+  return (
+    <span className="hof-lux" style={{ width: size, height: size }}>
+      <svg className="hof-lux-layer hof-lux-rays" viewBox="0 0 120 120" aria-hidden>
+        {RAYS.map((a) => (
+          <rect key={a} x={58.6} y={6} width={2.8} height={30} rx={1.4} fill={v.glow} opacity={0.35} transform={`rotate(${a} 60 60)`} />
+        ))}
+      </svg>
+      <span className="hof-lux-layer hof-lux-glow" style={{ background: `radial-gradient(circle, ${v.glow}d9 0%, ${v.glow}00 68%)` }} />
+      {kind === "halo" && (
+        <svg className="hof-lux-layer hof-lux-halo" viewBox="0 0 120 120" aria-hidden>
+          <defs>
+            <radialGradient id="hofHaloDot" cx="35%" cy="30%" r="70%">
+              <stop offset="0" stopColor="#fff" />
+              <stop offset="0.6" stopColor="#dfeaf7" />
+              <stop offset="1" stopColor="#8fa3c4" />
+            </radialGradient>
+          </defs>
+          <circle cx={60} cy={60} r={54} fill="none" stroke="#e7ecf5" strokeWidth={3} />
+          {HALO_DOTS.map(([x, y], i) => (
+            <circle key={i} cx={x} cy={y} r={5.2} fill="url(#hofHaloDot)" stroke="#fff" strokeWidth={0.8} />
+          ))}
+        </svg>
+      )}
+      <span className="hof-lux-layer hof-lux-float">
+        <GemSvg v={v} box={box} />
+        {sheen}
+      </span>
+      {SPARKS_AT[kind].map(([l, t, s, d, tint], i) => (
+        <span key={i} className="hof-lux-spark" style={{ left: `${l}%`, top: `${t}%`, width: `${s}%`, height: `${s}%`, animationDelay: `${d}s` }}>
+          <svg viewBox="-7 -7 14 14">
+            <path d={SPARK} fill={tint ? v.glow : "#fff"} />
+          </svg>
+        </span>
+      ))}
+    </span>
+  );
 }
 
 /* ---------- 프로필 둘레: 상장 리본(로제트) (제작자 2026-11-10 '월계수 관 별로' -> 5개 안 중 '상장 리본으로, 애니메이션 고급지고 화려하게') ----------
@@ -167,7 +304,7 @@ function Podium({ rank, h, me, open, onToggle }: { rank: 1 | 2 | 3; h: HallRow; 
         {rank === 1 && <HeroHalo />}
         <Rosette rank={rank} size={rank === 1 ? 92 : 70} />
         <span className="hof-pod-pic">
-          <Face h={h} size={rank === 1 ? 54 : 40} />
+          <Face h={h} size={rank === 1 ? 54 : 40} rank={rank} />
         </span>
       </span>
       <b className="hof-pod-name">
@@ -273,7 +410,7 @@ export function HallPage({ me }: { me: Me }) {
             <button className="hof-row-btn" onClick={() => toggle(h.name)}>
               <span className="hof-rank">{i + 4}</span>
               <span className="hof-row-face">
-                <Face h={h} size={26} />
+                <Face h={h} size={26} rank={i + 4} />
               </span>
               <span className="hof-row-name">
                 <Nick name={h.name} />
