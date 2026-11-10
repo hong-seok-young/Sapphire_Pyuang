@@ -15,6 +15,7 @@ import datetime
 import json
 import math
 import re
+import shutil
 import statistics
 import sys
 from collections import defaultdict
@@ -31,19 +32,60 @@ ICON_DIR = ROOT / "자료" / "이미지" / "시세동향"
 BODY = re.compile(r"갑옷|옷|로브|드레스|비늘|흉골|협의|화복|풍운의|경갑|경기의상|나들이복")
 
 
-def icon_for(name: str) -> str | None:
-    """시세 동향 물건 이름 -> data/trend/<그림>.png. 괄호 설명을 떼고 같은 이름, 없으면 '플랑 세트'처럼 앞말로 시작하는 부위 중 몸통"""
-    if not ICON_DIR.exists():
+# 시세동향 그림이 없을 때 찾아보는 다른 그림 (2026-11-10 제작자 '다른 쪽에 이미지 다 있을 텐데'): 성장코인샵 물건 칸(이미 /data/gcoin/ 으로 나감),
+# 도감 영상에서 자른 것, 카페 글의 아이템 그림 (둘은 /data/trend/ 로 복사)
+GCOIN_DIR = ROOT / "자료" / "이미지" / "성장코인샵"
+MORE_DIRS = [ROOT / "자료" / "이미지" / "도감", ROOT / "자료" / "이미지" / "아이템"]
+TREND_OUT = ROOT / "web" / "public" / "data" / "trend"
+_more: dict[str, Path] | None = None
+
+
+def _pic_key(s: str) -> str:
+    return re.sub(r"\s", "", s.rstrip("("))
+
+
+def other_icon(base: str) -> str | None:
+    """이름이 똑같은(띄어쓰기 무시) 다른 그림"""
+    global _more
+    # 'S등급 무기마법서' -> 카페 그림 이름 '무기마법서(S등급)'
+    m = re.fullmatch(r"(SS|S|A|B|C|D)등급\s*(무기|갑옷)마법서", base)
+    if m:
+        base = f"{m.group(2)}마법서({m.group(1)}등급)"
+    k = _pic_key(base)
+    if GCOIN_DIR.exists():
+        for f in GCOIN_DIR.glob("*.png"):
+            if _pic_key(f.stem) == k:
+                return f"/data/gcoin/{f.name}"
+    if _more is None:
+        _more = {}
+        for d in MORE_DIRS:
+            if d.exists():
+                for f in sorted(d.glob("*.png")):
+                    _more.setdefault(_pic_key(f.stem), f)
+    f = _more.get(k)
+    if not f:
         return None
+    TREND_OUT.mkdir(parents=True, exist_ok=True)
+    dst = TREND_OUT / f"{k}.png"
+    if not dst.exists():
+        shutil.copy2(f, dst)
+    return f"/data/trend/{k}.png"
+
+
+def icon_for(name: str) -> str | None:
+    """시세 동향 물건 이름 -> data/trend/<그림>.png. 괄호 설명을 떼고 같은 이름, 없으면 '플랑 세트'처럼 앞말로 시작하는 부위 중 몸통,
+    그것도 없으면 다른 메뉴의 같은 이름 그림 (other_icon)"""
     base = re.sub(r"\s*\(.*\)\s*$", "", name).strip()
+    if not ICON_DIR.exists():
+        return other_icon(base)
     if (ICON_DIR / f"{base}.png").exists():
         return f"/data/trend/{base}.png"
     head = re.split(r"[ ·]", re.sub(r"\s*(세트|셋)$", "", base))[0]
     if len(head) < 2:
-        return None
+        return other_icon(base)
     cands = sorted(p.stem for p in ICON_DIR.glob(f"{head}*.png"))
     if not cands:
-        return None
+        return other_icon(base)
     body = [c for c in cands if BODY.search(c[len(head):])]
     return f"/data/trend/{(body or cands)[0]}.png"
 
@@ -322,6 +364,8 @@ ALIASES: dict[str, str | None] = {
     "연격장": "연속공격의장갑", "골장": "강철골렘장갑", "설원가죽옷": "설인가죽옷", "세계롶잎": "세계수잎로브",
     "회바갑": "회색바위의갑옷", "회바투": "회색바위의투구", "회바뚝": "회색바위의투구", "회바신": "회색바위의장화", "샤쿤신발": "샤쿤그리브", "티타눔부츠": "티타늄부츠",
     "설원장": "설원의저주장화", "설원신": "설원의저주장화", "샤보": "샤도우보우", "하갑": "하이가드갑옷", "티벨": "티타늄벨트",  # 제작자 확인
+    # 2026-11-10 정리 때 더함 (톡방 글로 짐작: '지2 레이븐 3', '5맹독신 민3 이속7', '크2 육오트윌갑 9', '6철실(속저x) 2.5장' 의 실 = 쉴드)
+    "레이븐": "레이븐목걸이", "맹독신": "맹독의장화", "오트윌갑": "오트윌의경갑", "철실": "철갑쉴드", "닼실": "다크스틸쉴드",
     "거뼈": "거미줄뼈갑옷", "황목": "황금목걸이", "닥스": "다크스컬", "글라": "글라디우스", "숲요장": "숲요정의장갑", "속모": "속전속결의모자", "속전모": "속전속결의모자", "사용장": "사막용병의장갑", "재벨": "재생의벨트", "데조모": "데조르바의모자", "강장": "강철골렘장갑",
 }
 

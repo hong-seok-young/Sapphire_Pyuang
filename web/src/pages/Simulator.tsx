@@ -19,7 +19,7 @@ import { CAT_NAME, CoinCtx, SpaceCtx, fetchKing, luckOf, reachWithin, simUrl, st
 import type { Cat, King, SimRec, Space } from "../simRank";
 import { BAG_MAX, SaveCtx, expOf, legacySave, raiseExp, restoreFromRecords, useKept, useSave, useSaveState } from "../simState";
 import type { SimSave } from "../simState";
-import { QuestCtx, titleOf, todayQuests, useQuest } from "../simQuest";
+import { QuestCtx, kstDay, titleOf, todayQuests, useQuest } from "../simQuest";
 import type { SimEvent } from "../simQuest";
 import { api } from "../auth";
 import { fetchEventOdds } from "../official";
@@ -48,7 +48,8 @@ export function pctText(p: number): string {
   const d = v >= 10 ? 1 : v >= 1 ? 2 : 3;
   return `${Number(v.toFixed(d))}%`;
 }
-const n0 = (v: number) => (v >= 1e9 ? `${(v / 1e8).toFixed(0)}억` : v >= 1e5 ? `${(v / 1e4).toFixed(v >= 1e6 ? 0 : 1)}만` : Math.round(v).toLocaleString());
+// 1억 ~ 10억은 '1.1억' (예전에는 '10667만'으로 보였다)
+const n0 = (v: number) => (v >= 1e8 ? `${Number((v / 1e8).toFixed(v >= 1e9 ? 0 : 1))}억` : v >= 1e5 ? `${(v / 1e4).toFixed(v >= 1e6 ? 0 : 1)}만` : Math.round(v).toLocaleString());
 
 /** 숫자가 바뀌면 잠깐 굴러가며 바뀐다 */
 function Count({ value, ms = 500 }: { value: number; ms?: number }) {
@@ -117,39 +118,51 @@ export function SimulatorPage({ wiki, me, space }: { wiki: Wiki; me: Me; space: 
     );
   }, [saveState, space, me.id]);
   const today = (coin.wallet?.rules.reduce((t, r) => t + r.n * r.coin, 0) ?? 0) + (coin.wallet?.quests.filter(Boolean).length ?? 0) * (coin.wallet?.questCoin ?? 0);
-  // 오늘의 도전 (src/simQuest.ts): 결과마다 알리면 맞는 도전을 깨고 코인을 받는다
-  const quests = useMemo(() => todayQuests(), []);
+  // 오늘의 도전 (src/simQuest.ts): 결과마다 알리면 맞는 도전을 깨고 코인을 받는다.
+  // 화면을 켜 둔 채 0시가 지나면 새 날의 도전으로 바꾼다 (예전에는 어제 도전을 깨면 오늘 같은 번호 도전의 코인이 들어갔다)
+  const { reload } = coin;
+  const [day, setDay] = useState(kstDay);
+  const quests = useMemo(() => todayQuests(day), [day]);
   const [done, setDone] = useState<boolean[]>([false, false, false]);
   const doneRef = useRef(done);
+  const doneDay = useRef(day);
   useEffect(() => {
-    if (coin.wallet) {
-      doneRef.current = coin.wallet.quests;
-      setDone(coin.wallet.quests);
-    }
+    if (!coin.wallet) return;
+    // 서버 값에 이 화면에서 막 깬 것을 더한다 (보낸 도전이 서버에 닿기 전에 지갑을 다시 받으면 깬 표시가 풀리고 축하가 또 떴다)
+    const now = kstDay();
+    const mine = doneDay.current === now ? doneRef.current : [false, false, false];
+    doneDay.current = now;
+    setDay(now);
+    doneRef.current = coin.wallet.quests.map((x, i) => x || !!mine[i]);
+    setDone(doneRef.current);
   }, [coin.wallet]);
   const [cheer, setCheer] = useState<{ text: string; n: number } | null>(null);
   const emit = useCallback(
     (e: SimEvent) => {
+      if (kstDay() !== day) {
+        reload();
+        return;
+      }
       quests.forEach((q, i) => {
         if (doneRef.current[i] || !q.done(e)) return;
         doneRef.current = doneRef.current.map((x, j) => x || j === i);
         setDone(doneRef.current);
         setCheer((c) => ({ text: q.text, n: (c?.n ?? 0) + 1 }));
-        api<{ coins: number; got: boolean }>(simUrl("/api/sim/wallet", space), "POST", { quest: i }).then(() => coin.reload(), () => undefined);
+        api<{ coins: number; got: boolean }>(simUrl("/api/sim/wallet", space), "POST", { quest: i }).then(() => reload(), () => undefined);
       });
     },
-    [quests, coin, space],
+    [quests, day, reload, space],
   );
   useEffect(() => {
     if (!cheer) return;
     const t = window.setTimeout(() => setCheer(null), 2600);
     return () => window.clearTimeout(t);
   }, [cheer]);
-  // 전광판은 30초마다 다시
+  // 전광판은 30초마다 다시 (예전에는 시도할 때마다 화면이 다시 그려지며 타이머가 새로 시작돼, 누르는 동안에는 전광판이 바뀌지 않았다)
   useEffect(() => {
-    const t = window.setInterval(() => document.visibilityState === "visible" && coin.reload(), 30_000);
+    const t = window.setInterval(() => document.visibilityState === "visible" && reload(), 30_000);
     return () => window.clearInterval(t);
-  }, [coin]);
+  }, [reload]);
   // 위키에 없는 물건(코스튬 등)의 그림 목록 (시세 동향 그림, 없으면 위키 그림만)
   const [trendPics, setTrendPics] = useState<Record<string, [number, number]> | null>(null);
   useEffect(() => {

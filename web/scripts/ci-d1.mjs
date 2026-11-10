@@ -777,3 +777,23 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
     console.log(`알림 설정 모두 켬 (꺼져 있던 줄 ${n}개, 한 번)`);
   }
 }
+
+// 예전 기부(기부자별 내역)로 마일리지를 받은 사람에게 알림 (제작자 2026-11-10 'ㄱ'): 장부의 '기부함 · 예전 기부…' 줄 합이 0 보다 큰 앱 계정마다 한 번 장비대여 알림.
+// 폰 알림은 같은 때·종류로 push_queue 에 적어 두면 /api/news 가 40대씩 보낸다 (server/push.ts drainPushQueue). setup 'mileage_notice_old_20261110' 로 한 번만
+{
+  const KEY = "mileage_notice_old_20261110";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const now = Date.now();
+    const NOT_DONE = `NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}')`;
+    runSql([
+      "INSERT INTO alerts (user_id, kind, text, link, created_at) " +
+        `SELECT m.who, 'rent', '[장비대여] 예전에 기부하신 것으로 마일리지가 💎' || m.n || ' 들어왔어요 · 대여 보증금으로 쓸 수 있어요', '#/rent?v=apps', ${now} ` +
+        "FROM (SELECT who, SUM(delta) AS n FROM rental_mileage WHERE reason = 'donate' AND note LIKE '기부함 · 예전 기부%' GROUP BY who) m " +
+        `JOIN users u ON u.id = m.who WHERE m.n > 0 AND COALESCE((SELECT p.enabled FROM alert_prefs p WHERE p.user_id = m.who AND p.kind = 'rent'), 1) = 1 AND ${NOT_DONE};`,
+      `INSERT INTO push_queue (kind, created_at, last, claimed_at) SELECT 'rent', ${now}, '', NULL WHERE EXISTS (SELECT 1 FROM alerts WHERE kind = 'rent' AND created_at = ${now}) AND ${NOT_DONE};`,
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+    ]);
+    const n = queryFirst(`SELECT COUNT(*) AS n FROM alerts WHERE kind = 'rent' AND created_at = ${now}`)?.n ?? 0;
+    console.log(`예전 기부 마일리지 알림 ${n}명 (한 번)`);
+  }
+}

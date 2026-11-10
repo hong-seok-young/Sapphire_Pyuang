@@ -256,6 +256,6 @@ export async function grantRentDonation(env: Env, me: User, now = Date.now()): P
     )
       .bind(r.id, give, now)
       .run();
-    await notify(env, [r.id], "rent", `[장비대여] 기부하신 장비로 마일리지 💎${give} 가 들어왔어요 · 대여 보증금으로 쓸 수 있어요`, "#/rent?v=apps", "");
+    await notify(env, [r.id], "rent", `[장비대여] 기부하신 장비로 마일리지가 💎${give} 들어왔어요 · 대여 보증금으로 쓸 수 있어요`, "#/rent?v=apps", "");
   }
 }
