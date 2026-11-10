@@ -7,6 +7,8 @@ import { useAsync } from "../data";
 import { Nick } from "../kakao";
 import { useEntryState } from "../router";
 import { weaponOf } from "../rental";
+import { ENCHANTS, ENCHANT_CATEGORIES, ENHANCE_CATEGORIES, categoryOf, inRoll, itemFacts, rollHint } from "../market";
+import type { Enchant } from "../market";
 import type { Item, Wiki } from "../types";
 import { FitLine, Loading, PicImg, TopBar } from "../ui";
 import {
@@ -18,6 +20,7 @@ import {
   dayText,
   diaText,
   mileText,
+  donateExtra,
   donateLabel,
   editDonate,
   fetchDonate,
@@ -91,45 +94,154 @@ interface FormState {
   enhance: string;
   gold: string;
   note: string;
+  /** 위키 장비의 범위 옵션마다 적은 값 (옵션 이름 -> 글자) */
+  opts: Record<string, string>;
+  /** 범위 옵션이 없는 것(위키에 없는 물건 등)의 옵션 줄글 ('지3 마재2', 서버가 '지능 3 · 마나재생 2' 로 통일) */
+  optText: string;
+  /** 속성부여 ('힘', 값) */
+  ench: Enchant | null;
+  enchVal: number | null;
 }
-const EMPTY: FormState = { item: "", qty: "1", enhance: "0", gold: "", note: "" };
-const fromRow = (r: DonateRow, gold: number | null): FormState => ({
-  item: r.item,
-  qty: String(r.qty),
-  enhance: String(r.enhance),
-  gold: gold === null ? "" : String(gold),
-  note: r.note ?? "",
-});
-function toInput(f: FormState): DonateInput | string {
+const EMPTY: FormState = { item: "", qty: "1", enhance: "0", gold: "", note: "", opts: {}, optText: "", ench: null, enchVal: null };
+/** '명중 9 · 크리티컬 4' -> { 명중: '9', 크리티컬: '4' } */
+const optsOf = (s: string | null) =>
+  Object.fromEntries(
+    (s ?? "")
+      .split("·")
+      .map((p) => /^(.+?)\s*([\d.]+)%?$/.exec(p.trim()))
+      .filter((m): m is RegExpExecArray => !!m)
+      .map((m) => [m[1].trim(), m[2]]),
+  );
+const fromRow = (r: DonateRow, gold: number | null): FormState => {
+  const em = /^(\S+) (\d+)$/.exec(r.enchant ?? "");
+  const ench = em ? ENCHANTS.find((e) => e.name === em[1]) : undefined;
+  return {
+    item: r.item,
+    qty: String(r.qty),
+    enhance: String(r.enhance),
+    gold: gold === null ? "" : String(gold),
+    note: r.note ?? "",
+    opts: optsOf(r.options),
+    optText: r.options ?? "",
+    ench: ench?.key ?? null,
+    enchVal: ench && em ? Number(em[2]) : null,
+  };
+};
+/** 위키 장비면 그 장비의 종류·옵션 (강화·속성부여가 되는지, 범위 옵션) */
+function gearOf(wiki: Wiki | null, name: string) {
+  const it = wiki && name.trim() ? weaponOf(wiki, name.trim()) : undefined;
+  const cat = categoryOf(it);
+  if (!it || !cat) return null;
+  const facts = itemFacts(it);
+  return {
+    it,
+    cat,
+    facts,
+    enhance: ENHANCE_CATEGORIES.includes(cat) && !facts.options.notes.some((n) => n.includes("강화불가")),
+    enchant: ENCHANT_CATEGORIES.includes(cat),
+  };
+}
+function toInput(f: FormState, wiki: Wiki | null): DonateInput | string {
+  const gear = gearOf(wiki, f.item);
   const qty = num(f.qty) ?? 1;
-  const enhance = num(f.enhance) ?? 0;
+  const enhance = gear && !gear.enhance ? 0 : (num(f.enhance) ?? 0);
   const gold = num(f.gold);
   if (!f.item.trim()) return "아이템 이름을 적어 주세요";
   if (!Number.isInteger(qty) || qty < 1) return "개수가 맞지 않아요";
   if (!Number.isInteger(enhance) || enhance < 0 || enhance > 20) return "강화는 0~20 이에요";
   if (gold !== null && (!Number.isInteger(gold) || gold < 0)) return "골드 가치가 맞지 않아요";
-  return { item: f.item.trim(), qty, enhance, gold, note: f.note.trim() };
+  // 옵션은 위키 장비의 범위 옵션 중 적은 것만 (0 은 뺀다), 이름도 위키 이름으로
+  const options = gear?.facts.options.rolls.length
+    ? gear.facts.options.rolls
+        .map((r) => [r.name, num(f.opts[r.name] ?? ""), r.unit] as const)
+        .filter(([, v]) => v !== null && Number.isFinite(v) && v > 0)
+        .map(([n, v, u]) => `${n} ${v}${u}`)
+        .join(" · ")
+    : f.optText.trim();
+  const e = gear?.enchant && f.ench && f.enchVal !== null ? `${ENCHANTS.find((x) => x.key === f.ench)!.name} ${f.enchVal}` : "";
+  return { item: gear ? gear.it.name : f.item.trim(), qty, enhance, gold, note: f.note.trim(), options, enchant: e };
 }
 
 /** 아이템 · 개수 · 강화 · 골드 가치 · 메모 칸 */
+/**
+ * 아이템 · 개수 · 강화 · 옵션 · 속성부여 · 골드 가치 · 메모 칸.
+ * 위키 장비를 고르면 (제작자 2026-11-10 '헌터보우를 고르면 그 템의 옵션이 DB에 다 있으니까 옵션 적는 프리셋, 강화 정도, 속성부여 가능한 장신구면 그것도,
+ * 아니면 옵션을 줄글로, 아이템 이름도 줄글로'): 그 장비에 뜨는 옵션마다 값 칸('명중 0~11'), 강화는 강화되는 부위만, 속성부여는 장신구만. 위키에 없으면 이름·옵션 모두 줄글
+ */
 function DonateFields({ wiki, f, set, goldLabel = "골드 가치" }: { wiki: Wiki | null; f: FormState; set: (f: FormState) => void; goldLabel?: string }) {
   const gold = num(f.gold);
+  const gear = gearOf(wiki, f.item);
+  const rolls = gear?.facts.options.rolls ?? [];
+  const ench = f.ench ? ENCHANTS.find((e) => e.key === f.ench) : undefined;
   return (
     <div className="dn-fields">
       <div className="dn-row1">
         <ItemIcon wiki={wiki} name={f.item} />
         <ItemName wiki={wiki} value={f.item} onChange={(item) => set({ ...f, item })} />
       </div>
+      {gear && (
+        <p className="dn-gear">
+          {[gear.facts.level && `Lv.${gear.facts.level}`, gear.cat, gear.facts.job, ...gear.facts.stats].filter(Boolean).join(" · ")}
+          {gear.facts.options.fixed.length > 0 && <span> · {gear.facts.options.fixed.join(" · ")}</span>}
+        </p>
+      )}
       <div className="dn-row2">
         <label>
           개수
           <input inputMode="numeric" value={f.qty} onChange={(e) => set({ ...f, qty: e.target.value })} />
         </label>
-        <label>
-          강화 +
-          <input inputMode="numeric" value={f.enhance} onChange={(e) => set({ ...f, enhance: e.target.value })} />
-        </label>
+        {(!gear || gear.enhance) && (
+          <label>
+            강화 +
+            <input inputMode="numeric" value={f.enhance} onChange={(e) => set({ ...f, enhance: e.target.value })} />
+          </label>
+        )}
       </div>
+      {rolls.length > 0 && (
+        <div className="dn-opts">
+          {rolls.map((r) => {
+            const text = f.opts[r.name] ?? "";
+            const off = text !== "" && !inRoll(r, Number(text));
+            return (
+              <label key={r.name} className="dn-opt">
+                <b>{r.name}</b>
+                <input
+                  inputMode="decimal"
+                  value={text}
+                  placeholder="0"
+                  aria-label={r.name}
+                  onChange={(e) => set({ ...f, opts: { ...f.opts, [r.name]: e.target.value.replace(/[^\d.]/g, "").slice(0, 5) } })}
+                />
+                <small className={off ? "dn-opt-off" : ""}>{rollHint(r)}</small>
+              </label>
+            );
+          })}
+        </div>
+      )}
+      {gear?.enchant && (
+        <div className="dn-ench">
+          <span>속성부여</span>
+          <div className="dn-chips">
+            <button type="button" className={"pill" + (!f.ench ? " pill-on" : "")} onClick={() => set({ ...f, ench: null, enchVal: null })}>
+              없음
+            </button>
+            {ENCHANTS.map((e) => (
+              <button key={e.key} type="button" className={"pill" + (f.ench === e.key ? " pill-on" : "")} onClick={() => set({ ...f, ench: e.key, enchVal: null })}>
+                {e.name}
+              </button>
+            ))}
+          </div>
+          {ench && (
+            <div className="dn-chips">
+              {ench.values.map((v) => (
+                <button key={v} type="button" className={"pill" + (f.enchVal === v ? " pill-on" : "")} onClick={() => set({ ...f, enchVal: v })}>
+                  {ench.name} {v}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <label className="dn-gold">
         {goldLabel}
         <span className="dn-gold-in">
@@ -142,7 +254,10 @@ function DonateFields({ wiki, f, set, goldLabel = "골드 가치" }: { wiki: Wik
           </small>
         )}
       </label>
-      <input className="dn-note" value={f.note} maxLength={100} placeholder="메모 (옵션 등)" onChange={(e) => set({ ...f, note: e.target.value })} />
+      {rolls.length === 0 && (
+        <input className="dn-note" value={f.optText} maxLength={100} placeholder="옵션 (예: 지3 마재2)" onChange={(e) => set({ ...f, optText: e.target.value })} />
+      )}
+      <input className="dn-note" value={f.note} maxLength={100} placeholder="메모" onChange={(e) => set({ ...f, note: e.target.value })} />
     </div>
   );
 }
@@ -184,7 +299,7 @@ function Give({ data, wiki, me, done }: { data: DonateData; wiki: Wiki | null; m
   const [ef, setEf] = useState<FormState>(EMPTY);
   const [sure, setSure] = useState<number | null>(null);
   async function send() {
-    const v = toInput(f);
+    const v = toInput(f, wiki);
     if (typeof v === "string") return setErr(v);
     setBusy(true);
     setErr("");
@@ -199,7 +314,7 @@ function Give({ data, wiki, me, done }: { data: DonateData; wiki: Wiki | null; m
     }
   }
   async function save(id: number) {
-    const v = toInput(ef);
+    const v = toInput(ef, wiki);
     if (typeof v === "string") return setErr(v);
     try {
       await editDonate(id, v);
@@ -245,13 +360,14 @@ function Give({ data, wiki, me, done }: { data: DonateData; wiki: Wiki | null; m
                 <ItemIcon wiki={wiki} name={r.item} size={20} />
                 <span className="dn-line-name">
                   <span className="dn-label">{donateLabel(r)}</span>
+                  {donateExtra(r) && <small className="dn-extra">{donateExtra(r)}</small>}
                   <small>
                     {dayText(r.created_at)}
                     {r.who !== me.id && <> · {r.who}</>}
                   </small>
                 </span>
                 <span className="dn-line-gold">
-                  {r.status === "done" ? goldText(r.gold ?? 0) : r.gold_ask !== null ? goldText(r.gold_ask) : "-"}
+                  {r.status === "done" || r.status === "hall" || r.status === "honor" ? goldText(r.gold ?? 0) : r.gold_ask !== null ? goldText(r.gold_ask) : "-"}
                   <small className={`dn-st dn-st-${r.status}`}>{STATUS_NAME[r.status]}</small>
                 </span>
               </div>
@@ -330,6 +446,7 @@ function Pending({ rows, wiki, done }: { rows: DonateRow[]; wiki: Wiki | null; d
             <ItemIcon wiki={wiki} name={r.item} size={20} />
             <span className="dn-line-name">
               <span className="dn-label">{donateLabel(r)}</span>
+                  {donateExtra(r) && <small className="dn-extra">{donateExtra(r)}</small>}
               <small>
                 <Nick name={r.who} /> · {dayText(r.created_at)}
               </small>
@@ -347,7 +464,7 @@ function Pending({ rows, wiki, done }: { rows: DonateRow[]; wiki: Wiki | null; d
                 <button
                   className="pill pill-on"
                   onClick={async () => {
-                    const v = toInput(f);
+                    const v = toInput(f, wiki);
                     if (typeof v === "string") return setErr(v);
                     if (v.gold === null) return setErr("골드 가치를 적어 주세요");
                     try {
@@ -398,7 +515,7 @@ function AddByStaff({ wiki, done }: { wiki: Wiki | null; done: (msg: string) => 
         className="pill pill-on dn-send"
         disabled={busy}
         onClick={async () => {
-          const v = toInput(f);
+          const v = toInput(f, wiki);
           if (typeof v === "string") return setErr(v);
           if (!who.trim()) return setErr("기부한 사람을 적어 주세요");
           if (v.gold === null) return setErr("골드 가치를 적어 주세요");
@@ -459,6 +576,7 @@ function Store({ rows, wiki, done }: { rows: DonateRow[]; wiki: Wiki | null; don
                 <ItemIcon wiki={wiki} name={r.item} size={20} />
                 <span className="dn-line-name">
                   <span className="dn-label">{donateLabel(r)}</span>
+                  {donateExtra(r) && <small className="dn-extra">{donateExtra(r)}</small>}
                   <small>
                     <Nick name={r.who} /> · {dayText(r.done_at ?? r.created_at)}
                     {r.place !== "keep" && (
@@ -534,7 +652,7 @@ function Store({ rows, wiki, done }: { rows: DonateRow[]; wiki: Wiki | null; don
                       <button
                         className="pill pill-on dn-send"
                         onClick={async () => {
-                          const v = toInput(f);
+                          const v = toInput(f, wiki);
                           if (typeof v === "string") return setErr(v);
                           try {
                             const res = await editDonate(r.id, v);

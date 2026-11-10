@@ -9,7 +9,7 @@
 import { RANK, TEST_IDS } from "./auth";
 import type { Env, User } from "./auth";
 import { notify } from "./alerts";
-import { isTerm, termDays } from "./rentalParse";
+import { isTerm, normalizeOptions, termDays } from "./rentalParse";
 import type { RentJob, RentTerm } from "./rentalParse";
 export { termDays, termName } from "./rentalParse";
 
@@ -151,7 +151,8 @@ export function checkItem(b: Record<string, unknown>): { error: string } | { ite
   const enhance = Number(b.enhance);
   const price = Number(b.price);
   const weapon = typeof b.weapon === "string" ? b.weapon.trim() : "";
-  const options = typeof b.options === "string" ? b.options.replace(/\s+/g, "") : "";
+  // 옵션은 줄임말로 통일 ('지능3 마나재생 2' -> '지3마재2', server/rentalParse.ts normalizeOptions)
+  const options = typeof b.options === "string" ? normalizeOptions(b.options) : "";
   const donor = typeof b.donor === "string" ? b.donor.trim() : "";
   const note = typeof b.note === "string" ? b.note.trim() : "";
   if (!job) return { error: "직업을 골라 주세요" };

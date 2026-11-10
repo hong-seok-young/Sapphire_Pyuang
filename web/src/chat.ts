@@ -243,6 +243,8 @@ export function wikiContext(
     if (name.length >= 2 && q.includes(norm(name))) names.push({ kind: "monster", name });
   for (const p of Object.values(wiki.places))
     if (p.name.length >= 2 && q.includes(norm(p.name))) names.push({ kind: "place", name: p.name, id: p.id });
+    // 자리 안내의 찾는말('신전' …)로도 그 사냥터를 고른다 (자료 길드/사냥터_자리.json)
+    else if (p.guide?.words.some((w) => q.includes(norm(w)))) names.push({ kind: "place", name: p.name, id: p.id });
   names.sort((a, b) => b.name.length - a.name.length);
   const picked = names.filter((n, i) => !names.slice(0, i).some((m) => norm(m.name).includes(norm(n.name)))).slice(0, 8);
 
@@ -287,6 +289,13 @@ export function wikiContext(
       const p = wiki.places[n.id];
       const mons = p.monsters.map((k) => wiki.monsters[k]).filter(Boolean).map((m) => m.name + (m.level ? ` Lv.${m.level}` : ""));
       add(`[사냥터] ${p.name} (${p.region}${levelText(p.level) ? ", " + levelText(p.level) : ""}) 몬스터: ${mons.join(", ")}`);
+      // 길드가 정한 자리 나누기 (제작자 2026-11-10, 마을모금함이 길드 잡담방에 공유한 것). 그림 주소는 답에 [[그림:주소|설명]] 으로 넣을 수 있다
+      if (p.guide)
+        add(
+          `[${p.name} ${p.guide.title} · 길드 자료 · ${p.guide.by}]\n` +
+            p.guide.notes.map((n) => "- " + n).join("\n") +
+            p.guide.pics.map((pic) => `\n그림 주소: /${pic.src} (${pic.caption})`).join(""),
+        );
       const post = posts?.[p.id];
       if (post) add(`[${p.name} 안내]\n` + postText(post, [...p.above, ...p.below]));
     }

@@ -5,7 +5,7 @@ import { GCOIN_OPEN } from "./launcher";
 
 export type AlertKind =
   | "market_want" | "market_bid" | "market_outbid" | "market_auction" | "market_new" | "gold_want" | "request" | "request_new" | "talk" | "account" | "shop"
-  | "board" | "board_notice" | "imo_news" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo" | "gdungeon" | "app_news" | "devreq" | "bday" | "gcoin" | "donate";
+  | "board" | "board_notice" | "imo_news" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo" | "gdungeon" | "app_news" | "devreq" | "bday" | "gcoin" | "donate" | "push_test";
 
 export interface Alert {
   id: number;
@@ -18,40 +18,41 @@ export interface Alert {
   who?: string;
 }
 
-/** 메뉴별 알림 종류 (켜고 끄기 칸). 이름은 짧은 명사로 */
+/**
+ * 알림 종류 (내 정보 > 계정 > 알림 설정, pages/AlertSettings.tsx). 묶음 이름은 홈·아래 탭 단추 이름 그대로 (제작자 2026-11-10 '알림 설정 카테고리는 무조건 버튼 명으로,
+ * 토론방도 사파이어 중개인 안에 있는 거잖아, 버튼 명에 없는 다른 알림들은 따로 묶어'): 토론방·골드는 사파이어 중개인 안, 건의함 결재는 게시판 댓글과 같은 종류(board),
+ * 단추가 없는 계정·새 기능은 맨 아래 '기타'. 종류 이름은 짧은 명사로
+ */
 export const ALERT_GROUPS: { menu: string; kinds: { kind: AlertKind; name: string; developer?: boolean; preview?: boolean }[] }[] = [
+  { menu: "게시판", kinds: [{ kind: "board", name: "내 글 댓글 · 건의 결재" }, { kind: "board_notice", name: "새 공지·이벤트" }, { kind: "imo_news", name: "아이모 소식" }] },
   {
-    menu: "중개인",
+    menu: "사파이어 중개인",
     kinds: [
       { kind: "market_want", name: "살래요" }, { kind: "market_bid", name: "입찰" }, { kind: "market_outbid", name: "입찰 밀림" },
-      { kind: "market_auction", name: "경매 전환" },
-      { kind: "market_new", name: "새 물건" },
+      { kind: "market_auction", name: "경매 전환" }, { kind: "market_new", name: "새 물건" },
+      { kind: "talk", name: "토론방 새 글" }, { kind: "gold_want", name: "골드 거래 신청" },
     ],
   },
-  { menu: "골드", kinds: [{ kind: "gold_want", name: "거래 신청" }] },
-  { menu: "의뢰소", kinds: [{ kind: "request", name: "내 의뢰" }, { kind: "request_new", name: "새 의뢰" }] },
-  { menu: "토론방", kinds: [{ kind: "talk", name: "새 글" }] },
-  { menu: "게시판", kinds: [{ kind: "board", name: "내 글 댓글" }, { kind: "board_notice", name: "새 공지·이벤트" }, { kind: "imo_news", name: "아이모 소식" }] },
-  { menu: "상점", kinds: [{ kind: "shop", name: "플래티넘 구매" }] },
+  { menu: "길드원 의뢰소", kinds: [{ kind: "request", name: "내 의뢰" }, { kind: "request_new", name: "새 의뢰" }] },
+  // To do 함께 하는 할 일 (2026-11-02 열었다, server/todo.ts TODO_OPEN)
+  { menu: "To do", kinds: [{ kind: "todo", name: "함께 하는 할 일" }] },
+  // 길드 던전 (1군 전용, 제작자 요청 2026-11-02): 파티 들어옴, 가능한 때가 다 모임, 확정, 불참
+  { menu: "길드 던전", kinds: [{ kind: "gdungeon", name: "파티·시간" }] },
+  // 장비대여: 신청, 대여, 마일리지 (2026-11-02 열었다, server/rental.ts RENT_OPEN)
+  { menu: "장비대여", kinds: [{ kind: "rent", name: "대여·마일리지" }] },
+  { menu: "플래티넘 할인 상점", kinds: [{ kind: "shop", name: "구매 신청·거래" }] },
   {
     menu: "챗봇",
     kinds: [{ kind: "chat_done", name: "답변 완료" }, { kind: "chat_fixed", name: "개선됨" }, { kind: "chat_gap", name: "모르는 질문", developer: true }],
   },
-  { menu: "계정", kinds: [{ kind: "account", name: "역할" }] },
-  // 장비대여: 신청, 대여, 마일리지 (2026-11-02 열었다, server/rental.ts RENT_OPEN)
-  { menu: "장비대여", kinds: [{ kind: "rent", name: "대여·마일리지" }] },
-  // To do 함께 하는 할 일 (2026-11-02 열었다, server/todo.ts TODO_OPEN)
-  { menu: "To do", kinds: [{ kind: "todo", name: "함께" }] },
-  // 길드 던전 (1군 전용, 제작자 요청 2026-11-02): 파티 들어옴, 가능한 때가 다 모임, 확정, 불참
-  { menu: "길드 던전", kinds: [{ kind: "gdungeon", name: "파티·시간" }] },
-  // 새 기능 (server/appNews.ts, 제작자 요청 2026-11-05 '새로운 기능 생겼다고 알림도'): 메뉴를 새로 열면 모두에게 한 번
-  { menu: "앱", kinds: [{ kind: "app_news", name: "새 기능" }] },
   // 개발 요청 결재선 (server/devreq.ts)
   { menu: "개발 요청", kinds: [{ kind: "devreq", name: "신청·결재" }] },
-  // 2군 성장코인샵 (server/gcoin.ts, 개발중, 제작자 2026-11-09 '나한테만 보이게'): 구매 신청·지급, 순위 보너스
+  // 2군 성장코인샵 (server/gcoin.ts): 구매 신청·지급, 순위 보너스
   { menu: "성장코인샵", kinds: [{ kind: "gcoin", name: "신청·지급", preview: !GCOIN_OPEN }] },
   // 기부함 (server/donate.ts, 개발중, 제작자 2026-11-10): 기부 신청·확정·거절
   { menu: "기부함", kinds: [{ kind: "donate", name: "신청·확정", preview: true }] },
+  // 단추가 없는 알림: 역할 바뀜·아이디 생성·계정 삭제 요청(account), 새 기능(server/appNews.ts)
+  { menu: "기타", kinds: [{ kind: "account", name: "계정 (역할·요청)" }, { kind: "app_news", name: "새 기능" }] },
 ];
 
 export const fetchAlerts = () =>

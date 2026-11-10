@@ -816,6 +816,7 @@ def main():
                 "monsters": [m["key"] for m in mons], "above": above, "below": below,
             }
         regions.append({"name": region["이름"], "pic": region_pics.get(region["이름"]), "places": ids})
+    place_guides(places)
 
     print("장비")
     equipment = []
@@ -958,13 +959,49 @@ def build_odds():
     print("공식 확률 표", len(tables), "행", sum(len(s["r"]) for t in tables for s in t["sections"]))
 
 
+def place_guides(places: dict) -> None:
+    """사냥터 자리 안내 (제작자 2026-11-10 '데이터에 넣어 챗봇 등등이 활용하게', 길드 잡담방에서 마을모금함이 공유한 신전·루나프 자리 나누기).
+    비공개 자료 길드/사냥터_자리.json 을 사냥터마다 guide 로 붙이고 그림(이미지/사냥터자리/)을 data/guide/ 로 복사한다 (로그인한 길드원에게만).
+    사냥터 화면 맨 위 '자리 안내'(Places.tsx GuideBox)와 챗봇 자료(src/chat.ts wikiContext)가 쓴다. 기록은 자료 제공/사냥터_자리.md"""
+    src = SRC / "길드" / "사냥터_자리.json"
+    out = OUT / "data" / "guide"
+    if out.exists():
+        shutil.rmtree(out)
+    if not src.exists():
+        return
+    out.mkdir(parents=True)
+    data = json.loads(src.read_text(encoding="utf-8"))
+    count = 0
+    for aid, g in (data.get("사냥터") or {}).items():
+        if aid not in places:
+            print("  자리 안내: 위키에 없는 사냥터", aid)
+            continue
+        pics = []
+        for pic in g.get("그림", []):
+            f = SRC / "이미지" / "사냥터자리" / pic["파일"]
+            if not f.exists():
+                print("  자리 안내: 그림 없음", pic["파일"])
+                continue
+            shutil.copy2(f, out / f.name)
+            with Image.open(f) as im:
+                w, h = im.size
+            pics.append({"src": f"data/guide/{f.name}", "w": w, "h": h, "caption": pic.get("설명", "")})
+        places[aid]["guide"] = {
+            "title": g.get("제목", "자리 안내"), "by": g.get("알린사람", ""), "notes": g.get("글", []),
+            "words": g.get("찾는말", []), "pics": pics,
+        }
+        count += 1
+    print("사냥터 자리 안내", count)
+
+
 def copy_rank_pictures():
     """게임 화면 스샷에서 자른 그림: 길드 랭킹(자료/scripts/make_rank_marks.py), 사파이어 중개인(make_market_marks.py).
     data/ 아래에 두어 위키 자료처럼 로그인한 길드원에게만 보인다 (functions/data/_middleware.ts)."""
     # 시세동향: 위키에 없는 물건(코스튬 등)의 그림, 제작자가 보낸 도감 스샷에서 자른 것 (자료/scripts/make_trend_icons.py)
     # 생일: 생일 스티커 (src/birthday.tsx, 자료/scripts/make_birthday_sticker.py)
     # 성장코인샵: 2군 성장코인샵 물건 칸 그림, 제작자가 보낸 거래소 스샷에서 자른 것 (src/gcoin.ts itemPic, 자료/scripts/make_gcoin_icons.py)
-    for src, dst in (("랭킹", "rank"), ("중개인", "market"), ("상점", "shop"), ("시세동향", "trend"), ("생일", "birthday"), ("성장코인샵", "gcoin")):
+    # 때리기: 운영진 때리기의 데미지 숫자와 CRITICAL! · DEADLY!, 제작자가 보낸 인게임 영상에서 오린 것 (src/smackFx.ts, 자료/scripts/make_smack_marks.py)
+    for src, dst in (("랭킹", "rank"), ("중개인", "market"), ("상점", "shop"), ("시세동향", "trend"), ("생일", "birthday"), ("성장코인샵", "gcoin"), ("때리기", "smack")):
         out = OUT / "data" / dst
         if out.exists():
             shutil.rmtree(out)

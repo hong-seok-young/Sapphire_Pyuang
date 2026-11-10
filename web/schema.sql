@@ -381,6 +381,14 @@ CREATE TABLE IF NOT EXISTS push_subs (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS push_subs_user ON push_subs (user_id);
+-- 모두에게 가는 알림처럼 40대 넘게 보낼 폰 알림 (server/push.ts drainPushQueue): /api/news 가 40대씩 이어 보낸다. last = 마지막으로 보낸 폰 주소
+CREATE TABLE IF NOT EXISTS push_queue (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  last TEXT NOT NULL,
+  claimed_at INTEGER
+);
 -- 폰 알림 서명 키 (서버가 처음 쓸 때 만든다. 한 줄)
 CREATE TABLE IF NOT EXISTS push_keys (
   id INTEGER PRIMARY KEY,
@@ -1055,6 +1063,8 @@ CREATE TABLE IF NOT EXISTS donate_items (
   qty INTEGER NOT NULL DEFAULT 1,
   enhance INTEGER NOT NULL DEFAULT 0,
   note TEXT,
+  options TEXT,                           -- 위키 장비에 뜬 옵션 '명중 9 · 크리티컬 4' (ci-d1 ADDED_COLUMNS 로 더한 칸)
+  enchant TEXT,                           -- 장신구 속성부여 '힘 3'
   gold_ask INTEGER,                       -- 기부한 사람이 적은 골드 가치
   gold INTEGER,                           -- 운영진이 확정한 골드 가치
   dia INTEGER NOT NULL DEFAULT 0,         -- 이 줄로 rental_mileage 에 넣은 💎 (같은 사람 줄의 합 = 확정 골드 합 / 10만 내림)
@@ -1068,3 +1078,24 @@ CREATE TABLE IF NOT EXISTS donate_items (
 );
 CREATE INDEX IF NOT EXISTS donate_items_status ON donate_items (status, created_at);
 CREATE INDEX IF NOT EXISTS donate_items_who ON donate_items (who);
+
+-- 건의 결재선 이력 (server/suggest.ts, 제작자 2026-11-10 '건의함이 게시판이 아니잖아, 결재선'). 상태는 board_posts.sg_status (ci-d1 ADDED_COLUMNS), 지우지 않는다 (글을 지우면 같이)
+CREATE TABLE IF NOT EXISTS suggest_steps (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  post_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  kind TEXT NOT NULL,                     -- agree | approve | skip(길마 직권) | force(반려 뒤 강제) | reject | done(반영 완료)
+  note TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS suggest_steps_post ON suggest_steps (post_id, id);
+
+-- 장비대여에만 있는 기부자의 마일리지 (제작자 2026-11-10 '장비대여에만 있는 기부자, 웹 로그인 했을 때 줘', server/donate.ts grantRentDonation):
+-- who = 명예의 전당 장비대여 기부(status 'honor')의 기부자 이름. 그 이름의 캐릭터가 앱을 열면(/api/me) 한 번 마일리지를 넣고 granted_at 을 적는다
+CREATE TABLE IF NOT EXISTS donate_grants (
+  who TEXT PRIMARY KEY,
+  created_at INTEGER NOT NULL,
+  granted_at INTEGER,
+  granted_to TEXT,
+  dia INTEGER
+);

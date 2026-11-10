@@ -115,6 +115,10 @@ const ADDED_COLUMNS = [
   ["rental_items", "return_req_at", "INTEGER"], ["rental_items", "return_app_id", "INTEGER"],
   // 건의함 익명 글·댓글 (2026-11-09, server/board.ts)
   ["board_posts", "anon", "INTEGER NOT NULL DEFAULT 0"], ["board_comments", "anon", "INTEGER NOT NULL DEFAULT 0"],
+  ["donate_items", "options", "TEXT"], ["donate_items", "enchant", "TEXT"],
+  ["board_posts", "sg_status", "TEXT"],
+  // 폰 알림을 마지막으로 보낸 때와 푸시 서버의 답 (server/push.ts pushOne, 어느 폰이 안 받는지 보려고)
+  ["push_subs", "last_status", "INTEGER"], ["push_subs", "last_at", "INTEGER"],
 ];
 for (const [table, column, type] of ADDED_COLUMNS) {
   const columns = parseJson(wrangler("d1", "execute", DB, "--remote", "--json", "--command", `PRAGMA table_info(${table})`))[0]?.results ?? [];
@@ -622,8 +626,6 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
     ["딸기빙수", "20개", 0, null],
     ["꿀사과", "20개", 0, null],
     ["알사탕", "20개", 0, null],
-    ["칠면조 구이", "20개", 0, null],
-    ["송편", "20개", 0, null],
     ["자라의노래", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 경험치 30% 증가"],
   ];
   const RANK = [5, 4, 3, 2, 1];
@@ -677,8 +679,6 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
       ["딸기빙수", "20개", 0, null],
       ["꿀사과", "20개", 0, null],
       ["알사탕", "20개", 0, null],
-      ["칠면조 구이", "20개", 0, null],
-      ["송편", "20개", 0, null],
       ["자라의노래", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 경험치 30% 증가"],
     ];
     runSql([
@@ -760,5 +760,73 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
       `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
     ]);
     console.log("기부함 마일리지 0.6 반영 (한 번)");
+  }
+}
+
+// 길드원 전원 알림 설정 모두 켜기 (제작자 2026-11-10 '길드원 전원 웹 내의 알림 설정은 다 켜버려'): 알림 종류마다 끈 줄(앱 알림함·폰 알림)을 지워 처음 값으로 되돌린다.
+// 처음 값은 모두 켜짐 (server/alerts.ts ALERT_KINDS, 새 물건·새 의뢰도 이때부터 켜짐). 이 폰의 폰 알림 스위치(브라우저 허락)는 폰마다라 여기서 켤 수 없다. setup 'alerts_all_on_20261110' 로 한 번만
+{
+  const KEY = "alerts_all_on_20261110";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const n = queryFirst("SELECT COUNT(*) AS n FROM alert_prefs WHERE enabled = 0 OR push = 0")?.n ?? 0;
+    runSql(["DELETE FROM alert_prefs;", `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`]);
+    console.log(`알림 설정 모두 켬 (꺼져 있던 줄 ${n}개, 한 번)`);
+  }
+}
+
+// 예전 기부(기부자별 내역)로 마일리지를 받은 사람에게 알림 (제작자 2026-11-10 'ㄱ'): 장부의 '기부함 · 예전 기부…' 줄 합이 0 보다 큰 앱 계정마다 한 번 장비대여 알림.
+// 폰 알림은 같은 때·종류로 push_queue 에 적어 두면 /api/news 가 40대씩 보낸다 (server/push.ts drainPushQueue). setup 'mileage_notice_old_20261110' 로 한 번만
+{
+  const KEY = "mileage_notice_old_20261110";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const now = Date.now();
+    const NOT_DONE = `NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}')`;
+    runSql([
+      "INSERT INTO alerts (user_id, kind, text, link, created_at) " +
+        `SELECT m.who, 'rent', '[장비대여] 예전에 기부하신 것으로 마일리지가 💎' || m.n || ' 들어왔어요 · 대여 보증금으로 쓸 수 있어요', '#/rent?v=apps', ${now} ` +
+        "FROM (SELECT who, SUM(delta) AS n FROM rental_mileage WHERE reason = 'donate' AND note LIKE '기부함 · 예전 기부%' GROUP BY who) m " +
+        `JOIN users u ON u.id = m.who WHERE m.n > 0 AND COALESCE((SELECT p.enabled FROM alert_prefs p WHERE p.user_id = m.who AND p.kind = 'rent'), 1) = 1 AND ${NOT_DONE};`,
+      `INSERT INTO push_queue (kind, created_at, last, claimed_at) SELECT 'rent', ${now}, '', NULL WHERE EXISTS (SELECT 1 FROM alerts WHERE kind = 'rent' AND created_at = ${now}) AND ${NOT_DONE};`,
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+    ]);
+    const n = queryFirst(`SELECT COUNT(*) AS n FROM alerts WHERE kind = 'rent' AND created_at = ${now}`)?.n ?? 0;
+    console.log(`예전 기부 마일리지 알림 ${n}명 (한 번)`);
+  }
+}
+
+// 성장코인샵에서 칠면조 구이·송편 빼기 (제작자 2026-11-10 '칠면조구이 송편은 빼'). 오픈 전이라 신청은 없다. setup 'gcoin_drop_turkey_songpyeon_20261110' 로 한 번만
+{
+  const KEY = "gcoin_drop_turkey_songpyeon_20261110";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    runSql([
+      "DELETE FROM gc_items WHERE replace(name, ' ', '') IN ('칠면조구이', '송편');",
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
+    ]);
+    console.log("성장코인샵 칠면조 구이·송편 뺌 (한 번)");
+  }
+}
+
+// 개발 요청 #13 (유어아너 '길드에 건의할 건의함좀 만들어주세여') 결재·완료 (제작자 2026-11-10 '유어아너 합의 길마결재 넣고 개발완료 처리해줘': 건의함은 이미 열었다).
+// 이번 차례에 유어아너 합의 · 마을모금함 결재 · 퓨앙 개발 완료를 결재 이력에 넣고 상태를 done 으로. 신청한 사람에게 개발 완료 알림. setup 'devreq13_done_20261110' 로 한 번만
+{
+  const KEY = "devreq13_done_20261110";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const row = queryFirst("SELECT id, round, status, user_id FROM dev_requests WHERE id = 13 AND body LIKE '%건의함%'");
+    if (row && row.status !== "done") {
+      const now = Date.now();
+      runSql([
+        `INSERT INTO dev_request_steps (req_id, round, user_id, kind, note, created_at) VALUES (13, ${row.round}, '유어아너', 'agree', NULL, ${now - 2000});`,
+        `INSERT INTO dev_request_steps (req_id, round, user_id, kind, note, created_at) VALUES (13, ${row.round}, '마을모금함', 'approve', NULL, ${now - 1000});`,
+        `INSERT INTO dev_request_steps (req_id, round, user_id, kind, note, created_at) VALUES (13, ${row.round}, '퓨앙', 'done', '건의함 오픈 (홈 칸 건의함)', ${now});`,
+        `UPDATE dev_requests SET status = 'done', updated_at = ${now} WHERE id = 13;`,
+        `INSERT INTO alerts (user_id, kind, text, link, created_at) SELECT user_id, 'devreq', '개발 완료 · “길드에 건의할 건의함좀 만들어주세여” · 건의함 오픈 (홈 칸 건의함)', '#/devreq?id=13', ${now} FROM dev_requests WHERE id = 13 AND user_id != '퓨앙';`,
+        `INSERT INTO push_queue (kind, created_at, last, claimed_at) VALUES ('devreq', ${now}, '', NULL);`,
+        `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+      ]);
+      console.log("개발 요청 #13 합의·결재·개발 완료 (한 번)");
+    } else {
+      runSql([`INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`]);
+      console.log(`개발 요청 #13 은 ${row ? "이미 완료" : "찾지 못함"} (건너뜀)`);
+    }
   }
 }

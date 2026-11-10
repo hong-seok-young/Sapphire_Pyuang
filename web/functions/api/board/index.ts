@@ -1,4 +1,4 @@
-// GET  /api/board?cat=&q=&before= -> 글 목록 (로그인한 길드원 누구나). 첫 쪽에는 고정 글을 위에. 30개씩
+// GET  /api/board?cat=&q=&before=&mine= -> 글 목록 (mine=1 이면 내가 쓴 글만) (로그인한 길드원 누구나). 첫 쪽에는 고정 글을 위에. 30개씩
 // POST /api/board { cat, title, body, anon? } -> 글 쓰기 { id }. 사진과 파일은 그다음 /api/board/:id/files 로 하나씩 올린다
 // 건의 사항은 익명(anon)으로 올릴 수 있다 (건의함, server/board.ts): 글쓴이가 '익명'으로 보이고(mine 으로 내 글인지만), 글쓴이로 찾아지지 않는다.
 // 건의 사항 글은 오피서 이상(앱개발자 포함)과 쓴 사람만 본다 (visiblePosts)
@@ -28,6 +28,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     where.push(vis.sql);
     binds.push(...vis.binds);
   }
+  // 건의함 '내 건의함': 내가 쓴 글만 (묶은 캐릭터 것까지)
+  if (p.get("mine") === "1") {
+    const chars = me.chars?.length ? me.chars : [me.id];
+    where.push(`p.author IN (${chars.map(() => "?").join(", ")})`);
+    binds.push(...chars);
+  }
   if (q) {
     // 익명 글은 글쓴이로 찾지 않는다 (이름을 볼 수 있는 사람만)
     where.push(`(p.title LIKE ? OR p.body LIKE ? OR (p.author LIKE ?${canSeeAnon(env, me) ? "" : " AND p.anon = 0"}))`);
@@ -44,6 +50,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const order = before === 0 && !q ? "p.pinned DESC, p.id DESC" : "p.id DESC";
   const { results } = await env.DB.prepare(
     "SELECT p.id, p.cat, p.author, p.title, substr(p.body, 1, 120) AS snippet, p.pinned, p.anon, p.created_at AS at, " +
+      "CASE WHEN p.cat = 'suggest' THEN COALESCE(p.sg_status, 'agree') END AS sg, (SELECT COUNT(*) FROM suggest_steps s WHERE s.post_id = p.id AND s.kind = 'agree' AND s.id > COALESCE((SELECT MAX(r.id) FROM suggest_steps r WHERE r.post_id = p.id AND r.kind = 'resubmit'), 0)) AS sgAgrees, " +
       "(SELECT COUNT(*) FROM board_comments c WHERE c.post_id = p.id) AS comments, " +
       "(SELECT COUNT(*) FROM board_likes l WHERE l.post_id = p.id) AS likes, " +
       "(SELECT COUNT(*) FROM board_views v WHERE v.post_id = p.id) AS views, " +
@@ -85,7 +92,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     await notify(env, "all", "board_notice", `[${CAT_NAME[b.cat]}] ${title} · ${me.id}${lead ? "\n" + lead : ""}`, `#/board/${row.id}`, me.id);
   } else if (b.cat === "suggest") {
     const { results } = await env.DB.prepare("SELECT DISTINCT COALESCE(main_id, id) AS id FROM users WHERE role IN ('developer', 'master', 'officer')").all<{ id: string }>();
-    await notify(env, results.map((r) => r.id), "board", `[건의 사항] ${title} · ${anon ? ANON_NAME : me.id}${lead ? "\n" + lead : ""}`, postLink("suggest", row.id), me.id);
+    // 건의는 결재선을 탄다 (server/suggest.ts): 먼저 본 오피서 누구든 합의·반려
+    await env.DB.prepare("UPDATE board_posts SET sg_status = 'agree' WHERE id = ?").bind(row.id).run();
+    await notify(
+      env,
+      results.map((r) => r.id),
+      "board",
+      `[건의 접수 · 오피서 합의] ${title} · ${anon ? ANON_NAME : me.id} · 먼저 보신 오피서 누구든 의견 달고 합의하거나 반려해 주세요${lead ? "\n" + lead : ""}`,
+      postLink("suggest", row.id),
+      me.id,
+    );
   }
   return json({ id: row.id }, 201);
 };

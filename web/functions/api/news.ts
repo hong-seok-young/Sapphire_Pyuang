@@ -21,6 +21,7 @@ import { canManageGcoin, canUseGcoin } from "../../server/gcoin";
 import { remindIfDue } from "../../server/gdungeon";
 import { announceApp } from "../../server/appNews";
 import { announceBday } from "../../server/birthday";
+import { drainPushQueue } from "../../server/push";
 import { seesAllSuggest } from "../../server/board";
 
 const IMO: Record<string, string> = { "imo.notice": "type IN ('N', 'I', 'D')", "imo.maint": "type = 'C'", "imo.event": "type = 'E'" };
@@ -188,6 +189,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
   waitUntil(announceApp(env, now).catch((e) => console.error("app news", e instanceof Error ? e.message : e)));
   // 생일 알림 (server/birthday.ts): 그날 0시가 되면 모두에게 한 번, 폰 알림은 부를 때마다 40대씩 이어서
   waitUntil(announceBday(env, now).catch((e) => console.error("bday notice", e instanceof Error ? e.message : e)));
+  // 밀린 폰 알림 40대 (모두에게 가는 알림은 40대씩 나눠 보낸다, server/push.ts)
+  waitUntil(drainPushQueue(env, now).catch((e) => console.error("push queue", e instanceof Error ? e.message : e)));
   return json(
     {
       counts,

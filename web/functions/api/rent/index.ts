@@ -188,7 +188,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       env.DB.prepare("SELECT id FROM users ORDER BY id"),
       // 기부함에서 '장비대여 운용'으로 넘어와 아직 목록에 안 올린 기부 (물건 추가에서 고른다)
       env.DB.prepare(
-        "SELECT id, who, item, qty, enhance, gold, note, done_at AS at FROM donate_items WHERE status = 'done' AND place = 'rent' AND rental_id IS NULL ORDER BY done_at, id",
+        "SELECT id, who, item, qty, enhance, gold, note, options, enchant, done_at AS at FROM donate_items WHERE status = 'done' AND place = 'rent' AND rental_id IS NULL ORDER BY done_at, id",
       ),
     ]);
     out.balances = balR.results;

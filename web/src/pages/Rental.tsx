@@ -54,6 +54,7 @@ import {
   optionFull,
   optionParts,
   optionShort,
+  normalizeOptions,
   removeRent,
   requestReturn,
   returnRent,
@@ -1428,7 +1429,7 @@ function AddFromDonation({ wiki, data, job, onDone }: { wiki: Wiki; data: RentDa
                 </b>
                 <small>
                   기부 <Nick name={g.who} />
-                  {g.note ? ` · ${g.note}` : ""}
+                  {[g.options, g.enchant && `속성부여 ${g.enchant}`, g.note].filter(Boolean).map((t) => ` · ${t}`).join("")}
                 </small>
               </span>
             </button>
@@ -1441,6 +1442,10 @@ function AddFromDonation({ wiki, data, job, onDone }: { wiki: Wiki; data: RentDa
                   level: Number(it?.equip?.[0]?.info["레벨제한"]) || 1,
                   weapon: it?.name ?? g.item,
                   enhance: g.enhance,
+                  // 기부함에서 적은 옵션 ('명중 9 · 크리티컬 4', '지3 마재2') -> 장비대여 옵션 줄임말 ('명9크4', src/rental.ts normalizeOptions)
+                  options: normalizeOptions(g.options ?? ""),
+                  // 장신구 속성부여는 메모로
+                  note: g.enchant ? `속성부여 ${g.enchant}` : undefined,
                   donor: g.who,
                 }}
                 onDone={() => (setPick(null), onDone())}

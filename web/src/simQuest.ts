@@ -31,7 +31,7 @@ const POOL: Quest[] = [
   { id: "r5", text: "장비 수리로 +5 이상", done: (e) => e.kind === "repair" && e.level >= 5 },
 ];
 
-const kstDay = () => new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
+export const kstDay = () => new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
 /** 오늘의 도전 셋 (날짜로 섞어 모두 같은 셋을 본다) */
 export function todayQuests(day = kstDay()): Quest[] {
   let h = 2166136261;

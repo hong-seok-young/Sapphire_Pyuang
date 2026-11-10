@@ -1,5 +1,5 @@
 // 알림 (제작자 요청): 내 물건에 살래요, 입찰, 의뢰 수락처럼 나와 관련된 일을 앱 안 알림함(#/alerts)에 남긴다.
-// 종류마다 끄고 켤 수 있다 (D1 alert_prefs). 새 물건, 새 의뢰처럼 많은 것은 처음엔 꺼져 있다. 지우지 않는다 (제작자 요청 2026-11-01: 기록은 평생. 알림함은 최근 60개만 보인다).
+// 종류마다 끄고 켤 수 있다 (D1 alert_prefs). 처음엔 모두 켜져 있다 (제작자 2026-11-10 '알림 설정은 다 켜버려', 예전엔 새 물건·새 의뢰가 꺼져 있었다). 지우지 않는다 (제작자 요청 2026-11-01: 기록은 평생. 알림함은 최근 60개만 보인다).
 // 폰 자체 알림(웹 푸시)도 같이 보낸다 (server/push.ts, 폰에서 켠 사람만). 게임 위에는 아무것도 띄우지 않는다
 import type { Env } from "./auth";
 import { pushNew } from "./push";
@@ -11,10 +11,10 @@ export const ALERT_KINDS = {
   market_bid: true,
   market_outbid: true,
   market_auction: true,
-  market_new: false,
+  market_new: true,
   gold_want: true,
   request: true,
-  request_new: false,
+  request_new: true,
   talk: true,
   account: true,
   shop: true,
@@ -37,6 +37,8 @@ export const ALERT_KINDS = {
   donate: true,
   // 생일 축하 (server/birthday.ts, 제작자 2026-11-07 '11월 8일 되는 순간 알림 무조건'): 알림 설정에 줄을 두지 않아 끄지 못한다
   bday: true,
+  // 폰 알림 시험 (내 정보 > 알림 설정의 '시험 알림', functions/api/push.ts): 설정에 줄이 없다
+  push_test: true,
 } as const;
 export type AlertKind = keyof typeof ALERT_KINDS;
 export const isAlertKind = (k: unknown): k is AlertKind => typeof k === "string" && k in ALERT_KINDS;

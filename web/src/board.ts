@@ -13,7 +13,7 @@ export const CAT_ICON: Record<Cat, string> = { notice: "📌", event: "🎉", fr
  * 익명 글·댓글을 쓴다 (이름은 서버가 가린다). 건의 글은 운영진(오피서 이상)과 쓴 사람만 본다 (서버가 거른다). 서버 server/board.ts 의 SUGGEST_OPEN 과 같이 바꾼다:
  * false 인 동안 건의함은 개발 중(미리 보는 사람만)이고 게시판에 '건의' 칸이 그대로 있다. true 면 게시판에서 '건의' 칸을 빼고 건의함이 홈 칸으로
  */
-export const SUGGEST_OPEN = false;
+export const SUGGEST_OPEN = true;
 /** 게시판에 보이는 칸 (건의함을 열면 건의 사항은 건의함에만) */
 export const BOARD_CATS: Cat[] = SUGGEST_OPEN ? CATS.filter((c) => c !== "suggest") : CATS;
 /** 익명 글·댓글의 가린 이름 (서버 server/board.ts ANON_NAME) */
@@ -30,6 +30,9 @@ export interface PostSummary {
   anon?: boolean;
   /** 내가 쓴 글 (익명이어도) */
   mine?: boolean;
+  /** 건의 결재선 상태와 합의 수 (건의 사항 글만) */
+  sg?: SgStatus | null;
+  sgAgrees?: number;
   at: number;
   comments: number;
   likes: number;
@@ -58,7 +61,23 @@ export interface BoardComment {
   mine?: boolean;
 }
 
+/** 건의 결재선 (server/suggest.ts): agree 오피서 합의·길마 결재 대기 | accepted 건의 접수 완료 | done 건의 반영 완료 | rejected 반려 */
+export type SgStatus = "agree" | "accepted" | "done" | "rejected";
+export type SgKind = "agree" | "approve" | "skip" | "force" | "reject" | "done" | "resubmit";
+export interface SgStep {
+  user_id: string;
+  kind: SgKind;
+  note: string | null;
+  created_at: number;
+}
+export const actSuggest = (id: number, act: SgKind, note: string) => api<{ ok: boolean; status: SgStatus }>(`/api/board/${id}/suggest`, "POST", { act, note });
+/** 목록·글의 건의 상태 이름 (합의가 있으면 '결재 대기') */
+export const sgName = (s: SgStatus, agrees: number) =>
+  s === "agree" ? (agrees ? "결재 대기" : "합의 대기") : s === "accepted" ? "접수 완료" : s === "done" ? "반영 완료" : "반려";
+
 export interface PostDetail {
+  /** 건의 결재선 (건의 사항 글만) */
+  flow?: { status: SgStatus; steps: SgStep[] };
   post: { id: number; cat: Cat; author: string; title: string; body: string; pinned: boolean; created_at: number; edited_at: number | null; anon?: boolean; mine?: boolean };
   files: BoardFile[];
   comments: BoardComment[];
@@ -78,9 +97,10 @@ export interface LinkPreview {
 
 export const fileUrl = (id: number) => `/api/board/files/${id}`;
 
-export function fetchPosts(q: { cat?: Cat | null; q?: string; before?: number }) {
+export function fetchPosts(q: { cat?: Cat | null; q?: string; before?: number; mine?: boolean }) {
   const p = new URLSearchParams();
   if (q.cat) p.set("cat", q.cat);
+  if (q.mine) p.set("mine", "1");
   if (q.q) p.set("q", q.q);
   if (q.before) p.set("before", String(q.before));
   return api<{ posts: PostSummary[]; more: boolean }>(`/api/board?${p}`);

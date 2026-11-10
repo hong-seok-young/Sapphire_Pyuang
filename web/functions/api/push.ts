@@ -1,9 +1,10 @@
 // GET    /api/push              -> 구독에 쓸 공개 키 { publicKey } (server/push.ts)
 // PUT    /api/push { endpoint } -> 이 폰으로 폰 알림 받기. 한 사람 폰 5대까지
 // DELETE /api/push { endpoint } -> 이 폰은 그만 받기
+// POST   /api/push { endpoint } -> 이 폰에 시험 알림 (제작자 2026-11-10 길드원 문의 '사이트 알람 켜 뒀는데 따로 안 떠요'): 푸시 서버의 답 코드 { status }
 import { NEED_LOGIN, currentUser, json, readJson } from "../../server/auth";
 import type { Env } from "../../server/auth";
-import { vapidKeys } from "../../server/push";
+import { pushOne, vapidKeys } from "../../server/push";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
@@ -38,4 +39,26 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env }) => {
   if (!okEndpoint(b.endpoint)) return json({ error: "알림 주소가 맞지 않아요" }, 400);
   await env.DB.prepare("DELETE FROM push_subs WHERE endpoint = ? AND user_id = ?").bind(b.endpoint, me.id).run();
   return json({ ok: true });
+};
+
+/** 시험 알림: 이 폰(구독)을 내 것으로 적고, 읽은 알림 한 줄(push_test)을 넣은 뒤 이 폰에만 신호를 보낸다. 서비스 워커가 그 글을 가져와 띄운다 */
+export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  const me = await currentUser(env, request);
+  if (!me) return NEED_LOGIN();
+  const b = await readJson<{ endpoint: unknown }>(request);
+  if (!okEndpoint(b.endpoint)) return json({ error: "알림 주소가 맞지 않아요" }, 400);
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare(
+      "INSERT INTO push_subs (endpoint, user_id, created_at) VALUES (?, ?, ?) ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id",
+    ).bind(b.endpoint, me.id, now),
+    env.DB.prepare("INSERT INTO alerts (user_id, kind, text, link, created_at, read_at) VALUES (?, 'push_test', ?, '#/me?open=alerts', ?, ?)").bind(
+      me.id,
+      "폰 알림 시험이에요 · 이 알림이 보이면 이 폰으로 잘 와요",
+      now,
+      now,
+    ),
+  ]);
+  const status = await pushOne(env, await vapidKeys(env), b.endpoint);
+  return json({ status });
 };

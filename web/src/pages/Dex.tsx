@@ -4,12 +4,13 @@
 // - 완료로 표시한 항목의 효과를 게임 '획득 옵션' 창 순서(시세 동향 캐릭터의 도감 표와 같은 DEX_ORDER)로 합친다.
 // - 지금 목록(칸 · 찾기 · 능력치 거르기)의 미완료 항목을 다 하면 더 오르는 값(+)과, 그러려면 필요한 재료 합계.
 // - 완료 표시는 이 기기에 계정별로 (localStorage sapphire.dex.done.<아이디>).
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadDex, useAsync } from "../data";
 import type { Dex, DexEntry, DexItem } from "../data";
 import type { Me } from "../auth";
 import type { Wiki } from "../types";
 import { iconLookup } from "../simIcons";
+import { weaponOf } from "../rental";
 import type { IconOf } from "../simIcons";
 import { Loading, Panel, PicImg, TopBar } from "../ui";
 
@@ -51,19 +52,36 @@ function addUp(entries: DexEntry[]): Sum {
   return s;
 }
 const num = (v: number) => String(Math.round(v * 100) / 100);
-const effectText = ([stat, v, pct]: [string, number, boolean]) => `${stat} +${num(v)}${pct ? "%" : ""}`;
+/** 효과 글자 (긴 이름은 획득 옵션 칸과 같은 줄임말 SHORT, 제작자 2026-11-10 '아래쪽도 위처럼 줄임말') */
+const effectText = ([stat, v, pct]: [string, number, boolean]) => `${SHORT[stat] ?? stat} +${num(v)}${pct ? "%" : ""}`;
 
-/** 게임 도감 '획득 옵션' 창의 줄 순서 (제작자가 시세 동향 때 보낸 스샷 7장 2026-11-03, 2026-11-10 '그거로 전체 능력치 세팅'):
- *  [능력치, % 줄인지]. 체력·마나·PVE 데미지 같은 것은 고정값 줄과 % 줄이 따로 있다 */
-const OPTION_ROWS: [string, boolean][] = [
-  ["명중", false], ["회피", false], ["크리티컬", false], ["불저항", false], ["냉기저항", false], ["번개저항", false], ["속성저항", false],
-  ["체력", false], ["마나", false], ["체력", true], ["마나", true], ["체력재생", false], ["마나재생", false], ["힘", false], ["지능", false], ["민첩", false],
-  ["이동속도", false], ["막기", false], ["아머", false], ["PVE 데미지", false], ["PVP 데미지", false], ["PVE 데미지", true], ["PVP 데미지", true],
-  ["PVE 데미지 감소", false], ["PVP 데미지 감소", false], ["PVE 데미지 감소", true], ["PVP 데미지 감소", true], ["아이템 드랍", false], ["골드 드랍", false],
-  ["보스 데미지", true], ["크리티컬 저항", true], ["크리티컬 데미지 감소", false], ["크리티컬 데미지 감소", true], ["데들리 저항", true],
-  ["데들리 데미지 감소", false], ["데들리 데미지 감소", true], ["경험치", true],
+/** 게임 도감 '획득 옵션' 창의 37줄 (제작자가 시세 동향 때 보낸 스샷 7장, 2026-11-03). 체력·마나·PVE 데미지 같은 것은 고정값 줄과 % 줄이 따로 있다.
+ *  좌우 두 칸 짝으로 둔다 (제작자 2026-11-10 '바를 빼고 최대한 유사한 것들끼리 좌우 2열 배치'). null = 빈 칸. 37줄이 모두 한 번씩 들어 있다 */
+type Row = [string, boolean];
+const OPTION_PAIRS: [Row | null, Row | null][] = [
+  [["체력", false], ["마나", false]],
+  [["체력", true], ["마나", true]],
+  [["체력재생", false], ["마나재생", false]],
+  [["힘", false], ["지능", false]],
+  [["민첩", false], ["이동속도", false]],
+  [["명중", false], ["회피", false]],
+  [["크리티컬", false], ["크리티컬 저항", true]],
+  [["아머", false], ["막기", false]],
+  [["불저항", false], ["냉기저항", false]],
+  [["번개저항", false], ["속성저항", false]],
+  [["PVE 데미지", false], ["PVP 데미지", false]],
+  [["PVE 데미지", true], ["PVP 데미지", true]],
+  [["PVE 데미지 감소", false], ["PVP 데미지 감소", false]],
+  [["PVE 데미지 감소", true], ["PVP 데미지 감소", true]],
+  [["크리티컬 데미지 감소", false], ["크리티컬 데미지 감소", true]],
+  [["데들리 데미지 감소", false], ["데들리 데미지 감소", true]],
+  [["데들리 저항", true], ["보스 데미지", true]],
+  [["아이템 드랍", false], ["골드 드랍", false]],
+  [["경험치", true], null],
 ];
 const rowKey = (s: string, pct: boolean) => s + (pct ? "%" : "");
+/** 두 칸 배치에서 잘리는 긴 이름은 줄여 보인다 (고정값 칸과 % 칸이 구분되게) */
+const SHORT: Record<string, string> = { "PVE 데미지 감소": "PVE 뎀감", "PVP 데미지 감소": "PVP 뎀감", "크리티컬 데미지 감소": "크리 뎀감", "크리티컬 저항": "크리 저항", "데들리 데미지 감소": "데들리 뎀감" };
 const pick = (sum: Sum, s: string, pct: boolean) => (pct ? sum.get(s)?.pct : sum.get(s)?.flat) ?? 0;
 
 /** 손으로 맞춘 내 능력치 (줄마다, 없으면 완료 합계). 이 기기에 계정별로 (localStorage sapphire.dex.stat.<아이디>) */
@@ -110,6 +128,17 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
   const [stat, setStat] = useState<string | null>(null);
   const [cat, setCat] = useState<string>("all");
   const [showNeed, setShowNeed] = useState(false);
+  // 목록 폭 (한 줄에 아이템 칸을 몇 px 로 넣을지 정한다)
+  const listRef = useRef<HTMLUListElement>(null);
+  const [listW, setListW] = useState(0);
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setListW(el.clientWidth));
+    ro.observe(el);
+    setListW(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
   const [over, setOverState] = useState<Record<string, number>>(() => readStats(me));
   const setOver = (v: Record<string, number>) => {
     setOverState(v);
@@ -130,21 +159,21 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
   const query = norm(q);
   const matchQ = (e: DexEntry) =>
     !query || norm(e.name).includes(query) || e.items.some((it) => it.name && norm(it.name).replace(/^\+\d+/, "").includes(query.replace(/^\+\d+/, "")));
-  const matchStat = (e: DexEntry) => !stat || e.effects.some(([s]) => s === stat);
+  // 능력치 칸을 누르면 그 능력치(고정값·% 따로)를 주는 항목만 (제작자 2026-11-10 '해당 속성 누르면 해당하는 리스트가 아래에 뜨게, 밑에 필터링 버튼들 없애고')
+  const matchStat = (e: DexEntry) => !stat || e.effects.some(([s, , pct]) => rowKey(s, pct) === stat);
+  const statBar = useRef<HTMLDivElement>(null);
+  const pickStat = (k: string) => {
+    const next = stat === k ? null : k;
+    setStat(next);
+    if (next) window.setTimeout(() => statBar.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  };
   const inCat = (e: DexEntry) => cat === "all" || (e.cat ?? "일반") === cat;
   const inTab = (e: DexEntry) => inCat(e) && (tab === "all" ? true : tab === "done" ? done.has(e.name) : !done.has(e.name));
   const listed = dex.entries.filter((e) => inTab(e) && matchQ(e) && matchStat(e));
   const doneEntries = dex.entries.filter((e) => done.has(e.name));
   const have = useMemo(() => addUp(doneEntries), [done, dex]); // eslint-disable-line react-hooks/exhaustive-deps
   const todoListed = listed.filter((e) => !done.has(e.name));
-  const gain = addUp(todoListed);
 
-  // 나오는 능력치 (게임 '획득 옵션' 순서, 순서표에 없는 것은 뒤에)
-  const stats = useMemo(() => {
-    const seen = new Set(dex.entries.flatMap((e) => e.effects.map(([s]) => s)));
-    return [...dex.order.filter((s) => seen.has(s)), ...[...seen].filter((s) => !dex.order.includes(s))];
-  }, [dex]);
-  const countOf = (s: string) => dex.entries.filter((e) => inTab(e) && matchQ(e) && e.effects.some(([x]) => x === s)).length;
 
   // 지금 목록의 미완료를 다 하려면 필요한 재료 (같은 이름·강화끼리 더한다)
   const need = useMemo(() => {
@@ -168,7 +197,7 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
 
   return (
     <div className="dex">
-      <StatPanel have={have} gain={gain} full={full} over={over} setOver={setOver} stat={stat} doneN={doneEntries.length} total={dex.entries.length} todoN={todoListed.length} />
+      <StatPanel have={have} full={full} over={over} setOver={setOver} stat={stat} onPick={pickStat} doneN={doneEntries.length} total={dex.entries.length} />
 
       <div className="mk-cats dex-cats">
         {["all", "일반", "코스튬", "펫"].map((c) => {
@@ -198,19 +227,16 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
         )}
       </div>
 
-      <div className="mk-cats dex-stats">
-        <button type="button" className={"sub-tab" + (!stat ? " sub-tab-on" : "")} onClick={() => setStat(null)}>
-          전체 능력치
-        </button>
-        {stats.map((s) => {
-          const n = countOf(s);
-          return n || stat === s ? (
-            <button key={s} type="button" className={"sub-tab" + (stat === s ? " sub-tab-on" : "")} onClick={() => setStat(stat === s ? null : s)}>
-              {s} <small>{n}</small>
-            </button>
-          ) : null;
-        })}
-      </div>
+      {stat && (
+        <div className="dex-statbar" ref={statBar}>
+          <span>
+            <b>{SHORT[stat.replace(/%$/, "")] ?? stat.replace(/%$/, "")}{stat.endsWith("%") ? "%" : ""}</b> 주는 항목 <b>{listed.length}</b>개
+          </span>
+          <button type="button" className="sub-tab" onClick={() => setStat(null)}>
+            ✕ 전체 보기
+          </button>
+        </div>
+      )}
 
       {todoListed.length > 0 && (
         <Panel className="dex-need">
@@ -247,9 +273,9 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
         </Panel>
       )}
 
-      <ul className="dex-list">
+      <ul className="dex-list" ref={listRef}>
         {listed.map((e) => (
-          <EntryRow key={e.name} e={e} done={done.has(e.name)} onToggle={() => toggle(e.name)} iconOf={iconOf} stat={stat} onItem={(name) => setQ(name)} />
+          <EntryRow key={e.name} e={e} listW={listW} done={done.has(e.name)} onToggle={() => toggle(e.name)} iconOf={iconOf} stat={stat} onItem={(name) => setQ(name)} wiki={wiki} />
         ))}
       </ul>
       {!listed.length && <p className="muted dex-empty">맞는 항목이 없어요</p>}
@@ -258,84 +284,130 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
   );
 }
 
-/** 획득 옵션: 게임 창의 줄마다 내 수치(0 ~ 기록된 도감을 다 채웠을 때)를 슬라이더로 움직이거나 숫자로 적는다.
- *  손대지 않은 줄은 완료로 누른 항목의 합. 초록 + = 지금 목록의 미완료를 다 하면 더 오르는 값 (제작자 2026-11-10) */
-function StatPanel({ have, gain, full, over, setOver, stat, doneN, total, todoN }: {
-  have: Sum; gain: Sum; full: Sum; over: Record<string, number>; setOver: (v: Record<string, number>) => void;
-  stat: string | null; doneN: number; total: number; todoN: number;
+/** 획득 옵션: 게임 창의 37줄을 비슷한 것끼리 좌우 두 칸으로 (OPTION_PAIRS). 칸마다 이름, 그 아래 '최대'(도감을 다 채웠을 때, 제작자 2026-11-10 '최대치만'),
+ *  오른쪽 숫자 칸에 내 수치를 직접 적는다. 손대지 않은 칸은 완료로 누른 항목의 합 (제작자 2026-11-10, 슬라이더는 '바를 빼는 게 좋을 듯'으로 뺐다) */
+function StatPanel({ have, full, over, setOver, stat, onPick, doneN, total }: {
+  have: Sum; full: Sum; over: Record<string, number>; setOver: (v: Record<string, number>) => void;
+  stat: string | null; onPick: (k: string) => void; doneN: number; total: number;
 }) {
   const [all, setAll] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({});
-  const rows: [string, boolean][] = [...OPTION_ROWS];
-  for (const [s, x] of full) for (const pct of [false, true]) if ((pct ? x.pct : x.flat) && !rows.some(([a, b]) => a === s && b === pct)) rows.push([s, pct]);
+  const pairs: [Row | null, Row | null][] = [...OPTION_PAIRS];
+  // 짝 목록에 없는 능력치가 자료에 생기면 끝에 붙인다
+  const known = new Set(OPTION_PAIRS.flat().filter((r): r is Row => !!r).map(([a, b]) => rowKey(a, b)));
+  const extra: Row[] = [];
+  for (const [s, x] of full) for (const pct of [false, true]) if ((pct ? x.pct : x.flat) && !known.has(rowKey(s, pct))) extra.push([s, pct]);
+  for (let i = 0; i < extra.length; i += 2) pairs.push([extra[i], extra[i + 1] ?? null]);
   const valueOf = (s: string, pct: boolean) => over[rowKey(s, pct)] ?? pick(have, s, pct);
   const set = (k: string, v: number) => setOver({ ...over, [k]: Math.max(0, Math.round(v * 100) / 100) });
-  const shown = all ? rows : rows.filter(([s, pct]) => valueOf(s, pct) > 0 || pick(gain, s, pct) > 0 || rowKey(s, pct) in over);
+  const live = (r: Row | null) => !!r && (valueOf(r[0], r[1]) > 0 || pick(full, r[0], r[1]) > 0 || rowKey(r[0], r[1]) in over);
+  const shown = all ? pairs : pairs.filter(([a, b]) => live(a) || live(b));
   const touched = Object.keys(over).length > 0;
+  const cell = (r: Row | null, i: number) => {
+    if (!r) return <div key={i} className="dex-cell dex-cell-empty" />;
+    const [s, pct] = r;
+    const k = rowKey(s, pct);
+    const v = valueOf(s, pct);
+    const mx = pick(full, s, pct);
+    return (
+      <div key={k} className={"dex-cell" + (stat === k ? " dex-cell-on" : "") + (k in over ? " dex-cell-set" : "")}>
+        <button type="button" className="dex-cell-name" onClick={() => onPick(k)} disabled={!mx} aria-pressed={stat === k}>
+          <b title={s}>{SHORT[s] ?? s}{pct && <small>%</small>}</b>
+          <small className="muted">{mx ? `최대 ${num(mx)}` : "최대 -"}</small>
+        </button>
+        <input className="dex-row-num" type="number" inputMode="decimal" min={0} step={mx > 50 ? 0.5 : 0.01} aria-label={`${s}${pct ? " %" : ""} 내 수치`}
+          value={draft[k] ?? num(v)}
+          onChange={(e) => {
+            setDraft({ ...draft, [k]: e.target.value });
+            const n = parseFloat(e.target.value);
+            if (!Number.isNaN(n)) set(k, n);
+          }}
+          onBlur={() => {
+            const d = { ...draft };
+            delete d[k];
+            setDraft(d);
+          }} />
+      </div>
+    );
+  };
   return (
     <Panel className="dex-sum" title={<>획득 옵션 <small className="muted">완료 {doneN} / {total}</small></>}>
       {shown.length ? (
-        <ul className="dex-rows">
-          {shown.map(([s, pct]) => {
-            const k = rowKey(s, pct);
-            const v = valueOf(s, pct);
-            const mx = pick(full, s, pct);
-            const g = pick(gain, s, pct);
-            const step = mx > 50 ? 0.5 : 0.01;
-            return (
-              <li key={k} className={"dex-row" + (stat === s ? " dex-row-on" : "") + (k in over ? " dex-row-set" : "")}>
-                <span className="dex-row-name">
-                  {s}
-                  {pct && <small>%</small>}
-                  {g > 0 && <small className="dex-gain">+{num(g)}</small>}
-                </span>
-                <input type="range" min={0} max={mx || 1} step={step} value={Math.min(v, mx || 1)} disabled={!mx} aria-label={`${s}${pct ? " %" : ""} 수치`}
-                  onChange={(e) => set(k, Number(e.target.value))} />
-                <input className="dex-row-num" type="number" inputMode="decimal" min={0} step={step} aria-label={`${s}${pct ? " %" : ""} 직접 적기`}
-                  value={draft[k] ?? num(v)}
-                  onChange={(e) => {
-                    setDraft({ ...draft, [k]: e.target.value });
-                    const n = parseFloat(e.target.value);
-                    if (!Number.isNaN(n)) set(k, n);
-                  }}
-                  onBlur={() => {
-                    const d = { ...draft };
-                    delete d[k];
-                    setDraft(d);
-                  }} />
-                <span className="dex-row-max muted">/{mx ? num(mx) : "-"}</span>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="dex-cells">{shown.map(([a, b], i) => [cell(a, i * 2), cell(b, i * 2 + 1)])}</div>
       ) : (
         <p className="muted dex-empty">아직 완료한 항목이 없어요</p>
       )}
       <div className="dex-sum-foot">
-        <button type="button" className="sub-tab" onClick={() => setAll(!all)}>{all ? "접기 ▲" : `전체 능력치 ${rows.length} ▼`}</button>
+        <button type="button" className="sub-tab" onClick={() => setAll(!all)}>{all ? "접기 ▲" : "전체 능력치 ▼"}</button>
         {touched && (
           <button type="button" className="sub-tab" onClick={() => { setOver({}); setDraft({}); }}>
             완료 합계로
           </button>
         )}
       </div>
-      <p className="dex-legend muted">
-        끝 = 도감 {total}개를 다 채웠을 때 · <span className="dex-gain">+ 지금 목록의 미완료 {todoN}개를 다 하면</span>
-      </p>
+      <p className="dex-legend muted">최대 = 도감 {total}개를 다 채웠을 때</p>
     </Panel>
   );
 }
 
-function ItemPic({ it, iconOf }: { it: DexItem; iconOf: IconOf }) {
+function ItemPic({ it, iconOf, size = 30 }: { it: DexItem; iconOf: IconOf; size?: number }) {
   const pic = it.name ? iconOf(it.name) : null;
-  if (pic) return <PicImg pic={pic} fit={30} />;
-  if (it.pic) return <img className="dex-pic" src={encodeURI(it.pic)} alt="" />;
+  if (pic) return <PicImg pic={pic} fit={size} />;
+  if (it.pic) return <img className="dex-pic" src={encodeURI(it.pic)} alt="" style={{ width: size, height: size }} />;
   return <span className="dex-noimg">{(it.name ?? "?").replace(/^\+\d+/, "").slice(0, 1)}</span>;
 }
 
-function EntryRow({ e, done, onToggle, iconOf, stat, onItem }: { e: DexEntry; done: boolean; onToggle: () => void; iconOf: IconOf; stat: string | null; onItem: (name: string) => void }) {
+/** 도감 한 줄 (제작자 2026-11-10 '한 행으로, 높이 높을 필요 없어, 템 크기 줄여도 되니 최대한 콤팩트하게 한눈에'):
+ *  완료 칸 · 제목과 효과(작게, 넘치면 …) · 오른쪽에 작은 아이템 칸 (칸이 많으면 칸을 줄여 한 줄에, 그래도 안 들어가면 제목 아래 줄로). 칸을 누르면 그 줄 아래에 이름·개수·강화·대체 스탬프와 '이 템 찾기' */
+/** 한 줄에 아이템 칸을 넣을 크기: 제목이 TITLE_MIN px 는 남도록 28 → 26 → 24 → 22 → 20px 로 줄여 본다. 그래도 안 되면 칸을 제목 아래 줄로 (null)
+ *  (제작자 2026-11-10 '아이템을 왜 한 행에 안 했어? 최대한 한 행에 넣어 봐'. 줄 안쪽 = 목록 폭 - 테두리·여백 14 - 완료 칸 22 - 사이 12) */
+const TITLE_MIN = 100;
+const SLOT_SIZES = [28, 26, 24, 22, 20];
+function slotSize(n: number, listW: number): number | null {
+  if (!listW) return 28;
+  const room = listW - 14 - 22 - 12 - TITLE_MIN;
+  return SLOT_SIZES.find((sz) => n * (sz + 2) <= room) ?? null;
+}
+
+/** 칸 상세의 아이템 정보: 영상 툴팁에서 받아 적은 것(요구 레벨·방어력·옵션, 재료면 설명) + 위키의 옵션 범위·직업·얻는 곳 (제작자 2026-11-10 '이미지랑 내용 장비옵션 다') */
+function ItemInfo({ it, wiki }: { it: DexItem; wiki: Wiki | null }) {
+  const base = it.name?.replace(/^\+\d+\s*/, "");
+  const w = wiki && base ? weaponOf(wiki, base) : undefined;
+  const eq = w?.equip?.[0]?.info;
+  const from = (eq?.["획득처"] ? [eq["획득처"]] : (w?.from ?? []).map((f) => f.split("@")[0])).filter(Boolean);
+  const lines = [
+    it.info,
+    eq?.["옵션"] ? `옵션 ${eq["옵션"]}` : "",
+    eq?.["직업"] ? `직업 ${eq["직업"]}` : "",
+    from.length ? `얻는 곳 ${[...new Set(from)].slice(0, 6).join(", ")}` : "",
+  ].filter(Boolean);
+  if (!lines.length) return null;
   return (
-    <li className={"dex-entry" + (done ? " dex-done" : "")}>
+    <span className="dex-info">
+      {lines.map((l, i) => (
+        <small key={i}>{l}</small>
+      ))}
+    </span>
+  );
+}
+
+function EntryRow({ e, listW, done, onToggle, iconOf, stat, onItem, wiki }: { e: DexEntry; listW: number; done: boolean; onToggle: () => void; iconOf: IconOf; stat: string | null; onItem: (name: string) => void; wiki: Wiki | null }) {
+  const [sel, setSel] = useState<number | null>(null);
+  const it = sel === null ? null : e.items[sel];
+  const ref = useRef<HTMLLIElement>(null);
+  // 칸을 연 채로 다른 곳을 누르면 닫는다 (제작자 2026-11-10)
+  useEffect(() => {
+    if (sel === null) return;
+    const close = (ev: PointerEvent) => {
+      if (!ref.current?.contains(ev.target as Node)) setSel(null);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [sel]);
+  const sz = slotSize(e.items.length, listW);
+  const box = sz ?? 28;
+  return (
+    <li ref={ref} className={"dex-entry" + (done ? " dex-done" : "") + (sz === null ? " dex-entry-wide" : "")}>
       <button type="button" className="dex-check" onClick={onToggle} aria-pressed={done} aria-label={done ? "완료 취소" : "완료"}>
         {done ? "✓" : ""}
       </button>
@@ -343,28 +415,37 @@ function EntryRow({ e, done, onToggle, iconOf, stat, onItem }: { e: DexEntry; do
         <div className="dex-title">
           <b>{e.name}</b>
           {e.cat && <small className="dex-cat">{e.cat}</small>}
-          {e.period && <small className="dex-period">{e.period}</small>}
         </div>
         <div className="dex-effects">
           {e.effects.map((f, i) => (
-            <span key={i} className={"dex-eff" + (stat === f[0] ? " dex-eff-on" : "")}>{effectText(f)}</span>
-          ))}
-        </div>
-        <div className="dex-items">
-          {e.items.map((it, i) => (
-            <button key={i} type="button" className={"dex-item" + (it.name ? "" : " dex-item-unknown")} title={[plusLabel(it), itemLabel(it), it.est ? "(그림으로 추정)" : "", it.stamp ?? ""].filter(Boolean).join(" ")}
-              onClick={() => it.name && onItem(it.name.replace(/^\+\d+\s*/, ""))}>
-              <span className="dex-slot">
-                <ItemPic it={it} iconOf={iconOf} />
-                {plusLabel(it) && <i className={"dex-plus" + (it.plus ? "" : " dex-noplus")}>{plusLabel(it)}</i>}
-                {it.n > 1 && <i className="dex-n">{it.n.toLocaleString("ko-KR")}</i>}
-              </span>
-              <span className="dex-iname">{it.name ? it.name.replace(/^\+\d+\s*/, "") + (it.est ? "?" : "") : "이름 모름"}</span>
-              {stampText(it) && <span className={stampCls(it.sg)}>{stampText(it)}</span>}
-            </button>
+            <span key={i} className={"dex-eff" + (stat === rowKey(f[0], f[2]) ? " dex-eff-on" : "")}>{effectText(f)}</span>
           ))}
         </div>
       </div>
+      <div className="dex-items">
+        {e.items.map((x, i) => (
+          <button key={i} type="button" className={"dex-slot" + (x.name ? "" : " dex-slot-unknown") + (sel === i ? " dex-slot-on" : "")} style={box === 28 ? undefined : { width: box, height: box }}
+            aria-label={[plusLabel(x), itemLabel(x), x.n > 1 ? `${x.n}개` : ""].filter(Boolean).join(" ")} onClick={() => setSel(sel === i ? null : i)}>
+            <ItemPic it={x} iconOf={iconOf} size={box - 6} />
+            {x.plus ? <i className="dex-plus">+{x.plus}</i> : null}
+            {x.n > 1 && <i className="dex-n">{x.n >= 1000 ? `${Math.round(x.n / 100) / 10}k` : x.n}</i>}
+          </button>
+        ))}
+      </div>
+      {it && (
+        <div className="dex-detail">
+          {plusLabel(it) && <em className={"dex-need-plus" + (it.plus ? "" : " dex-noplus")}>{plusLabel(it)}</em>}
+          <b>{itemLabel(it)}{it.est ? "?" : ""}</b>
+          <span className="muted">×{it.n.toLocaleString("ko-KR")}</span>
+          {stampText(it) && <small className={stampCls(it.sg)}>{it.sg === "불가" ? stampText(it) : `${it.sg?.startsWith("아바돈") ? "아바돈 " : ""}장비스탬프 ${it.sg?.replace("아바돈", "")} ${it.sn}개`}</small>}
+          <ItemInfo it={it} wiki={wiki} />
+          {it.name && (
+            <button type="button" className="sub-tab dex-find" onClick={() => onItem(it.name!.replace(/^\+\d+\s*/, ""))}>
+              이 템 찾기
+            </button>
+          )}
+        </div>
+      )}
     </li>
   );
 }

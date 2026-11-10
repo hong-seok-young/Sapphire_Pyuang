@@ -2,7 +2,7 @@
 import { api } from "./auth";
 import type { Job } from "./auth";
 
-export type DonateStatus = "request" | "done" | "rejected" | "removed";
+export type DonateStatus = "request" | "done" | "rejected" | "removed" | "hall" | "honor";
 export type DonatePlace = "keep" | "rent" | "used";
 
 export interface DonateRow {
@@ -12,6 +12,10 @@ export interface DonateRow {
   qty: number;
   enhance: number;
   note: string | null;
+  /** 위키 장비에 뜬 옵션 ('명중 9 · 크리티컬 4') */
+  options: string | null;
+  /** 장신구 속성부여 ('힘 3') */
+  enchant: string | null;
   gold_ask: number | null;
   gold: number | null;
   dia: number;
@@ -79,6 +83,8 @@ export interface DonateInput {
   qty: number;
   enhance: number;
   note: string;
+  options: string;
+  enchant: string;
   gold: number | null;
 }
 export const askDonate = (v: DonateInput) => api<{ id: number }>("/api/donate", "POST", v);
@@ -98,6 +104,10 @@ export const removeDonate = (id: number) => api<{ dia?: number }>(`/api/donate/$
 export const donateLabel = (r: { item: string; qty: number; enhance: number }) =>
   `${r.enhance > 0 ? `+${r.enhance} ` : ""}${r.item}${r.qty > 1 ? ` x${r.qty}` : ""}`;
 
+/** 옵션·속성부여·메모 한 줄 ('명중 9 · 크리티컬 4 · 속성부여 힘 3 · 메모') */
+export const donateExtra = (r: { options?: string | null; enchant?: string | null; note?: string | null }) =>
+  [r.options, r.enchant ? `속성부여 ${r.enchant}` : "", r.note].filter(Boolean).join(" · ");
+
 /** 골드를 '12만', '1.5억', '5,000' 으로 */
 export function goldText(g: number): string {
   if (g >= 100_000_000) return `${Math.round(g / 10_000_000) / 10}억`;
@@ -113,7 +123,7 @@ export const mileText = (m: number) => {
 /** 골드 가치로 쌓이는 마일리지 글자 (x 0.6 / 10만) */
 export const diaText = (gold: number) => mileText((gold * MILEAGE_RATE) / DIA_GOLD);
 
-export const STATUS_NAME: Record<DonateStatus, string> = { request: "확인 전", done: "확정", rejected: "거절", removed: "지움" };
+export const STATUS_NAME: Record<DonateStatus, string> = { request: "확인 전", done: "확정", rejected: "거절", removed: "지움", hall: "예전 기부", honor: "장비대여 기부" };
 export const PLACE_NAME: Record<DonatePlace, string> = { keep: "보관", rent: "장비대여", used: "나눔·사용" };
 
 /** '11/10' */

@@ -1,5 +1,6 @@
-import { useCallback } from "react";
-import type { Block, Place, Wiki } from "../types";
+import { useCallback, useState } from "react";
+import type { Block, Place, PlaceGuide, Wiki } from "../types";
+import { ImageViewer } from "./ImageViewer";
 import { FavStar, PicImg, TopBar, levelText, Loading, NotFound } from "../ui";
 import { MonsterCard } from "../wiki-ui";
 import { Blocks, OriginalLink } from "../Blocks";
@@ -73,6 +74,38 @@ export function Places({ wiki, region }: { wiki: Wiki; region: string }) {
  * 사냥터 화면: 몬스터는 카드로, 나머지(옆 사냥터로 가는 길, 지도, 퀘스트, NPC, 참고, 보상)는 원글 칸을 그대로 그린다.
  * 원글을 따로 열지 않아도 원글의 정보가 모두 보이게 한다. 어떤 칸을 그릴지는 build_data.py 의 post_parts 가 정한다.
  */
+/**
+ * 사냥터 자리 안내 (제작자 2026-11-10 '데이터에 넣어 챗봇 등등이 활용하게': 길드 잡담방에서 마을모금함이 공유한 신전·루나프 자리 나누기).
+ * 비공개 자료 길드/사냥터_자리.json -> build_data.py place_guides -> places 의 guide. 그림은 눌러서 크게 (ImageViewer, 뒤로 가기로 닫힘)
+ */
+function GuideBox({ g }: { g: PlaceGuide }) {
+  const [view, setView] = useState<number | null>(null);
+  return (
+    <section className="place-guide">
+      <div className="place-guide-head">
+        <b>{g.title}</b>
+        {g.by && <small>{g.by}</small>}
+      </div>
+      <ul className="place-guide-notes">
+        {g.notes.map((n, i) => (
+          <li key={i}>{n}</li>
+        ))}
+      </ul>
+      {g.pics.length > 0 && (
+        <div className="place-guide-pics">
+          {g.pics.map((pic, i) => (
+            <button key={pic.src} type="button" onClick={() => setView(i)}>
+              <img src={pic.src} alt={pic.caption} width={pic.w} height={pic.h} loading="lazy" />
+              {pic.caption && <small>{pic.caption}</small>}
+            </button>
+          ))}
+        </div>
+      )}
+      {view !== null && <ImageViewer images={g.pics.map((pic) => ({ src: pic.src, name: pic.caption }))} start={view} onClose={() => setView(null)} />}
+    </section>
+  );
+}
+
 export function PlacePage({ wiki, id }: { wiki: Wiki; id: string }) {
   const p = wiki.places[id];
   // 원글 칸은 그 사냥터 파일에서 따로 불러온다
@@ -94,6 +127,7 @@ export function PlacePage({ wiki, id }: { wiki: Wiki; id: string }) {
         </div>
       </div>
       <OriginalLink postId={id} />
+      {p.guide && <GuideBox g={p.guide} />}
       {part(parts?.above)}
       {mons.map((m) => (
         <MonsterCard key={m.key} wiki={wiki} m={m} />

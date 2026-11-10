@@ -4,7 +4,8 @@
 //   운영진이 골드 가치를 고쳐 확정하면 장비대여와 같은 마일리지(💎 1 = 10만 골드, rental_mileage reason 'donate')로 쌓인다.
 // - 마일리지는 기부 골드 가치의 0.6 (10만 골드당 💎1, MILEAGE_RATE). 소수점은 줄마다 버리지 않고 그 사람이 확정받은 골드 합으로 누적하고 정수 부분만 쓴다
 //   (10만 + 10만 + 10만 + 10만 + 10만 = 💎3). donate_items.dia 는 그 줄로 장부에 넣은 몫이고, 한 사람의 dia 합 = floor(확정 골드 합 x 0.6 / 10만) 을 늘 지킨다 (syncDia).
-// - 장비대여 쪽은 건드리지 않는다 (제작자): 장비대여 '물건 추가·기부 현황'에서 적립한 기부는 그대로 두고 여기 명예의 전당·내역에 같이 보인다.
+// - 장비대여 쪽은 건드리지 않는다 (제작자): 장비대여 '물건 추가·기부 현황'에서 적립한 기부 💎 는 마일리지로 그대로 쓴다. 명예의 전당에는 넣지 않는다
+//   (2026-11-10 기부함 전의 기부는 제작자가 준 기부자별 내역을 예전 기부(status hall)로 넣었다: 그 내역에 장비 기부도 다 있다).
 //   여기서 넣은 장부 줄은 note 가 '기부함 · ' 으로 시작해서 장비대여 기부와 가린다.
 // - 받은 템을 장비대여용으로 쓰면 '장비대여로' 로 rental_items 에 물건을 만든다 (마일리지는 여기서 이미 줬으니 장비대여 기부 💎 는 0).
 // 게임을 읽거나 게임에 무엇을 보내지 않는다 (사람이 적는 장부).
@@ -12,6 +13,7 @@ import type { Env, User } from "./auth";
 import { RANK, TEST_IDS } from "./auth";
 import { notify } from "./alerts";
 import { DIA_GOLD, mileageOfName } from "./rental";
+import { optionsDisplay } from "./rentalParse";
 
 /** 모두에게 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (제작자 2026-11-10 '개발 중 (운영진만)'). 화면 launcher.ts 의 DONATE_OPEN 과 같이 바꾼다 */
 export const DONATE_OPEN = false;
@@ -30,7 +32,9 @@ export const earnedDia = (gold: number) => (gold * MILEAGE_RATE) / DIA_GOLD;
 /** 장부 줄 note 머리 (장비대여 기부와 가린다) */
 export const NOTE_HEAD = "기부함 · ";
 
-export type DonateStatus = "request" | "done" | "rejected" | "removed";
+/** hall = 기부함 전의 예전 기부 (제작자가 준 기부자별 내역, scripts/donate-hall-seed.mjs). 확정 기부와 같이 마일리지에 들고(syncDia), 운영의 받은 템 목록에는 안 나온다 */
+/** honor = 장비대여 목록의 기부자 (기부함 전, 명예의 전당·기부 내역에만, 마일리지에는 안 든다. 제작자 2026-11-10 '장비대여에만 있는 기부자도 명예의 전당에') */
+export type DonateStatus = "request" | "done" | "rejected" | "removed" | "hall" | "honor";
 export type DonatePlace = "keep" | "rent" | "used";
 export interface DonateRow {
   id: number;
@@ -39,6 +43,10 @@ export interface DonateRow {
   qty: number;
   enhance: number;
   note: string | null;
+  /** 위키 장비의 뜬 옵션 ('명중 9 · 크리티컬 4', 제작자 2026-11-10 '옵션 적는 프리셋') */
+  options: string | null;
+  /** 장신구 속성부여 ('힘 3', '체력 30') */
+  enchant: string | null;
   gold_ask: number | null;
   gold: number | null;
   dia: number;
@@ -59,18 +67,25 @@ export const goldText = (g: number) =>
   g >= 100_000_000 ? `${Math.round(g / 10_000_000) / 10}억` : g >= 10_000 ? `${Math.round(g / 1000) / 10}만` : `${g}`;
 
 /** 신청·등록 값 검사 */
-export function readDonate(b: Record<string, unknown>): { error: string } | { item: string; qty: number; enhance: number; note: string | null; gold: number | null } {
+/** 속성부여 글 ('힘 1~3', '민첩 1~3', '지능 1~3', '체력·마나 10/20/30', 화면 market.ts ENCHANTS 와 같다) */
+const ENCHANT_RE = /^(?:(?:힘|민첩|지능) [123]|(?:체력|마나) (?:10|20|30))$/;
+export function readDonate(b: Record<string, unknown>): { error: string } | { item: string; qty: number; enhance: number; note: string | null; options: string | null; enchant: string | null; gold: number | null } {
   const item = typeof b.item === "string" ? b.item.trim() : "";
   const qty = b.qty === undefined || b.qty === null || b.qty === "" ? 1 : Number(b.qty);
   const enhance = b.enhance === undefined || b.enhance === null || b.enhance === "" ? 0 : Number(b.enhance);
   const note = typeof b.note === "string" && b.note.trim() ? b.note.trim() : null;
   const gold = b.gold === undefined || b.gold === null || b.gold === "" ? null : Number(b.gold);
+  // 옵션은 알아보는 것이면 '지능 3 · 마나재생 2' 로 통일 (server/rentalParse.ts optionsDisplay)
+  const options = typeof b.options === "string" && b.options.trim() ? optionsDisplay(b.options) : null;
+  const enchant = typeof b.enchant === "string" && b.enchant.trim() ? b.enchant.trim() : null;
+  if (options && options.length > 120) return { error: "옵션이 너무 길어요" };
+  if (enchant && !ENCHANT_RE.test(enchant)) return { error: "속성부여가 맞지 않아요" };
   if (!item || item.length > 40) return { error: "아이템 이름을 적어 주세요" };
   if (!Number.isInteger(qty) || qty < 1 || qty > 99_999) return { error: "개수가 맞지 않아요" };
   if (!Number.isInteger(enhance) || enhance < 0 || enhance > 20) return { error: "강화는 0~20 이에요" };
   if (note && note.length > 100) return { error: "메모가 너무 길어요" };
   if (gold !== null && (!Number.isInteger(gold) || gold < 0 || gold > 100_000_000_000)) return { error: "골드 가치가 맞지 않아요" };
-  return { item, qty, enhance, note, gold };
+  return { item, qty, enhance, note, options, enchant, gold };
 }
 
 /**
@@ -79,7 +94,7 @@ export function readDonate(b: Record<string, unknown>): { error: string } | { it
  */
 export async function syncDia(env: Env, who: string, rowId: number, label: string, by: string): Promise<{ error?: string; diff: number; mileage: number }> {
   const s = await env.DB.prepare(
-    "SELECT COALESCE(SUM(CASE WHEN status = 'done' THEN gold ELSE 0 END), 0) AS gold, COALESCE(SUM(dia), 0) AS dia FROM donate_items WHERE who = ?",
+    "SELECT COALESCE(SUM(CASE WHEN status IN ('done', 'hall') THEN gold ELSE 0 END), 0) AS gold, COALESCE(SUM(dia), 0) AS dia FROM donate_items WHERE who = ?",
   )
     .bind(who)
     .first<{ gold: number; dia: number }>();
@@ -147,28 +162,27 @@ export interface GiftLine {
 }
 
 /**
- * 명예의 전당: 사람마다 기부한 골드 가치 합 (기부함 확정 + 장비대여 기부 💎 x 10만). since 를 주면 그때부터.
- * 같은 사람의 캐릭터는 본캐 이름으로 합친다
+ * 명예의 전당: 사람마다 기부한 골드 가치 합 (기부함 확정 + 예전 기부(status hall)). since 를 주면 그때부터.
+ * 같은 사람의 캐릭터는 본캐 이름으로 합친다.
+ * 장비대여 '물건 추가·기부 현황'에서 적은 기부 💎(rental_mileage reason 'donate')는 넣지 않는다 (제작자 2026-11-10 '기부자별 내역 이거로 적용해줘':
+ * 기부함 전의 기부는 그 내역(예전 기부)이 다 갖고 있어서 같이 세면 겹친다. 그 장부 줄은 마일리지로는 그대로 쓴다)
  */
 export async function hallOfFame(env: Env, since = 0): Promise<{ rows: HallRow[]; lines: GiftLine[] }> {
-  const [box, rent] = await Promise.all([
-    env.DB.prepare(
-      "SELECT id, who, item, qty, enhance, gold, dia, place, COALESCE(done_at, created_at) AS at FROM donate_items WHERE status = 'done' AND COALESCE(done_at, created_at) >= ? ORDER BY at DESC",
-    )
-      .bind(since)
-      .all<{ id: number; who: string; item: string; qty: number; enhance: number; gold: number; dia: number; place: DonatePlace; at: number }>(),
-    // 장비대여 기부 (물건 추가의 기부 💎, 기부 현황의 기부 적립). 고침(-) 줄도 같이 더해 순수한 합으로
-    env.DB.prepare(
-      "SELECT id, who, delta, note, created_at AS at FROM rental_mileage WHERE reason = 'donate' AND (note IS NULL OR note NOT LIKE ?) AND created_at >= ? ORDER BY created_at DESC",
-    )
-      .bind(`${NOTE_HEAD}%`, since)
-      .all<{ id: number; who: string; delta: number; note: string | null; at: number }>(),
-  ]);
-  const lines: GiftLine[] = [
-    ...box.results.map((r) => ({ id: `b${r.id}`, who: r.who, label: donateLabel(r), gold: r.gold ?? 0, dia: earnedDia(r.gold ?? 0), at: r.at, from: "box" as const, place: r.place })),
-    // 장비대여 기부는 운영진이 💎 를 바로 적었다: 마일리지는 그대로, 골드 가치는 0.6 으로 되돌려 어림한다
-    ...rent.results.map((r) => ({ id: `r${r.id}`, who: r.who, label: (r.note ?? "장비 기부").replace(/ 기부( \(고침\))?$/, "$1"), gold: Math.round((r.delta * DIA_GOLD) / MILEAGE_RATE), dia: r.delta, at: r.at, from: "rent" as const })),
-  ].sort((a, b) => b.at - a.at);
+  const box = await env.DB.prepare(
+    "SELECT id, who, item, qty, enhance, gold, dia, place, COALESCE(done_at, created_at) AS at FROM donate_items WHERE status IN ('done', 'hall', 'honor') AND COALESCE(done_at, created_at) >= ? ORDER BY at DESC",
+  )
+    .bind(since)
+    .all<{ id: number; who: string; item: string; qty: number; enhance: number; gold: number; dia: number; place: DonatePlace; at: number }>();
+  const lines: GiftLine[] = box.results.map((r) => ({
+    id: `b${r.id}`,
+    who: r.who,
+    label: donateLabel(r),
+    gold: r.gold ?? 0,
+    dia: earnedDia(r.gold ?? 0),
+    at: r.at,
+    from: "box" as const,
+    place: r.place,
+  }));
 
   const who = [...new Set(lines.map((l) => l.who))];
   const { results: users } = who.length
@@ -201,7 +215,7 @@ export async function hallOfFame(env: Env, since = 0): Promise<{ rows: HallRow[]
     if (!h.names.includes(l.who)) h.names.push(l.who);
     h.gold += l.gold;
     h.earned += l.dia;
-    if (l.gold > 0) h.count++;
+    h.count++;
     h.last = Math.max(h.last, l.at);
     hall.set(key, h);
   }
@@ -210,4 +224,38 @@ export async function hallOfFame(env: Env, since = 0): Promise<{ rows: HallRow[]
   // 남은 마일리지 (앞 30명만, D1 읽기를 아끼려고)
   await Promise.all(rows.slice(0, 30).map(async (h) => (h.mileage = await mileageOfName(env, h.name))));
   return { rows, lines };
+}
+
+/**
+ * 장비대여에만 있는 기부자의 마일리지 (제작자 2026-11-10 '장비대여에만 있는 기부자, 웹 로그인 했을 때 줘'): 명예의 전당에 넣은 장비대여 기부(status 'honor', 보증금 ÷ 1.5 = 골드)도
+ * 기부 골드 x 0.6 / 10만 마일리지로 친다. 그 기부자 이름(대소문자 무시)의 캐릭터가 앱을 열면(/api/me) 한 번만:
+ * 넣을 💎 = floor((기부함 확정 + 예전 기부 + 장비대여 기부 골드) x 0.6 / 10만) - 이미 받은 기부 마일리지 합(장부 reason 'donate': 운영진이 장비대여에서 적어 준 기부 💎 포함, 그래서 겹치지 않는다).
+ * 장부에 '기부함 · 장비대여 기부 (기부함 전)' 줄과 장비대여 알림. donate_items.dia 는 건드리지 않아 기부함 확정(syncDia)과 따로 간다
+ */
+export async function grantRentDonation(env: Env, me: User, now = Date.now()): Promise<void> {
+  const ids = me.chars?.length ? me.chars : [me.id];
+  const { results } = await env.DB.prepare(
+    "SELECT g.who AS who, u.id AS id FROM donate_grants g JOIN users u ON lower(u.id) = lower(g.who) WHERE g.granted_at IS NULL AND u.id IN (SELECT value FROM json_each(?))",
+  )
+    .bind(JSON.stringify(ids))
+    .all<{ who: string; id: string }>();
+  for (const r of results) {
+    const claimed = await env.DB.prepare("UPDATE donate_grants SET granted_at = ?, granted_to = ? WHERE who = ? AND granted_at IS NULL").bind(now, r.id, r.who).run();
+    if (!claimed.meta.changes) continue;
+    const gold = await env.DB.prepare("SELECT COALESCE(SUM(gold), 0) AS n FROM donate_items WHERE lower(who) = lower(?) AND status IN ('done', 'hall', 'honor')")
+      .bind(r.who)
+      .first<{ n: number }>();
+    const had = await env.DB.prepare("SELECT COALESCE(SUM(delta), 0) AS n FROM rental_mileage WHERE reason = 'donate' AND (lower(who) = lower(?1) OR who = ?2)")
+      .bind(r.who, r.id)
+      .first<{ n: number }>();
+    const give = Math.max(0, usableDia(Number(gold?.n) || 0) - (Number(had?.n) || 0));
+    await env.DB.prepare("UPDATE donate_grants SET dia = ? WHERE who = ?").bind(give, r.who).run();
+    if (give <= 0) continue;
+    await env.DB.prepare(
+      "INSERT INTO rental_mileage (who, delta, reason, note, by_user, created_at) VALUES (?, ?, 'donate', '기부함 · 장비대여 기부 (기부함 전)', 'system', ?)",
+    )
+      .bind(r.id, give, now)
+      .run();
+    await notify(env, [r.id], "rent", `[장비대여] 기부하신 장비로 마일리지가 💎${give} 들어왔어요 · 대여 보증금으로 쓸 수 있어요`, "#/rent?v=apps", "");
+  }
 }

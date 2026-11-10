@@ -30,6 +30,7 @@ const KIND_TITLE = {
   bday: "🎂 생일 축하해요!",
   gcoin: "🪙 성장코인샵",
   donate: "🎁 기부함",
+  push_test: "🔔 폰 알림 시험",
 };
 
 self.addEventListener("install", () => self.skipWaiting());

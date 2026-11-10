@@ -100,8 +100,6 @@ export const DEFAULT_ITEMS: { name: string; unit: string; price: number }[] = [
   { name: "딸기빙수", unit: "20개", price: 0 },
   { name: "꿀사과", unit: "20개", price: 0 },
   { name: "알사탕", unit: "20개", price: 0 },
-  { name: "칠면조 구이", unit: "20개", price: 0 },
-  { name: "송편", unit: "20개", price: 0 },
   { name: "자라의노래", unit: "20개", price: 0 },
   { name: "피닉스의심장", unit: "5개", price: 2 },
 ];
