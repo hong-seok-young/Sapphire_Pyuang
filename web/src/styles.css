@@ -5187,3 +5187,7 @@ button.dex-cell-name:disabled { cursor: default; }
 @media (prefers-reduced-motion: reduce) {
   .rn-quest-mark, .rn-card, .rn-kakao::after, .rn-never-on .rn-box, .rn-steps .rn-now { animation: none; }
 }
+/* 성장코인샵 목표 줄: 시작 레벨 − + → 목표 레벨 − + */
+.gr-tg-from b { min-width: 22px; font-size: 12px; }
+.gr-tg-arrow { color: var(--muted); font-size: 12px; }
+.gr-tg-ok { color: #7ee2a8; font-size: 11px; }
