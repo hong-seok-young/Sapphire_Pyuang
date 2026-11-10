@@ -18,6 +18,10 @@ import type { Sky } from "../weather";
 import type { Weather } from "../weather";
 import { goCharacter, refreshMe } from "../characters";
 import { useBackClose } from "../backClose";
+import { AlertSettings } from "./AlertSettings";
+import { canPreview } from "../launcher";
+import { pushState } from "../push";
+import type { PushState } from "../push";
 
 /** "12.345" -> 12345, 비었으면 null, 틀렸으면 undefined */
 function parseExp(text: string): number | null | undefined {
@@ -203,7 +207,7 @@ export function ProfileSetupPage({
   );
 }
 
-type MenuKey = "info" | "photo" | "chars" | "rename" | "kakao" | "weather" | "test";
+type MenuKey = "info" | "photo" | "chars" | "rename" | "kakao" | "alerts" | "weather" | "test";
 
 /** 펼치는 줄의 오른쪽 꺾쇠 (이모지·글자 대신 선으로 그린다, 펼치면 아래로) */
 const Chevron = () => <span className="me-chev" aria-hidden />;
@@ -255,10 +259,14 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
   // '#/me?open=kakao' 처럼 줄을 펼친 채로 연다 (내 글의 흐린 '카톡'을 누르면 카톡 오픈프로필로)
   const [open, setOpen] = useState<MenuKey | null>(() => {
     const k = new URLSearchParams(location.hash.split("?")[1] ?? "").get("open");
-    return k === "kakao" || k === "photo" || k === "info" || k === "weather" ? k : null;
+    return k === "kakao" || k === "photo" || k === "info" || k === "weather" || k === "alerts" ? k : null;
   });
   const { links } = useKakao();
   const [wxOn, setWxOn] = useState(weatherOn);
+  const [phone, setPhone] = useState<PushState | null>(null);
+  useEffect(() => {
+    pushState().then(setPhone, () => setPhone("unsupported"));
+  }, [open]);
   const row = (k: MenuKey) => ({ open: open === k, onToggle: () => setOpen((o) => (o === k ? null : k)) });
   // 직책은 지금 캐릭터의 것 (me.role 은 묶은 캐릭터 중 가장 높은 권한)
   const myRole = me.characters?.find((c) => c.id === me.id)?.role ?? me.role;
@@ -343,6 +351,10 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
         <MeRow label="카톡 오픈프로필" value={links[me.id] ? "등록됨" : "없음"} {...row("kakao")}>
           <KakaoField name={me.id} />
           <KakaoWhere me={me} link={!!links[me.id]} />
+        </MeRow>
+        {/* 알림 설정 (제작자 2026-11-10 '알림함 맨 밑의 알림 설정을 프로필 계정 설정 안으로', pages/AlertSettings.tsx) */}
+        <MeRow label="알림 설정" value={phone === "on" ? "폰 알림 켜짐" : phone ? "폰 알림 꺼짐" : undefined} {...row("alerts")}>
+          <AlertSettings developer={me.role === "developer"} preview={canPreview(me)} />
         </MeRow>
       </MeGroup>
 

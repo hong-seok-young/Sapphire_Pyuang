@@ -433,10 +433,7 @@ function Wiki({
   else if (page === "devreq") body = <DevRequestsPage me={me} query={route.query} />;
   else if (page === "alerts")
     body = (
-      <AlertsPage
-        developer={me.role === "developer"}
-        preview={canPreview(me)}
-      />
+      <AlertsPage />
     );
   else if (page === "shop") body = <PlatShopPage />;
   else if (page === "patch") body = <PatchNotesPage />;
