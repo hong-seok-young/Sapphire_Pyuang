@@ -4,6 +4,7 @@ import type { Wiki } from "../types";
 import { monstersByName } from "../data";
 import { PicImg, levelText } from "../ui";
 import { ImageViewer } from "./ImageViewer";
+import { TrendSnippet } from "./Trend";
 import type { ViewImage } from "./ImageViewer";
 import { PLAT_PACKS } from "../platshop";
 
@@ -20,6 +21,7 @@ import { PLAT_PACKS } from "../platshop";
  *   [[탭:이름]] … [[탭끝]] -> 눌러서 바꾸는 탭 (직업별 교환표처럼)
  *   [[확률:제목|이름=98%;이름=1.94%]] -> 확률 막대
  *   [[계산기:대상=덥마북;확률=0.1304%;가격=570;최대=200;플골드=700;원골드=70]] -> 뽑기 계산기 (몇 개 살지 끌면 얻을 확률·플래티넘·현금·골드)
+ *   [[시세:물건 이름]] · [[시세:골드]] -> 시세 동향 화면의 그 물건 칸(날짜 그림 · 묶음 표 · 올린 사람 · 원글)이나 골드 시세 칸 그대로 (제작자 요청 2026-11-10)
  *   [[공식글:번호|제목]] -> 게시판 '아이모 소식'의 그 글로 가는 단추 (제작자 요청 2026-11-06: 이벤트를 물으면 그 글로 가서 직접 보게)
  */
 
@@ -175,6 +177,7 @@ const safeImg = (raw: string) => {
 const IMG_TOKEN = /\[\[그림:([^\]|\n]{1,600})(?:\|([^\]\n]{0,120}))?\]\]/g;
 const ODDS_TOKEN = /^\s*\[\[확률:([^\]\n]{1,800})\]\]\s*$/;
 const CALC_TOKEN = /^\s*\[\[계산기:([^\]\n]{1,400})\]\]\s*$/;
+const TREND_TOKEN = /^\s*(?:[-•]\s*)?\[\[시세:([^\]\n]{1,40})\]\]\s*$/;
 const TAB_TOKEN = /^\s*\[\[탭:([^\]\n]{1,40})\]\]\s*$/;
 const POST_TOKEN = /\[\[공식글:(\d{1,9})(?:\|([^\]\n]{0,120}))?\]\]/g;
 const TAB_END = /^\s*\[\[탭끝\]\]\s*$/;
@@ -436,6 +439,12 @@ function ChatAnswerView({ wiki, text, done, onAsk }: { wiki: Wiki; text: string;
       if (isTableLine(line)) {
         flushList(i);
         (table ??= []).push(cellsOf(line));
+        return;
+      }
+      const trend = line.match(TREND_TOKEN);
+      if (trend) {
+        flush(i);
+        blocks.push(<TrendSnippet key={`${base}tr${i}`} query={trend[1].trim()} wiki={wiki} />);
         return;
       }
       const odds = line.match(ODDS_TOKEN);

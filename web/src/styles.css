@@ -4936,3 +4936,8 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .dex-cat { padding: 0 4px; font-size: 10px; color: #c9b8ff; border: 1px solid currentColor; }
 .dex-stamp-AB { color: #ff7a6b; }
 .dex-stamp-no { color: var(--muted); border-style: dashed; }
+
+/* 챗봇 답은 좌우 폭을 다 쓴다 (제작자 2026-11-10 '챗봇 대답은 좌우 폭을 전체를 다 써도 돼'), 답 속 시세 칸 (`TrendSnippet`) */
+.bubble-assistant { max-width: 100%; align-self: stretch; }
+.trend-snip { margin: 2px 0; white-space: normal; line-height: 1.4; font-size: 13px; }
+.trend-snip .trend-list { margin: 0; }
