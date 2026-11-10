@@ -2,7 +2,7 @@
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import { notify } from "../../../server/alerts";
 import type { Env } from "../../../server/auth";
-import { GCOIN_OPEN, MAX_NOTE, canManageGcoin, canUseGcoin, int, isMember, text } from "../../../server/gcoin";
+import { MAX_NOTE, canManageGcoin, canUseGcoin, gcoinOpen, int, isMember, text } from "../../../server/gcoin";
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
@@ -19,6 +19,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   await env.DB.prepare("INSERT INTO gc_ledger (user_id, delta, kind, ref, note, by_user, created_at) VALUES (?, ?, 'adjust', ?, ?, ?, ?)")
     .bind(userId, delta, `a${now}-${Math.random().toString(36).slice(2, 8)}`, note, me.id, now)
     .run();
-  if (GCOIN_OPEN) await notify(env, [userId], "gcoin", `성장코인 ${delta > 0 ? "+" : ""}${delta} · ${note}`, "#/gcoin?t=mine", me.id);
+  if (gcoinOpen()) await notify(env, [userId], "gcoin", `성장코인 ${delta > 0 ? "+" : ""}${delta} · ${note}`, "#/gcoin?t=mine", me.id);
   return json({ ok: true });
 };

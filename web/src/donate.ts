@@ -121,3 +121,61 @@ export function dayText(ms: number): string {
   const d = new Date(ms + 9 * 3_600_000);
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
 }
+
+/**
+ * 명예의 전당 예시 (제작자 2026-11-10 '명예의 전당 우리 길드원 닉네임으로 샘플 데이터 넣어줘'): 기부가 하나도 없으면 '예시' 로 보인다 (서버로 가지 않음).
+ * [닉네임, 직업, [며칠 전, 물건, 골드 가치, 장비대여?]...]. 마일리지는 골드 가치 x 0.6 / 10만
+ */
+export function sampleHall(period: "all" | "month", now = Date.now()): HallData {
+  const DAY = 86_400_000;
+  const P: [string, Job, [number, string, number, boolean?][]][] = [
+    ["마을모금함", "warrior", [[2, "+8 다크스틸소드", 3_200_000], [9, "의지의 망토", 1_800_000], [21, "사나운 멧돼지 인형 x40", 480_000], [40, "+7 강화가죽장갑", 1_500_000, true]]],
+    ["유어아너", "ranger", [[1, "+8 헌터보우", 2_600_000], [12, "자몽케이크 x100", 240_000], [33, "+7 윙의날개", 1_900_000, true]]],
+    ["멍멍", "mage", [[4, "+7 고요의지팡이", 2_100_000, true], [18, "지능3 목걸이", 900_000]]],
+    ["아홀로틀", "monk", [[3, "+8 길로틴", 1_700_000], [27, "피닉스의심장 x10", 120_000]]],
+    ["향단", "mage", [[6, "+6 의식용홀", 1_200_000], [15, "검은진액 x100", 350_000]]],
+    ["정서", "warrior", [[8, "힘2 벨트", 700_000], [36, "+7 워소드", 800_000, true]]],
+    ["퓨앙", "mage", [[5, "+7 나무지팡이", 600_000], [11, "망고워터 x40", 120_000]]],
+    ["달팽이", "ranger", [[10, "민첩3 반지", 650_000]]],
+    ["간다이", "monk", [[13, "+6 강화가죽장갑", 550_000]]],
+    ["별빛하늘", "warrior", [[7, "자몽주스 x100", 240_000], [25, "+5 회색바위 투구", 200_000]]],
+    ["현금술사", "ranger", [[16, "+6 헌터보우", 380_000]]],
+    ["도리", "mage", [[19, "마나30 망토", 300_000]]],
+    ["쿨쿨쿠루미", "monk", [[22, "데블랑사탕 x40", 160_000]]],
+    ["백돼쥐", "warrior", [[3, "사나운 멧돼지 인형 x20", 120_000]]],
+  ];
+  const kst = new Date(now + 9 * 3_600_000);
+  const monthStart = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), 1) - 9 * 3_600_000;
+  const since = period === "month" ? monthStart : 0;
+  const lines: GiftLine[] = [];
+  const hall: HallRow[] = [];
+  for (const [name, job, gifts] of P) {
+    const mine = gifts.filter(([d]) => now - d * DAY >= since);
+    if (!mine.length) continue;
+    let gold = 0;
+    mine.forEach(([d, label, g, rent], i) => {
+      gold += g;
+      lines.push({ id: `s-${name}-${i}`, who: name, label, gold: g, dia: (g * MILEAGE_RATE) / DIA_GOLD, at: now - d * DAY, from: rent ? "rent" : "box" });
+    });
+    hall.push({
+      name,
+      names: [name],
+      gold,
+      earned: (gold * MILEAGE_RATE) / DIA_GOLD,
+      count: mine.length,
+      mileage: Math.floor((gold * MILEAGE_RATE) / DIA_GOLD),
+      last: now - Math.min(...mine.map(([d]) => d)) * DAY,
+      job,
+      avatar: null,
+      highSpec: false,
+    });
+  }
+  hall.sort((a, b) => b.earned - a.earned);
+  lines.sort((a, b) => b.at - a.at);
+  return {
+    period,
+    hall,
+    lines,
+    total: { earned: hall.reduce((s, h) => s + h.earned, 0), gold: hall.reduce((s, h) => s + h.gold, 0), count: lines.length, people: hall.length },
+  };
+}

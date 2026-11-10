@@ -97,7 +97,7 @@ function WalletCard({
   w: GcWallet;
   curve: GcCurve[];
   sample: boolean;
-  /** 시범운영(레벨 코인 끔): 2주 목표 판과 내 줄 */
+  /** 시범운영(레벨 코인 끔): 주간 목표 판과 내 줄 */
   race?: { race: GcRace; mine: GcRaceEntry | null } | null;
   me: Me;
   onMe?: (p: Partial<Me>) => void;
@@ -120,7 +120,7 @@ function WalletCard({
           {race ? "보상표" : "코인표"}
         </button>
       </div>
-      {/* 시범운영: 성장 카드 = 2주 목표 달성률 (제작자 2026-11-09 '상점의 성장 카드는 달성률이 나오게', '성장 반영 버튼, 길드 랭킹에도 연동') */}
+      {/* 시범운영: 성장 카드 = 주간 목표 달성률 (제작자 2026-11-09 '상점의 성장 카드는 달성률이 나오게', '성장 반영 버튼, 길드 랭킹에도 연동') */}
       {race && (
         <RaceCard
           entry={race.mine}
@@ -992,7 +992,7 @@ function CoinsTab({
       <div className="panel gc-set">
         <p className="gc-week-head">
           <b>
-            {data.levelCoins ? "주간 1~5위 보너스" : "2주 목표 달성 1~5위 상금"}
+            {data.levelCoins ? "주간 1~5위 보너스" : "주간 목표 달성 1~5위 상금"}
           </b>
         </p>
         {rank.map((v, i) => (
@@ -1395,11 +1395,11 @@ export function GrowthShopPage({
   const wallet = cur.wallet ?? (sample ? SAMPLE_WALLET : null);
   const history = cur.member ? cur.history : SAMPLE_HISTORY;
   const pending = cur.admin?.pending.length ?? 0;
-  // 시범운영 2주 목표 선착순: 목표를 아무도 안 정했으면 예시 판 (제작자 2026-11-09 '테스트 데이터 몇 개 넣어 주고')
+  // 시범운영 주간 목표 선착순: 목표를 아무도 안 정했으면 예시 판 (제작자 2026-11-09 '테스트 데이터 몇 개 넣어 주고')
   const now = Date.now();
   const raceSample = !cur.race.list.length;
   // 예시는 판이 열흘쯤 지난 것처럼 (제작자 2026-11-09 '10일간 진행한 차트로, 너무 빽빽해') (첫날이면 선이 안 보인다)
-  const raceNow = raceSample ? cur.race.start + 10.2 * 86_400_000 : now;
+  const raceNow = raceSample ? cur.race.start + 5.2 * 86_400_000 : now;
   const race = raceSample ? sampleRace(cur.race.start, raceNow) : cur.race;
   const myRace = cur.levelCoins
     ? null

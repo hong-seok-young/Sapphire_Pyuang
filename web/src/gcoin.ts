@@ -90,6 +90,10 @@ export interface GcRaceEntry {
 export interface GcRace {
   start: number;
   end: number;
+  /** 담당자가 목표를 정하는 판 (쉬는 주면 다음 판) */
+  next?: number;
+  /** 쉬는 주에 다음 판에 정해 둔 목표 */
+  upcoming?: { id: string; fromLevel: number; target: number }[] | null;
   /** 1~5위 상금 */
   prizes: number[];
   list: GcRaceEntry[];
@@ -225,7 +229,7 @@ export function curveRows(
 }
 
 /** 물건 그림이 있는 이름 (게임 거래소 스샷에서 자른 칸, 자료 scripts/make_gcoin_icons.py -> data/gcoin/<이름(띄어쓰기 없이)>.png).
- * 칸 오른쪽 아래 개수 표가 한 통(자몽주스·자몽케이크 50, 나머지 20)이다 */
+ * 칸 오른쪽 아래 개수 표가 한 통(자몽주스·자몽케이크 50, 피닉스의심장 5(게임 상점 스샷), 나머지 20)이다 */
 const PICS = new Set([
   "사나운멧돼지인형",
   "망고워터",
@@ -242,10 +246,12 @@ const PICS = new Set([
   "칠면조구이",
   "송편",
   "자라의노래",
+  "피닉스의심장",
 ]);
 export function itemPic(name: string): string | null {
   let key = name.replace(/\s/g, "");
   if (/멧돼지/.test(key)) key = "사나운멧돼지인형";
+  if (/피닉스|피닉|피심/.test(key)) key = "피닉스의심장";
   return PICS.has(key) ? `/data/gcoin/${encodeURIComponent(key)}.png` : null;
 }
 
@@ -263,6 +269,7 @@ const ITEM_INFO: Record<string, string[]> = {
   별과자: ["쿨타임 5초", "20분 동안 지속: 크리티컬 5 증가"],
   데블랑사탕: ["쿨타임 5초", "20분 동안 지속: 크리티컬 5 증가"],
   자라의노래: ["쿨타임 5초", "20분 동안 지속: 경험치 30% 증가"],
+  피닉스의심장: ["사용: 제자리에서 부활"],
   자몽주스: [
     "쿨타임 5초",
     "요구 레벨 27",
@@ -410,7 +417,7 @@ export function milestone(from: number, to: number): string | null {
 
 /**
  * 예시 판 (제작자 2026-11-09 '테스트 데이터 몇 개 넣어 주고'): 목표를 아직 아무도 안 정했으면 성장 현황에 '예시'로 보인다 (서버로 가지 않음).
- * 시작 때부터 열흘 동안 몇 번 적은 것처럼, 추월이 두 번 일어난다
+ * 시작 때부터 7일 동안 몇 번 적은 것처럼, 추월이 두 번 일어난다
  */
 export function sampleRace(start: number, now: number): GcRace {
   const d = (x: number) => Math.min(now, start + x * 86_400_000);
@@ -431,7 +438,9 @@ export function sampleRace(start: number, now: number): GcRace {
   ];
   const series: Record<string, [number, number][]> = {};
   const list: GcRaceEntry[] = P.map(([id, job, from, target, pts]) => {
+    // 열흘짜리로 적은 점을 7일 판에 맞춰 0.7 배로
     series[id] = pts
+      .map(([x, p]) => [x * 0.7, p] as [number, number])
       .filter(([x]) => start + x * 86_400_000 <= now)
       .map(([x, p]) => [d(x), p]);
     const last = series[id][series[id].length - 1]?.[1] ?? 0;
@@ -457,10 +466,10 @@ export function sampleRace(start: number, now: number): GcRace {
       ? (a.doneAt ?? Infinity) - (b.doneAt ?? Infinity)
       : b.pct - a.pct,
   );
-  const prizes = [5, 4, 3, 2, 1];
+  const prizes = [6, 4, 3, 2, 2];
   list.forEach((e, i) => {
     e.rank = i + 1;
     if (e.doneAt !== null) e.coins = prizes[i] ?? 0;
   });
-  return { start, end: start + 14 * 86_400_000, prizes, list, series };
+  return { start, end: start + 7 * 86_400_000, prizes, list, series };
 }

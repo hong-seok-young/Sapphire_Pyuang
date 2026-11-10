@@ -10,7 +10,7 @@ import { HeroHalo } from "../heroHalo";
 import { Nick } from "../kakao";
 import { useEntryState } from "../router";
 import { Loading, TopBar } from "../ui";
-import { PLACE_NAME, dayText, fetchHall, goldText, mileText } from "../donate";
+import { PLACE_NAME, dayText, fetchHall, goldText, mileText, sampleHall } from "../donate";
 import type { GiftLine, HallRow } from "../donate";
 
 function Face({ h, size }: { h: HallRow; size: number }) {
@@ -117,12 +117,15 @@ function Podium({ rank, h, me, open, onToggle }: { rank: 1 | 2 | 3; h: HallRow; 
 export function HallPage({ me }: { me: Me }) {
   const [period, setPeriod] = useEntryState<"all" | "month">("hof.period", "all");
   const [open, setOpen] = useState<string | null>(null);
-  const { data, error } = useAsync(
+  const { data: real, error } = useAsync(
     useCallback(() => fetchHall(period), [period]),
     `hall:${period}`,
   );
-  if (!data) return <Loading error={error} />;
-  const mine = (h: HallRow) => h.names.includes(me.id) || h.name === me.id;
+  if (!real) return <Loading error={error} />;
+  // 기부가 아직 없으면 길드원 닉네임으로 만든 예시 (서버로 가지 않음)
+  const sample = !real.hall.length;
+  const data = sample ? sampleHall(period) : real;
+  const mine = (h: HallRow) => !sample && (h.names.includes(me.id) || h.name === me.id);
   const linesOf = (h: HallRow) => data.lines.filter((l) => h.names.includes(l.who));
   const toggle = (name: string) => setOpen((o) => (o === name ? null : name));
   const top = data.hall.slice(0, 3);
@@ -167,6 +170,7 @@ export function HallPage({ me }: { me: Me }) {
             <small>기부자</small>
             <b>{data.total.people}명</b>
           </span>
+          {sample && <i className="sample-tag hof-sample">예시</i>}
         </div>
         {!top.length ? (
           <p className="hof-empty">아직 기부가 없어요</p>

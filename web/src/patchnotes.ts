@@ -10,7 +10,11 @@ export interface Patch {
   items: string[];
 }
 
+// 오픈 예약한 판은 그때부터 보인다 (성장코인샵 2026-11-11 11:00 한국 시간)
+const AT_1_6 = Date.UTC(2026, 10, 11, 2);
+
 export const PATCHES: Patch[] = [
+  ...(Date.now() >= AT_1_6 ? [{ version: "1.6", date: "11.11", items: ["성장코인샵 추가 (2군 전용)"] }] : []),
   {
     version: "1.5",
     date: "11.09",

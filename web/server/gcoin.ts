@@ -16,14 +16,15 @@ import { notify } from "./alerts";
 import { realStart } from "./growth";
 import { WEEK, weekStart } from "./week";
 
-/** 2군에게 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (개발 중, 제작자 2026-11-09 '오피서랑 길마 보게 열어 줘, 개발 중으로 두고').
- * 화면 launcher.ts 의 GCOIN_OPEN·canGcoin 과 같이 바꾼다 */
-export const GCOIN_OPEN = false;
+/** 2026-11-11(수) 11:00 한국 시간에 모두에게 연다 (제작자 2026-11-10 '11/11 오전 11시 오픈 예약'). 그 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만.
+ * 화면 launcher.ts 의 GCOIN_OPEN_AT·canGcoin 과 같이 바꾼다. 첫 주간 목표 판도 이때 시작한다 (server/gcrace.ts) */
+export const GCOIN_OPEN_AT = Date.UTC(2026, 10, 11, 2);
+export const gcoinOpen = (now = Date.now()) => now >= GCOIN_OPEN_AT;
 /** 레벨·경험치마다 코인 (김다혜 2026-11-09 시범운영 '레벨별 코인은 일단 빼고 선착순만, 레벨 구간별 보너스는 나중에'):
  *  끄면 지갑의 성장·첫 달성 보너스가 0, 주간 순위·연속 보너스 정산도 쉰다. 코인은 2주 목표 선착순 상금(server/gcrace.ts)과 조정만 */
 export const LEVEL_COINS = false;
 export const canUseGcoin = (me: User) =>
-  GCOIN_OPEN || RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
+  gcoinOpen() || RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
 /** 신청 처리, 설정, 코인 조정: 오피서 이상 */
 export const canManageGcoin = (role: User["role"]) =>
   role === "developer" || role === "master" || role === "officer";
@@ -62,7 +63,7 @@ export const milestonesBetween = (base: number, top: number) =>
 
 /** 주간 2군 성장 1·2·3위 보너스 기본값 */
 /** 주간 순위 보너스 1~5위 (제작자 2026-11-09 '총 5위까지 추가 보상') */
-export const DEFAULT_RANK = [5, 4, 3, 2, 1];
+export const DEFAULT_RANK = [6, 4, 3, 2, 2];
 /** 처음 물건 (코인 1개 = 1,000골드쯤) */
 // 자몽주스·자몽케이크는 50개, 나머지는 20개씩 판다 (제작자 2026-11-09). price 는 관리자가 적은 골드 가치(천 골드) = 성장코인.
 // 제작자가 처음 준 값(사나운 멧돼지 인형·망고워터·자몽주스·자몽케이크) 말고는 0 = 값을 정하기 전 (제작자 '스샷 골드 가격 무시해, 골드 값어치는 관리자가 쓸 거야').
@@ -82,6 +83,7 @@ export const DEFAULT_ITEMS: { name: string; unit: string; price: number }[] = [
   { name: "칠면조 구이", unit: "20개", price: 0 },
   { name: "송편", unit: "20개", price: 0 },
   { name: "자라의노래", unit: "20개", price: 0 },
+  { name: "피닉스의심장", unit: "5개", price: 2 },
 ];
 export const MAX_NAME = 20;
 export const MAX_UNIT = 10;
@@ -483,7 +485,7 @@ export async function settleWeeks(
           ),
         ),
     ]);
-    if (GCOIN_OPEN)
+    if (gcoinOpen())
       for (const [i, e] of top.entries())
         await notify(
           env,

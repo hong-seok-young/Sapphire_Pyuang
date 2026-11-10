@@ -1,9 +1,9 @@
-// PUT /api/gcoin/targets { userId, target } -> 이번 2주 판의 목표 레벨 정하기 (담당자: 오피서 이상, 김다혜 2026-11-09 '2주간의 목표 레벨은 담당자가 정해 주고').
+// PUT /api/gcoin/targets { userId, target } -> 이번 주간 판(쉬는 주면 다음 판)의 목표 레벨 정하기 (담당자: 오피서 이상, 김다혜 2026-11-09 '2주간의 목표 레벨은 담당자가 정해 주고').
 // target 이 null 이면 뺀다. 2군 본캐에게만, 목표는 지금 레벨보다 높게. 정할 때 레벨을 시작 레벨로 적는다 (달성률의 0%)
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { canManageGcoin, canUseGcoin, int, isMember } from "../../../server/gcoin";
-import { raceStart } from "../../../server/gcrace";
+import { targetRound } from "../../../server/gcrace";
 
 export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
@@ -12,7 +12,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   const b = await readJson<{ userId: unknown; target: unknown }>(request);
   const userId = typeof b.userId === "string" ? b.userId : "";
   if (!userId || !(await isMember(env, userId))) return json({ error: "2군 본캐가 아니에요" }, 400);
-  const round = raceStart();
+  const round = targetRound();
   if (b.target === null) {
     await env.DB.prepare("DELETE FROM gc_targets WHERE round = ? AND user_id = ?").bind(round, userId).run();
     return json({ ok: true });

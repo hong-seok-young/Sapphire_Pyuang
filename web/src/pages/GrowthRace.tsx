@@ -1,4 +1,4 @@
-// 2군 성장코인샵 시범운영: 2주 목표 레벨 선착순 (서버 server/gcrace.ts, 김다혜·제작자 2026-11-09).
+// 2군 성장코인샵 시범운영: 주간 목표 레벨 선착순 (1주 진행·1주 휴식, 서버 server/gcrace.ts, 김다혜·제작자 2026-11-09).
 // 성장 현황(리더보드 + 추월 차트), 상점 맨 위 성장 카드(달성률 · 성장반영), 담당자 '목표' 칸, 보상표.
 // 달성한 사람이 찍은 순서대로 위(1위 확정), 아직인 사람은 달성률 순. 1~5위 달성자가 상금을 받는다
 import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -29,9 +29,10 @@ function whenText(ms: number): string {
   const d = new Date(ms + 9 * 3600_000);
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
 }
-/** 판의 마지막 날 (끝은 다음 월요일 0시라 그 전날 일요일) */
-export const periodText = (race: GcRace) =>
-  `${dayText(race.start)} ~ ${dayText(race.end - 1)}`;
+/** '11/11(수) 11:00' */
+const atText = (ms: number) => `${dayText(ms)} ${whenText(ms).split(" ")[1]}`;
+/** 판 기간 (1주 진행, 오픈 때 시각부터) */
+export const periodText = (race: GcRace) => `${atText(race.start)} ~ ${atText(race.end)}`;
 const pctShow = (p: number) => (Number.isInteger(p) ? String(p) : p.toFixed(1));
 
 function Face({ e, size }: { e: GcRaceEntry; size: number }) {
@@ -166,6 +167,7 @@ function RaceChart({
   const T = 30;
   const B = 20;
   const tNow = Math.min(Math.max(now, race.start), race.end);
+  const days = Math.round((race.end - race.start) / DAY);
   const x = (t: number) =>
     L + ((t - race.start) / (race.end - race.start)) * (w - L - R);
   const y = (p: number) => T + (1 - p / 100) * (H - T - B);
@@ -242,7 +244,7 @@ function RaceChart({
           height={H}
           onPointerDown={tap}
           role="img"
-          aria-label="2주 달성률 추월 차트"
+          aria-label="주간 목표 달성률 추월 차트"
         >
           <defs>
             <pattern
@@ -256,7 +258,7 @@ function RaceChart({
             </pattern>
           </defs>
           {/* 눈금: 50% 와 날마다 옅은 선, 일주일 선은 조금 진하게 */}
-          {Array.from({ length: 15 }, (_, i) => (
+          {Array.from({ length: days + 1 }, (_, i) => (
             <line
               key={i}
               className={i % 7 === 0 ? "gr-grid-w" : "gr-grid"}
@@ -274,13 +276,13 @@ function RaceChart({
           <text className="gr-tick" x={L - 4} y={y(0) + 3} textAnchor="end">
             0%
           </text>
-          {[0, 7, 13].map((dd) => (
+          {[0, Math.round(days / 2), days].map((dd) => (
             <text
               key={dd}
               className="gr-tick"
-              x={x(race.start + dd * DAY + (dd === 13 ? DAY / 2 : 0))}
+              x={x(race.start + dd * DAY)}
               y={H - 5}
-              textAnchor={dd === 0 ? "start" : "middle"}
+              textAnchor={dd === 0 ? "start" : dd === days ? "end" : "middle"}
             >
               {dayText(race.start + dd * DAY).replace(/\(.\)/, "")}
             </text>
@@ -443,7 +445,7 @@ export function RaceBoard({
       <div className="gr-head">
         <span className="gr-period">
           {periodText(race)}
-          <b className="gr-dday">{now >= race.end ? "끝" : `D-${left}`}</b>
+          <b className="gr-dday">{now < race.start ? "시작 전" : now >= race.end ? "끝" : `D-${left}`}</b>
           {sample && <i className="sample-tag">예시</i>}
         </span>
         <span className="gr-prizes">
@@ -456,6 +458,9 @@ export function RaceBoard({
           ))}
         </span>
       </div>
+      {now >= race.end && race.next && race.next > race.start && (
+        <p className="gr-next">다음 판 {atText(race.next)}</p>
+      )}
       <RaceChart race={race} me={me} pick={pick} onPick={toggle} now={now} />
       <ol className="gr-list">
         {race.list.map((e) => {
@@ -617,7 +622,7 @@ export function RaceCard({
   );
 }
 
-/** 보상표 창 (성장 카드의 '보상표'): 2주 목표 선착순 1~5위 상금 */
+/** 보상표 창 (성장 카드의 '보상표'): 주간 목표 선착순 1~5위 상금 */
 export function PrizeSheet({
   race,
   onClose,
@@ -680,7 +685,11 @@ export function TargetsTab({
   race: GcRace;
   onChanged: (msg: string) => void;
 }) {
-  const set = new Map(race.list.map((e) => [e.id, e]));
+  // 쉬는 주면 다음 판 목표를 정한다 (server/gcrace.ts targetRound)
+  const next = race.upcoming && race.next ? race.next : null;
+  const set = new Map<string, TargetEntry>(
+    next ? (race.upcoming ?? []).map((e) => [e.id, { ...e, doneAt: null, rank: 0 }]) : race.list.map((e) => [e.id, e]),
+  );
   const list = [...members].sort(
     (a, b) =>
       Number(set.has(b.id)) - Number(set.has(a.id)) ||
@@ -690,9 +699,9 @@ export function TargetsTab({
   return (
     <div className="panel gr-targets">
       <p className="gc-week-head">
-        <b>2주 목표</b>
+        <b>{next ? "다음 판 목표" : "주간 목표"}</b>
         <small>
-          {periodText(race)} · {race.list.length}명
+          {next ? periodText({ ...race, start: next, end: next + (race.end - race.start) }) : periodText(race)} · {set.size}명
         </small>
       </p>
       {!list.length && <p className="gc-empty">2군 본캐가 없어요</p>}
@@ -710,13 +719,15 @@ export function TargetsTab({
   );
 }
 
+type TargetEntry = { fromLevel: number; target: number; doneAt: number | null; rank: number };
+
 function TargetRow({
   m,
   e,
   onChanged,
 }: {
   m: GcWallet;
-  e: GcRaceEntry | null;
+  e: TargetEntry | null;
   onChanged: (msg: string) => void;
 }) {
   const lv = m.level ?? 1;

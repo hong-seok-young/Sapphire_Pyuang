@@ -22,6 +22,7 @@ import {
   canFit,
   canPreview,
   canGcoin,
+  GCOIN_OPEN,
   canDonate,
   canSmack,
   canSuggest,
@@ -148,6 +149,7 @@ function prefetchPages(staff: boolean, master: boolean) {
   const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
   if (conn?.saveData || /(^|-)2g$/.test(conn?.effectiveType ?? "")) return () => undefined;
   const list: (keyof typeof CHUNKS)[] = ["Board", "Ranking", "Market", "Todo", "GuildDungeon", "Requests", "Rental", "Enhance", "DevRequests", "Chat", "Profile", "Alerts", "PlatShop", "Official"];
+  if (GCOIN_OPEN) list.push("GrowthShop");
   if (staff) list.push("Admin");
   if (master) list.push("ActivityLog", "ChatGaps");
   let stop = false;

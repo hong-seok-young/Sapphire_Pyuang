@@ -710,6 +710,25 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
   }
 }
 
+// 성장코인샵 오픈 준비 (제작자 2026-11-10, 유어아너 공지 '2군 퀘스트 이벤트'): 1~5위 6 · 4 · 3 · 2 · 2, 피닉스의심장 5개 2코인(6만 골드),
+// 판을 1주 진행·1주 휴식으로 바꾸며 첫 판이 11/11(수) 11:00 시작이 되어(server/gcrace.ts), 11/9 판에 정해 둔 목표는 새 첫 판으로 옮기고 오픈 전 11/9 판 상금은 지운다. setup 'gcoin_open_prep_20261110' 로 한 번만
+{
+  const KEY = "gcoin_open_prep_20261110";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const OLD = 1794150000000; // 2026-11-09 00:00 KST
+    const NEW = 1794362400000; // 2026-11-11 11:00 KST
+    runSql([
+      ...[6, 4, 3, 2, 2].map((v, i) => `INSERT INTO gc_settings (key, value) VALUES ('rank${i + 1}', ${v}) ON CONFLICT (key) DO UPDATE SET value = excluded.value;`),
+      "INSERT INTO gc_items (name, unit, price, gold, active, sort) SELECT '피닉스의심장', '5개', 2, 60000, 1, (SELECT COALESCE(MAX(sort), 0) + 1 FROM gc_items) " +
+        "WHERE NOT EXISTS (SELECT 1 FROM gc_items WHERE REPLACE(name, ' ', '') = '피닉스의심장');",
+      `UPDATE gc_targets SET round = ${NEW} WHERE round = ${OLD} AND NOT EXISTS (SELECT 1 FROM gc_targets t WHERE t.round = ${NEW} AND t.user_id = gc_targets.user_id);`,
+      `DELETE FROM gc_ledger WHERE kind = 'race' AND ref = 'race:${OLD}';`,
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
+    ]);
+    console.log("성장코인샵 오픈 준비 (한 번)");
+  }
+}
+
 // 기부함 마일리지를 기부 골드 가치의 0.6 으로 (제작자 2026-11-10 '기부한 골드 가치의 x 0.6 이 마일리지로 쌓이는 거임, 10만 골드당 1, 소수점은 누적, 정수 부분만 사용').
 // 그 전에 확정한 기부(1.0 으로 넣은 💎)를 사람마다 floor(골드 합 x 0.6 / 10만) 에 맞춰 차이를 장부에 한 줄 넣고, 그 사람의 가장 최근 기부 줄 dia 에 더한다. setup 'donate_rate_06_20261110' 로 한 번만
 {

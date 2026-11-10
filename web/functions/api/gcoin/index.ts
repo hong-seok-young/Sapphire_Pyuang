@@ -4,7 +4,7 @@
 import { FORBIDDEN, NEED_LOGIN, currentUser, json } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { raceData } from "../../../server/gcrace";
-import { GCOIN_OPEN, LEVEL_COINS, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
+import { LEVEL_COINS, gcoinOpen, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
 import { weekStart } from "../../../server/week";
 
 interface OrderRow {
@@ -112,7 +112,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const streak = LEVEL_COINS && wallet ? await myStreak(env, me.id, now) : 0;
 
   return json({
-    open: GCOIN_OPEN,
+    open: gcoinOpen(),
     levelCoins: LEVEL_COINS,
     race,
     manage,

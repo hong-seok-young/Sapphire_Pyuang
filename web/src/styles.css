@@ -4800,3 +4800,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 @media (prefers-reduced-motion: reduce) {
   .hof-rays, .hof-spot, .hof-star, .hof-crown, .hof-beam, .hof-sheen { animation: none; }
 }
+
+/* 성장코인샵 쉬는 주: 다음 판 시작 */
+.gr-next { margin: 2px 0 6px; font-size: 12px; color: var(--muted, #9aa3c7); text-align: right; }
+.hof-sample { position: absolute; top: -8px; right: 6px; }

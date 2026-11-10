@@ -56,8 +56,10 @@ export const SMACK_OPEN = false;
 /** 운영진 때리기에 들어가는 사람: 열기 전에는 앱개발자(와 테스트 계정)만 */
 export const canSmack = (me: Me) => SMACK_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
 
-/** 2군 성장코인샵을 열었는지 (서버 server/gcoin.ts GCOIN_OPEN 과 같이 바꾼다) */
-export const GCOIN_OPEN = false;
+/** 2군 성장코인샵을 여는 때: 2026-11-11(수) 11:00 한국 시간 (제작자 2026-11-10 '11/11 오전 11시 오픈 예약', 서버 server/gcoin.ts GCOIN_OPEN_AT 과 같이 바꾼다).
+ * 화면을 연 때 한 번 본다 (그 전에 열어 둔 화면은 다시 열거나 업데이트로 새로 뜨면) */
+export const GCOIN_OPEN_AT = Date.UTC(2026, 10, 11, 2);
+export const GCOIN_OPEN = Date.now() >= GCOIN_OPEN_AT;
 /** 2군 성장코인샵에 들어가는 사람: 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (제작자 2026-11-09 '오피서랑 길마 보게 열어 줘, 개발 중으로 두고') */
 export const canGcoin = (me: Me) => GCOIN_OPEN || RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
 
@@ -113,7 +115,8 @@ export const ITEMS: LaunchItem[] = [
   { key: "donate", title: "기부함", to: "#/donate", icon: "🎁", managers: !DONATE_OPEN, soon: !DONATE_OPEN, badge: "개발중", match: ["donate"] },
   // 명예의 전당 (개발중, 제작자 2026-11-10 '명예의 전당은 별도 버튼으로'): 기부로 쌓인 마일리지 순위. 기부함과 같이 연다 (DONATE_OPEN)
   { key: "hall", title: "명예의 전당", short: "명예의 전당", to: "#/hall", icon: "🏆", managers: !DONATE_OPEN, soon: !DONATE_OPEN, badge: "개발중", match: ["hall"] },
-  { key: "gcoin", title: "성장코인샵", short: "코인샵", to: "#/gcoin", icon: "🪙", ribbon: "2군 전용", ring: "silver", managers: !GCOIN_OPEN, soon: !GCOIN_OPEN, badge: "개발중", match: ["gcoin"] },
+  // 담당자 유어아너 (제작자 2026-11-10 '장비대여 담당자처럼 버튼에 유어아너로')
+  { key: "gcoin", title: "성장코인샵", short: "코인샵", to: "#/gcoin", icon: "🪙", ribbon: "2군 전용", ring: "silver", corner: ["담당자", "유어아너"], managers: !GCOIN_OPEN, soon: !GCOIN_OPEN, badge: "개발중", match: ["gcoin"] },
   { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
   // 헬스 루틴 (개발중, 길드원 완뻔치 님 개발 요청 #8, 제작자 2026-11-09 '플릭 같은 헬스 어플'): 실제 헬스장 운동 기록 (pages/Fit.tsx). 게임과 상관없다
   { key: "fit", title: "헬스 루틴", short: "헬스", to: "#/fit", icon: "🏋️", developer: !FIT_OPEN, soon: !FIT_OPEN, badge: "개발중", match: ["fit"] },

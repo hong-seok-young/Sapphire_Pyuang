@@ -1,24 +1,32 @@
-// 2군 성장코인샵 시범운영: 2주 목표 레벨 선착순 (제작자·김다혜 2026-11-09).
+// 2군 성장코인샵 시범운영: 주간 목표 레벨 선착순 (제작자·김다혜 2026-11-09, 유어아너 공지 2026-11-10 '격주: 일주일 하고 일주일 쉬고').
 // '2주간의 목표 레벨은 담당자가 정해 주고, 월요일부터 다음 주 일요일까지가 기본 2주', '그 2주 동안 목표 레벨을 먼저 달성하면 1위, 선착순 제도',
 // '1등부터 5등만 주는 걸로', '37렙 먼저 찍으면 5코인', '누군가 딱 달성하면 1위로 확정', '상점의 성장 카드는 달성률이 나오게, 그 달성률로 순위를 매기다가'.
-// 판은 2026-11-09(월) 0시(한국 시간)부터 14일씩 (11/9 ~ 11/22, 11/23 ~ 12/6 …). 목표는 판마다 사람마다 (D1 gc_targets).
+// 판은 2026-11-11(수) 11:00(한국 시간, 오픈 때)부터 7일 진행하고 7일 쉰다 (11/11 11:00 ~ 11/18 11:00, 쉬고, 11/25 11:00 ~ …). 목표는 판마다 사람마다 (D1 gc_targets).
+// 쉬는 주에는 끝난 판 결과를 보이고, 담당자가 정하는 목표는 다음 판 것이다 (targetRound).
 // 달성은 길드 랭킹·내 정보에 적은 레벨 기록(level_log)에서 그 판 안에 처음 목표 레벨 이상을 적은 때로 센다 (게임을 읽지 않는다).
 // 달성한 사람은 그때 순서대로 1위 2위 … (확정), 아직인 사람은 달성률 순. 1~5위는 달성하는 순간 상금(gc_settings rank1~5)이 지갑에 들어간다 (gc_ledger kind race).
 import type { Env, User } from "./auth";
 import { notify } from "./alerts";
-import { GCOIN_OPEN, canUseGcoin, isMember, readRank } from "./gcoin";
+import { GCOIN_OPEN_AT, canUseGcoin, gcoinOpen, isMember, readRank } from "./gcoin";
 
 const DAY = 86_400_000;
-export const RACE_DAYS = 14;
-/** 첫 판 시작: 2026-11-09(월) 0시 한국 시간 = 11-08 15:00 UTC */
-const RACE_ANCHOR = Date.UTC(2026, 10, 8, 15);
+/** 진행하는 날 수와 한 바퀴(진행 + 휴식) */
+export const RACE_DAYS = 7;
+export const RACE_CYCLE = 14;
+/** 첫 판 시작 = 오픈 때 (2026-11-11 11:00 한국 시간) */
+const RACE_ANCHOR = GCOIN_OPEN_AT;
 
-/** 지금 판이 시작한 때 */
+/** 지금(또는 마지막) 판이 시작한 때. 첫 판 전이면 첫 판 */
 export function raceStart(now = Date.now()): number {
-  const n = Math.max(0, Math.floor((now - RACE_ANCHOR) / (RACE_DAYS * DAY)));
-  return RACE_ANCHOR + n * RACE_DAYS * DAY;
+  const n = Math.max(0, Math.floor((now - RACE_ANCHOR) / (RACE_CYCLE * DAY)));
+  return RACE_ANCHOR + n * RACE_CYCLE * DAY;
 }
 export const raceEnd = (start: number) => start + RACE_DAYS * DAY;
+/** 담당자가 목표를 정하는 판: 진행 중이거나 첫 판 전이면 그 판, 쉬는 주면 다음 판 */
+export function targetRound(now = Date.now()): number {
+  const s = raceStart(now);
+  return now < raceEnd(s) ? s : s + RACE_CYCLE * DAY;
+}
 
 export interface RaceEntry {
   id: string;
@@ -49,9 +57,15 @@ export function progress(fromLevel: number, target: number, level: number, exp: 
 }
 
 /** 이 판의 목표와 순위 (prizes 는 1~5위 상금) */
-export async function raceState(env: Env, start: number, prizes: number[]): Promise<RaceEntry[]> {
+export async function raceState(env: Env, start: number, prizes: number[], now = Date.now()): Promise<RaceEntry[]> {
+  // 끝난 판은 끝날 때의 레벨로 (쉬는 주에 오른 레벨로 달성률이 바뀌지 않게)
+  const end = raceEnd(start);
+  const at = (col: "level" | "exp") =>
+    now >= end
+      ? `COALESCE((SELECT l.${col} FROM level_log l WHERE l.user_id = t.user_id AND l.at < ${end} ORDER BY l.at DESC LIMIT 1), p.${col})`
+      : `p.${col}`;
   const { results } = await env.DB.prepare(
-    "SELECT t.user_id AS id, t.from_level AS fromLevel, t.target AS target, p.level AS level, p.exp AS exp, p.job AS job, " +
+    `SELECT t.user_id AS id, t.from_level AS fromLevel, t.target AS target, ${at("level")} AS level, ${at("exp")} AS exp, p.job AS job, ` +
       "a.updated_at AS avatar, u.high_spec AS high, " +
       "(SELECT MIN(l.at) FROM level_log l WHERE l.user_id = t.user_id AND l.level >= t.target AND l.at >= ? AND l.at < ?) AS doneAt " +
       "FROM gc_targets t JOIN profiles p ON p.user_id = t.user_id JOIN users u ON u.id = t.user_id " +
@@ -96,13 +110,13 @@ export async function awardRace(env: Env, start: number, list: RaceEntry[]): Pro
     win.map((e) =>
       env.DB.prepare(
         "INSERT OR IGNORE INTO gc_ledger (user_id, delta, kind, ref, note, by_user, created_at) VALUES (?, ?, 'race', ?, ?, NULL, ?)",
-      ).bind(e.id, e.coins, `race:${start}`, `2주 목표 Lv.${e.target} ${e.rank}위 달성`, e.doneAt),
+      ).bind(e.id, e.coins, `race:${start}`, `주간 목표 Lv.${e.target} ${e.rank}위 달성`, e.doneAt),
     ),
   );
   const fresh = win.filter((_, i) => (res[i]?.meta?.changes ?? 0) > 0);
-  if (GCOIN_OPEN)
+  if (gcoinOpen())
     for (const e of fresh)
-      await notify(env, [e.id], "gcoin", `🏁 2주 목표 Lv.${e.target} ${e.rank}위 달성 · 성장코인 +${e.coins}`, "#/gcoin", "system");
+      await notify(env, [e.id], "gcoin", `🏁 주간 목표 Lv.${e.target} ${e.rank}위 달성 · 성장코인 +${e.coins}`, "#/gcoin", "system");
   return fresh;
 }
 
@@ -145,13 +159,22 @@ async function raceSeries(env: Env, start: number, list: RaceEntry[]): Promise<R
   return out;
 }
 
-/** 화면에 주는 판 자료 */
+/** 화면에 주는 판 자료. 쉬는 주면 next(다음 판 시작)와 그 판에 정해 둔 목표(upcoming)도 */
 export async function raceData(env: Env, now = Date.now()) {
   const start = raceStart(now);
   const prizes = await readRank(env);
-  const list = await raceState(env, start, prizes);
+  const list = await raceState(env, start, prizes, now);
   const [series] = await Promise.all([raceSeries(env, start, list), awardRace(env, start, list)]);
-  return { start, end: raceEnd(start), prizes, list, series };
+  const next = targetRound(now);
+  const upcoming =
+    next !== start
+      ? (
+          await env.DB.prepare("SELECT user_id AS id, from_level AS fromLevel, target FROM gc_targets WHERE round = ?")
+            .bind(next)
+            .all<{ id: string; fromLevel: number; target: number }>()
+        ).results
+      : null;
+  return { start, end: raceEnd(start), next, prizes, list, series, upcoming };
 }
 
 export interface RaceGain {
@@ -170,6 +193,7 @@ export interface RaceGain {
 export async function raceBefore(env: Env, me: User) {
   if (!canUseGcoin(me) || !(await isMember(env, me.id))) return null;
   const start = raceStart();
+  if (Date.now() >= raceEnd(start)) return null;
   const prizes = await readRank(env);
   const mine = (await raceState(env, start, prizes)).find((e) => e.id === me.id);
   return mine ? { start, prizes, mine } : null;
