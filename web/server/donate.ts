@@ -39,6 +39,10 @@ export interface DonateRow {
   qty: number;
   enhance: number;
   note: string | null;
+  /** 위키 장비의 뜬 옵션 ('명중 9 · 크리티컬 4', 제작자 2026-11-10 '옵션 적는 프리셋') */
+  options: string | null;
+  /** 장신구 속성부여 ('힘 3', '체력 30') */
+  enchant: string | null;
   gold_ask: number | null;
   gold: number | null;
   dia: number;
@@ -59,18 +63,24 @@ export const goldText = (g: number) =>
   g >= 100_000_000 ? `${Math.round(g / 10_000_000) / 10}억` : g >= 10_000 ? `${Math.round(g / 1000) / 10}만` : `${g}`;
 
 /** 신청·등록 값 검사 */
-export function readDonate(b: Record<string, unknown>): { error: string } | { item: string; qty: number; enhance: number; note: string | null; gold: number | null } {
+/** 속성부여 글 ('힘 1~3', '민첩 1~3', '지능 1~3', '체력·마나 10/20/30', 화면 market.ts ENCHANTS 와 같다) */
+const ENCHANT_RE = /^(?:(?:힘|민첩|지능) [123]|(?:체력|마나) (?:10|20|30))$/;
+export function readDonate(b: Record<string, unknown>): { error: string } | { item: string; qty: number; enhance: number; note: string | null; options: string | null; enchant: string | null; gold: number | null } {
   const item = typeof b.item === "string" ? b.item.trim() : "";
   const qty = b.qty === undefined || b.qty === null || b.qty === "" ? 1 : Number(b.qty);
   const enhance = b.enhance === undefined || b.enhance === null || b.enhance === "" ? 0 : Number(b.enhance);
   const note = typeof b.note === "string" && b.note.trim() ? b.note.trim() : null;
   const gold = b.gold === undefined || b.gold === null || b.gold === "" ? null : Number(b.gold);
+  const options = typeof b.options === "string" && b.options.trim() ? b.options.replace(/\s+/g, " ").trim() : null;
+  const enchant = typeof b.enchant === "string" && b.enchant.trim() ? b.enchant.trim() : null;
+  if (options && options.length > 120) return { error: "옵션이 너무 길어요" };
+  if (enchant && !ENCHANT_RE.test(enchant)) return { error: "속성부여가 맞지 않아요" };
   if (!item || item.length > 40) return { error: "아이템 이름을 적어 주세요" };
   if (!Number.isInteger(qty) || qty < 1 || qty > 99_999) return { error: "개수가 맞지 않아요" };
   if (!Number.isInteger(enhance) || enhance < 0 || enhance > 20) return { error: "강화는 0~20 이에요" };
   if (note && note.length > 100) return { error: "메모가 너무 길어요" };
   if (gold !== null && (!Number.isInteger(gold) || gold < 0 || gold > 100_000_000_000)) return { error: "골드 가치가 맞지 않아요" };
-  return { item, qty, enhance, note, gold };
+  return { item, qty, enhance, note, options, enchant, gold };
 }
 
 /**

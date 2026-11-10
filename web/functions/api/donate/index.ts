@@ -56,9 +56,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     if (!who || who.length > 20) return json({ error: "기부한 사람을 적어 주세요" }, 400);
     if (v.gold === null) return json({ error: "골드 가치를 적어 주세요" }, 400);
     const r = await env.DB.prepare(
-      "INSERT INTO donate_items (who, item, qty, enhance, note, gold, status, created_at, created_by, done_at, done_by) VALUES (?, ?, ?, ?, ?, ?, 'done', ?, ?, ?, ?)",
+      "INSERT INTO donate_items (who, item, qty, enhance, note, options, enchant, gold, status, created_at, created_by, done_at, done_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'done', ?, ?, ?, ?)",
     )
-      .bind(who, v.item, v.qty, v.enhance, v.note, v.gold, now, me.id, now, me.id)
+      .bind(who, v.item, v.qty, v.enhance, v.note, v.options, v.enchant, v.gold, now, me.id, now, me.id)
       .run();
     const id = Number(r.meta.last_row_id);
     const s = await syncDia(env, who, id, label, me.id);
@@ -75,9 +75,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const open = await env.DB.prepare("SELECT COUNT(*) AS n FROM donate_items WHERE created_by = ? AND status = 'request'").bind(me.id).first<{ n: number }>();
   if ((open?.n ?? 0) >= 30) return json({ error: "확인을 기다리는 기부가 너무 많아요 (30개)" }, 400);
   const r = await env.DB.prepare(
-    "INSERT INTO donate_items (who, item, qty, enhance, note, gold_ask, status, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, 'request', ?, ?)",
+    "INSERT INTO donate_items (who, item, qty, enhance, note, options, enchant, gold_ask, status, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'request', ?, ?)",
   )
-    .bind(me.id, v.item, v.qty, v.enhance, v.note, v.gold, now, me.id)
+    .bind(me.id, v.item, v.qty, v.enhance, v.note, v.options, v.enchant, v.gold, now, me.id)
     .run();
   await notifyDonateStaff(env, `🎁 기부 신청 · ${me.id} · ${label}${v.gold !== null ? ` · ${goldText(v.gold)} 골드` : ""}`, me.id);
   return json({ id: Number(r.meta.last_row_id) });

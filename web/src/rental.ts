@@ -144,7 +144,7 @@ export interface RentData {
   /** 운영진: 기부 현황 (남은 💎, 기부로 적립한 💎, 기부 건수) */
   balances?: { person: string; dia: number; at: number; donated: number; count: number }[];
   /** 운영진: 기부함에서 넘어와 아직 목록에 안 올린 기부 (물건 추가에서 고른다) */
-  donated?: { id: number; who: string; item: string; qty: number; enhance: number; gold: number | null; note: string | null; at: number }[];
+  donated?: { id: number; who: string; item: string; qty: number; enhance: number; gold: number | null; note: string | null; options?: string | null; enchant?: string | null; at: number }[];
   members?: string[];
 }
 
