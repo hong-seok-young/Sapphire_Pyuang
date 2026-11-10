@@ -436,6 +436,8 @@ function ShopTab({
         <ul className="gc-goods">
           {[...groups.values()].flat().map((it) => {
             const short = !!wallet && balance < it.price;
+            const c = capOf(it);
+            const per = qtyOf(it.unit);
             return (
               <li key={it.id}>
                 <button
@@ -450,6 +452,12 @@ function ShopTab({
                     setError("");
                   }}
                 >
+                  {c && (
+                    <span className="gc-cap-tag">
+                      주간 {wallet ? `${Math.ceil((c.cap - c.left) / per)}/` : ""}
+                      {Math.floor(c.cap / per)}
+                    </span>
+                  )}
                   <Pic name={it.name} />
                   <FitLine
                     className="gc-good-name"
@@ -1157,7 +1165,14 @@ function ItemsTab({
     <>
       {error && <p className="form-error">{error}</p>}
       {[...groups.entries()].map(([name, list]) => (
-        <ItemGroup key={name} name={name} list={list} busy={busy} run={run} />
+        <ItemGroup
+          key={name}
+          name={name}
+          list={list}
+          cap={data.caps?.[name.replace(/\s/g, "")] ?? 0}
+          busy={busy}
+          run={run}
+        />
       ))}
       <div className="panel gc-item-new">
         <p className="gc-week-head">
@@ -1213,11 +1228,14 @@ function ItemsTab({
 function ItemGroup({
   name,
   list,
+  cap,
   busy,
   run,
 }: {
   name: string;
   list: GcItem[];
+  /** 주간 한도 (낱개, 0 = 없음) */
+  cap: number;
   busy: boolean;
   run: (fn: () => Promise<unknown>, done: string) => void;
 }) {
@@ -1226,6 +1244,9 @@ function ItemGroup({
   useEffect(() => setNm(name), [name]);
   const [qty, setQty] = useState("");
   const [gold, setGold] = useState("");
+  const cap0 = cap ? String(cap) : "";
+  const [capIn, setCapIn] = useState(cap0);
+  useEffect(() => setCapIn(cap0), [cap0]);
   return (
     <div className="panel gc-item">
       <div className="gc-item-head">
@@ -1257,6 +1278,32 @@ function ItemGroup({
       {list.map((it) => (
         <Bundle key={it.id} it={it} busy={busy} run={run} />
       ))}
+      <div className="gc-bundle gc-cap-row">
+        <span>주간 한도</span>
+        <input
+          className="mk-input"
+          inputMode="numeric"
+          value={capIn}
+          onChange={(e) => setCapIn(digits(e.target.value, 5))}
+          placeholder="없음"
+          aria-label="주간 한도"
+        />
+        <span>개</span>
+        {capIn !== cap0 && (
+          <button
+            className="pill gc-mini gc-done-btn"
+            disabled={busy}
+            onClick={() =>
+              run(
+                () => saveGcSettings({ cap: { name, n: Number(capIn) || 0 } }),
+                Number(capIn) ? `주간 한도 ${Number(capIn)}개` : "주간 한도 없음",
+              )
+            }
+          >
+            저장
+          </button>
+        )}
+      </div>
       <div className="gc-bundle gc-bundle-add">
         <input
           className="mk-input"

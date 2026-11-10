@@ -2,7 +2,7 @@
 //   오피서에게 알림 (열기 전에는 앱개발자에게만). 실제로 주는 것은 게임 안에서 오피서가
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
-import { MAX_QTY, WEEKLY_CAP, canUseGcoin, capKey, openCleanup, int, isMember, notifyStaff, readCurve, unitCount, wallets, weekBought, orderLabel } from "../../../../server/gcoin";
+import { MAX_QTY, readCaps, canUseGcoin, capKey, openCleanup, int, isMember, notifyStaff, readCurve, unitCount, wallets, weekBought, orderLabel } from "../../../../server/gcoin";
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
@@ -23,10 +23,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!item) return json({ error: "지금 팔지 않는 물건이에요" }, 404);
   // 한 주 상한 (사나운 멧돼지 인형 30개)
   const key = capKey(item.name);
-  const cap = WEEKLY_CAP[key];
+  const caps = await readCaps(env);
+  const cap = caps[key];
   const want = unitCount(item.unit) * qty;
   if (cap !== undefined) {
-    const had = (await weekBought(env, me.id))[key] ?? 0;
+    const had = (await weekBought(env, me.id, caps))[key] ?? 0;
     const u = unitCount(item.unit);
     if (had + want > cap) return json({ error: `이번주 구매한도 (${Math.ceil(had / u)}/${Math.floor(cap / u)})` }, 409);
   }
@@ -38,7 +39,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .run();
   // 두 신청이 동시에 들어와 둘 다 잔액을 통과했으면 나중 것을 지운다 (코인이 0 아래로 내려가지 않게)
   const [after] = await wallets(env, await readCurve(env), me.id);
-  const over = cap !== undefined && ((await weekBought(env, me.id))[key] ?? 0) > cap;
+  const over = cap !== undefined && ((await weekBought(env, me.id, caps))[key] ?? 0) > cap;
   if (!after || after.balance < 0 || over) {
     await env.DB.prepare("DELETE FROM gc_orders WHERE id = ?").bind(Number(ins.meta.last_row_id)).run();
     return json({ error: over ? "이번주 구매한도를 넘었어요" : `성장코인이 모자라요 (가진 코인 ${w.balance}, 필요 ${cost})` }, 409);

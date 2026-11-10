@@ -4,7 +4,7 @@
 import { FORBIDDEN, NEED_LOGIN, currentUser, json } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { raceData } from "../../../server/gcrace";
-import { LEVEL_COINS, WEEKLY_CAP, weekBought, gcoinOpen, openCleanup, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
+import { LEVEL_COINS, readCaps, weekBought, gcoinOpen, openCleanup, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
 import { weekStart } from "../../../server/week";
 
 interface OrderRow {
@@ -50,6 +50,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const [start, rank, mine] = await Promise.all([startAt(env), readRank(env), wallets(env, curve, me.id)]);
   // 2군 본캐만 지갑이 있다 (wallets 는 프로필만 보고 세므로 여기서 2군 본캐인지 다시 본다)
   const wallet = (await isMember(env, me.id)) ? (mine[0] ?? null) : null;
+  const caps = await readCaps(env);
 
   const now = Date.now();
   const ws = Math.max(weekStart(now), start);
@@ -115,8 +116,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   return json({
     open: gcoinOpen(),
     // 한 주 상한 (낱개, 띄어쓰기 없는 이름마다)과 이번 주 내가 신청한 수
-    caps: WEEKLY_CAP,
-    weekBought: wallet ? await weekBought(env, me.id) : {},
+    caps,
+    weekBought: wallet ? await weekBought(env, me.id, caps) : {},
     levelCoins: LEVEL_COINS,
     race,
     manage,

@@ -120,13 +120,26 @@ export function orderLabel(
 }
 export const MAX_QTY = 20;
 
-/** 한 주(월요일 0시 ~ 일요일 24시, growthWeekStart. 제작자 2026-11-10 '한 주는 월요일 0시부터 일요일 24시')에 한 사람이 신청할 수 있는 낱개 상한 (제작자 2026-11-10 '사멧은 1주에 구매 가능 상한을 30개로, 낱개 단위로 30개, 통 말고').
- * 키는 띄어쓰기 없는 이름. 기다리는 중·지급 완료한 신청을 센다 (반려·취소는 빼서 다시 살 수 있다). 화면 src/gcoin.ts 는 /api/gcoin 의 caps 를 그대로 쓴다 */
-export const WEEKLY_CAP: Record<string, number> = { 사나운멧돼지인형: 30 };
+/** 한 주(월요일 0시 ~ 일요일 24시, growthWeekStart. 제작자 2026-11-10 '한 주는 월요일 0시부터 일요일 24시')에 한 사람이 신청할 수 있는 낱개 상한
+ * (제작자 2026-11-10 '사멧은 1주에 구매 가능 상한을 30개로, 낱개 단위로 30개, 통 말고', '담당자 메뉴에서도 주간 한도 설정할 수 있게').
+ * 키는 띄어쓰기 없는 이름. 담당자가 정한 값은 gc_settings 'cap:<이름>'(0 = 한도 없음), 없으면 DEFAULT_CAP.
+ * 기다리는 중·지급 완료한 신청을 센다 (반려·취소는 빼서 다시 살 수 있다). 화면은 /api/gcoin 의 caps 를 그대로 쓴다 */
+export const DEFAULT_CAP: Record<string, number> = { 사나운멧돼지인형: 30 };
+export const MAX_CAP = 100_000;
+export async function readCaps(env: Env): Promise<Record<string, number>> {
+  const out: Record<string, number> = { ...DEFAULT_CAP };
+  const { results } = await env.DB.prepare("SELECT key, value FROM gc_settings WHERE key LIKE 'cap:%'").all<{ key: string; value: number }>();
+  for (const r of results) {
+    const k = r.key.slice(4);
+    if (r.value > 0) out[k] = r.value;
+    else delete out[k];
+  }
+  return out;
+}
 export const capKey = (name: string) => name.replace(/\s/g, "");
 export const unitCount = (unit: string | null) => Number(/(\d+)\s*개/.exec(unit ?? "")?.[1] ?? 1) || 1;
 /** 이번 주에 신청한 낱개 수 (상한이 있는 물건만, 띄어쓰기 없는 이름마다) */
-export async function weekBought(env: Env, userId: string, now = Date.now()): Promise<Record<string, number>> {
+export async function weekBought(env: Env, userId: string, caps: Record<string, number>, now = Date.now()): Promise<Record<string, number>> {
   const { results } = await env.DB.prepare(
     "SELECT name, unit, qty FROM gc_orders WHERE user_id = ? AND status IN ('pending', 'done') AND created_at >= ?",
   )
@@ -135,7 +148,7 @@ export async function weekBought(env: Env, userId: string, now = Date.now()): Pr
   const out: Record<string, number> = {};
   for (const r of results) {
     const k = capKey(r.name);
-    if (WEEKLY_CAP[k] !== undefined) out[k] = (out[k] ?? 0) + unitCount(r.unit) * r.qty;
+    if (caps[k] !== undefined) out[k] = (out[k] ?? 0) + unitCount(r.unit) * r.qty;
   }
   return out;
 }
