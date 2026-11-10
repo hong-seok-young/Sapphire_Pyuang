@@ -326,16 +326,20 @@ function StatPanel({ have, gain, full, over, setOver, stat, doneN, total, todoN 
   );
 }
 
-function ItemPic({ it, iconOf }: { it: DexItem; iconOf: IconOf }) {
+function ItemPic({ it, iconOf, size = 30 }: { it: DexItem; iconOf: IconOf; size?: number }) {
   const pic = it.name ? iconOf(it.name) : null;
-  if (pic) return <PicImg pic={pic} fit={30} />;
-  if (it.pic) return <img className="dex-pic" src={encodeURI(it.pic)} alt="" />;
+  if (pic) return <PicImg pic={pic} fit={size} />;
+  if (it.pic) return <img className="dex-pic" src={encodeURI(it.pic)} alt="" style={{ width: size, height: size }} />;
   return <span className="dex-noimg">{(it.name ?? "?").replace(/^\+\d+/, "").slice(0, 1)}</span>;
 }
 
+/** 도감 한 줄 (제작자 2026-11-10 '한 행으로, 높이 높을 필요 없어, 템 크기 줄여도 되니 최대한 콤팩트하게 한눈에'):
+ *  완료 칸 · 제목과 효과(작게, 넘치면 …) · 오른쪽에 작은 아이템 칸 (칸이 5개 이상이면 제목이 잘리지 않게 칸을 제목 아래 줄로). 칸을 누르면 그 줄 아래에 이름·개수·강화·대체 스탬프와 '이 템 찾기' */
 function EntryRow({ e, done, onToggle, iconOf, stat, onItem }: { e: DexEntry; done: boolean; onToggle: () => void; iconOf: IconOf; stat: string | null; onItem: (name: string) => void }) {
+  const [sel, setSel] = useState<number | null>(null);
+  const it = sel === null ? null : e.items[sel];
   return (
-    <li className={"dex-entry" + (done ? " dex-done" : "")}>
+    <li className={"dex-entry" + (done ? " dex-done" : "") + (e.items.length > 4 ? " dex-entry-wide" : "")}>
       <button type="button" className="dex-check" onClick={onToggle} aria-pressed={done} aria-label={done ? "완료 취소" : "완료"}>
         {done ? "✓" : ""}
       </button>
@@ -343,28 +347,36 @@ function EntryRow({ e, done, onToggle, iconOf, stat, onItem }: { e: DexEntry; do
         <div className="dex-title">
           <b>{e.name}</b>
           {e.cat && <small className="dex-cat">{e.cat}</small>}
-          {e.period && <small className="dex-period">{e.period}</small>}
         </div>
         <div className="dex-effects">
           {e.effects.map((f, i) => (
             <span key={i} className={"dex-eff" + (stat === f[0] ? " dex-eff-on" : "")}>{effectText(f)}</span>
           ))}
         </div>
-        <div className="dex-items">
-          {e.items.map((it, i) => (
-            <button key={i} type="button" className={"dex-item" + (it.name ? "" : " dex-item-unknown")} title={[plusLabel(it), itemLabel(it), it.est ? "(그림으로 추정)" : "", it.stamp ?? ""].filter(Boolean).join(" ")}
-              onClick={() => it.name && onItem(it.name.replace(/^\+\d+\s*/, ""))}>
-              <span className="dex-slot">
-                <ItemPic it={it} iconOf={iconOf} />
-                {plusLabel(it) && <i className={"dex-plus" + (it.plus ? "" : " dex-noplus")}>{plusLabel(it)}</i>}
-                {it.n > 1 && <i className="dex-n">{it.n.toLocaleString("ko-KR")}</i>}
-              </span>
-              <span className="dex-iname">{it.name ? it.name.replace(/^\+\d+\s*/, "") + (it.est ? "?" : "") : "이름 모름"}</span>
-              {stampText(it) && <span className={stampCls(it.sg)}>{stampText(it)}</span>}
-            </button>
-          ))}
-        </div>
       </div>
+      <div className="dex-items">
+        {e.items.map((x, i) => (
+          <button key={i} type="button" className={"dex-slot" + (x.name ? "" : " dex-slot-unknown") + (sel === i ? " dex-slot-on" : "")}
+            aria-label={[plusLabel(x), itemLabel(x), x.n > 1 ? `${x.n}개` : ""].filter(Boolean).join(" ")} onClick={() => setSel(sel === i ? null : i)}>
+            <ItemPic it={x} iconOf={iconOf} size={22} />
+            {x.plus ? <i className="dex-plus">+{x.plus}</i> : null}
+            {x.n > 1 && <i className="dex-n">{x.n >= 1000 ? `${Math.round(x.n / 100) / 10}k` : x.n}</i>}
+          </button>
+        ))}
+      </div>
+      {it && (
+        <div className="dex-detail">
+          {plusLabel(it) && <em className={"dex-need-plus" + (it.plus ? "" : " dex-noplus")}>{plusLabel(it)}</em>}
+          <b>{itemLabel(it)}{it.est ? "?" : ""}</b>
+          <span className="muted">×{it.n.toLocaleString("ko-KR")}</span>
+          {stampText(it) && <small className={stampCls(it.sg)}>{it.sg === "불가" ? stampText(it) : `${it.sg?.startsWith("아바돈") ? "아바돈 " : ""}장비스탬프 ${it.sg?.replace("아바돈", "")} ${it.sn}개`}</small>}
+          {it.name && (
+            <button type="button" className="sub-tab dex-find" onClick={() => onItem(it.name!.replace(/^\+\d+\s*/, ""))}>
+              이 템 찾기
+            </button>
+          )}
+        </div>
+      )}
     </li>
   );
 }

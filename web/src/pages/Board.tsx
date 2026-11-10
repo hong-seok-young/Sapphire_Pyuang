@@ -699,7 +699,7 @@ function Write({ me, cat: startCat, editId, box }: { me: Me; cat?: Cat; editId?:
           value={body}
           maxLength={10000}
           onChange={(e) => (setBody(e.target.value), setBefore(null))}
-          placeholder="내용 (링크를 넣으면 미리보기가 붙어요. 유튜브는 글 안에서 재생돼요)"
+          placeholder={box ? "건의 내용" : "내용 (링크를 넣으면 미리보기가 붙어요. 유튜브는 글 안에서 재생돼요)"}
           aria-label="내용"
         />
         <div className="bd-pickers">
