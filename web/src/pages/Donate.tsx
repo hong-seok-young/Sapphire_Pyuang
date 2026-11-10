@@ -367,7 +367,7 @@ function Give({ data, wiki, me, done }: { data: DonateData; wiki: Wiki | null; m
                   </small>
                 </span>
                 <span className="dn-line-gold">
-                  {r.status === "done" || r.status === "hall" ? goldText(r.gold ?? 0) : r.gold_ask !== null ? goldText(r.gold_ask) : "-"}
+                  {r.status === "done" || r.status === "hall" || r.status === "honor" ? goldText(r.gold ?? 0) : r.gold_ask !== null ? goldText(r.gold_ask) : "-"}
                   <small className={`dn-st dn-st-${r.status}`}>{STATUS_NAME[r.status]}</small>
                 </span>
               </div>

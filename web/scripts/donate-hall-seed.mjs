@@ -8,6 +8,10 @@
 //   예전 기부 줄의 dia 에 그 사람 몫을 적어 '한 사람의 dia 합 = 확정 골드 합 / 10만 x 0.6 내림'을 지킨다 (그래야 다음 기부함 확정 때 syncDia 가 차이만 준다).
 // - 기부자 이름은 앱 닉네임 후보(names) 중 앱에 있는 첫 이름, 없으면 첫 이름 그대로 (장부는 닉네임 글자라 앱에 없는 사람도 쌓인다).
 // - 결과(사람마다 💎, 뺀 장비대여 기부, 앱에 없는 이름)는 앱개발자 알림으로, 공개 실행 기록에는 개수만 찍는다.
+// - 셋째 (같은 날 '장비대여에만 있는 기부자도 명예의 전당에, 장비대여 보증금은 실제 골드 가격의 1.5배라 1.5 로 나눠서'): 장비대여 물건(rental_items)의 기부자를
+//   status 'honor' 줄로 넣는다 (setup 'donate_hall_rent_20261110'). 골드 가치 = 보증금 💎 x 10만 / 1.5, 명예의 전당 💎 = 그 x 0.6 / 10만 (= 보증금 x 0.4).
+//   'honor' 는 명예의 전당·기부 내역에만 보이고 마일리지에는 들지 않는다. 기부함에서 넘어간 물건(donate_items.rental_id)과 내린 물건, 예전 기부와 같은 물건
+//   (JSON 의 rentalDuplicates: [기부자, 무기 이름 일부])은 뺀다. 카톡 목록으로 처음 채운 물건(11/2 전)은 날짜를 몰라 10/31 로, 그 뒤 앱에서 올린 물건은 올린 날로.
 // 자동 배포(.github/workflows/deploy-web.yml)가 계정 DB 준비 다음에 돌린다.
 //   node scripts/donate-hall-seed.mjs [--local]      (로컬 시험: D1_PERSIST=<wrangler pages dev 의 --persist-to 폴더>)
 import { execFileSync } from "node:child_process";
@@ -20,6 +24,8 @@ const DB = "sapphire-accounts";
 const FILE = "../자료/길드/기부함/예전_기부.json";
 const KEY_SEED = "donate_hall_seed_20261110";
 const KEY = "donate_hall_mileage_20261110";
+const KEY_RENT = "donate_hall_rent_20261110";
+const RENT_NOTE = "장비대여 기부 (기부함 전)";
 const DEV = "퓨앙";
 const TESTERS = [DEV, "테스트1", "테스트2"];
 const NOTE = "예전 기부 (기부함 전)";
@@ -54,9 +60,9 @@ const runSql = (lines) => {
   }
 };
 
-const done = new Set(query(`SELECT key FROM setup WHERE key IN (${q(KEY_SEED)}, ${q(KEY)})`).map((r) => r.key));
-if (done.has(KEY)) {
-  console.log("예전 기부 마일리지는 이미 넣었어요");
+const done = new Set(query(`SELECT key FROM setup WHERE key IN (${q(KEY_SEED)}, ${q(KEY)}, ${q(KEY_RENT)})`).map((r) => r.key));
+if (done.has(KEY) && done.has(KEY_RENT)) {
+  console.log("예전 기부 마일리지와 장비대여 기부는 이미 넣었어요");
   process.exit(0);
 }
 
@@ -75,6 +81,10 @@ const whoSql = (names) => {
 };
 const now = Date.now();
 
+if (!done.has(KEY)) seedOld();
+if (!done.has(KEY_RENT)) seedRent();
+
+function seedOld() {
 // 1) 예전 기부 줄을 JSON 그대로 다시 맞춘다 (처음이면 기부함 시험 줄도 정리)
 const a = [];
 let tests = [];
@@ -151,3 +161,47 @@ b.push(
 b.push(`INSERT OR IGNORE INTO setup (key, done_at) VALUES (${q(KEY)}, ${now});`);
 runSql(b);
 console.log(`예전 기부 ${count}건(${donors.length}명)을 맞추고 마일리지를 ${paid}명에게 넣었어요 (시험 기부 ${tests.length}건 지움)`);
+}
+
+// 3) 장비대여 물건의 기부자 -> 명예의 전당 (status 'honor', 마일리지 없음)
+function seedRent() {
+  const dup = (data.rentalDuplicates ?? []).map(([who, weapon]) => [String(who).toLowerCase(), String(weapon).replace(/\s/g, "")]);
+  const rows = query(
+    "SELECT id, donor, weapon, enhance, price, created_at FROM rental_items WHERE donor IS NOT NULL AND trim(donor) != '' AND status != 'gone' " +
+      "AND id NOT IN (SELECT rental_id FROM donate_items WHERE rental_id IS NOT NULL) ORDER BY id",
+  );
+  const before = Date.UTC(2026, 10, 2, 15); // 2026-11-03 0시 한국 시간: 그 전은 카톡 목록으로 처음 채운 물건
+  const oldAt = Date.UTC(2026, 9, 31, 3); // 10/31 낮 12시 한국 시간
+  const c = [`DELETE FROM donate_items WHERE status = 'honor' AND note = ${q(RENT_NOTE)} AND created_by = ${q(DEV)};`];
+  const per = new Map();
+  let skipped = 0;
+  for (const r of rows) {
+    const who = String(r.donor).trim();
+    const name = String(r.weapon).replace(/\s/g, "");
+    if (dup.some(([w, n]) => w === who.toLowerCase() && name.includes(n))) {
+      skipped++;
+      continue;
+    }
+    const gold = Math.round((Number(r.price) * 100_000) / 1.5);
+    const at = Number(r.created_at) < before ? oldAt : Number(r.created_at);
+    c.push(
+      "INSERT INTO donate_items (who, item, qty, enhance, note, gold, gold_ask, dia, status, place, rental_id, created_at, created_by, done_at, done_by) VALUES (" +
+        [whoSql([who]), q(r.weapon), 1, Number(r.enhance) || 0, q(RENT_NOTE), gold, gold, 0, "'honor'", "'rent'", r.id, at, q(DEV), at, q(DEV)].join(", ") +
+        ");",
+    );
+    const p = per.get(who) ?? { n: 0, price: 0 };
+    p.n++;
+    p.price += Number(r.price) || 0;
+    per.set(who, p);
+  }
+  const list = [...per.entries()].sort((x, y) => y[1].price - x[1].price);
+  const text = list.map(([who, p]) => `${who} ${p.n}개 💎${Math.round(p.price * 0.4 * 100) / 100}`).join(" · ");
+  c.push(
+    `INSERT INTO alerts (user_id, kind, text, link, created_at) SELECT ${q(DEV)}, 'donate', ` +
+      `${q(`[명예의 전당] 장비대여 기부 ${rows.length - skipped}개(${list.length}명) 넣음 (보증금 ÷ 1.5 = 골드, 마일리지는 안 줌, 예전 기부와 같은 ${skipped}개 뺌) · ${text}`)}, ` +
+      `'#/hall', ${now} WHERE EXISTS (SELECT 1 FROM users WHERE id = ${q(DEV)});`,
+    `INSERT OR IGNORE INTO setup (key, done_at) VALUES (${q(KEY_RENT)}, ${now});`,
+  );
+  runSql(c);
+  console.log(`장비대여 기부 ${rows.length - skipped}개(${list.length}명)를 명예의 전당에 넣었어요 (예전 기부와 같은 ${skipped}개 뺌)`);
+}

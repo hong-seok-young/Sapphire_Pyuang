@@ -4680,7 +4680,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .dn-st { font-weight: 700; }
 .dn-st-request { color: var(--sunset) !important; }
 .dn-st-done { color: var(--gold) !important; }
-.dn-st-hall { color: var(--muted) !important; }
+.dn-st-hall, .dn-st-honor { color: var(--muted) !important; }
 .dn-st-rejected { color: var(--red) !important; }
 .dn-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .dn-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
