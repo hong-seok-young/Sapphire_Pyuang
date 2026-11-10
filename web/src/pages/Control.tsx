@@ -97,9 +97,7 @@ export function ControlBoard() {
         </span>
         <div className="ctl-title">
           <b>{c.title}</b>
-          <small>
-            중립 길드 · 잡지 않는 몹 {count}
-          </small>
+          <small>통제 몹 {count}</small>
         </div>
       </div>
       <div className="ctl-grid">
@@ -126,8 +124,8 @@ export function ControlPlaceBox({ wiki, id }: { wiki: Wiki; id: string }) {
           통제
         </span>
         <div className="ctl-title">
-          <b>{g.mark ? `${c.server} 통제 · ${g.mark}` : `${c.server} 통제 · 잡지 않는 몹`}</b>
-          <small>중립 길드</small>
+          <b>{c.title}</b>
+          <small>{g.mark ? g.mark : "잡지 않는 몹"}</small>
         </div>
         <a className="ctl-more" href={NOTICE}>
           공지 ›
@@ -154,7 +152,7 @@ export function ControlMonsterBox({ wiki, keys }: { wiki: Wiki; keys: string[] }
           통제
         </span>
         <div className="ctl-title">
-          <b>{c.server} 통제 · 우리 길드는 잡지 않아요</b>
+          <b>{c.server} 통제 몹 · 잡지 않아요</b>
           <small>
             {hits.map((h) => h.group.place + (h.mob.note ? ` · ${h.mob.note}` : "")).join(" / ")}
           </small>

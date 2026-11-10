@@ -836,7 +836,7 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
     const lines = controlCardSql("../자료", Date.now());
     if (lines) {
       runSql(lines);
-      console.log("통제 리스트 공지를 앱 모양 칸으로 바꿨어요");
+      console.log("통제 리스트 공지의 제목·본문을 바꿨어요");
     }
   }
 }
