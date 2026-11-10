@@ -15,6 +15,86 @@ ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "자료" / "도감" / "일반.json"
 PICS = ROOT / "자료" / "이미지" / "도감"
 OUT = ROOT / "web" / "public" / "data"
+# 시세 비교 (제작자 요청 2026-11-11: '골드로 직접 장비를 구매하는 게 싼가 vs 스탬프로 등록하는 게 싼가', '아바돈 이벤트 기준 vs 이벤트 아닐 때'):
+# 장비 최저가 = 거래소(암거래중개인) 녹화를 읽은 날짜별 시세, 스탬프·마법서 값 = 자료/시세/스탬프.json, 규칙은 자료/제공/도감_시세.md
+MARKET = ROOT / "자료" / "시세" / "암거래중개인"
+STAMP = ROOT / "자료" / "시세" / "스탬프.json"
+NEWS = ROOT / "자료" / "공식" / "소식.json"
+ARMOR_TABS = {"투구", "보조 장비", "장갑", "신발"}  # 거래소 탭이 이것이면 위키 장비표에 없는 이름(코스튬 모자 등)도 갑옷류
+
+
+def abaddon_sale() -> dict | None:
+    """가장 최근 공식 패치노트의 '아바돈 장비 스탬프 패키지 판매' 기간 ('판매 기간: 10/29(목) 점검 후 ~ 11/12(목) 점검 전까지')"""
+    if not NEWS.exists():
+        return None
+    best = None
+    for p in json.loads(NEWS.read_text(encoding="utf-8")).get("rows", []):
+        body = p.get("body") or ""
+        i = body.find("아바돈 장비 스탬프 패키지 판매")
+        if i < 0:
+            continue
+        m = re.search(r"판매 기간:\s*(\d+)/(\d+)[^~\n]*~\s*(\d+)/(\d+)([^\n]*)", body[i:i + 400])
+        y = re.match(r"(\d{4})-", str(p.get("start_date") or ""))
+        if not m or not y:
+            continue
+        year = int(y.group(1))
+        sm, sd, em, ed = (int(x) for x in m.groups()[:4])
+        start = date(year, sm, sd)
+        end = date(year + (1 if em < sm else 0), em, ed)
+        cand = {"start": start.isoformat(), "end": end.isoformat(), "text": m.group(0).replace("판매 기간:", "").strip(), "id": p.get("id")}
+        if not best or cand["start"] > best["start"]:
+            best = cand
+    return best
+
+
+def price_data(key, wanted: set, infos: dict) -> dict | None:
+    """도감에 나오는 장비만: 이름 key -> {k: 무기/갑옷류/기타, lv: 요구 레벨, p: {강화: 최저가}}"""
+    days = sorted(MARKET.glob("*/시세.json")) if MARKET.exists() else []
+    if not days:
+        return None
+    latest = days[-1]
+    s = json.loads(latest.read_text(encoding="utf-8"))
+    tabs: dict[str, set] = {}
+    m_path = latest.parent / "매물.json"
+    if m_path.exists():
+        for r in json.loads(m_path.read_text(encoding="utf-8"))["listings"]:
+            tabs.setdefault(key(r["base"]), set()).add(r["tab"])
+    # 요구 레벨: 위키 장비표 '레벨제한' -> 거래소 정보창 '요구 레벨' -> 도감 영상 툴팁 '요구 레벨 N'
+    wiki_lv = {}
+    eq = OUT / "equipment.json"
+    if eq.exists():
+        for t in json.loads(eq.read_text(encoding="utf-8")):
+            h = t["headers"]
+            if "레벨제한" in h:
+                for r in t["rows"]:
+                    mm = re.search(r"\d+", r["cells"][h.index("레벨제한")] or "")
+                    if mm:
+                        wiki_lv.setdefault(key(r["name"]), int(mm.group(0)))
+    seen_lv = {}
+    for it in s.get("items", []):
+        lv = (it.get("options_seen") or {}).get("요구레벨")
+        if lv:
+            seen_lv.setdefault(key(it["base"]), lv[0])
+    gear = {}
+    for e in s.get("equipment", []):
+        k = key(e["base"])
+        if k not in wanted:
+            continue
+        kind = e.get("kind") or ("갑옷류" if tabs.get(k, set()) & ARMOR_TABS else None)
+        mm = re.search(r"요구\s*레벨\s*(\d+)", infos.get(k, ""))
+        lv = wiki_lv.get(k) or seen_lv.get(k) or (int(mm.group(1)) if mm else None)
+        gear[k] = {"k": kind, "lv": lv, "p": {str(pl): v for pl, v in e["min_by_plus"].items()}}
+    out = {"date": s.get("날짜"), "src": "암거래중개인(게임 거래소) 녹화", "gear": gear}
+    if STAMP.exists():
+        st = json.loads(STAMP.read_text(encoding="utf-8"))
+        out["stamp"] = {"normal": st["평소"], "event": st["이벤트"], "abaddon": st.get("아바돈_일반", 50),
+                        "platGold": st["플래티넘_100당_골드"] / 100, "date": st.get("날짜"),
+                        "noteNormal": st.get("평소_메모"), "noteEvent": st.get("이벤트_메모")}
+        out["scroll"] = st.get("마법서_값") or {}
+    sale = abaddon_sale()
+    if sale:
+        out["sale"] = sale
+    return out
 
 # 화면 글자와 획득 옵션 이름이 다를 때 (띄어쓰기 등)
 STAT_ALIAS = {"불 저항": "불저항", "냉기 저항": "냉기저항", "번개 저항": "번개저항", "속성 저항": "속성저항",
@@ -107,6 +187,12 @@ def main() -> None:
                         "period": e.get("period"), "items": items, **({"cat": e["category"]} if e.get("category") else {})})
     unknown = sorted({s for e in entries for s, _, _ in e["effects"]} - set(order))
     data = {"source": raw.get("source", "게임 도감 퀘스트 (제작자 영상)"), "built": date.today().isoformat(), "order": order, "entries": entries}
+    wanted = {key(re.sub(r"^\+\d+\s*", "", it["name"])) for e in entries for it in e["items"] if it.get("name")}
+    price = price_data(key, wanted, infos)
+    if price:
+        data["price"] = price
+        print("도감 시세", {"날짜": price["date"], "시세 있는 장비": len(price["gear"]), "레벨 모름": sorted(k for k, g in price["gear"].items() if not g["lv"]),
+                         "종류 모름": sorted(k for k, g in price["gear"].items() if not g["k"]), "아바돈 판매": price.get("sale")})
     (OUT / "dex.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print("도감 계산기", {"항목": len(entries), "뺀 이벤트 도감": len(events), "아이템 칸": sum(len(e["items"]) for e in entries),
                      "이름 모름": sum(1 for e in entries for i in e["items"] if not i["name"]), "그림": len(pics),
