@@ -881,7 +881,7 @@ def main():
     meta = {"source": SOURCE, "built": datetime.date.today().isoformat(),
             "counts": {"posts": len(posts), "places": len(places), "monsters": len(monsters),
                        "items": len(items), "images": len(list((OUT / "img").iterdir()))}}
-    control = control_list()
+    control = control_list(places, monsters)
     if control:
         meta["control"] = control
     data = {"posts": posts, "menu": menu, "regions": regions, "places": places, "monsters": monsters,
@@ -966,15 +966,53 @@ def build_odds():
     print("공식 확률 표", len(tables), "행", sum(len(s["r"]) for t in tables for s in t["sections"]))
 
 
-def control_list():
-    """길드 통제 리스트 (제작자 2026-11-10 '우리 길드는 중립길드야, 이 몹들을 잡으면 안 되는 통제 리스트'): 비공개 자료 길드/통제_리스트.json 을 meta.json 의 control 로.
-    챗봇 자료(src/chat.ts wikiContext)가 통제·중립이나 리스트의 곳·몹 이름이 나오면 붙인다. 공지사항 글은 배포가 한 번 올렸다 (scripts/controlNotice.mjs)"""
+def control_list(places: dict, monsters: dict):
+    """길드 통제 리스트 (제작자 2026-11-10 '우리 길드는 중립길드야, 이 몹들을 잡으면 안 되는 통제 리스트', '다 DB 화 해서 챗봇이 읽을 수 있게'):
+    비공개 자료 길드/통제_리스트.json 을 meta.json 의 control 로. 몹마다 위키 몬스터(key)와 사냥터(placeId)를 잇는다.
+    쓰는 곳: 공지사항 글의 통제 리스트 칸(Board.tsx '[[통제 리스트]]', pages/Control.tsx), 사냥터·몬스터 화면의 통제 표시,
+    챗봇 자료(src/chat.ts wikiContext). 공지사항 글은 배포가 한 번 올렸다 (scripts/controlNotice.mjs)"""
     src = SRC / "길드" / "통제_리스트.json"
     if not src.exists():
         return None
     d = json.loads(src.read_text(encoding="utf-8"))
-    groups = [{"place": g["곳"], "mark": g.get("표시", ""), "mobs": g.get("몹", [])} for g in d.get("목록", [])]
-    print("통제 리스트", sum(len(g["mobs"]) for g in groups))
+    norm = lambda s: re.sub(r"\s", "", s or "")
+    alias = d.get("위키이름", {})  # 리스트의 이름 -> 위키 몬스터 이름 (같은 사냥터의 비슷한 이름, 자료에 '짐작'으로 적음)
+    by_name: dict[str, list[str]] = {}
+    for k, m in monsters.items():
+        by_name.setdefault(norm(m["name"]), []).append(k)
+
+    def find_place(name: str) -> str:
+        n = norm(name)
+        hits = [pid for pid, p in places.items() if norm(p["title"]).startswith(n) or norm(p["name"]) == n]
+        return hits[0] if len(hits) == 1 else ""
+
+    def find_mob(name: str, pid: str) -> str:
+        n = norm(alias.get(name, name))
+        if pid:
+            own = [k for k in places[pid]["monsters"] if k in monsters]
+            for k in own:
+                if norm(monsters[k]["name"]) == n:
+                    return k
+            pre = [k for k in own if norm(monsters[k]["name"]).startswith(n)]
+            if len(pre) == 1:
+                return pre[0]
+        keys = by_name.get(n, [])
+        return keys[0] if len(keys) == 1 else ""
+
+    groups = []
+    for g in d.get("목록", []):
+        pid = find_place(g["곳"])
+        mobs = []
+        for raw in g.get("몹", []):
+            parts = [x.strip() for x in re.split(r"\s[/·]\s", raw) if x.strip()]
+            name, note = parts[0], " · ".join(parts[1:])
+            key = "" if "통제" in name else find_mob(name, pid)
+            mobs.append({"name": name, "note": note, "key": key})
+        if not pid:  # 제목이 달라도 (등대던전 2F, 이슬롯의 신전) 찾은 몬스터의 사냥터로
+            pid = next((monsters[m["key"]]["place"] for m in mobs if m["key"]), "")
+        groups.append({"place": g["곳"], "mark": g.get("표시", ""), "placeId": pid, "mobs": mobs})
+    miss = [m["name"] for g in groups for m in g["mobs"] if not m["key"] and "통제" not in m["name"]]
+    print("통제 리스트", sum(len(g["mobs"]) for g in groups), "· 위키에 없는 이름", miss)
     return {"title": d.get("제목", "통제 리스트"), "server": d.get("서버", ""), "by": d.get("제작", ""), "date": d.get("수정", ""),
             "rule": d.get("규칙", ""), "groups": groups}
 

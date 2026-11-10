@@ -12,7 +12,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash, pbkdf2Sync, randomBytes } from "node:crypto";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { CONTROL_KEY, controlNoticeSql } from "./controlNotice.mjs";
+import { CONTROL_CARD_KEY, CONTROL_KEY, controlCardSql, controlNoticeSql } from "./controlNotice.mjs";
 
 const DB = "sapphire-accounts";
 const DEVELOPER = "퓨앙";
@@ -829,6 +829,14 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
       const n = queryFirst(`SELECT COUNT(*) AS n FROM alerts WHERE kind = 'board_notice' AND created_at = ${now}`)?.n ?? 0;
       const f = queryFirst(`SELECT COUNT(*) AS n, MAX(length(data)) AS b FROM board_files WHERE created_at = ${now}`);
       console.log(`통제 리스트 공지를 올렸어요 (알림 ${n}명, 그림 ${f?.n ?? 0}장 ${f?.b ?? 0}바이트)`);
+    }
+  }
+  // 앱 모양의 통제 리스트 칸으로 (제작자 2026-11-10 '앱 스타일대로 이쁘게'): 이미 올라간 글의 본문만 바꾼다. 알림은 다시 보내지 않는다
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${CONTROL_CARD_KEY}'`)) {
+    const lines = controlCardSql("../자료", Date.now());
+    if (lines) {
+      runSql(lines);
+      console.log("통제 리스트 공지를 앱 모양 칸으로 바꿨어요");
     }
   }
 }

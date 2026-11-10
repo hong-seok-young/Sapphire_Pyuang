@@ -11,15 +11,29 @@ const CHUNK = 40_000;
 
 const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
 
+export const CONTROL_CARD_KEY = "control_notice_card_20261110";
+
+/** 본문의 '[[통제 리스트]]' 줄은 화면이 앱 모양의 통제 리스트 칸으로 그린다 (src/pages/Control.tsx, 자료는 meta.json control).
+ * 제작자 2026-11-10 '그림 저대로 올리는 것도 좋지만 앱 스타일대로 이쁘게', '이미지도 우리 DB 에서 써도 돼'. 아래 첨부 그림은 원본 표 */
 export function controlBody(list) {
-  const lines = ["우리 길드는 중립 길드예요. 아래 몹은 잡지 않아요.", ""];
-  for (const g of list["목록"]) {
-    lines.push(`■ ${g["곳"]}${g["표시"] ? " · " + g["표시"] : ""}`);
-    for (const m of g["몹"]) lines.push(`- ${m}`);
-    lines.push("");
-  }
-  lines.push(`표 제작: ${list["제작"]} · 수정 ${String(list["수정"]).replace(/-/g, "/")}`);
-  return lines.join("\n");
+  return [
+    "우리 길드는 중립 길드예요. 아래 몹은 잡지 않아요.",
+    "",
+    "[[통제 리스트]]",
+    "",
+    `원본 표 (제작 ${list["제작"]} · 수정 ${String(list["수정"]).replace(/-/g, "/")})`,
+  ].join("\n");
+}
+
+/** 이미 올라간 공지 글의 본문을 앱 모양 칸으로 바꾸는 SQL (setup CONTROL_CARD_KEY 로 한 번) */
+export function controlCardSql(dataDir, now) {
+  const jsonPath = join(dataDir, "길드", "통제_리스트.json");
+  if (!existsSync(jsonPath)) return null;
+  const list = JSON.parse(readFileSync(jsonPath, "utf8"));
+  return [
+    `UPDATE board_posts SET body = ${q(controlBody(list))} WHERE cat = 'notice' AND title = ${q(CONTROL_TITLE)} AND author = ${q(CONTROL_AUTHOR)};`,
+    `INSERT OR REPLACE INTO setup (key, done_at) VALUES ('${CONTROL_CARD_KEY}', ${now});`,
+  ];
 }
 
 /** 자료 폴더(…/자료)에서 공지 SQL 줄들. 자료가 없으면 null */

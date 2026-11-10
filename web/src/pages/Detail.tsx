@@ -5,6 +5,7 @@ import type { ItemEvent } from "../official";
 import { ImageText } from "./ImageText";
 import { FavStar, PicImg, TopBar, NotFound, Panel } from "../ui";
 import { MonsterCard } from "../wiki-ui";
+import { ControlMonsterBox } from "./Control";
 import { monstersByName } from "../data";
 
 export function MonsterPage({ wiki, name }: { wiki: Wiki; name: string }) {
@@ -17,6 +18,7 @@ export function MonsterPage({ wiki, name }: { wiki: Wiki; name: string }) {
         <PicImg pic={list[0].img} scale={2} max={180} alt={name} />
       </div>
       {list.length > 1 && <div className="muted center">{list.length}곳에 나와요</div>}
+      <ControlMonsterBox wiki={wiki} keys={list.map((m) => m.key)} />
       {list.map((m) => (
         <MonsterCard key={m.key} wiki={wiki} m={m} showPlace link={false} />
       ))}

@@ -3,6 +3,7 @@ import type { Block, Place, PlaceGuide, Wiki } from "../types";
 import { ImageViewer } from "./ImageViewer";
 import { FavStar, PicImg, TopBar, levelText, Loading, NotFound } from "../ui";
 import { MonsterCard } from "../wiki-ui";
+import { ControlPlaceBox } from "./Control";
 import { Blocks, OriginalLink } from "../Blocks";
 import { NEED_LOGIN, getJson, loadPosts, useAsync } from "../data";
 
@@ -127,6 +128,7 @@ export function PlacePage({ wiki, id }: { wiki: Wiki; id: string }) {
         </div>
       </div>
       <OriginalLink postId={id} />
+      <ControlPlaceBox wiki={wiki} id={id} />
       {p.guide && <GuideBox g={p.guide} />}
       {part(parts?.above)}
       {mons.map((m) => (

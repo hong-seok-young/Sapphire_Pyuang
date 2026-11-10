@@ -1,5 +1,6 @@
 import type { Monster, Wiki } from "./types";
 import { PicImg, num } from "./ui";
+import { ControlTag } from "./pages/Control";
 
 /** 드랍 아이템: 아이콘 + 이름, 누르면 아이템 화면 */
 export function DropChips({ wiki, names }: { wiki: Wiki; names: string[] }) {
@@ -31,7 +32,7 @@ export function MonsterCard({ wiki, m, showPlace = false, link = true }: {
       </div>
       <div className="mon-head">
         <div className="mon-name">
-          {m.name} <span className="lv">Lv.{m.levels ? m.levels.join(" / ") : m.level ?? "-"}</span>
+          {m.name} <ControlTag wiki={wiki} monsterKey={m.key} /> <span className="lv">Lv.{m.levels ? m.levels.join(" / ") : m.level ?? "-"}</span>
         </div>
         <div className="mon-stats">
           HP {m.hps ? m.hps.join(" / ") : num(m.hp)} · {m.traits}

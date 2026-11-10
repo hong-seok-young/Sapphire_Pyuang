@@ -19,6 +19,7 @@ import { KakaoButton, Nick } from "../kakao";
 import { isOfficialTab } from "../official";
 import { AnonName, Comments } from "./Comments";
 import { ImageViewer } from "./ImageViewer";
+import { CONTROL_MARK, ControlBoard } from "./Control";
 import { SuggestFlow } from "./SuggestFlow";
 
 /** 공지사항과 이벤트는 오피서 이상만 쓴다 (서버 server/board.ts canWrite 와 같다) */
@@ -350,8 +351,18 @@ function LinkCard({ url }: { url: string }) {
   );
 }
 
-/** 글 내용: 줄바꿈은 그대로, 주소는 링크로, 유튜브와 다른 링크는 아래에 미리보기 */
+/** 글 내용: 줄바꿈은 그대로, 주소는 링크로, 유튜브와 다른 링크는 아래에 미리보기.
+ * '[[통제 리스트]]' 줄은 그 자리에 길드 통제 리스트 칸 (pages/Control.tsx, 제작자 2026-11-10 '앱 스타일대로 이쁘게') */
 function Body({ text }: { text: string }) {
+  const at = text.indexOf(CONTROL_MARK);
+  if (at >= 0)
+    return (
+      <>
+        <Body text={text.slice(0, at).replace(/\n+$/, "")} />
+        <ControlBoard />
+        <Body text={text.slice(at + CONTROL_MARK.length).replace(/^\n+/, "")} />
+      </>
+    );
   const parts: ReactNode[] = [];
   const links: string[] = [];
   let last = 0;

@@ -113,13 +113,21 @@ export interface Meta {
   control?: ControlList;
 }
 
+/** 길드 통제 리스트 (meta.json control, build_data.py control_list): 중립 길드라 잡지 않는 몹 */
 export interface ControlList {
   title: string;
   server: string;
   by: string;
   date: string;
   rule: string;
-  groups: { place: string; mark: string; mobs: string[] }[];
+  groups: { place: string; mark: string; placeId: string; mobs: ControlMob[] }[];
+}
+
+/** name 리스트에 적힌 이름, note 덧붙인 말('하트 양보제'), key 위키 몬스터 (없으면 "") */
+export interface ControlMob {
+  name: string;
+  note: string;
+  key: string;
 }
 
 export interface Wiki {
