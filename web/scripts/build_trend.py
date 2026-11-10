@@ -168,6 +168,10 @@ NOT_ITEM = re.compile(r"^(골드|구매시|통 구매시|일괄구매시|통|개
 NUMBERING = re.compile(r"^\d+\.\s*")
 
 HEAD = re.compile(r"^(\d{4})년 (\d{1,2})월 (\d{1,2})일 (오전|오후) (\d{1,2}):(\d{2}), (.+?) : (.*)$")
+# PC 카카오톡 내보내기 (2026-11-10 받은 파일): 날짜 줄 '--------------- 2026년 10월 12일 월요일 ---------------' 아래 '[닉네임] [오전 2:24] 글'
+DAY = re.compile(r"^-+ (\d{4})년 (\d{1,2})월 (\d{1,2})일 \S+요일 -+$")
+HEAD_PC = re.compile(r"^\[(.+?)\] \[(오전|오후) (\d{1,2}):(\d{2})\] ?(.*)$")
+JOINED = re.compile(r"님이 (들어왔습니다|나갔습니다)|님을 내보냈습니다|^불법촬영물 식별|^이미지, 동영상 또는 압축파일")
 SYSTEM = re.compile(r"님이 (들어왔습니다|나갔습니다)\.?$|^\d{4}년 \d{1,2}월 \d{1,2}일 (오전|오후) \d{1,2}:\d{2}$")
 ROOM = re.compile(r"^﻿?(.+?) \d* ?님과 카카오톡 대화")
 
@@ -209,13 +213,32 @@ def parse(path: Path) -> tuple[str, list[dict]]:
     room = path.stem
     msgs: list[dict] = []
     cur: dict | None = None
+    day: str | None = None  # PC 내보내기의 지금 날짜
     with path.open(encoding="utf-8-sig") as f:
         for i, raw in enumerate(f):
-            line = raw.rstrip("\n")
+            line = raw.rstrip("\r\n")
             if i == 0:
                 m = ROOM.match(line)
                 if m:
                     room = m.group(1).strip()
+            d = DAY.match(line)
+            if d:
+                day = f"{d.group(1)}-{int(d.group(2)):02d}-{int(d.group(3)):02d}"
+                cur = None
+                continue
+            pc = HEAD_PC.match(line) if day else None
+            if pc:
+                who, text = pc.group(1), pc.group(5)
+                if who == "오픈채팅봇":
+                    cur = None
+                    continue
+                name, tel = norm_who(who)
+                cur = {"date": day, "who": name, "tel": tel, "text": text}
+                msgs.append(cur)
+                continue
+            if JOINED.search(line):
+                cur = None
+                continue
             m = HEAD.match(line)
             if m:
                 y, mo, d, _ap, _h, _mi, who, text = m.groups()
@@ -1345,11 +1368,16 @@ def main() -> None:
     if not files:
         print("시세 동향: 자료/카톡 이 없어서 건너뜀")
         return
+    # 같은 방을 여러 번 내보낸 파일은 날짜가 겹친다. 날짜마다 가장 새 파일의 글만 쓴다
+    # (2026-11-10 PC 내보내기는 닉네임을 바꾼 사람을 지금 닉네임으로 적어서, 같은 글이라도 예전 파일과 겹쳐 셌다)
     rooms, msgs = [], []
-    for f in files:
+    covered: dict[str, set[str]] = {}
+    for f in sorted(files, key=lambda f: f.stem.rsplit("_", 1)[-1], reverse=True):
         room, ms = parse(f)
         rooms.append(room)
-        msgs.extend(ms)
+        seen = covered.setdefault(room, set())
+        msgs.extend(m for m in ms if m["date"] not in seen)
+        seen.update(m["date"] for m in ms)
     msgs = dedupe(msgs)
     dates = sorted({m["date"] for m in msgs})
     last = datetime.date.fromisoformat(dates[-1])
@@ -1383,7 +1411,7 @@ def main() -> None:
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    print("시세 동향", {"rooms": len(rooms), "messages": len(msgs), "days": len(gold), "items": len(items), "itemsBuy": len(items_buy), "chars": len(chars["rows"]),
+    print("시세 동향", {"rooms": len(set(rooms)), "messages": len(msgs), "days": len(gold), "items": len(items), "itemsBuy": len(items_buy), "chars": len(chars["rows"]),
                      "wiki": sum(1 for it in items if it["wiki"])})
     write_chat_market(data, rs)
     if "--unknown" in sys.argv:
