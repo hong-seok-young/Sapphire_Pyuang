@@ -4,7 +4,7 @@
 import { FORBIDDEN, NEED_LOGIN, currentUser, json } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { raceData } from "../../../server/gcrace";
-import { LEVEL_COINS, gcoinOpen, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
+import { LEVEL_COINS, gcoinOpen, openCleanup, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
 import { weekStart } from "../../../server/week";
 
 interface OrderRow {
@@ -40,6 +40,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!canUseGcoin(me)) return FORBIDDEN();
+  await openCleanup(env);
   const manage = canManageGcoin(me);
   const curve = await readCurve(env);
   // 끝난 주의 순위 보너스 (아직이면 지금 한 번)

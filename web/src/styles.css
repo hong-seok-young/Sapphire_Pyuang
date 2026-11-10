@@ -4344,12 +4344,14 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .gc-wallet-num b { font-size: 26px; line-height: 1; color: #fff3b0; text-shadow: 2px 2px 0 var(--edge); }
 .gc-curve-step { font-size: 10px; color: var(--muted); text-align: right; white-space: nowrap; }
 .gc-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin: 2px 0 8px; }
-.gc-sum span { display: grid; justify-items: center; gap: 1px; padding: 4px 2px; background: rgba(13, 15, 34, 0.45); border: 1px solid #4a5480; }
+.gc-sum > button { display: grid; justify-items: center; gap: 1px; padding: 5px 2px; background: rgba(13, 15, 34, 0.45); border: 1px solid #4a5480; color: inherit; font: inherit; cursor: pointer; }
+.gc-sum > button:active { transform: scale(0.96); }
+.gc-sum > button.gc-sum-on { border-color: #c9d3e6; background: rgba(201, 211, 230, 0.16); box-shadow: inset 0 0 0 1px rgba(201, 211, 230, 0.5); }
 .gc-sum small { font-size: 10px; color: var(--muted); }
 .gc-sum b { display: flex; align-items: center; font-size: 13px; }
 .gc-sum b.gc-plus { color: #3fe0a0; }
 .gc-sum b.gc-minus { color: #ffb27a; }
-.gc-sum-total { border-color: var(--gold) !important; }
+.gc-sum-total b { color: var(--gold); }
 .gc-sum-total b { color: var(--gold); }
 .gc-next-bar { display: block; height: 5px; background: var(--lo); border: 1px solid var(--edge); overflow: hidden; }
 .gc-next-bar i { display: block; height: 100%; background: linear-gradient(90deg, #c3cfe6, var(--gold)); transform-origin: 0 50%; transition: transform 0.6s ease; }
@@ -4807,3 +4809,13 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 /* 성장코인샵 쉬는 주: 다음 판 시작 */
 .gr-next { margin: 2px 0 6px; font-size: 12px; color: var(--muted, #9aa3c7); text-align: right; }
 .hof-sample { position: absolute; top: -8px; right: 6px; }
+
+/* 장비대여 > 운영 > 물건 추가: 기부함에서 넘어온 기부 (누르면 그 아래 칸) */
+.rent-gifts { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.rent-gift { border: 1px solid rgba(124, 110, 210, 0.45); background: rgba(20, 18, 50, 0.5); }
+.rent-gift-on { border-color: var(--gold); }
+.rent-gift-btn { width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 9px; background: none; border: 0; color: inherit; text-align: left; cursor: pointer; }
+.rent-gift-pic { width: 24px; height: 24px; flex: none; display: flex; align-items: center; justify-content: center; }
+.rent-gift-name { min-width: 0; display: flex; flex-direction: column; }
+.rent-gift-name small { font-size: 11px; color: var(--muted); }
+.rent-gift .rent-form { padding: 0 9px 9px; }

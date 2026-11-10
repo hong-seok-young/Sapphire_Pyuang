@@ -2,12 +2,13 @@
 //   오피서에게 알림 (열기 전에는 앱개발자에게만). 실제로 주는 것은 게임 안에서 오피서가
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
-import { MAX_QTY, canUseGcoin, int, isMember, notifyStaff, readCurve, wallets, orderLabel } from "../../../../server/gcoin";
+import { MAX_QTY, canUseGcoin, openCleanup, int, isMember, notifyStaff, readCurve, wallets, orderLabel } from "../../../../server/gcoin";
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!canUseGcoin(me)) return FORBIDDEN();
+  await openCleanup(env);
   if (!(await isMember(env, me.id))) return json({ error: "2군 본캐만 성장코인으로 살 수 있어요" }, 403);
   const b = await readJson<{ itemId: unknown; qty: unknown }>(request);
   const itemId = int(b.itemId, 1, Number.MAX_SAFE_INTEGER);

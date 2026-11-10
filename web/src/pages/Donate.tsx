@@ -1,12 +1,12 @@
 // 기부함 (개발중, 제작자 2026-11-10 길드 톡방: '모든 템을 골드로 환산하고 마일리지 환산', '기부하게 따로 기부함', 마을모금함 '마일리지 순위표, 명예의 전당').
 // 칸: 명예의 전당(전체·이번 달) · 기부 내역 · 기부하기(신청과 내 기부) · 운영(신청 확정·직접 등록·받은 템). 서버 server/donate.ts
 import { useCallback, useMemo, useState } from "react";
-import { JOBS, JOB_NAME, errorText } from "../auth";
-import type { Job, Me } from "../auth";
+import { errorText } from "../auth";
+import type { Me } from "../auth";
 import { useAsync } from "../data";
 import { Nick } from "../kakao";
 import { useEntryState } from "../router";
-import { wikiJobs, weaponOf } from "../rental";
+import { weaponOf } from "../rental";
 import type { Item, Wiki } from "../types";
 import { FitLine, Loading, PicImg, TopBar } from "../ui";
 import {
@@ -422,75 +422,11 @@ function AddByStaff({ wiki, done }: { wiki: Wiki | null; done: (msg: string) => 
   );
 }
 
-/** 장비대여로 넘기기 칸 (직업, 레벨, 대여 기한, 💎 가격) */
-function ToRent({ row, wiki, done }: { row: DonateRow; wiki: Wiki | null; done: (msg: string) => void }) {
-  const it = wiki ? weaponOf(wiki, row.item) : undefined;
-  const [jobs, setJobs] = useState<Job[]>(() => (it ? wikiJobs(it) : []));
-  const [level, setLevel] = useState(() => String(Number(it?.equip?.[0]?.info?.["레벨제한"]) || ""));
-  const [weeks, setWeeks] = useState(0);
-  const [price, setPrice] = useState("");
-  const [err, setErr] = useState("");
-  return (
-    <div className="dn-rent">
-      <div className="dn-jobs">
-        {JOBS.map((j) => (
-          <button
-            key={j}
-            className={"sub-tab" + (jobs.includes(j) ? " sub-tab-on" : "")}
-            onClick={() => setJobs((s) => (s.includes(j) ? (s.length > 1 ? s.filter((x) => x !== j) : s) : [...s, j]))}
-          >
-            {JOB_NAME[j]}
-          </button>
-        ))}
-      </div>
-      <div className="dn-row2">
-        <label>
-          레벨
-          <input inputMode="numeric" value={level} onChange={(e) => setLevel(e.target.value)} />
-        </label>
-        <label>
-          💎 가격
-          <input inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value)} />
-        </label>
-      </div>
-      <div className="dn-term">
-        기한
-        <button className="pill" onClick={() => setWeeks((w) => Math.max(0, w - 1))}>
-          −
-        </button>
-        <b>{weeks ? `${weeks}주` : "기한 없음"}</b>
-        <button className="pill" onClick={() => setWeeks((w) => Math.min(52, w + 1))}>
-          +
-        </button>
-      </div>
-      {err && <p className="form-error">{err}</p>}
-      <button
-        className="pill pill-on dn-send"
-        onClick={async () => {
-          if (!jobs.length) return setErr("직업을 골라 주세요");
-          const lv = num(level);
-          const pr = num(price);
-          if (!lv || !Number.isInteger(lv)) return setErr("레벨을 적어 주세요");
-          if (pr === null || !Number.isInteger(pr) || pr < 0) return setErr("💎 가격을 적어 주세요");
-          try {
-            await rentDonate(row.id, { job: jobs.join(","), level: lv, term: weeks ? `${weeks}w` : "none", price: pr });
-            done("장비대여 목록에 올렸어요");
-          } catch (e) {
-            setErr(errorText(e));
-          }
-        }}
-      >
-        장비대여에 올리기
-      </button>
-    </div>
-  );
-}
-
-/** 운영 > 받은 템: 확정한 기부. 가치 고치기, 보관·나눔, 장비대여로, 지우기 */
+/** 운영 > 받은 템: 확정한 기부. 가치 고치기, 보관·나눔, 장비대여 운용(장비대여 '물건 추가' 목록으로 넘긴다), 지우기 */
 function Store({ rows, wiki, done }: { rows: DonateRow[]; wiki: Wiki | null; done: (msg: string) => void }) {
   const [filter, setFilter] = useEntryState<StoreFilter>("dn.store", "keep");
   const [open, setOpen] = useState<number | null>(null);
-  const [mode, setMode] = useState<"edit" | "rent" | null>(null);
+  const [mode, setMode] = useState<"edit" | null>(null);
   const [f, setF] = useState<FormState>(EMPTY);
   const [err, setErr] = useState("");
   const [sure, setSure] = useState<number | null>(null);
@@ -525,7 +461,9 @@ function Store({ rows, wiki, done }: { rows: DonateRow[]; wiki: Wiki | null; don
                   <span className="dn-label">{donateLabel(r)}</span>
                   <small>
                     <Nick name={r.who} /> · {dayText(r.done_at ?? r.created_at)}
-                    {r.place !== "keep" && <em className="dn-tag">{PLACE_NAME[r.place]}</em>}
+                    {r.place !== "keep" && (
+                      <em className="dn-tag">{r.place === "rent" ? (r.rental_id ? "장비대여 중" : "장비대여 대기") : PLACE_NAME[r.place]}</em>
+                    )}
                   </small>
                 </span>
                 <span className="dn-line-gold">
@@ -545,9 +483,19 @@ function Store({ rows, wiki, done }: { rows: DonateRow[]; wiki: Wiki | null; don
                     >
                       가치 수정
                     </button>
-                    {r.place !== "rent" && (
-                      <button className={"pill" + (mode === "rent" ? " pill-on" : "")} onClick={() => setMode(mode === "rent" ? null : "rent")}>
-                        장비대여로
+                    {!r.rental_id && (
+                      <button
+                        className={"pill" + (r.place === "rent" ? " pill-on" : "")}
+                        onClick={async () => {
+                          try {
+                            await rentDonate(r.id, r.place === "rent");
+                            done(r.place === "rent" ? "보관으로 돌렸어요" : "장비대여로 넘겼어요");
+                          } catch (e) {
+                            setErr(errorText(e));
+                          }
+                        }}
+                      >
+                        {r.place === "rent" ? "장비대여 취소" : "장비대여 운용"}
                       </button>
                     )}
                     {r.place !== "rent" && (
@@ -600,7 +548,6 @@ function Store({ rows, wiki, done }: { rows: DonateRow[]; wiki: Wiki | null; don
                       </button>
                     </>
                   )}
-                  {mode === "rent" && <ToRent row={r} wiki={wiki} done={done} />}
                   {err && <p className="form-error">{err}</p>}
                 </div>
               )}

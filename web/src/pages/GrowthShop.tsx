@@ -519,6 +519,8 @@ function MineTab({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [view, setView] = useEntryState<"all" | "grow" | "prize" | "spent">("gc.hist", "all");
+  const show = (k: "grow" | "prize" | "spent") => view === "all" || view === k;
   async function cancel(o: GcOrder) {
     if (sample) return setError("예시예요");
     setBusy(true);
@@ -540,33 +542,34 @@ function MineTab({
           <b>기록표</b>
         </p>
         {/* 코인 합계는 카드가 아니라 기록표에 (제작자 2026-11-09 '성장으로 얼마, 소모 얼마 이런 거 그냥 기록에 다 정리') */}
+        {/* 한 줄을 꽉 채운 단추: 전체(지금 코인)가 맨 앞, 누르면 그 기록만 (제작자 2026-11-10 '상금 사용 지금 버튼이 행에 꽉 차게, 각각 누르면 각각에 맞는 거, 전체 버튼 맨 앞') */}
         {w && (
-          <div className="gc-sum">
-            {levelCoins && (
-              <span>
-                <small>성장</small>
-                <b className="gc-plus">+{w.earned}</b>
-              </span>
-            )}
-            <span>
-              <small>{levelCoins ? "보너스" : "상금"}</small>
-              <b className="gc-plus">+{w.milestone + w.bonus + w.adjust}</b>
-            </span>
-            <span>
-              <small>사용</small>
-              <b className="gc-minus">−{w.spent}</b>
-            </span>
-            <span className="gc-sum-total">
-              <small>지금</small>
+          <div className="gc-sum" style={{ gridTemplateColumns: `repeat(${levelCoins ? 4 : 3}, minmax(0, 1fr))` }}>
+            <button className={"gc-sum-total" + (view === "all" ? " gc-sum-on" : "")} aria-pressed={view === "all"} onClick={() => setView("all")}>
+              <small>전체</small>
               <b>
                 <Coin />
                 {w.balance}
               </b>
-            </span>
+            </button>
+            {levelCoins && (
+              <button className={view === "grow" ? "gc-sum-on" : ""} aria-pressed={view === "grow"} onClick={() => setView("grow")}>
+                <small>성장</small>
+                <b className="gc-plus">+{w.earned}</b>
+              </button>
+            )}
+            <button className={view === "prize" ? "gc-sum-on" : ""} aria-pressed={view === "prize"} onClick={() => setView("prize")}>
+              <small>{levelCoins ? "보너스" : "상금"}</small>
+              <b className="gc-plus">+{w.milestone + w.bonus + w.adjust}</b>
+            </button>
+            <button className={view === "spent" ? "gc-sum-on" : ""} aria-pressed={view === "spent"} onClick={() => setView("spent")}>
+              <small>사용</small>
+              <b className="gc-minus">−{w.spent}</b>
+            </button>
           </div>
         )}
         <ul className="gc-hist">
-          {history.orders.map((o) => (
+          {show("spent") && history.orders.map((o) => (
             <li key={"o" + o.id} className={"gc-hist-row gc-hist-" + o.status}>
               <Pic name={o.name} small />
               <span className="gc-hist-main">
@@ -597,7 +600,7 @@ function MineTab({
               )}
             </li>
           ))}
-          {history.ledger.map((l, i) => (
+          {show("prize") && history.ledger.map((l, i) => (
             <li key={"l" + i} className="gc-hist-row">
               <span className="gc-hist-icon">
                 {l.kind === "rank" ? "🏆" : l.kind === "streak" ? "🔥" : "✏️"}
@@ -615,14 +618,14 @@ function MineTab({
               </span>
             </li>
           ))}
-          {history.milestones.map((m) => (
+          {show(levelCoins ? "prize" : "grow") && history.milestones.map((m) => (
             <li key={"m" + m.level} className="gc-hist-row gc-hist-ms">
               <span className="gc-hist-icon">🎉</span>
               <span className="gc-hist-main">{m.name} · 첫 달성 보너스</span>
               <span className="gc-delta gc-plus">+{m.coin}</span>
             </li>
           ))}
-          {history.levels.map((l) => (
+          {show("grow") && history.levels.map((l) => (
             <li key={"v" + l.level + (l.pct ?? "")} className="gc-hist-row">
               <span className="gc-hist-icon">
                 {l.pct === null ? "⬆️" : "📈"}
@@ -635,10 +638,10 @@ function MineTab({
               <span className="gc-delta gc-plus">+{l.coin}</span>
             </li>
           ))}
-          {!history.orders.length &&
-            !history.ledger.length &&
-            !history.levels.length &&
-            !history.milestones.length && (
+          {!(show("spent") && history.orders.length) &&
+            !(show("prize") && history.ledger.length) &&
+            !(show("grow") && history.levels.length) &&
+            !(show(levelCoins ? "prize" : "grow") && history.milestones.length) && (
               <li className="gc-hist-empty">아직 없어요</li>
             )}
         </ul>
@@ -1391,13 +1394,14 @@ export function GrowthShopPage({
   if (!cur) return <Loading error={error} />;
   // 메뉴는 모두가 보고 신청은 2군 본캐만 (제작자 2026-11-09 '이 메뉴는 모두가 봐야 하지만 2군만 상점 등 구매 버튼이 활성화, 1군이 누르면 2군 전용이라고 안내').
   // 2군이 아닌 운영진은 화면을 보려고 예시 지갑을, 그 밖의 사람은 지갑과 내 코인 칸 없이 성장 현황·상점만
-  const sample = !cur.member && cur.manage;
+  // 오픈(11/11 11:00) 뒤에는 예시를 모두 뺀다 (제작자 2026-11-10 '11시 오픈일 때는 테스트 데이터 싹 빼고')
+  const sample = !cur.open && !cur.member && cur.manage;
   const wallet = cur.wallet ?? (sample ? SAMPLE_WALLET : null);
   const history = cur.member ? cur.history : SAMPLE_HISTORY;
   const pending = cur.admin?.pending.length ?? 0;
   // 시범운영 주간 목표 선착순: 목표를 아무도 안 정했으면 예시 판 (제작자 2026-11-09 '테스트 데이터 몇 개 넣어 주고')
   const now = Date.now();
-  const raceSample = !cur.race.list.length;
+  const raceSample = !cur.open && !cur.race.list.length;
   // 예시는 판이 열흘쯤 지난 것처럼 (제작자 2026-11-09 '10일간 진행한 차트로, 너무 빽빽해') (첫날이면 선이 안 보인다)
   const raceNow = raceSample ? cur.race.start + 5.2 * 86_400_000 : now;
   const race = raceSample ? sampleRace(cur.race.start, raceNow) : cur.race;

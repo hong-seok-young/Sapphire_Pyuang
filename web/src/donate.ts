@@ -90,8 +90,8 @@ export const editDonate = (id: number, v: DonateInput) =>
   api<{ dia?: number; mileage?: number }>(`/api/donate/${id}`, "PUT", { ...v, action: "edit" });
 export const rejectDonate = (id: number) => api(`/api/donate/${id}`, "PUT", { action: "reject" });
 export const placeDonate = (id: number, place: "keep" | "used") => api(`/api/donate/${id}`, "PUT", { action: "place", place });
-export const rentDonate = (id: number, v: { job: string; level: number; term: string; price: number }) =>
-  api<{ rentalId: number }>(`/api/donate/${id}`, "PUT", { ...v, action: "rent" });
+/** 장비대여 운용: 장비대여 '물건 추가' 목록으로 넘긴다 (undo 면 보관으로 되돌림, 아직 안 올렸을 때만) */
+export const rentDonate = (id: number, undo = false) => api(`/api/donate/${id}`, "PUT", { action: "rent", undo });
 export const removeDonate = (id: number) => api<{ dia?: number }>(`/api/donate/${id}`, "DELETE");
 
 /** '+7 헌터보우 x3' */
@@ -114,7 +114,7 @@ export const mileText = (m: number) => {
 export const diaText = (gold: number) => mileText((gold * MILEAGE_RATE) / DIA_GOLD);
 
 export const STATUS_NAME: Record<DonateStatus, string> = { request: "확인 전", done: "확정", rejected: "거절", removed: "지움" };
-export const PLACE_NAME: Record<DonatePlace, string> = { keep: "보관", rent: "장비대여로", used: "나눔·사용" };
+export const PLACE_NAME: Record<DonatePlace, string> = { keep: "보관", rent: "장비대여", used: "나눔·사용" };
 
 /** '11/10' */
 export function dayText(ms: number): string {

@@ -1,10 +1,11 @@
 // GET /api/rent -> 장비대여 목록(무기마다 쓰는 사람, 줄, 새로 신청하면 받을 수 있는 때), 신청서(대화 포함), 내 마일리지와 장부
 //   길드원: 내 신청서 최근 10개. 운영진: 줄 서는 신청이 있는 신청서 모두와 무기마다 줄 명단, 사람마다 마일리지, 닉네임 목록
-// POST /api/rent { job, level, weapon, options, enhance, term, price, donor, donorDia, note } -> 물건 더하기 (운영진). donorDia: 기부자에게 적립할 💎 (server/rental.ts setDonation)
+// POST /api/rent { donateId, job, level, weapon, options, enhance, term, price, note } -> 물건 더하기 (운영진). 기부함에서 '장비대여 운용'으로 넘어온 기부(donate_items)만 (제작자 2026-11-10
+//   '기부함에서 통합 관리, 기부함에서 장비대여 운용 버튼 누르면 장비대여 쪽 리스트로', '기부자 닉네임을 장비대여 물건 추가에서 안 해도 돼, 기부함에서 넘어온 데이터만'). 기부자는 그 기부의 사람, 마일리지는 기부함이 이미 줬다
 // 제작자 요청 2026-11-01, 신청서·줄·대화창 2026-11-02. 2026-11-02 길드원에게 열었다 (server/rental.ts RENT_OPEN)
 import { FORBIDDEN, NEED_LOGIN, TEST_IDS, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { DIA_GOLD, termDays, canEnter, checkItem, donations, donorDiaOf, expectedTimes, isManager, mileageOf, setDonation } from "../../../server/rental";
+import { DIA_GOLD, termDays, canEnter, checkItem, donations, expectedTimes, isManager, mileageOf } from "../../../server/rental";
 import type { QueueRow, RentalRow } from "../../../server/rental";
 
 interface ReqRow {
@@ -176,7 +177,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   };
   if (manager) {
     // 사람마다 마일리지 (묶은 캐릭터는 본캐 하나로, 앱에 없는 기부자는 닉네임 그대로)와 닉네임 고르기 목록
-    const [balR, usersR] = await env.DB.batch([
+    const [balR, usersR, giftR] = await env.DB.batch([
       env.DB.prepare(
         // 기부 현황 (제작자 요청 2026-11-02: 운영 '기부 현황'): 남은 💎, 기부로 적립한 💎, 기부 건수 (물건으로 적립한 것은 물건마다 한 번, 손으로 적립한 것은 줄마다)
         "SELECT COALESCE(u.main_id, u.id, m.who) AS person, SUM(m.delta) AS dia, MAX(m.created_at) AS at, " +
@@ -185,8 +186,13 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
           "FROM rental_mileage m LEFT JOIN users u ON u.id = m.who GROUP BY person ORDER BY donated DESC, dia DESC",
       ),
       env.DB.prepare("SELECT id FROM users ORDER BY id"),
+      // 기부함에서 '장비대여 운용'으로 넘어와 아직 목록에 안 올린 기부 (물건 추가에서 고른다)
+      env.DB.prepare(
+        "SELECT id, who, item, qty, enhance, gold, note, done_at AS at FROM donate_items WHERE status = 'done' AND place = 'rent' AND rental_id IS NULL ORDER BY done_at, id",
+      ),
     ]);
     out.balances = balR.results;
+    out.donated = giftR.results;
     out.members = (usersR.results as { id: string }[]).map((r) => r.id).filter((id) => !TEST_IDS.includes(id));
   }
   return json(out, 200, { "cache-control": "no-store" });
@@ -197,12 +203,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!me) return NEED_LOGIN();
   if (!canEnter(me) || !isManager(me)) return FORBIDDEN();
   const body = await readJson<Record<string, unknown>>(request);
-  const checked = checkItem(body);
+  const donateId = Number(body.donateId);
+  const gift = Number.isInteger(donateId)
+    ? await env.DB.prepare("SELECT who FROM donate_items WHERE id = ? AND status = 'done' AND place = 'rent' AND rental_id IS NULL")
+        .bind(donateId)
+        .first<{ who: string }>()
+    : null;
+  if (!gift) return json({ error: "기부함에서 넘어온 물건을 골라 주세요" }, 409);
+  const checked = checkItem({ ...body, donor: gift.who });
   if ("error" in checked) return json({ error: checked.error }, 400);
   const it = checked.item;
-  const dia = donorDiaOf(body);
-  if (dia === null) return json({ error: "기부 💎 가 맞지 않아요" }, 400);
-  if (dia > 0 && !it.donor) return json({ error: "기부한 사람을 적어 주세요" }, 400);
   const now = Date.now();
   const r = await env.DB.prepare(
     "INSERT INTO rental_items (job, level, weapon, options, enhance, term, price, donor, note, status, created_at, updated_at, updated_by) " +
@@ -211,6 +221,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .bind(it.job, it.level, it.weapon, it.options, it.enhance, it.term, it.price, it.donor, it.note, now, now, me.id)
     .run();
   const id = Number(r.meta.last_row_id);
-  const err = dia > 0 ? await setDonation(env, { id, weapon: it.weapon, enhance: it.enhance }, it.donor, dia, me.id) : null;
-  return json({ id, ...(err ? { warning: err } : {}) });
+  // 두 사람이 같은 기부를 동시에 올리면 먼저 잇는 쪽만 (나머지는 지운다)
+  const link = await env.DB.prepare("UPDATE donate_items SET rental_id = ? WHERE id = ? AND rental_id IS NULL").bind(id, donateId).run();
+  if (!link.meta.changes) {
+    await env.DB.prepare("DELETE FROM rental_items WHERE id = ?").bind(id).run();
+    return json({ error: "이미 장비대여에 올린 기부예요" }, 409);
+  }
+  return json({ id });
 };

@@ -1,10 +1,10 @@
-// PUT /api/rent/:id { job, level, weapon, options, enhance, term, price, donor, donorDia, note, dueAt? } -> 물건 고치기 (운영진). 기부 💎 는 이미 적립한 만큼과의 차이만 장부에.
+// PUT /api/rent/:id { job, level, weapon, options, enhance, term, price, note, dueAt? } -> 물건 고치기 (운영진). 기부자와 마일리지는 기부함에서만 (제작자 2026-11-10), 여기서는 그대로 둔다.
 //   대여 중이면 dueAt(ms, 기한 없으면 null)으로 반납 기한도 고친다 (제작자 요청 2026-11-02: 기한을 조정하는 곳이 없다). 바뀌면 빌린 사람에게 알림
 // DELETE /api/rent/:id -> 목록에서 내리기 (운영진. 기록은 남기고 status 'gone', 기다리던 신청은 거절하고 알린다)
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, paramId, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { notify } from "../../../server/alerts";
-import { canEnter, checkItem, donorDiaOf, isManager, itemLabel, setDonation } from "../../../server/rental";
+import { canEnter, checkItem, isManager, itemLabel } from "../../../server/rental";
 import type { RentalRow } from "../../../server/rental";
 
 export const onRequestPut: PagesFunction<Env> = async ({ request, env, params }) => {
@@ -13,14 +13,11 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
   if (!canEnter(me) || !isManager(me)) return FORBIDDEN();
   const id = Number(paramId(params));
   const body = await readJson<Record<string, unknown>>(request);
-  const checked = checkItem(body);
-  if ("error" in checked) return json({ error: checked.error }, 400);
-  const it = checked.item;
-  const dia = donorDiaOf(body);
-  if (dia === null) return json({ error: "기부 💎 가 맞지 않아요" }, 400);
-  // 마일리지를 먼저 맞춘다 (이미 써서 뺄 수 없으면 물건도 고치지 않는다)
   const exists = await env.DB.prepare("SELECT * FROM rental_items WHERE id = ? AND status = 'open'").bind(id).first<RentalRow>();
   if (!exists) return json({ error: "없는 물건이에요" }, 404);
+  const checked = checkItem({ ...body, donor: exists.donor ?? "" });
+  if ("error" in checked) return json({ error: checked.error }, 400);
+  const it = checked.item;
   // 반납 기한 (대여 중일 때만): null 이면 기한 없음, 숫자면 빌린 때보다 뒤
   let due = exists.due_at;
   if (exists.renter && "dueAt" in body) {
@@ -29,8 +26,6 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
     else if (Number.isInteger(v) && (v as number) > (exists.rented_at ?? 0) && (v as number) < Date.now() + 400 * 86_400_000) due = v as number;
     else return json({ error: "반납 기한이 맞지 않아요" }, 400);
   }
-  const err = await setDonation(env, { id, weapon: it.weapon, enhance: it.enhance }, it.donor, dia, me.id);
-  if (err) return json({ error: err }, 400);
   const r = await env.DB.prepare(
     "UPDATE rental_items SET job = ?, level = ?, weapon = ?, options = ?, enhance = ?, term = ?, price = ?, donor = ?, note = ?, due_at = ?, updated_at = ?, updated_by = ? " +
       "WHERE id = ? AND status = 'open'",

@@ -20,6 +20,23 @@ import { WEEK, weekStart } from "./week";
  * 화면 launcher.ts 의 GCOIN_OPEN_AT·canGcoin 과 같이 바꾼다. 첫 주간 목표 판도 이때 시작한다 (server/gcrace.ts) */
 export const GCOIN_OPEN_AT = Date.UTC(2026, 10, 11, 2);
 export const gcoinOpen = (now = Date.now()) => now >= GCOIN_OPEN_AT;
+
+/**
+ * 오픈 때 시험 자료를 비운다 (제작자 2026-11-10 '11시 오픈일 때는 테스트 데이터 싹 빼고 오픈'): 오픈 전에 생긴 구매 신청·코인 장부·연속 기록.
+ * 담당자가 미리 정해 둔 첫 판 목표(gc_targets)와 물건·설정은 그대로. 오픈 뒤 처음 부르는 한 곳만 (setup 'gcoin_open_clean_20261111')
+ */
+export async function openCleanup(env: Env): Promise<void> {
+  if (!gcoinOpen()) return;
+  const KEY = "gcoin_open_clean_20261111";
+  if (await env.DB.prepare("SELECT 1 AS x FROM setup WHERE key = ?").bind(KEY).first()) return;
+  const r = await env.DB.prepare("INSERT OR IGNORE INTO setup (key, done_at) VALUES (?, ?)").bind(KEY, Date.now()).run();
+  if (!r.meta.changes) return;
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM gc_orders WHERE created_at < ?").bind(GCOIN_OPEN_AT),
+    env.DB.prepare("DELETE FROM gc_ledger WHERE created_at < ?").bind(GCOIN_OPEN_AT),
+    env.DB.prepare("DELETE FROM gc_streak"),
+  ]);
+}
 /** 레벨·경험치마다 코인 (김다혜 2026-11-09 시범운영 '레벨별 코인은 일단 빼고 선착순만, 레벨 구간별 보너스는 나중에'):
  *  끄면 지갑의 성장·첫 달성 보너스가 0, 주간 순위·연속 보너스 정산도 쉰다. 코인은 2주 목표 선착순 상금(server/gcrace.ts)과 조정만 */
 export const LEVEL_COINS = false;

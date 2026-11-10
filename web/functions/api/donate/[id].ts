@@ -3,13 +3,13 @@
 //   edit    { item, qty, enhance, note, gold }      운영진: 확인 전·확정한 줄 고치기 (확정한 줄은 마일리지를 맞춘다). 신청한 사람: 확인 전 내 신청 고치기 (gold 는 내가 적는 가치)
 //   reject                                         운영진: 신청 거절
 //   place   { place: keep | used }                 운영진: 받은 템을 보관 / 나눔·사용
-//   rent    { job, level, term, price }            운영진: 장비대여 물건으로 넘기기 (rental_items, 마일리지는 이미 줬으니 장비대여 기부 💎 는 0)
+//   rent    { undo? }                              운영진: 장비대여 운용 (장비대여 '물건 추가' 목록으로 넘긴다, undo 면 보관으로)
 // DELETE /api/donate/:id  운영진: 지우기 (확정한 줄이면 그만큼 마일리지를 뺀다). 신청한 사람: 확인 전 내 신청 취소
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { canManageDonate, canUseDonate, donateLabel, earnedDia, goldText, notifyDonor, readDonate, syncDia } from "../../../server/donate";
 import type { DonateRow } from "../../../server/donate";
-import { checkItem } from "../../../server/rental";
+import { notifyManagers } from "../../../server/rental";
 
 async function rowOf(env: Env, id: number) {
   return env.DB.prepare("SELECT * FROM donate_items WHERE id = ?").bind(id).first<DonateRow>();
@@ -91,27 +91,25 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
 
   if (b.action === "place") {
     if (row.status !== "done") return json({ error: "확정한 기부만 돼요" }, 409);
+    if (row.rental_id) return json({ error: "장비대여에 올린 물건이에요" }, 409);
     const place = b.place === "used" ? "used" : "keep";
     await env.DB.prepare("UPDATE donate_items SET place = ? WHERE id = ?").bind(place, id).run();
     return json({ ok: true });
   }
 
-  // 장비대여로 넘기기 (제작자 '여기서 기부한 거도 장비대여용으로 쓴다 하면 장비대여 쪽으로 넘길 수 있게')
+  // 장비대여 운용 (제작자 2026-11-10 '기부함에서 장비대여 운용 버튼 누르면 장비대여 쪽 리스트로'): 넘기기만 하고, 직업·레벨·기한·💎 가격은 장비대여 '물건 추가'에서 이 기부를 골라 정한다.
+  // undo: 아직 장비대여에 안 올렸으면 보관으로 되돌린다
   if (b.action === "rent") {
     if (row.status !== "done") return json({ error: "확정한 기부만 돼요" }, 409);
-    if (row.place === "rent" && row.rental_id) return json({ error: "이미 장비대여로 넘겼어요" }, 409);
-    const checked = checkItem({ ...b, weapon: row.item, enhance: row.enhance, options: "", donor: row.who, note: "기부함에서" });
-    if ("error" in checked) return json({ error: checked.error }, 400);
-    const it = checked.item;
-    const r = await env.DB.prepare(
-      "INSERT INTO rental_items (job, level, weapon, options, enhance, term, price, donor, note, status, created_at, updated_at, updated_by) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)",
-    )
-      .bind(it.job, it.level, it.weapon, it.options, it.enhance, it.term, it.price, it.donor, it.note, now, now, me.id)
-      .run();
-    const rentalId = Number(r.meta.last_row_id);
-    await env.DB.prepare("UPDATE donate_items SET place = 'rent', rental_id = ? WHERE id = ?").bind(rentalId, id).run();
-    return json({ ok: true, rentalId });
+    if (row.rental_id) return json({ error: "이미 장비대여에 올렸어요" }, 409);
+    if (b.undo === true) {
+      await env.DB.prepare("UPDATE donate_items SET place = 'keep' WHERE id = ? AND rental_id IS NULL").bind(id).run();
+      return json({ ok: true });
+    }
+    if (row.place === "rent") return json({ error: "이미 장비대여로 넘겼어요" }, 409);
+    await env.DB.prepare("UPDATE donate_items SET place = 'rent' WHERE id = ?").bind(id).run();
+    await notifyManagers(env, `🎁 기부함에서 장비대여로 · ${donateLabel(row)} (기부 ${row.who}) · 물건 추가에서 올려 주세요`, me.id);
+    return json({ ok: true });
   }
 
   return json({ error: "잘못된 요청이에요" }, 400);

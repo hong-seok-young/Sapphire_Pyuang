@@ -298,7 +298,7 @@ export function RentalPage({
                 : p === "back"
                   ? `장비반납 ${lent.length}`
                   : p === "add"
-                    ? "물건 추가"
+                    ? `물건 추가 ${data.donated?.length ?? 0}`
                     : "기부 현황"}
               {p === "back" && <NewsDot n={backAsked} />}
             </button>
@@ -339,12 +339,7 @@ export function RentalPage({
               <p className="rent-muted">빌려 간 무기가 없어요</p>
             ))}
           {panel === "add" && (
-            <ItemForm
-              wiki={wiki}
-              data={data}
-              start={{ job }}
-              onDone={() => (setPanel("apps"), void load())}
-            />
+            <AddFromDonation wiki={wiki} data={data} job={job} onDone={() => void load()} />
           )}
           {panel === "mileage" && (
             <DonationPanel wiki={wiki} data={data} onDone={() => void load()} />
@@ -660,7 +655,6 @@ function ItemPopup({
           (editing ? (
             <ItemForm
               wiki={wiki}
-              data={data}
               start={item}
               onDone={() => (setEditing(false), onDone())}
             />
@@ -1409,16 +1403,67 @@ function NameInput({
   );
 }
 
-/** 물건 더하기·고치기. 기부 💎 를 적으면 기부자 마일리지에 쌓인다 (고치면 차이만, 제작자 요청 2026-11-02) */
+/**
+ * 물건 추가 (제작자 2026-11-10 '기부함에서 장비대여 운용 버튼 누르면 장비대여 쪽 리스트로', '물건 추가도 기부된 걸 눌러서', '기부자 닉네임을 장비대여 물건 추가에서 안 해도 돼'):
+ * 기부함에서 넘어온 기부를 누르면 그 물건으로 칸이 채워지고 직업·레벨·옵션·기한·💎 가격만 정한다
+ */
+function AddFromDonation({ wiki, data, job, onDone }: { wiki: Wiki; data: RentData; job: Job; onDone: () => void }) {
+  const [pick, setPick] = useState<number | null>(null);
+  const list = data.donated ?? [];
+  if (!list.length) return <p className="rent-muted">기부함에서 넘어온 물건이 없어요</p>;
+  return (
+    <ul className="rent-gifts">
+      {list.map((g) => {
+        const it = weaponOf(wiki, g.item);
+        const on = pick === g.id;
+        return (
+          <li key={g.id} className={"rent-gift" + (on ? " rent-gift-on" : "")}>
+            <button className="rent-gift-btn" onClick={() => setPick(on ? null : g.id)}>
+              <span className="rent-gift-pic">{it?.icon ? <PicImg pic={it.icon} fit={22} /> : null}</span>
+              <span className="rent-gift-name">
+                <b>
+                  {g.enhance > 0 ? `+${g.enhance} ` : ""}
+                  {g.item}
+                  {g.qty > 1 ? ` x${g.qty}` : ""}
+                </b>
+                <small>
+                  기부 <Nick name={g.who} />
+                  {g.note ? ` · ${g.note}` : ""}
+                </small>
+              </span>
+            </button>
+            {on && (
+              <ItemForm
+                wiki={wiki}
+                donateId={g.id}
+                start={{
+                  job: it ? wikiJobs(it).join(",") || job : job,
+                  level: Number(it?.equip?.[0]?.info["레벨제한"]) || 1,
+                  weapon: it?.name ?? g.item,
+                  enhance: g.enhance,
+                  donor: g.who,
+                }}
+                onDone={() => (setPick(null), onDone())}
+              />
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** 물건 더하기·고치기. 기부자와 마일리지는 기부함에서만 (제작자 2026-11-10), 여기서는 보이기만 */
 function ItemForm({
   wiki,
-  data,
   start,
+  donateId,
   onDone,
 }: {
   wiki: Wiki;
-  data: RentData;
   start: Partial<RentItem>;
+  /** 새 물건: 기부함에서 넘어온 기부 */
+  donateId?: number;
   onDone: () => void;
 }) {
   const [f, setF] = useState<RentFields>({
@@ -1429,11 +1474,8 @@ function ItemForm({
     enhance: start.enhance ?? 6,
     term: start.term ?? "none",
     price: start.price ?? 1,
-    donor: start.donor ?? "",
-    donorDia: start.donorDia ?? 0,
     note: start.note ?? "",
   });
-  const [warning, setWarning] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [reading, setReading] = useState(false);
@@ -1566,13 +1608,7 @@ function ItemForm({
     try {
       if (start.id)
         await editRent(start.id, f, rentedAt !== null ? due : undefined);
-      else {
-        const r = await addRent(f);
-        if (r.warning) {
-          setWarning(r.warning);
-          return;
-        }
-      }
+      else if (donateId) await addRent(donateId, f);
       onDone();
     } catch (e) {
       setError(errorText(e));
@@ -1782,56 +1818,7 @@ function ItemForm({
           />
         </label>
       )}
-      {/* 기부한 사람과 그 사람에게 적립할 마일리지 */}
-      <div className="rent-donor">
-        <label className="mk-field">
-          <span>기부</span>
-          <input
-            className="mk-input"
-            maxLength={20}
-            value={f.donor}
-            onChange={(e) => set("donor", e.target.value)}
-            placeholder="닉네임"
-          />
-        </label>
-        <Num
-          label="기부 💎"
-          value={f.donorDia}
-          min={0}
-          max={9999}
-          onChange={(v) => set("donorDia", v)}
-        />
-      </div>
-      {(() => {
-        const q = f.donor.trim().toLowerCase();
-        const hits = q
-          ? (data.members ?? [])
-              .filter((m) => m.toLowerCase().includes(q) && m !== f.donor)
-              .slice(0, 6)
-          : [];
-        return hits.length > 0 ? (
-          <div className="mk-chips">
-            {hits.map((m) => (
-              <button
-                key={m}
-                type="button"
-                className="pill"
-                onClick={() => set("donor", m)}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-        ) : null;
-      })()}
-      {f.donorDia > 0 && (
-        <p className="rent-muted">
-          {f.donor.trim() || "기부자"} 님 마일리지에 💎{f.donorDia}
-          {start.id && start.donorDia
-            ? ` (지금까지 💎${start.donorDia}, 차이만 적립)`
-            : ""}
-        </p>
-      )}
+      {start.donor && <p className="rent-muted">기부 <Nick name={start.donor} /></p>}
       <label className="mk-field">
         <span>메모</span>
         <input
@@ -1841,12 +1828,11 @@ function ItemForm({
           onChange={(e) => set("note", e.target.value)}
         />
       </label>
-      {warning && <p className="form-error">{warning}</p>}
       <div className="mk-actions">
         <button
           className="btn"
           disabled={
-            busy || !f.weapon.trim() || (f.donorDia > 0 && !f.donor.trim())
+            busy || !f.weapon.trim() || (!start.id && !donateId)
           }
           onClick={() => void save()}
         >
@@ -2224,14 +2210,6 @@ function DonationPanel({
           기부 <b>{donors.filter((b) => b.count > 0).length}</b>명 · 적립{" "}
           <b>💎{donated}</b> · 남은 <b>💎{left}</b>
         </span>
-        <button
-          className={"pill" + (form && !form.who ? " pill-on" : "")}
-          onClick={() =>
-            setForm(form && !form.who ? null : { who: "", mode: "donate" })
-          }
-        >
-          기부 적립
-        </button>
       </div>
       {form && !form.who && (
         <DonationForm
@@ -2304,7 +2282,8 @@ function DonationPanel({
                     <p className="rent-muted">불러오는 중…</p>
                   )}
                   <div className="pill-row">
-                    {(["donate", "adjust", "minus"] as const).map((m) => (
+                    {/* 기부 적립은 기부함에서만 (제작자 2026-11-10 '기부함에서 통합 관리') */}
+                    {(["adjust", "minus"] as const).map((m) => (
                       <button
                         key={m}
                         className={
