@@ -626,8 +626,6 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
     ["딸기빙수", "20개", 0, null],
     ["꿀사과", "20개", 0, null],
     ["알사탕", "20개", 0, null],
-    ["칠면조 구이", "20개", 0, null],
-    ["송편", "20개", 0, null],
     ["자라의노래", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 경험치 30% 증가"],
   ];
   const RANK = [5, 4, 3, 2, 1];
@@ -681,8 +679,6 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
       ["딸기빙수", "20개", 0, null],
       ["꿀사과", "20개", 0, null],
       ["알사탕", "20개", 0, null],
-      ["칠면조 구이", "20개", 0, null],
-      ["송편", "20개", 0, null],
       ["자라의노래", "20개", 0, "쿨타임 5초 · 20분 동안 지속: 경험치 30% 증가"],
     ];
     runSql([
@@ -795,5 +791,17 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
     ]);
     const n = queryFirst(`SELECT COUNT(*) AS n FROM alerts WHERE kind = 'rent' AND created_at = ${now}`)?.n ?? 0;
     console.log(`예전 기부 마일리지 알림 ${n}명 (한 번)`);
+  }
+}
+
+// 성장코인샵에서 칠면조 구이·송편 빼기 (제작자 2026-11-10 '칠면조구이 송편은 빼'). 오픈 전이라 신청은 없다. setup 'gcoin_drop_turkey_songpyeon_20261110' 로 한 번만
+{
+  const KEY = "gcoin_drop_turkey_songpyeon_20261110";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    runSql([
+      "DELETE FROM gc_items WHERE replace(name, ' ', '') IN ('칠면조구이', '송편');",
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
+    ]);
+    console.log("성장코인샵 칠면조 구이·송편 뺌 (한 번)");
   }
 }
