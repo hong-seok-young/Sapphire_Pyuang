@@ -5285,3 +5285,39 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 .dex-price small { font-size: 10.5px; color: var(--text); overflow-wrap: anywhere; }
 .dex-price b { color: #fff; }
 .dex-price .dex-rec { color: var(--gold); }
+
+/* 데미지 계산기 (개발중, pages/Damage.tsx): 내 무기는 강화 비교 칸 그대로, 상대 방어구는 부위마다 한 줄 (부위 · 장비 · − +N + · 방어도) */
+.dmg-armor { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.dmg-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dmg-head > b:first-child { font-size: 13px; }
+.dmg-total { font-size: 18px; color: var(--gold); }
+.dmg-clear { margin-left: auto; padding: 2px 8px; font-size: 12px; }
+.dmg-jobs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin: 0; padding: 4px; }
+.dmg-jobs .sub-tab { padding: 4px 1px; font-size: 12px; }
+.dmg-rows { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.dmg-row { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto 30px; align-items: center; gap: 4px; min-width: 0; min-height: 26px; padding: 1px 3px; background: var(--lo); }
+.dmg-row-on { outline: 2px solid var(--sapphire); outline-offset: -2px; }
+.dmg-slot { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.dmg-item { display: flex; align-items: center; gap: 4px; min-width: 0; height: 24px; padding: 0 4px; font-size: 12px; text-align: left; background: none; border: 0; box-shadow: none; color: inherit; }
+.dmg-item:active { transform: scale(0.98); }
+.dmg-item > span { min-width: 0; overflow-wrap: anywhere; line-height: 1.15; }
+.dmg-item-empty { color: var(--muted); }
+.dmg-def { text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; }
+.dmg-extra { min-width: 0; width: 100%; height: 24px; font-size: 16px; padding: 0 6px; }
+.dmg-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; max-height: 240px; overflow-y: auto; padding: 4px; border: 2px solid var(--sapphire); background: var(--lo); animation: enh-unfold 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.dmg-opt { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 4px; align-items: center; min-width: 0; padding: 3px 5px; font-size: 12px; line-height: 1.2; text-align: left; }
+.dmg-opt > :first-child:not(span) { grid-row: span 2; }
+.dmg-opt small { grid-column: 2; font-size: 10px; color: var(--muted); white-space: nowrap; }
+.dmg-opt-on { outline: 2px solid var(--gold); outline-offset: -2px; }
+.dmg-result { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.dmg-res-top { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.dmg-res-top .enh-big { font-size: 20px; line-height: 1.1; }
+.dmg-bars { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.dmg-bar { display: grid; grid-template-columns: 40px auto minmax(0, 1fr) auto; align-items: center; gap: 4px; font-size: 10px; color: var(--muted); }
+.dmg-bar small { white-space: nowrap; }
+.dmg-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.dmg-table th { font-weight: normal; font-size: 11px; color: var(--muted); padding: 2px 4px; text-align: right; }
+.dmg-table td { padding: 3px 4px; text-align: right; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.dmg-table th:first-child, .dmg-table td:first-child { text-align: left; }
+.dmg-tr-on td { color: var(--gold); }
+@media (prefers-reduced-motion: reduce) { .dmg-list { animation: none; } }

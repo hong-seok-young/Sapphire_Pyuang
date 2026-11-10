@@ -86,6 +86,7 @@ export const TITLE_EN: Record<string, string> = {
   "사파이어 중개인": "SAPPHIRE BROKER",
   게시판: "NOTICE BOARD",
   "강화 비교": "WEAPON COMPARE",
+  "데미지 계산기": "DAMAGE CALC",
   "개발 요청": "DEV REQUEST",
   건의함: "SUGGESTION BOX",
   "확률 시뮬레이터": "LUCK SIMULATOR",

@@ -122,6 +122,8 @@ export const ITEMS: LaunchItem[] = [
   { key: "gcoin", title: "성장코인샵", short: "코인샵", to: "#/gcoin", icon: "🪙", ribbon: "2군 전용", ring: "silver", corner: ["담당자", "유어아너"], managers: !GCOIN_OPEN, soon: !GCOIN_OPEN, badge: "개발중", match: ["gcoin"] },
   { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
   // 도감 계산기 (개발중, 제작자 요청 2026-11-10: 게임 도감 항목을 웹에서 정리, 제작자 도감 영상에서 옮긴 자료). 개발 중 묶음 (미리 보는 사람만, pages/Dex.tsx)
+  // 데미지 계산기 (개발중, 제작자 요청 2026-11-11 '데미지 계산기' + 카페 글 331187 기본 데미지 산출공식): 내 무기·강화와 상대 방어도로 방어도/5 를 뺀 기본 데미지 (pages/Damage.tsx)
+  { key: "damage", title: "데미지 계산기", short: "데미지", to: "#/damage", icon: "🎯", soon: true, badge: "개발중", match: ["damage"] },
   { key: "dex", title: "도감 계산기", short: "도감", to: "#/dex", icon: "📖", soon: true, badge: "개발중", match: ["dex"] },
   // 헬스 루틴 (개발중, 길드원 완뻔치 님 개발 요청 #8, 제작자 2026-11-09 '플릭 같은 헬스 어플'): 실제 헬스장 운동 기록 (pages/Fit.tsx). 게임과 상관없다
   { key: "fit", title: "헬스 루틴", short: "헬스", to: "#/fit", icon: "🏋️", developer: !FIT_OPEN, soon: !FIT_OPEN, badge: "개발중", match: ["fit"] },
@@ -213,7 +215,7 @@ function build(dock: string[], slots: string[], search: boolean): Layout {
 /** 처음 배치 (제작자 요청 2026-11-02: 제작자 폰의 배치 그대로 '이걸 기본 배치로') */
 export const DEFAULT_LAYOUT: Layout = {
   dock: ["home", "board", "info", "search", "chat"],
-  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "trend", "dex", "enhance", "sim", "simtest", "devreq", "suggest", "fit", "app", "smack", "gcoin", "donate", "hall"],
+  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "trend", "dex", "enhance", "damage", "sim", "simtest", "devreq", "suggest", "fit", "app", "smack", "gcoin", "donate", "hall"],
 };
 
 /**

@@ -43,6 +43,8 @@ def main() -> None:
         "common": common,
         "mage": {k: v for k, v in mage.items()},
         "weapons": weapons,
+        # 방어구 기본 방어도(1~30)마다 +0~+15 방어도 (엑셀 '강화 가산치' 시트, 카페 글 331187 의 공식 표와 같다). 데미지 계산기 (pages/Damage.tsx)
+        "armor": {k: v for k, v in bonus.get("방어도", {}).items()},
     }
     OUT.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print("강화 비교", {"무기": len(weapons), "직업": {j: sum(w["job"] == j for w in weapons) for j in ("전사", "레인저", "마법사", "무도가")}})
