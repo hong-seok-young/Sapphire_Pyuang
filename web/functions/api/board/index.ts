@@ -50,7 +50,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const order = before === 0 && !q ? "p.pinned DESC, p.id DESC" : "p.id DESC";
   const { results } = await env.DB.prepare(
     "SELECT p.id, p.cat, p.author, p.title, substr(p.body, 1, 120) AS snippet, p.pinned, p.anon, p.created_at AS at, " +
-      "CASE WHEN p.cat = 'suggest' THEN COALESCE(p.sg_status, 'agree') END AS sg, (SELECT COUNT(*) FROM suggest_steps s WHERE s.post_id = p.id AND s.kind = 'agree') AS sgAgrees, " +
+      "CASE WHEN p.cat = 'suggest' THEN COALESCE(p.sg_status, 'agree') END AS sg, (SELECT COUNT(*) FROM suggest_steps s WHERE s.post_id = p.id AND s.kind = 'agree' AND s.id > COALESCE((SELECT MAX(r.id) FROM suggest_steps r WHERE r.post_id = p.id AND r.kind = 'resubmit'), 0)) AS sgAgrees, " +
       "(SELECT COUNT(*) FROM board_comments c WHERE c.post_id = p.id) AS comments, " +
       "(SELECT COUNT(*) FROM board_likes l WHERE l.post_id = p.id) AS likes, " +
       "(SELECT COUNT(*) FROM board_views v WHERE v.post_id = p.id) AS views, " +

@@ -63,7 +63,7 @@ export const cleanName = (n: string) => n.replace(/[\\/\u0000-\u001f]/g, "_").sl
  * 건의함 오픈 (화면 src/board.ts 의 SUGGEST_OPEN 과 같이 바꾼다): false 인 동안 게시판에 '건의 사항' 칸이 그대로 있고 건의함은 개발 중(미리 보는 사람만).
  * true 면 게시판 '전체'에서 건의 글을 빼고, 건의 알림이 건의함 글로 간다
  */
-export const SUGGEST_OPEN = false;
+export const SUGGEST_OPEN = true;
 
 /** 익명이라고 보일 이름 */
 export const ANON_NAME = "익명";

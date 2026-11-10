@@ -8,7 +8,7 @@ import { RANK } from "./auth";
 import { notify } from "./alerts";
 
 export type SgStatus = "agree" | "accepted" | "done" | "rejected";
-export type SgKind = "agree" | "approve" | "skip" | "force" | "reject" | "done";
+export type SgKind = "agree" | "approve" | "skip" | "force" | "reject" | "done" | "resubmit";
 export const SG_NOTE_MAX = 300;
 
 export interface SgStep {
@@ -22,6 +22,9 @@ export interface SgStep {
 export const sgRole = (me: User) => ({ agree: me.role === "officer", approve: me.role === "master", done: RANK[me.role] >= 1 });
 
 export const sgStatusOf = (s: string | null | undefined): SgStatus => (s === "accepted" || s === "done" || s === "rejected" ? s : "agree");
+
+/** 이번 차례의 이력 (반려 뒤 고쳐서 다시 올리면 그 뒤부터 새 차례) */
+export const currentRound = (steps: SgStep[]) => steps.slice(steps.map((s) => s.kind).lastIndexOf("resubmit") + 1);
 
 export async function sgSteps(env: Env, postId: number): Promise<SgStep[]> {
   const { results } = await env.DB.prepare("SELECT user_id, kind, note, created_at FROM suggest_steps WHERE post_id = ? ORDER BY id").bind(postId).all<SgStep>();

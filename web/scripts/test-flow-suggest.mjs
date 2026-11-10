@@ -35,7 +35,12 @@ const lastAlert = async (id, re) => ((await api(id, "/api/alerts")).j.alerts ?? 
 for (const u of [MEMBER, OFFICER, OFFICER2, MASTER]) await login(u);
 const made = [];
 const post = async (who, title, anon = false) => {
-  const r = await api(who, "/api/board", "POST", { cat: "suggest", title, body: "흐름 시험", anon });
+  let r = await api(who, "/api/board", "POST", { cat: "suggest", title, body: "흐름 시험", anon });
+  // 게시판은 1분에 3개까지 올린다: 막히면 1분 기다렸다 다시
+  if (r.s === 429) {
+    await new Promise((res) => setTimeout(res, 61_000));
+    r = await api(who, "/api/board", "POST", { cat: "suggest", title, body: "흐름 시험", anon });
+  }
   made.push([who, r.j.id]);
   return r.j.id;
 };
@@ -74,7 +79,25 @@ try {
   ok((await act(MASTER, C, "force", "그래도 합니다")).s === 200 && (await flow(C)).status === "accepted", "길마 강제 결재 -> 접수 완료");
   ok(!!(await lastAlert(OFFICER, /\[강제 결재\] 반려하신 건의를/)), "반려한 오피서에게 강제 결재 알림");
 
-  // 4) 오피서는 자기 건의에 합의 못 함, 길드원은 남의 건의를 못 봄
+  // 4) 반려 -> 올린 사람이 고쳐서 다시 올리기 -> 새 차례로 합의부터
+  const E = await post(MEMBER, "결재 시험 E");
+  ok((await act(OFFICER, E, "agree", "일단 합의")).s === 200, "합의 하나");
+  ok((await act(OFFICER2, E, "reject", "조금 더 자세히 적어 주세요")).s === 200, "다른 오피서가 반려");
+  ok((await act(OFFICER, E, "resubmit")).s === 403, "다시 올리기는 올린 사람만");
+  ok((await api(MEMBER, `/api/board/${E}`, "PATCH", { title: "결재 시험 E (고침)", body: "자세히 적었어요" })).s === 200, "올린 사람이 수정");
+  ok((await act(MEMBER, E, "resubmit", "고쳤어요")).s === 200 && (await flow(E)).status === "agree", "다시 올리기 -> 합의 대기");
+  ok((await api(MEMBER, "/api/board?cat=suggest&mine=1")).j.posts.find((p) => p.id === E)?.sgAgrees === 0, "새 차례는 합의 0부터");
+  ok(!!(await lastAlert(OFFICER, /\[건의 다시 접수 · 오피서 합의\]/)), "오피서에게 다시 접수 알림");
+  ok((await act(MASTER, E, "approve")).s === 409, "앞 차례 합의로는 결재 못 함");
+  ok((await act(OFFICER, E, "agree")).s === 200, "같은 오피서가 새 차례에 다시 합의");
+  ok((await act(MASTER, E, "approve")).s === 200 && (await flow(E)).status === "accepted", "길마 결재 -> 접수 완료");
+  ok((await act(MEMBER, E, "resubmit")).s === 409, "반려가 아니면 다시 올리기 막힘");
+
+  // 5) 게시판에서 건의가 빠졌는지 (건의함으로만)
+  const all = (await api(OFFICER2, "/api/board")).j.posts.map((p) => p.cat);
+  ok(!all.includes("suggest"), "게시판 '전체'에 건의 없음");
+
+  // 6) 오피서는 자기 건의에 합의 못 함, 길드원은 남의 건의를 못 봄
   const D = await post(OFFICER, "결재 시험 D");
   ok((await act(OFFICER, D, "agree")).s === 409, "자기 건의에 합의 막힘");
   ok((await act(MEMBER, D, "agree")).s === 404, "길드원은 남의 건의를 못 봄");
