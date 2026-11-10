@@ -33,7 +33,8 @@ export const earnedDia = (gold: number) => (gold * MILEAGE_RATE) / DIA_GOLD;
 export const NOTE_HEAD = "기부함 · ";
 
 /** hall = 기부함 전의 예전 기부 (제작자가 준 기부자별 내역, scripts/donate-hall-seed.mjs). 확정 기부와 같이 마일리지에 들고(syncDia), 운영의 받은 템 목록에는 안 나온다 */
-export type DonateStatus = "request" | "done" | "rejected" | "removed" | "hall";
+/** honor = 장비대여 목록의 기부자 (기부함 전, 명예의 전당·기부 내역에만, 마일리지에는 안 든다. 제작자 2026-11-10 '장비대여에만 있는 기부자도 명예의 전당에') */
+export type DonateStatus = "request" | "done" | "rejected" | "removed" | "hall" | "honor";
 export type DonatePlace = "keep" | "rent" | "used";
 export interface DonateRow {
   id: number;
@@ -168,7 +169,7 @@ export interface GiftLine {
  */
 export async function hallOfFame(env: Env, since = 0): Promise<{ rows: HallRow[]; lines: GiftLine[] }> {
   const box = await env.DB.prepare(
-    "SELECT id, who, item, qty, enhance, gold, dia, place, COALESCE(done_at, created_at) AS at FROM donate_items WHERE status IN ('done', 'hall') AND COALESCE(done_at, created_at) >= ? ORDER BY at DESC",
+    "SELECT id, who, item, qty, enhance, gold, dia, place, COALESCE(done_at, created_at) AS at FROM donate_items WHERE status IN ('done', 'hall', 'honor') AND COALESCE(done_at, created_at) >= ? ORDER BY at DESC",
   )
     .bind(since)
     .all<{ id: number; who: string; item: string; qty: number; enhance: number; gold: number; dia: number; place: DonatePlace; at: number }>();
