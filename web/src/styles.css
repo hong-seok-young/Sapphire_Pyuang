@@ -5336,3 +5336,36 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 /* 데미지 계산기: 캐릭터 기본 데미지 칸 (짐작, 무기 데미지에 더함) */
 .dmg-own { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto minmax(0, 1fr) auto; align-items: center; gap: 4px; min-width: 0; padding: 1px 3px; background: var(--lo); font-size: 12px; }
 .dmg-guess { font-size: 10px; color: var(--muted); border: 1px solid rgba(255, 255, 255, 0.2); padding: 0 3px; white-space: nowrap; }
+
+/* 아이모 사기꾼 명단 (제작자 2026-11-11, pages/Scam.tsx): 중개인 맨 위 붉은 얇은 띠(점검 띠와 같은 모양)와 #/scam 화면 */
+.scam-band {
+  display: flex; align-items: center; gap: 6px; height: 20px; margin: 0 0 8px; padding: 0 8px; overflow: hidden;
+  font-size: 10.5px; line-height: 20px; color: rgba(255, 170, 150, 0.95); text-decoration: none; letter-spacing: 0.2px;
+  background: repeating-linear-gradient(-45deg, rgba(255, 80, 60, 0.18) 0 7px, rgba(255, 80, 60, 0.06) 7px 14px);
+}
+.scam-band:active { filter: brightness(1.25); }
+.scam-band-dot { flex: none; width: 5px; height: 5px; background: currentColor; box-shadow: 0 0 4px currentColor; animation: maint-blink 1.4s steps(1) infinite; }
+.scam-band-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; }
+.scam-band-go { flex: none; font-size: 13px; }
+.scam-rule { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; padding: 4px 8px; font-size: 11px; color: rgba(255, 175, 155, 0.95);
+  background: repeating-linear-gradient(-45deg, rgba(255, 80, 60, 0.18) 0 7px, rgba(255, 80, 60, 0.06) 7px 14px); }
+.scam-rule-dot { flex: none; width: 5px; height: 5px; background: currentColor; box-shadow: 0 0 4px currentColor; animation: maint-blink 1.4s steps(1) infinite; }
+.scam-rule-text { flex: 1; min-width: 0; }
+.scam-cheat { flex: none; color: #ffd6c8; font-weight: 700; text-decoration: none; padding: 1px 6px; border: 1px solid rgba(255, 140, 120, 0.6); }
+.scam-find { width: 100%; box-sizing: border-box; margin: 0 0 4px; }
+.scam-count { margin: 0 2px 6px; font-size: 11px; color: var(--muted, #9aa3c7); }
+.scam-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.scam-row { display: flex; gap: 8px; padding: 6px 8px; background: rgba(255, 255, 255, 0.04); border-left: 2px solid rgba(255, 96, 80, 0.55); }
+.scam-no { flex: none; width: 20px; font-size: 11px; color: rgba(255, 150, 130, 0.9); text-align: right; padding-top: 1px; }
+.scam-main { flex: 1; min-width: 0; }
+.scam-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; }
+.scam-name { font-size: 13px; }
+.scam-nick { font-size: 11px; color: var(--gold); padding: 0 5px; border: 1px solid rgba(255, 195, 92, 0.45); }
+.scam-phone { font-size: 11px; color: #c9d2ff; }
+.scam-acc { font-size: 11px; color: #b8c0e0; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.scam-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+.scam-tag { font-size: 10px; padding: 0 5px; color: #ffb3a6; background: rgba(255, 96, 80, 0.14); }
+.scam-tag-hot { color: #fff; background: rgba(230, 60, 50, 0.75); }
+.scam-foot { margin: 10px 2px 4px; font-size: 10.5px; color: var(--muted, #9aa3c7); }
+.scam-foot a { color: inherit; }
+@media (prefers-reduced-motion: reduce) { .scam-band-dot, .scam-rule-dot { animation: none; } }

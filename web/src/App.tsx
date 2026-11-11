@@ -113,6 +113,7 @@ const CHUNKS = {
   GrowthShop: () => import("./pages/GrowthShop"),
   Donate: () => import("./pages/Donate"),
   Hall: () => import("./pages/Hall"),
+  Scam: () => import("./pages/Scam"),
 };
 const ChatPage = lazy(() => CHUNKS.Chat().then((m) => ({ default: m.ChatPage })));
 const AdminPage = lazy(() => CHUNKS.Admin().then((m) => ({ default: m.AdminPage })));
@@ -145,6 +146,7 @@ const SmackPage = lazy(() => CHUNKS.Smack().then((m) => ({ default: m.SmackPage 
 const GrowthShopPage = lazy(() => CHUNKS.GrowthShop().then((m) => ({ default: m.GrowthShopPage })));
 const DonatePage = lazy(() => CHUNKS.Donate().then((m) => ({ default: m.DonatePage })));
 const HallPage = lazy(() => CHUNKS.Hall().then((m) => ({ default: m.HallPage })));
+const ScamPage = lazy(() => CHUNKS.Scam().then((m) => ({ default: m.ScamPage })));
 
 /**
  * 홈이 뜬 뒤 쉬는 때에 자주 여는 화면의 조각을 하나씩 미리 받아 둔다 (제작자 2026-11-04 '화면 전환이나 버튼 동작별로 반응이 늦거나 렉').
@@ -528,6 +530,8 @@ function Wiki({
   else if (page === "donate") body = canDonate(me) ? <DonatePage wiki={wiki ?? null} me={me} /> : <DevSoon title="기부함" />;
   // 명예의 전당 (개발중, 제작자 2026-11-10 '별도 버튼으로'): 기부함과 같은 사람이 본다
   else if (page === "hall") body = canDonate(me) ? <HallPage me={me} /> : <DevSoon title="명예의 전당" />;
+  // 아이모 사기꾼 명단 (제작자 2026-11-11): 로그인한 길드원 모두. 중개인·골드 칸 맨 위 띠와 챗봇에서 연다 (pages/Scam.tsx)
+  else if (page === "scam") body = <ScamPage />;
   else if (!wiki)
     body = (
       <Loading

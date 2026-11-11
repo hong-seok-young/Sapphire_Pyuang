@@ -785,6 +785,18 @@
   (`toAuction`, `POST /api/market/:id/auction`, D1 `listings.auto_auction`). 지금 가격이 시작가가 되고, 살래요 누른 사람들에게
   입찰 알림(`market_auction`, 중개인 '경매 전환')이 간다.
 
+## 사기꾼 명단 (제작자 2026-11-11 '거래전 더치트조회&실물확인! bit.ly/47c9kbQ 사기꾼 리스트 정리한다, 이것도 우리 db 에 넣고 여기 내용 업뎃되면 반영')
+- 원본은 거래 톡방에 도는 카카오 오픈프로필 포스트 '아이모 사기꾼 명단' (Made by. 시리온 암, bit.ly/47c9kbQ -> open.kakao.com/p/skq6nFDlNPtfT3GJqOk). 표 그림 하나(번호, 이름(가림), 인게임 닉네임, 폰 뒷자리, 계좌(일부 가림), 비고, 비고2).
+  웹에서는 포스트 글을 못 읽고 og:image(첫 그림)와 og:title 만 보인다: 그림이 여러 장이면 첫 장만 받는다 (2026-11-11 25줄).
+- 저장: 비공개 자료 `링크/사기꾼_명단/명단.json`(사람이 옮긴 것)과 원본 그림, 기록 `제공/사기꾼_명단.md`. 계정 DB(D1) `scam_list` 한 줄(rows JSON, made person|ai).
+  배포(`deploy-web.yml` 'Scam list', `scripts/scam-list.mjs --seed`)가 DB 가 비었거나 같은 그림일 때 그 json 을 넣는다.
+- 업데이트 반영: 공식 소식 작업(`official-news.yml` 30분마다 'Scam list', `scripts/scam-list.mjs`)이 포스트의 og:image 폴더가 바뀌었는지 보고, 바뀌면 그림(img.jpg)을 Claude(opus, effort high)로 옮겨 넣고(made 'ai')
+  앱개발자에게 알림. 옮긴 줄이 전보다 크게 줄면(60% 아래) 넣지 않고 알린다. 공개 실행 기록에는 줄 수만. AI 가 옮긴 것을 사람이 확인하면 json 을 고쳐 올린다(image 를 새 주소로).
+- 화면 `#/scam` (`pages/Scam.tsx`, `GET /api/scam`, 로그인한 길드원 모두): 맨 위 붉은 띠 '거래 전 더치트 조회 & 아이템 실물 확인 필수 · 더치트 ↗', 이름·닉네임·폰 뒷자리·계좌 숫자 찾기
+  (없으면 '명단에 없어요 · 그래도 더치트 조회와 실물 확인'), 줄마다 닉네임(금색)·폰·계좌·비고 표, 맨 아래 'Made by. 시리온 암 · 반영 날 · 원본 ↗'. 중개인 맨 위(물건·골드 모든 칸)에 붉은 얇은 띠로 연다 (`.scam-band`).
+- 챗봇: 사기·먹튀·더치트·계좌·월거 같은 말이 있거나 질문에 명단의 닉네임·폰 뒷자리·계좌 숫자가 나오면 명단 전체와 맞는 줄을 붙인다 (`server/scam.ts` `scamContext`, `chatapp.ts`). `[[화면:사기꾼 명단]]`.
+  명단에 없다고 안전하다고 하지 않고, 없는 사람을 사기꾼으로 짐작하지 않는다. 이름·계좌가 든 자료라 공개 저장소·실행 기록에 적지 않는다 (library-sync 는 `링크/*.json` 을 넣지 않아 DB 의 최신 것만 쓴다).
+
 ## 시세 동향 (개발중, 제작자 요청 2026-11-03)
 - 제작자가 폰에서 내보낸 시리온 거래 톡방 카카오톡 대화(`자료/카톡/*.txt`, 비공개 자료 저장소)를 `web/scripts/build_trend.py` 가 읽어
   `data/trend.json` 을 만들고(`build_data.py` 끝에서 같이 부른다, 폴더가 없으면 건너뜀), 홈의 '시세 동향' 칸(민트 '개발중' 띠, `#/trend`,
