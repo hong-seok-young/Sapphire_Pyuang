@@ -107,7 +107,8 @@ export const loadTrend = () => getJson<Trend>("trend");
 
 /** 강화 비교 (개발중): scripts/build_enhance.py 가 만든다. bonus: common = 전사·레인저·무도가 공통 가산치, mage = 마법사 무기마다, null = 강화 수치 모름 */
 export interface EnhanceWeapon { name: string; job: string; lv: number | null; min: number; max: number; bonus: "common" | "mage" | null; src: "excel" | "wiki" }
-export interface Enhance { source: string; common: number[]; mage: Record<string, number[]>; weapons: EnhanceWeapon[] }
+/** armor: 방어구 기본 방어도 -> +0~+15 의 방어도 (데미지 계산기) */
+export interface Enhance { source: string; common: number[]; mage: Record<string, number[]>; weapons: EnhanceWeapon[]; armor?: Record<string, number[]> }
 export const loadEnhance = () => getJson<Enhance>("enhance");
 
 /** 도감 계산기 (개발중): scripts/build_dex.py 가 비공개 자료 도감/일반.json (제작자 도감 영상을 옮긴 것)에서 만든다.

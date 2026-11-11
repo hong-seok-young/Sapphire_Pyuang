@@ -22,6 +22,7 @@ import { growthWeekStart } from "./week";
 import { TODO_OPEN, doneKeys, eventTasks, todoExtras } from "./todo";
 import { ASK_MORE, mineExtras, newsNow, shopCatalog } from "./chatmine";
 import { canUseDevReq } from "./devreq";
+import { scamContext } from "./scam";
 
 
 /** 길드 앱 자료 전체 글자 수 (내 정보, 아이모 소식, 장비대여를 더해 늘렸다. 2026-11-02) */
@@ -455,6 +456,9 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
 
   // ---------- 개발 요청: 모든 요청과 결재 단계·의견 (모두가 본다, server/devreq.ts) ----------
   if (canUseDevReq(me) && ASK.devreq.test(q)) parts.push(await devreqPart(env));
+
+  // ---------- 아이모 사기꾼 명단: 사기·거래 안전을 묻거나 명단의 닉네임·폰 뒷자리·계좌가 나오면 (server/scam.ts) ----------
+  parts.push(await scamContext(env, question).catch(() => ""));
 
   // ---------- 내가 한 것 (늘): 중개인, 골드, 의뢰소, 상점 신청 ----------
   {

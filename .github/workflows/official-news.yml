@@ -61,6 +61,14 @@ jobs:
           ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
         run: node --experimental-strip-types scripts/read-official-images.mjs --budget ${{ inputs.image_budget || '1200' }}
 
+      # 아이모 사기꾼 명단 (제작자 2026-11-11 '업데이트되면 반영'): 카카오 포스트의 표 그림이 바뀌었으면 Claude 로 옮겨 넣는다 (scripts/scam-list.mjs, 공개 기록에는 줄 수만)
+      - name: Scam list
+        working-directory: web
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+        run: node scripts/scam-list.mjs || echo "::warning::사기꾼 명단을 보지 못했어요"
+
       - name: To do digest
         working-directory: web
         env:

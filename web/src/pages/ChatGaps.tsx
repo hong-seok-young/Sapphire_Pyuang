@@ -4,13 +4,15 @@ import { fixGap, listGaps } from "../chat";
 import type { ChatGap } from "../chat";
 import { ago } from "../market";
 import { Loading, MasterNote, TopBar } from "../ui";
+import type { Wiki } from "../types";
+import { ChatAnswer } from "./ChatAnswer";
 
 /**
  * 챗봇 개선 (앱개발자만, 제작자 요청): 길잡이가 짐작하거나 자료가 없다고 한 답, 길드원이 '👎 별로'를 누른 답.
  * '목록 복사'로 Claude 에게 넘겨 위키 자료나 프롬프트를 고치고 배포한 뒤 '개선 완료'를 누르면,
  * 물은 사람에게 '챗봇이 개선됐어요' 알림이 가고 누르면 그 대화에서 새 답을 받는다
  */
-export function ChatGapsPage({ role }: { role: string }) {
+export function ChatGapsPage({ role, wiki }: { role: string; wiki: Wiki | null }) {
   const [tab, setTab] = useState<"open" | "fixed">("open");
   const [gaps, setGaps] = useState<ChatGap[] | null>(null);
   const [error, setError] = useState("");
@@ -94,6 +96,7 @@ export function ChatGapsPage({ role }: { role: string }) {
         <GapCard
           key={g.id}
           g={g}
+          wiki={wiki}
           onFixed={() =>
             setGaps((all) => (all ?? []).filter((x) => x.id !== g.id))
           }
@@ -106,10 +109,12 @@ export function ChatGapsPage({ role }: { role: string }) {
 
 function GapCard({
   g,
+  wiki,
   onFixed,
   onError,
 }: {
   g: ChatGap;
+  wiki: Wiki | null;
   onFixed: () => void;
   onError: (e: string) => void;
 }) {
@@ -135,7 +140,17 @@ function GapCard({
           {open ? "답 접기" : "답 보기"}
         </button>
       )}
-      {open && g.answer && <div className="gap-answer">{g.answer}</div>}
+      {/* 답은 챗봇 화면과 똑같이 그린다 (제작자 2026-11-11 '텍스트만으로 답변이 뜨게 하지 말고 챗봇 답변 그대로'). 위키 자료를 아직 못 받았으면 글자로 */}
+      {open && g.answer && (
+        wiki ? (
+          <div className="bubble bubble-assistant gap-bubble">
+            <div className="npc-name">🧙 사파이어 길잡이</div>
+            <ChatAnswer wiki={wiki} text={g.answer} done onAsk={() => {}} />
+          </div>
+        ) : (
+          <div className="gap-answer">{g.answer}</div>
+        )
+      )}
       {g.status === "open" && !fixing && (
         <div className="gap-actions">
           <button className="pill pill-on" onClick={() => setFixing(true)}>

@@ -96,6 +96,7 @@ const CHUNKS = {
   Simulator: () => import("./pages/Simulator"),
   Trend: () => import("./pages/Trend"),
   Dex: () => import("./pages/Dex"),
+  Damage: () => import("./pages/Damage"),
   ActivityLog: () => import("./pages/ActivityLog"),
   Alerts: () => import("./pages/Alerts"),
   ChatGaps: () => import("./pages/ChatGaps"),
@@ -112,6 +113,7 @@ const CHUNKS = {
   GrowthShop: () => import("./pages/GrowthShop"),
   Donate: () => import("./pages/Donate"),
   Hall: () => import("./pages/Hall"),
+  Scam: () => import("./pages/Scam"),
 };
 const ChatPage = lazy(() => CHUNKS.Chat().then((m) => ({ default: m.ChatPage })));
 const AdminPage = lazy(() => CHUNKS.Admin().then((m) => ({ default: m.AdminPage })));
@@ -125,6 +127,7 @@ const DevRequestsPage = lazy(() => CHUNKS.DevRequests().then((m) => ({ default: 
 const SimulatorPage = lazy(() => CHUNKS.Simulator().then((m) => ({ default: m.SimulatorPage })));
 const TrendPage = lazy(() => CHUNKS.Trend().then((m) => ({ default: m.TrendPage })));
 const DexPage = lazy(() => CHUNKS.Dex().then((m) => ({ default: m.DexPage })));
+const DamagePage = lazy(() => CHUNKS.Damage().then((m) => ({ default: m.DamagePage })));
 const ActivityLogPage = lazy(() => CHUNKS.ActivityLog().then((m) => ({ default: m.ActivityLogPage })));
 const AlertsPage = lazy(() => CHUNKS.Alerts().then((m) => ({ default: m.AlertsPage })));
 const ChatGapsPage = lazy(() => CHUNKS.ChatGaps().then((m) => ({ default: m.ChatGapsPage })));
@@ -143,6 +146,7 @@ const SmackPage = lazy(() => CHUNKS.Smack().then((m) => ({ default: m.SmackPage 
 const GrowthShopPage = lazy(() => CHUNKS.GrowthShop().then((m) => ({ default: m.GrowthShopPage })));
 const DonatePage = lazy(() => CHUNKS.Donate().then((m) => ({ default: m.DonatePage })));
 const HallPage = lazy(() => CHUNKS.Hall().then((m) => ({ default: m.HallPage })));
+const ScamPage = lazy(() => CHUNKS.Scam().then((m) => ({ default: m.ScamPage })));
 
 /**
  * 홈이 뜬 뒤 쉬는 때에 자주 여는 화면의 조각을 하나씩 미리 받아 둔다 (제작자 2026-11-04 '화면 전환이나 버튼 동작별로 반응이 늦거나 렉').
@@ -501,7 +505,7 @@ function Wiki({
   else if (page === "gaps")
     body =
       RANK[me.role] >= 2 ? (
-        <ChatGapsPage role={me.role} />
+        <ChatGapsPage role={me.role} wiki={wiki ?? null} />
       ) : (
         <NotFound what="페이지" />
       );
@@ -526,6 +530,8 @@ function Wiki({
   else if (page === "donate") body = canDonate(me) ? <DonatePage wiki={wiki ?? null} me={me} /> : <DevSoon title="기부함" />;
   // 명예의 전당 (개발중, 제작자 2026-11-10 '별도 버튼으로'): 기부함과 같은 사람이 본다
   else if (page === "hall") body = canDonate(me) ? <HallPage me={me} /> : <DevSoon title="명예의 전당" />;
+  // 아이모 사기꾼 명단 (제작자 2026-11-11): 로그인한 길드원 모두. 중개인·골드 칸 맨 위 띠와 챗봇에서 연다 (pages/Scam.tsx)
+  else if (page === "scam") body = <ScamPage />;
   else if (!wiki)
     body = (
       <Loading
@@ -561,6 +567,7 @@ function Wiki({
   else if (page === "trend") body = canPreview(me) ? <TrendPage wiki={wiki} /> : <DevSoon title="시세 동향" />;
   // 도감 계산기 (개발중, 제작자 요청 2026-11-10): 제작자 도감 영상을 옮긴 항목으로 완료 효과 합계와 필요 재료. 미리 보는 사람만
   else if (page === "dex") body = canPreview(me) ? <DexPage wiki={wiki} me={me} /> : <DevSoon title="도감 계산기" />;
+  else if (page === "damage") body = canPreview(me) ? <DamagePage wiki={wiki} me={me} /> : <DevSoon title="데미지 계산기" />;
   // 강화 비교 (제작자 요청 2026-11-04, 2026-11-05 모두에게 열었다): 두 무기(+강)의 데미지와 몇 % 강해지는지
   else if (page === "enhance") body = <EnhancePage wiki={wiki} query={route.query} me={me} />;
   // 확률 시뮬레이터 개발 중판은 미리 보는 사람(길드마스터·오피서·달팽이·간다이, launcher.ts canPreview), 테스트판은 앱개발자(와 테스트 계정)만 (제작자 2026-11-04 '도플갱어로')

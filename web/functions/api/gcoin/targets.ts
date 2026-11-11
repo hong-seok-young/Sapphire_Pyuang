@@ -27,8 +27,8 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   // 판·레벨·정해 둔 목표를 한꺼번에 읽는다 (제작자 2026-11-10 '명단 넣고 빼는 것도 반응이 늦다')
   const [r, p, mine] = await Promise.all([
     targetRound(env),
-    env.DB.prepare("SELECT level FROM profiles WHERE user_id = ?").bind(userId).first<{ level: number }>(),
-    env.DB.prepare("SELECT round, from_level FROM gc_targets WHERE user_id = ?").bind(userId).all<{ round: number; from_level: number }>(),
+    env.DB.prepare("SELECT level, exp FROM profiles WHERE user_id = ?").bind(userId).first<{ level: number; exp: number | null }>(),
+    env.DB.prepare("SELECT round, from_level, from_exp FROM gc_targets WHERE user_id = ?").bind(userId).all<{ round: number; from_level: number; from_exp: number | null }>(),
   ]);
   if (!r) return json({ error: "다음 판 기간을 먼저 정해 주세요" }, 409);
   const round = r.id;
@@ -49,11 +49,14 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   if (b.from !== undefined && b.from !== null && given === null) return json({ error: "시작 레벨이 맞지 않아요" }, 400);
   const from = given ?? had?.from_level ?? p.level;
   if (target <= from) return json({ error: `목표는 Lv.${from} 보다 높게 정해 주세요` }, 400);
+  // 목표를 정한 자리가 달성률 0% (제작자 2026-11-11 '목표 설정하면 기존 겸치가 어떻든 그냥 달성률 0% 로 시작'):
+  // 시작 레벨이 지금 레벨이면 지금 경험치부터, 담당자가 다른 시작 레벨을 적었으면 그 레벨 0%부터. 목표만 고치면 정해 둔 자리 그대로
+  const fromExp = had && had.from_level === from && had.from_exp !== null ? had.from_exp : from === p.level ? (p.exp ?? 0) : 0;
   await env.DB.batch([
     env.DB.prepare(
-      "INSERT INTO gc_targets (round, user_id, from_level, target, set_at, set_by) VALUES (?, ?, ?, ?, ?, ?) " +
-        "ON CONFLICT (round, user_id) DO UPDATE SET from_level = excluded.from_level, target = excluded.target, set_at = excluded.set_at, set_by = excluded.set_by",
-    ).bind(round, userId, from, target, Date.now(), me.id),
+      "INSERT INTO gc_targets (round, user_id, from_level, from_exp, target, set_at, set_by) VALUES (?, ?, ?, ?, ?, ?, ?) " +
+        "ON CONFLICT (round, user_id) DO UPDATE SET from_level = excluded.from_level, from_exp = excluded.from_exp, target = excluded.target, set_at = excluded.set_at, set_by = excluded.set_by",
+    ).bind(round, userId, from, fromExp, target, Date.now(), me.id),
     env.DB.prepare("DELETE FROM gc_settings WHERE key = ?").bind(hideKey),
   ]);
   return json({ ok: true });

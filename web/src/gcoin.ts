@@ -73,6 +73,8 @@ export interface GcRankEntry {
 export interface GcRaceEntry {
   id: string;
   fromLevel: number;
+  /** 목표를 정할 때 경험치(% x 1000): 그 자리가 달성률 0% */
+  fromExp?: number;
   target: number;
   level: number;
   exp: number | null;
@@ -105,6 +107,7 @@ export interface GcRace {
 export interface RaceGain {
   target: number;
   fromLevel: number;
+  fromExp?: number;
   prevPct: number;
   pct: number;
   justDone: boolean;
@@ -481,6 +484,7 @@ export function sampleRace(start: number, now: number): GcRace {
     return {
       id,
       fromLevel: from,
+      fromExp: 0,
       target,
       level: Math.floor(pos),
       exp: Math.round((pos % 1) * 100_000),
@@ -504,4 +508,10 @@ export function sampleRace(start: number, now: number): GcRace {
     if (e.doneAt !== null) e.coins = prizes[i] ?? 0;
   });
   return { start, end: start + 7 * 86_400_000, prizes, list, series };
+}
+
+/** 레벨 눈금의 자리(%): 목표를 정한 자리(레벨 + 경험치)가 0%, 목표 레벨이 100% */
+export function levelMark(fromLevel: number, fromExp: number | undefined, target: number, level: number): number {
+  const from = fromLevel + (fromExp ?? 0) / 100_000;
+  return target <= from ? 100 : ((level - from) / (target - from)) * 100;
 }

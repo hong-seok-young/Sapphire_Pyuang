@@ -25,8 +25,8 @@ const KNUM: Record<string, number> = { 일: 1, 이: 2, 삼: 3, 사: 4, 오: 5, �
 const key = (s: string) => s.replace(/\s+/g, "");
 /** 톡방 줄임말의 한 글자 (닼 = 다크, 롭 = 로브) */
 const squeeze = (s: string) => s.replace(/닼/g, "다크").replace(/롭/g, "로브");
-const JOB_OF: Record<string, string> = { warrior: "전사", ranger: "레인저", mage: "마법사", monk: "무도가" };
-const JOBS = ["전사", "레인저", "마법사", "무도가"] as const;
+export const JOB_OF: Record<string, string> = { warrior: "전사", ranger: "레인저", mage: "마법사", monk: "무도가" };
+export const JOBS = ["전사", "레인저", "마법사", "무도가"] as const;
 /** 그 직업 무기, 레벨 순 (같은 레벨은 강화 수치가 있는 것 먼저) */
 /** 그래프 끌기 안내를 본 기기 (그래프에 손을 대면 적는다). 안내 모양을 바꿔 다시 한 번 보이려면 이름 끝 판을 올린다
  * (2: 그래프 전체 반짝임으로 바꾼 판, 제작자 2026-11-05 '전 버전에서 눌러서 이제 안 뜨는데 나한테도 한 번 뜨게') */
@@ -37,7 +37,7 @@ const SPARKS: [number, number, number][] = [
   [40, 44, 0.6], [70, 52, 1.6], [94, 46, 0.9], [24, 68, 0.4], [56, 72, 1.3], [86, 70, 0.7], [8, 88, 1.5], [44, 92, 0.1], [74, 90, 1],
 ];
 
-const jobWeapons = (d: Enhance, job: string) =>
+export const jobWeapons = (d: Enhance, job: string) =>
   d.weapons.filter((w) => w.job === job).sort((a, b) => (a.lv ?? 0) - (b.lv ?? 0) || Number(!a.bonus) - Number(!b.bonus) || a.name.localeCompare(b.name));
 
 /** '8윙의날개', '+8 윙의날개', '8강 윙의날개', '팔헌보' -> 강화와 이름. korean 이면 앞의 한글 숫자(팔 = 8)도 강화로 읽는다 */
@@ -75,21 +75,21 @@ function bonusOf(d: Enhance, w: EnhanceWeapon): number[] | null {
   if (w.bonus === "mage") return d.mage[key(w.name)] ?? null;
   return null;
 }
-const maxPlus = (d: Enhance, w: EnhanceWeapon) => (bonusOf(d, w)?.length ?? 1) - 1;
+export const maxPlus = (d: Enhance, w: EnhanceWeapon) => (bonusOf(d, w)?.length ?? 1) - 1;
 
-function damage(d: Enhance, w: EnhanceWeapon, plus: number) {
+export function damage(d: Enhance, w: EnhanceWeapon, plus: number) {
   const b = bonusOf(d, w)?.[plus] ?? 0;
   const min = w.min * (1 + b / 100);
   const max = w.max * (1 + b / 100);
   return { min, max, avg: (min + max) / 2 };
 }
 
-const fmt = (n: number) => (Math.round(n * 10) / 10).toLocaleString("ko-KR");
+export const fmt = (n: number) => (Math.round(n * 10) / 10).toLocaleString("ko-KR");
 const pct = (a: number, b: number) => (a > 0 ? (b / a - 1) * 100 : 0);
 const pctText = (p: number) => (p > 0 ? "+" : "") + (Math.round(p * 10) / 10).toFixed(1) + "%";
 const tone = (p: number) => (p > 0.05 ? " enh-up" : p < -0.05 ? " enh-down" : "");
 
-interface Pick {
+export interface Pick {
   q: string;
   w: EnhanceWeapon | null;
   plus: number;
@@ -97,10 +97,10 @@ interface Pick {
 /** 무기를 처음 고를 때의 강화 (제작자 2026-11-05 '무기 선택하면 기본을 7강으로'): 강화를 적지 않으면 +7, 그 무기가 +7 까지 안 되면 될 수 있는 만큼 */
 const START_PLUS = 7;
 /** 마법사 칸 맨 위 띠 (홈 점검 띠 모양) */
-const MAGE_NOTE = "마법사 무기는 데미지 계산이 달라 실제와 맞지 않아요 · 재미로만 봐 주세요";
-const EMPTY: Pick = { q: "", w: null, plus: START_PLUS };
+export const MAGE_NOTE = "마법사 무기는 데미지 계산이 달라 실제와 맞지 않아요 · 재미로만 봐 주세요";
+export const EMPTY: Pick = { q: "", w: null, plus: START_PLUS };
 
-function initial(d: Enhance | undefined, text: string | null): Pick {
+export function initial(d: Enhance | undefined, text: string | null): Pick {
   const p: Pick = { q: text ?? "", w: null, plus: START_PLUS };
   if (!d || !text) return p;
   const { plus, w } = readText(d, text);
@@ -108,7 +108,7 @@ function initial(d: Enhance | undefined, text: string | null): Pick {
 }
 
 /** 값이 바뀌면 톡 튀게 (제작자 2026-11-05 '계속 보고 있거나 클릭했을 때의 애니메이션'). 처음 그릴 때는 그대로 둔다: 화면이 뜰 때 움직임은 없다 */
-function Pop({ value, off = false, className, children }: { value: string | number; off?: boolean; className?: string; children: ReactNode }) {
+export function Pop({ value, off = false, className, children }: { value: string | number; off?: boolean; className?: string; children: ReactNode }) {
   const last = useRef(value);
   const n = useRef(0);
   if (last.current !== value) {
@@ -130,7 +130,7 @@ function searching(d: Enhance, pick: Pick): string[] {
 
 /** 무기 칸 하나 (지금 무기 왼쪽, 바꿀 무기 오른쪽에 나란히. 제작자 2026-11-05 '무기 고르는 거를 좌우로 배치', '좀 더 콤팩트하게' -> '행 높이 더 압축'):
  *  두 줄: ◀ 이름 ▶ (이름을 누르면 적는 칸과 그 직업 무기 목록), 그림(아래 구석에 작은 레벨)과 − +N + (데미지는 결과 칸에) */
-function WeaponCard({ d, wiki, side, hint, pick, onPick, open, onOpen }: {
+export function WeaponCard({ d, wiki, side, hint, pick, onPick, open, onOpen }: {
   d: Enhance; wiki: Wiki; side: "a" | "b"; hint: string; pick: Pick; onPick: (p: Pick) => void; open: boolean; onOpen: () => void;
 }) {
   const [edit, setEdit] = useState(false);
@@ -215,7 +215,7 @@ function WeaponCard({ d, wiki, side, hint, pick, onPick, open, onOpen }: {
 
 /** 무기 칸 아래 목록 (두 칸 너비): 적는 중이면 찾은 무기, 아니면 고른 직업의 무기 전부. 그 칸의 색 띠 */
 /** 목록에 보일 무기: 적는 중이면 찾은 무기 6개, 아니면 그 칸을 채울 차례일 때 고른 직업의 무기 전부 */
-function listFor(d: Enhance, pick: Pick, job: string, open: boolean): EnhanceWeapon[] {
+export function listFor(d: Enhance, pick: Pick, job: string, open: boolean): EnhanceWeapon[] {
   const qs = searching(d, pick);
   if (qs.length)
     return d.weapons
@@ -227,7 +227,7 @@ function listFor(d: Enhance, pick: Pick, job: string, open: boolean): EnhanceWea
   return open ? jobWeapons(d, job) : [];
 }
 
-function WeaponList({ d, side, pick, shown, onPick }: { d: Enhance; side: "a" | "b"; pick: Pick; shown: EnhanceWeapon[]; onPick: (p: Pick) => void }) {
+export function WeaponList({ d, side, pick, shown, onPick }: { d: Enhance; side: "a" | "b"; pick: Pick; shown: EnhanceWeapon[]; onPick: (p: Pick) => void }) {
   if (shown.length === 0) return null;
   return (
     <div className={"enh-hits enh-list enh-list-" + side}>

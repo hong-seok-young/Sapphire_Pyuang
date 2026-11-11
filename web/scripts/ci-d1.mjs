@@ -120,6 +120,8 @@ const ADDED_COLUMNS = [
   ["board_posts", "sg_status", "TEXT"],
   // 폰 알림을 마지막으로 보낸 때와 푸시 서버의 답 (server/push.ts pushOne, 어느 폰이 안 받는지 보려고)
   ["push_subs", "last_status", "INTEGER"], ["push_subs", "last_at", "INTEGER"],
+  // 성장코인샵 목표를 정할 때 경험치: 그 자리가 달성률 0% (제작자 2026-11-11)
+  ["gc_targets", "from_exp", "INTEGER"],
 ];
 for (const [table, column, type] of ADDED_COLUMNS) {
   const columns = parseJson(wrangler("d1", "execute", DB, "--remote", "--json", "--command", `PRAGMA table_info(${table})`))[0]?.results ?? [];
@@ -766,6 +768,73 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
       `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
     ]);
     console.log("성장코인샵 첫 판을 11/16(월) 0시부터 (한 번)");
+  }
+}
+
+// 성장코인샵 목표를 정한 자리를 달성률 0% 로 (제작자 2026-11-11 '목표 설정하면 기존 겸치가 어떻든 그냥 달성률 0% 로 시작'): 이미 정한 목표마다
+// 판이 시작한 때와 정한 때 중 늦은 때의 마지막 기록이 시작 레벨이면 그 경험치, 기록이 없으면 지금 프로필(같은 레벨일 때). setup 'gcoin_from_exp_20261111' 로 한 번만
+{
+  const KEY = "gcoin_from_exp_20261111";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const at = "MAX(gc_targets.set_at, COALESCE((SELECT r.start FROM gc_rounds r WHERE r.id = gc_targets.round), gc_targets.round))";
+    const last = `FROM level_log l WHERE l.user_id = gc_targets.user_id AND l.at <= ${at} ORDER BY l.at DESC LIMIT 1`;
+    runSql([
+      "UPDATE gc_targets SET from_exp = CASE " +
+        `WHEN EXISTS (SELECT 1 ${last}) THEN COALESCE((SELECT CASE WHEN l.level = gc_targets.from_level THEN COALESCE(l.exp, 0) ELSE 0 END ${last}), 0) ` +
+        "ELSE COALESCE((SELECT CASE WHEN p.level = gc_targets.from_level THEN COALESCE(p.exp, 0) ELSE 0 END FROM profiles p WHERE p.user_id = gc_targets.user_id), 0) END " +
+        "WHERE from_exp IS NULL;",
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
+    ]);
+    console.log("성장코인샵 목표 시작 경험치 채움 (한 번)");
+  }
+}
+
+// 성장코인샵 목표는 목표 레벨만 정한다 (제작자 2026-11-11 '목표 레벨만 설정하면 되지 시작 레벨은 뭐야'): 담당자가 시작 레벨 칸으로 지금과 다르게 적어 둔 목표도
+// 아직 안 끝난 판은 정한 때(판 시작 전에 정했으면 판 시작 때)의 레벨·경험치를 시작(달성률 0%)으로 다시 맞춘다. 목표가 그 레벨 이하가 되는 줄은 그대로. setup 'gcoin_from_reset_20261111' 로 한 번만
+{
+  const KEY = "gcoin_from_reset_20261111";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const now = Date.now();
+    const at = "MAX(gc_targets.set_at, COALESCE((SELECT r.start FROM gc_rounds r WHERE r.id = gc_targets.round), gc_targets.round))";
+    const last = `FROM level_log l WHERE l.user_id = gc_targets.user_id AND l.at <= ${at} ORDER BY l.at DESC LIMIT 1`;
+    const prof = "FROM profiles p WHERE p.user_id = gc_targets.user_id";
+    const lv = `(CASE WHEN EXISTS (SELECT 1 ${last}) THEN (SELECT l.level ${last}) ELSE (SELECT p.level ${prof}) END)`;
+    const ex = `(CASE WHEN EXISTS (SELECT 1 ${last}) THEN (SELECT COALESCE(l.exp, 0) ${last}) ELSE (SELECT COALESCE(p.exp, 0) ${prof}) END)`;
+    runSql([
+      `UPDATE gc_targets SET from_level = ${lv}, from_exp = ${ex} ` +
+        `WHERE COALESCE((SELECT r.end_at FROM gc_rounds r WHERE r.id = gc_targets.round), gc_targets.round + 604800000) > ${now} ` +
+        `AND ${lv} IS NOT NULL AND gc_targets.target > ${lv};`,
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+    ]);
+    console.log("성장코인샵 목표 시작을 정한 때 자리로 (한 번)");
+  }
+}
+
+// 성장코인샵 이번 판 목표를 유어아너 공지대로 (제작자 2026-11-11: '도등21->27 … 펀취36->37, 공포티모48(도핑템)', '현재렙이 웹과 다른 건 렙업했는데 웹에 반영 안 한 듯 목표렙만').
+// 지금 진행 중인 판(gc_rounds)에만. 시작(달성률 0%)은 웹 레벨이 공지 시작 레벨보다 낮으면 공지 레벨 0% (웹에 아직 안 적은 레벨업이라 나중에 적어도 성장으로 안 세게), 아니면 웹 레벨·경험치.
+// 공포티모는 목표가 없어 넣지 않는다. 계정·레벨이 없는 닉네임은 건너뛴다. setup 'gcoin_notice_targets_20261111' 로 한 번만
+{
+  const KEY = "gcoin_notice_targets_20261111";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const now = Date.now();
+    const round = queryFirst(`SELECT id FROM gc_rounds WHERE start <= ${now} AND end_at > ${now} ORDER BY start DESC LIMIT 1`);
+    const NOTICE = [["도등", 21, 27], ["미즈로바", 23, 28], ["혈천도마", 30, 32], ["무도가", 31, 33], ["춘천다크갈비", 31, 33], ["먼쥐", 32, 34],
+      ["마가목", 32, 34], ["도아햄", 34, 36], ["이름뭐로짓지", 34, 36], ["펀취", 36, 37]];
+    if (round) {
+      runSql([
+        ...NOTICE.map(([name, from, target]) => {
+          const who = `(SELECT u.id FROM users u WHERE REPLACE(LOWER(u.id), ' ', '') = '${name}' LIMIT 1)`;
+          return "INSERT INTO gc_targets (round, user_id, from_level, from_exp, target, set_at, set_by) " +
+            `SELECT ${round.id}, p.user_id, MAX(p.level, ${from}), CASE WHEN p.level >= ${from} THEN COALESCE(p.exp, 0) ELSE 0 END, ${target}, ${now}, 'system' ` +
+            `FROM profiles p WHERE p.user_id = ${who} AND MAX(p.level, ${from}) < ${target} ` +
+            "ON CONFLICT (round, user_id) DO UPDATE SET from_level = excluded.from_level, from_exp = excluded.from_exp, target = excluded.target;";
+        }),
+        ...NOTICE.map(([name]) => `DELETE FROM gc_settings WHERE key = 'hide:' || (SELECT u.id FROM users u WHERE REPLACE(LOWER(u.id), ' ', '') = '${name}' LIMIT 1);`),
+        `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+      ]);
+      const n = queryFirst(`SELECT COUNT(*) AS n FROM gc_targets WHERE round = ${round.id}`)?.n ?? 0;
+      console.log(`성장코인샵 이번 판 목표 공지대로 (목표 ${n}명)`);
+    } else console.log("성장코인샵 이번 판이 아직 없어 공지 목표는 다음 배포에");
   }
 }
 
