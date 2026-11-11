@@ -1,6 +1,7 @@
 // 시세 동향 (개발중, 제작자 요청 2026-11-03): 제작자가 폰에서 내보낸 시리온 거래 톡방 대화를 자료로 만든 골드 시세와 물건 가격.
 // 자료는 web/scripts/build_trend.py 가 자료/카톡/*.txt 에서 만든 data/trend.json (닉네임 없음, 로그인한 길드원에게만).
 // 게임을 읽지 않고 사람들이 톡방에 쓴 글만 센다.
+import { ScamPanel } from "./Scam";
 import { useCallback, useMemo, useState } from "react";
 import type { PointerEvent } from "react";
 import { loadTrend, useAsync } from "../data";
@@ -688,18 +689,20 @@ function CharRow({ r }: { r: TrendChar }) {
   );
 }
 
-type Tab = "gold" | "item" | "char";
+type Tab = "gold" | "item" | "char" | "scam";
 const TABS: { key: Tab; label: string }[] = [
   { key: "gold", label: "골드" },
   { key: "item", label: "물건" },
   { key: "char", label: "캐릭터" },
+  // 아이모 사기꾼 명단 (제작자 2026-11-11 '만들 거면 시세 동향 쪽에', pages/Scam.tsx)
+  { key: "scam", label: "사기꾼" },
 ];
 
 /** 주소의 ?t= 로 칸을 기억한다 (#/trend?t=item). 없으면 골드 */
 function tabFromHash(): Tab {
   const q = window.location.hash.split("?")[1] ?? "";
   const t = new URLSearchParams(q).get("t");
-  return t === "item" || t === "char" ? t : "gold";
+  return t === "item" || t === "char" || t === "scam" ? t : "gold";
 }
 
 /** 골드 · 물건 · 캐릭터를 단추로 나눠 하나씩 본다 (제작자 요청 2026-11-03: 한 화면에 다 늘어놓지 않기) */
@@ -728,6 +731,7 @@ export function TrendPage({ wiki }: { wiki: Wiki }) {
           {tab === "gold" && <GoldPanel t={t} />}
           {tab === "item" && <ItemsPanel t={t} wiki={wiki} />}
           {tab === "char" && <CharsPanel t={t} />}
+          {tab === "scam" && <ScamPanel />}
         </>
       )}
     </>

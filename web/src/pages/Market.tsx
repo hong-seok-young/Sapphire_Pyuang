@@ -1637,12 +1637,6 @@ export function MarketPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   return (
     <>
       <TopBar title="사파이어 중개인" />
-      {/* 사기꾼 명단 띠 (제작자 2026-11-11 '거래 전 더치트 조회 & 실물 확인'): 물건·골드 모든 칸 위, 누르면 #/scam */}
-      <a className="scam-band" href="#/scam">
-        <span className="scam-band-dot" aria-hidden />
-        <span className="scam-band-text">거래 전 사기꾼 명단 · 더치트 조회 · 실물 확인</span>
-        <span className="scam-band-go">›</span>
-      </a>
       {/* 맨 위 같은 폭 단추 넷, 그림·이모지 없이 (제작자 2026-11-03). 내 글의 숫자는 내 팝니다·삽니다 글에 온 살래요·팔래요 수 */}
       <nav className="pill-row mk-tabs" role="tablist">
         {TABS.map((t) => (
