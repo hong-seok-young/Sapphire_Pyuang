@@ -81,8 +81,8 @@ export function fmtGold(v: number): string {
   if (v >= 1e4) return `${Math.round(v / 1e3) / 10}만`;
   return Math.round(v).toLocaleString("ko-KR");
 }
-export function wayText(w: GoldWay, scroll: string | null): string {
-  const base = `${w.base ? "+" + w.base : "노강"} 매물 ${fmtGold(w.baseV)}`;
+export function wayText(w: GoldWay, scroll: string | null, gear = true): string {
+  const base = `${w.base ? "+" + w.base + " " : gear ? "노강 " : ""}매물 ${fmtGold(w.baseV)}`;
   const core = w.scrolls ? `${base} + ${scroll ? scrollLabel(scroll) : "마법서"} ${w.scrolls}장` : base;
   return w.mult.length ? (w.scrolls ? `(${core}) ${w.mult.join(" ")}` : `${core} ${w.mult.join(" ")}`) : core;
 }

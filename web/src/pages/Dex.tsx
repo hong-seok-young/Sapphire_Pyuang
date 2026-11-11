@@ -533,7 +533,7 @@ function CostPanel({ price, tot, pset, setPset, n }: { price: DexPrice; tot: Tot
             ))}
           </div>
           <p className="dex-cost-note">
-            미완료 {n}개의 장비 {tot.slots}칸{save > 0 ? <> · 이벤트 때 채우면 <b>{fmtGold(save)}</b> 골드 아껴요</> : null}
+            미완료 {n}개의 값 있는 칸 {tot.slots}개{save > 0 ? <> · 이벤트 때 채우면 <b>{fmtGold(save)}</b> 골드 아껴요</> : null}
             {tot.none > 0 && <span className="muted"> · 값 없는 칸 {tot.none}개 (거래소 시세가 없고 스탬프로도 안 됨)</span>}
             {missingN > 0 && <span className="muted"> · 마법서 값이 없어 골드로 못 센 칸 {missingN}개</span>}
           </p>
@@ -619,7 +619,7 @@ function SlotPrice({ it, price, pset }: { it: DexItem; price: DexPrice; pset: Pr
         골드{" "}
         {c.gold != null && c.way ? (
           <>
-            <b>{fmtGold(c.gold)}</b> = {wayText(c.way, c.scroll)}
+            <b>{fmtGold(c.gold)}</b> = {wayText(c.way, c.scroll, isGear(it))}
             {it.n > 1 ? ` × ${it.n}` : ""}
           </>
         ) : c.missing ? (

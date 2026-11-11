@@ -24,7 +24,9 @@ const persist = local && process.env.D1_PERSIST ? [`--persist-to=${process.env.D
 const CHUNK = 2000;
 const TEXT = /\.(md|txt|json|csv|tsv)$/i;
 // fandom/: 해외 팬 위키를 긁은 영어 원문·목록(articles.jsonl, index.json, images.json …)은 한국어 질문에 걸리지 않고 조각만 늘린다 -> 한국어 번역(fandom/ko/*.md)과 한국어 가이드(guide_ko.txt)만
-const SKIP = [/^\.git\//, /^scripts\//, /^이미지\//, /^도감\/작업\//, /^드랍표_원본\//, /^공식\/소식\.json$/, /^공식\/확률\//, /^저장할_글_/, /^2차_링크\.json$/, /^길드\/익명_보기\.txt$/, /^fandom\/(?!ko\/[^/]+\.md$|guide_ko\.txt$|그림글\.md$)/, /^링크\/.*\.json$/, /^제공\/초보자톡방_정리\.json$/]; // 초보자톡방 정리는 같은 내용의 md 만 (조각이 겹치지 않게)
+const SKIP = [/^\.git\//, /^scripts\//, /^이미지\//, /^도감\/작업\//, /^드랍표_원본\//, /^공식\/소식\.json$/, /^공식\/확률\//, /^저장할_글_/, /^2차_링크\.json$/, /^길드\/익명_보기\.txt$/, /^fandom\/(?!ko\/[^/]+\.md$|guide_ko\.txt$|그림글\.md$)/, /^링크\/.*\.json$/, /^제공\/초보자톡방_정리\.json$/,
+  // 거래소 녹화의 매물 하나하나·그림 목록, 도감 정보 아이템 목록 json 은 같은 내용의 요약 md 가 있다 (2026-11-12): 요약 md 와 시세.json 만
+  /^시세\/암거래중개인\/[^/]+\/(매물|아이콘)\.json$/, /^도감\/아이템\/아이템\.json$/]; // 초보자톡방 정리는 같은 내용의 md 만 (조각이 겹치지 않게)
 
 if (!existsSync(ROOT)) {
   console.log("자료 저장소가 없어서 건너뛰어요");
@@ -109,7 +111,8 @@ function chunksOf(path, raw) {
       .replace(/^(\d{4}년 [^,\n]+, [^:\n]*?)\s?\(\d{4}\) : /gm, "$1 : ");
   const out = [];
   // 해외 위키 번역은 문서('## 이름 (영문)')를 자르지 않고 묶는다: 이름이 든 머리와 본문이 한 조각에, 긴 문서의 다음 조각에는 '## 이름 (이어서)'
-  if (path.startsWith("fandom/ko/") || path === "fandom/그림글.md") {
+  // 영상에서 옮긴 아이템·시세·상점·도감 요약 md 도 아이템 하나 = '## 이름' 덩어리라 같은 방식 (2026-11-12)
+  if (path.startsWith("fandom/ko/") || path === "fandom/그림글.md" || /^(도감|시세|상점)\/.*\.md$/.test(path)) {
     const docs = text.split(/\n(?=## )/);
     let pack = "";
     for (const doc of docs) {
