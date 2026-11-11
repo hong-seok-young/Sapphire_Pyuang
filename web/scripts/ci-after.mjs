@@ -239,3 +239,26 @@ function runSql(lines) {
     console.log(`챗봇 개선 완료(블락) ${n}건`);
   }
 }
+
+// 챗봇 개선 완료 2026-11-11 (퓨앙 '카톡 공지방에서 공지를 해줄거임 제국 차례면'): #45 마녀 버프를 받는 조건.
+// 자료 저장소 제공/마녀_버프.md, 지시문 server/chatPrompt.ts. #45 는 앱개발자가 물은 것이라 알림 없이 완료만. setup 'gap_fix_witch_20261111'
+{
+  const KEY = "gap_fix_witch_20261111";
+  const done = queryFirst(`SELECT 1 AS d FROM setup WHERE key = '${KEY}'`)?.d;
+  if (!done) {
+    const now = Date.now();
+    const NOTE = "마녀 버프는 제국 차례가 되면 길드 카톡 공지방에서 공지해 준다고 답해요";
+    const OPEN = `g.status = 'open' AND g.id = 45`;
+    const n = queryFirst(`SELECT COUNT(*) AS n FROM chat_gaps g WHERE ${OPEN}`)?.n ?? 0;
+    runSql([
+      "INSERT INTO alerts (user_id, kind, text, link, created_at) " +
+        `SELECT g.user_id, 'chat_fixed', '챗봇이 개선됐어요. 물어봤던 “' || substr(replace(replace(g.question, char(10), ' '), char(13), ' '), 1, 40) || '” · ${NOTE}', ` +
+        "CASE WHEN EXISTS (SELECT 1 FROM chat_threads t WHERE t.id = g.thread_id AND t.user_id = g.user_id) THEN '#/chat/' || g.thread_id || '?again=' || g.id ELSE '#/chat' END, " +
+        `${now} FROM chat_gaps g WHERE ${OPEN} AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = g.user_id AND u.role = 'developer') ` +
+        "AND COALESCE((SELECT p.enabled FROM alert_prefs p WHERE p.user_id = g.user_id AND p.kind = 'chat_fixed'), 1) = 1;",
+      `UPDATE chat_gaps SET status = 'fixed', note = '${NOTE}', fixed_at = ${now} WHERE id IN (SELECT g.id FROM chat_gaps g WHERE ${OPEN});`,
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+    ]);
+    console.log(`챗봇 개선 완료(마녀 버프) ${n}건`);
+  }
+}
