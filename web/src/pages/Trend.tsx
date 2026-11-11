@@ -721,6 +721,12 @@ export function TrendPage({ wiki }: { wiki: Wiki }) {
         <Loading error={error?.includes("404") ? "시세 자료가 아직 없어요" : error} />
       ) : (
         <>
+          {/* 사기꾼 명단 띠 (제작자 2026-11-11 '이걸 시세 동향에 해': 중개인 맨 위에 있던 띠를 여기로). 누르면 '사기꾼' 칸 */}
+          <button type="button" className="scam-band" onClick={() => pick("scam")}>
+            <span className="scam-band-dot" aria-hidden />
+            <span className="scam-band-text">거래 전 사기꾼 명단 · 더치트 조회 · 실물 확인</span>
+            <span className="scam-band-go">›</span>
+          </button>
           <nav className="pill-row trend-tabs" role="tablist">
             {TABS.map((x) => (
               <button key={x.key} type="button" role="tab" aria-selected={tab === x.key} className={"pill" + (tab === x.key ? " pill-on" : "")} onClick={() => pick(x.key)}>
