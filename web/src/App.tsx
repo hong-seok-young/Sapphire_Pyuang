@@ -503,7 +503,7 @@ function Wiki({
   else if (page === "gaps")
     body =
       RANK[me.role] >= 2 ? (
-        <ChatGapsPage role={me.role} />
+        <ChatGapsPage role={me.role} wiki={wiki ?? null} />
       ) : (
         <NotFound what="페이지" />
       );

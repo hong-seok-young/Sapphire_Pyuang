@@ -1565,6 +1565,9 @@ button { font: inherit; color: inherit; }
 .gap-head { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
 .gap-q { font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
 .gap-reason { font-size: 13px; color: var(--gold); }
+/* 챗봇 개선의 답: 챗봇 화면 말풍선 그대로, 카드 폭을 다 쓰고 추천 질문 단추는 눌러도 묻지 않아서 숨긴다 */
+.gap-bubble { max-width: 100%; margin-top: 6px; }
+.gap-bubble .ans-asks { display: none; }
 .gap-answer { font-size: 12px; line-height: 1.6; color: var(--muted); white-space: pre-wrap; max-height: 220px; overflow-y: auto; background: rgba(0, 0, 0, 0.2); padding: 6px 8px; }
 .gap-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .gap-actions .chat-input { flex: 1 1 180px; }
