@@ -789,6 +789,27 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
   }
 }
 
+// 성장코인샵 목표는 목표 레벨만 정한다 (제작자 2026-11-11 '목표 레벨만 설정하면 되지 시작 레벨은 뭐야'): 담당자가 시작 레벨 칸으로 지금과 다르게 적어 둔 목표도
+// 아직 안 끝난 판은 정한 때(판 시작 전에 정했으면 판 시작 때)의 레벨·경험치를 시작(달성률 0%)으로 다시 맞춘다. 목표가 그 레벨 이하가 되는 줄은 그대로. setup 'gcoin_from_reset_20261111' 로 한 번만
+{
+  const KEY = "gcoin_from_reset_20261111";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const now = Date.now();
+    const at = "MAX(gc_targets.set_at, COALESCE((SELECT r.start FROM gc_rounds r WHERE r.id = gc_targets.round), gc_targets.round))";
+    const last = `FROM level_log l WHERE l.user_id = gc_targets.user_id AND l.at <= ${at} ORDER BY l.at DESC LIMIT 1`;
+    const prof = "FROM profiles p WHERE p.user_id = gc_targets.user_id";
+    const lv = `(CASE WHEN EXISTS (SELECT 1 ${last}) THEN (SELECT l.level ${last}) ELSE (SELECT p.level ${prof}) END)`;
+    const ex = `(CASE WHEN EXISTS (SELECT 1 ${last}) THEN (SELECT COALESCE(l.exp, 0) ${last}) ELSE (SELECT COALESCE(p.exp, 0) ${prof}) END)`;
+    runSql([
+      `UPDATE gc_targets SET from_level = ${lv}, from_exp = ${ex} ` +
+        `WHERE COALESCE((SELECT r.end_at FROM gc_rounds r WHERE r.id = gc_targets.round), gc_targets.round + 604800000) > ${now} ` +
+        `AND ${lv} IS NOT NULL AND gc_targets.target > ${lv};`,
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+    ]);
+    console.log("성장코인샵 목표 시작을 정한 때 자리로 (한 번)");
+  }
+}
+
 // 기부함 마일리지를 기부 골드 가치의 0.6 으로 (제작자 2026-11-10 '기부한 골드 가치의 x 0.6 이 마일리지로 쌓이는 거임, 10만 골드당 1, 소수점은 누적, 정수 부분만 사용').
 // 그 전에 확정한 기부(1.0 으로 넣은 💎)를 사람마다 floor(골드 합 x 0.6 / 10만) 에 맞춰 차이를 장부에 한 줄 넣고, 그 사람의 가장 최근 기부 줄 dia 에 더한다. setup 'donate_rate_06_20261110' 로 한 번만
 {

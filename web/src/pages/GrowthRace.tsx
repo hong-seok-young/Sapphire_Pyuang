@@ -730,13 +730,15 @@ export function TargetsTab({
     setAdding((xs) => xs.filter((x) => x !== id));
     if (server) hideTarget(id).catch(() => undefined);
   };
-  async function save(id: string, from: number, target: number | null) {
+  async function save(id: string, target: number | null) {
     const had = set.get(id) ?? null;
     const back = over[id];
+    // 시작 자리는 서버가 정한다 (정할 때 레벨·경험치, 이미 정했으면 그대로)
+    const from = had?.fromLevel ?? people.find((p) => p.id === id)?.level ?? 1;
     setOver((o) => ({ ...o, [id]: target === null ? null : { fromLevel: from, target, doneAt: had?.doneAt ?? null, rank: had?.rank ?? 0 } }));
     if (target === null) drop(id, false);
     try {
-      await setTarget(id, target, from);
+      await setTarget(id, target);
       onChanged(target === null ? `${id} 목표 뺌` : `${id} 목표 Lv.${target}`);
     } catch (x) {
       setOver((o) => {
@@ -769,7 +771,7 @@ export function TargetsTab({
               key={m.id}
               m={m}
               e={set.get(m.id) ?? null}
-              onSave={(t, f) => save(m.id, f, t)}
+              onSave={(t) => save(m.id, t)}
               onDrop={() => drop(m.id)}
             />
           ))}
@@ -881,22 +883,22 @@ function TargetRow({
   m: { id: string; level: number | null };
   e: TargetEntry | null;
   /** 바로 화면에 바꾸고 서버에 보낸다 (실패하면 던진다) */
-  onSave: (target: number | null, from: number) => Promise<void>;
+  onSave: (target: number | null) => Promise<void>;
   /** 아직 정하지 않은 줄을 목록에서 뺀다 */
   onDrop: () => void;
 }) {
   const lv = m.level ?? 1;
-  // 시작 레벨도 담당자가 고친다 (2026-11-10 담당자 '목표 레벨 정한 거 저장이 안 돼요': 공지의 시작 레벨보다 사이트 레벨이 높으면 목표를 그 위로만 정할 수 있었다)
-  const [f, setF] = useState(e?.fromLevel ?? lv);
-  const [t, setT] = useState(e?.target ?? Math.max(lv, e?.fromLevel ?? lv) + 2);
+  // 목표 레벨만 정한다 (제작자 2026-11-11 '목표 레벨만 설정하면 되지 시작 레벨은 뭐야'): 시작은 정할 때의 레벨·경험치 (달성률 0%)
+  const from = e?.fromLevel ?? lv;
+  const [t, setT] = useState(e?.target ?? lv + 2);
   const busy = false;
   const [error, setError] = useState("");
   const [ok, setOk] = useState(false);
-  const dirty = !e || t !== e.target || f !== e.fromLevel;
+  const dirty = !e || t !== e.target;
   function run(target: number | null) {
     setError("");
     setOk(false);
-    onSave(target, f).then(
+    onSave(target).then(
       () => target !== null && setOk(true),
       (x) => setError(errorText(x)),
     );
@@ -907,22 +909,10 @@ function TargetRow({
         <Nick name={m.id} />
         <small>Lv.{lv}</small>
       </span>
-      <span className="gc-step gr-tg-step gr-tg-from">
-        <button className="pill" disabled={busy || f <= 1} onClick={() => setF((x) => x - 1)} aria-label="시작 레벨 내리기">
-          −
-        </button>
-        <b key={f} className="gc-pop">
-          {f}
-        </b>
-        <button className="pill" disabled={busy || f >= t - 1} onClick={() => setF((x) => x + 1)} aria-label="시작 레벨 올리기">
-          +
-        </button>
-      </span>
-      <span className="gr-tg-arrow">→</span>
       <span className="gc-step gr-tg-step">
         <button
           className="pill"
-          disabled={busy || t <= f + 1}
+          disabled={busy || t <= from + 1}
           onClick={() => setT((x) => x - 1)}
           aria-label="목표 내리기"
         >
