@@ -3,7 +3,7 @@
 // 이번 주 2군 성장 순위를 보인다. 누르면 상점으로. src/auth.ts saveMyProfile 이 'sapphire:gcoin' 으로 알린다 (서버가 코인을 줄 때만: 지금은 앱개발자·테스트 계정)
 import { useEffect, useRef, useState } from "react";
 import { go } from "./router";
-import { COIN_EVENT, RACE_EVENT, milestone } from "./gcoin";
+import { COIN_EVENT, RACE_EVENT, levelMark, milestone } from "./gcoin";
 import type { CoinGain, RaceGain } from "./gcoin";
 
 const SHOW_MS = 5200;
@@ -303,7 +303,7 @@ export function RaceToast() {
           {Array.from(
             { length: Math.max(0, g.target - g.fromLevel - 1) },
             (_, i) => {
-              const at = ((i + 1) / (g.target - g.fromLevel)) * 100;
+              const at = levelMark(g.fromLevel, g.fromExp, g.target, g.fromLevel + i + 1);
               const hit = at > g.prevPct + 1e-6 && at <= g.pct + 1e-6;
               return (
                 <span

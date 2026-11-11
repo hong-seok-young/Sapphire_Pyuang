@@ -1044,6 +1044,7 @@ CREATE TABLE IF NOT EXISTS gc_targets (
   target INTEGER NOT NULL,
   set_at INTEGER NOT NULL,
   set_by TEXT,
+  from_exp INTEGER,
   PRIMARY KEY (round, user_id)
 );
 -- 연속 성장 (server/gcoin.ts settleWeeks): 사람마다 마지막으로 코인을 번 주(시작 ms)와 그때까지 이어진 주 수. 2주째부터 연속 보너스 (gc_ledger kind streak)

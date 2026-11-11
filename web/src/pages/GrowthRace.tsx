@@ -7,7 +7,7 @@ import { JOB_NAME, avatarUrl, errorText } from "../auth";
 import { JobEmblem } from "../emblems";
 import { Nick } from "../kakao";
 import { useBackClose } from "../backClose";
-import { COIN_GOLD, hideTarget, setRound, setTarget } from "../gcoin";
+import { COIN_GOLD, hideTarget, levelMark, setRound, setTarget } from "../gcoin";
 import type { GcPerson, GcRace, GcRaceEntry, GcRoundResult } from "../gcoin";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
@@ -51,7 +51,7 @@ function Face({ e, size }: { e: GcRaceEntry; size: number }) {
   );
 }
 
-/** 닉네임 표 폭 어림 (12px 굵은 글씨, 한글 12.5px · 나머지 7.5px, 둘레 12px, 왕관 14px) */
+/** 선 끝 순위 표 폭 어림 (제작자 2026-11-11 '이름표 너무 겹침, 숫자로 1등 2등 3등': 닉네임 대신 순위 숫자. 12px 굵은 글씨, 숫자 7.5px, 둘레 12px) */
 function tagWidth(name: string, crown: boolean): number {
   let n = 12 + (crown ? 14 : 0);
   for (const ch of name) n += /[\u3131-\uD7A3]/.test(ch) ? 12.5 : 7.5;
@@ -75,7 +75,7 @@ function placeTags<P extends { e: GcRaceEntry; end: number; last: number }>(
   return list.map((p) => {
     const cx = x(p.end);
     const cy = y(p.last);
-    const tw = tagWidth(p.e.id, p.e.rank === 1);
+    const tw = tagWidth(String(p.e.rank), false);
     const hw = tw / 2;
     const fit = (v: number) => Math.min(Math.max(v, hw + 2), w - hw - 2);
     let pick: { tx: number; ty: number } | null = null;
@@ -396,8 +396,7 @@ function RaceChart({
               }}
               onClick={() => onPick(p.e.id)}
             >
-              {p.e.rank === 1 && <em className="gr-crown">👑</em>}
-              {p.e.id}
+              {p.e.rank}
             </span>
           </Fragment>
         ))}
@@ -612,7 +611,7 @@ export function RaceCard({
                 className={
                   "gr-tick-lv" + (entry.level >= l ? " gr-tick-on" : "")
                 }
-                style={{ left: `${((l - entry.fromLevel) / span) * 100}%` }}
+                style={{ left: `${levelMark(entry.fromLevel, entry.fromExp, entry.target, l)}%` }}
               >
                 <em>{l}</em>
               </span>

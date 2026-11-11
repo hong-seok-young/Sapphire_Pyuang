@@ -120,6 +120,8 @@ const ADDED_COLUMNS = [
   ["board_posts", "sg_status", "TEXT"],
   // 폰 알림을 마지막으로 보낸 때와 푸시 서버의 답 (server/push.ts pushOne, 어느 폰이 안 받는지 보려고)
   ["push_subs", "last_status", "INTEGER"], ["push_subs", "last_at", "INTEGER"],
+  // 성장코인샵 목표를 정할 때 경험치: 그 자리가 달성률 0% (제작자 2026-11-11)
+  ["gc_targets", "from_exp", "INTEGER"],
 ];
 for (const [table, column, type] of ADDED_COLUMNS) {
   const columns = parseJson(wrangler("d1", "execute", DB, "--remote", "--json", "--command", `PRAGMA table_info(${table})`))[0]?.results ?? [];
@@ -766,6 +768,24 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
       `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
     ]);
     console.log("성장코인샵 첫 판을 11/16(월) 0시부터 (한 번)");
+  }
+}
+
+// 성장코인샵 목표를 정한 자리를 달성률 0% 로 (제작자 2026-11-11 '목표 설정하면 기존 겸치가 어떻든 그냥 달성률 0% 로 시작'): 이미 정한 목표마다
+// 판이 시작한 때와 정한 때 중 늦은 때의 마지막 기록이 시작 레벨이면 그 경험치, 기록이 없으면 지금 프로필(같은 레벨일 때). setup 'gcoin_from_exp_20261111' 로 한 번만
+{
+  const KEY = "gcoin_from_exp_20261111";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const at = "MAX(gc_targets.set_at, COALESCE((SELECT r.start FROM gc_rounds r WHERE r.id = gc_targets.round), gc_targets.round))";
+    const last = `FROM level_log l WHERE l.user_id = gc_targets.user_id AND l.at <= ${at} ORDER BY l.at DESC LIMIT 1`;
+    runSql([
+      "UPDATE gc_targets SET from_exp = CASE " +
+        `WHEN EXISTS (SELECT 1 ${last}) THEN COALESCE((SELECT CASE WHEN l.level = gc_targets.from_level THEN COALESCE(l.exp, 0) ELSE 0 END ${last}), 0) ` +
+        "ELSE COALESCE((SELECT CASE WHEN p.level = gc_targets.from_level THEN COALESCE(p.exp, 0) ELSE 0 END FROM profiles p WHERE p.user_id = gc_targets.user_id), 0) END " +
+        "WHERE from_exp IS NULL;",
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
+    ]);
+    console.log("성장코인샵 목표 시작 경험치 채움 (한 번)");
   }
 }
 

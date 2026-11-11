@@ -67,6 +67,8 @@ export interface RaceEntry {
   id: string;
   /** 목표를 정할 때 레벨과 목표 레벨 */
   fromLevel: number;
+  /** 목표를 정할 때 경험치(% x 1000): 그 자리가 달성률 0% (제작자 2026-11-11 '목표 설정하면 기존 겸치가 어떻든 0% 로 시작') */
+  fromExp: number;
   target: number;
   /** 지금 레벨·경험치(% x 1000) */
   level: number;
@@ -85,9 +87,11 @@ export interface RaceEntry {
 }
 
 const pos = (level: number, exp: number | null) => level + (exp ?? 0) / 100_000;
-export function progress(fromLevel: number, target: number, level: number, exp: number | null): number {
-  if (target <= fromLevel) return 100;
-  const p = ((pos(level, exp) - fromLevel) / (target - fromLevel)) * 100;
+/** 달성률: 목표를 정한 자리(레벨 + 경험치)가 0%, 목표 레벨 0% 가 100% */
+export function progress(fromLevel: number, fromExp: number, target: number, level: number, exp: number | null): number {
+  const from = pos(fromLevel, fromExp);
+  if (target <= from) return 100;
+  const p = ((pos(level, exp) - from) / (target - from)) * 100;
   return Math.max(0, Math.min(100, Math.floor(p * 10 + 1e-6) / 10));
 }
 
@@ -100,17 +104,18 @@ export async function raceState(env: Env, round: Round, prizes: number[], now = 
       ? `COALESCE((SELECT l.${col} FROM level_log l WHERE l.user_id = t.user_id AND l.at < ${end} ORDER BY l.at DESC LIMIT 1), p.${col})`
       : `p.${col}`;
   const { results } = await env.DB.prepare(
-    `SELECT t.user_id AS id, t.from_level AS fromLevel, t.target AS target, ${at("level")} AS level, ${at("exp")} AS exp, p.job AS job, ` +
+    `SELECT t.user_id AS id, t.from_level AS fromLevel, COALESCE(t.from_exp, 0) AS fromExp, t.target AS target, ${at("level")} AS level, ${at("exp")} AS exp, p.job AS job, ` +
       "a.updated_at AS avatar, u.high_spec AS high, " +
       "(SELECT MIN(l.at) FROM level_log l WHERE l.user_id = t.user_id AND l.level >= t.target AND l.at >= ? AND l.at < ?) AS doneAt " +
       "FROM gc_targets t JOIN profiles p ON p.user_id = t.user_id JOIN users u ON u.id = t.user_id " +
       "LEFT JOIN avatars a ON a.user_id = t.user_id WHERE t.round = ?",
   )
     .bind(start, end, round.id)
-    .all<{ id: string; fromLevel: number; target: number; level: number; exp: number | null; job: string; avatar: number | null; high: number | null; doneAt: number | null }>();
+    .all<{ id: string; fromLevel: number; fromExp: number; target: number; level: number; exp: number | null; job: string; avatar: number | null; high: number | null; doneAt: number | null }>();
   const list = results.map((r) => ({
     id: r.id,
     fromLevel: r.fromLevel,
+    fromExp: r.fromExp,
     target: r.target,
     level: r.level,
     exp: r.exp,
@@ -118,7 +123,7 @@ export async function raceState(env: Env, round: Round, prizes: number[], now = 
     avatar: r.avatar,
     highSpec: r.high === 1,
     doneAt: r.doneAt,
-    pct: r.doneAt !== null ? 100 : progress(r.fromLevel, r.target, r.level, r.exp),
+    pct: r.doneAt !== null ? 100 : progress(r.fromLevel, r.fromExp, r.target, r.level, r.exp),
     rank: 0,
     coins: 0,
   }));
@@ -182,7 +187,7 @@ async function raceSeries(env: Env, round: Round, list: RaceEntry[]): Promise<Re
   const add = (id: string, at: number, level: number, exp: number | null) => {
     const e = by.get(id);
     if (!e) return;
-    const p = level >= e.target ? 100 : progress(e.fromLevel, e.target, level, exp);
+    const p = level >= e.target ? 100 : progress(e.fromLevel, e.fromExp, e.target, level, exp);
     const b = Math.max(best.get(id) ?? 0, p);
     const pts = (out[id] ??= []);
     if (pts.length && pts[pts.length - 1][1] === b) return;
@@ -229,6 +234,7 @@ export async function raceData(env: Env, now = Date.now(), pre?: { rounds: Round
 export interface RaceGain {
   target: number;
   fromLevel: number;
+  fromExp: number;
   /** 저장 전·후 달성률 */
   prevPct: number;
   pct: number;
@@ -261,6 +267,7 @@ export async function raceAfter(env: Env, me: User, before: { round: Round; priz
   return {
     target: mine.target,
     fromLevel: mine.fromLevel,
+    fromExp: mine.fromExp,
     prevPct: before.mine.pct,
     pct: mine.pct,
     justDone,
