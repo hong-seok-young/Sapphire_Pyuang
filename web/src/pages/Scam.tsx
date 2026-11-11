@@ -1,6 +1,6 @@
 // 아이모 사기꾼 명단 (제작자 2026-11-11 '거래 전 더치트 조회 & 실물 확인! 사기꾼 리스트, 우리 DB 에 넣고 업데이트되면 반영').
 // 'db 에 넣어' = 챗봇·검색 등 웹이 얼마든지 쓰는 데이터로 (제작자 같은 날, '메뉴도 만들라고 한 적 없는데, 만들 거면 시세 동향 쪽에').
-// 자료는 GET /api/scam (server/scam.ts, D1 scam_list: 카카오 포스트의 표 그림을 옮긴 것, 30분마다 그림이 바뀌었는지 본다).
+// 자료는 GET /api/scam (server/scam.ts, D1 scam_list: 카카오 포스트의 표 그림을 옮긴 것, 일주일에 한 번 그림이 바뀌었는지 본다).
 // 쓰는 곳: 시세 동향의 '사기꾼' 칸(ScamPanel), 검색 화면(ScamRows, matches), 챗봇(server/scam.ts). 원본이 가린 글자(x)는 그대로.
 import { api } from "../auth";
 import { useAsync } from "../data";

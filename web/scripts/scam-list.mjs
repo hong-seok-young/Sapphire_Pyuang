@@ -1,7 +1,7 @@
 // 아이모 사기꾼 명단 (제작자 2026-11-11 '거래 전 더치트 조회 & 실물 확인! 사기꾼 리스트 정리한다, 이것도 우리 DB 에 넣고 여기 내용 업데이트되면 반영').
 // 원본은 카카오 오픈프로필 포스트(bit.ly/47c9kbQ -> open.kakao.com/p/…, Made by. 시리온 암)의 표 그림 하나다. 웹에서는 포스트 글은 못 읽고
 // og:image(표 그림)와 og:title 만 보인다. 그래서 그림 주소가 바뀌면(포스트를 고치면 새 그림이 올라간다) 그 그림을 Claude 로 옮겨 계정 DB(D1) scam_list 에 넣는다.
-//   node scripts/scam-list.mjs                 30분마다 (official-news.yml): 그림이 바뀌었으면 옮겨 넣는다 (made 'ai'), 앱개발자에게 알림
+//   node scripts/scam-list.mjs                 일주일에 한 번 (scam-list.yml, 제작자 '30분 너무 짧음'): 그림이 바뀌었으면 옮겨 넣는다 (made 'ai'), 앱개발자에게 알림
 //   node scripts/scam-list.mjs --seed <json>   배포 (deploy-web.yml): 비공개 자료 링크/사기꾼_명단/명단.json(사람이 옮긴 것)을 넣는다.
 //                                              DB 가 비었거나 같은 그림이면 넣고, DB 가 더 새 그림(AI 가 옮긴 것)이면 그대로 둔다
 //   --local (D1_PERSIST=<persist 폴더>)       로컬 시험
@@ -104,7 +104,7 @@ if (seedFile) {
   process.exit(0);
 }
 
-// ---------- 30분마다: 포스트의 그림이 바뀌었는지 ----------
+// ---------- 일주일에 한 번: 포스트의 그림이 바뀌었는지 ----------
 const meta = (html, prop) => {
   const m = html.match(new RegExp(`<meta[^>]+property="${prop}"[^>]+content="([^"]*)"`, "i"));
   return m ? m[1].replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">") : "";

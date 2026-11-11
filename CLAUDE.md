@@ -790,7 +790,7 @@
   웹에서는 포스트 글을 못 읽고 og:image(첫 그림)와 og:title 만 보인다: 그림이 여러 장이면 첫 장만 받는다 (2026-11-11 25줄).
 - 저장: 비공개 자료 `링크/사기꾼_명단/명단.json`(사람이 옮긴 것)과 원본 그림, 기록 `제공/사기꾼_명단.md`. 계정 DB(D1) `scam_list` 한 줄(rows JSON, made person|ai).
   배포(`deploy-web.yml` 'Scam list', `scripts/scam-list.mjs --seed`)가 DB 가 비었거나 같은 그림일 때 그 json 을 넣는다.
-- 업데이트 반영: 공식 소식 작업(`official-news.yml` 30분마다 'Scam list', `scripts/scam-list.mjs`)이 포스트의 og:image 폴더가 바뀌었는지 보고, 바뀌면 그림(img.jpg)을 Claude(opus, effort high)로 옮겨 넣고(made 'ai')
+- 업데이트 반영: 일주일에 한 번(월 12:17 한국 시간, 제작자 '30분 너무 짧음, 일주일에 한 번 해도 돼') `scam-list.yml`(손으로도 돌린다, `scripts/scam-list.mjs`)이 포스트의 og:image 폴더가 바뀌었는지 보고, 바뀌면 그림(img.jpg)을 Claude(opus, effort high)로 옮겨 넣고(made 'ai')
   앱개발자에게 알림. 옮긴 줄이 전보다 크게 줄면(60% 아래) 넣지 않고 알린다. 공개 실행 기록에는 줄 수만. AI 가 옮긴 것을 사람이 확인하면 json 을 고쳐 올린다(image 를 새 주소로).
 - 'db 에 넣어' = 메뉴를 만들라는 게 아니라 챗봇·검색 등 웹이 얼마든지 쓰는 데이터로 (제작자 같은 날 '메뉴도 만들라고 한 적 없는데, 만들 거면 시세 동향 쪽에'.
   처음에 따로 만든 #/scam 화면과 중개인 맨 위 띠는 그래서 뺐다). 앞으로도 '자료를 db 에 넣어'는 데이터화와 챗봇·검색 연결이고, 메뉴는 묻거나 시키면 만든다.

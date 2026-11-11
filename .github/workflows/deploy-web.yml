@@ -117,7 +117,7 @@ jobs:
         working-directory: web
         run: node scripts/donate-hall-seed.mjs || echo "::warning::명예의 전당 예전 기부를 넣지 못했어요"
 
-      # 아이모 사기꾼 명단 (제작자 2026-11-11): 비공개 자료 링크/사기꾼_명단/명단.json(사람이 옮긴 것)을 같은 그림일 때 넣는다. 포스트가 바뀌면 30분마다 도는 공식 소식 작업이 옮긴다
+      # 아이모 사기꾼 명단 (제작자 2026-11-11): 비공개 자료 링크/사기꾼_명단/명단.json(사람이 옮긴 것)을 같은 그림일 때 넣는다. 포스트가 바뀌면 일주일에 한 번 도는 scam-list.yml 이 옮긴다
       - name: Scam list
         working-directory: web
         run: node scripts/scam-list.mjs --seed ../자료/링크/사기꾼_명단/명단.json || echo "::warning::사기꾼 명단을 넣지 못했어요"

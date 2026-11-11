@@ -1,5 +1,5 @@
 // 아이모 사기꾼 명단 (제작자 2026-11-11 '거래 전 더치트 조회 & 실물 확인, 사기꾼 리스트 우리 DB 에 넣고 업데이트되면 반영').
-// D1 scam_list 한 줄 (scripts/scam-list.mjs 가 채운다: 배포는 비공개 자료의 사람이 옮긴 것, 30분마다 카카오 포스트 그림이 바뀌면 AI 가 옮긴 것).
+// D1 scam_list 한 줄 (scripts/scam-list.mjs 가 채운다: 배포는 비공개 자료의 사람이 옮긴 것, 일주일에 한 번 카카오 포스트 그림이 바뀌었는지 보고 AI 가 옮긴 것).
 // 쓰는 곳: 챗봇(chatapp.ts scamContext), 검색 화면, 시세 동향 '사기꾼' 칸 (src/pages/Scam.tsx, GET /api/scam). 로그인한 길드원만.
 import type { Env } from "./auth";
 
