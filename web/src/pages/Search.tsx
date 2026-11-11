@@ -8,6 +8,8 @@ import { forgetSearch, recentSearches, rememberSearch, useFavorites } from "../f
 import type { FavKind } from "../favorites";
 import { TYPE_NAME, fetchOfficial } from "../official";
 import type { OfficialItem } from "../official";
+import { ScamRows, fetchScam, matches, scamSource } from "./Scam";
+import type { ScamList } from "./Scam";
 
 const KIND = { item: "아이템", monster: "몬스터", place: "사냥터" } as const;
 
@@ -70,6 +72,28 @@ function useOfficialHits(q: string): OfficialItem[] | null {
   return items;
 }
 
+/**
+ * 아이모 사기꾼 명단에서도 찾는다 (제작자 2026-11-11 'db 에 넣어 = 챗봇이나 검색 등 우리 웹이 얼마든지 활용할 수 있게'): 이름·닉네임·폰 뒷자리·계좌 숫자.
+ * 명단은 이번에 연 동안 한 번만 받는다 (pages/Scam.tsx, GET /api/scam)
+ */
+let scamOnce: Promise<ScamList | null> | null = null;
+function useScamHits(q: string): { list: ScamList; rows: ScamList["rows"] } | null {
+  const [list, setList] = useState<ScamList | null>(null);
+  const on = q.replace(/\s+/g, "").length >= 2;
+  useEffect(() => {
+    if (!on || list) return;
+    let alive = true;
+    scamOnce ??= fetchScam().then((r) => r.list, () => ((scamOnce = null), null));
+    scamOnce.then((l) => alive && setList(l));
+    return () => {
+      alive = false;
+    };
+  }, [on, list]);
+  if (!on || !list) return null;
+  const rows = list.rows.filter((r) => matches(r, q));
+  return rows.length ? { list, rows } : null;
+}
+
 const HIT_NAME: Record<string, string> = { body: "본문", image: "그림 속 글자" };
 const OFFICIAL_MAX = 8;
 
@@ -87,6 +111,7 @@ export function Search({ wiki, q }: { wiki: Wiki; q: string }) {
   const [recent, setRecent] = useState(recentSearches);
   const remember = () => rememberSearch(q);
   const official = useOfficialHits(q);
+  const scam = useScamHits(q);
 
   return (
     <>
@@ -156,7 +181,14 @@ export function Search({ wiki, q }: { wiki: Wiki; q: string }) {
           </ul>
         </section>
       )}
-      {q && !hits.length && official && !official.length && <div className="empty">"{q}" 검색 결과가 없어요.</div>}
+      {scam && (
+        <section className="search-scam">
+          <h2 className="panel-title">사기꾼 명단 {scam.rows.length}</h2>
+          <ScamRows rows={scam.rows} />
+          <div className="scam-foot">{scamSource(scam.list)}</div>
+        </section>
+      )}
+      {q && !hits.length && !scam && official && !official.length && <div className="empty">"{q}" 검색 결과가 없어요.</div>}
       <ul className="list">
         {hits.map((h) => {
           const key = h.kind === "place" ? h.to.split("/").pop()! : h.name;

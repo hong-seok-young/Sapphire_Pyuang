@@ -5337,16 +5337,7 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 .dmg-own { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto minmax(0, 1fr) auto; align-items: center; gap: 4px; min-width: 0; padding: 1px 3px; background: var(--lo); font-size: 12px; }
 .dmg-guess { font-size: 10px; color: var(--muted); border: 1px solid rgba(255, 255, 255, 0.2); padding: 0 3px; white-space: nowrap; }
 
-/* 아이모 사기꾼 명단 (제작자 2026-11-11, pages/Scam.tsx): 중개인 맨 위 붉은 얇은 띠(점검 띠와 같은 모양)와 #/scam 화면 */
-.scam-band {
-  display: flex; align-items: center; gap: 6px; height: 20px; margin: 0 0 8px; padding: 0 8px; overflow: hidden;
-  font-size: 10.5px; line-height: 20px; color: rgba(255, 170, 150, 0.95); text-decoration: none; letter-spacing: 0.2px;
-  background: repeating-linear-gradient(-45deg, rgba(255, 80, 60, 0.18) 0 7px, rgba(255, 80, 60, 0.06) 7px 14px);
-}
-.scam-band:active { filter: brightness(1.25); }
-.scam-band-dot { flex: none; width: 5px; height: 5px; background: currentColor; box-shadow: 0 0 4px currentColor; animation: maint-blink 1.4s steps(1) infinite; }
-.scam-band-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; }
-.scam-band-go { flex: none; font-size: 13px; }
+/* 아이모 사기꾼 명단 (제작자 2026-11-11, pages/Scam.tsx): 시세 동향 '사기꾼' 칸과 검색 결과 */
 .scam-rule { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; padding: 4px 8px; font-size: 11px; color: rgba(255, 175, 155, 0.95);
   background: repeating-linear-gradient(-45deg, rgba(255, 80, 60, 0.18) 0 7px, rgba(255, 80, 60, 0.06) 7px 14px); }
 .scam-rule-dot { flex: none; width: 5px; height: 5px; background: currentColor; box-shadow: 0 0 4px currentColor; animation: maint-blink 1.4s steps(1) infinite; }
@@ -5368,4 +5359,6 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 .scam-tag-hot { color: #fff; background: rgba(230, 60, 50, 0.75); }
 .scam-foot { margin: 10px 2px 4px; font-size: 10.5px; color: var(--muted, #9aa3c7); }
 .scam-foot a { color: inherit; }
-@media (prefers-reduced-motion: reduce) { .scam-band-dot, .scam-rule-dot { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .scam-rule-dot { animation: none; } }
+.search-scam { margin-top: 10px; }
+.search-scam .scam-foot { margin-top: 4px; }

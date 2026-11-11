@@ -14,7 +14,7 @@ export interface Patch {
 const AT_1_6 = Date.UTC(2026, 10, 11, 2);
 
 export const PATCHES: Patch[] = [
-  ...(Date.now() >= AT_1_6 ? [{ version: "1.6", date: "11.11", items: ["성장코인샵 추가 (2군 전용)", "사기꾼 명단 추가 (중개인 맨 위 띠)", "챗봇 사기꾼 명단 답변 추가"] }] : []),
+  ...(Date.now() >= AT_1_6 ? [{ version: "1.6", date: "11.11", items: ["성장코인샵 추가 (2군 전용)", "검색 사기꾼 명단 결과 추가", "챗봇 사기꾼 명단 답변 추가"] }] : []),
   {
     version: "1.5",
     date: "11.09",
