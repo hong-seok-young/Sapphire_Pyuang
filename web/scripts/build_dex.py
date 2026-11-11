@@ -193,6 +193,18 @@ def main() -> None:
     if bpd.exists():
         for f in bpd.glob("*.png"):
             book_pics.setdefault(key(f.stem), f)
+    # 파일 이름에 못 쓰는 글자(':' 등)는 '_' 로 저장돼 있다: 사전의 '그림' 경로로 이름과 잇는다 ('명예:희생의갑옷' -> 명예_희생의갑옷.png)
+    for b in book.values():
+        if b.get("그림"):
+            f = DATA / b["그림"]
+            if f.exists():
+                book_pics.setdefault(key(b["이름"]), f)
+    for f in (PICS.glob("*.png") if PICS.exists() else []):
+        crops.setdefault(key(f.stem.replace("_", ":")), f)
+    # 그다음 거래소 녹화에서 오린 그림 (자료/이미지/암거래중개인, 코스튬·재료 등)
+    exd = DATA / "이미지" / "암거래중개인"
+    for f in (exd.glob("*.png") if exd.exists() else []):
+        book_pics.setdefault(key(f.stem), f)
     pics = {n: crops.get(n) or cafe.get(n) or book_pics.get(n) for n in names if n not in wiki and (crops.get(n) or cafe.get(n) or book_pics.get(n))}
     out_pics = OUT / "dex"
     if out_pics.exists():
