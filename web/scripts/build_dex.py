@@ -81,7 +81,13 @@ def price_data(key, wanted: set, infos: dict) -> dict | None:
         seen_lv, kinds, byp = {}, {}, {}
         for e in s.get("equipment", []):
             kinds[key(e["base"])] = e.get("kind")
-        ck = lambda e, k: ("C:" + k) if str(e.get("tab") or "").startswith("코스튬") else k  # 코스튬 탭 매물은 일반 장비와 이름이 같아도 따로 ('동그리모자')
+        def ck(e, k):
+            tab = str(e.get("tab") or "")
+            if tab.startswith("코스튬"):  # 코스튬 탭 매물은 일반 장비와 이름이 같아도 따로 ('동그리모자')
+                return "C:" + k
+            if tab == "펫":  # 펫은 띄어쓰기만 다른 다른 펫이 있다 ('견습마법사' / '견습 마법사'): 이름 그대로
+                return "P:" + (e.get("base") or e.get("name") or "").strip()
+            return k
         for it in s.get("items", []):
             k = ck(it, key(it.get("base") or it.get("name") or ""))
             if not k:
@@ -102,9 +108,9 @@ def price_data(key, wanted: set, infos: dict) -> dict | None:
             if k and o.get("unit_min") is not None and k not in byp:
                 byp[k] = {"0": o["unit_min"]}
         for k, p in byp.items():
-            if k.removeprefix("C:") not in wanted or not p:
+            if k.removeprefix("C:") not in wanted and not (k.startswith("P:") and key(k[2:]) in wanted) or not p:
                 continue
-            kind = None if k.startswith("C:") else (kinds.get(k) or ("갑옷류" if tabs.get(k, set()) & ARMOR_TABS else None))
+            kind = None if k[:2] in ("C:", "P:") else (kinds.get(k) or ("갑옷류" if tabs.get(k, set()) & ARMOR_TABS else None))
             mm = re.search(r"요구\s*레벨\s*(\d+)", infos.get(k, ""))
             lv = wiki_lv.get(k) or seen_lv.get(k) or (int(mm.group(1)) if mm else None)
             gear[k] = {"k": kind, "lv": lv, "p": p, "d": date_}
@@ -209,6 +215,7 @@ def main() -> None:
     pics = {n: crops.get(n) or cafe.get(n) or book_pics.get(n) for n in names if n not in wiki and (crops.get(n) or cafe.get(n) or book_pics.get(n))}
     # 영상에서 아이템만 오린 아이콘 (자료/이미지/도감아이콘, 육각형·칸 바탕 없이, 고화질): 위키 그림이 있어도 이것을 먼저 쓴다
     # (제작자 2026-11-12 '아이콘은 해당 아이템 그 자체를 누끼', '화질 구린 거 이번 영상 화질로 싹 교체')
+    exact_src: dict[str, Path] = {}
     cut_dir = DATA / "이미지" / "도감아이콘"
     cut_list = cut_dir / "목록.json"
     if cut_list.exists():
@@ -216,6 +223,7 @@ def main() -> None:
             f = cut_dir / (re.sub(r'[\/:*?"<>|]', "_", nm) + ".png")
             if f.exists() and key(nm) in names:
                 pics[key(nm)] = f
+                exact_src[nm] = f
     out_pics = OUT / "dex"
     if out_pics.exists():
         shutil.rmtree(out_pics)
@@ -223,6 +231,15 @@ def main() -> None:
         out_pics.mkdir(parents=True)
         for n, f in pics.items():
             shutil.copy2(f, out_pics / f"{n}.png")
+    # 띄어쓰기만 다른 이름이 둘 이상인 것만 이름 그대로 따로 복사 (그 밖은 key 이름 하나)
+    from collections import Counter as _C
+    _dup = _C(key(n) for n in exact_src)
+    exact_pics: dict[str, str] = {}
+    for nm, f in exact_src.items():
+        if _dup[key(nm)] > 1:
+            fn = "x_" + re.sub(r'[\/:*?"<>|\s]', "_", nm) + ".png"
+            shutil.copy2(f, out_pics / fn)
+            exact_pics[nm] = fn
     no_pic = sorted(n for n in names if n not in wiki and n not in pics)
     # 영상 툴팁에서 받아 적은 아이템 정보(요구 레벨·방어력·옵션, 재료면 설명). 같은 이름의 다른 칸에만 적힌 것도 쓴다 (제작자 2026-11-10 '이미지랑 내용 장비옵션 다 db화')
     def clean_info(t: str) -> str:
@@ -271,7 +288,9 @@ def main() -> None:
                 d["sg"], d["sn"] = (m.group(1) or "") + m.group(2).upper(), int(m.group(3))
             elif "불가" in st:
                 d["sg"] = "불가"
-            if base and key(base) in pics:
+            if base and base in exact_pics:
+                d["pic"] = f"/data/dex/{exact_pics[base]}"
+            elif base and key(base) in pics:
                 d["pic"] = f"/data/dex/{key(base)}.png"
             info = clean_info(it.get("info")) or (infos.get(key(base)) if base else None)
             if info:
@@ -299,6 +318,9 @@ def main() -> None:
                 k = key(re.sub(r"^\+\d+\s*", "", it["name"]))
                 if e.get("cat") == "코스튬":
                     it["pk"] = ("C:" + k) if ("C:" + k) in price["gear"] else ("" if k in price["gear"] else None)
+                elif e.get("cat") == "펫":
+                    pk = "P:" + it["name"].strip()
+                    it["pk"] = pk if pk in price["gear"] else ""
                 if it.get("pk") is None:
                     it.pop("pk", None)
         print("도감 시세", {"날짜": price["date"], "시세 있는 장비": len(price["gear"]), "레벨 모름": sorted(k for k, g in price["gear"].items() if not g["lv"]),
