@@ -5,10 +5,11 @@ import { Fragment, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { JOB_NAME, avatarUrl, errorText } from "../auth";
 import { JobEmblem } from "../emblems";
-import { Nick } from "../kakao";
+import { Nick, useKakao } from "../kakao";
 import { useBackClose } from "../backClose";
 import { COIN_GOLD, hideTarget, levelMark, setRound, setTarget } from "../gcoin";
 import type { GcPerson, GcRace, GcRaceEntry, GcRoundResult } from "../gcoin";
+import { FitLine } from "../ui";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
 /** 앞 세 사람 선 색 (dataviz 검사기 --pairs all 로 어두운 바탕 #1b1d3a 에서 통과: 파랑 · 주황 · 청록) */
@@ -887,6 +888,7 @@ function TargetRow({
   /** 아직 정하지 않은 줄을 목록에서 뺀다 */
   onDrop: () => void;
 }) {
+  const { high } = useKakao();
   const lv = m.level ?? 1;
   // 목표 레벨만 정한다 (제작자 2026-11-11 '목표 레벨만 설정하면 되지 시작 레벨은 뭐야'): 시작은 정할 때의 레벨·경험치 (달성률 0%)
   const from = e?.fromLevel ?? lv;
@@ -906,7 +908,7 @@ function TargetRow({
   return (
     <li className={"gr-tg" + (e ? " gr-tg-set" : "")}>
       <span className="gr-tg-name">
-        <Nick name={m.id} />
+        <FitLine text={m.id} wrap={false} hs={high.includes(m.id)} />
         <small>Lv.{lv}</small>
       </span>
       <span className="gc-step gr-tg-step">

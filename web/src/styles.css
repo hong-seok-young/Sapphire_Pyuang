@@ -5142,7 +5142,13 @@ button.dex-cell-name:disabled { cursor: default; }
 .gr-add-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .gr-add-list small { opacity: 0.75; font-size: 10px; }
 .gr-tg { justify-content: flex-end; }
-.gr-tg-name { flex: 1 1 96px; white-space: nowrap; }
+/* 담당자 > 목표 한 줄 (제작자 2026-11-11 '한 행으로'): 닉네임 · − Lv.37 + · 정하기/빼기. 알림 글만 다음 줄로 */
+.gr-tg-name { flex: 1 1 0; min-width: 0; white-space: nowrap; flex-direction: column; align-items: stretch; gap: 0; line-height: 1.15; }
+.gr-tg-name small { flex: none; font-size: 10px; }
+.gr-tg > .pill, .gr-tg-step { flex: none; }
+.gr-tg-step .pill { padding: 1px 7px; }
+.gr-tg-step b { min-width: 40px; }
+.gr-tg > small { flex-basis: 100%; text-align: right; }
 /* ---------- 장비대여 안내 (pages/RentNotice.tsx, 제작자 2026-11-10 · 대여 담당 요청 '신청하고 저한테 카톡 주세요'): 맨 위 퀘스트 줄, 들어올 때 NPC 대화창, 신청한 뒤 창.
    초안 셋 중 제작자가 고른 '퀘스트 줄 + NPC 대화창'. 움직임은 transform·opacity 만 ('!' 표 들썩임, 단추 위로 빛, 체크 톡, 지금 단계 둘레 숨 쉬기) ---------- */
 .rn-wrap { margin: -4px -12px 8px; display: grid; grid-template-columns: minmax(0, 1fr); }

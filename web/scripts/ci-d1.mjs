@@ -810,6 +810,34 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
   }
 }
 
+// 성장코인샵 이번 판 목표를 유어아너 공지대로 (제작자 2026-11-11: '도등21->27 … 펀취36->37, 공포티모48(도핑템)', '현재렙이 웹과 다른 건 렙업했는데 웹에 반영 안 한 듯 목표렙만').
+// 지금 진행 중인 판(gc_rounds)에만. 시작(달성률 0%)은 웹 레벨이 공지 시작 레벨보다 낮으면 공지 레벨 0% (웹에 아직 안 적은 레벨업이라 나중에 적어도 성장으로 안 세게), 아니면 웹 레벨·경험치.
+// 공포티모는 목표가 없어 넣지 않는다. 계정·레벨이 없는 닉네임은 건너뛴다. setup 'gcoin_notice_targets_20261111' 로 한 번만
+{
+  const KEY = "gcoin_notice_targets_20261111";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const now = Date.now();
+    const round = queryFirst(`SELECT id FROM gc_rounds WHERE start <= ${now} AND end_at > ${now} ORDER BY start DESC LIMIT 1`);
+    const NOTICE = [["도등", 21, 27], ["미즈로바", 23, 28], ["혈천도마", 30, 32], ["무도가", 31, 33], ["춘천다크갈비", 31, 33], ["먼쥐", 32, 34],
+      ["마가목", 32, 34], ["도아햄", 34, 36], ["이름뭐로짓지", 34, 36], ["펀취", 36, 37]];
+    if (round) {
+      runSql([
+        ...NOTICE.map(([name, from, target]) => {
+          const who = `(SELECT u.id FROM users u WHERE REPLACE(LOWER(u.id), ' ', '') = '${name}' LIMIT 1)`;
+          return "INSERT INTO gc_targets (round, user_id, from_level, from_exp, target, set_at, set_by) " +
+            `SELECT ${round.id}, p.user_id, MAX(p.level, ${from}), CASE WHEN p.level >= ${from} THEN COALESCE(p.exp, 0) ELSE 0 END, ${target}, ${now}, 'system' ` +
+            `FROM profiles p WHERE p.user_id = ${who} AND MAX(p.level, ${from}) < ${target} ` +
+            "ON CONFLICT (round, user_id) DO UPDATE SET from_level = excluded.from_level, from_exp = excluded.from_exp, target = excluded.target;";
+        }),
+        ...NOTICE.map(([name]) => `DELETE FROM gc_settings WHERE key = 'hide:' || (SELECT u.id FROM users u WHERE REPLACE(LOWER(u.id), ' ', '') = '${name}' LIMIT 1);`),
+        `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+      ]);
+      const n = queryFirst(`SELECT COUNT(*) AS n FROM gc_targets WHERE round = ${round.id}`)?.n ?? 0;
+      console.log(`성장코인샵 이번 판 목표 공지대로 (목표 ${n}명)`);
+    } else console.log("성장코인샵 이번 판이 아직 없어 공지 목표는 다음 배포에");
+  }
+}
+
 // 기부함 마일리지를 기부 골드 가치의 0.6 으로 (제작자 2026-11-10 '기부한 골드 가치의 x 0.6 이 마일리지로 쌓이는 거임, 10만 골드당 1, 소수점은 누적, 정수 부분만 사용').
 // 그 전에 확정한 기부(1.0 으로 넣은 💎)를 사람마다 floor(골드 합 x 0.6 / 10만) 에 맞춰 차이를 장부에 한 줄 넣고, 그 사람의 가장 최근 기부 줄 dia 에 더한다. setup 'donate_rate_06_20261110' 로 한 번만
 {
