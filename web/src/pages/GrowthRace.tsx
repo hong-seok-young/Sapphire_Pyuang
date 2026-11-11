@@ -501,29 +501,25 @@ export function RaceBoard({
               <span className="gr-main">
                 <span className="gr-name">
                   <Nick name={e.id} />
-                  <small>
-                    {JOB_NAME[e.job]} · Lv.{e.fromLevel} → {e.target}
-                  </small>
+                  <small>{JOB_NAME[e.job]}</small>
                 </span>
-                <span className="gr-bar">
-                  <i style={{ transform: `scaleX(${e.pct / 100})` }} />
+                <span className="gr-prog">
+                  {done ? (
+                    <b className="gr-stamp">확정</b>
+                  ) : (
+                    <b className="gr-pct">{pctShow(e.pct)}%</b>
+                  )}
+                  <span className="gr-bar">
+                    <i style={{ transform: `scaleX(${e.pct / 100})` }} />
+                  </span>
                 </span>
               </span>
               <span className="gr-val">
-                {done ? (
-                  <>
-                    <b className="gr-stamp">확정</b>
-                    {e.coins > 0 && (
-                      <small>
-                        <Coin />+{e.coins}
-                      </small>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <b>{pctShow(e.pct)}%</b>
-                    <small>Lv.{e.level}</small>
-                  </>
+                <b>Lv.{e.target}</b>
+                {done && e.coins > 0 && (
+                  <small>
+                    <Coin />+{e.coins}
+                  </small>
                 )}
               </span>
             </li>
