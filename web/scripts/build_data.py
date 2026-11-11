@@ -25,6 +25,7 @@ import hashlib
 import html
 import io
 import json
+import os
 import re
 import shutil
 import sys
@@ -36,7 +37,7 @@ from PIL import Image
 
 sys.stdout.reconfigure(encoding="utf-8")
 ROOT = Path(__file__).resolve().parents[2]
-SRC = ROOT / "자료"
+SRC = Path(os.environ.get("SAPPHIRE_DATA") or ROOT / "자료")  # 시험할 때 SAPPHIRE_DATA 로 다른 자료 사본
 OUT = ROOT / "web" / "public"
 POST_DIRS = [SRC / "드랍표_원본" / "글", SRC / "드랍표_원본" / "글2", SRC / "드랍표_원본" / "글3"]
 INDEX_PAGE = SRC / "드랍표_원본" / "page.html"
@@ -835,15 +836,30 @@ def main():
     print("아이템")
     icon_index = json.loads((SRC / "이미지" / "이미지_목록.json").read_text(encoding="utf-8"))
     items: dict[str, dict] = {}
+    # 띄어쓰기만 다른 같은 아이템은 하나로 ('스카우트띠' 드랍표 / '스카우트 띠' 장비표, 제작자 2026-11-12 '검색에 둘 다 나와, 통합해 줘').
+    # 보이는 이름은 장비표 이름이 먼저, 다른 표기는 aka 로 남겨 찾기에 쓴다. 몬스터 드랍 이름도 합친 이름으로 바꾼다.
+    nospace = lambda s: re.sub(r"\s+", "", s)
+    canon: dict[str, str] = {}
+    for eq in equipment:
+        for row in eq["rows"]:
+            canon.setdefault(nospace(row["name"]), row["name"])
+    for m in monsters.values():
+        for d in m["drops"]:
+            canon.setdefault(nospace(d), d)
 
     def item(name):
-        if name not in items:
-            items[name] = {"name": name, "icon": None, "from": [], "equip": []}
-        return items[name]
+        cname = canon.get(nospace(name), name)
+        if cname not in items:
+            items[cname] = {"name": cname, "icon": None, "from": [], "equip": []}
+        if name != cname and name not in items[cname].setdefault("aka", []):
+            items[cname]["aka"].append(name)
+        return items[cname]
 
     for m in monsters.values():
         for d in m["drops"]:
-            item(d)["from"].append(m["key"])
+            if m["key"] not in item(d)["from"]:
+                item(d)["from"].append(m["key"])
+        m["drops"] = list(dict.fromkeys(canon.get(nospace(d), d) for d in m["drops"]))
     for eq in equipment:
         for row in eq["rows"]:
             it = item(row["name"])
@@ -851,6 +867,11 @@ def main():
                                 "info": dict(zip(row.get("h") or eq["headers"], row["cells"]))})
             if row["icon"] and not it["icon"]:
                 it["icon"] = row["icon"]
+    for it in items.values():
+        if not it.get("aka"):
+            it.pop("aka", None)
+    merged = {k: v["aka"] for k, v in items.items() if v.get("aka")}
+    print("띄어쓰기만 다른 아이템 합침", len(merged), dict(list(merged.items())[:30]))
     for name, it in items.items():
         if not it["icon"]:
             named = icon_index.get("아이템", {})

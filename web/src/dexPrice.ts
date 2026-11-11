@@ -91,7 +91,9 @@ export function wayText(w: GoldWay, scroll: string | null, gear = true): string 
 export interface SlotCost { gold: number | null; way: GoldWay | null; missing: string | null; scroll: string | null; stamp: Record<Mode, number | null> }
 export function slotCost(it: DexItem, price: DexPrice, set: PriceSet): SlotCost {
   const stamp = { normal: stampGold(it, price, set, "normal"), event: stampGold(it, price, set, "event") };
-  const g = it.name ? price.gear[gearKey(it.name)] : undefined;
+  // pk: 코스튬 도감 칸은 거래소 코스튬 탭 값만 ('C:' 열쇠), '' = 같은 이름의 일반 장비 값만 있어 쓰지 않음
+  const pk = it.pk ?? (it.name ? gearKey(it.name) : "");
+  const g = pk ? price.gear[pk] : undefined;
   if (!g) return { gold: null, way: null, missing: null, scroll: null, stamp };
   const kind = kindOf(g.k);
   const grade = g.lv != null ? scrollGrade(g.lv) : null;
@@ -120,7 +122,7 @@ export function pickWay(c: SlotCost, mode: Mode): { by: "gold" | "stamp"; v: num
 }
 
 /** 장비 칸인지 (강화·장비스탬프가 있거나 시세가 있는 장비). 재료(쿠이증표 등)는 값을 세지 않는다 */
-export const isCostSlot = (it: DexItem, price: DexPrice) => !!it.plus || (!!it.sg && it.sg !== "불가") || (!!it.name && !!price.gear[gearKey(it.name)]);
+export const isCostSlot = (it: DexItem, price: DexPrice) => !!it.plus || (!!it.sg && it.sg !== "불가") || !!price.gear[it.pk ?? (it.name ? gearKey(it.name) : "")];
 
 export interface Totals {
   slots: number;

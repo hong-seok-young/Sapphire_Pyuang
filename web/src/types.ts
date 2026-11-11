@@ -95,6 +95,8 @@ export interface Item {
   icon: Pic | null;
   from: string[];
   equip: EquipInfo[];
+  /** 띄어쓰기만 다른 다른 표기 (드랍표 '스카우트띠' / 장비표 '스카우트 띠' 를 합친 것) */
+  aka?: string[];
 }
 
 export interface EquipTable {

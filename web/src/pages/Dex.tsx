@@ -366,9 +366,10 @@ function StatPanel({ have, full, over, setOver, stat, onPick, doneN, total }: {
 }
 
 function ItemPic({ it, iconOf, size = 30 }: { it: DexItem; iconOf: IconOf; size?: number }) {
+  // 영상에서 오린 아이콘(it.pic)이 먼저, 없으면 위키 그림 (제작자 2026-11-12 '화질 구린 거 이번 영상 화질로')
+  if (it.pic) return <img className="dex-pic" src={encodeURI(it.pic)} alt="" style={{ width: size, height: size }} />;
   const pic = it.name ? iconOf(it.name) : null;
   if (pic) return <PicImg pic={pic} fit={size} />;
-  if (it.pic) return <img className="dex-pic" src={encodeURI(it.pic)} alt="" style={{ width: size, height: size }} />;
   return <span className="dex-noimg">{(it.name ?? "?").replace(/^\+\d+/, "").slice(0, 1)}</span>;
 }
 

@@ -69,7 +69,8 @@ function ItemEvents({ name, job }: { name: string; job: string | null }) {
 }
 
 export function ItemPage({ wiki, name, job = null }: { wiki: Wiki; name: string; job?: string | null }) {
-  const it = wiki.items[name];
+  // 띄어쓰기만 다른 옛 이름(합치기 전 링크·즐겨찾기, 예 '스카우트띠')도 같은 아이템으로 (build_data.py 의 aka)
+  const it = wiki.items[name] ?? Object.values(wiki.items).find((x) => x.name.replace(/\s+/g, "") === name.replace(/\s+/g, "") || x.aka?.includes(name));
   const droppers = useMemo(
     () => (it ? it.from.map((k) => wiki.monsters[k]).filter(Boolean).sort((a, b) => (a.level ?? 0) - (b.level ?? 0)) : []),
     [wiki, it],

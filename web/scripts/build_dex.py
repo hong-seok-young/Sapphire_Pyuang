@@ -81,8 +81,9 @@ def price_data(key, wanted: set, infos: dict) -> dict | None:
         seen_lv, kinds, byp = {}, {}, {}
         for e in s.get("equipment", []):
             kinds[key(e["base"])] = e.get("kind")
+        ck = lambda e, k: ("C:" + k) if str(e.get("tab") or "").startswith("코스튬") else k  # 코스튬 탭 매물은 일반 장비와 이름이 같아도 따로 ('동그리모자')
         for it in s.get("items", []):
-            k = key(it.get("base") or it.get("name") or "")
+            k = ck(it, key(it.get("base") or it.get("name") or ""))
             if not k:
                 continue
             lv = (it.get("options_seen") or {}).get("요구레벨")
@@ -93,17 +94,17 @@ def price_data(key, wanted: set, infos: dict) -> dict | None:
                 byp.setdefault(k, {})
                 byp[k][pl] = min(it["min"], byp[k].get(pl, it["min"]))
         for e in s.get("equipment", []):
-            k = key(e["base"])
+            k = ck(e, key(e["base"]))
             byp.setdefault(k, {}).update({str(pl): v for pl, v in (e.get("min_by_plus") or {}).items()})
         # 장비가 아닌 물건(소모품·재료·인챈트·코스튬·펫 등, 2026-11-12 부터): 화면 가격은 묶음 전체 값이라 개당 최저가(unit_min)를 쓴다
         for o in s.get("others", []):
-            k = key(o.get("base") or "")
+            k = ck(o, key(o.get("base") or ""))
             if k and o.get("unit_min") is not None and k not in byp:
                 byp[k] = {"0": o["unit_min"]}
         for k, p in byp.items():
-            if k not in wanted or not p:
+            if k.removeprefix("C:") not in wanted or not p:
                 continue
-            kind = kinds.get(k) or ("갑옷류" if tabs.get(k, set()) & ARMOR_TABS else None)
+            kind = None if k.startswith("C:") else (kinds.get(k) or ("갑옷류" if tabs.get(k, set()) & ARMOR_TABS else None))
             mm = re.search(r"요구\s*레벨\s*(\d+)", infos.get(k, ""))
             lv = wiki_lv.get(k) or seen_lv.get(k) or (int(mm.group(1)) if mm else None)
             gear[k] = {"k": kind, "lv": lv, "p": p, "d": date_}
@@ -206,6 +207,15 @@ def main() -> None:
     for f in (exd.glob("*.png") if exd.exists() else []):
         book_pics.setdefault(key(f.stem), f)
     pics = {n: crops.get(n) or cafe.get(n) or book_pics.get(n) for n in names if n not in wiki and (crops.get(n) or cafe.get(n) or book_pics.get(n))}
+    # 영상에서 아이템만 오린 아이콘 (자료/이미지/도감아이콘, 육각형·칸 바탕 없이, 고화질): 위키 그림이 있어도 이것을 먼저 쓴다
+    # (제작자 2026-11-12 '아이콘은 해당 아이템 그 자체를 누끼', '화질 구린 거 이번 영상 화질로 싹 교체')
+    cut_dir = DATA / "이미지" / "도감아이콘"
+    cut_list = cut_dir / "목록.json"
+    if cut_list.exists():
+        for nm in json.loads(cut_list.read_text(encoding="utf-8")):
+            f = cut_dir / (re.sub(r'[\/:*?"<>|]', "_", nm) + ".png")
+            if f.exists() and key(nm) in names:
+                pics[key(nm)] = f
     out_pics = OUT / "dex"
     if out_pics.exists():
         shutil.rmtree(out_pics)
@@ -282,6 +292,15 @@ def main() -> None:
     price = price_data(key, wanted, infos)
     if price:
         data["price"] = price
+        for e in entries:
+            for it in e["items"]:
+                if not it.get("name"):
+                    continue
+                k = key(re.sub(r"^\+\d+\s*", "", it["name"]))
+                if e.get("cat") == "코스튬":
+                    it["pk"] = ("C:" + k) if ("C:" + k) in price["gear"] else ("" if k in price["gear"] else None)
+                if it.get("pk") is None:
+                    it.pop("pk", None)
         print("도감 시세", {"날짜": price["date"], "시세 있는 장비": len(price["gear"]), "레벨 모름": sorted(k for k, g in price["gear"].items() if not g["lv"]),
                          "종류 모름": sorted(k for k, g in price["gear"].items() if not g["k"]), "아바돈 판매": price.get("sale")})
     (OUT / "dex.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
