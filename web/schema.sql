@@ -1106,6 +1106,6 @@ CREATE TABLE IF NOT EXISTS lib_files (path TEXT PRIMARY KEY, hash TEXT NOT NULL,
 CREATE TABLE IF NOT EXISTS lib_chunks (path TEXT NOT NULL, part INTEGER NOT NULL, staff INTEGER NOT NULL DEFAULT 0, text TEXT NOT NULL, PRIMARY KEY (path, part));
 
 -- 아이모 사기꾼 명단 (제작자 2026-11-11 '거래 전 더치트 조회 & 실물 확인, 사기꾼 리스트 우리 DB 에 넣고 업데이트되면 반영'). 한 줄(id 1).
--- 원본은 카카오 오픈프로필 포스트의 표 그림. scripts/scam-list.mjs 가 30분마다 그림이 바뀌었는지 보고 바뀌면 Claude 로 옮겨 넣는다 (made 'ai'),
+-- 원본은 카카오 오픈프로필 포스트의 표 그림. scripts/scam-list.mjs 가 일주일에 한 번(scam-list.yml) 그림이 바뀌었는지 보고 바뀌면 Claude 로 옮겨 넣는다 (made 'ai'),
 -- 배포는 비공개 자료 링크/사기꾼_명단/명단.json(사람이 옮긴 것, made 'person')을 같은 그림일 때 넣는다. rows 는 JSON
 CREATE TABLE IF NOT EXISTS scam_list (id INTEGER PRIMARY KEY, src TEXT NOT NULL, title TEXT NOT NULL, by TEXT, post TEXT, rule TEXT, rows TEXT NOT NULL, made TEXT NOT NULL, updated_at INTEGER NOT NULL, checked_at INTEGER NOT NULL);

@@ -1,0 +1,43 @@
+# 아이모 사기꾼 명단 (제작자 2026-11-11 '업데이트되면 반영' -> '30분 너무 짧음, 일주일에 한 번 해도 돼'): 일주일에 한 번(월요일 12:17 한국 시간)
+# 카카오 포스트의 표 그림이 바뀌었는지 보고, 바뀌었으면 Claude 로 옮겨 계정 DB(D1) scam_list 에 넣는다 (web/scripts/scam-list.mjs). 공개 기록에는 줄 수만.
+name: Scam list
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: scam-list
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        working-directory: web
+        run: npm ci
+
+      - name: Scam list
+        working-directory: web
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+        run: node scripts/scam-list.mjs
