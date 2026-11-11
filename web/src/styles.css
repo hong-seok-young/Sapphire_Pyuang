@@ -5333,3 +5333,6 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 .dmg-table th:first-child, .dmg-table td:first-child { text-align: left; }
 .dmg-tr-on td { color: var(--gold); }
 @media (prefers-reduced-motion: reduce) { .dmg-list { animation: none; } }
+/* 데미지 계산기: 캐릭터 기본 데미지 칸 (짐작, 무기 데미지에 더함) */
+.dmg-own { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto minmax(0, 1fr) auto; align-items: center; gap: 4px; min-width: 0; padding: 1px 3px; background: var(--lo); font-size: 12px; }
+.dmg-guess { font-size: 10px; color: var(--muted); border: 1px solid rgba(255, 255, 255, 0.2); padding: 0 3px; white-space: nowrap; }

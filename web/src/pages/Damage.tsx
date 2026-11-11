@@ -4,6 +4,8 @@
 //   기본 데미지 = 무기 기본 데미지 x (1 + 강화도 가산값 / 100)
 //   근접·원거리 데미지는 상대 방어도 / 5 만큼 빠진다 (마법 데미지는 이 규칙에 없다: 마법사는 빼지 않는다).
 // 힘·민첩·지능, 스킬 계수가 들어간 최종 데미지 공식은 공개되지 않아 '기본 데미지' 기준이다.
+// 캐릭터 기본 데미지 (짐작, 확인 전. 향단 2026-11-11 카톡 '노도감 1렙 때 기본데미지 1~5 + 무기데미지가 기본 공격력', '레벨에 따라 오르는데 정리된 표는 모름'):
+//   직접 적는 칸(비우면 0), 강화 가산값을 곱하지 않고 무기 데미지에 더한다. 자료 자료/제공/데미지_계산.md
 // 화면: 내 무기(강화 비교의 무기 칸 그대로) · 상대 방어구(부위마다 장비와 강화, 장신구는 방어력 그대로, 기타 방어도 직접) · 결과(방어 전·후 막대) · 강화별 표.
 import { useCallback, useState } from "react";
 import type { Me } from "../auth";
@@ -133,11 +135,19 @@ function ArmorRow({ d, slot, items, worn, job, open, onOpen, onSet }: {
   );
 }
 
-function Result({ d, pick, armor }: { d: Enhance; pick: Pick; armor: number }) {
+/** 캐릭터 기본 데미지 [최소, 최대] (짐작: 무기 데미지에 더한다) */
+type Own = [number, number];
+const withOwn = (x: { min: number; max: number }, own: Own) => {
+  const min = x.min + own[0];
+  const max = x.max + own[1];
+  return { min, max, avg: (min + max) / 2 };
+};
+
+function Result({ d, pick, armor, own }: { d: Enhance; pick: Pick; armor: number; own: Own }) {
   if (!pick.w) return null;
   const magic = pick.w.job === "마법사";
   const cut = magic ? 0 : armor / 5;
-  const base = damage(d, pick.w, pick.plus);
+  const base = withOwn(damage(d, pick.w, pick.plus), own);
   const after = { min: Math.max(0, base.min - cut), max: Math.max(0, base.max - cut), avg: Math.max(0, base.avg - cut) };
   const loss = base.avg > 0 ? ((base.avg - after.avg) / base.avg) * 100 : 0;
   const hi = base.max || 1;
@@ -192,7 +202,7 @@ function Result({ d, pick, armor }: { d: Enhance; pick: Pick; armor: number }) {
         </thead>
         <tbody>
           {ROWS.filter((k) => k <= maxPlus(d, pick.w!)).map((k) => {
-            const b = damage(d, pick.w!, k);
+            const b = withOwn(damage(d, pick.w!, k), own);
             const a = Math.max(0, b.avg - cut);
             return (
               <tr key={k} className={k === pick.plus ? "dmg-tr-on" : ""}>
@@ -216,6 +226,9 @@ export function DamagePage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const [jobPick, setJob] = useEntryState<string | null>("dmg.job", null);
   const [worn, setWorn] = useEntryState<Worn>("dmg.armor", {});
   const [extra, setExtra] = useEntryState<string>("dmg.extra", "");
+  const [ownText, setOwnText] = useEntryState<[string, string]>("dmg.own", ["", ""]);
+  const ownN = (t: string) => Math.max(0, Math.min(999, Number(t) || 0));
+  const own: Own = [ownN(ownText[0]), Math.max(ownN(ownText[0]), ownN(ownText[1]))];
   const [armorJob, setArmorJob] = useEntryState<string>("dmg.ajob", "전체");
   const [listOpen, setListOpen] = useState<boolean | null>(null);
   const [openSlot, setOpenSlot] = useState<string | null>(null);
@@ -283,6 +296,15 @@ export function DamagePage({ wiki, me }: { wiki: Wiki; me: Me }) {
             </div>
             <WeaponCard d={d} wiki={wiki} side="a" hint="내 무기" pick={p} onPick={choose} open={shown.length > 0} onOpen={() => setListOpen(true)} />
             <WeaponList d={d} side="a" pick={p} shown={shown} onPick={choose} />
+            <div className="dmg-own">
+              <span className="dmg-slot">캐릭터</span>
+              <input className="dmg-extra" inputMode="numeric" placeholder="1" aria-label="캐릭터 기본 데미지 최소" value={ownText[0]}
+                onChange={(e) => setOwnText([e.target.value.replace(/[^\d]/g, "").slice(0, 3), ownText[1]])} />
+              <span>~</span>
+              <input className="dmg-extra" inputMode="numeric" placeholder="5" aria-label="캐릭터 기본 데미지 최대" value={ownText[1]}
+                onChange={(e) => setOwnText([ownText[0], e.target.value.replace(/[^\d]/g, "").slice(0, 3)])} />
+              <small className="dmg-guess">짐작</small>
+            </div>
           </section>
           <section className="enh-card dmg-armor">
             <div className="dmg-head">
@@ -338,7 +360,7 @@ export function DamagePage({ wiki, me }: { wiki: Wiki; me: Me }) {
               </div>
             </div>
           </section>
-          <Result d={d} pick={p} armor={total} />
+          <Result d={d} pick={p} armor={total} own={own} />
         </div>
       )}
     </>
