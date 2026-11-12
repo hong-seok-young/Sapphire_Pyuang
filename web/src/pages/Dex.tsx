@@ -11,7 +11,7 @@ import type { ReactNode } from "react";
 import { loadDex, useAsync } from "../data";
 import { fetchMarket, wonText } from "../market";
 import type { Dex, DexEntry, DexItem, DexPrice } from "../data";
-import { MODES, STAMP_GRADES, amgeoText, gearKey, fmtGold, isCostSlot, pickWay, readPriceSet, saleOn, scrollLabel, slotCost, totals, wayText, writePriceSet } from "../dexPrice";
+import { MODES, STAMP_GRADES, amgeoText, gearKey, fmtGold, isCostSlot, pickWay, saleOn, scrollLabel, slotCost, totals, usePriceSet, wayText } from "../dexPrice";
 import type { PriceSet, Totals } from "../dexPrice";
 import type { Me } from "../auth";
 import { fetchMe } from "../auth";
@@ -213,11 +213,8 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
     writeStats(me, v);
   };
   // 시세 비교에서 손으로 고친 마법서·스탬프 값 (제작자 2026-11-11)
-  const [pset, setPsetState] = useState<PriceSet>(() => readPriceSet(me));
-  const setPset = (v: PriceSet) => {
-    setPsetState(v);
-    writePriceSet(me, v);
-  };
+  // 마법서·스탬프·플래티넘 값: 서버 한 벌, 앱개발자만 고친다 (제작자 2026-11-12 '나만 세팅할 수 있어야')
+  const { pset, setPset, canEdit: canSetPrice } = usePriceSet(me);
   // 슬라이더 끝 = 기록된 도감을 다 채웠을 때
   const petTotal = dex.entries.filter((e) => e.cat === "펫").length;
   const full = useMemo(() => withRewards(addUp(dex.entries), dex.petRewards, petTotal), [dex]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -394,7 +391,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
         </div>
       )}
 
-      {price && tot && todoListed.length > 0 && tot.slots > 0 && <CostPanel price={price} tot={tot} pset={pset} setPset={setPset} n={todoListed.length} />}
+      {price && tot && todoListed.length > 0 && tot.slots > 0 && <CostPanel price={price} tot={tot} pset={pset} setPset={setPset} canEdit={canSetPrice} n={todoListed.length} />}
 
       {todoListed.length > 0 && (
         <Panel className="dex-need">
@@ -673,8 +670,12 @@ function EntryRow({ e, listW, done, onToggle, iconOf, stat, onItem, wiki, price,
 }
 
 /** 숫자 칸: 비우면 자료 값으로 되돌린다. 손댄 칸은 금색 (획득 옵션 칸과 같은 방식) */
-function NumIn({ value, def, onSet, label }: { value: number | undefined; def: number | null; onSet: (v: number | null) => void; label: string }) {
+function NumIn({ value, def, onSet, label, ro }: { value: number | undefined; def: number | null; onSet: (v: number | null) => void; label: string; ro?: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
+  if (ro) {
+    const v = value ?? def;
+    return <span className="dex-row-num dex-num-ro" aria-label={label}>{v == null ? "-" : v.toLocaleString("ko-KR")}</span>;
+  }
   return (
     <input className={"dex-row-num" + (value != null ? " dex-num-set" : "")} type="number" inputMode="decimal" min={0} aria-label={label}
       value={draft ?? (value ?? def ?? "")} placeholder={def == null ? "값" : undefined}
@@ -696,7 +697,7 @@ function intUnit(v: number): string {
   if (v >= 1e4) return `${Math.round(v / 1e4).toLocaleString("ko-KR")}만`;
   return Math.round(v).toLocaleString("ko-KR");
 }
-function CostPanel({ price, tot, pset, setPset, n }: { price: DexPrice; tot: Totals; pset: PriceSet; setPset: (v: PriceSet) => void; n: number }) {
+function CostPanel({ price, tot, pset, setPset, canEdit, n }: { price: DexPrice; tot: Totals; pset: PriceSet; setPset: (v: PriceSet) => void; canEdit: boolean; n: number }) {
   const [open, setOpen] = useState(false);
   const on = saleOn(price);
   // 현금 어림 (제작자 2026-11-12 '현금으로 얼만지도 평소와 아바돈 아래에'): 중개인 골드 팝니다 평균 시세, 없으면 75:1 (1만 원에 75만 골드)
@@ -781,12 +782,12 @@ function CostPanel({ price, tot, pset, setPset, n }: { price: DexPrice; tot: Tot
                   return (
                     <label key={k} className={tot.missing.has(k) ? "dex-need-scroll" : ""}>
                       <span>{scrollLabel(k)}</span>
-                      <NumIn value={pset.scroll[k]} def={price.scroll?.[kind]?.[grade] ?? null} onSet={(v) => setScroll(k, v)} label={`${scrollLabel(k)} 골드`} />
+                      <NumIn value={pset.scroll[k]} def={price.scroll?.[kind]?.[grade] ?? null} onSet={(v) => setScroll(k, v)} label={`${scrollLabel(k)} 골드`} ro={!canEdit} />
                     </label>
                   );
                 })}
               </div>
-              <small className="muted">마법서 등급은 장비 요구 레벨로 (D 10 미만 · C 20 · B 30 · A 40 · S 50 미만). 값을 넣으면 강화 칸도 '노강 + 마법서'로 셈</small>
+              {canEdit && <small className="muted">마법서 등급은 장비 요구 레벨로 (D 10 미만 · C 20 · B 30 · A 40 · S 50 미만). 값을 넣으면 강화 칸도 '노강 + 마법서'로 셈</small>}
             </div>
           )}
 
@@ -801,7 +802,7 @@ function CostPanel({ price, tot, pset, setPset, n }: { price: DexPrice; tot: Tot
                 {MODES.map((m) => (
                   <Row key={m.key} label={m.key === "normal" ? "평소" : "이벤트"}>
                     {STAMP_GRADES.map((g) => (
-                      <NumIn key={g} value={pset.stamp[`${m.key} ${g}`]} def={price.stamp?.[m.key]?.[g] ?? null} onSet={(v) => setStamp(`${m.key} ${g}`, v)} label={`${m.label} 장비스탬프${g} 플래티넘`} />
+                      <NumIn key={g} value={pset.stamp[`${m.key} ${g}`]} def={price.stamp?.[m.key]?.[g] ?? null} onSet={(v) => setStamp(`${m.key} ${g}`, v)} label={`${m.label} 장비스탬프${g} 플래티넘`} ro={!canEdit} />
                     ))}
                   </Row>
                 ))}
@@ -809,7 +810,7 @@ function CostPanel({ price, tot, pset, setPset, n }: { price: DexPrice; tot: Tot
               <label className="dex-cost-plat">
                 <span>플래티넘 100 =</span>
                 <NumIn value={pset.plat != null ? pset.plat * 100 : undefined} def={Math.round((price.stamp.platGold ?? 700) * 100)}
-                  onSet={(v) => setPset({ ...pset, plat: v == null ? undefined : v / 100 })} label="플래티넘 100 의 골드" />
+                  onSet={(v) => setPset({ ...pset, plat: v == null ? undefined : v / 100 })} label="플래티넘 100 의 골드" ro={!canEdit} />
                 <span>골드</span>
               </label>
               <small className="muted">아바돈 스탬프 1장 = 일반 {price.stamp.abaddon}장. 이벤트 값은 봉인된스탬프함 A/B 와 왜곡된수정구 평균으로 셈</small>
@@ -817,7 +818,7 @@ function CostPanel({ price, tot, pset, setPset, n }: { price: DexPrice; tot: Tot
           )}
 
           <div className="dex-sum-foot">
-            {touched && (
+            {touched && canEdit && (
               <button type="button" className="sub-tab" onClick={() => setPset({ scroll: {}, stamp: {} })}>
                 자료 값으로
               </button>
@@ -956,8 +957,9 @@ function planTargets(entries: DexEntry[], targets: Map<string, number>, costOf: 
 
 export function DexSnippet({ spec }: { spec: string }) {
   const { data: all } = useAsync(useCallback(() => loadDex(), []), "dex");
-  // 손으로 고친 마법서·스탬프 값과 '도감 계산기에서 보기'의 목표는 계정별로 둬서 누구인지 묻는다
+  // '도감 계산기에서 보기'의 목표는 계정별로 둬서 누구인지 묻는다. 마법서·스탬프 값은 서버 한 벌
   const { data: me } = useAsync(useCallback(() => fetchMe(), []), "me");
+  const { pset } = usePriceSet(me ?? null);
   const { data: market } = useAsync(useCallback(() => fetchMarket(), []), "market");
   const [withEv, setWithEv] = useState(false); // 이벤트 도감은 처음엔 뺀다 (제작자 2026-11-12)
   const [open, setOpen] = useState(false);
@@ -981,7 +983,6 @@ export function DexSnippet({ spec }: { spec: string }) {
       targets.set(rowKey(row[0], row[1]), v);
     }
     const price = all.price;
-    const pset: PriceSet = me ? readPriceSet(me) : { scroll: {}, stamp: {} };
     const costOf = (e: DexEntry, mode: "normal" | "event") => {
       if (!price) return null;
       let g = 0;
@@ -994,7 +995,7 @@ export function DexSnippet({ spec }: { spec: string }) {
     };
     const max = addUp(entries);
     return { targets, bad, max, ...planTargets(entries, targets, costOf) };
-  }, [all, spec, withEv, me]);
+  }, [all, spec, withEv, pset]);
   if (!all || !plan || !plan.targets.size) return null;
   const goDex = () => {
     if (me) writeStats(me, Object.fromEntries(plan.targets));

@@ -6,6 +6,8 @@
 // - 단계마다 그 강화 완성품 매물이 계산값보다 싸면 매물 값 (제작자 확인 2026-11-11 '이게 맞지'). 그래서 +3 매물에 마법서를 더하는 길도 저절로 견준다.
 // - 마법서 등급은 장비 요구 레벨로: D 10 미만 · C 20 · B 30 · A 40 · S 50 미만 · 그 위 SS (해외 위키 마법서 표).
 // - 스탬프 = 칸의 대체 스탬프 장수 × 1장 값. 아바돈 스탬프 1장 = 일반 50장 (제작자, 평소에는 자판기에서 일반 50장으로 바꾼다).
+import { useEffect, useState } from "react";
+import { api } from "./auth";
 import type { Me } from "./auth";
 import type { DexGearPrice, DexItem, DexPrice } from "./data";
 
@@ -23,24 +25,69 @@ export const gearKey = (name: string) => name.replace(/^\+\d+\s*/, "").replace(/
 export const scrollGrade = (lv: number) => (lv < 10 ? "D" : lv < 20 ? "C" : lv < 30 ? "B" : lv < 40 ? "A" : lv < 50 ? "S" : "SS");
 const kindOf = (k: string | null): Kind | null => (k === "무기" ? "무기" : k === "갑옷류" ? "갑옷" : null);
 
-/** 화면에서 손으로 고친 값 (이 기기에 계정별로, localStorage sapphire.dex.price.<아이디>):
- *  scroll['무기 A'] = 마법서 1장 골드, stamp['normal A'] = 스탬프 1장 플래티넘, plat = 플래티넘 1 의 골드 */
+/** 손으로 정한 값 (제작자 2026-11-12 '이 값들은 나만 바꾸게, 골드 값 등등 나만 세팅'): 서버(D1 dex_price_set) 한 벌을 모두가 같이 쓰고 앱개발자만 고친다.
+ *  scroll['무기 A'] = 마법서 1장 골드, stamp['normal A'] = 스탬프 1장 플래티넘, plat = 플래티넘 1 의 골드. 비운 칸은 자료(dex.json price) 값 */
 export interface PriceSet { scroll: Record<string, number>; stamp: Record<string, number>; plat?: number }
-const setKey = (me: Me) => `sapphire.dex.price.${me.id}`;
-export function readPriceSet(me: Me): PriceSet {
-  try {
-    const v = JSON.parse(localStorage.getItem(setKey(me)) ?? "{}") as Partial<PriceSet>;
-    return { scroll: v.scroll ?? {}, stamp: v.stamp ?? {}, plat: v.plat };
-  } catch {
-    return { scroll: {}, stamp: {} };
+const EMPTY: PriceSet = { scroll: {}, stamp: {} };
+let shared: { set: PriceSet; canEdit: boolean } | null = null;
+let loading: Promise<{ set: PriceSet; canEdit: boolean }> | null = null;
+const listeners = new Set<() => void>();
+const tidy = (v: Partial<PriceSet> | null | undefined): PriceSet => ({ scroll: v?.scroll ?? {}, stamp: v?.stamp ?? {}, ...(v?.plat != null ? { plat: v.plat } : {}) });
+const emptySet = (v: PriceSet) => !Object.keys(v.scroll).length && !Object.keys(v.stamp).length && v.plat == null;
+/** 예전에 이 기기에만 적어 둔 값 (localStorage sapphire.dex.price.<아이디>): 앱개발자가 처음 열 때 서버가 비어 있으면 한 번 올린다 */
+const oldKey = (me: Me) => `sapphire.dex.price.${me.id}`;
+let sharedFor: string | null = null;
+function loadPriceSet(me: Me | null): Promise<{ set: PriceSet; canEdit: boolean }> {
+  // 캐릭터·계정을 바꾸면(테스트 계정 등) 고칠 수 있는지가 달라서 다시 받는다
+  if ((me?.id ?? null) !== sharedFor) {
+    sharedFor = me?.id ?? null;
+    shared = null;
+    loading = null;
   }
+  if (shared) return Promise.resolve(shared);
+  loading ??= api<{ set: Partial<PriceSet>; canEdit: boolean }>("/api/dex/prices")
+    .then(async (r) => {
+      let set = tidy(r.set);
+      if (r.canEdit && me && emptySet(set)) {
+        try {
+          const old = tidy(JSON.parse(localStorage.getItem(oldKey(me)) ?? "null"));
+          if (!emptySet(old)) {
+            await api("/api/dex/prices", "PUT", old);
+            set = old;
+          }
+        } catch {
+          /* 옛 값이 없거나 못 올리면 그대로 */
+        }
+      }
+      shared = { set, canEdit: r.canEdit };
+      listeners.forEach((f) => f());
+      return shared;
+    })
+    .catch(() => {
+      loading = null;
+      return { set: EMPTY, canEdit: false };
+    });
+  return loading;
 }
-export function writePriceSet(me: Me, v: PriceSet) {
-  try {
-    localStorage.setItem(setKey(me), JSON.stringify(v));
-  } catch {
-    /* 이번에 연 동안만 */
-  }
+let saveTimer = 0;
+/** 모두가 같이 쓰는 값과, 앱개발자면 고치는 함수 (0.6초 모아서 서버로) */
+export function usePriceSet(me: Me | null): { pset: PriceSet; setPset: (v: PriceSet) => void; canEdit: boolean } {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    const f = () => bump((n) => n + 1);
+    listeners.add(f);
+    void loadPriceSet(me);
+    return () => void listeners.delete(f);
+  }, [me]);
+  const cur = shared ?? { set: EMPTY, canEdit: false };
+  const setPset = (v: PriceSet) => {
+    if (!cur.canEdit) return;
+    shared = { set: tidy(v), canEdit: true };
+    listeners.forEach((f) => f());
+    window.clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(() => void api("/api/dex/prices", "PUT", shared?.set ?? v).catch(() => undefined), 600);
+  };
+  return { pset: cur.set, setPset, canEdit: cur.canEdit };
 }
 
 export const scrollName = (kind: Kind, grade: string) => `${kind} ${grade}`;

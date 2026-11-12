@@ -258,6 +258,7 @@ const ACTIONS: [RegExp, (d: Rec, m: RegExpMatchArray, at: number) => string][] =
   [/^DELETE \/api\/avatar$/, () => "캐릭터 사진 지움"],
   [/^POST \/api\/avatar\/cutout/, () => "캐릭터 사진 AI 보정"],
   [/^PUT \/api\/kakao$/, (d) => (str(d.user) ? `카톡 링크 저장 · ${d.user}` : str(d.link) ? "내 카톡 링크 저장" : "내 카톡 링크 지움")],
+  [/^PUT \/api\/dex\/prices$/, () => "도감 계산기 마법서·스탬프 값 바꿈"],
   [/^PUT \/api\/layout$/, (d) => join("홈 배치 바꿈", names(d.dock).length ? `아래 탭 ${names(d.dock).map(tileName).join(", ")}` : null)],
   [/^POST \/api\/characters$/, (d) => join("캐릭터 추가 요청", str(d.id))],
   [/^POST \/api\/characters\/switch$/, (d) => join("캐릭터 바꿈", str(d.to) && `→ ${d.to}`)],
