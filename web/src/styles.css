@@ -5123,6 +5123,10 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .dex-cell-on .dex-cell-name b { color: var(--gold); }
 .dex-cell-set .dex-row-num { color: var(--gold); border-color: var(--gold); }
 .dex-cell .dex-row-num { height: 24px; font-size: 11px; }
+.dex-cell .dex-row-num { touch-action: pan-y; cursor: ew-resize; }
+.dex-fold-sep { grid-column: 1 / -1; padding: 6px 0 2px; font-size: 10px; border-top: 1px dashed rgba(169, 162, 207, 0.25); }
+.dex-goal { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; color: var(--gold); }
+.dex-cell-goal .dex-row-num { color: #7be3a8; border-color: #7be3a8; }
 /* 도감 계산기: 능력치 칸 이름을 누르면 그 능력치를 주는 항목만 (목록 위 안내 줄) */
 button.dex-cell-name { padding: 0; font: inherit; color: inherit; text-align: left; background: none; border: 0; cursor: pointer; }
 button.dex-cell-name:disabled { cursor: default; }

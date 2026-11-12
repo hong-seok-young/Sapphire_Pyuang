@@ -108,18 +108,21 @@ const OPTION_PAIRS: [Row | null, Row | null][] = [
   [["민첩", false], ["이동속도", false]],
   [["명중", false], ["회피", false]],
   [["크리티컬", false], ["크리티컬 저항", true]],
-  [["아머", false], ["막기", false]],
-  [["불저항", false], ["냉기저항", false]],
-  [["번개저항", false], ["속성저항", false]],
+  [["아머", false], ["보스 데미지", true]],
   [["PVE 데미지", false], ["PVP 데미지", false]],
   [["PVE 데미지", true], ["PVP 데미지", true]],
   [["PVE 데미지 감소", false], ["PVP 데미지 감소", false]],
   [["PVE 데미지 감소", true], ["PVP 데미지 감소", true]],
   [["크리티컬 데미지 감소", false], ["크리티컬 데미지 감소", true]],
-  [["데들리 데미지 감소", false], ["데들리 데미지 감소", true]],
-  [["데들리 저항", true], ["보스 데미지", true]],
   [["아이템 드랍", false], ["골드 드랍", false]],
   [["경험치", true], null],
+];
+/** 접어 두는 8줄: '전체 능력치'를 펼칠 때만 맨 아래에 (제작자 2026-11-12 '이 8개는 접어놓자': 막기, 불·냉기·번개·속성저항, 데들리 뎀감·뎀감%·저항%) */
+const FOLDED_PAIRS: [Row | null, Row | null][] = [
+  [["불저항", false], ["냉기저항", false]],
+  [["번개저항", false], ["속성저항", false]],
+  [["막기", false], ["데들리 저항", true]],
+  [["데들리 데미지 감소", false], ["데들리 데미지 감소", true]],
 ];
 const rowKey = (s: string, pct: boolean) => s + (pct ? "%" : "");
 /** 두 칸 배치에서 잘리는 긴 이름은 줄여 보인다 (고정값 칸과 % 칸이 구분되게) */
@@ -221,10 +224,60 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   };
   const inCat = (e: DexEntry) => cat === "all" || (e.cat ?? "일반") === cat;
   const inTab = (e: DexEntry) => inCat(e) && (tab === "all" ? true : tab === "done" ? done.has(e.name) : !done.has(e.name));
-  const listed = dex.entries.filter((e) => inTab(e) && matchQ(e) && matchStat(e));
   const doneEntries = dex.entries.filter((e) => done.has(e.name));
   const petDone = doneEntries.filter((e) => e.cat === "펫").length;
   const have = useMemo(() => withRewards(addUp(doneEntries), dex.petRewards, petDone), [done, dex]); // eslint-disable-line react-hooks/exhaustive-deps
+  const price = dex.price;
+  // 목표 수치까지 (제작자 2026-11-12 '수치 입력하거나 좌우로 조정하면 그 수치까지 도감 싼 순서대로 찍는 데 얼마'):
+  // 아직 안 한 항목 중 그 능력치 1 당 골드가 가장 싼 것부터 (평소 값, 칸마다 골드로 사기 vs 스탬프 중 싼 쪽). 값을 모르는 칸이 있는 항목은 맨 뒤
+  const entryGold = useMemo(() => {
+    const m = new Map<string, number | null>();
+    if (!price) return m;
+    for (const e of dex.entries) {
+      let g = 0;
+      let ok = true;
+      for (const it of e.items) {
+        const w = pickWay(slotCost(it, price, pset), "normal");
+        if (!w) {
+          ok = false;
+          break;
+        }
+        g += w.v;
+      }
+      m.set(e.name, ok ? g : null);
+    }
+    return m;
+  }, [dex, price, pset]);
+  const planFor = (k: string): GoalStep[] => {
+    const c = dex.entries
+      .filter((e) => !done.has(e.name))
+      .map((e) => ({ e, v: e.effects.filter(([st, , pct]) => rowKey(st, pct) === k).reduce((a, [, v]) => a + v, 0), g: entryGold.get(e.name) ?? null }))
+      .filter((x) => x.v > 0);
+    c.sort((a, b) => (a.g == null ? 1 : 0) - (b.g == null ? 1 : 0) || (a.g != null && b.g != null ? a.g / a.v - b.g / b.v : b.v - a.v));
+    return c;
+  };
+  const curOf = (k: string) => pick(have, k.replace(/%$/, ""), k.endsWith("%"));
+  const goalOf = (k: string, target: number): Goal | null => {
+    const need = target - curOf(k);
+    if (need <= 1e-9) return null;
+    const steps: GoalStep[] = [];
+    let got = 0;
+    let gold = 0;
+    let unknown = 0;
+    for (const x of planFor(k)) {
+      if (got >= need - 1e-9) break;
+      steps.push(x);
+      got += x.v;
+      if (x.g == null) unknown++;
+      else gold += x.g;
+    }
+    return { steps, gold, unknown, reached: got >= need - 1e-9 };
+  };
+  const goal = stat && over[stat] != null ? goalOf(stat, over[stat]) : null;
+  const goalNames = goal ? new Map(goal.steps.map((x, i) => [x.e.name, i])) : null;
+  const listed = goalNames
+    ? dex.entries.filter((e) => goalNames.has(e.name) && matchQ(e)).sort((a, b) => goalNames.get(a.name)! - goalNames.get(b.name)!)
+    : dex.entries.filter((e) => inTab(e) && matchQ(e) && matchStat(e));
   const rewards = (dex.petRewards ?? []).filter(([n]) => n <= petTotal);
   const nextReward = rewards.find(([n]) => n > petDone);
   const todoListed = listed.filter((e) => !done.has(e.name));
@@ -249,13 +302,13 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   for (const e of todoListed) for (const it of e.items) if (it.sg && it.sn) stamps.set(it.sg, (stamps.get(it.sg) ?? 0) + it.sn * it.n);
   const stampSum = ["S", "A", "B", ...[...stamps.keys()].filter((g) => !["S", "A", "B"].includes(g)).sort()].filter((g) => stamps.has(g));
   // 지금 목록의 미완료를 다 채우는 값: 칸마다 골드로 사기 vs 스탬프 중 싼 쪽, 평소 · 아바돈 이벤트
-  const price = dex.price;
   const tot = price ? totals(todoListed.flatMap((e) => e.items), price, pset) : null;
 
 
   return (
     <div className="dex">
-      <StatPanel have={have} full={full} over={over} setOver={setOver} stat={stat} onPick={pickStat} doneN={doneEntries.length} total={dex.entries.length} />
+      <StatPanel have={have} full={full} over={over} setOver={setOver} stat={stat} onPick={pickStat} doneN={doneEntries.length} total={dex.entries.length}
+        goalOf={price ? goalOf : null} stepsOf={(k) => planFor(k).map((x) => x.v)} />
 
       <div className="mk-cats dex-cats">
         {CATS.map((c) => {
@@ -299,7 +352,16 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
       {stat && (
         <div className="dex-statbar" ref={statBar}>
           <span>
-            <b>{SHORT[stat.replace(/%$/, "")] ?? stat.replace(/%$/, "")}{stat.endsWith("%") ? "%" : ""}</b> 주는 항목 <b>{listed.length}</b>개
+            <b>{SHORT[stat.replace(/%$/, "")] ?? stat.replace(/%$/, "")}{stat.endsWith("%") ? "%" : ""}</b>{" "}
+            {goal ? (
+              <>
+                {num(over[stat])}까지 싼 순서 <b>{goal.steps.length}</b>개 · <b>{fmtGold(goal.gold)}</b>
+                {goal.unknown > 0 && <> · 값 모름 {goal.unknown}</>}
+                {!goal.reached && <> · 다 해도 모자람</>}
+              </>
+            ) : (
+              <>주는 항목 <b>{listed.length}</b>개</>
+            )}
           </span>
           <button type="button" className="sub-tab" onClick={() => setStat(null)}>
             ✕ 전체 보기
@@ -355,17 +417,25 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   );
 }
 
+interface GoalStep { e: DexEntry; v: number; g: number | null }
+interface Goal { steps: GoalStep[]; gold: number; unknown: number; reached: boolean }
+
 /** 획득 옵션: 게임 창의 37줄을 비슷한 것끼리 좌우 두 칸으로 (OPTION_PAIRS). 칸마다 이름, 그 아래 '최대'(도감을 다 채웠을 때, 제작자 2026-11-10 '최대치만'),
- *  오른쪽 숫자 칸에 내 수치를 직접 적는다. 손대지 않은 칸은 완료로 누른 항목의 합 (제작자 2026-11-10, 슬라이더는 '바를 빼는 게 좋을 듯'으로 뺐다) */
-function StatPanel({ have, full, over, setOver, stat, onPick, doneN, total }: {
+ *  오른쪽 숫자 칸은 완료로 누른 항목의 합, 거기에 목표를 적거나 좌우로 끌면 이름 아래에 그 수치까지 1 당 싼 항목부터 채우는 골드와 항목 수 (제작자 2026-11-12),
+ *  이름을 누르면 그 항목들이 싼 순서로 아래 목록에 (슬라이더는 '바를 빼는 게 좋을 듯'으로 뺐다) */
+function StatPanel({ have, full, over, setOver, stat, onPick, doneN, total, goalOf, stepsOf }: {
   have: Sum; full: Sum; over: Record<string, number>; setOver: (v: Record<string, number>) => void;
   stat: string | null; onPick: (k: string) => void; doneN: number; total: number;
+  goalOf: ((k: string, target: number) => Goal | null) | null; stepsOf: (k: string) => number[];
 }) {
+  // 숫자 칸을 좌우로 끌면 싼 순서의 다음 항목만큼 오르내린다 (제작자 2026-11-12 '바로 좌우로 조정', 바는 '목록이 길어져서 싫다')
+  const drag = useRef<{ k: string; x: number; moved: boolean; marks: number[]; i0: number } | null>(null);
+  const dragged = useRef(0);
   const [all, setAll] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const pairs: [Row | null, Row | null][] = [...OPTION_PAIRS];
   // 짝 목록에 없는 능력치가 자료에 생기면 끝에 붙인다
-  const known = new Set(OPTION_PAIRS.flat().filter((r): r is Row => !!r).map(([a, b]) => rowKey(a, b)));
+  const known = new Set([...OPTION_PAIRS, ...FOLDED_PAIRS].flat().filter((r): r is Row => !!r).map(([a, b]) => rowKey(a, b)));
   const extra: Row[] = [];
   for (const [s, x] of full) for (const pct of [false, true]) if ((pct ? x.pct : x.flat) && !known.has(rowKey(s, pct))) extra.push([s, pct]);
   for (let i = 0; i < extra.length; i += 2) pairs.push([extra[i], extra[i + 1] ?? null]);
@@ -373,6 +443,7 @@ function StatPanel({ have, full, over, setOver, stat, onPick, doneN, total }: {
   const set = (k: string, v: number) => setOver({ ...over, [k]: Math.max(0, Math.round(v * 100) / 100) });
   const live = (r: Row | null) => !!r && (valueOf(r[0], r[1]) > 0 || pick(full, r[0], r[1]) > 0 || rowKey(r[0], r[1]) in over);
   const shown = all ? pairs : pairs.filter(([a, b]) => live(a) || live(b));
+  const folded = all ? FOLDED_PAIRS : [];
   const touched = Object.keys(over).length > 0;
   const cell = (r: Row | null, i: number) => {
     if (!r) return <div key={i} className="dex-cell dex-cell-empty" />;
@@ -380,14 +451,57 @@ function StatPanel({ have, full, over, setOver, stat, onPick, doneN, total }: {
     const k = rowKey(s, pct);
     const v = valueOf(s, pct);
     const mx = pick(full, s, pct);
+    const cur = pick(have, s, pct);
+    const g = goalOf && k in over ? goalOf(k, over[k]) : null;
     return (
-      <div key={k} className={"dex-cell" + (stat === k ? " dex-cell-on" : "") + (k in over ? " dex-cell-set" : "")}>
+      <div key={k} className={"dex-cell" + (stat === k ? " dex-cell-on" : "") + (k in over ? " dex-cell-set" : "") + (g ? " dex-cell-goal" : "")}>
         <button type="button" className="dex-cell-name" onClick={() => onPick(k)} disabled={!mx} aria-pressed={stat === k}>
           <b title={s}>{SHORT[s] ?? s}{pct && <small>%</small>}</b>
-          <small className="muted">{mx ? `최대 ${num(mx)}` : "최대 -"}</small>
+          {g ? (
+            <small className="dex-goal">
+              {fmtGold(g.gold)}{g.unknown ? "+?" : ""} · {g.steps.length}개{g.reached ? "" : " 모자람"}
+            </small>
+          ) : (
+            <small className="muted">{mx ? `최대 ${num(mx)}` : "최대 -"}</small>
+          )}
         </button>
         <input className="dex-row-num" type="number" inputMode="decimal" min={0} step={mx > 50 ? 0.5 : 0.01} aria-label={`${s}${pct ? " %" : ""} 내 수치`}
           value={draft[k] ?? num(v)}
+          onFocus={(e) => {
+            // 0 은 지우고 쓰지 않게 비우고, 다른 값은 통째로 골라 바로 덮어쓴다 (제작자 2026-11-12)
+            if (Date.now() - dragged.current < 400) {
+              e.currentTarget.blur();
+              return;
+            }
+            if (v === 0) setDraft({ ...draft, [k]: "" });
+            else e.currentTarget.select();
+          }}
+          onPointerDown={(e) => {
+            const marks = [cur];
+            for (const x of stepsOf(k)) marks.push(Math.round((marks[marks.length - 1] + x) * 100) / 100);
+            const i0 = Math.max(0, marks.findIndex((m) => m >= v - 1e-9));
+            drag.current = { k, x: e.clientX, moved: false, marks, i0: marks.some((m) => m >= v - 1e-9) ? i0 : marks.length - 1 };
+          }}
+          onPointerMove={(e) => {
+            const d = drag.current;
+            if (!d || d.k !== k) return;
+            const dx = e.clientX - d.x;
+            if (!d.moved) {
+              if (Math.abs(dx) < 8) return;
+              d.moved = true;
+              e.currentTarget.setPointerCapture(e.pointerId);
+              e.currentTarget.blur();
+            }
+            const i = Math.min(d.marks.length - 1, Math.max(0, d.i0 + Math.round(dx / 14)));
+            set(k, d.marks[i]);
+          }}
+          onPointerUp={() => {
+            if (drag.current?.moved) dragged.current = Date.now();
+            drag.current = null;
+          }}
+          onPointerCancel={() => {
+            drag.current = null;
+          }}
           onChange={(e) => {
             setDraft({ ...draft, [k]: e.target.value });
             const n = parseFloat(e.target.value);
@@ -404,7 +518,11 @@ function StatPanel({ have, full, over, setOver, stat, onPick, doneN, total }: {
   return (
     <Panel className="dex-sum" title={<>획득 옵션 <small className="muted">완료 {doneN} / {total}</small></>}>
       {shown.length ? (
-        <div className="dex-cells">{shown.map(([a, b], i) => [cell(a, i * 2), cell(b, i * 2 + 1)])}</div>
+        <div className="dex-cells">
+          {shown.map(([a, b], i) => [cell(a, i * 2), cell(b, i * 2 + 1)])}
+          {folded.length > 0 && <div className="dex-fold-sep muted">접어 둔 능력치</div>}
+          {folded.map(([a, b], i) => [cell(a, 1000 + i * 2), cell(b, 1001 + i * 2)])}
+        </div>
       ) : (
         <p className="muted dex-empty">아직 완료한 항목이 없어요</p>
       )}
@@ -412,7 +530,7 @@ function StatPanel({ have, full, over, setOver, stat, onPick, doneN, total }: {
         <button type="button" className="sub-tab" onClick={() => setAll(!all)}>{all ? "접기 ▲" : "전체 능력치 ▼"}</button>
         {touched && (
           <button type="button" className="sub-tab" onClick={() => { setOver({}); setDraft({}); }}>
-            완료 합계로
+            목표 지우기
           </button>
         )}
       </div>
