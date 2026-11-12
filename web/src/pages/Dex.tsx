@@ -321,7 +321,8 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   for (const e of todoListed) for (const it of e.items) if (it.sg && it.sn) stamps.set(it.sg, (stamps.get(it.sg) ?? 0) + it.sn * it.n);
   const stampSum = ["S", "A", "B", ...[...stamps.keys()].filter((g) => !["S", "A", "B"].includes(g)).sort()].filter((g) => stamps.has(g));
   // 지금 목록의 미완료를 다 채우는 값: 칸마다 골드로 사기 vs 스탬프 중 싼 쪽, 평소 · 아바돈 이벤트
-  const tot = price ? totals(todoListed.flatMap((e) => e.items), price, pset) : null;
+  // 효과 없는 항목(코스튬 '옵션 없음' 43, 라이딩 2)은 능력치를 주지 않아 비용에서 뺀다 (제작자 2026-11-12 '도감 효과 없는 건 몰라도 되지 않나')
+  const tot = price ? totals(todoListed.filter((e) => e.effects.length > 0).flatMap((e) => e.items), price, pset) : null;
 
 
   return (
