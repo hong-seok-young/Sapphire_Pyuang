@@ -36,6 +36,12 @@ export const APP_NEWS: AppNews[] = [
     text: "성장코인샵 추가 · 2군 본캐는 주간 목표 레벨을 먼저 찍으면 성장코인, 코인으로 도핑템 교환",
     link: "#/gcoin",
   },
+  {
+    key: "app_news_hall_20261112",
+    at: Date.parse("2026-11-12T22:35:00+09:00"),
+    text: "명예의 전당 추가 · 기부로 쌓인 마일리지 순위, 안의 기부함 단추로 어떤 템이든 기부 신청하면 마일리지가 쌓여요",
+    link: "#/hall",
+  },
 ];
 
 const WINDOW = 2 * 86_400_000;

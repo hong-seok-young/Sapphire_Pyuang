@@ -180,6 +180,28 @@ export const GUIDES: Guide[] = [
     ],
   },
   {
+    // 명예의 전당 (2026-11-12 열었다, 안에 기부함): 숨은 동작과 규칙만
+    key: "hall",
+    title: "명예의 전당",
+    tutorial: [
+      {
+        sel: ".hof-give",
+        head: "기부함",
+        text: "어떤 템이든 기부 신청을 하면 운영진이 가치를 확인해요.\n확정되면 기부 가치의 0.6 이 마일리지로 쌓여요. 10만 골드당 💎1, 장비대여 보증금으로 써요.",
+      },
+      { sel: ".hof-total-mile", head: "누적 마일리지", text: "숫자를 누르면 소수점까지 보여요. 소수는 쌓아 두고 정수만 써요." },
+      { sel: ".hof-pod, .hof-row-btn", head: "기부 내역", text: "단상이나 줄을 누르면 그 사람이 기부한 것이 펼쳐져요." },
+    ],
+  },
+  {
+    key: "donate",
+    title: "기부함",
+    tutorial: [
+      { sel: ".dn-name input", head: "아이템 이름", text: "줄임말(사멧), 초성, 조금 틀린 이름도 찾아요.\n목록에 없는 템은 적은 그대로 신청돼요." },
+      { sel: ".dn-tabs .pill:has-text('운영')", who: "officer", head: "운영", text: "신청을 확정하면 기부한 사람에게 마일리지가 들어가요.\n받은 템은 장비대여로 넘길 수 있어요." },
+    ],
+  },
+  {
     key: "shop",
     title: "플래티넘 할인 상점",
     tutorial: [

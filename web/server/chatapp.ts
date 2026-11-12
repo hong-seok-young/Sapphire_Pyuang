@@ -23,6 +23,7 @@ import { TODO_OPEN, doneKeys, eventTasks, todoExtras } from "./todo";
 import { ASK_MORE, mineExtras, newsNow, shopCatalog } from "./chatmine";
 import { canUseDevReq } from "./devreq";
 import { scamContext } from "./scam";
+import { canUseDonate, hallOfFame } from "./donate";
 
 
 /** 길드 앱 자료 전체 글자 수 (내 정보, 아이모 소식, 장비대여를 더해 늘렸다. 2026-11-02) */
@@ -48,6 +49,7 @@ const ASK = {
   gaps: /챗봇|질문|개선|모름|별로/,
   todo: /할 ?일|투두|to ?do|숙제|뭐 ?(해|하|할)|챙겨|인던|던전|길드 ?(출석|임무)|체크|이벤트/i,
   devreq: /개발 ?요청|기능 ?요청|요청한|결재|합의|반려|착수|만들어 ?(줘|주|달)|개발자/,
+  hall: /기부|명예|마일리지|전당/,
 };
 
 interface Person {
@@ -457,6 +459,9 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
   // ---------- 개발 요청: 모든 요청과 결재 단계·의견 (모두가 본다, server/devreq.ts) ----------
   if (canUseDevReq(me) && ASK.devreq.test(q)) parts.push(await devreqPart(env));
 
+  // ---------- 명예의 전당 (안에 기부함): 기부로 쌓인 마일리지 순위와 내 기부 (server/donate.ts hallOfFame, 2026-11-12 열었다) ----------
+  if (canUseDonate(me) && ASK.hall.test(q)) parts.push(await hallPart(env, me, now).catch(() => ""));
+
   // ---------- 아이모 사기꾼 명단: 사기·거래 안전을 묻거나 명단의 닉네임·폰 뒷자리·계좌가 나오면 (server/scam.ts) ----------
   parts.push(await scamContext(env, question).catch(() => ""));
 
@@ -597,6 +602,31 @@ const DEVREQ_STEP: Record<string, string> = { submit: "신청", resubmit: "다�
 const DEVREQ_SCOPE: Record<string, string> = { me: "나", some: "특정 인원", all: "길드 전체" };
 
 /** 개발 요청 최근 40개: 상태, 범위, 이번 차례 결재 이력(누가, 의견) */
+/** 명예의 전당 자료: 전체·이번 달 순위(앞 20명), 묻는 사람의 순위·쌓인 마일리지·남은 💎·최근 기부. 화면 Hall.tsx 와 같은 셈 (마일리지는 소수 그대로, 쓸 수 있는 💎 는 정수) */
+async function hallPart(env: Env, me: User, now: number): Promise<string> {
+  const d = new Date(now + KST);
+  const month = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1) - KST;
+  const [all, mon] = await Promise.all([hallOfFame(env, 0), hallOfFame(env, month)]);
+  const mine = new Set(me.chars?.length ? me.chars : [me.id]);
+  const isMine = (names: string[]) => names.some((n) => mine.has(n));
+  const line = (h: { name: string; earned: number; gold: number; count: number }, i: number) =>
+    `${i + 1}위 ${h.name} · 쌓인 마일리지 ${Number(h.earned.toFixed(2))} · 기부 가치 ${gold(h.gold)} · ${h.count}건`;
+  const out = [
+    section("명예의 전당 · 전체 (기부로 쌓인 마일리지 순, 기부 골드 가치 x 0.6 / 10만)", all.rows.slice(0, 20).map(line)),
+    section(`명예의 전당 · 이번 달 (${d.getUTCMonth() + 1}월)`, mon.rows.slice(0, 20).map(line)),
+  ];
+  const myIdx = all.rows.findIndex((h) => isMine(h.names));
+  const myLines = all.lines.filter((l) => mine.has(l.who)).slice(0, 10);
+  const me1: string[] = [];
+  if (myIdx >= 0) {
+    const h = all.rows[myIdx];
+    me1.push(`전체 ${myIdx + 1}위 · 쌓인 마일리지 ${Number(h.earned.toFixed(2))} · 기부 가치 ${gold(h.gold)} · ${h.count}건${myIdx < 30 ? ` · 지금 남은 마일리지 💎${h.mileage}` : ""}`);
+  } else me1.push("아직 확정된 기부 없음");
+  for (const l of myLines) me1.push(`${when(l.at)} ${l.label} · ${gold(l.gold)} · 💎+${Number(l.dia.toFixed(2))}`);
+  out.push(section("내 기부 (명예의 전당)", me1));
+  return out.filter(Boolean).join("\n\n");
+}
+
 async function devreqPart(env: Env): Promise<string> {
   const [rowsR, stepsR] = await env.DB.batch([
     env.DB.prepare("SELECT id, user_id, body, scope, people, status, round, updated_at FROM dev_requests ORDER BY updated_at DESC LIMIT 40"),

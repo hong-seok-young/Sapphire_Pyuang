@@ -65,8 +65,8 @@ export const GCOIN_OPEN = Date.now() >= GCOIN_OPEN_AT;
 /** 2군 성장코인샵에 들어가는 사람: 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (제작자 2026-11-09 '오피서랑 길마 보게 열어 줘, 개발 중으로 두고') */
 export const canGcoin = (me: Me) => GCOIN_OPEN || RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
 
-/** 기부함을 모두에게 열었는지 (서버 server/donate.ts DONATE_OPEN 과 같이 바꾼다) */
-export const DONATE_OPEN = false;
+/** 명예의 전당(안에 기부함)을 모두에게 열었는지 (서버 server/donate.ts DONATE_OPEN 과 같이 바꾼다). 2026-11-12 열었다 (제작자 '명예의전당 오픈') */
+export const DONATE_OPEN = true;
 /** 기부함에 들어가는 사람: 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (제작자 2026-11-10 '개발 중 (운영진만)') */
 export const canDonate = (me: Me) => DONATE_OPEN || RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
 

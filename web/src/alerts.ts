@@ -49,8 +49,8 @@ export const ALERT_GROUPS: { menu: string; kinds: { kind: AlertKind; name: strin
   { menu: "개발 요청", kinds: [{ kind: "devreq", name: "신청·결재" }] },
   // 2군 성장코인샵 (server/gcoin.ts): 구매 신청·지급, 순위 보너스
   { menu: "성장코인샵", kinds: [{ kind: "gcoin", name: "신청·지급", preview: !GCOIN_OPEN }] },
-  // 기부함 (server/donate.ts, 개발중, 제작자 2026-11-10): 기부 신청·확정·거절
-  { menu: "기부함", kinds: [{ kind: "donate", name: "신청·확정", preview: true }] },
+  // 기부함 (server/donate.ts, 명예의 전당 안 단추, 2026-11-12 열었다): 기부 신청·확정·거절
+  { menu: "기부함", kinds: [{ kind: "donate", name: "신청·확정" }] },
   // 단추가 없는 알림: 역할 바뀜·아이디 생성·계정 삭제 요청(account), 새 기능(server/appNews.ts)
   { menu: "기타", kinds: [{ kind: "account", name: "계정 (역할·요청)" }, { kind: "app_news", name: "새 기능" }] },
 ];

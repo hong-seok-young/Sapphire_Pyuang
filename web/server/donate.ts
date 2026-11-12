@@ -15,8 +15,8 @@ import { notify } from "./alerts";
 import { DIA_GOLD, mileageOfName, mileageOfNames } from "./rental";
 import { optionsDisplay } from "./rentalParse";
 
-/** 모두에게 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (제작자 2026-11-10 '개발 중 (운영진만)'). 화면 launcher.ts 의 DONATE_OPEN 과 같이 바꾼다 */
-export const DONATE_OPEN = false;
+/** 2026-11-12 모두에게 열었다 (제작자 '명예의전당 오픈'). 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (제작자 2026-11-10 '개발 중 (운영진만)'). 화면 launcher.ts 의 DONATE_OPEN 과 같이 바꾼다 */
+export const DONATE_OPEN = true;
 export const canUseDonate = (me: User) => DONATE_OPEN || RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
 /** 확정·고치기·장비대여로 넘기기: 운영진 (제작자 '그 운영진이나 길마가 골드값을 매겨서 마일리지를 지급') */
 export const canManageDonate = (me: User) => RANK[me.role] >= 1;
