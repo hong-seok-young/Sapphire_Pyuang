@@ -48,7 +48,7 @@ function useEventClock(entries: DexEntry[]): number {
 }
 /** '이벤트 ~11/26' */
 const untilText = (to?: string) => (to ? `~${+to.slice(5, 7)}/${+to.slice(8, 10)}` : "");
-const CATS = ["all", "일반", "코스튬", "펫", "이벤트"];
+const CATS = ["all", "일반", "코스튬", "펫", "라이딩", "이벤트"];
 
 const storeKey = (me: Me) => `sapphire.dex.done.${me.id}`;
 function readDone(me: Me): Set<string> {
@@ -78,6 +78,19 @@ function addUp(entries: DexEntry[]): Sum {
       else cur.flat += v;
       s.set(stat, cur);
     }
+  return s;
+}
+/** 펫 도감 달성 보상 (퓨앙 스샷 2026-11-12): 펫 항목을 n 개 채웠으면 n 이하 보상을 더한다 */
+function withRewards(base: Sum, rewards: Dex["petRewards"], petN: number): Sum {
+  if (!rewards?.length) return base;
+  const s: Sum = new Map([...base].map(([k, v]) => [k, { ...v }]));
+  for (const [n, stat, v, pct] of rewards) {
+    if (n > petN) continue;
+    const cur = s.get(stat) ?? { flat: 0, pct: 0 };
+    if (pct) cur.pct += v;
+    else cur.flat += v;
+    s.set(stat, cur);
+  }
   return s;
 }
 const num = (v: number) => String(Math.round(v * 100) / 100);
@@ -183,7 +196,8 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
     writePriceSet(me, v);
   };
   // 슬라이더 끝 = 기록된 도감을 다 채웠을 때
-  const full = useMemo(() => addUp(dex.entries), [dex]);
+  const petTotal = dex.entries.filter((e) => e.cat === "펫").length;
+  const full = useMemo(() => withRewards(addUp(dex.entries), dex.petRewards, petTotal), [dex]); // eslint-disable-line react-hooks/exhaustive-deps
   const iconOf: IconOf = useMemo(() => (wiki ? iconLookup(wiki, null) : () => null), [wiki]);
 
   const toggle = (name: string) => {
@@ -209,7 +223,10 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   const inTab = (e: DexEntry) => inCat(e) && (tab === "all" ? true : tab === "done" ? done.has(e.name) : !done.has(e.name));
   const listed = dex.entries.filter((e) => inTab(e) && matchQ(e) && matchStat(e));
   const doneEntries = dex.entries.filter((e) => done.has(e.name));
-  const have = useMemo(() => addUp(doneEntries), [done, dex]); // eslint-disable-line react-hooks/exhaustive-deps
+  const petDone = doneEntries.filter((e) => e.cat === "펫").length;
+  const have = useMemo(() => withRewards(addUp(doneEntries), dex.petRewards, petDone), [done, dex]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rewards = (dex.petRewards ?? []).filter(([n]) => n <= petTotal);
+  const nextReward = rewards.find(([n]) => n > petDone);
   const todoListed = listed.filter((e) => !done.has(e.name));
 
 
@@ -250,6 +267,17 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
           ) : null;
         })}
       </div>
+
+      {cat === "펫" && rewards.length > 0 && (
+        <p className="dex-petrw">
+          펫 달성 보상 <b>{rewards.filter(([n]) => n <= petDone).length}/{rewards.length}</b>
+          {nextReward && (
+            <span className="muted">
+              {" "}· {nextReward[0]}개 {effectText([nextReward[1], nextReward[2], nextReward[3]])}
+            </span>
+          )}
+        </p>
+      )}
 
       <nav className="pill-row" role="tablist">
         {TABS.map((x) => (

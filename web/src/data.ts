@@ -135,7 +135,8 @@ export interface DexPrice {
   scroll?: Partial<Record<"무기" | "갑옷", Record<string, number>>>;
   sale?: { start: string; end: string; text: string; id?: number };
 }
-export interface Dex { source: string; built: string; order: string[]; entries: DexEntry[]; price?: DexPrice }
+/** petRewards: 펫 도감 달성 보상 [펫 항목 몇 개, 능력치, 값, %인지] (10개마다) */
+export interface Dex { source: string; built: string; order: string[]; entries: DexEntry[]; price?: DexPrice; petRewards?: [number, string, number, boolean][] }
 export const loadDex = () => getJson<Dex>("dex");
 
 /** 아이템 책 (제작자 2026-11-12 'DB 에는 있는데 웹이 못 쓰는 것 전부', scripts/build_book.py): 비공개 자료의 게임 도감 정보 사전, 게임 거래소 녹화 값,

@@ -5049,6 +5049,8 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .dex-cats { margin-bottom: 6px; }
 .dex-cat { padding: 0 4px; font-size: 10px; color: #c9b8ff; border: 1px solid currentColor; }
 .dex-cat-ev { flex: none; color: #ffb35c; white-space: nowrap; }
+.dex-petrw { margin: -2px 0 6px; font-size: 12px; }
+.dex-petrw b { color: var(--gold); }
 .dex-stamp-AB { color: #ff7a6b; }
 .dex-stamp-no { color: var(--muted); border-style: dashed; }
 

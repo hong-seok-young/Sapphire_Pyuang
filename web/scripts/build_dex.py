@@ -159,7 +159,8 @@ def main() -> None:
     order = [name for name, _ in build_trend.DEX_ORDER]
     raw = json.loads(SRC.read_text(encoding="utf-8"))
     # 코스튬·펫 도감 (제작자 2026-11-12 영상): 자료/도감/코스튬.json, 펫.json (일반.json 과 같은 형식)
-    for extra, cat in (("코스튬.json", "코스튬"), ("펫.json", "펫")):
+    # 라이딩 2개 (도감 랭킹 '라이딩 0/2', 퀘스트 창에는 없고 달성도에만, 효과 모름): 자료/도감/라이딩.json (2026-11-12)
+    for extra, cat in (("코스튬.json", "코스튬"), ("펫.json", "펫"), ("라이딩.json", "라이딩")):
         ep = SRC.parent / extra
         if ep.exists():
             more = json.loads(ep.read_text(encoding="utf-8"))
@@ -309,6 +310,10 @@ def main() -> None:
             e["name"] += f" ({seen_names[k]}번째)"
     unknown = sorted({s for e in entries for s, _, _ in e["effects"]} - set(order))
     data = {"source": raw.get("source", "게임 도감 퀘스트 (제작자 영상)"), "built": date.today().isoformat(), "order": order, "entries": entries}
+    # 펫 도감 달성 보상 (퓨앙 스샷 2026-11-12): 펫 항목을 10개 채울 때마다 [달성 수, 능력치, 값, %인지]
+    pr = SRC.parent / "펫_달성보상.json"
+    if pr.exists():
+        data["petRewards"] = [[r["달성"], *effect(*r["보상"])] for r in json.loads(pr.read_text(encoding="utf-8"))["보상"]]
     wanted = {key(re.sub(r"^\+\d+\s*", "", it["name"])) for e in entries for it in e["items"] if it.get("name")}
     price = price_data(key, wanted, infos)
     if price:
