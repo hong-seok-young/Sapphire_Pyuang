@@ -31,7 +31,7 @@ type Kind = "아이템" | "몬스터" | "사냥터" | "메뉴" | "화면";
 
 const SCREENS: Record<string, string> = {
   "길드 랭킹": "#/ranking", 랭킹: "#/ranking", "사파이어 중개인": "#/market", 중개인: "#/market", "길드원 의뢰소": "#/requests",
-  의뢰소: "#/requests", 게시판: "#/board", "플래티넘 할인 상점": "#/shop", 상점: "#/shop", 검색: "#/search", "내 정보": "#/me",
+  의뢰소: "#/requests", 게시판: "#/board", "플래티넘 할인 상점": "#/shop", 상점: "#/shop", 검색: "#/search", "내 정보": "#/me", 설정: "#/me",
   알림: "#/alerts", 장비: "#/equip", 사냥터: "#/places", 챗봇: "#/chat", 정보: "#/info", "공식 확률": "#/odds", "패치 내역": "#/patch",
   "길드원 관리": "#/admin", "사용 기록": "#/log", "To do": "#/todo", 투두: "#/todo", "할 일": "#/todo", "아이모 소식": "#/board?cat=imo",
   장비대여: "#/rent", "장비 대여": "#/rent", "길드 던전": "#/match", 길던: "#/match", "강화 비교": "#/enhance", "개발 요청": "#/devreq", 건의함: "#/suggest", 건의: "#/suggest", 성장코인샵: "#/gcoin", "성장 코인샵": "#/gcoin", "명예의 전당": "#/hall", 기부함: "#/donate", 기부: "#/donate", "사기꾼 명단": "#/trend?t=scam",

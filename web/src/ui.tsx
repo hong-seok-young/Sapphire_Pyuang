@@ -80,7 +80,7 @@ export function PicImg({
   );
 }
 
-/** 화면 위 줄: 뒤로, 제목, 오른쪽에는 따로 준 것이 없으면 '내 정보' 단추 (내 정보 화면에서는 빼고) */
+/** 화면 위 줄: 뒤로, 제목, 오른쪽에는 따로 준 것이 없으면 '설정' 단추 (설정 화면에서는 빼고) */
 /**
  * 메뉴 화면 제목의 영문 (제작자 요청 2026-11-02, 4안: 화면 아래 따로 두던 배너를 없애고 위 줄 가운데 제목을 작은 배너 모양으로).
  * 여기 있는 제목만 배너로 그리고, 아이템·글·사냥터 이름 같은 제목은 글자 그대로. 새 메뉴 화면을 만들면 여기에 더한다
@@ -105,7 +105,7 @@ export const TITLE_EN: Record<string, string> = {
   "공식 확률": "OFFICIAL ODDS",
   "아이모 소식": "IMO NEWS",
   알림: "NOTIFICATIONS",
-  "내 정보": "MY PAGE",
+  "설정": "SETTINGS",
   "길드원 관리": "MEMBERS",
   "사용 기록": "ACTIVITY LOG",
   "챗봇 개선": "CHATBOT FIXES",
@@ -282,7 +282,7 @@ function CharacterMenu({
             role="menuitem"
           >
             <span className="char-name">
-              <b>내 정보</b>
+              <b>설정</b>
             </span>
             <span className="char-mark">›</span>
           </a>
@@ -294,7 +294,7 @@ function CharacterMenu({
 }
 
 /**
- * 프로필 단추 (👤): 캐릭터가 하나면 누르면 바로 내 정보, 묶은 캐릭터가 있으면 아이디 목록과 '내 정보'가 뜨고 고르면 그 캐릭터로 바꾼다
+ * 설정 단추 (톱니바퀴, 제작자 2026-11-12 '내정보보다는 설정에 가까워, 메뉴명도 설정으로'. 예전 👤 프로필 단추): 캐릭터가 하나면 누르면 바로 내 정보, 묶은 캐릭터가 있으면 아이디 목록과 '내 정보'가 뜨고 고르면 그 캐릭터로 바꾼다
  * (제작자 요청 2026-11-02: '알림 + 프로필 모양으로 두고 한 번 누르면 아이디 목록 + 내 정보, 부캐 없으면 바로 내 정보')
  */
 export function MeButton({
@@ -308,8 +308,8 @@ export function MeButton({
   const [at, setAt] = useState<number | null>(null);
   if (list.length < 2)
     return (
-      <a className={className} href="#/me" aria-label="내 정보" title="내 정보">
-        <PixelIcon name="me" size={size} />
+      <a className={className} href="#/me" aria-label="설정" title="설정">
+        <PixelIcon name="cog" size={size} />
       </a>
     );
   return (
@@ -323,10 +323,10 @@ export function MeButton({
               : null,
           )
         }
-        aria-label="캐릭터 · 내 정보"
+        aria-label="캐릭터 · 설정"
         aria-expanded={at !== null}
       >
-        <PixelIcon name="me" size={size} />
+        <PixelIcon name="cog" size={size} />
       </button>
       {at !== null && <CharacterMenu top={at} me onClose={() => setAt(null)} />}
     </>
@@ -557,6 +557,7 @@ export function PixelIcon({
     | "info"
     | "chat"
     | "me"
+    | "cog"
     | "phone";
   size?: number;
   className?: string;

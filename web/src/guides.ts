@@ -71,7 +71,7 @@ export const GUIDES: Guide[] = [
     key: "",
     title: "홈",
     tutorial: [
-      { sel: ".hero-me", head: "내 정보 버튼", text: "캐릭터가 여러 개면 캐릭터 목록이 떠요." },
+      { sel: ".hero-me", head: "설정 버튼", text: "캐릭터가 여러 개면 캐릭터 목록이 떠요." },
       { sel: ".home-edit", head: "배치 편집", text: "홈 칸을 꾹 눌러도 편집이 시작돼요.", tap: true, opens: ".launch-bar" },
       { sel: ".tiles", head: "칸 옮기기", text: "끌어서 정해진 자리에 놓아요. 빈 자리에 놓으면 거기 그대로 있고, 다른 칸 위에 놓으면 둘이 자리를 바꿔요. 아래 탭에 넣을 수도 있어요." },
       { sel: ".launch-bar .pill-on", head: "완료", text: "배치는 계정에 저장돼서 다른 폰에서도 같아요.", tap: true, closes: ".launch-bar", undo: false },
@@ -92,7 +92,7 @@ export const GUIDES: Guide[] = [
       {
         sel: ".rank-views button:has-text('주간')",
         head: "주간 성장",
-        text: "월요일 0시마다 새로 시작해요. 1등 카드의 사진은 내 정보의 캐릭터 사진이에요.",
+        text: "월요일 0시마다 새로 시작해요. 1등 카드의 사진은 설정의 캐릭터 사진이에요.",
         tap: true,
         opens: ".growth-hero",
         undo: false,
@@ -335,7 +335,7 @@ export const GUIDES: Guide[] = [
   },
   {
     key: "me",
-    title: "내 정보",
+    title: "설정",
     tutorial: [
       {
         sel: ".me-row:has-text('캐릭터 정보')",
@@ -364,7 +364,7 @@ export const GUIDES: Guide[] = [
     key: "alerts",
     title: "알림",
     tutorial: [
-      { sel: ".alert-settings-link", head: "알림 설정", text: "종류마다 켜고 끄는 건 내 정보의 알림 설정에서 해요. 새 알림은 1분마다, 홈의 새 글 숫자는 2분마다 다시 세요." },
+      { sel: ".alert-settings-link", head: "알림 설정", text: "종류마다 켜고 끄는 건 설정의 알림 설정에서 해요. 새 알림은 1분마다, 홈의 새 글 숫자는 2분마다 다시 세요." },
     ],
   },
   {

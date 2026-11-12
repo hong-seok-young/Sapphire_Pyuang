@@ -156,7 +156,7 @@ export function reportOpen(userId: string) {
 
 const PAGE_NAME: Record<string, string> = {
   "": "홈", places: "사냥터 목록", search: "검색", equip: "장비", chat: "챗봇", ranking: "길드 랭킹", market: "사파이어 중개인",
-  requests: "길드원 의뢰소", alerts: "알림", shop: "플래티넘 할인 상점", board: "게시판", me: "내 정보", admin: "길드원 관리", app: "앱", password: "비밀번호 바꾸기", log: "사용 기록", patch: "패치 내역", odds: "공식 확률",
+  requests: "길드원 의뢰소", alerts: "알림", shop: "플래티넘 할인 상점", board: "게시판", me: "설정", admin: "길드원 관리", app: "앱", password: "비밀번호 바꾸기", log: "사용 기록", patch: "패치 내역", odds: "공식 확률",
   match: "길드 던전", todo: "To do", rent: "장비대여", gaps: "챗봇 개선", info: "정보", as: "캐릭터 바꿔서 열기", trend: "시세 동향", dex: "도감 계산기", enhance: "강화 비교", sim: "확률 시뮬레이터", simtest: "시뮬레이터 테스트", devreq: "개발 요청", fit: "헬스 루틴", donate: "기부함", hall: "명예의 전당",
   suggest: "건의함",
 };
@@ -216,7 +216,7 @@ export function pageName(path: string, wiki: Wiki, detail?: string | null): stri
     return v ? `장비대여: ${v}` : "장비대여";
   }
   if (page === "chat") return arg === "list" ? "챗봇: 대화 목록" : /^\d+$/.test(arg) ? "챗봇: 지난 대화" : "챗봇";
-  if (page === "me") return new URLSearchParams(query).get("open") === "kakao" ? "내 정보: 카톡 오픈프로필" : "내 정보";
+  if (page === "me") return new URLSearchParams(query).get("open") === "kakao" ? "설정: 카톡 오픈프로필" : "설정";
   // 모르는 화면도 주소 대신 홈 칸 이름이나 '앱 화면' (제작자 요청 2026-11-02: 코드 말고 누구나 알게)
   return PAGE_NAME[page] ?? ITEMS.find((i) => i.to === `#/${page}`)?.title ?? "앱 화면";
 }
@@ -253,7 +253,7 @@ const ACTIONS: [RegExp, (d: Rec, m: RegExpMatchArray, at: number) => string][] =
   [/^POST \/api\/login$/, (d) => (d.failed ? `로그인 실패 (${d.failed === 401 ? "비밀번호 틀림" : String(d.failed)})` : "로그인")],
   [/^POST \/api\/logout$/, () => "로그아웃"],
   [/^POST \/api\/password$/, () => "비밀번호 바꿈"],
-  [/^PUT \/api\/profile$/, (d) => join("내 정보 저장", jobLevel(d))],
+  [/^PUT \/api\/profile$/, (d) => join("캐릭터 정보 저장", jobLevel(d))],
   [/^(PUT|POST) \/api\/avatar$/, () => "캐릭터 사진 올림"],
   [/^DELETE \/api\/avatar$/, () => "캐릭터 사진 지움"],
   [/^POST \/api\/avatar\/cutout/, () => "캐릭터 사진 AI 보정"],
@@ -477,7 +477,7 @@ export function actionText(what: string, detail: string | null, at = Date.now())
  */
 const VIEW_SECTION: Record<string, string> = {
   board: "게시판", official: "게시판", suggest: "게시판", market: "중개인", rent: "장비대여", donate: "기부함", requests: "의뢰소", shop: "플래티넘 상점", chat: "챗봇",
-  ranking: "길드 랭킹", admin: "길드원 관리", me: "내 정보", password: "내 정보", alerts: "알림", todo: "To do", log: "사용 기록",
+  ranking: "길드 랭킹", admin: "길드원 관리", me: "설정", password: "설정", alerts: "알림", todo: "To do", log: "사용 기록",
   info: "정보", menu: "정보", post: "정보", place: "정보", places: "정보", monster: "정보", item: "정보", equip: "정보", odds: "정보", search: "검색",
   fit: "헬스 루틴",
 };
@@ -490,7 +490,7 @@ const ACT_SECTION: [RegExp, string][] = [
   [/^\w+ \/api\/chat/, "챗봇"],
   [/^\w+ \/api\/(users|signup)/, "길드원 관리"],
   [/^POST \/api\/delete-requests\/.+/, "길드원 관리"],
-  [/^\w+ \/api\/(profile|avatar|password|kakao|characters)/, "내 정보"],
+  [/^\w+ \/api\/(profile|avatar|password|kakao|characters)/, "설정"],
   [/^\w+ \/api\/todo/, "To do"],
   [/^\w+ \/api\/favorites/, "정보"],
   [/^\w+ \/api\/bday/, "생일 스티커"],

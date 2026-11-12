@@ -233,7 +233,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
           .filter(Boolean)
           .join(" · "),
       );
-    else lines.push(`캐릭터: ${me.id} · 직업·레벨을 아직 안 정함 ('내 정보'에서 정한다)`);
+    else lines.push(`캐릭터: ${me.id} · 직업·레벨을 아직 안 정함 ('설정'에서 정한다)`);
     lines.push(...extra.me);
     parts.push(section(`내 정보: 묻는 사람 ${me.id} (질문의 '나', '내', '제'는 이 사람. 레벨·직업을 안 말해도 이 값으로 답한다)`, lines));
   }

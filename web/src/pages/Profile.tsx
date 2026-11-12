@@ -276,7 +276,7 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
   const pending = me.pendingCharacters?.length ?? 0;
   return (
     <>
-      <TopBar title="내 정보" />
+      <TopBar title="설정" />
       <section className="panel me-hero">
         <div className="me-hero-top">
           <div className="me-face">
