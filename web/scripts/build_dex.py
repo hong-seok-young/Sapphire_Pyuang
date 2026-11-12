@@ -341,7 +341,7 @@ def main() -> None:
                     it.pop("pk", None)
         # 레어도(등급)별 어림 시세 (제작자 2026-11-12 '코스튬도 펫도 레어도에 따라 가격이 정해짐, 같은 레어도면 대충 범위'):
         # 거래소 녹화에 값이 있는 코스튬·펫의 최저가를 도감 정보 사전의 등급으로 묶어 가운데값(med)과 사분위(lo~hi). 다섯 개 이상 있는 등급만.
-        # 값이 없는 코스튬·펫 칸은 거래 가능하고 등급이 하나면 gr 로 이 표를 가리킨다 (화면 dexPrice.ts 가 '등급 어림'으로 셈). 거래불가면 nt.
+        # 값이 없는 코스튬·펫 칸은 등급이 하나면 gr 로 이 표를 가리킨다 (화면 dexPrice.ts 가 '등급 어림'으로 셈). 거래불가면 nt 도 (표시만, 값은 등급 어림).
         import statistics
         by_tab: dict[tuple, list] = {}
         for b in json.loads(bp.read_text(encoding="utf-8")).get("아이템", []) if bp.exists() else []:
@@ -401,10 +401,10 @@ def main() -> None:
                     continue
                 k = key(re.sub(r"^\+\d+\s*", "", it["name"]))
                 bs = by_tab.get((e["cat"], k), [])
+                # 거래불가 칸도 같은 등급 어림값으로 센다 (제작자 2026-11-12 '거래불가여도 레어도 따라서'). nt 는 표시('거래불가')로만 남긴다.
                 if bs and all(b.get("거래불가") for b in bs):
                     it["nt"] = True
                     n_nt += 1
-                    continue
                 gr = grade_of(e["cat"], k)
                 if not gr and not bs:
                     # 사전에 없는 칸(새로 나온 펫 등)은 툴팁 이름 색으로 등급: 흰 일반 · 초록 고급 · 파랑 희귀 · 보라 영웅 (사전과 견줘 1,319칸 중 1칸만 다름)
@@ -414,7 +414,6 @@ def main() -> None:
                     if others and all(x.get("nt") or all(b.get("거래불가") for b in by_tab.get((e["cat"], key(x.get("name") or "")), [{"거래불가": False}])) for x in others):
                         it["nt"] = True
                         n_nt += 1
-                        continue
                 if gr and f"{e['cat']}|{gr}" in grade_price:
                     it["gr"] = f"{e['cat']}|{gr}"
                     n_gr += 1
