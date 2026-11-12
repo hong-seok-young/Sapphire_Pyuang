@@ -227,7 +227,12 @@ export function normalize(raw: Partial<Layout> | null | undefined): Layout {
   const dock = ["home", ...(Array.isArray(raw?.dock) ? raw.dock : []).filter(ok)];
   const rawGrid = Array.isArray(raw?.grid) ? raw.grid : [];
   const search = rawGrid.includes("search") && ok("search");
-  let slots = rawGrid.filter((k) => k !== "search").map((k) => (ok(k) ? k : EMPTY));
+  // 모르는 칸(없앤 칸)·겹친 칸은 사람이 둔 마지막 빈 자리("") 앞이면 빈 자리로 두어 다른 칸 자리를 지키고, 그 뒤(위부터 채운 곳·끝에 붙인 안 보이는 칸)면 뺀다.
+  // 빈 자리로 두면 그 뒤가 '사람이 둔 자리'로 굳어 안 보이는 칸들이 빈 칸 줄이 된다
+  // (2026-11-12 기부함 칸(donate)을 없애자 끝의 [… 성장코인샵, donate, 명예의 전당] 에서 donate 가 빈 자리가 되어 성장코인샵 위로 빈 칸 7개가 생겼다, 제작자 '왜 자꾸 이 지랄')
+  const saved = rawGrid.filter((k) => k !== "search");
+  const lastGap = saved.lastIndexOf(EMPTY);
+  let slots = saved.flatMap((k, i) => (ok(k) ? [k] : i <= lastGap ? [EMPTY] : []));
   const put = (k: string) => {
     const i = firstEmpty(slots);
     slots[i] = k;
