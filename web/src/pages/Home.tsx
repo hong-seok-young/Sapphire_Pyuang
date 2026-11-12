@@ -40,17 +40,16 @@ import type { Maint } from "../news";
 import { ClickHint, openGuide } from "../tutorial";
 import { showNew } from "../updates";
 import { useBackClose } from "../backClose";
+import { emojiPic } from "../emojiIcons";
 
 /**
  * 칸 그림: 이모지 (상점 칸만 게임 상점 그림). 제작자 요청 2026-10-31: 게임 아이템 그림을 키운 아이콘은 뭉개져서
  * 보기 싫다, 게임 그림을 굳이 쓸 필요 없다
  */
 export function TileIcon({ t }: { t: LaunchItem }) {
-  return t.iconPic ? (
-    <img className="tile-pic" src={t.iconPic} alt="" draggable={false} />
-  ) : (
-    <>{t.icon}</>
-  );
+  // 이모지도 그림으로 (제작자 2026-11-12 '아이콘 폰인데 pc랑 다르자너': 이모지는 기기 글꼴이라 폰과 PC 가 달랐다, emojiIcons.ts)
+  const pic = t.iconPic ?? emojiPic(t.icon);
+  return pic ? <img className="tile-pic" src={pic} alt="" draggable={false} /> : <>{t.icon}</>;
 }
 
 /**
