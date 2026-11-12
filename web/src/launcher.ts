@@ -116,7 +116,7 @@ export const ITEMS: LaunchItem[] = [
   // 열 때는 managers·soon·badge 를 빼고 GCOIN_OPEN (CLAUDE.md '2군 성장코인샵')
   // 명예의 전당 (개발중, 제작자 2026-11-10 '명예의 전당은 별도 버튼으로'): 기부로 쌓인 마일리지 순위. 열 때는 managers·soon·badge 를 빼고 DONATE_OPEN.
   // 기부함(#/donate)은 따로 칸을 두지 않고 명예의 전당 안 '전체 · 이번 달' 오른쪽 단추로 (제작자 2026-11-12 '기부함을 명예의 전당 안에 넣기만', '이번 달 우측에 기부함 버튼 편입')
-  { key: "hall", title: "명예의 전당", short: "명예의 전당", to: "#/hall", icon: "🏆", managers: !DONATE_OPEN, soon: !DONATE_OPEN, badge: "개발중", match: ["hall", "donate"] },
+  { key: "hall", title: "명예의 전당", short: "명예의 전당", to: "#/hall", icon: "🏛️", iconPic: "/icons/hall.png", managers: !DONATE_OPEN, soon: !DONATE_OPEN, badge: "개발중", match: ["hall", "donate"] },
   // 담당자 유어아너 (제작자 2026-11-10 '장비대여 담당자처럼 버튼에 유어아너로')
   { key: "gcoin", title: "성장코인샵", short: "코인샵", to: "#/gcoin", icon: "🪙", iconPic: "/icons/gcoin.png", ribbon: "2군 전용", ring: "silver", corner: ["담당자", "유어아너"], managers: !GCOIN_OPEN, soon: !GCOIN_OPEN, badge: "개발중", match: ["gcoin"] },
   { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
