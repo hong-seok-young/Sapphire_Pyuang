@@ -444,6 +444,7 @@ def load_posts() -> tuple[dict, dict]:
             blocks = drop_chatter(body_blocks(box))
             if aid in GAME_INFO_ONLY:
                 blocks = game_info_only(blocks)
+            blocks = fix_post_text(blocks)
             posts[aid] = {"id": aid, "title": title.strip(), "blocks": blocks}
             if GIFS_DROPPED[0]:
                 posts[aid]["gifs"] = GIFS_DROPPED[0]
@@ -716,10 +717,27 @@ def parse_equipment(aid: str, title: str, box: Tag) -> dict | None:
 # 원글 장비 표의 잘못: (아이템명, 칸에 든 글) -> 바꿀 글. 카페 원글(Made by iOS)의 표를 그대로 옮기지만 게임에 없는 값은 뺀다
 # (제작자 2026-11-03: 고대의봉의 '마법 데미지 +100' 은 인게임에 없는 옵션. 원글 346124 마법사 무기 표의 옵션 칸에 그대로 적혀 있던 것)
 ERRATA = {
-    ("고대의봉", " / 마법 데미지 +100"): "",
+    # 원글 346124 마법사 무기 표의 '마법 데미지 +100' 은 인게임 정보창에 없는 숨은 옵션이고 실제로는 최종 데미지 +10% (제작자 2026-11-12 '고봉숨옵 100이 아니고 10퍼 같은데',
+    # 해외 위키 테스트도 같음: 이론 데미지와 실제 데미지가 10% 차이, 자료 fandom/ko/기타_01.md·제공/고대의봉_숨옵.md). 짐작이 섞인 값이라 '숨은 옵션'으로 적는다
+    ("고대의봉", " / 마법 데미지 +100"): " / 숨은 옵션 최종 데미지 +10%",
     # 원글 표에 마나재생이 빠졌다 (제작자 2026-11-10 '236설신 = 지능2 마재3 이속6', 공식 확률 130102 '설원의저주장화 - 마나재생 0~4', 도감 영상 툴팁에도 마나재생)
     ("설원의저주장화", "지능 0~4 / 이동속도 2~10%"): "지능 0~4 / 마나재생 0~4 / 이동속도 2~10%",
 }
+
+
+# 글 화면(#/post)과 챗봇이 읽는 원글 칸에도 같은 고침을 넣는다 (장비 표만 고쳐서 글과 챗봇은 '+100' 으로 보였다, 2026-11-12)
+POST_ERRATA = {"마법 데미지 +100": "숨은 옵션 최종 데미지 +10%"}
+
+
+def fix_post_text(node):
+    if isinstance(node, list):
+        return [fix_post_text(x) for x in node]
+    if isinstance(node, dict):
+        out = {k: fix_post_text(v) for k, v in node.items()}
+        if isinstance(out.get("t"), str) and out["t"].strip() in POST_ERRATA:
+            out["t"] = out["t"].replace(out["t"].strip(), POST_ERRATA[out["t"].strip()])
+        return out
+    return node
 
 
 def fix_cells(name, cells):
