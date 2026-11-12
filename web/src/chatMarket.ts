@@ -21,6 +21,7 @@ interface MarketItem extends Stat {
   other: { med: number; n: number } | null;
   groups: (Stat & { label: string })[];
   samples: string[];
+  each?: boolean;
 }
 interface ChatMarket {
   source: { from: string; to: string; rooms: string[]; rate: number };
@@ -109,7 +110,7 @@ function statLine(s: Stat) {
 }
 
 function itemText(it: MarketItem, side: "팝니다" | "삽니다") {
-  const lines = [`- ${it.name}${it.abbr.length ? ` (줄임말 ${it.abbr.slice(0, 4).join(", ")})` : ""} [${side}, ${it.cat ?? "기타"}]: ${statLine(it)}`];
+  const lines = [`- ${it.name}${it.abbr.length ? ` (줄임말 ${it.abbr.slice(0, 4).join(", ")})` : ""} [${side}, ${it.cat ?? "기타"}${it.each ? ", 값은 한 개 값 ('500개 2장' 같은 묶음 글도 개수로 나눔)" : ""}]: ${statLine(it)}`];
   if (it.other) lines.push(`  · 반대쪽(${side === "팝니다" ? "삽니다" : "팝니다"}) 중간값 ${won(it.other.med)} (글 ${it.other.n}개)`);
   for (const g of it.groups) lines.push(`  · ${g.label}: ${statLine(g)}`);
   if (it.samples.length) lines.push(`  · 원글 예: ${it.samples.join(" | ")}`);

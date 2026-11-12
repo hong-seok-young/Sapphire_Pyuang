@@ -434,7 +434,7 @@ function ItemRow({ it, t, wiki, side, open, onToggle }: { it: TrendItem; t: Tren
         <span className="trend-itemmain">
           <span className="trend-itemtitle">
             <span className="row-title">{it.name}</span>
-            <span className="trend-itemprice"><b>{priceText(it.med)}</b><Spark days={it.days} /></span>
+            <span className="trend-itemprice"><b>{it.each ? <small className="muted">개당 </small> : null}{priceText(it.med)}</b><Spark days={it.days} /></span>
           </span>
           <span className="trend-groupchips">
             {chips.map((g) => (
@@ -513,7 +513,7 @@ function GroupRows({ g, t, open, onToggle }: { g: TrendGroup; t: Trend; open: bo
             <ul className="trend-sample-list">
               {g.samples.map((s, i) => (
                 <li key={i}>
-                  <span className="muted">{md(s.date)}</span> <b>{shortWon(s.price)}</b> <Who who={s.who} tel={s.tel} /> <span className="trend-raw muted">{s.raw}</span>
+                  <span className="muted">{md(s.date)}</span> <b>{s.per ? "개당 " : ""}{shortWon(s.price)}</b> <Who who={s.who} tel={s.tel} /> <span className="trend-raw muted">{s.raw}</span>
                 </li>
               ))}
             </ul>

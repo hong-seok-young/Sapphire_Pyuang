@@ -67,7 +67,7 @@ export interface TrendVariant {
   label: string; n: number; sellers: number; sell: number; buy: number;
   /** 가격은 만 원 (1장 = 1만 원) */
   med: number; min: number; max: number; recent: number | null; before: number | null;
-  first: string; last: string; days: [string, number][]; samples: { date: string; price: number; who: string; tel: string; raw: string }[];
+  first: string; last: string; days: [string, number][]; samples: { date: string; price: number; who: string; tel: string; raw: string; per?: number }[];
   /** 싼 사람부터 */
   people: TrendPerson[];
 }
@@ -80,6 +80,10 @@ export interface TrendItem extends TrendVariant {
   name: string; wiki: boolean; abbr: string[];
   /** 아무도 풀지 못한 줄임말 (위키에도, 알려 준 이름 표에도 없다) */
   unknown?: boolean;
+  /** 값이 한 개 값 (재료·주화: '개당' 글, 'N개 값' 글은 개수로 나눔) */
+  each?: boolean;
+  /** 여러 물건을 묶은 이름(펫, 바슬신 …)의 그림을 가져온 물건 */
+  iconFrom?: string;
   cat: TrendCat;
   /** 위키에 없는 물건의 그림 주소 (/data/trend/…png 제작자 도감 스샷에서 자른 것, 스킬북은 /img/… 위키 직업별 스킬의 아이콘) */
   icon?: string;
