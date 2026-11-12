@@ -880,6 +880,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 function SlotPrice({ it, price, pset }: { it: DexItem; price: DexPrice; pset: PriceSet }) {
   if (!isCostSlot(it, price)) return it.nt ? <span className="dex-price"><small>거래불가</small></span> : null;
   const c = slotCost(it, price, pset);
+  const g = price.gear[it.pk ?? gearKey(it.name ?? "")];
   const rec = MODES.map((m) => [m.label, pickWay(c, m.key)] as const);
   const same = rec[0][1]?.by === rec[1][1]?.by;
   const recText = (w: ReturnType<typeof pickWay>) => (w ? (w.by === "gold" ? "골드로 사기" : "스탬프") : "값 없음");
@@ -889,11 +890,12 @@ function SlotPrice({ it, price, pset }: { it: DexItem; price: DexPrice; pset: Pr
         골드{" "}
         {c.gold != null && c.way ? (
           <>
-            <b>{fmtGold(c.gold)}</b> = {wayText(c.way, c.scroll, isGear(it))}
+            <b>{fmtGold(c.gold)}</b> = {wayText(c.way, c.scroll, isGear(it), !!g?.craft)}
             {it.n > 1 ? ` × ${it.n}` : ""}
             {c.date ? ` · ${amgeoText([c.date])}` : ""}
             {price.gear[it.pk ?? ""]?.noench ? " · 속성부여 매물이라 같은 등급 노작 값" : ""}
             {price.gear[it.pk ?? ""]?.odd ? " · 장난 매물이라 같은 등급 값" : ""}
+            {g?.craft && !c.way.base ? ` · ${g.craft}` : ""}
             {price.gear[it.pk ?? gearKey(it.name ?? "")]?.m ? (price.gear[it.pk ?? gearKey(it.name ?? "")]?.guess ? " · 매물 없어 비슷한 아이템으로 추정한 값" : " · 매물 없어 정한 값") : ""}
           </>
         ) : c.grade ? (

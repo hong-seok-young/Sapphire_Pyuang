@@ -50,6 +50,55 @@ def abaddon_sale() -> dict | None:
     return best
 
 
+def craft(gear: dict, allp: dict, wanted: set, wiki_lv: dict) -> None:
+    """조합·NPC 제작이 거래소 노강 값보다 싸면 그 값으로 (제작자 2026-11-12 '조합 더 싼 거 있으면 도감계산기에 반영').
+    레시피는 자료 시세/조합_레시피.json (자료 scripts/make_craft_recipes.py). 재료 값은 거래소 개당 최저가·수동 값,
+    재료도 조합으로 더 싸지면 그 값으로 (네 번 되풀이). 값 모르는 재료가 있는 레시피는 쓰지 않는다. 2% 넘게 쌀 때만 바꾼다.
+    바꾼 칸은 gear 에 craft = '조합책 조합북III · 타락한마법석 30 + 5차코어 20 + 5,000골드' (화면 칸 상세)."""
+    path = DATA / "시세" / "조합_레시피.json"
+    if not path.exists():
+        return
+    recs = json.loads(path.read_text(encoding="utf-8"))["레시피"]
+    price = dict(allp)
+    how: dict = {}
+    for _ in range(4):
+        for r in recs:
+            if any(a not in price for a, _ in r["ins"]):
+                continue
+            c = (r["gold"] + sum(price[a] * n for a, n in r["ins"])) / r["q"]
+            if r["out"] not in price or c < price[r["out"]] * 0.98:
+                price[r["out"]] = c
+                how[r["out"]] = r
+    kind_of = {}
+    eq = OUT / "equipment.json"
+    if eq.exists():
+        for t in json.loads(eq.read_text(encoding="utf-8")):
+            sl = t.get("slot") or ""
+            k = "무기" if "무기" in sl else ("갑옷류" if any(x in sl for x in ("갑옷", "투구", "장갑", "신발", "보조", "방패")) else None)
+            for r in t["rows"]:
+                kind_of.setdefault(re.sub(r"\s", "", r["name"]), k)
+    n = 0
+    for k, r in how.items():
+        if k not in wanted:
+            continue
+        c = round(price[k])
+        g = gear.get(k)
+        cur = (g or {}).get("p", {}).get("0")
+        if cur is not None and c >= cur:
+            continue
+        ins = " + ".join(f"{a} {m}" for a, m in r["ins"]) + (f" + {r['gold']:,}골드" if r["gold"] else "")
+        text = f"{r['src']} · {ins}" + (f" → {r['q']}개" if r["q"] > 1 else "")
+        if g is None:
+            gear[k] = {"k": kind_of.get(k), "lv": wiki_lv.get(k), "p": {"0": c}, "craft": text}
+        else:
+            g["p"]["0"] = c
+            g["craft"] = text
+            g.pop("m", None)
+            g.pop("guess", None)
+        n += 1
+    print(f"도감 계산기: 조합이 더 싼 칸 {n}개")
+
+
 def price_data(key, wanted: set, infos: dict) -> dict | None:
     """도감에 나오는 물건만: 이름 key -> {k: 무기/갑옷류/기타/None, lv: 요구 레벨, p: {강화: 최저가}, d: 시세 날짜}.
     녹화 날짜마다 거래소 탭이 다르다 (2026-11-11 갑옷·무기·투구·보조·장갑, 2026-11-12 신발부터 나머지 전부): 날짜 순으로 읽고 같은 물건은 새 날짜 값을 쓴다.
@@ -69,6 +118,7 @@ def price_data(key, wanted: set, infos: dict) -> dict | None:
                     if mm:
                         wiki_lv.setdefault(key(r["name"]), int(mm.group(0)))
     gear: dict = {}
+    allp: dict = {}
     for day in days:
         s = json.loads(day.read_text(encoding="utf-8"))
         date_ = s.get("날짜") or day.parent.name
@@ -114,6 +164,8 @@ def price_data(key, wanted: set, infos: dict) -> dict | None:
         for n, v in mj.get("값", {}).items():
             byp.setdefault(key(n), {"0": v, "m": "e" if key(n) in guess else True})
         for k, p in byp.items():
+            if k[:2] not in ("C:", "P:") and p.get("0") is not None:
+                allp[k] = p["0"]  # 조합 재료 값 (도감에 안 나오는 재료도)
             if k.removeprefix("C:") not in wanted and not (k.startswith("P:") and key(k[2:]) in wanted) or not p:
                 continue
             kind = None if k[:2] in ("C:", "P:") else (kinds.get(k) or ("갑옷류" if tabs.get(k, set()) & ARMOR_TABS else None))
@@ -124,6 +176,7 @@ def price_data(key, wanted: set, infos: dict) -> dict | None:
                 gear[k] = {"k": kind, "lv": lv, "p": p, "m": True, **({"guess": True} if mm_ == "e" else {})}
                 continue
             gear[k] = {"k": kind, "lv": lv, "p": p, "d": date_}
+    craft(gear, allp, wanted, wiki_lv)
     s = {"날짜": max(g["d"] for g in gear.values() if g.get("d")) if gear else days[-1].parent.name}
     out = {"date": s.get("날짜"), "dates": sorted({g["d"] for g in gear.values() if g.get("d")}), "src": "암거래중개인(게임 거래소) 녹화", "gear": gear}
     if STAMP.exists():
