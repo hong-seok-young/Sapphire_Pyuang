@@ -33,9 +33,6 @@ let shared: { set: PriceSet; canEdit: boolean } | null = null;
 let loading: Promise<{ set: PriceSet; canEdit: boolean }> | null = null;
 const listeners = new Set<() => void>();
 const tidy = (v: Partial<PriceSet> | null | undefined): PriceSet => ({ scroll: v?.scroll ?? {}, stamp: v?.stamp ?? {}, ...(v?.plat != null ? { plat: v.plat } : {}) });
-const emptySet = (v: PriceSet) => !Object.keys(v.scroll).length && !Object.keys(v.stamp).length && v.plat == null;
-/** 예전에 이 기기에만 적어 둔 값 (localStorage sapphire.dex.price.<아이디>): 앱개발자가 처음 열 때 서버가 비어 있으면 한 번 올린다 */
-const oldKey = (me: Me) => `sapphire.dex.price.${me.id}`;
 let sharedFor: string | null = null;
 function loadPriceSet(me: Me | null): Promise<{ set: PriceSet; canEdit: boolean }> {
   // 캐릭터·계정을 바꾸면(테스트 계정 등) 고칠 수 있는지가 달라서 다시 받는다
@@ -47,18 +44,7 @@ function loadPriceSet(me: Me | null): Promise<{ set: PriceSet; canEdit: boolean 
   if (shared) return Promise.resolve(shared);
   loading ??= api<{ set: Partial<PriceSet>; canEdit: boolean }>("/api/dex/prices")
     .then(async (r) => {
-      let set = tidy(r.set);
-      if (r.canEdit && me && emptySet(set)) {
-        try {
-          const old = tidy(JSON.parse(localStorage.getItem(oldKey(me)) ?? "null"));
-          if (!emptySet(old)) {
-            await api("/api/dex/prices", "PUT", old);
-            set = old;
-          }
-        } catch {
-          /* 옛 값이 없거나 못 올리면 그대로 */
-        }
-      }
+      const set = tidy(r.set);
       shared = { set, canEdit: r.canEdit };
       listeners.forEach((f) => f());
       return shared;
