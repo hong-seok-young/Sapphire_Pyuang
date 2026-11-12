@@ -5286,8 +5286,13 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 .dex-cost-body { display: flex; flex-direction: column; gap: 8px; padding: 0 10px 8px; font-size: 12px; }
 .dex-sale { margin: 0; font-size: 11px; color: var(--muted); }
 .dex-sale-on { color: var(--gold); }
+.dex-cost-tip { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; width: max-content; max-width: min(240px, 80vw); padding: 6px 8px; font-size: 11px; line-height: 1.4;
+  color: #e8e4ff; background: #1a1430; border: 1px solid rgba(169, 162, 207, 0.45); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); animation: dex-tip-in 0.15s ease-out; }
+.dex-cost-tip.dex-sale-on { color: var(--gold); }
+@keyframes dex-tip-in { from { opacity: 0; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .dex-cost-tip { animation: none; } }
 .dex-cost-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.dex-cost-col { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 6px 8px; background: rgba(7, 6, 15, 0.35); border: 1px solid rgba(169, 162, 207, 0.2); }
+.dex-cost-col { position: relative; display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 6px 8px; background: rgba(7, 6, 15, 0.35); border: 1px solid rgba(169, 162, 207, 0.2); }
 .dex-cost-col b { font-size: 15px; color: #fff; overflow-wrap: anywhere; }
 .dex-cost-col small { font-size: 10.5px; }
 .dex-cost-now { border-color: var(--gold); }

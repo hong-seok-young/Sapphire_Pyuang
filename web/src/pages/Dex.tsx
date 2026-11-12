@@ -682,12 +682,35 @@ function NumIn({ value, def, onSet, label }: { value: number | undefined; def: n
 
 /** 도감 비용 (제작자 요청 2026-11-11): 지금 목록의 미완료 칸을 다 채우는 골드. 칸마다 '골드로 장비 사기'와 '장비스탬프' 중 싼 쪽을 더한다.
  *  평소와 아바돈 이벤트(스탬프가 싸진다)를 나란히, 이벤트 때 아끼는 골드. 아래에서 마법서·스탬프·플래티넘 값을 직접 고친다 */
+/** 가장 큰 단위의 정수로: 59.7억 -> '60억', 8008.3만 -> '8008만' (제작자 2026-11-12 '정수 단위 반올림') */
+function intUnit(v: number): string {
+  if (v >= 1e8) return `${Math.round(v / 1e8).toLocaleString("ko-KR")}억`;
+  if (v >= 1e4) return `${Math.round(v / 1e4).toLocaleString("ko-KR")}만`;
+  return Math.round(v).toLocaleString("ko-KR");
+}
 function CostPanel({ price, tot, pset, setPset, n }: { price: DexPrice; tot: Totals; pset: PriceSet; setPset: (v: PriceSet) => void; n: number }) {
   const [open, setOpen] = useState(false);
   const on = saleOn(price);
   // 현금 어림 (제작자 2026-11-12 '현금으로 얼만지도 평소와 아바돈 아래에'): 중개인 골드 팝니다 평균 시세, 없으면 75:1 (1만 원에 75만 골드)
   const { data: market } = useAsync(useCallback(() => fetchMarket(), []), "market");
   const rate = market?.goldRate || 75;
+  // 아바돈 칸을 누르면 판매 기간 설명이 잠깐 (제작자 2026-11-12 '누르면 설명 간단히, 다른 곳 누르면 사라지거나 잠시 뒤 사라지게')
+  const [tip, setTip] = useState(false);
+  const tipTimer = useRef(0);
+  const showTip = () => {
+    window.clearTimeout(tipTimer.current);
+    setTip((v) => !v);
+    tipTimer.current = window.setTimeout(() => setTip(false), 4000);
+  };
+  useEffect(() => {
+    if (!tip) return;
+    const off = (e: PointerEvent) => {
+      if (!(e.target as Element)?.closest?.(".dex-cost-now, .dex-cost-col")) setTip(false);
+    };
+    document.addEventListener("pointerdown", off);
+    return () => document.removeEventListener("pointerdown", off);
+  }, [tip]);
+  useEffect(() => () => window.clearTimeout(tipTimer.current), []);
   const save = tot.by.normal.sum - tot.by.event.sum;
   const setScroll = (k: string, v: number | null) => {
     const scroll = { ...pset.scroll };
@@ -708,22 +731,27 @@ function CostPanel({ price, tot, pset, setPset, n }: { price: DexPrice; tot: Tot
     <Panel className="dex-need dex-cost">
       <button type="button" className="dex-need-head" onClick={() => setOpen(!open)} aria-expanded={open}>
         <b>도감 비용</b>
-        <span className="muted">
-          평소 {fmtGold(tot.by.normal.sum)} · 이벤트 {fmtGold(tot.by.event.sum)}
-        </span>
-        {on && <span className="dex-sale-dot">판매 중</span>}
+        {!open && (
+          <span className="muted">
+            평소 {intUnit(tot.by.normal.sum)} ({intUnit(tot.by.normal.sum / rate)}원) · 이벤트 {intUnit(tot.by.event.sum)} ({intUnit(tot.by.event.sum / rate)}원)
+          </span>
+        )}
+        {on && !open && <span className="dex-sale-dot">판매 중</span>}
         <span className="dex-caret">{open ? "▲" : "▼"}</span>
       </button>
       {open && (
         <div className="dex-cost-body">
-          {price.sale && (
-            <p className={"dex-sale" + (on ? " dex-sale-on" : "")}>
-              {on ? "아바돈 장비 스탬프 판매 중" : "지난 아바돈 장비 스탬프 판매"} · {price.sale.text}
-            </p>
-          )}
           <div className="dex-cost-cols">
             {MODES.map((m) => (
-              <div key={m.key} className={"dex-cost-col" + (m.key === "event" && on ? " dex-cost-now" : "")}>
+              <div key={m.key} className={"dex-cost-col" + (m.key === "event" && on ? " dex-cost-now" : "")}
+                onClick={m.key === "event" && price.sale ? showTip : undefined} role={m.key === "event" && price.sale ? "button" : undefined}>
+                {m.key === "event" && tip && price.sale && (
+                  <span className={"dex-cost-tip" + (on ? " dex-sale-on" : "")}>
+                    아바돈 스탬프를 살 수 있을 때 값
+                    <br />
+                    {on ? "판매 중" : "지난 판매"} · {price.sale.text}
+                  </span>
+                )}
                 <small>{m.label}</small>
                 <b>{fmtGold(tot.by[m.key].sum)} 골드</b>
                 <small className="muted">≈ {wonText(Math.round(tot.by[m.key].sum / rate / 10_000) * 10_000)}</small>
