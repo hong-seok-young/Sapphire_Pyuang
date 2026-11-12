@@ -1113,3 +1113,11 @@ CREATE TABLE IF NOT EXISTS scam_list (id INTEGER PRIMARY KEY, src TEXT NOT NULL,
 -- 도감 계산기 시세 비교의 마법서 1장 골드·스탬프 1장 플래티넘·플래티넘 골드 (제작자 2026-11-12 '이 값들은 나만 바꾸게, 골드 값 등등 나만 세팅'). 한 줄(id 1), data 는 JSON { scroll, stamp, plat }.
 -- 앱개발자만 고치고(PUT /api/dex/prices) 모두가 같은 값으로 셈한다. 비우면 자료(dex.json price) 값
 CREATE TABLE IF NOT EXISTS dex_price_set (id INTEGER PRIMARY KEY, data TEXT NOT NULL, updated_at INTEGER NOT NULL, updated_by TEXT);
+
+-- 같은 매물 글 답 다시 쓰기 (server/chatCache.ts, 제작자 2026-11-12 'API 비용 아끼기'): 정리한 첫 질문의 SHA-256 -> 처음 답
+CREATE TABLE IF NOT EXISTS chat_cache (
+  qkey TEXT PRIMARY KEY,
+  msg_id INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  hits INTEGER NOT NULL DEFAULT 0
+);

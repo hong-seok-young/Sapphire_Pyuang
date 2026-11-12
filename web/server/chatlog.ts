@@ -3,6 +3,7 @@
 // 질문은 /api/chat 이 답을 받기 시작할 때 넣고, 답은 화면이 다 받은 뒤 넣는다 (서버는 답을 읽지 않고 그대로 흘려보내서)
 import type { Env } from "./auth";
 import { notify } from "./alerts";
+import { rememberAnswer } from "./chatCache";
 
 /** 그 대화의 답 받기 일꾼 (server/chatRun.ts, 대화마다 하나) */
 export const runStub = (ns: DurableObjectNamespace, threadId: number) => ns.get(ns.idFromName(`thread:${threadId}`));
@@ -171,6 +172,7 @@ export async function finishInBackground(
   questionId: number | null,
   question: string,
   stream: ReadableStream<Uint8Array>,
+  cacheKey: string | null = null,
 ): Promise<void> {
   const chunks: Uint8Array[] = [];
   const reader = stream.getReader();
@@ -202,6 +204,7 @@ export async function finishInBackground(
     const id = await addMsg(env, threadId, "assistant", text.slice(0, MAX_ANSWER), { thinking: thinking.slice(0, MAX_THINKING) || null });
     const gaps = [...text.matchAll(GAP_TOKEN)].map((m) => m[1].trim()).filter(Boolean);
     if (gaps.length) await recordGap(env, userId, threadId, id, text, gaps.join(" / "), "bot");
+    await rememberAnswer(env, cacheKey, id, text).catch(() => undefined);
     await notify(env, [userId], "chat_done", `답변이 준비됐어요: “${question.replace(/\s+/g, " ").slice(0, 40) || "첨부 질문"}”`, `#/chat/${threadId}`, "");
   } catch (e) {
     console.error("chat finish failed", e);

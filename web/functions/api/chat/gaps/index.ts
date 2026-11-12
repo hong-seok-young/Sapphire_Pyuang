@@ -4,6 +4,7 @@
 import { FORBIDDEN, NEED_LOGIN, RANK, currentUser, json, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
 import { recordGap } from "../../../../server/chatlog";
+import { forgetAnswer } from "../../../../server/chatCache";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
@@ -31,5 +32,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!row) return json({ error: "답을 찾지 못했어요" }, 404);
   const done = await env.DB.prepare("SELECT 1 FROM chat_gaps WHERE msg_id = ? AND kind = 'user'").bind(row.id).first();
   if (!done) await recordGap(env, me.id, row.thread_id, row.id, row.text, "길드원이 별로라고 함", "user");
+  // 별로인 답은 같은 글을 묻는 다른 사람에게 다시 쓰지 않는다
+  const q = await env.DB.prepare("SELECT text FROM chat_msgs WHERE thread_id = ? AND role = 'user' AND id < ? ORDER BY id DESC LIMIT 1")
+    .bind(row.thread_id, row.id)
+    .first<{ text: string }>();
+  await forgetAnswer(env, q?.text, row.id).catch(() => undefined);
   return json({ ok: true });
 };

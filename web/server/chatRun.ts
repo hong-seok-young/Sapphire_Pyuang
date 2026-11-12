@@ -14,6 +14,7 @@ import type { Env } from "./auth";
 import { notify } from "./alerts";
 import { GAP_TOKEN, MAX_ANSWER, MAX_THINKING, addMsg, recordGap } from "./chatlog";
 import { errorCause, errorText, isWebOff } from "./chatErrors";
+import { rememberAnswer } from "./chatCache";
 
 /** 일꾼에게 맡기는 것 (functions/api/chat/index.ts 가 보낸다) */
 export interface RunStart {
@@ -29,6 +30,8 @@ export interface RunStart {
     developer: boolean;
     /** 위키 자료가 질문 뒤에 따라온다 (/context). CONTEXT_WAIT_MS 까지 기다렸다가 붙이고, 안 오면(앱을 껐다) 없이 답한다 */
     waitContext?: boolean;
+    /** 같은 글 답 다시 쓰기 열쇠 (server/chatCache.ts): 도감·시세 칸이 든 답이면 적어 둔다 */
+    cacheKey?: string;
   };
   /** Claude API 요청 (stream 은 일꾼이 붙인다) */
   params: Record<string, unknown>;
@@ -452,6 +455,7 @@ export class ChatRun extends DurableObject<Env> {
         // 길잡이가 짐작했거나 자료가 없다고 표시했으면 앱개발자에게 (제작자 요청)
         const gaps = [...got.text.matchAll(GAP_TOKEN)].map((m) => m[1].trim()).filter(Boolean);
         if (gaps.length) await recordGap(env, meta.userId, meta.threadId, savedId, got.text, gaps.join(" / "), "bot");
+        await rememberAnswer(env, meta.cacheKey, savedId, got.text).catch(() => undefined);
       } catch (e) {
         console.error("chat run save failed", e);
       }

@@ -22,6 +22,7 @@ import { CHAT_SYSTEM as SYSTEM, WEB_TOOLS, portalSearch } from "../../../server/
 import { costContext } from "../../../server/chatCost";
 import { libraryContext } from "../../../server/library";
 import { addMsg, finishInBackground, newThread, ownThread, runStub, titleOf } from "../../../server/chatlog";
+import { cacheKey, cachedAnswer, cachedSse } from "../../../server/chatCache";
 import { errorCause, errorText, isWebOff } from "../../../server/chatErrors";
 import type { RunStart } from "../../../server/chatRun";
 
@@ -130,6 +131,19 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
   const later = body.later === true;
   if (later && !env.CHATRUN) return json({ needContext: true }, 409);
 
+  // 같은 매물 글이면 앞서 누가 물은 답을 그대로 (server/chatCache.ts): 새 대화의 첫 질문, 사진·파일 없이. API 를 부르지 않는다
+  const first = turns[turns.length - 1];
+  const qkey = !thread && !again && turns.length === 1 && !first.images?.length && !first.files?.length ? await cacheKey(first.text).catch(() => null) : null;
+  const hit = await cachedAnswer(env, qkey).catch(() => null);
+  if (hit) {
+    const tid = await newThread(env, me.id, titleOf(first.text));
+    const qid = await addMsg(env, tid, "user", first.text);
+    const aid = await addMsg(env, tid, "assistant", hit.text, { found: hit.found, steps: hit.steps, sources: hit.sources });
+    return new Response(cachedSse(hit.text, aid), {
+      headers: { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", "x-chat-thread": String(tid), "x-chat-msg": String(qid), "x-chat-cached": "1" },
+    });
+  }
+
   // 오늘(한국 시간) 몇 번째 질문인지. 답을 못 받으면 되돌린다
   const day = new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
   const used = await env.DB.prepare(
@@ -219,6 +233,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
           day,
           developer: me.role === "developer",
           ...(later ? { waitContext: true } : {}),
+          ...(qkey ? { cacheKey: qkey } : {}),
         },
         params: params(true),
         key: env.ANTHROPIC_API_KEY,
@@ -291,7 +306,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
   if (upstream.body && threadId !== null) {
     const [toClient, toKeep] = upstream.body.tee();
     out = toClient;
-    waitUntil(finishInBackground(env, me.id, threadId, msgId, last.text, toKeep));
+    waitUntil(finishInBackground(env, me.id, threadId, msgId, last.text, toKeep, qkey));
   }
   return new Response(out, {
     headers: {
