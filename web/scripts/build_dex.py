@@ -107,15 +107,22 @@ def price_data(key, wanted: set, infos: dict) -> dict | None:
             k = ck(o, key(o.get("base") or ""))
             if k and o.get("unit_min") is not None and k not in byp:
                 byp[k] = {"0": o["unit_min"]}
+        # 거래소 매물이 없던 재료는 제작자가 준 값 (자료 시세/수동_값.json, 개당 골드, 0 = 값어치 없음. 거래소 값이 먼저)
+        manual = DATA / "시세" / "수동_값.json"
+        for n, v in (json.loads(manual.read_text(encoding="utf-8")).get("값", {}) if manual.exists() else {}).items():
+            byp.setdefault(key(n), {"0": v, "m": True})
         for k, p in byp.items():
             if k.removeprefix("C:") not in wanted and not (k.startswith("P:") and key(k[2:]) in wanted) or not p:
                 continue
             kind = None if k[:2] in ("C:", "P:") else (kinds.get(k) or ("갑옷류" if tabs.get(k, set()) & ARMOR_TABS else None))
             mm = re.search(r"요구\s*레벨\s*(\d+)", infos.get(k, ""))
             lv = wiki_lv.get(k) or seen_lv.get(k) or (int(mm.group(1)) if mm else None)
+            if p.pop("m", None):
+                gear[k] = {"k": kind, "lv": lv, "p": p, "m": True}
+                continue
             gear[k] = {"k": kind, "lv": lv, "p": p, "d": date_}
-    s = {"날짜": max(g["d"] for g in gear.values()) if gear else days[-1].parent.name}
-    out = {"date": s.get("날짜"), "dates": sorted({g["d"] for g in gear.values()}), "src": "암거래중개인(게임 거래소) 녹화", "gear": gear}
+    s = {"날짜": max(g["d"] for g in gear.values() if g.get("d")) if gear else days[-1].parent.name}
+    out = {"date": s.get("날짜"), "dates": sorted({g["d"] for g in gear.values() if g.get("d")}), "src": "암거래중개인(게임 거래소) 녹화", "gear": gear}
     if STAMP.exists():
         st = json.loads(STAMP.read_text(encoding="utf-8"))
         out["stamp"] = {"normal": st["평소"], "event": st["이벤트"], "abaddon": st.get("아바돈_일반", 50),
