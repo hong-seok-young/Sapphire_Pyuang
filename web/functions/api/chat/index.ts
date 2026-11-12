@@ -22,7 +22,7 @@ import { CHAT_SYSTEM as SYSTEM, WEB_TOOLS, portalSearch } from "../../../server/
 import { costContext } from "../../../server/chatCost";
 import { libraryContext } from "../../../server/library";
 import { addMsg, finishInBackground, newThread, ownThread, runStub, titleOf } from "../../../server/chatlog";
-import { cacheKey, cachedAnswer, cachedSse } from "../../../server/chatCache";
+import { cacheKey, cachedAnswer, cachedSse, routeSame, similarQuestion } from "../../../server/chatCache";
 import { errorCause, errorText, isWebOff } from "../../../server/chatErrors";
 import type { RunStart } from "../../../server/chatRun";
 
@@ -134,12 +134,22 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
   // 같은 매물 글이면 앞서 누가 물은 답을 그대로 (server/chatCache.ts): 새 대화의 첫 질문, 사진·파일 없이. API 를 부르지 않는다
   const first = turns[turns.length - 1];
   const qkey = !thread && !again && turns.length === 1 && !first.images?.length && !first.files?.length ? await cacheKey(first.text).catch(() => null) : null;
-  const hit = await cachedAnswer(env, qkey).catch(() => null);
+  let hit = await cachedAnswer(env, qkey).catch(() => null);
+  let followup: string | null = null;
+  // 글이 조금 달라도: 낱말이 많이 겹치는 앞선 글이 있으면 짧은 API 한 번으로 같은 매물인지·따로 묻는 요청을 가린다 (못 가리면 보통대로)
+  if (qkey && !hit) {
+    const near = await similarQuestion(env, first.text).catch(() => null);
+    const r = near ? await routeSame(env, near.question, first.text).catch((e) => (console.error("chat route failed", e), null)) : null;
+    if (near && r?.same) {
+      hit = await cachedAnswer(env, near.qkey).catch(() => null);
+      followup = r.extra;
+    }
+  }
   if (hit) {
     const tid = await newThread(env, me.id, titleOf(first.text));
     const qid = await addMsg(env, tid, "user", first.text);
     const aid = await addMsg(env, tid, "assistant", hit.text, { found: hit.found, steps: hit.steps, sources: hit.sources });
-    return new Response(cachedSse(hit.text, aid), {
+    return new Response(cachedSse(hit.text, aid, followup), {
       headers: { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", "x-chat-thread": String(tid), "x-chat-msg": String(qid), "x-chat-cached": "1" },
     });
   }

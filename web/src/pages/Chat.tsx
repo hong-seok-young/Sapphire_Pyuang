@@ -489,6 +489,11 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
       else if (r.paused) note = "웹을 오래 찾아서 여기까지 답했어요";
       else if (r.broken) note = "답이 중간에 끊겼어요";
       update((last) => ({ ...last, text, thinkMs, note, streaming: false }));
+      // 앞선 같은 매물 글의 답을 다시 썼고 새 글에 따로 묻는 요청이 붙어 있었으면, 그 요청만 이어서 API 로 묻는다 (server/chatCache.ts)
+      if (r.followup) {
+        const f = r.followup;
+        window.setTimeout(() => sendRef.current(undefined, f), 400);
+      }
       if (r.savedId !== null) {
         const id = r.savedId;
         update((last) => ({ ...last, id }));

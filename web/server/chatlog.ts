@@ -204,7 +204,7 @@ export async function finishInBackground(
     const id = await addMsg(env, threadId, "assistant", text.slice(0, MAX_ANSWER), { thinking: thinking.slice(0, MAX_THINKING) || null });
     const gaps = [...text.matchAll(GAP_TOKEN)].map((m) => m[1].trim()).filter(Boolean);
     if (gaps.length) await recordGap(env, userId, threadId, id, text, gaps.join(" / "), "bot");
-    await rememberAnswer(env, cacheKey, id, text).catch(() => undefined);
+    await rememberAnswer(env, cacheKey, id, text, question).catch(() => undefined);
     await notify(env, [userId], "chat_done", `답변이 준비됐어요: “${question.replace(/\s+/g, " ").slice(0, 40) || "첨부 질문"}”`, `#/chat/${threadId}`, "");
   } catch (e) {
     console.error("chat finish failed", e);

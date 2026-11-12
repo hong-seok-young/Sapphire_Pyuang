@@ -455,7 +455,7 @@ export class ChatRun extends DurableObject<Env> {
         // 길잡이가 짐작했거나 자료가 없다고 표시했으면 앱개발자에게 (제작자 요청)
         const gaps = [...got.text.matchAll(GAP_TOKEN)].map((m) => m[1].trim()).filter(Boolean);
         if (gaps.length) await recordGap(env, meta.userId, meta.threadId, savedId, got.text, gaps.join(" / "), "bot");
-        await rememberAnswer(env, meta.cacheKey, savedId, got.text).catch(() => undefined);
+        await rememberAnswer(env, meta.cacheKey, savedId, got.text, meta.question).catch(() => undefined);
       } catch (e) {
         console.error("chat run save failed", e);
       }

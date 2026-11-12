@@ -669,6 +669,8 @@ export interface ChatResult {
   savedId: number | null;
   /** 끝 신호(message_stop)까지 받았으면 true */
   finished: boolean;
+  /** 앞선 같은 매물 글의 답을 다시 썼고, 새 글에 따로 묻는 요청이 있으면 그 요청 (화면이 이어서 묻는다, server/chatCache.ts) */
+  followup?: string | null;
 }
 
 export interface AskEvents {
@@ -716,6 +718,8 @@ interface SseEvent {
   sapphire?: boolean;
   /** sapphire_saved: 일꾼이 넣은 답 번호 */
   id?: number;
+  /** sapphire_followup: 이어서 물을 요청 */
+  text?: string;
 }
 
 const host = (url: string) => {
@@ -900,6 +904,7 @@ async function readAnswer(body: ReadableStream<Uint8Array>, on: AskEvents, signa
           result.paused = ev.delta.stop_reason === "pause_turn";
         } else if (ev.type === "message_stop") finished = true;
         else if (ev.type === "sapphire_saved" && typeof ev.id === "number") result.savedId = ev.id;
+        else if (ev.type === "sapphire_followup" && typeof ev.text === "string") result.followup = ev.text;
         else if (ev.type === "sapphire_web_off") on.onStep({ kind: "search", text: "꺼짐 (위키 자료로만 답해요)" });
         else if (ev.type === "error") throw new StreamError(ev.sapphire && ev.error?.message ? ev.error.message : streamError(ev.error?.type));
       }
