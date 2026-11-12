@@ -1032,6 +1032,19 @@ function planTargets(entries: DexEntry[], targets: Map<string, number>, costOf: 
   return { picks, got, gold: picks.reduce((a, p) => a + (p.g ?? 0), 0), goldEv: picks.reduce((a, p) => a + (p.ge ?? p.g ?? 0), 0), unknown: picks.filter((p) => p.g == null).length };
 }
 
+/** 챗봇 도감 칸: 골드로 살 칸의 골드 + 스탬프로 할 칸의 장 수 */
+function SnipSplit({ s }: { s: { gold: number; stamps: (readonly [string, number])[] } }) {
+  if (!s.stamps.length) return null;
+  return (
+    <span className="dex-snip-split">
+      <span>골드 {fmtGold(s.gold)}</span>
+      {s.stamps.map(([g, n]) => (
+        <span key={g} className={stampCls(g)}>{g} {n.toLocaleString("ko-KR")}장</span>
+      ))}
+    </span>
+  );
+}
+
 export function DexSnippet({ spec }: { spec: string }) {
   const { data: all } = useAsync(useCallback(() => loadDex(), []), "dex");
   // '도감 계산기에서 보기'의 목표는 계정별로 둬서 누구인지 묻는다. 마법서·스탬프 값은 서버 한 벌
@@ -1071,7 +1084,23 @@ export function DexSnippet({ spec }: { spec: string }) {
       return g;
     };
     const max = addUp(entries);
-    return { targets, bad, max, ...planTargets(entries, targets, costOf) };
+    const res = planTargets(entries, targets, costOf);
+    // 칸마다 가장 싼 수단: 골드가 싼 칸은 골드, 장비스탬프가 싼 칸은 스탬프 장 수로 (도감 계산기 필요 재료와 같은 셈, 제작자 2026-11-12 '챗봇 쪽에서도 반영')
+    const split = (mode: "normal" | "event") => {
+      const st = new Map<string, number>();
+      let gold = 0;
+      if (price)
+        for (const { e } of res.picks)
+          for (const it of e.items) {
+            const w = pickWay(slotCost(it, price, pset), mode);
+            if (!w) continue;
+            if (w.by === "stamp" && it.sg && it.sn) st.set(it.sg, (st.get(it.sg) ?? 0) + it.sn * it.n);
+            else gold += w.v;
+          }
+      const order = ["S", "A", "B", ...[...st.keys()].filter((g) => !["S", "A", "B"].includes(g)).sort()].filter((g) => st.has(g));
+      return { gold, stamps: order.map((g) => [g, st.get(g)!] as const) };
+    };
+    return { targets, bad, max, ...res, split: { normal: split("normal"), event: split("event") } };
   }, [all, spec, withEv, pset]);
   if (!all || !plan || !plan.targets.size) return null;
   const goDex = () => {
@@ -1106,13 +1135,27 @@ export function DexSnippet({ spec }: { spec: string }) {
           <small>평소</small>
           <b>{fmtGold(plan.gold)} 골드</b>
           <small className="muted">≈ {wonText(Math.round(plan.gold / rate / 10_000) * 10_000)}</small>
+          <SnipSplit s={plan.split.normal} />
         </div>
         <div className="dex-cost-col">
           <small>아바돈 이벤트</small>
           <b>{fmtGold(plan.goldEv)} 골드</b>
           <small className="muted">≈ {wonText(Math.round(plan.goldEv / rate / 10_000) * 10_000)}</small>
+          <SnipSplit s={plan.split.event} />
         </div>
       </div>
+      <button type="button" className="dex-go" onClick={goDex}>
+        <span className="dex-go-clip" aria-hidden>
+          <span className="dex-go-shine" />
+        </span>
+        <span className="dex-go-ring" aria-hidden />
+        <span className="dex-go-ring dex-go-ring2" aria-hidden />
+        {[0, 1, 2, 3].map((i) => (
+          <span key={i} className={`dex-go-spark dex-go-spark${i}`} aria-hidden />
+        ))}
+        <span className="dex-go-txt">도감 계산기에서 보기</span>
+        <span className="dex-go-arrow" aria-hidden>›</span>
+      </button>
       <button type="button" className="dex-snip-list-head" onClick={() => setOpen(!open)} aria-expanded={open}>
         항목 {plan.picks.length}개{plan.unknown ? ` · 값 모름 ${plan.unknown}` : ""}
         {plan.bad.length > 0 && <span className="muted"> · 모르는 능력치 {plan.bad.join(", ")}</span>}
@@ -1132,9 +1175,6 @@ export function DexSnippet({ spec }: { spec: string }) {
           ))}
         </ul>
       )}
-      <button type="button" className="sub-tab dex-snip-go" onClick={goDex}>
-        도감 계산기에서 보기 ›
-      </button>
     </div>
   );
 }

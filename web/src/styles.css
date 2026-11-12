@@ -5496,7 +5496,40 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 .dex-snip-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; padding: 3px 0; font-size: 11px; border-bottom: 1px dashed rgba(169, 162, 207, 0.15); }
 .dex-snip-list li span { min-width: 0; }
 .dex-snip-list li b { flex: none; color: var(--gold); font-weight: normal; }
-.dex-snip-go { align-self: flex-end; }
+/* 챗봇 도감 칸의 칸마다 싼 수단 (골드 + 스탬프 장 수) */
+.dex-snip-split { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 5px; margin-top: 2px; font-size: 10px; color: var(--muted); }
+.dex-snip-split .dex-stamp { font-size: 10px; margin: 0; }
+/* '도감 계산기에서 보기' (제작자 2026-11-12 '엄청 눈에 띄게 애니메이션 팍팍, 딱 봐도 누르고 싶게'):
+   금빛 큰 단추가 통통 뛰고, 빛이 지나가고, 둘레로 고리가 퍼지고, 모서리 별이 반짝이고, 화살표가 앞으로 쿡쿡. transform·opacity 만 */
+.dex-go {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 40px; margin: 4px 0 2px; padding: 0 14px;
+  font: inherit; font-size: 14px; font-weight: 800; letter-spacing: 0.3px; color: #2b1800; cursor: pointer;
+  background: linear-gradient(180deg, #fff1a8 0%, #ffd34d 45%, #f2a51a 100%); border: 2px solid #fff3b8;
+  box-shadow: 0 0 0 1px rgba(60, 30, 0, 0.7), 0 3px 0 #9a5c06, 0 0 14px rgba(255, 200, 60, 0.55);
+  animation: dex-go-bob 1.4s ease-in-out infinite;
+}
+.dex-go:active { animation: none; transform: translateY(2px) scale(0.97); }
+.dex-go-txt { position: relative; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55); }
+.dex-go-arrow { position: relative; font-size: 20px; line-height: 1; animation: dex-go-poke 0.9s ease-in-out infinite; }
+.dex-go-clip { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.dex-go-shine { position: absolute; top: -10%; bottom: -10%; left: 0; width: 34%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.85), transparent);
+  transform: translateX(-120%) skewX(-18deg); animation: dex-go-shine 2.2s ease-in-out infinite; }
+.dex-go-ring { position: absolute; inset: -3px; border: 2px solid rgba(255, 214, 90, 0.9); pointer-events: none; animation: dex-go-ring 1.8s ease-out infinite; }
+.dex-go-ring2 { animation-delay: 0.9s; }
+.dex-go-spark { position: absolute; width: 5px; height: 5px; background: #fff; box-shadow: 0 0 6px #ffe680; pointer-events: none; opacity: 0; animation: dex-go-spark 1.6s ease-in-out infinite; }
+.dex-go-spark0 { top: -4px; left: 8%; }
+.dex-go-spark1 { top: -4px; right: 14%; animation-delay: 0.4s; }
+.dex-go-spark2 { bottom: -4px; left: 30%; animation-delay: 0.8s; }
+.dex-go-spark3 { bottom: -4px; right: 6%; animation-delay: 1.2s; }
+@keyframes dex-go-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes dex-go-poke { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(5px); } }
+@keyframes dex-go-shine { 0% { transform: translateX(-120%) skewX(-18deg); } 60%, 100% { transform: translateX(420%) skewX(-18deg); } }
+@keyframes dex-go-ring { 0% { transform: scale(1, 1); opacity: 0.9; } 100% { transform: scale(1.06, 1.45); opacity: 0; } }
+@keyframes dex-go-spark { 0%, 100% { transform: scale(0.3) rotate(0deg); opacity: 0; } 50% { transform: scale(1.2) rotate(45deg); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .dex-go, .dex-go-arrow, .dex-go-shine, .dex-go-ring, .dex-go-spark { animation: none; }
+  .dex-go-ring, .dex-go-spark, .dex-go-shine { display: none; }
+}
 
 /* 기부 내역의 물건 이름 (pages/GiftName.tsx, 제작자 2026-11-12 '정식 용어로 바꾸고 아이콘도 넣어서 이쁘게 정리'):
    왼쪽 그림은 첫 물건(여럿이면 뒤에 둘째 그림과 '+2'), 이름은 물건마다 '[작은 그림] +5 정식 이름 ×60' 과 아래 옵션 */
