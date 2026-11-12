@@ -318,10 +318,6 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
     return [...m.entries()].sort((a, b) => b[1].entries - a[1].entries || b[1].n - a[1].n);
   }, [todoListed.map((e) => e.name).join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 장비를 모두 장비스탬프로 대체하면 드는 스탬프 (등급별 합)
-  const stamps = new Map<string, number>();
-  for (const e of todoListed) for (const it of e.items) if (it.sg && it.sn) stamps.set(it.sg, (stamps.get(it.sg) ?? 0) + it.sn * it.n);
-  const stampSum = ["S", "A", "B", ...[...stamps.keys()].filter((g) => !["S", "A", "B"].includes(g)).sort()].filter((g) => stamps.has(g));
   // 지금 목록의 미완료를 다 채우는 값: 칸마다 골드로 사기 vs 스탬프 중 싼 쪽, 평소 · 아바돈 이벤트
   // 효과 없는 항목(코스튬 '옵션 없음' 43, 라이딩 2)은 능력치를 주지 않아 비용에서 뺀다 (제작자 2026-11-12 '도감 효과 없는 건 몰라도 되지 않나')
   const tot = price ? totals(todoListed.filter((e) => e.effects.length > 0).flatMap((e) => e.items), price, pset) : null;
@@ -399,14 +395,6 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
             <b>필요 재료</b> <span className="muted">미완료 {todoListed.length}개 · 재료 {need.length}종</span>
             <span className="dex-caret">{showNeed ? "▲" : "▼"}</span>
           </button>
-          {showNeed && stampSum.length > 0 && (
-            <p className="dex-stampsum">
-              장비스탬프로 대체하면{" "}
-              {stampSum.map((g) => (
-                <span key={g} className={stampCls(g)}>{g} {stamps.get(g)!.toLocaleString("ko-KR")}</span>
-              ))}
-            </p>
-          )}
           {showNeed && (
             <ul className="dex-need-list">
               {need.map(([k, { it, n, entries }]) => (
@@ -697,8 +685,20 @@ function intUnit(v: number): string {
   if (v >= 1e4) return `${Math.round(v / 1e4).toLocaleString("ko-KR")}만`;
   return Math.round(v).toLocaleString("ko-KR");
 }
+function FoldHead({ open, onClick, children }: { open: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" className="dex-cost-fold" onClick={onClick} aria-expanded={open}>
+      <b>{children}</b>
+      <span className="dex-caret">{open ? "▲" : "▼"}</span>
+    </button>
+  );
+}
+
 function CostPanel({ price, tot, pset, setPset, canEdit }: { price: DexPrice; tot: Totals; pset: PriceSet; setPset: (v: PriceSet) => void; canEdit: boolean }) {
   const [open, setOpen] = useState(false);
+  // 마법서·스탬프 값 칸은 접어 둔다 (제작자 2026-11-12 '마법서 가격으로 해서 접어놓고 스탬프 가격으로 해서 접어놔')
+  const [foldScroll, setFoldScroll] = useState(false);
+  const [foldStamp, setFoldStamp] = useState(false);
   const on = saleOn(price);
   // 현금 어림 (제작자 2026-11-12 '현금으로 얼만지도 평소와 아바돈 아래에'): 중개인 골드 팝니다 평균 시세, 없으면 75:1 (1만 원에 75만 골드)
   const { data: market } = useAsync(useCallback(() => fetchMarket(), []), "market");
@@ -773,8 +773,8 @@ function CostPanel({ price, tot, pset, setPset, canEdit }: { price: DexPrice; to
 
           {scrolls.length > 0 && (
             <div className="dex-cost-set">
-              <b>마법서 1장 (골드)</b>
-              <div className="dex-cost-inputs">
+              <FoldHead open={foldScroll} onClick={() => setFoldScroll(!foldScroll)}>마법서 가격</FoldHead>
+              {foldScroll && <div className="dex-cost-inputs">
                 {scrolls.map((k) => {
                   const [kind, grade] = k.split(" ") as ["무기" | "갑옷", string];
                   return (
@@ -784,13 +784,14 @@ function CostPanel({ price, tot, pset, setPset, canEdit }: { price: DexPrice; to
                     </label>
                   );
                 })}
-              </div>
+              </div>}
             </div>
           )}
 
           {price.stamp && (
             <div className="dex-cost-set">
-              <b>스탬프 1장 (플래티넘)</b>
+              <FoldHead open={foldStamp} onClick={() => setFoldStamp(!foldStamp)}>스탬프 가격</FoldHead>
+              {foldStamp && <>
               <div className="dex-cost-grid">
                 <span />
                 {STAMP_GRADES.map((g) => (
@@ -810,7 +811,7 @@ function CostPanel({ price, tot, pset, setPset, canEdit }: { price: DexPrice; to
                   onSet={(v) => setPset({ ...pset, plat: v == null ? undefined : v / 100 })} label="플래티넘 100 의 골드" ro={!canEdit} />
                 <span>골드</span>
               </label>
-              <small className="muted">아바돈 스탬프 1장 = 일반 {price.stamp.abaddon}장. 이벤트 값은 봉인된스탬프함 A/B 와 왜곡된수정구 평균으로 셈</small>
+              </>}
             </div>
           )}
 
@@ -821,10 +822,6 @@ function CostPanel({ price, tot, pset, setPset, canEdit }: { price: DexPrice; to
               </button>
             )}
           </div>
-          <p className="dex-legend muted">
-            장비 시세 {amgeoText(price.dates?.length ? price.dates : [price.date])} (옵션은 안 보고 가장 싼 매물)
-            {price.stamp?.date ? ` · 스탬프 상점 ${price.stamp.date}` : ""}
-          </p>
         </div>
       )}
     </Panel>

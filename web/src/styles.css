@@ -5339,6 +5339,9 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 .dex-cost-note b { color: var(--gold); }
 .dex-cost-set { display: flex; flex-direction: column; gap: 4px; }
 .dex-cost-set > b { font-size: 11px; }
+.dex-cost-fold { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 6px 0; background: none; border: 0; border-top: 1px solid rgba(255,255,255,.08); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.dex-cost-fold b { font-size: 12px; }
+.dex-cost-fold:active { transform: scale(.98); }
 .dex-cost-set > small { font-size: 10px; line-height: 1.4; }
 .dex-cost-inputs { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 4px 8px; }
 .dex-cost-inputs label { display: grid; grid-template-columns: minmax(0, 1fr) 70px; align-items: center; gap: 4px; font-size: 11px; }
