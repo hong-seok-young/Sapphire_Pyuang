@@ -15,8 +15,8 @@ import { thingNew, useNews } from "./news";
 
 /**
  * 픽셀 그림. 작은 아이콘은 scale 배로 키워도 흐려지지 않게 그린다.
- * fit 을 주면 원본 크기와 상관없이 긴 쪽을 fit 픽셀에 맞춘다 (같은 아이템이 드랍표에선 12px,
- * 장비표에선 30px 로 저장돼 있어서, 아이템 아이콘은 fit 으로 크기를 맞춘다)
+ * fit 을 주면 원본 크기와 상관없이 긴 쪽을 fit 픽셀에 맞추고 칸은 fit x fit 정사각형 (같은 아이템이 드랍표에선 12px,
+ * 장비표에선 30px 로 저장돼 있어서, 아이템 아이콘은 fit 으로 크기를 맞춘다. 아이템 아이콘은 max 가 아니라 fit 을 쓴다: 줄마다 글자 시작이 같아진다)
  */
 export function PicImg({
   pic,
@@ -46,13 +46,14 @@ export function PicImg({
   // 영상에서 오린 고화질 아이콘(data/icon, build_book.py)은 줄여 그릴 때 부드럽게 (카페 글의 작은 픽셀 그림은 키워도 또렷하게 pixelated)
   if (pic.src.includes("data/icon/")) className = "pic-hq " + (className ?? "");
   if (fit) {
-    const k = fit / Math.max(pic.w, pic.h);
+    // 칸은 늘 fit x fit 정사각형이고 그림은 그 안에 비율 그대로 가운데 (object-fit: contain, .pic-fit).
+    // 제작자 2026-11-12 '템 크기 통일하고 텍스트 시작부를 통일': 전에는 그림 비율대로 폭이 달라져(세로로 긴 장화·주스는 좁게) 옆 글자가 줄마다 다른 자리에서 시작했다
     return (
       <img
-        className={"pic " + (className ?? "")}
+        className={"pic pic-fit " + (className ?? "")}
         src={pic.src}
-        width={Math.round(pic.w * k)}
-        height={Math.round(pic.h * k)}
+        width={fit}
+        height={fit}
         alt={alt}
         loading="lazy"
         decoding="async"

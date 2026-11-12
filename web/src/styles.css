@@ -63,6 +63,8 @@ a { color: inherit; text-decoration: none; }
 button { font: inherit; color: inherit; }
 .pic, .inline-icon, .inline-pic, .topbar-logo, .hero-mark { image-rendering: pixelated; }
 .pic-empty { display: inline-block; width: 24px; height: 24px; }
+/* 아이템 아이콘 칸은 정사각형, 그림은 그 안에 비율 그대로 (ui.tsx PicImg fit): 줄마다 옆 글자가 같은 자리에서 시작한다 */
+.pic-fit { object-fit: contain; flex: none; }
 
 /* 100dvh: the visible height on phones (100vh is taller there and made the home screen scroll for nothing) */
 .app { max-width: 640px; margin: 0 auto; min-height: 100vh; min-height: 100dvh; }
@@ -3076,7 +3078,7 @@ button.gd-member-row { cursor: pointer; }
 .trend-other { color: var(--gold); }
 
 /* 시세 동향: 도감 스샷에서 자른 그림 (위키에 없는 물건) */
-.trend-icon { max-width: 30px; max-height: 30px; image-rendering: pixelated; }
+.trend-icon { width: 30px; height: 30px; object-fit: contain; image-rendering: pixelated; }
 
 /* 강화 비교 (개발중): 무기마다 한 줄, 결과·곡선·단계별 표 (제작자 2026-11-04 '콤팩트하게') */
 .enh { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }

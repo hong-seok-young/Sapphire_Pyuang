@@ -566,7 +566,7 @@ function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClo
               const g = gears.find((x) => x.part === part && x.name === h.name);
               return (
                 <li key={`${h.name}-${i}`}>
-                  <span className="sim-shop-pic">{g?.icon ? <PicImg pic={g.icon} max={28} /> : null}</span>
+                  <span className="sim-shop-pic">{g?.icon ? <PicImg pic={g.icon} fit={28} /> : null}</span>
                   <span className="sim-shop-name">
                     <b>
                       +{h.lv} {h.name}
@@ -590,7 +590,7 @@ function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClo
           const open = canBuy(list, i, cleared);
           return (
           <li key={g.name} className={open ? "" : "sim-shop-locked"} style={{ animationDelay: `${Math.min(i, 14) * 25}ms` }}>
-            <span className="sim-shop-pic">{g.icon ? <PicImg pic={g.icon} max={28} /> : null}</span>
+            <span className="sim-shop-pic">{g.icon ? <PicImg pic={g.icon} fit={28} /> : null}</span>
             <span className="sim-shop-name">
               <b>{g.name}</b>
               <small>

@@ -428,7 +428,7 @@ function ItemRow({ it, t, wiki, side, open, onToggle }: { it: TrendItem; t: Tren
       <button type="button" className="trend-itemrow" onClick={onToggle}>
         <span className="mk-slot trend-slot">
           {/* 영상에서 오린 고화질 아이콘(iconHQ)이 먼저 (제작자 2026-11-12 '시세동향에서도 이미지 없는 거 싹 채워') */}
-          {it.iconHQ && it.icon ? <img className="trend-icon" src={encodeURI(it.icon)} alt="" /> : pic ? <PicImg pic={pic} max={30} /> : it.icon ? <img className="trend-icon" src={encodeURI(it.icon)} alt="" /> : <img className="mk-coin" src={MARKET_PIC + "coin.png"} alt="" />}
+          {it.iconHQ && it.icon ? <img className="trend-icon" src={encodeURI(it.icon)} alt="" /> : pic ? <PicImg pic={pic} fit={30} /> : it.icon ? <img className="trend-icon" src={encodeURI(it.icon)} alt="" /> : <img className="mk-coin" src={MARKET_PIC + "coin.png"} alt="" />}
         </span>
         <span className="trend-itemmain">
           <span className="trend-itemtitle">

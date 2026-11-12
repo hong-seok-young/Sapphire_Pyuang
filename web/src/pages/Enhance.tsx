@@ -189,7 +189,7 @@ export function WeaponCard({ d, wiki, side, hint, pick, onPick, open, onOpen }: 
         {pick.w && cur && (
           <div className="enh-ctl" title={`Lv.${pick.w.lv ?? "?"} · ${fmt(cur.min)}~${fmt(cur.max)}`}>
             <span className="enh-slot">
-              {pic ? <PicImg pic={pic} max={20} /> : null}
+              {pic ? <PicImg pic={pic} fit={20} /> : null}
               <small className="enh-lvtag">Lv{pick.w.lv ?? "?"}</small>
             </span>
             <span className="enh-step">
@@ -379,7 +379,7 @@ function Similar({ d, wiki, a, b, onPick }: { d: Enhance; wiki: Wiki; a: Pick; b
               disabled={r.me}
               onClick={() => onPick(r.w, r.plus)}
             >
-              <span className="enh-sim-pic">{pic ? <PicImg pic={pic} max={18} /> : null}</span>
+              <span className="enh-sim-pic">{pic ? <PicImg pic={pic} fit={18} /> : null}</span>
               <span className="enh-sim-name">
                 +{r.plus} {r.w.name} <small>Lv.{r.w.lv ?? "?"}</small>
               </span>
@@ -512,7 +512,7 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
             </button>
             <div className="enh-ch-refbox">
               <span className="enh-ch-reftag">기준</span>
-              {basePic ? <PicImg pic={basePic} max={16} /> : null}
+              {basePic ? <PicImg pic={basePic} fit={16} /> : null}
               <Pop value={nowLabel} className="enh-ch-refwhat">
                 <FitLine text={nowLabel} wrap={false} />
               </Pop>
@@ -578,7 +578,7 @@ function PowerChart({ d, wiki, job, a, b, onPick, onBase }: {
                   onClick={() => setOpen(shut ? r.w.name : null)}
                   aria-expanded={!shut}
                 >
-                  <span className="enh-ch-pic">{pic ? <PicImg pic={pic} max={16} /> : null}</span>
+                  <span className="enh-ch-pic">{pic ? <PicImg pic={pic} fit={16} /> : null}</span>
                   <FitLine text={r.w.name} wrap={false} />
                 </button>
                 <div

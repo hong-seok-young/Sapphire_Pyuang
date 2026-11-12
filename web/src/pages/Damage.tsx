@@ -93,7 +93,7 @@ function ArmorRow({ d, slot, items, worn, job, open, onOpen, onSet }: {
       <div className={"dmg-row" + (open ? " dmg-row-on" : "")}>
         <span className="dmg-slot">{slot.name}</span>
         <button type="button" className={"dmg-item" + (it ? "" : " dmg-item-empty")} onClick={onOpen} aria-expanded={open}>
-          {it?.icon ? <PicImg pic={it.icon} max={18} /> : null}
+          {it?.icon ? <PicImg pic={it.icon} fit={18} /> : null}
           <span>{it ? it.name : "없음"}</span>
         </button>
         {slot.enhance && it ? (
@@ -122,7 +122,7 @@ function ArmorRow({ d, slot, items, worn, job, open, onOpen, onSet }: {
           </button>
           {shown.map((x) => (
             <button key={x.name} type="button" className={"dmg-opt" + (it?.name === x.name ? " dmg-opt-on" : "")} onClick={() => onSet([x.name, it?.name === x.name ? plus : slot.enhance ? Math.min(plus, 15) : 0])}>
-              {x.icon ? <PicImg pic={x.icon} max={16} /> : null}
+              {x.icon ? <PicImg pic={x.icon} fit={16} /> : null}
               <span>{x.name}</span>
               <small>
                 Lv.{x.lv} · 방어 {x.def}

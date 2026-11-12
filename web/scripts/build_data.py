@@ -758,8 +758,9 @@ def parse_equipment(aid: str, title: str, box: Tag) -> dict | None:
             name = cells[name_col]
             if not name:
                 continue
-            if name in ROW_NAME:  # 원글 표의 이름 오타 (게임 사전·공식 확률표·거래소 녹화 이름으로)
-                name = ROW_NAME[name]
+            fixed = row_name(name, dict(zip(h, cells)))  # 원글 표의 이름 오타·줄바꿈 (게임 사전·공식 확률표·거래소 녹화 이름으로)
+            if fixed != name:
+                name = fixed
                 cells[name_col] = name
             cells = fix_cells(name, cells, h)
             row = {"name": name, "icon": first_picture(tds[0]), "cells": cells}
@@ -808,6 +809,80 @@ def fix_post_text(node):
     return node
 
 
+def row_name(name: str, info: dict) -> str:
+    """장비 표 줄 이름 고침: 칸 안 줄바꿈(' / '), 오타, 같은 이름으로 잘못 적힌 줄 (2026-11-12 제작자 확인: 아뮬렛, 모험가벨트, 환상의지팡이)"""
+    name = re.sub(r"\s*/\s*", " ", name).replace("[40-~49LV]", "[40~49LV]").replace("환상의자팡이", "환상의지팡이").strip()
+    lv = re.search(r"\d+", info.get("레벨제한") or "")
+    # 환상의너클 네 줄이 모두 '[1~20LV]' 로 적혀 있다 (검·활·지팡이는 1~20, 21~30, 31~40, 41~50): 레벨제한으로 맞춘다
+    if name.startswith("환상의너클[") and lv:
+        name = "환상의너클" + {1: "[1~20LV]", 21: "[21~30LV]", 31: "[31~40LV]", 41: "[41~50LV]"}.get(int(lv.group()), name[5:])
+    # 불타는신발 방어력 10 짜리는 게임 이름이 '불타는신발 X' (원글은 V. VI 는 방어력 6)
+    if name == "불타는신발V" and (info.get("방어력") or "").strip() == "10":
+        name = "불타는신발 X"
+    return ROW_NAME.get(name, name)
+
+
+_official: dict | None = None
+
+
+def official_options() -> dict:
+    """컴투스 공식 옵션 재설정 확률표(자료/공식/확률/130101·130102, lim.com2us.com): 아이템(띄어쓰기 뺌) -> 옵션 -> 범위 글 ('0~6', '0 & 4~12' = 0 이거나 4~12).
+    제작자 2026-11-12 '각각 출처가 어떻게 돼? 공홈이 맞다고 본다': 카페 원글 표의 옵션 범위가 이 표와 다르면 공식 값으로 쓴다"""
+    global _official
+    if _official is not None:
+        return _official
+    _official = {}
+    alias = {"최대체력": "체력", "최대마나": "마나", "크리": "크리티컬"}
+    g = lambda x: f"{x:g}"
+    for key in ("130101", "130102"):
+        p = SRC / "공식" / "확률" / f"{key}.json"
+        if not p.exists():
+            continue
+        for it in json.loads(p.read_text(encoding="utf-8")).get("items", []):
+            title = (it.get("title") or {}).get("ko") or ""
+            if " - " not in title:
+                continue
+            item, opt = title.rsplit(" - ", 1)
+            opt = re.sub(r"\s", "", opt.replace("\xa0", ""))
+            vals = set()
+            for row in (it.get("item") or {}).get("rows", []):
+                try:
+                    vals.add(float(str(row.get("OptionValue")).replace("%", "")))
+                except ValueError:
+                    pass
+            if not vals:
+                continue
+            nz = sorted(v for v in vals if v != 0)
+            if 0 in vals and nz and nz[0] > 1:
+                text = f"0 & {g(nz[0])}~{g(nz[-1])}" if nz[0] != nz[-1] else f"0 & {g(nz[0])}"
+            else:
+                lo, hi = min(vals), max(vals)
+                text = f"{g(lo)}~{g(hi)}" if lo != hi else g(lo)
+            _official.setdefault(re.sub(r"\s", "", item.replace("\xa0", "")), {})[alias.get(opt, opt)] = text
+    return _official
+
+
+OFFICIAL_FIXED: list = []
+
+
+def official_cell(name: str, cell: str) -> str:
+    """옵션 칸의 범위를 공식 표 값으로. 표에 있는 옵션만 바꾸고(없는 옵션을 더하지 않는다), 고정 옵션·'거래불가' 같은 글은 그대로"""
+    off = official_options().get(re.sub(r"\s", "", name))
+    if not off:
+        return cell
+    parts = cell.split(" / ")
+    for i, part in enumerate(parts):
+        m = re.match(r"^(\s*)([가-힣 ]+?)(\s*)(\d[\d~&\s.]*)(%?)(\s*)$", part)
+        if not m:
+            continue
+        stat = re.sub(r"\s", "", m.group(2))
+        want = off.get("크리티컬" if stat == "크리" else stat)
+        if want and re.sub(r"\s", "", m.group(4)) != want.replace(" ", ""):
+            OFFICIAL_FIXED.append(f"{name} {m.group(2)} {m.group(4).strip()}{m.group(5)} -> {want}{m.group(5)}")
+            parts[i] = f"{m.group(1)}{m.group(2)}{m.group(3) or ' '}{want}{m.group(5)}{m.group(6)}"
+    return " / ".join(parts)
+
+
 def fix_cells(name, cells, headers=None):
     for (item, bad), good in ERRATA.items():
         if name == item:
@@ -820,6 +895,13 @@ def fix_cells(name, cells, headers=None):
                 cells[i] = good
             elif bad in cells[i] and col == "옵션":
                 cells[i] = cells[i].replace(bad, good)
+    if headers and "옵션" in headers and headers.index("옵션") < len(cells):
+        i = headers.index("옵션")
+        cells[i] = official_cell(name, cells[i])
+        # 게임 정보창에는 있는데 원글 옵션 칸에 빠진 옵션·세트 효과를 더한다 (이미 그 옵션이 적혀 있으면 두지 않는다)
+        add = OPTION_ADD.get(name)
+        if add and add.split(" ")[0] not in cells[i]:
+            cells[i] = add if cells[i].strip() in ("", "-") else f"{cells[i]} / {add}"
     return cells
 
 
@@ -834,12 +916,55 @@ FIELD_ERRATA = {
     ("숙련모험가의망토", "방어력"): ("2", "1"),
     # 공식 옵션 재설정 확률표(자료/공식/확률/130101 '세계수가지갑옷 - 불저항': 0 또는 10~14)와 제작자 '불저13'. 원글은 체력 범위(26~34)가 불저항 칸에도 적혀 있었다
     ("세계수가지갑옷", "옵션"): ("불저항 26~34", "불저항 0 & 10~14"),
+    # 능력치 이름 없이 숫자만 적힌 칸 (게임 사전: 체력), 옵션이 '-' 인 쿠이모자 (게임 사전: 힘 1 · 민첩 1 · 체력 1)
+    ("까막이반지", "옵션"): ("10 to 25", "체력 10~25"), ("뼈반지", "옵션"): ("10", "체력 10"), ("신념의벨트", "옵션"): ("10 to 14", "체력 10~14"),
+    ("쿠이모자", "옵션"): ("-", "힘 1 / 민첩 1 / 체력 1"),
     # 세트 효과 (영상 장면으로 확인: 파란폭포의장화 '세트: 체력 30', 노란유채도복 '세트: 힘 3 이동속도 5%'. 회색바위 40 · 푸른숲 35 · 노란유채 35 는 원글과 같다)
     ("파란폭포의두건", "옵션"): ("[2세트] 체력 35", "[2세트] 체력 30"), ("파란폭포의로브", "옵션"): ("[2세트] 체력 35", "[2세트] 체력 30"),
     ("파란폭포의장화", "옵션"): ("[2세트] 체력 35", "[2세트] 체력 30"), ("노란유채의장화", "옵션"): ("[3세트] 지능3", "[3세트] 힘3"),
 }
-# 원글 장비 표의 이름 오타 -> 게임 이름 (게임 사전 + 공식 확률표 또는 거래소 녹화로 확인)
-ROW_NAME = {"다크스컬쉴드": "다크스틸쉴드", "현자의로브": "현인의로브", "마나재생벨트": "마력재생벨트", "노란유채의장화신발": "노란유채의장화"}
+# 게임 정보창(도감 정보 사전)에는 있는데 원글 옵션 칸에 빠진 옵션 (제작자 2026-11-12 '추가해야지'). '??' = 게임이 값을 가린 옵션이라 범위를 모른다.
+# 세계수 갑옷의 2세트 효과는 영상 장면으로 확인 (세계수잎로브 '세트: 체력 5 지능 2')
+OPTION_ADD = {"거미줄뼈갑옷": "크리티컬 ??", "참나무지팡이": "마나 ??", "티타늄벨트": "체력재생 ??", "스컬쉴드": "힘 ??", "강화가죽갑옷": "마나 ??", "숙련마법사옷": "체력 ??",
+              "세계수껍질갑옷": "[2세트] 체력 5, 명중 2", "세계수가지갑옷": "[2세트] 체력 5, 명중 2", "세계수도복": "[2세트] 체력 5, 명중 2", "세계수잎로브": "[2세트] 체력 5, 지능 2"}
+# 원글 장비 표의 이름 오타 -> 게임 이름 (게임 사전 + 공식 확률표 또는 거래소 녹화로 확인. 아뮬렛·모험가벨트는 제작자 2026-11-12 확인)
+ROW_NAME = {"다크스컬쉴드": "다크스틸쉴드", "현자의로브": "현인의로브", "마나재생벨트": "마력재생벨트", "노란유채의장화신발": "노란유채의장화",
+            "모험가의벨트": "모험가벨트", "전문 모험가의 아물렛": "전문 모험가의 아뮬렛"}
+# 게임 사전에는 있는데 원글 장비 표에 없는 장비 (제작자 2026-11-12 '추가해야지'): 이름만 여기 두고 레벨·능력치·직업은 만들 때 비공개 자료의 사전에서 읽는다.
+# 사전의 '산호검'·'정찰대검' 등은 표의 '+3산호검'·'+5정찰대검' 과 같은 것이라 넣지 않는다
+BOOK_ROWS = ["견습모험가옷", "로크의도복", "산타모자", "가면[..]", "가면[꺄아]", "가면[흑흑]", "가면[번쩍]", "가면[헉]", "낙엽머리띠", "로크의 두건", "견습용장갑"]
+BOOK_SLOT = {"갑옷": "갑옷", "투구": "투구", "장갑": "장갑", "신발": "신발", "벨트": "벨트", "목걸이": "목걸이", "망토": "망토", "반지": "반지", "보조장비": "보조 장비"}
+
+
+def add_book_rows(equipment: list[dict]) -> None:
+    """BOOK_ROWS 의 장비를 게임 사전 값으로 장비 표에 더한다 (같은 부위 표, 레벨 순서 자리에). 획득처는 사전에 없어 비워 둔다"""
+    import build_book
+    nk = lambda s: re.sub(r"\s+", "", s or "")
+    have = {nk(r["name"]) for eq in equipment for r in eq["rows"]}
+    added = []
+    for want in BOOK_ROWS:
+        b = next((c for c in build_book.book_cells() if c.get("큰탭") == "일반" and nk(c.get("이름")) == nk(want) and c.get("고르기") in BOOK_SLOT), None)
+        if not b or nk(want) in have:
+            continue
+        eq = next((e for e in equipment if e["slot"] == BOOK_SLOT[b["고르기"]]), None)
+        if not eq:
+            continue
+        stats = dict((s, str(v)) for s, v in (b.get("능력치") or []))
+        jobs = b.get("직업") or []
+        opts = [f"{s} {v}" for s, v in (b.get("능력치") or []) if s not in ("방어력", "공격", "속도")] + (["거래불가"] if b.get("거래불가") else [])
+        vals = {"이미지": "", "아이템명": b["이름"], "레벨제한": str(b.get("요구레벨") or ""), "방어력": stats.get("방어력", ""), "공격": stats.get("공격", ""),
+                "속도": stats.get("속도", ""), "직업": "공용" if len(jobs) >= 4 else "·".join(jobs), "옵션": " / ".join(opts) or "-", "획득처": ""}
+        row = {"name": b["이름"], "icon": None, "cells": [vals.get(h, "") for h in eq["headers"]]}
+        lv = int(b.get("요구레벨") or 0)
+        def level_of(r):
+            hh = r.get("h") or eq["headers"]
+            m = re.search(r"\d+", r["cells"][hh.index("레벨제한")] if "레벨제한" in hh and hh.index("레벨제한") < len(r["cells"]) else "")
+            return int(m.group()) if m else 0
+        at = max((i + 1 for i, r in enumerate(eq["rows"]) if level_of(r) <= lv), default=0)
+        eq["rows"].insert(at, row)
+        have.add(nk(want))
+        added.append(b["이름"])
+    print("게임 사전에서 더한 장비 줄", len(added), added)
 # 드랍표와 장비 표가 같은 아이템을 다르게 적은 것 -> 게임 사전 이름 하나로 (아이템 화면이 '떨구는 몬스터 없음' / '장비 정보 없음' 둘로 갈려 있었다).
 # 고요의장화 = 고요의신발: 사전에는 고요의신발만 있고, 드랍표의 고요의장화는 장비 표 고요의신발의 획득처(돌무더기 요새)에서 나온다
 ITEM_ALIAS = {"버닝블레이": "버닝블레이드", "회색바위투구": "회색바위의투구", "회색바위갑옷": "회색바위의갑옷", "주술사의모자": "주술사모자",
@@ -987,6 +1112,8 @@ def main():
                 equipment.append(eq)
     equipment.sort(key=lambda e: EQUIP_ORDER.index(e["slot"]) if e["slot"] in EQUIP_ORDER else 99)
     name_jobs(equipment)
+    add_book_rows(equipment)
+    print("공식 재설정 확률표로 바꾼 옵션 범위", len(OFFICIAL_FIXED), OFFICIAL_FIXED[:60])
 
     print("아이템")
     icon_index = json.loads((SRC / "이미지" / "이미지_목록.json").read_text(encoding="utf-8"))
