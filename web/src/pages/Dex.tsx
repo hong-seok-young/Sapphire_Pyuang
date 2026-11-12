@@ -20,7 +20,7 @@ import { iconLookup } from "../simIcons";
 import { filterByName } from "../search";
 import { weaponOf } from "../rental";
 import type { IconOf } from "../simIcons";
-import { Loading, Panel, PicImg, TopBar } from "../ui";
+import { FlowLine, Loading, Panel, PicImg, TopBar } from "../ui";
 
 type Tab = "todo" | "done" | "all";
 const TABS: { key: Tab; label: string }[] = [
@@ -325,10 +325,26 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   const todoListed = listed.filter((e) => !done.has(e.name));
 
 
-  // 장비를 모두 장비스탬프로 대체하면 드는 스탬프 (등급별 합). 필요 재료 머리에 짧게, 펼치면 칩으로 (제작자 2026-11-12 '스탬프 총 몇 등급 몇 장 필요한지 펼치면, 재료 371종 우측에는 스탬프 S12 A345')
-  const stamps = new Map<string, number>();
-  for (const e of todoListed) for (const it of e.items) if (it.sg && it.sn && it.sg !== "불가") stamps.set(it.sg, (stamps.get(it.sg) ?? 0) + it.sn * it.n);
-  const stampSum = ["S", "A", "B", ...[...stamps.keys()].filter((g) => !["S", "A", "B"].includes(g)).sort()].filter((g) => stamps.has(g));
+  // 장비스탬프로 등록하는 게 골드로 사는 것보다 싼 칸만 센 스탬프 (등급별 합). 필요 재료 머리에 짧게, 펼치면 띠 설명과 칩
+  // (제작자 2026-11-12 '스탬프 총 몇 등급 몇 장 필요한지 펼치면, 재료 371종 우측에는 스탬프 S12 A345', '골드로 사는 게 더 싼 칸은 빼고, 펼쳤을 때 전광판 띠처럼 설명')
+  const stampsOf = (mode: "normal" | "event") => {
+    const m = new Map<string, number>();
+    for (const e of todoListed)
+      for (const it of e.items) {
+        if (!it.sg || !it.sn || it.sg === "불가") continue;
+        if (price && pickWay(slotCost(it, price, pset), mode)?.by !== "stamp") continue;
+        m.set(it.sg, (m.get(it.sg) ?? 0) + it.sn * it.n);
+      }
+    return m;
+  };
+  const gradeOrder = (m: Map<string, number>) => ["S", "A", "B", ...[...m.keys()].filter((g) => !["S", "A", "B"].includes(g)).sort()].filter((g) => m.has(g));
+  const stamps = stampsOf("normal");
+  const stampSum = gradeOrder(stamps);
+  const evStamps = price ? stampsOf("event") : null;
+  const evSum = evStamps ? gradeOrder(evStamps) : [];
+  const stampNote =
+    "골드로 사는 것보다 장비스탬프가 싼 칸만 센 장 수 · 평소 값 기준" +
+    (evStamps ? ` · 아바돈 이벤트 때는 ${evSum.length ? evSum.map((g) => `${g} ${evStamps.get(g)!.toLocaleString("ko-KR")}장`).join(" · ") : "없음"}` : "");
 
   // 지금 목록의 미완료를 다 하려면 필요한 재료 (같은 이름·강화끼리 더한다)
   const need = useMemo(() => {
@@ -442,6 +458,11 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
             </span>
             <span className="dex-caret">{showNeed ? "▲" : "▼"}</span>
           </button>
+          {showNeed && (stampSum.length > 0 || evSum.length > 0) && (
+            <div className="maint dex-stamp-note">
+              <FlowLine text={stampNote} />
+            </div>
+          )}
           {showNeed && stampSum.length > 0 && (
             <p className="dex-stampsum">
               {stampSum.map((g) => (
