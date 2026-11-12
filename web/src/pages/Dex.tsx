@@ -325,40 +325,46 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   const todoListed = listed.filter((e) => !done.has(e.name));
 
 
-  // 장비스탬프로 등록하는 게 골드로 사는 것보다 싼 칸만 센 스탬프 (등급별 합). 필요 재료 머리에 짧게, 펼치면 띠 설명과 칩
-  // (제작자 2026-11-12 '스탬프 총 몇 등급 몇 장 필요한지 펼치면, 재료 371종 우측에는 스탬프 S12 A345', '골드로 사는 게 더 싼 칸은 빼고, 펼쳤을 때 전광판 띠처럼 설명')
-  const stampsOf = (mode: "normal" | "event") => {
-    const m = new Map<string, number>();
+  // 필요 재료는 칸마다 가장 싼 수단으로 (제작자 2026-11-12 '골드로 사는 게 더 싼 칸은 골드 가격으로 합산하고 스탬프는 그만큼 빼 줘야지, 가장 싼 수단'):
+  // 골드가 싼 칸(값을 모르는 칸 포함)은 재료로 남기고 골드를 더하고, 장비스탬프가 싼 칸은 재료에서 빼서 스탬프 장 수로 센다. 평소 값 기준, 아바돈 이벤트 때 값은 펼친 띠에
+  const plan = (mode: "normal" | "event") => {
+    const stamp = new Map<string, number>();
+    const items: DexItem[] = [];
+    let gold = 0;
     for (const e of todoListed)
       for (const it of e.items) {
-        if (!it.sg || !it.sn || it.sg === "불가") continue;
-        if (price && pickWay(slotCost(it, price, pset), mode)?.by !== "stamp") continue;
-        m.set(it.sg, (m.get(it.sg) ?? 0) + it.sn * it.n);
+        const w = price && isCostSlot(it, price) ? pickWay(slotCost(it, price, pset), mode) : null;
+        if (w?.by === "stamp" && it.sg && it.sn) {
+          stamp.set(it.sg, (stamp.get(it.sg) ?? 0) + it.sn * it.n);
+          continue;
+        }
+        if (w && e.effects.length > 0) gold += w.v; // 도감 비용 판과 같게 효과 없는 항목은 골드에 안 셈
+        items.push(it);
       }
-    return m;
+    const order = ["S", "A", "B", ...[...stamp.keys()].filter((g) => !["S", "A", "B"].includes(g)).sort()].filter((g) => stamp.has(g));
+    return { stamp, order, items, gold };
   };
-  const gradeOrder = (m: Map<string, number>) => ["S", "A", "B", ...[...m.keys()].filter((g) => !["S", "A", "B"].includes(g)).sort()].filter((g) => m.has(g));
-  const stamps = stampsOf("normal");
-  const stampSum = gradeOrder(stamps);
-  const evStamps = price ? stampsOf("event") : null;
-  const evSum = evStamps ? gradeOrder(evStamps) : [];
+  const pn = plan("normal");
+  const pe = price ? plan("event") : null;
+  const stamps = pn.stamp;
+  const stampSum = pn.order;
+  const stampList = (q: ReturnType<typeof plan>) => q.order.map((g) => `${g} ${q.stamp.get(g)!.toLocaleString("ko-KR")}장`).join(" · ");
   const stampNote =
-    "골드로 사는 것보다 장비스탬프가 싼 칸만 센 장 수 · 평소 값 기준" +
-    (evStamps ? ` · 아바돈 이벤트 때는 ${evSum.length ? evSum.map((g) => `${g} ${evStamps.get(g)!.toLocaleString("ko-KR")}장`).join(" · ") : "없음"}` : "");
+    "칸마다 가장 싼 수단 · 골드가 싼 칸은 재료로 사고 스탬프가 싼 칸은 스탬프로 · 평소 값 기준" +
+    (pe ? ` · 아바돈 이벤트 때는 골드 ${fmtGold(pe.gold)}${pe.order.length ? ` · 스탬프 ${stampList(pe)}` : ""}` : "");
 
-  // 지금 목록의 미완료를 다 하려면 필요한 재료 (같은 이름·강화끼리 더한다)
+  // 사야 할 재료 (같은 이름·강화끼리 더한다)
   const need = useMemo(() => {
     const m = new Map<string, { it: DexItem; n: number; entries: number }>();
-    for (const e of todoListed)
-      for (const it of e.items) {
-        const k = plusLabel(it) + " " + itemLabel(it) + (it.name ? "" : ` (${it.icon ?? ""})`);
-        const cur = m.get(k) ?? { it, n: 0, entries: 0 };
-        cur.n += it.n;
-        cur.entries += 1;
-        m.set(k, cur);
-      }
+    for (const it of pn.items) {
+      const k = plusLabel(it) + " " + itemLabel(it) + (it.name ? "" : ` (${it.icon ?? ""})`);
+      const cur = m.get(k) ?? { it, n: 0, entries: 0 };
+      cur.n += it.n;
+      cur.entries += 1;
+      m.set(k, cur);
+    }
     return [...m.entries()].sort((a, b) => b[1].entries - a[1].entries || b[1].n - a[1].n);
-  }, [todoListed.map((e) => e.name).join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pn.items.map((it) => `${it.pk ?? it.name}${it.plus ?? ""}`).join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 지금 목록의 미완료를 다 채우는 값: 칸마다 골드로 사기 vs 스탬프 중 싼 쪽, 평소 · 아바돈 이벤트
   // 효과 없는 항목(코스튬 '옵션 없음' 43, 라이딩 2)은 능력치를 주지 않아 비용에서 뺀다 (제작자 2026-11-12 '도감 효과 없는 건 몰라도 되지 않나')
@@ -454,11 +460,11 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
         <Panel className="dex-need">
           <button type="button" className="dex-need-head" onClick={() => setShowNeed(!showNeed)} aria-expanded={showNeed}>
             <b>필요 재료</b> <span className="muted">
-              재료 {need.length}종{stampSum.length > 0 && <> · 스탬프 {stampSum.map((g) => `${g}${stamps.get(g)!.toLocaleString("ko-KR")}`).join(" ")}</>}
+              재료 {need.length}종{price && pn.gold > 0 && <> · {fmtGold(pn.gold)}</>}{stampSum.length > 0 && <> · 스탬프 {stampSum.map((g) => `${g}${stamps.get(g)!.toLocaleString("ko-KR")}`).join(" ")}</>}
             </span>
             <span className="dex-caret">{showNeed ? "▲" : "▼"}</span>
           </button>
-          {showNeed && (stampSum.length > 0 || evSum.length > 0) && (
+          {showNeed && price && (
             <div className="maint dex-stamp-note">
               <FlowLine text={stampNote} />
             </div>
