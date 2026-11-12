@@ -125,9 +125,12 @@ export interface DexEntry { name: string; effects: [string, number, boolean][]; 
 /** 도감 시세 (제작자 요청 2026-11-11, build_dex.py price_data): 장비 이름 key(띄어쓰기·괄호 뺌) -> 종류(무기/갑옷류/기타), 요구 레벨, 강화 단계마다 거래소 최저가.
  *  stamp = 스탬프 1장 플래티넘 값(평소 · 아바돈 이벤트), abaddon = 아바돈 1장이 일반 몇 장, platGold = 플래티넘 1 의 골드. scroll = 마법서 골드 값(등급마다, 자료에 있으면),
  *  sale = 가장 최근 아바돈 장비 스탬프 판매 기간 (공식 패치노트) */
-export interface DexGearPrice { k: string | null; lv: number | null; p: Record<string, number> }
+/** d = 그 값을 읽은 암거래중개인 녹화 날짜 */
+export interface DexGearPrice { k: string | null; lv: number | null; p: Record<string, number>; d?: string }
 export interface DexPrice {
   date: string; src: string; gear: Record<string, DexGearPrice>;
+  /** 값을 읽은 녹화 날짜들 (탭마다 찍은 날이 다르다) */
+  dates?: string[];
   stamp?: { normal: Record<string, number>; event: Record<string, number>; abaddon: number; platGold: number; date?: string; noteNormal?: string; noteEvent?: string };
   scroll?: Partial<Record<"무기" | "갑옷", Record<string, number>>>;
   sale?: { start: string; end: string; text: string; id?: number };

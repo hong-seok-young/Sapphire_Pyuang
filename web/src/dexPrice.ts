@@ -88,7 +88,12 @@ export function wayText(w: GoldWay, scroll: string | null, gear = true): string 
 }
 
 /** 한 칸의 값: 골드로(장비 × 개수), 스탬프로(평소 · 이벤트). missing = 이 마법서 값이 있으면 골드 값이 나온다 */
-export interface SlotCost { gold: number | null; way: GoldWay | null; missing: string | null; scroll: string | null; stamp: Record<Mode, number | null> }
+export interface SlotCost { gold: number | null; way: GoldWay | null; missing: string | null; scroll: string | null; stamp: Record<Mode, number | null>; date?: string }
+/** '2026-11-12' -> '11월 12일 암거 기준' (제작자 2026-11-12: 도감 계산기의 골드 값은 그날 암거래중개인을 한 번 찍은 값이라 날짜를 이렇게 적는다) */
+export const amgeoText = (dates: (string | undefined)[]): string => {
+  const days = [...new Set(dates.filter((d): d is string => !!d))].sort().map((d) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8, 10))}일`);
+  return days.length ? days.join(" · ") + " 암거 기준" : "암거 기준";
+};
 export function slotCost(it: DexItem, price: DexPrice, set: PriceSet): SlotCost {
   const stamp = { normal: stampGold(it, price, set, "normal"), event: stampGold(it, price, set, "event") };
   // pk: 코스튬 도감 칸은 거래소 코스튬 탭 값만 ('C:' 열쇠), '' = 같은 이름의 일반 장비 값만 있어 쓰지 않음
@@ -104,7 +109,7 @@ export function slotCost(it: DexItem, price: DexPrice, set: PriceSet): SlotCost 
   // 마법서 값이 없어서 못 셈: 아무 값이나 넣으면 나오는지 본다
   const missing = !way && sp == null && sname && goldWay(g, plus, 1) ? sname : null;
   // 강화 칸이면 마법서 값으로 더 싸질 수 있다 (화면에 그 등급 마법서 값 칸을 보인다)
-  return { gold: way ? way.v * it.n : null, way, missing, scroll: plus > 0 ? sname : null, stamp };
+  return { gold: way ? way.v * it.n : null, way, missing, scroll: plus > 0 ? sname : null, stamp, date: g.d };
 }
 function stampGold(it: DexItem, price: DexPrice, set: PriceSet, mode: Mode): number | null {
   if (!it.sg || it.sg === "불가" || !it.sn || !price.stamp) return null;

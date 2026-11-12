@@ -48,8 +48,12 @@ MANIFEST = json.loads((ORIG_DIR / "목록.json").read_text(encoding="utf-8"))
 # 조합책 메뉴가 2018년 판(206149 …)이라 재료 수·값이 지금과 달랐다 (가공한가죽 거친가죽 x5 -> x3, 의지의 망토, 세트 장화 재료 …). 옛 글 번호 -> 새 글 번호
 LINK_DIR = SRC / "링크" / "카페"
 POST_REPLACED = {"206149": "346281", "206306": "346279", "206152": "346280", "206312": "346291", "213714": "346299", "214770": "346310"}
+# 드랍표 저장본에는 없고 따로 받아 둔 같은 작성자(iOS)의 카페 글: 정보 메뉴의 기존 묶음에 글 단추로 넣는다
+# (제작자 2026-11-12 '카페 글 두 개(수수료, 명예 등급)만 넣기'. 블로그 글 둘은 다른 사람 글이라 챗봇 자료로만 둔다). 글 번호 -> 메뉴 묶음
+# 둘 다 '강화 · 보석 · 성장' 에: '전장 · 헌팅그라운드' 묶음의 글은 원글에서만 보는 글(cafe.ts GUIDE_SECTIONS)이라 거기 넣으면 앱 안에서 표가 안 보인다
+LINK_POSTS = {"346139": "강화 · 보석 · 성장", "346201": "강화 · 보석 · 성장"}
 LINK_PICS: dict[str, Path] = {}
-for _aid in POST_REPLACED.values():
+for _aid in [*POST_REPLACED.values(), *LINK_POSTS]:
     _tsv = LINK_DIR / f"{_aid}_그림" / "목록.tsv"
     if _tsv.exists():
         for _line in _tsv.read_text(encoding="utf-8").splitlines():
@@ -441,7 +445,8 @@ def load_posts() -> tuple[dict, dict]:
     # 새 판이 있는 글은 옛 저장본을 읽지 않고 새 글을 읽는다 (새 글 파일이 없으면 옛 글 그대로)
     newer = {new: LINK_DIR / f"{new}.html" for new in POST_REPLACED.values()}
     replaced = {old for old, new in POST_REPLACED.items() if newer[new].exists()}
-    sources = [(d, sorted(d.glob("*.html"))) for d in POST_DIRS] + [(LINK_DIR, [f for f in newer.values() if f.exists()])]
+    extra = [LINK_DIR / f"{aid}.html" for aid in LINK_POSTS]
+    sources = [(d, sorted(d.glob("*.html"))) for d in POST_DIRS] + [(LINK_DIR, [f for f in [*newer.values(), *extra] if f.exists()])]
     for d, files in sources:
         titles = {}
         lst = d / "목록.tsv"
@@ -465,6 +470,8 @@ def load_posts() -> tuple[dict, dict]:
             if aid in GAME_INFO_ONLY:
                 blocks = game_info_only(blocks)
             blocks = fix_post_text(blocks)
+            if aid in LINK_POSTS:  # 그림을 못 받은 칸뿐인 열은 뺀다 (명예 등급 표의 (구)·(신)이미지: 해외 위키 그림이라 받지 못했다)
+                blocks = drop_empty_columns(blocks)
             if replaced:  # 다른 글에서 옛 조합책 글로 가던 링크는 새 글로
                 blocks = relink(blocks, {"post:" + old: "post:" + new for old, new in POST_REPLACED.items() if old in replaced})
             posts[aid] = {"id": aid, "title": title.strip(), "blocks": blocks}
@@ -473,6 +480,20 @@ def load_posts() -> tuple[dict, dict]:
             soups[aid] = box
             print(f"  글 {aid} {title[:30]}")
     return posts, soups
+
+
+def drop_empty_columns(blocks: list[dict]) -> list[dict]:
+    """표에서 머리줄만 있고 아래 칸이 모두 빈 열을 뺀다 (칸을 합친 표는 그대로 둔다)"""
+    def empty(cell: dict) -> bool:
+        return not any((r.get("t") or "").strip() or r.get("src") for line in cell.get("l", []) for r in line)
+    for b in blocks:
+        rows = b.get("rows") if b.get("k") == "table" else None
+        if not rows or len(rows) < 3 or len({len(r) for r in rows}) != 1 or any(c.get("cs") or c.get("rs") for r in rows for c in r):
+            continue
+        keep = [i for i in range(len(rows[0])) if not all(empty(r[i]) for r in rows[1:])]
+        if 0 < len(keep) < len(rows[0]):
+            b["rows"] = [[r[i] for i in keep] for r in rows]
+    return blocks
 
 
 def relink(node, table: dict):
@@ -1048,7 +1069,7 @@ def main():
     menu = []
     for title, index_post, ids in MENU:
         index_post = POST_REPLACED.get(index_post, index_post) if POST_REPLACED.get(index_post) in posts else index_post
-        ids = [POST_REPLACED[i] if POST_REPLACED.get(i) in posts else i for i in ids]
+        ids = [POST_REPLACED[i] if POST_REPLACED.get(i) in posts else i for i in ids] + [a for a, sec in LINK_POSTS.items() if sec == title]
         menu.append({"title": title, "index": index_post,
                      "posts": [{"id": i, "title": posts[i]["title"], **({} if shows_something(posts[i]) else {"orig": 1})}
                                for i in ids if i in posts]})

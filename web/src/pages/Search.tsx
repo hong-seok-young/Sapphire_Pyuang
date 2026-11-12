@@ -223,7 +223,7 @@ export function Search({ wiki, q }: { wiki: Wiki; q: string }) {
       </ul>
       {posts.length > 0 && (
         <section className="search-off">
-          <h2 className="panel-title">위키 글 {posts.length}</h2>
+          <h2 className="panel-title">정보 글 {posts.length}</h2>
           <ul className="list">
             {posts.map((p) => {
               // 원글에서만 보는 글(공략, 지도·스샷뿐인 글)은 메뉴와 같이 바로 카페 원글로

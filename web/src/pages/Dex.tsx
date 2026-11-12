@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { loadDex, useAsync } from "../data";
 import type { Dex, DexEntry, DexItem, DexPrice } from "../data";
-import { MODES, STAMP_GRADES, fmtGold, isCostSlot, pickWay, readPriceSet, saleOn, scrollLabel, slotCost, totals, wayText, writePriceSet } from "../dexPrice";
+import { MODES, STAMP_GRADES, amgeoText, fmtGold, isCostSlot, pickWay, readPriceSet, saleOn, scrollLabel, slotCost, totals, wayText, writePriceSet } from "../dexPrice";
 import type { PriceSet, Totals } from "../dexPrice";
 import type { Me } from "../auth";
 import type { Wiki } from "../types";
@@ -591,7 +591,8 @@ function CostPanel({ price, tot, pset, setPset, n }: { price: DexPrice; tot: Tot
             )}
           </div>
           <p className="dex-legend muted">
-            장비 시세 {price.date} {price.src} (옵션은 안 보고 가장 싼 매물){price.stamp?.date ? ` · 스탬프 상점 ${price.stamp.date}` : ""}
+            장비 시세 {amgeoText(price.dates?.length ? price.dates : [price.date])} (옵션은 안 보고 가장 싼 매물)
+            {price.stamp?.date ? ` · 스탬프 상점 ${price.stamp.date}` : ""}
           </p>
         </div>
       )}
@@ -622,11 +623,12 @@ function SlotPrice({ it, price, pset }: { it: DexItem; price: DexPrice; pset: Pr
           <>
             <b>{fmtGold(c.gold)}</b> = {wayText(c.way, c.scroll, isGear(it))}
             {it.n > 1 ? ` × ${it.n}` : ""}
+            {c.date ? ` · ${amgeoText([c.date])}` : ""}
           </>
         ) : c.missing ? (
           `${scrollLabel(c.missing)} 값을 넣으면 셈`
         ) : (
-          "거래소 시세 없음"
+          "암거 시세 없음"
         )}
       </small>
       <small>
