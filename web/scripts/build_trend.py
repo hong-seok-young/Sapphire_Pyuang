@@ -95,7 +95,8 @@ def icon_for(name: str) -> str | None:
 # ---- 2026-11-12 영상 자료로 그림·정보 채우기 (제작자 '시세동향에서도 이미지 없는 거랑 정보 없는 거 싹 채워')
 # 그림: 영상에서 아이템만 오린 고화질 아이콘 (자료/이미지/도감아이콘) 이 먼저 -> 화면도 위키 그림보다 이것을 먼저 (iconHQ)
 # 정보: 도감 정보 사전(도감/아이템/아이템.json) -> 도감 칸 툴팁(도감/일반·코스튬·펫.json) -> 거래소 정보창(시세/암거래중개인) -> 위키 장비표
-#      + 게임 거래소(암거래중개인) 최저가 (gx: 날짜별 시세를 합쳐 가장 새 값, 묶음 물건은 개당)
+#      게임 거래소(암거래중개인) 최저가는 붙이지 않는다 (제작자 2026-11-12: 항상 새로 찍어 줄 수 없는 값이라 러프한 도감 계산기에만 쓰고,
+#      실시간으로 정확해야 하는 시세 동향 등에는 안 쓴다. 거래소 정보창의 설명 글만 정보로 쓴다)
 _nk = lambda s: re.sub(r"\s", "", s or "")
 _ref: dict | None = None
 
@@ -104,7 +105,7 @@ def _load_ref() -> dict:
     global _ref
     if _ref is not None:
         return _ref
-    ref = {"cut": {}, "info": {}, "gx": {}}
+    ref = {"cut": {}, "info": {}}
     cd = DATA / "이미지" / "도감아이콘"
     if (cd / "목록.json").exists():
         for nm in json.loads((cd / "목록.json").read_text(encoding="utf-8")):
@@ -138,15 +139,10 @@ def _load_ref() -> dict:
             k = _nk(it.get("base"))
             if it.get("info"):
                 put(k, it["info"], "게임 거래소 정보창")
-            cur = ref["gx"].get(k)
-            if it.get("plus") in (0, None) and it.get("min") is not None and (not cur or cur["date"] < d or (cur["date"] == d and it["min"] < cur["min"])):
-                ref["gx"][k] = {"min": it["min"], "date": d, "n": it.get("count")}
         for o in s.get("others", []):
             k = _nk(o.get("base"))
             if o.get("info"):
                 put(k, o["info"], "게임 거래소 정보창")
-            if o.get("unit_min") is not None:
-                ref["gx"][k] = {"min": o["unit_min"], "date": d, "n": o.get("count"), "unit": True}
     _ref = ref
     return ref
 
@@ -209,7 +205,7 @@ def _fuzzy(keys: list[str], pool: dict, name: str = "") -> str | None:
 def enrich(it: dict, wiki_items: dict, skill: bool = False) -> None:
     ref = _load_ref()
     keys = [_nk(n) for n in _base_names(it["name"])]
-    kc, ki, kg = (None if skill else _fuzzy(keys, ref["cut"], it["name"])), _fuzzy(keys, ref["info"], it["name"]), _fuzzy(keys, ref["gx"], it["name"])
+    kc, ki = (None if skill else _fuzzy(keys, ref["cut"], it["name"])), _fuzzy(keys, ref["info"], it["name"])
     keys = [x for x in (kc,) if x] + keys
     for k in ([kc] if kc else []):
         f = ref["cut"].get(k)
@@ -237,9 +233,6 @@ def enrich(it: dict, wiki_items: dict, skill: bool = False) -> None:
             info = {"lines": ["떨구는 몬스터 " + ", ".join(x.split("@")[0] for x in w["from"][:6])], "src": "위키 드랍표"}
     if info:
         it["info"] = info
-    gx = ref["gx"].get(kg) if kg else None
-    if gx:
-        it["gx"] = gx
 
 POSTS_JSON = ROOT / "web" / "public" / "data" / "posts.json"
 MENU_JSON = ROOT / "web" / "public" / "data" / "menu.json"

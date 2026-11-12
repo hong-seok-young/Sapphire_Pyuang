@@ -4,7 +4,8 @@
 (코스튬·펫·라이딩·소모품)이 검색에 안 나오고 능력치·설명·거래소 값·도감·상점 구성도 안 보였다. 비공개 자료의 아래 것들을 아이템 이름으로 한데 묶는다:
 
 - 게임 '도감 정보' 아이템 사전 `자료/도감/아이템/아이템.json` (등급·요구 레벨·직업·능력치·세트·설명·거래불가·캐쉬샵)
-- 게임 거래소(암거래중개인) 녹화 `자료/시세/암거래중개인/<날짜>/시세.json` (강화 단계마다 최저가, 묶음 물건은 개당, 정보창 글)
+- 게임 거래소(암거래중개인) 녹화 `자료/시세/암거래중개인/<날짜>/시세.json` 의 물건 이름·정보창 글·그림 (값은 넣지 않는다: 제작자 2026-11-12
+  '게임 거래소 최소가는 항상 업데이트를 할 수가 없어서 러프한 도감 계산기 정도에만', 실시간으로 정확해야 하는 곳에는 쓰지 않는다)
 - 도감 퀘스트 (build_dex.py 가 만든 data/dex.json): 그 아이템이 들어가는 도감 항목
 - 거래 톡방 시세 (build_trend.py 가 만든 data/trend.json): 팝니다 중간값
 - 게임 상점 `자료/상점/상품.json`·`상자.json`·`가챠.json` (플래티넘 값, 구매 제한, 구성품)
@@ -269,13 +270,10 @@ def main() -> None:
             if pic:
                 v["pic"] = pic
 
-    # 2) 게임 거래소 녹화: 날짜 순으로, 같은 물건은 새 날짜 값
+    # 2) 게임 거래소 녹화: 사전에 없는 물건(재료·스킬북 등)의 이름·정보창 글·그림만. 최저가는 도감 계산기(build_dex.py)만 쓴다
     days = sorted((DATA / "시세" / "암거래중개인").glob("*/시세.json"))
-    gx_dates = []
     for day in days:
         s = json.loads(day.read_text(encoding="utf-8"))
-        d = s.get("날짜") or day.parent.name
-        gx_dates.append(d)
         info_of: dict[str, list] = {}
         for it in s.get("items", []):
             if it.get("info") and it.get("plus") in (0, None):
@@ -285,7 +283,6 @@ def main() -> None:
             if not e.get("base") or not p:
                 continue
             v = variant("일반", e["base"], e.get("slot") or e.get("tab"))
-            v["gx"] = {"p": p, "d": d, **({"n": e["count"]} if e.get("count") else {})}
             set_lines(v, info_of.get(nk(e["base"])), "게임 거래소 정보창")
             set_pic(v, e["base"])
         for o in s.get("others", []):
@@ -294,12 +291,6 @@ def main() -> None:
                 continue
             t = "코스튬" if tab.startswith("코스튬") else "펫" if tab == "펫" else "일반"
             v = variant(t, base, re.sub(r"^코스튬", "", tab) or None)
-            gx = {"p": {"0": int(o["unit_min"])}, "d": d}
-            if o.get("count"):
-                gx["n"] = o["count"]
-            if any((q or 1) > 1 for _, q in (o.get("listings") or [])):
-                gx["u"] = 1  # 묶음으로 올라온 물건: 개당 값
-            v["gx"] = gx
             set_lines(v, o.get("info"), "게임 거래소 정보창")
             set_pic(v, base)
 
@@ -418,12 +409,12 @@ def main() -> None:
         if vs:
             keep[key] = vs
     out = {"built": date.today().isoformat(),
-           "src": {"book": "게임 도감 정보 (2026-11-11 녹화)", "gx": gx_dates},
+           "src": {"book": "게임 도감 정보 (2026-11-11 녹화)"},
            "items": keep, "abbr": abbr, "slang": slang}
     (OUT / "book.json").write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     count = lambda f: sum(1 for vs in keep.values() if any(f(v) for v in vs))
     print("아이템 책", {"이름": len(keep), "위키에 없는 이름": sum(1 for k in keep if k not in wiki), "그림": count(lambda v: v.get("pic")),
-                    "게임 정보": count(lambda v: v.get("g") or v.get("lv") or v.get("st") or v.get("desc") or v.get("lines")), "거래소 값": count(lambda v: v.get("gx")),
+                    "게임 정보": count(lambda v: v.get("g") or v.get("lv") or v.get("st") or v.get("desc") or v.get("lines")),
                     "도감": count(lambda v: v.get("dex")), "톡방 시세": count(lambda v: v.get("tk")), "상점": count(lambda v: v["t"] in ("상점", "상자", "가챠")),
                     "줄임말": len(abbr), "아이콘 파일": n_icons + shop_pics, "kb": (OUT / "book.json").stat().st_size // 1024})
 

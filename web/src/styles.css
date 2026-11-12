@@ -5374,8 +5374,6 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 
 /* 시세 동향 물건 정보 (2026-11-12): 도감·거래소 정보와 게임 거래소 최저가 */
 .trend-info { display: flex; flex-direction: column; gap: 3px; margin: 2px 0 6px; padding: 6px 8px; font-size: 11px; background: rgba(7, 6, 15, 0.3); border: var(--px) solid var(--edge); }
-.trend-gx { font-size: 12px; }
-.trend-gx b { color: var(--gold); }
 .trend-info-lines { display: flex; flex-direction: column; gap: 1px; }
 .trend-info-lines small { font-size: 11px; color: var(--text); overflow-wrap: anywhere; }
 .trend-info-src { font-size: 10px; }
@@ -5394,7 +5392,7 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 .bk-grade.bk-legend { color: #ff7a66; }
 .bk-chips > .bk-nt { color: #ff9a9a; }
 .bk-plat, .bk-lines, .bk-set { font-size: 13px; }
-.bk-plat b, .bk-gx b, .bk-tk b { color: var(--gold); }
+.bk-plat b, .bk-tk b { color: var(--gold); }
 .bk-plat small { color: var(--muted); font-size: 11px; }
 .bk-desc { margin-bottom: 0; font-size: 13px; line-height: 1.5; white-space: pre-line; }
 .bk-lines { display: grid; gap: 2px; }
@@ -5404,11 +5402,8 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 .bk-parts > * { padding: 2px 6px; border: 1px solid var(--edge); }
 .bk-parts a { color: var(--gold); }
 .bk-more { display: flex; flex-wrap: wrap; gap: 6px; }
-.bk-gx, .bk-tk, .bk-dex { font-size: 13px; border-top: 1px dashed var(--edge); padding-top: 6px; }
-.bk-gx-head small, .bk-tk small, .bk-dex small { color: var(--muted); font-size: 11px; }
-.bk-gx-head small { margin-left: 6px; }
-.bk-gx-rows { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 2px; }
-.bk-gx-rows i { font-style: normal; color: var(--muted); margin-right: 4px; }
+.bk-tk, .bk-dex { font-size: 13px; border-top: 1px dashed var(--edge); padding-top: 6px; }
+.bk-tk small, .bk-dex small { color: var(--muted); font-size: 11px; }
 .bk-dex { display: flex; flex-wrap: wrap; gap: 2px 10px; }
 .bk-dex-head { width: 100%; color: var(--muted); font-size: 12px; }
 .bk-src { font-size: 10px; color: var(--muted); }

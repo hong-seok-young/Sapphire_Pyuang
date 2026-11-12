@@ -79,7 +79,8 @@ const variantTitle = (v: BookVariant) =>
 
 /**
  * 아이템 책의 한 변형 (제작자 2026-11-12 'DB 에는 정보가 있는데 웹이 활용 못 하는 부분 싹 다'): 게임 도감 정보 사전의 등급·요구 레벨·직업·능력치·세트·설명,
- * 게임 상점의 플래티넘 값·구매 제한·구성품, 게임 거래소 녹화의 최저가, 톡방 시세, 들어가는 도감 항목. '??' 는 게임이 가린 값 그대로
+ * 게임 상점의 플래티넘 값·구매 제한·구성품, 톡방 시세, 들어가는 도감 항목. '??' 는 게임이 가린 값 그대로.
+ * 게임 거래소 녹화 최저가는 보이지 않는다 (제작자 2026-11-12: 항상 새로 찍어 줄 수 없는 값이라 러프한 도감 계산기에만)
  */
 function BookPanel({ v, has, book }: { v: BookVariant; has: (n: string) => boolean; book: Book }) {
   const chips = [
@@ -89,7 +90,6 @@ function BookPanel({ v, has, book }: { v: BookVariant; has: (n: string) => boole
     v.cd ? `쿨타임 ${v.cd}초` : "",
     v.cash ? `캐쉬샵 ${v.cash}` : "",
   ].filter(Boolean);
-  const plus = v.gx ? Object.entries(v.gx.p).sort((a, b) => Number(a[0]) - Number(b[0])) : [];
   return (
     <Panel title={variantTitle(v)} className="bk">
       {(v.g || chips.length > 0 || v.nt) && (
@@ -152,24 +152,6 @@ function BookPanel({ v, has, book }: { v: BookVariant; has: (n: string) => boole
           {v.more.map((p) => (
             <PicImg key={p.src} pic={p} fit={32} />
           ))}
-        </div>
-      )}
-      {v.gx && (
-        <div className="bk-gx">
-          <div className="bk-gx-head">
-            게임 거래소 최저가{v.gx.u ? " (개당)" : ""}
-            <small>
-              {md(v.gx.d)} 녹화{v.gx.n ? ` · 매물 ${v.gx.n}` : ""}
-            </small>
-          </div>
-          <div className="bk-gx-rows">
-            {plus.map(([p, g]) => (
-              <span key={p}>
-                {plus.length > 1 || p !== "0" ? <i>+{p}</i> : null}
-                <b>{g.toLocaleString("ko-KR")}</b> 골드
-              </span>
-            ))}
-          </div>
         </div>
       )}
       {v.tk && (

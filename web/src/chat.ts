@@ -277,7 +277,7 @@ function numberedPlace(q: string): string[] {
 /** 몬스터 한 줄 (레벨, HP, 선공·속도·거리, 재부활, 드랍, 스킬, 참고). 사냥터·인던을 물으면 몬스터마다 이것을 붙인다 */
 function monsterLine(m: Monster): string {
   return [
-    `- ${m.name}` + (m.level ? ` Lv.${m.level}` : "") + (m.hp ? ` HP ${m.hp.toLocaleString("ko-KR")}` : m.hps?.length ? ` HP ${m.hps.join("/")}` : ""),
+    `- ${m.name}` + (m.level ? ` Lv.${m.level}` : "") + (m.hp ? ` HP ${m.hp.toLocaleString("ko-KR")}${m.hpNote ? `(${m.hpNote} 값)` : ""}` : m.hps?.length ? ` HP ${m.hps.join("/")}` : ""),
     m.traits,
     m.respawn && `재부활 ${m.respawn}`,
     m.drops.length && `드랍: ${m.drops.join(", ")}`,
@@ -396,7 +396,7 @@ export function wikiContext(
         const place = wiki.places[m.place];
         add(
           [
-            `[몬스터] ${m.name}` + (m.level ? ` Lv.${m.level}` : "") + (m.hp ? ` HP ${m.hp}` : ""),
+            `[몬스터] ${m.name}` + (m.level ? ` Lv.${m.level}` : "") + (m.hp ? ` HP ${m.hp}${m.hpNote ? `(${m.hpNote} 값)` : ""}` : ""),
             place && `사냥터 ${place.name}(${place.region})`,
             m.respawn && `재부활 ${m.respawn}`,
             m.traits,

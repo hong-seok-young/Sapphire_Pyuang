@@ -24,6 +24,7 @@ import type { SimEvent } from "../simQuest";
 import { api } from "../auth";
 import { fetchEventOdds } from "../official";
 import { IconCtx, iconLookup, useIcon } from "../simIcons";
+import { useBook } from "../data";
 import type { IconOf } from "../simIcons";
 import type { Pic } from "../types";
 import { useBackClose } from "../backClose";
@@ -171,7 +172,8 @@ export function SimulatorPage({ wiki, me, space }: { wiki: Wiki; me: Me; space: 
       .then((v) => v && typeof v === "object" && setTrendPics(v))
       .catch(() => {});
   }, []);
-  const iconOf: IconOf = useMemo(() => iconLookup(wiki, trendPics), [wiki, trendPics]);
+  const book = useBook();
+  const iconOf: IconOf = useMemo(() => iconLookup(wiki, trendPics, book), [wiki, trendPics, book]);
   return (
     <SpaceCtx.Provider value={space}>
     <SaveCtx.Provider value={saveState}>

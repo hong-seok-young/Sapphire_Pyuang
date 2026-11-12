@@ -792,17 +792,12 @@ export function TrendSnippet({ query, wiki }: { query: string; wiki: Wiki }) {
   );
 }
 
-/** 물건 정보와 게임 거래소 최저가 (제작자 2026-11-12 '정보 없는 거 싹 채워'): 도감 정보 사전·도감 툴팁·게임 거래소 정보창·위키 표에서 */
+/** 물건 정보 (제작자 2026-11-12 '정보 없는 거 싹 채워'): 도감 정보 사전·도감 툴팁·게임 거래소 정보창·위키 표에서.
+ *  게임 거래소 최저가는 여기 두지 않는다 (제작자 같은 날: 항상 새로 찍어 줄 수 없는 값이라 도감 계산기에만) */
 function ItemInfo({ it }: { it: TrendItem }) {
-  if (!it.info && !it.gx) return null;
+  if (!it.info) return null;
   return (
     <div className="trend-info">
-      {it.gx && (
-        <div className="trend-gx">
-          게임 거래소 최저 <b>{it.gx.min.toLocaleString("ko-KR")}</b> 골드{it.gx.unit ? " (개당)" : ""}
-          <small className="muted"> · {it.gx.date.slice(5).replace("-", "/")} 녹화{it.gx.n ? ` · 매물 ${it.gx.n}` : ""}</small>
-        </div>
-      )}
       {it.info && (
         <>
           <div className="trend-info-lines">

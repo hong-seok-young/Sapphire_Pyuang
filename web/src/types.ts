@@ -72,6 +72,8 @@ export interface Monster {
   name: string;
   level: number | null;
   hp: number | null;
+  /** hp 가 우리 자료가 아닐 때 출처 ('해외 위키', '해외 위키, 약': 카페 드랍표에 체력이 비어 해외 팬 위키 값으로 채운 것, build_data.py) */
+  hpNote?: string;
   traits: string;
   drops: string[];
   place: string;

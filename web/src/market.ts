@@ -3,6 +3,7 @@
 import { JOBS, JOB_NAME, api } from "./auth";
 import type { Job, Role } from "./auth";
 import type { Item, Wiki } from "./types";
+import type { BookVariant } from "./data";
 
 /** 게임 거래소의 종류 (코스튬은 하나로 묶었다). 서버 server/market.ts 와 같다 */
 export const CATEGORIES = [
@@ -223,6 +224,23 @@ const SLOT_CATEGORY: Record<string, Category> = {
 /** 위키 아이템 (이름의 띄어쓰기는 상관없이) */
 export function wikiItem(wiki: Wiki, name: string): Item | undefined {
   return wiki.items[name] ?? wiki.items[name.replace(/\s+/g, "")];
+}
+
+/** 아이템 책(게임 도감 정보 사전)의 탭·고르기 -> 거래소 종류. 위키에 없는 물건(코스튬·펫·소모품 …)을 이름 추천에서 고르면 종류를 미리 채운다 */
+const BOOK_CATEGORY: Record<string, Category> = {
+  주장비: "주장비", 보조장비: "보조장비", "보조 장비": "보조장비", 투구: "투구", 갑옷: "갑옷", 장갑: "장갑", 신발: "신발", 망토: "망토", 벨트: "벨트",
+  목걸이: "목걸이", 반지: "반지", 가방: "가방", 소모품: "소모품", 인챈트: "인챈트", 기타: "기타", 스킬북: "스킬북",
+};
+export function bookCategory(v: BookVariant | undefined): Category | undefined {
+  if (!v) return undefined;
+  if (v.t === "코스튬") return "코스튬";
+  if (v.t === "펫") return "펫";
+  return v.t === "일반" && v.s ? BOOK_CATEGORY[v.s] : undefined;
+}
+/** 이름 추천에 넣을 책 아이템인지: 게임 아이템(상점 상품·상자·가챠 묶음이 아닌 것)이고 거래불가만 있는 것이 아닌 것 */
+export function bookTradable(vs: BookVariant[]): BookVariant | undefined {
+  const game = vs.filter((v) => v.t === "일반" || v.t === "코스튬" || v.t === "펫" || v.t === "라이딩");
+  return game.find((v) => !v.nt);
 }
 
 /** 위키가 아는 장비면 그 종류 */

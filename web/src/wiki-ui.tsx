@@ -35,7 +35,8 @@ export function MonsterCard({ wiki, m, showPlace = false, link = true }: {
           {m.name} <ControlTag wiki={wiki} monsterKey={m.key} /> <span className="lv">Lv.{m.levels ? m.levels.join(" / ") : m.level ?? "-"}</span>
         </div>
         <div className="mon-stats">
-          HP {m.hps ? m.hps.join(" / ") : num(m.hp)} · {m.traits}
+          HP {m.hps ? m.hps.join(" / ") : num(m.hp)}
+          {m.hpNote ? ` (${m.hpNote})` : ""} · {m.traits}
         </div>
         {showPlace && place && <div className="mon-place">📍 {place.name}</div>}
         {m.respawn && <div className="mon-sub">⏱ 재부활 {m.respawn}</div>}

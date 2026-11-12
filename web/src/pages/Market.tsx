@@ -10,9 +10,11 @@ import {
   positionOf,
 } from "../auth";
 import type { Me } from "../auth";
-import { useAsync } from "../data";
+import { bookPic, useAsync, useBook } from "../data";
 import {
   AUCTION_HOURS,
+  bookCategory,
+  bookTradable,
   CATEGORIES,
   ENCHANTS,
   ENCHANT_CATEGORIES,
@@ -69,7 +71,7 @@ import type {
   Side,
   TalkLine,
 } from "../market";
-import type { Wiki } from "../types";
+import type { Item, Wiki } from "../types";
 import { Loading, NewTag, NewsDot, PicImg, ThingDot, TopBar } from "../ui";
 import { markThingSeen, newsSide, thingSince, useNews } from "../news";
 import { timeLeft } from "../requests";
@@ -108,10 +110,13 @@ function Slot({
   size?: number;
 }) {
   const it = wikiItem(wiki, l.item);
+  // 위키에 없는 물건(코스튬·펫·소모품 …)은 아이템 책의 오린 아이콘 (제작자 2026-11-12 'DB 에 있는데 웹이 못 쓰는 것'). 책에도 없으면 판 사람 스샷
+  const book = useBook();
+  const pic = it?.icon ?? bookPic(book, l.item);
   return (
     <span className="mk-slot" style={{ width: size + 10, height: size + 10 }}>
-      {it?.icon ? (
-        <PicImg pic={it.icon} fit={size} />
+      {pic ? (
+        <PicImg pic={pic} fit={size} />
       ) : l.shot && l.id ? (
         // 위키에 없는 물건: 판 사람이 붙인 스샷 (제작자 요청 2026-11-02)
         <img
@@ -1029,19 +1034,30 @@ function SellForm({
     setUnit(next);
   }
   const qtyN = Number(qty);
+  // 이름 추천: 위키 아이템, 그다음 아이템 책에만 있는 게임 아이템(코스튬·펫·소모품 …, 거래불가뿐인 것은 빼고). 책 아이템은 고르면 종류도 채운다
+  const book = useBook();
   const suggestions = useMemo(() => {
     const q = squash(name);
     if (!q) return [];
-    return Object.values(wiki.items)
+    type Sug = { name: string; icon: Item["icon"] | undefined; sub: string; cat?: Category };
+    const order = (a: Sug, b: Sug) =>
+      Number(!squash(a.name).startsWith(q)) - Number(!squash(b.name).startsWith(q)) || a.name.length - b.name.length;
+    const fromWiki: Sug[] = Object.values(wiki.items)
       .filter((it) => squash(it.name).includes(q))
-      .sort(
-        (a, b) =>
-          Number(!squash(a.name).startsWith(q)) -
-            Number(!squash(b.name).startsWith(q)) ||
-          a.name.length - b.name.length,
-      )
-      .slice(0, 12);
-  }, [wiki, name]);
+      .map((it) => ({ name: it.name, icon: it.icon, sub: it.equip[0]?.slot ?? "" }))
+      .sort(order);
+    const fromBook: Sug[] = [];
+    if (book && fromWiki.length < 12) {
+      for (const [n, vs] of Object.entries(book.items)) {
+        if (wiki.items[n] || !squash(n).includes(q)) continue;
+        const v = bookTradable(vs);
+        if (!v) continue;
+        fromBook.push({ name: n, icon: v.pic ?? vs.find((x) => x.pic)?.pic, sub: v.t === "일반" ? (v.s ?? "") : v.t + (v.s ? " " + v.s : ""), cat: bookCategory(v) });
+      }
+      fromBook.sort(order);
+    }
+    return [...fromWiki, ...fromBook].slice(0, 12);
+  }, [wiki, name, book]);
   const optionsFilled = buy || rolls.every((r) => (optionText[r.name] ?? "") !== "");
   const ok =
     name.length > 0 &&
@@ -1190,14 +1206,14 @@ function SellForm({
                   type="button"
                   onClick={() => {
                     setItem(it.name);
-                    setCategory(null);
+                    setCategory(it.cat ?? null);
                     setOptionText({});
                     setTyping(false);
                   }}
                 >
                   <PicImg pic={it.icon} fit={28} />
                   <span>{it.name}</span>
-                  <small>{it.equip[0]?.slot ?? ""}</small>
+                  <small>{it.sub}</small>
                 </button>
               </li>
             ))}

@@ -87,8 +87,6 @@ export interface TrendItem extends TrendVariant {
   iconHQ?: boolean;
   /** 물건 정보 (도감 정보 사전·도감 툴팁·게임 거래소 정보창·위키 표, src = 출처, part = 세트·비슷한 이름이면 정보를 가져온 아이템) */
   info?: { lines: string[]; src: string; part?: string };
-  /** 게임 거래소(암거래중개인) 녹화의 최저가 골드 (unit = 묶음이면 개당), 녹화 날짜, 매물 수 */
-  gx?: { min: number; date: string; n?: number; unit?: boolean };
   /** enchant = 속성부여 부위 (벨트, 망토, 목걸이, 반지), enhance = 강화 부위, none = 그 밖 */
   kind: "enchant" | "enhance" | "none"; groups: TrendGroup[]; variants: TrendVariant[];
   /** 반대쪽(팝니다 목록이면 삽니다)의 중간값과 글 수. 없으면 null */
@@ -142,19 +140,18 @@ export const loadDex = () => getJson<Dex>("dex");
  *  한 이름에 변형이 여럿일 수 있다 (투구 '동그리모자' / 코스튬 '동그리모자', 거래 가능 / 거래불가 판).
  *  t = 게임 탭 (일반·코스튬·펫·라이딩) 또는 상점·상자·가챠, s = 고르기(갑옷, 모자 …), g = 등급, st = 능력치 [이름, 값('??' 는 게임이 가린 값)],
  *  nt = 거래불가, cash = 캐쉬샵 상태, lines = 사전에 없을 때 거래소 정보창·도감 툴팁·상점 글, more = 색만 다른 같은 아이템의 다른 그림,
- *  gx = 게임 거래소 최저가 (p: 강화 단계 -> 골드, d: 녹화 날짜, n: 매물 수, u: 묶음 물건의 개당 값), dex = 들어가는 도감 [항목, 강화, 개수],
+ *  dex = 들어가는 도감 [항목, 강화, 개수] (게임 거래소 녹화 최저가는 넣지 않는다: 제작자 2026-11-12 '러프한 도감 계산기 정도에만'),
  *  tk = 거래 톡방 팝니다 중간값(만 원)·글 수·마지막 날, plat = 상점 플래티넘 값, cnt = 한 번에 받는 개수, limit = 구매 제한 글, parts = 구성품 [이름, 개수] */
 export interface BookVariant {
   t: "일반" | "코스튬" | "펫" | "라이딩" | "상점" | "상자" | "가챠"; s?: string; src?: string;
   g?: string; lv?: number; jobs?: string[]; sex?: string[]; st?: [string, string][]; set?: string[]; cd?: number; desc?: string; nt?: 1; cash?: string;
   lines?: string[]; pic?: Pic; more?: Pic[];
-  gx?: { p: Record<string, number>; d: string; n?: number; u?: 1 };
   dex?: [string, number, number][];
   tk?: { med: number; n: number; to?: string };
   plat?: number; cnt?: number; limit?: string; parts?: [string, number][];
 }
 /** abbr = 줄임말 -> 아이템 이름들 ('고봉' -> 고대의봉), slang = 줄임말 풀이 글 (아이템이 아닌 말도: '월거' = 월드거래) */
-export interface Book { built: string; src: { book: string; gx: string[] }; items: Record<string, BookVariant[]>; abbr: Record<string, string[]>; slang: Record<string, string> }
+export interface Book { built: string; src: { book: string }; items: Record<string, BookVariant[]>; abbr: Record<string, string[]>; slang: Record<string, string> }
 let bookPromise: Promise<Book> | null = null;
 /** 한 번 받으면 이번에 연 동안 그대로. 못 받으면 다음에 다시 */
 export function loadBook(): Promise<Book> {
@@ -164,6 +161,29 @@ export function loadBook(): Promise<Book> {
   });
   return bookPromise;
 }
+let bookNow: Book | null = null;
+/** 아이템 책을 쓰는 화면용: 받았으면 책, 아직이면 null (받으면 다시 그린다). 못 받으면 null 그대로라 책 없이 그린다 */
+export function useBook(): Book | null {
+  const [book, setBook] = useState<Book | null>(bookNow);
+  useEffect(() => {
+    if (bookNow) return;
+    let alive = true;
+    loadBook().then(
+      (b) => {
+        bookNow = b;
+        if (alive) setBook(b);
+      },
+      () => {},
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return book;
+}
+/** 아이템 이름의 책 그림 (띄어쓰기는 상관없이 찾지 않는다: 이름 그대로와 꼬리표 뗀 이름만) */
+export const bookPic = (book: Book | null | undefined, name: string): Pic | undefined => bookOf(book, name).find((v) => v.pic)?.pic;
+
 /** 아이템 이름의 책 변형들. 위키 이름 뒤의 '(거불)'·'(5칸)' 같은 꼬리표를 떼고도 찾는다 */
 export function bookOf(book: Book | null | undefined, name: string): BookVariant[] {
   if (!book) return [];
