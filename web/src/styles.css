@@ -5431,3 +5431,24 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 .kind-post { background: #6b5a2e; }
 
 .bk > .panel-title + * { margin-top: 0; }
+
+/* 챗봇 답 속 도감 계산기 (`Dex.tsx` `DexSnippet`, 제작자 2026-11-12) */
+.dex-snip { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; padding: 8px; background: rgba(7, 6, 15, 0.35); border: 1px solid rgba(169, 162, 207, 0.3); }
+.dex-snip-head { display: flex; align-items: center; gap: 6px; }
+.dex-snip-head b { color: var(--gold); font-size: 13px; }
+.dex-snip-head small { flex: 1; min-width: 0; font-size: 10px; }
+.dex-snip-head .dex-evtoggle { margin: 0; }
+.dex-snip-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.dex-snip-stat { display: flex; flex-direction: column; min-width: 0; padding: 3px 5px; background: rgba(7, 6, 15, 0.35); border: 1px solid rgba(169, 162, 207, 0.15); }
+.dex-snip-stat span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--muted); }
+.dex-snip-stat b { font-size: 13px; color: #fff; }
+.dex-snip-stat small { font-size: 9px; }
+.dex-snip-short { border-color: #ff7a6b; }
+.dex-snip-short small { color: #ff7a6b; }
+.dex-snip-list-head { display: flex; align-items: center; gap: 4px; padding: 4px 0; font: inherit; font-size: 12px; color: inherit; text-align: left; background: none; border: 0; cursor: pointer; }
+.dex-snip-list-head .dex-caret { margin-left: auto; }
+.dex-snip-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; max-height: 260px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.dex-snip-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; padding: 3px 0; font-size: 11px; border-bottom: 1px dashed rgba(169, 162, 207, 0.15); }
+.dex-snip-list li span { min-width: 0; }
+.dex-snip-list li b { flex: none; color: var(--gold); font-weight: normal; }
+.dex-snip-go { align-self: flex-end; }

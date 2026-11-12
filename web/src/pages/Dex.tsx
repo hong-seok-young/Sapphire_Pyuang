@@ -14,6 +14,7 @@ import type { Dex, DexEntry, DexItem, DexPrice } from "../data";
 import { MODES, STAMP_GRADES, amgeoText, fmtGold, isCostSlot, pickWay, readPriceSet, saleOn, scrollLabel, slotCost, totals, wayText, writePriceSet } from "../dexPrice";
 import type { PriceSet, Totals } from "../dexPrice";
 import type { Me } from "../auth";
+import { fetchMe } from "../auth";
 import type { Wiki } from "../types";
 import { iconLookup } from "../simIcons";
 import { weaponOf } from "../rental";
@@ -872,5 +873,172 @@ function SlotPrice({ it, price, pset }: { it: DexItem; price: DexPrice; pset: Pr
         추천 {same ? recText(rec[0][1]) : rec.map(([l, w]) => `${l} ${recText(w)}`).join(" · ")}
       </small>
     </span>
+  );
+}
+
+/* ───────── 챗봇 답 속 도감 계산기 (제작자 2026-11-12 '챗봇에 물어보면 우리 도감계산기 그대로 띄워서, 시세 동향처럼') ─────────
+ * [[도감:명중=4;크리티컬=2;체력=244.3;체력%=7.4;PVE 데미지=13;PVE 데미지%=6]] -> 그 수치를 처음부터(완료 0) 채우는 데 드는 골드·현금.
+ * 여러 능력치를 한꺼번에: 아직 모자란 만큼을 목표로 나눈 비율의 합을 골드로 나눠 가장 효율 좋은 항목부터 고르고, 다 채운 뒤 없어도 되는 비싼 항목은 뺀다.
+ * 장비 칸은 골드로 사기 vs 스탬프 중 싼 쪽(평소 값으로 골랐고 같은 항목을 아바돈 이벤트 값으로도 센다). 값을 모르는 칸이 있는 항목은 효율 좋은 것이 없을 때만 넣고 '값 모름'으로 센다.
+ * 펫 도감 달성 보상은 넣지 않는다. */
+const STAT_ALIAS: Record<string, string> = {
+  크리: "크리티컬", 크리저항: "크리티컬 저항", 크뎀감: "크리티컬 데미지 감소", 크리뎀감: "크리티컬 데미지 감소", 데들리뎀감: "데들리 데미지 감소",
+  체재: "체력재생", 마재: "마나재생", 이속: "이동속도", 아드: "아이템 드랍", 골드: "골드 드랍", 경험치: "경험치", 보스뎀: "보스 데미지", 속저: "속성저항",
+};
+function statRow(raw: string, order: string[]): Row | null {
+  let t = raw.trim().replace(/\s/g, "");
+  const pct = t.endsWith("%");
+  if (pct) t = t.slice(0, -1);
+  t = t.replace(/뎀감$/, "데미지감소").replace(/뎀$/, "데미지").toUpperCase();
+  const byKey = new Map(order.map((n) => [n.replace(/\s/g, "").toUpperCase(), n]));
+  for (const [a, n] of Object.entries(STAT_ALIAS)) byKey.set(a.toUpperCase(), n);
+  for (const [n, sh] of Object.entries(SHORT)) byKey.set(sh.replace(/\s/g, "").toUpperCase(), n);
+  const n = byKey.get(t);
+  return n ? [n, pct] : null;
+}
+interface MultiPlan { picks: { e: DexEntry; g: number | null; ge: number | null }[]; got: Map<string, number>; gold: number; goldEv: number; unknown: number }
+function planTargets(entries: DexEntry[], targets: Map<string, number>, costOf: (e: DexEntry, mode: "normal" | "event") => number | null): MultiPlan {
+  const val = (e: DexEntry, k: string) => e.effects.filter(([s, , p]) => rowKey(s, p) === k).reduce((a, [, v]) => a + v, 0);
+  const cands = entries
+    .map((e) => ({ e, vs: new Map([...targets.keys()].map((k) => [k, val(e, k)] as const).filter(([, v]) => v > 0)), g: costOf(e, "normal") }))
+    .filter((c) => c.vs.size > 0);
+  const got = new Map([...targets.keys()].map((k) => [k, 0]));
+  const left = (k: string) => Math.max(0, targets.get(k)! - got.get(k)!);
+  const gain = (c: (typeof cands)[number]) => [...c.vs].reduce((a, [k, v]) => a + Math.min(v, left(k)) / targets.get(k)!, 0);
+  const chosen: typeof cands = [];
+  const used = new Set<number>();
+  while ([...targets.keys()].some((k) => left(k) > 1e-9)) {
+    let best = -1;
+    let bestScore = Infinity;
+    for (let i = 0; i < cands.length; i++) {
+      if (used.has(i)) continue;
+      const gn = gain(cands[i]);
+      if (gn <= 1e-12) continue;
+      // 값 모르는 항목은 값 있는 것보다 뒤 (아주 큰 값으로 친다)
+      const sc = (cands[i].g ?? 1e15) / gn;
+      if (sc < bestScore) {
+        bestScore = sc;
+        best = i;
+      }
+    }
+    if (best < 0) break;
+    used.add(best);
+    chosen.push(cands[best]);
+    for (const [k, v] of cands[best].vs) got.set(k, got.get(k)! + v);
+  }
+  // 다 채운 뒤 없어도 되는 항목은 비싼 것부터 뺀다
+  for (const c of [...chosen].sort((a, b) => (b.g ?? 1e15) - (a.g ?? 1e15))) {
+    if (![...c.vs].every(([k, v]) => got.get(k)! - v >= targets.get(k)! - 1e-9)) continue;
+    chosen.splice(chosen.indexOf(c), 1);
+    for (const [k, v] of c.vs) got.set(k, got.get(k)! - v);
+  }
+  const picks = chosen.map((c) => ({ e: c.e, g: c.g, ge: costOf(c.e, "event") }));
+  return { picks, got, gold: picks.reduce((a, p) => a + (p.g ?? 0), 0), goldEv: picks.reduce((a, p) => a + (p.ge ?? p.g ?? 0), 0), unknown: picks.filter((p) => p.g == null).length };
+}
+
+export function DexSnippet({ spec }: { spec: string }) {
+  const { data: all } = useAsync(useCallback(() => loadDex(), []), "dex");
+  // 손으로 고친 마법서·스탬프 값과 '도감 계산기에서 보기'의 목표는 계정별로 둬서 누구인지 묻는다
+  const { data: me } = useAsync(useCallback(() => fetchMe(), []), "me");
+  const { data: market } = useAsync(useCallback(() => fetchMarket(), []), "market");
+  const [withEv, setWithEv] = useState(true);
+  const [open, setOpen] = useState(false);
+  const rate = market?.goldRate || 75;
+  const plan = useMemo(() => {
+    if (!all) return null;
+    const now = Date.now();
+    const entries = all.entries.filter((e) => isLive(e, now) && (withEv || e.cat !== "이벤트"));
+    const targets = new Map<string, number>();
+    const bad: string[] = [];
+    for (const part of spec.split(/[;,]/)) {
+      const m = part.match(/^\s*([^=:]+?)\s*[=:]\s*([\d.]+)\s*%?\s*$/);
+      if (!m) continue;
+      const pctMark = /%\s*$/.test(part) && !/%/.test(m[1]);
+      const row = statRow(m[1] + (pctMark ? "%" : ""), all.order);
+      const v = Number(m[2]);
+      if (!row || !(v > 0)) {
+        bad.push(m[1].trim());
+        continue;
+      }
+      targets.set(rowKey(row[0], row[1]), v);
+    }
+    const price = all.price;
+    const pset: PriceSet = me ? readPriceSet(me) : { scroll: {}, stamp: {} };
+    const costOf = (e: DexEntry, mode: "normal" | "event") => {
+      if (!price) return null;
+      let g = 0;
+      for (const it of e.items) {
+        const w = pickWay(slotCost(it, price, pset), mode);
+        if (!w) return null;
+        g += w.v;
+      }
+      return g;
+    };
+    const max = addUp(entries);
+    return { targets, bad, max, ...planTargets(entries, targets, costOf) };
+  }, [all, spec, withEv, me]);
+  if (!all || !plan || !plan.targets.size) return null;
+  const goDex = () => {
+    if (me) writeStats(me, Object.fromEntries(plan.targets));
+    window.location.hash = "#/dex";
+  };
+  return (
+    <div className="dex-snip">
+      <div className="dex-snip-head">
+        <b>도감 계산기</b>
+        <small className="muted">처음부터 · 싼 순서</small>
+        <button type="button" className="dex-evtoggle" aria-pressed={withEv} onClick={() => setWithEv(!withEv)}>
+          <span className="dex-evbox">{withEv ? "✓" : ""}</span>이벤트
+        </button>
+      </div>
+      <div className="dex-snip-stats">
+        {[...plan.targets].map(([k, v]) => {
+          const g = plan.got.get(k) ?? 0;
+          const short = g < v - 1e-9;
+          const name = k.replace(/%$/, "");
+          return (
+            <div key={k} className={"dex-snip-stat" + (short ? " dex-snip-short" : "")}>
+              <span>{SHORT[name] ?? name}{k.endsWith("%") ? "%" : ""}</span>
+              <b>{num(v)}</b>
+              <small className="muted">{short ? `최대 ${num(pick(plan.max, name, k.endsWith("%")))}` : `채움 ${num(g)}`}</small>
+            </div>
+          );
+        })}
+      </div>
+      <div className="dex-cost-cols">
+        <div className="dex-cost-col">
+          <small>평소</small>
+          <b>{fmtGold(plan.gold)} 골드</b>
+          <small className="muted">≈ {wonText(Math.round(plan.gold / rate / 10_000) * 10_000)}</small>
+        </div>
+        <div className="dex-cost-col">
+          <small>아바돈 이벤트</small>
+          <b>{fmtGold(plan.goldEv)} 골드</b>
+          <small className="muted">≈ {wonText(Math.round(plan.goldEv / rate / 10_000) * 10_000)}</small>
+        </div>
+      </div>
+      <button type="button" className="dex-snip-list-head" onClick={() => setOpen(!open)} aria-expanded={open}>
+        항목 {plan.picks.length}개{plan.unknown ? ` · 값 모름 ${plan.unknown}` : ""}
+        {plan.bad.length > 0 && <span className="muted"> · 모르는 능력치 {plan.bad.join(", ")}</span>}
+        <span className="dex-caret">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <ul className="dex-snip-list">
+          {plan.picks.map(({ e, g }) => (
+            <li key={e.name}>
+              <span>
+                {e.name}
+                {e.cat && <small className="dex-cat">{e.cat}</small>}
+                <small className="muted"> {e.effects.map(effectText).join(" · ")}</small>
+              </span>
+              <b>{g == null ? "값 모름" : fmtGold(g)}</b>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button type="button" className="sub-tab dex-snip-go" onClick={goDex}>
+        도감 계산기에서 보기 ›
+      </button>
+    </div>
   );
 }
