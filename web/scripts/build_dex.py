@@ -330,6 +330,50 @@ def main() -> None:
                     it["pk"] = pk if pk in price["gear"] else ""
                 if it.get("pk") is None:
                     it.pop("pk", None)
+        # 레어도(등급)별 어림 시세 (제작자 2026-11-12 '코스튬도 펫도 레어도에 따라 가격이 정해짐, 같은 레어도면 대충 범위'):
+        # 거래소 녹화에 값이 있는 코스튬·펫의 최저가를 도감 정보 사전의 등급으로 묶어 가운데값(med)과 사분위(lo~hi). 다섯 개 이상 있는 등급만.
+        # 값이 없는 코스튬·펫 칸은 거래 가능하고 등급이 하나면 gr 로 이 표를 가리킨다 (화면 dexPrice.ts 가 '등급 어림'으로 셈). 거래불가면 nt.
+        import statistics
+        by_tab: dict[tuple, list] = {}
+        for b in json.loads(bp.read_text(encoding="utf-8")).get("아이템", []) if bp.exists() else []:
+            if b.get("이름") and b.get("큰탭") in ("코스튬", "펫"):
+                by_tab.setdefault((b["큰탭"], key(b["이름"])), []).append(b)
+        def grade_of(tab: str, k: str) -> str | None:
+            gs = {b.get("등급") for b in by_tab.get((tab, k), []) if b.get("등급")}
+            return gs.pop() if len(gs) == 1 else None
+        samples: dict[str, list] = {}
+        for pk, g in price["gear"].items():
+            if pk[:2] not in ("C:", "P:") or not g["p"]:
+                continue
+            tab = "코스튬" if pk.startswith("C:") else "펫"
+            gr = grade_of(tab, pk[2:] if tab == "코스튬" else key(pk[2:]))
+            if gr:
+                samples.setdefault(f"{tab}|{gr}", []).append(g["p"].get("0") or min(g["p"].values()))
+        grade_price = {}
+        for gk, xs in samples.items():
+            if len(xs) < 5:
+                continue
+            q = statistics.quantiles(sorted(xs), n=4)
+            grade_price[gk] = {"med": round(statistics.median(xs)), "lo": round(q[0]), "hi": round(q[2]), "n": len(xs)}
+        price["grade"] = grade_price
+        n_gr = n_nt = 0
+        for e in entries:
+            if e.get("cat") not in ("코스튬", "펫"):
+                continue
+            for it in e["items"]:
+                if not it.get("name") or it.get("pk"):
+                    continue
+                k = key(re.sub(r"^\+\d+\s*", "", it["name"]))
+                bs = by_tab.get((e["cat"], k), [])
+                if bs and all(b.get("거래불가") for b in bs):
+                    it["nt"] = True
+                    n_nt += 1
+                    continue
+                gr = grade_of(e["cat"], k)
+                if gr and f"{e['cat']}|{gr}" in grade_price:
+                    it["gr"] = f"{e['cat']}|{gr}"
+                    n_gr += 1
+        print("등급 어림 시세", {k: (v["med"], v["n"]) for k, v in sorted(grade_price.items())}, {"등급으로 셈 칸": n_gr, "거래불가 칸": n_nt})
         print("도감 시세", {"날짜": price["date"], "시세 있는 물건": len(price["gear"]), "레벨 모름": sum(1 for g in price["gear"].values() if not g["lv"]),
                          "종류 모름": sum(1 for g in price["gear"].values() if not g["k"]), "아바돈 판매": price.get("sale")})
     (OUT / "dex.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

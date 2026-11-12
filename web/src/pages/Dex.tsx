@@ -836,7 +836,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 
 /** 칸 상세의 값: 골드로(어떻게 셌는지), 스탬프로(평소 · 이벤트), 싼 쪽 */
 function SlotPrice({ it, price, pset }: { it: DexItem; price: DexPrice; pset: PriceSet }) {
-  if (!isCostSlot(it, price)) return null;
+  if (!isCostSlot(it, price)) return it.nt ? <span className="dex-price"><small>거래불가</small></span> : null;
   const c = slotCost(it, price, pset);
   const rec = MODES.map((m) => [m.label, pickWay(c, m.key)] as const);
   const same = rec[0][1]?.by === rec[1][1]?.by;
@@ -851,8 +851,15 @@ function SlotPrice({ it, price, pset }: { it: DexItem; price: DexPrice; pset: Pr
             {it.n > 1 ? ` × ${it.n}` : ""}
             {c.date ? ` · ${amgeoText([c.date])}` : ""}
           </>
+        ) : c.grade ? (
+          <>
+            <b>{fmtGold(c.gold!)}</b> = {c.grade.name} 어림 ({fmtGold(c.grade.lo)} ~ {fmtGold(c.grade.hi)}, 같은 등급 매물 {c.grade.n}개)
+            {it.n > 1 ? ` × ${it.n}` : ""}
+          </>
         ) : c.missing ? (
           `${scrollLabel(c.missing)} 값을 넣으면 셈`
+        ) : it.nt ? (
+          "거래불가"
         ) : (
           "암거 시세 없음"
         )}

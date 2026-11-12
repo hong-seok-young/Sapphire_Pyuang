@@ -88,7 +88,9 @@ export function wayText(w: GoldWay, scroll: string | null, gear = true): string 
 }
 
 /** 한 칸의 값: 골드로(장비 × 개수), 스탬프로(평소 · 이벤트). missing = 이 마법서 값이 있으면 골드 값이 나온다 */
-export interface SlotCost { gold: number | null; way: GoldWay | null; missing: string | null; scroll: string | null; stamp: Record<Mode, number | null>; date?: string }
+export interface SlotCost { gold: number | null; way: GoldWay | null; missing: string | null; scroll: string | null; stamp: Record<Mode, number | null>; date?: string;
+  /** 거래소 값이 없어 같은 등급의 어림 시세로 셈 (제작자 2026-11-12 '레어도에 따라 가격이 정해짐') */
+  grade?: { name: string; med: number; lo: number; hi: number; n: number } }
 /** '2026-11-12' -> '11월 12일 암거 기준' (제작자 2026-11-12: 도감 계산기의 골드 값은 그날 암거래중개인을 한 번 찍은 값이라 날짜를 이렇게 적는다) */
 export const amgeoText = (dates: (string | undefined)[]): string => {
   const days = [...new Set(dates.filter((d): d is string => !!d))].sort().map((d) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8, 10))}일`);
@@ -99,7 +101,11 @@ export function slotCost(it: DexItem, price: DexPrice, set: PriceSet): SlotCost 
   // pk: 코스튬 도감 칸은 거래소 코스튬 탭 값만 ('C:' 열쇠), '' = 같은 이름의 일반 장비 값만 있어 쓰지 않음
   const pk = it.pk ?? (it.name ? gearKey(it.name) : "");
   const g = pk ? price.gear[pk] : undefined;
-  if (!g) return { gold: null, way: null, missing: null, scroll: null, stamp };
+  if (!g) {
+    const gp = it.gr ? price.grade?.[it.gr] : undefined;
+    if (gp) return { gold: gp.med * it.n, way: null, missing: null, scroll: null, stamp, grade: { name: it.gr!.split("|").reverse().join(" "), ...gp } };
+    return { gold: null, way: null, missing: null, scroll: null, stamp };
+  }
   const kind = kindOf(g.k);
   const grade = g.lv != null ? scrollGrade(g.lv) : null;
   const sname = kind && grade ? scrollName(kind, grade) : null;
@@ -127,7 +133,8 @@ export function pickWay(c: SlotCost, mode: Mode): { by: "gold" | "stamp"; v: num
 }
 
 /** 장비 칸인지 (강화·장비스탬프가 있거나 시세가 있는 장비). 재료(쿠이증표 등)는 값을 세지 않는다 */
-export const isCostSlot = (it: DexItem, price: DexPrice) => !!it.plus || (!!it.sg && it.sg !== "불가") || !!price.gear[it.pk ?? (it.name ? gearKey(it.name) : "")];
+export const isCostSlot = (it: DexItem, price: DexPrice) =>
+  !!it.plus || (!!it.sg && it.sg !== "불가") || !!price.gear[it.pk ?? (it.name ? gearKey(it.name) : "")] || !!(it.gr && price.grade?.[it.gr]);
 
 export interface Totals {
   slots: number;

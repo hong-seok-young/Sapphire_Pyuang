@@ -119,7 +119,8 @@ export const loadEnhance = () => getJson<Enhance>("enhance");
  *  effects = [능력치, 값, % 인지], items 의 n = 필요 개수, plus = 강화 단계, pic = 위키에 그림이 없을 때 영상에서 자른 그림 (/data/dex/…png),
  *  name 이 null 이면 영상에서 칸을 누르지 않아 이름을 모르는 칸 (icon = 생김새), est = 같은 그림으로 이름을 추정한 칸,
  *  sg·sn = 도감 등록 창의 대체 스탬프 (장비스탬프 등급 'S'·'A'·'B' 와 개수, 대체 안 되면 sg '불가') */
-export interface DexItem { name: string | null; n: number; plus: number | null; icon?: string | null; pic?: string | null; stamp?: string | null; est?: boolean; sg?: string; sn?: number; info?: string; pk?: string }
+/** gr: 거래소 값이 없어 등급별 어림 시세를 쓰는 칸 ('코스튬|영웅'), nt: 거래불가 */
+export interface DexItem { name: string | null; n: number; plus: number | null; icon?: string | null; pic?: string | null; stamp?: string | null; est?: boolean; sg?: string; sn?: number; info?: string; pk?: string; gr?: string; nt?: boolean }
 /** cat: 코스튬 · 펫 · 이벤트 (없으면 일반). 이벤트는 period 화면 글과 from·to 한국 날짜 (to 그날 24시까지) */
 export interface DexEntry { name: string; effects: [string, number, boolean][]; period?: string | null; from?: string; to?: string; items: DexItem[]; cat?: string }
 /** 도감 시세 (제작자 요청 2026-11-11, build_dex.py price_data): 장비 이름 key(띄어쓰기·괄호 뺌) -> 종류(무기/갑옷류/기타), 요구 레벨, 강화 단계마다 거래소 최저가.
@@ -134,6 +135,8 @@ export interface DexPrice {
   stamp?: { normal: Record<string, number>; event: Record<string, number>; abaddon: number; platGold: number; date?: string; noteNormal?: string; noteEvent?: string };
   scroll?: Partial<Record<"무기" | "갑옷", Record<string, number>>>;
   sale?: { start: string; end: string; text: string; id?: number };
+  /** 등급별 어림 시세 '코스튬|영웅' -> 가운데값·사분위·매물 수 (거래소 녹화의 같은 등급 최저가들) */
+  grade?: Record<string, { med: number; lo: number; hi: number; n: number }>;
 }
 /** petRewards: 펫 도감 달성 보상 [펫 항목 몇 개, 능력치, 값, %인지] (10개마다) */
 export interface Dex { source: string; built: string; order: string[]; entries: DexEntry[]; price?: DexPrice; petRewards?: [number, string, number, boolean][] }
