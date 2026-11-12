@@ -341,21 +341,48 @@ def main() -> None:
         def grade_of(tab: str, k: str) -> str | None:
             gs = {b.get("등급") for b in by_tab.get((tab, k), []) if b.get("등급")}
             return gs.pop() if len(gs) == 1 else None
+        # 펫은 속성부여(힘·민첩·지능·마나) 때문에 비싸다 (제작자 2026-11-12 '노작 펫 기준으로 봐야'): 거래소 정보창에 속성부여 줄이 있던 펫은 등급 표에서 빼고(노작만),
+        # 그 펫 자신의 값도 같은 등급 노작 가운데값보다 비싸면 노작 값으로 친다. 노작 매물이 10개 안 되는 등급은 인기 펫이 섞여 치우쳐서 전체로 센다. 코스튬은 가운데값 그대로 ('대충 중앙값').
+        enchanted: set[str] = set()
+        for day in sorted(MARKET.glob("*/시세.json")) if MARKET.exists() else []:
+            for o in json.loads(day.read_text(encoding="utf-8")).get("others", []):
+                if o.get("tab") == "펫":
+                    k0 = key(o.get("base") or "")
+                    if any(re.match(r"^(힘|민첩|지능|마나)\s", x) for x in (o.get("info") or [])):
+                        enchanted.add(k0)
+                    else:
+                        enchanted.discard(k0)
         samples: dict[str, list] = {}
+        plain: dict[str, list] = {}
         for pk, g in price["gear"].items():
             if pk[:2] not in ("C:", "P:") or not g["p"]:
                 continue
             tab = "코스튬" if pk.startswith("C:") else "펫"
-            gr = grade_of(tab, pk[2:] if tab == "코스튬" else key(pk[2:]))
+            k0 = pk[2:] if tab == "코스튬" else key(pk[2:])
+            gr = grade_of(tab, k0)
             if gr:
-                samples.setdefault(f"{tab}|{gr}", []).append(g["p"].get("0") or min(g["p"].values()))
+                v = g["p"].get("0") or min(g["p"].values())
+                samples.setdefault(f"{tab}|{gr}", []).append(v)
+                if tab == "펫" and k0 not in enchanted:
+                    plain.setdefault(f"{tab}|{gr}", []).append(v)
         grade_price = {}
         for gk, xs in samples.items():
-            if len(xs) < 5:
+            use = plain[gk] if gk in plain and len(plain[gk]) >= 10 else xs
+            if len(use) < 5:
                 continue
-            q = statistics.quantiles(sorted(xs), n=4)
-            grade_price[gk] = {"med": round(statistics.median(xs)), "lo": round(q[0]), "hi": round(q[2]), "n": len(xs)}
+            q = statistics.quantiles(sorted(use), n=4)
+            grade_price[gk] = {"med": round(statistics.median(use)), "lo": round(q[0]), "hi": round(q[2]), "n": len(use), **({"plain": True} if use is not xs else {})}
         price["grade"] = grade_price
+        capped = 0
+        for pk, g in price["gear"].items():
+            if pk.startswith("P:") and key(pk[2:]) in enchanted:
+                gr = grade_of("펫", key(pk[2:]))
+                cap = grade_price.get(f"펫|{gr}", {}).get("med") if gr else None
+                if cap and grade_price[f"펫|{gr}"].get("plain") and g["p"] and min(g["p"].values()) > cap:
+                    g["p"] = {k: min(v, cap) for k, v in g["p"].items()}
+                    g["noench"] = True
+                    capped += 1
+        print("속성부여 펫", {"정보창에 속성": len(enchanted), "노작 값으로 낮춤": capped})
         n_gr = n_nt = 0
         for e in entries:
             if e.get("cat") not in ("코스튬", "펫"):

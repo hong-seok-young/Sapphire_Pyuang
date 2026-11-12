@@ -850,6 +850,7 @@ function SlotPrice({ it, price, pset }: { it: DexItem; price: DexPrice; pset: Pr
             <b>{fmtGold(c.gold)}</b> = {wayText(c.way, c.scroll, isGear(it))}
             {it.n > 1 ? ` × ${it.n}` : ""}
             {c.date ? ` · ${amgeoText([c.date])}` : ""}
+            {price.gear[it.pk ?? ""]?.noench ? " · 속성부여 매물이라 같은 등급 노작 값" : ""}
           </>
         ) : c.grade ? (
           <>
