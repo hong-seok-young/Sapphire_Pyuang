@@ -295,7 +295,24 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
     return { steps, gold, unknown, reached: got >= need - 1e-9 };
   };
   const goal = stat && over[stat] != null ? goalOf(stat, over[stat]) : null;
-  const goalNames = goal ? new Map(goal.steps.map((x, i) => [x.e.name, i])) : null;
+  // 적어 둔 목표를 모두 채우는 가장 싼 항목 묶음 (제작자 2026-11-12 '수치 입력하면 그걸 달성하기 위한 최소 세팅을 아래에, 금액도 그것으로'):
+  // 지금 완료한 것에서 모자란 만큼만, 아직 안 한 항목으로 챗봇 도감 칸과 같은 셈(planTargets). 능력치 칸을 누르면 그 능력치 하나만(goal)
+  const needs = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const [k, v] of Object.entries(over)) {
+      const n = v - curOf(k);
+      if (n > 1e-9) m.set(k, n);
+    }
+    return m;
+  }, [over, have]); // eslint-disable-line react-hooks/exhaustive-deps
+  const multi = useMemo(
+    () => (price && needs.size ? planTargets(dex.entries.filter((e) => !done.has(e.name)), needs, (e, mode) => (mode === "normal" ? entryGold.get(e.name) ?? null : null)) : null),
+    [needs, dex, done, entryGold, price],
+  );
+  const [allList, setAllList] = useEntryState("dex.allList", false);
+  const multiOn = !!multi && !goal && !stat && !allList;
+  const multiShort = multi ? [...needs].some(([k, v]) => (multi.got.get(k) ?? 0) < v - 1e-9) : false;
+  const goalNames = goal ? new Map(goal.steps.map((x, i) => [x.e.name, i])) : multiOn ? new Map(multi!.picks.map((x, i) => [x.e.name, i])) : null;
   const listed = goalNames
     ? dex.entries.filter((e) => goalNames.has(e.name) && matchQ(e)).sort((a, b) => goalNames.get(a.name)! - goalNames.get(b.name)!)
     : dex.entries.filter((e) => inTab(e) && matchQ(e) && matchStat(e));
@@ -366,6 +383,25 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
           </button>
         )}
       </div>
+
+      {!stat && multi && (
+        <div className="dex-statbar">
+          <span>
+            {allList ? (
+              <>목표 {needs.size}개 능력치</>
+            ) : (
+              <>
+                목표 {needs.size}개 능력치 채우기 <b>{multi.picks.length}</b>개
+                {multi.unknown > 0 && <> · 값 모름 {multi.unknown}</>}
+                {multiShort && <> · 다 해도 모자람</>}
+              </>
+            )}
+          </span>
+          <button type="button" className="sub-tab" onClick={() => setAllList(!allList)}>
+            {allList ? "목표만 보기" : "✕ 전체 보기"}
+          </button>
+        </div>
+      )}
 
       {stat && (
         <div className="dex-statbar" ref={statBar}>
