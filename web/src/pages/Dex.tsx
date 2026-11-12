@@ -9,6 +9,7 @@ import { useEntryState } from "../router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { loadDex, useAsync } from "../data";
+import { fetchMarket, wonText } from "../market";
 import type { Dex, DexEntry, DexItem, DexPrice } from "../data";
 import { MODES, STAMP_GRADES, amgeoText, fmtGold, isCostSlot, pickWay, readPriceSet, saleOn, scrollLabel, slotCost, totals, wayText, writePriceSet } from "../dexPrice";
 import type { PriceSet, Totals } from "../dexPrice";
@@ -684,6 +685,9 @@ function NumIn({ value, def, onSet, label }: { value: number | undefined; def: n
 function CostPanel({ price, tot, pset, setPset, n }: { price: DexPrice; tot: Totals; pset: PriceSet; setPset: (v: PriceSet) => void; n: number }) {
   const [open, setOpen] = useState(false);
   const on = saleOn(price);
+  // 현금 어림 (제작자 2026-11-12 '현금으로 얼만지도 평소와 아바돈 아래에'): 중개인 골드 팝니다 평균 시세, 없으면 75:1 (1만 원에 75만 골드)
+  const { data: market } = useAsync(useCallback(() => fetchMarket(), []), "market");
+  const rate = market?.goldRate || 75;
   const save = tot.by.normal.sum - tot.by.event.sum;
   const setScroll = (k: string, v: number | null) => {
     const scroll = { ...pset.scroll };
@@ -722,7 +726,7 @@ function CostPanel({ price, tot, pset, setPset, n }: { price: DexPrice; tot: Tot
               <div key={m.key} className={"dex-cost-col" + (m.key === "event" && on ? " dex-cost-now" : "")}>
                 <small>{m.label}</small>
                 <b>{fmtGold(tot.by[m.key].sum)} 골드</b>
-                <small className="muted">골드로 {tot.by[m.key].gold}칸 · 스탬프 {tot.by[m.key].stamp}칸</small>
+                <small className="muted">≈ {wonText(Math.round(tot.by[m.key].sum / rate / 10_000) * 10_000)}</small>
               </div>
             ))}
           </div>
