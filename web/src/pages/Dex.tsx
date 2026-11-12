@@ -325,6 +325,11 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   const todoListed = listed.filter((e) => !done.has(e.name));
 
 
+  // 장비를 모두 장비스탬프로 대체하면 드는 스탬프 (등급별 합). 필요 재료 머리에 짧게, 펼치면 칩으로 (제작자 2026-11-12 '스탬프 총 몇 등급 몇 장 필요한지 펼치면, 재료 371종 우측에는 스탬프 S12 A345')
+  const stamps = new Map<string, number>();
+  for (const e of todoListed) for (const it of e.items) if (it.sg && it.sn && it.sg !== "불가") stamps.set(it.sg, (stamps.get(it.sg) ?? 0) + it.sn * it.n);
+  const stampSum = ["S", "A", "B", ...[...stamps.keys()].filter((g) => !["S", "A", "B"].includes(g)).sort()].filter((g) => stamps.has(g));
+
   // 지금 목록의 미완료를 다 하려면 필요한 재료 (같은 이름·강화끼리 더한다)
   const need = useMemo(() => {
     const m = new Map<string, { it: DexItem; n: number; entries: number }>();
@@ -432,9 +437,18 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
       {todoListed.length > 0 && (
         <Panel className="dex-need">
           <button type="button" className="dex-need-head" onClick={() => setShowNeed(!showNeed)} aria-expanded={showNeed}>
-            <b>필요 재료</b> <span className="muted">미완료 {todoListed.length}개 · 재료 {need.length}종</span>
+            <b>필요 재료</b> <span className="muted">
+              재료 {need.length}종{stampSum.length > 0 && <> · 스탬프 {stampSum.map((g) => `${g}${stamps.get(g)!.toLocaleString("ko-KR")}`).join(" ")}</>}
+            </span>
             <span className="dex-caret">{showNeed ? "▲" : "▼"}</span>
           </button>
+          {showNeed && stampSum.length > 0 && (
+            <p className="dex-stampsum">
+              {stampSum.map((g) => (
+                <span key={g} className={stampCls(g)}>{g} {stamps.get(g)!.toLocaleString("ko-KR")}장</span>
+              ))}
+            </p>
+          )}
           {showNeed && (
             <ul className="dex-need-list">
               {need.map(([k, { it, n, entries }]) => (

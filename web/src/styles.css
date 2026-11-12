@@ -4988,7 +4988,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .dex-stats .sub-tab { border-color: rgba(169, 162, 207, 0.25); }
 .dex-need { padding: 0; }
 .dex-need-head { display: flex; align-items: center; gap: 6px; width: 100%; padding: 8px 10px; font: inherit; font-size: 13px; color: var(--text); background: none; border: 0; cursor: pointer; text-align: left; }
-.dex-need-head .muted { font-size: 11px; }
+.dex-need-head .muted { font-size: 11px; flex: 1; min-width: 0; }
 .dex-caret { margin-left: auto; font-size: 10px; color: var(--muted); }
 .dex-need-list { list-style: none; margin: 0; padding: 0 6px 6px; max-height: 300px; overflow-y: auto; }
 .dex-need-list button { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto auto; align-items: center; gap: 6px; width: 100%; min-height: 32px; padding: 2px 4px;
