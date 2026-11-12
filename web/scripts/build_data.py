@@ -44,6 +44,18 @@ INDEX_PAGE = SRC / "드랍표_원본" / "page.html"
 INDEX_FILES = SRC / "드랍표_원본" / "files"
 ORIG_DIR = SRC / "이미지" / "원본"
 MANIFEST = json.loads((ORIG_DIR / "목록.json").read_text(encoding="utf-8"))
+# 드랍표 저장본보다 새 판이 따로 받아져 있는 글 (자료/링크/카페, 공개 API 로 받은 글 본문과 그림. 제작자 2026-11-12 'DB 는 최신인데 웹은 아직 활용 못 하는 부분'):
+# 조합책 메뉴가 2018년 판(206149 …)이라 재료 수·값이 지금과 달랐다 (가공한가죽 거친가죽 x5 -> x3, 의지의 망토, 세트 장화 재료 …). 옛 글 번호 -> 새 글 번호
+LINK_DIR = SRC / "링크" / "카페"
+POST_REPLACED = {"206149": "346281", "206306": "346279", "206152": "346280", "206312": "346291", "213714": "346299", "214770": "346310"}
+LINK_PICS: dict[str, Path] = {}
+for _aid in POST_REPLACED.values():
+    _tsv = LINK_DIR / f"{_aid}_그림" / "목록.tsv"
+    if _tsv.exists():
+        for _line in _tsv.read_text(encoding="utf-8").splitlines():
+            _cols = _line.split("\t")
+            if len(_cols) >= 3:
+                LINK_PICS[_cols[2].strip().split("?")[0]] = _tsv.parent / _cols[1]
 CAFE = "https://cafe.naver.com/iphoneimo/"
 SOURCE = {"제목": "아이모 원클릭 드랍표", "작성자": "iOS", "글": CAFE + "333636", "패치": "2026.10.24"}
 # naver.me short links in the posts all lead to cafe posts. Resolved once (2026-10-30, curl -I) so the wiki
@@ -158,6 +170,8 @@ def picture_of(img: Tag, drop_animation: bool = False) -> dict | None:
     url = linkdata(a).get("src", "")
     if url in MANIFEST:
         return export_picture(ORIG_DIR / MANIFEST[url], drop_animation)
+    if url.split("?")[0] in LINK_PICS:
+        return export_picture(LINK_PICS[url.split("?")[0]], drop_animation)
     src = img.get("src") or ""
     m = re.match(r"data:image/(png|gif|jpe?g|webp);base64,(.+)", src, re.S)
     if m:
@@ -424,19 +438,25 @@ def game_info_only(blocks: list[dict]) -> list[dict]:
 
 def load_posts() -> tuple[dict, dict]:
     posts, soups = {}, {}
-    for d in POST_DIRS:
+    # 새 판이 있는 글은 옛 저장본을 읽지 않고 새 글을 읽는다 (새 글 파일이 없으면 옛 글 그대로)
+    newer = {new: LINK_DIR / f"{new}.html" for new in POST_REPLACED.values()}
+    replaced = {old for old, new in POST_REPLACED.items() if newer[new].exists()}
+    sources = [(d, sorted(d.glob("*.html"))) for d in POST_DIRS] + [(LINK_DIR, [f for f in newer.values() if f.exists()])]
+    for d, files in sources:
         titles = {}
         lst = d / "목록.tsv"
         if lst.exists():
             for line in lst.read_text(encoding="utf-8").splitlines():
                 aid, title, _ = line.split("\t")
                 titles[aid] = title
-        for f in sorted(d.glob("*.html")):
+        for f in files:
             aid = f.stem
+            if aid in replaced:
+                continue
             raw = f.read_text(encoding="utf-8", errors="replace")
             soup = BeautifulSoup(raw, "lxml")
             restore_grouped_images(soup, raw)
-            box = soup.select_one("div.post_cont")
+            box = soup.select_one("div.post_cont") or (soup.select_one("div.se-main-container") if d == LINK_DIR else None)
             if box is None:
                 continue
             title = titles.get(aid) or (soup.title.get_text().split(" : ")[0] if soup.title else aid)
@@ -445,12 +465,26 @@ def load_posts() -> tuple[dict, dict]:
             if aid in GAME_INFO_ONLY:
                 blocks = game_info_only(blocks)
             blocks = fix_post_text(blocks)
+            if replaced:  # 다른 글에서 옛 조합책 글로 가던 링크는 새 글로
+                blocks = relink(blocks, {"post:" + old: "post:" + new for old, new in POST_REPLACED.items() if old in replaced})
             posts[aid] = {"id": aid, "title": title.strip(), "blocks": blocks}
             if GIFS_DROPPED[0]:
                 posts[aid]["gifs"] = GIFS_DROPPED[0]
             soups[aid] = box
             print(f"  글 {aid} {title[:30]}")
     return posts, soups
+
+
+def relink(node, table: dict):
+    """글 조각 안의 링크(to)를 table 대로 바꾼다"""
+    if isinstance(node, list):
+        return [relink(x, table) for x in node]
+    if isinstance(node, dict):
+        out = {k: relink(v, table) for k, v in node.items()}
+        if isinstance(out.get("to"), str) and out["to"] in table:
+            out["to"] = table[out["to"]]
+        return out
+    return node
 
 
 # ---------------------------------------------------------------- hunting grounds, monsters, drops
@@ -496,7 +530,9 @@ def item_key(name: str) -> str:
     name = re.sub(r"\(\s*\*[\d~\-]+\s*\)$", "", name).strip()
     name = re.sub(r"\(\s*\)$", "", name).strip()
     name = re.sub(r"\s+\([^)]*\s[^)]*\)$", "", name).strip()  # a note in brackets, not part of the name
-    return name
+    # '강화가죽장갑(<직업 문양>, …)' 처럼 괄호 안이 그림과 쉼표라 '강화가죽장갑(' 로 잘린 것 (2026-11-12: 아이템 화면이 둘로 갈려 있었다)
+    name = re.sub(r"\($", "", name).strip()
+    return ITEM_ALIAS.get(name, name)
 
 
 def drop_names(text: str) -> list[str]:
@@ -701,13 +737,21 @@ def parse_equipment(aid: str, title: str, box: Tag) -> dict | None:
             name = cells[name_col]
             if not name:
                 continue
-            cells = fix_cells(name, cells)
+            cells = fix_cells(name, cells, h)
+            if name in ROW_NAME:  # 원글 표의 이름 오타 (게임 사전·공식 확률표·거래소 녹화 이름으로)
+                name = ROW_NAME[name]
+                cells[name_col] = name
             row = {"name": name, "icon": first_picture(tds[0]), "cells": cells}
             if h != headers:  # one post can hold tables with different columns (보조 장비: 방패 / 마법 / 정밀)
                 row["h"] = h
-            # the 직업 column is a job emblem picture, not text; name_jobs() turns it into a job name
+            # the 직업 column is a job emblem picture, not text; name_jobs() turns it into a job name.
+            # 문양이 둘·셋인 칸(전사·레인저가 같이 쓰는 검·가죽 장갑 등 83줄)은 모두 읽는다 (2026-11-12: 첫 문양만 읽어 '전사'로만 보였고,
+            # 챗봇의 레인저 장비 추천에서도 빠졌다. 게임 사전의 직업 아이콘과 대조)
             if "직업" in h and h.index("직업") < len(tds) and not cells[h.index("직업")]:
-                row["jobIcon"] = first_picture(tds[h.index("직업")])
+                pics = [p for p in (picture_of(img) for img in tds[h.index("직업")].find_all("img")) if p]
+                if pics:
+                    row["jobIcon"] = pics[0]
+                    row["jobIcons"] = pics
             rows.append(row)
     if not rows:
         return None
@@ -740,11 +784,45 @@ def fix_post_text(node):
     return node
 
 
-def fix_cells(name, cells):
+def fix_cells(name, cells, headers=None):
     for (item, bad), good in ERRATA.items():
         if name == item:
             cells = [c.replace(bad, good) for c in cells]
+    # 칸 이름을 아는 고침: 그 칸의 값이 원글 값 그대로일 때만 바꾼다 (원글이 고쳐지면 저절로 안 쓰인다)
+    for (item, col), (bad, good) in FIELD_ERRATA.items():
+        if name == item and headers and col in headers and headers.index(col) < len(cells):
+            i = headers.index(col)
+            if cells[i].strip() == bad:
+                cells[i] = good
+            elif bad in cells[i] and col == "옵션":
+                cells[i] = cells[i].replace(bad, good)
     return cells
+
+
+# 게임 화면(제작자 2026-11-11 '도감 정보' 녹화, 자료/도감/아이템/아이템.json)과 다른 원글 장비 표 값. (아이템명, 칸) -> (원글 값, 게임 값)
+# 방어력: 신발 표 12줄과 망토 1줄이 게임보다 1~2 높게 적혀 있었다. 영상 장면을 직접 본 것: 수도사·설원의저주·극한의 발걸음·엘프의 덧신·빛새김·푸른숲·혹한·파란폭포·맹독.
+# 나머지 넷(바다·설원추적자·노란유채·숙련모험가의망토)은 사전의 판독 값(여러 번 읽어 맞춘 것)
+FIELD_ERRATA = {
+    ("설원의저주장화", "방어력"): ("6", "5"), ("맹독의장화", "방어력"): ("6", "5"), ("혹한의장화", "방어력"): ("6", "5"),
+    ("푸른숲의장화", "방어력"): ("6", "5"), ("파란폭포의장화", "방어력"): ("6", "4"), ("노란유채의장화", "방어력"): ("6", "5"),
+    ("수도사의장화", "방어력"): ("5", "4"), ("설원추적자장화", "방어력"): ("8", "7"), ("빛새김의신발", "방어력"): ("8", "7"),
+    ("바다의장화", "방어력"): ("8", "7"), ("엘프의 덧신", "방어력"): ("8", "7"), ("극한의 발걸음", "방어력"): ("8", "7"),
+    ("숙련모험가의망토", "방어력"): ("2", "1"),
+    # 공식 옵션 재설정 확률표(자료/공식/확률/130101 '세계수가지갑옷 - 불저항': 0 또는 10~14)와 제작자 '불저13'. 원글은 체력 범위(26~34)가 불저항 칸에도 적혀 있었다
+    ("세계수가지갑옷", "옵션"): ("불저항 26~34", "불저항 0 & 10~14"),
+}
+# 원글 장비 표의 이름 오타 -> 게임 이름 (게임 사전 + 공식 확률표 또는 거래소 녹화로 확인)
+ROW_NAME = {"다크스컬쉴드": "다크스틸쉴드", "현자의로브": "현인의로브", "마나재생벨트": "마력재생벨트"}
+# 드랍표와 장비 표가 같은 아이템을 다르게 적은 것 -> 게임 사전 이름 하나로 (아이템 화면이 '떨구는 몬스터 없음' / '장비 정보 없음' 둘로 갈려 있었다).
+# 고요의장화 = 고요의신발: 사전에는 고요의신발만 있고, 드랍표의 고요의장화는 장비 표 고요의신발의 획득처(돌무더기 요새)에서 나온다
+ITEM_ALIAS = {"버닝블레이": "버닝블레이드", "회색바위투구": "회색바위의투구", "회색바위갑옷": "회색바위의갑옷", "주술사의모자": "주술사모자",
+              "야만의부츠": "야만 부츠", "사막용병의장갑": "사막용병장갑", "숲요정장갑": "숲요정의장갑", "마법사의지팡이": "마법사지팡이",
+              "고요의장화": "고요의신발", **ROW_NAME}
+# 원글 드랍표에 아직 없는 드랍: 몬스터 key -> 아이템. 급소가격 2단(2026-10-29 패치로 생긴 책)은 등대던전 3층 스팩터 (초보자 톡방 iOS '확인 완료' 2026-11-02, 자료/제공/초보자톡방_정리.md)
+DROP_EXTRA = {"스팩터@342705": ["급소가격2"]}
+
+
+JOBS = ["전사", "레인저", "마법사", "무도가"]
 
 
 def name_jobs(equipment: list[dict]) -> None:
@@ -765,18 +843,37 @@ def name_jobs(equipment: list[dict]) -> None:
         for row in eq["rows"]:
             h = row.get("h") or eq["headers"]
             col = h.index("직업") if "직업" in h else -1
-            icon = row.get("jobIcon")
-            if col >= 0 and icon and icon["src"] in names and col < len(row["cells"]):
-                row["cells"][col] = names[icon["src"]]
+            icons = row.pop("jobIcons", None) or ([row["jobIcon"]] if row.get("jobIcon") else [])
+            jobs = list(dict.fromkeys(names[i["src"]] for i in icons if i["src"] in names))
+            if col >= 0 and jobs and col < len(row["cells"]):
+                row["cells"][col] = "공용" if "공용" in jobs or len(jobs) >= 4 else "·".join(sorted(jobs, key=JOBS.index))
+    # 신발 표의 '엘프의 덧신' 마법사 줄은 '끈질긴 기억의 단화' (게임 사전: Lv.46 마법사 신발, 공식 확률 130102, 금서고 신발 넷 = 금서고의 발자국·엘프의 덧신·끈질긴 기억의 단화·극한의 발걸음)
+    for eq in equipment:
+        if eq["slot"] != "신발":
+            continue
+        for row in eq["rows"]:
+            h = row.get("h") or eq["headers"]
+            if row["name"] == "엘프의 덧신" and "직업" in h and row["cells"][h.index("직업")] == "마법사":
+                row["name"] = "끈질긴 기억의 단화"
+                row["cells"][h.index("아이템명")] = row["name"]
+    # 문양 하나만 읽던 때 직업만 달랐던 줄이 똑같아졌으면 한 줄만 남긴다
+    for eq in equipment:
+        seen_rows, kept = set(), []
+        for row in eq["rows"]:
+            sig = (row["name"], tuple(row["cells"]), tuple(row.get("h") or ()))
+            if sig not in seen_rows:
+                seen_rows.add(sig)
+                kept.append(row)
+        eq["rows"] = kept
 
 
 # ---------------------------------------------------------------- menu
 
-JOBS = ["전사", "레인저", "마법사", "무도가"]
 MENU = [
     # 초급, 중급, 고급 순 (직업은 전사, 레인저, 마법사, 무도가). 중급과 고급은 2026-10-31 제작자 요청으로 더했다 (글3)
     ("육성 공략", "343711", ["343732", "343699", "343720", "343710", "346046", "343767", "346049", "346067", "343788", "346050"]),
     ("직업별 스킬", "345532", ["345735", "344229", "344246", "342010"]),
+    # 조합책은 새 판(2026-10-31 리메이크, 자료/링크/카페)이 있으면 그 글 번호로 (POST_REPLACED)
     ("조합책", "206149", ["206306", "206152", "206312", "213714", "214770"]),
     ("강화 · 보석 · 성장", None, ["331665", "343765", "345584", "343078"]),
     ("인던 · 길드던전", None, ["342349", "343758", "332071", "343692", "338047", "338050",
@@ -844,7 +941,7 @@ def main():
     print("장비")
     equipment = []
     for aid, post in posts.items():
-        if re.search(r"\(20\d\d\.\d\d\.\d\d\)$", post["title"]) and "스킬" not in post["title"]:
+        if re.search(r"\(20\d\d\.\d\d\.\d\d\)$", post["title"]) and "스킬" not in post["title"] and aid not in POST_REPLACED.values():
             eq = parse_equipment(aid, post["title"], boxes[aid])
             if eq:
                 equipment.append(eq)
@@ -873,6 +970,11 @@ def main():
             items[cname]["aka"].append(name)
         return items[cname]
 
+    for mkey, extra in DROP_EXTRA.items():
+        if mkey in monsters:
+            monsters[mkey]["drops"] += [d for d in extra if d not in monsters[mkey]["drops"]]
+            for d in extra:
+                canon.setdefault(nospace(d), d)
     for m in monsters.values():
         for d in m["drops"]:
             if m["key"] not in item(d)["from"]:
@@ -885,6 +987,10 @@ def main():
                                 "info": dict(zip(row.get("h") or eq["headers"], row["cells"]))})
             if row["icon"] and not it["icon"]:
                 it["icon"] = row["icon"]
+    # 하나로 합친 옛 표기(드랍표·원글 표의 다른 이름)도 찾기에 쓰이게 aka 로 남긴다 ('고요의장화' 를 쳐도 고요의신발이 나오게)
+    for old, new in ITEM_ALIAS.items():
+        if new in items and old not in items and old not in items[new].setdefault("aka", []):
+            items[new]["aka"].append(old)
     for it in items.values():
         if not it.get("aka"):
             it.pop("aka", None)
@@ -897,6 +1003,22 @@ def main():
             if rel:
                 it["icon"] = export_picture(SRC / "이미지" / rel)
 
+    # 영상에서 아이템만 오린 고화질 아이콘이 있으면 그것으로 (제작자 2026-11-12 'DB 에는 있는데 웹이 못 쓰는 것 전부', '화질 구린 거 이번 영상 화질로 싹 교체'):
+    # 카페 글의 아이콘은 25x30 쯤이라 아이템 화면(80px)에서 흐리다. 아이템·장비 표를 쓰는 모든 화면(검색, 장비, 중개인, 장비대여, 기부함, 강화 비교 …)이 같이 바뀐다
+    import build_book
+    hq = 0
+    for name, it in items.items():
+        pic = build_book.wiki_icon(name, it.get("aka"))
+        if pic:
+            it["icon"] = pic
+            hq += 1
+    for eq in equipment:
+        for row in eq["rows"]:
+            pic = build_book.wiki_icon(row["name"])
+            if pic:
+                row["icon"] = pic
+    print("오린 아이콘으로 바꾼 위키 아이템", hq, "/", len(items))
+
     # 보이는 제목과 링크 글자를 다듬는다 (장비 표 찾기는 원래 제목으로 끝난 뒤)
     for post in posts.values():
         post["title"] = clean_title(post["title"])
@@ -906,6 +1028,8 @@ def main():
 
     menu = []
     for title, index_post, ids in MENU:
+        index_post = POST_REPLACED.get(index_post, index_post) if POST_REPLACED.get(index_post) in posts else index_post
+        ids = [POST_REPLACED[i] if POST_REPLACED.get(i) in posts else i for i in ids]
         menu.append({"title": title, "index": index_post,
                      "posts": [{"id": i, "title": posts[i]["title"], **({} if shows_something(posts[i]) else {"orig": 1})}
                                for i in ids if i in posts]})
@@ -942,6 +1066,8 @@ def main():
     # 도감 계산기 (개발중): 자료/도감/일반.json (제작자 도감 영상을 옮긴 것) -> data/dex.json (없으면 건너뛴다)
     import build_dex
     build_dex.main()
+    # 아이템 책: 게임 사전·거래소 값·도감·상점·줄임말을 아이템 이름으로 묶은 것 -> data/book.json, 오린 아이콘 -> data/icon/ (검색·아이템 화면)
+    build_book.main()
 
 
 def write_place_parts(posts: dict, places: dict) -> None:

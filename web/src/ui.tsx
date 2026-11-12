@@ -43,6 +43,8 @@ export function PicImg({
       />
     );
   }
+  // 영상에서 오린 고화질 아이콘(data/icon, build_book.py)은 줄여 그릴 때 부드럽게 (카페 글의 작은 픽셀 그림은 키워도 또렷하게 pixelated)
+  if (pic.src.includes("data/icon/")) className = "pic-hq " + (className ?? "");
   if (fit) {
     const k = fit / Math.max(pic.w, pic.h);
     return (

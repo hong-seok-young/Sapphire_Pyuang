@@ -5379,3 +5379,42 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 .trend-info-lines { display: flex; flex-direction: column; gap: 1px; }
 .trend-info-lines small { font-size: 11px; color: var(--text); overflow-wrap: anywhere; }
 .trend-info-src { font-size: 10px; }
+
+/* 영상에서 오린 고화질 아이콘 (data/icon, build_book.py): 줄여 그릴 때 부드럽게. 카페 글의 작은 픽셀 그림만 pixelated */
+.pic.pic-hq, .trend-icon[src*="/data/icon/"], .dex-pic[src*="/data/icon/"], .sim-pic[src*="data/icon/"] { image-rendering: auto; }
+
+/* 아이템 책 (제작자 2026-11-12: 게임 사전·거래소 값·도감·상점을 아이템 화면에, Detail.tsx BookPanel) */
+.bk > * + * { margin-top: 8px; }
+.bk-chips { display: flex; flex-wrap: wrap; gap: 4px; font-size: 12px; }
+.bk-chips > span { padding: 1px 6px; border: 1px solid var(--edge); background: rgba(255, 255, 255, 0.05); }
+.bk-grade.bk-common { color: #c9c9c9; }
+.bk-grade.bk-fine { color: #6fdc6f; }
+.bk-grade.bk-rare { color: #6cb2ff; }
+.bk-grade.bk-hero { color: #c99bff; }
+.bk-grade.bk-legend { color: #ff7a66; }
+.bk-chips > .bk-nt { color: #ff9a9a; }
+.bk-plat, .bk-lines, .bk-set { font-size: 13px; }
+.bk-plat b, .bk-gx b, .bk-tk b { color: var(--gold); }
+.bk-plat small { color: var(--muted); font-size: 11px; }
+.bk-desc { margin-bottom: 0; font-size: 13px; line-height: 1.5; white-space: pre-line; }
+.bk-lines { display: grid; gap: 2px; }
+.bk-set { color: #8fd0ff; }
+.bk-set + .bk-set { margin-top: 2px; }
+.bk-parts { display: flex; flex-wrap: wrap; gap: 4px; font-size: 12px; }
+.bk-parts > * { padding: 2px 6px; border: 1px solid var(--edge); }
+.bk-parts a { color: var(--gold); }
+.bk-more { display: flex; flex-wrap: wrap; gap: 6px; }
+.bk-gx, .bk-tk, .bk-dex { font-size: 13px; border-top: 1px dashed var(--edge); padding-top: 6px; }
+.bk-gx-head small, .bk-tk small, .bk-dex small { color: var(--muted); font-size: 11px; }
+.bk-gx-head small { margin-left: 6px; }
+.bk-gx-rows { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 2px; }
+.bk-gx-rows i { font-style: normal; color: var(--muted); margin-right: 4px; }
+.bk-dex { display: flex; flex-wrap: wrap; gap: 2px 10px; }
+.bk-dex-head { width: 100%; color: var(--muted); font-size: 12px; }
+.bk-src { font-size: 10px; color: var(--muted); }
+/* 검색: 줄임말 풀이 줄, 위키 글 */
+.search-slang { margin: 8px 0; padding: 6px 8px; border: 1px solid var(--edge); font-size: 13px; display: grid; gap: 2px; }
+.search-slang b { color: var(--gold); }
+.kind-post { background: #6b5a2e; }
+
+.bk > .panel-title + * { margin-top: 0; }

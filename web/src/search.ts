@@ -1,4 +1,5 @@
 import type { Wiki } from "./types";
+import type { Book } from "./data";
 
 const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
 
@@ -96,6 +97,8 @@ export interface Hit {
   name: string;
   to: string;
   score: number;
+  /** 줄임말로 찾았으면 그 줄임말 ('고봉' -> 고대의봉) */
+  via?: string;
 }
 
 function score(name: string, q: string): number {
@@ -111,13 +114,44 @@ function score(name: string, q: string): number {
   return n.includes(q) ? 1 : 0;
 }
 
-export function search(wiki: Wiki, query: string, limit = 60): Hit[] {
-  const q = norm(query);
-  if (!q) return [];
+const itemTo = (name: string) => "#/item/" + encodeURIComponent(name);
+
+/** 줄임말 표를 띄어쓰기 없는 소문자로 (책마다 한 번) */
+const abbrOf = new WeakMap<Book, Map<string, [string, string[]]>>();
+function abbrMap(book: Book): Map<string, [string, string[]]> {
+  let m = abbrOf.get(book);
+  if (!m) {
+    m = new Map(Object.entries(book.abbr).map(([a, names]) => [norm(a), [a, names]]));
+    abbrOf.set(book, m);
+  }
+  return m;
+}
+
+/** 오타 없이 그대로 맞는 것. book 이 있으면 위키에 없는 게임 아이템(코스튬·펫·소모품·상점 상품)과 줄임말도 */
+function plainHits(wiki: Wiki, q: string, book?: Book | null): Hit[] {
   const hits: Hit[] = [];
-  for (const name of Object.keys(wiki.items)) {
-    const s = score(name, q);
-    if (s) hits.push({ kind: "item", name, to: "#/item/" + encodeURIComponent(name), score: s + 0.2 });
+  for (const [name, it] of Object.entries(wiki.items)) {
+    let s = score(name, q);
+    for (const a of it.aka ?? []) s = Math.max(s, score(a, q));
+    if (s) hits.push({ kind: "item", name, to: itemTo(name), score: s + 0.2 });
+  }
+  if (book) {
+    for (const name of Object.keys(book.items)) {
+      if (wiki.items[name]) continue;
+      const s = score(name, q);
+      if (s) hits.push({ kind: "item", name, to: itemTo(name), score: s + 0.1 });
+    }
+    // 줄임말이 딱 맞으면 이름이 맞은 것 바로 아래에 ('고봉' -> 고대의봉)
+    const ab = onlyCho(q) ? undefined : abbrMap(book).get(q);
+    if (ab) {
+      for (const name of ab[1]) {
+        const had = hits.find((h) => h.kind === "item" && h.name === name);
+        if (had) {
+          had.score = Math.max(had.score, 4.6);
+          had.via = ab[0];
+        } else hits.push({ kind: "item", name, to: itemTo(name), score: 4.6, via: ab[0] });
+      }
+    }
   }
   const seen = new Set<string>();
   for (const m of Object.values(wiki.monsters)) {
@@ -130,9 +164,35 @@ export function search(wiki: Wiki, query: string, limit = 60): Hit[] {
     const s = Math.max(score(p.name, q), score(p.title, q));
     if (s) hits.push({ kind: "place", name: p.name, to: "#/place/" + p.id, score: s + 0.4 });
   }
+  return hits;
+}
+
+/**
+ * book (아이템 책, data.ts loadBook)을 주면 위키 드랍표에 없는 게임 아이템과 줄임말도 찾는다 (제작자 2026-11-12 '검색이 챗봇 답변과 너무 상이해':
+ * 챗봇은 자료 저장소를 다 읽는데 검색은 드랍표 아이템만 찾았다). 여러 낱말('고봉 숨옵')은 붙여서 아무것도 없을 때 낱말마다 찾아 합친다
+ */
+export function search(wiki: Wiki, query: string, limit = 60, book?: Book | null): Hit[] {
+  const q = norm(query);
+  if (!q) return [];
+  let hits = plainHits(wiki, q, book);
+  const words = query.trim().split(/\s+/).map(norm).filter((w) => [...w].length >= 2);
+  let split = false;
+  if (!hits.length && words.length > 1) {
+    const best = new Map<string, Hit>();
+    for (const w of words) {
+      for (const h of plainHits(wiki, w, book)) {
+        const key = h.kind + h.name;
+        const old = best.get(key);
+        // 낱말 여러 개가 맞은 것이 위로
+        best.set(key, old ? { ...old, score: old.score + h.score, via: old.via ?? h.via } : h);
+      }
+    }
+    hits = [...best.values()];
+    split = hits.length > 0;
+  }
   // 오타: 그냥 찾은 것이 적고 초성이 아닐 때만 (이름마다 자모 비교는 무거워서)
   // 두 글자는 틀린 자모 하나에도 엉뚱한 것이 많이 걸려서, 그냥 찾은 것이 하나도 없을 때만
-  if (!onlyCho(q) && ([...q].length >= 3 ? hits.length < FUZZY_BELOW : [...q].length === 2 && hits.length === 0)) {
+  if (!split && !onlyCho(q) && ([...q].length >= 3 ? hits.length < FUZZY_BELOW : [...q].length === 2 && hits.length === 0)) {
     const qc = [...q].join("");
     const qj = jamo(qc);
     const have = new Set(hits.map((h) => h.kind + h.name));
@@ -144,9 +204,29 @@ export function search(wiki: Wiki, query: string, limit = 60): Hit[] {
         hits.push({ kind, name, to, score: f + extra / 10 });
       }
     };
-    for (const name of Object.keys(wiki.items)) add("item", name, "#/item/" + encodeURIComponent(name), 0.2);
-    for (const name of seen) add("monster", name, "#/monster/" + encodeURIComponent(name), 0.3);
+    for (const name of Object.keys(wiki.items)) add("item", name, itemTo(name), 0.2);
+    if (book) for (const name of Object.keys(book.items)) if (!wiki.items[name]) add("item", name, itemTo(name), 0.1);
+    for (const m of Object.values(wiki.monsters)) add("monster", m.name, "#/monster/" + encodeURIComponent(m.name), 0.3);
     for (const p of Object.values(wiki.places)) add("place", p.name, "#/place/" + p.id, 0.4, p.title);
   }
   return hits.sort((a, b) => b.score - a.score || a.name.length - b.name.length).slice(0, limit);
+}
+
+/** 위키 글 제목에서 찾기 (메뉴에 있는 글: 조합책, 강화, 스킬, 공략 …). 낱말이 모두 제목에 있어야 한다 (titleMatch) */
+export function searchPosts(wiki: Wiki, query: string, limit = 8): { id: string; title: string; section: string }[] {
+  if (norm(query).length < 2) return [];
+  const out: { id: string; title: string; section: string; score: number }[] = [];
+  const seen = new Set<string>();
+  for (const m of wiki.menu) {
+    if (m.equip) continue; // 장비 표는 아이템으로 찾는다
+    for (const p of m.posts) {
+      if (seen.has(p.id)) continue;
+      const s = titleMatch(p.title, query);
+      if (s) {
+        seen.add(p.id);
+        out.push({ id: p.id, title: p.title, section: m.title, score: s });
+      }
+    }
+  }
+  return out.sort((a, b) => b.score - a.score || a.title.length - b.title.length).slice(0, limit);
 }

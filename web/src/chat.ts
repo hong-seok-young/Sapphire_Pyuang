@@ -486,7 +486,7 @@ export function wikiContext(
     if (job) {
       const gear = Object.values(wiki.items)
         .flatMap((it) => (it.equip ?? []).map((e) => ({ it, e })))
-        .filter(({ e }) => (e.info["직업"] === job || e.info["직업"] === "공용") && Number(e.info["레벨제한"]) >= lo - 5 && Number(e.info["레벨제한"]) <= hi + 5)
+        .filter(({ e }) => ((e.info["직업"] ?? "").includes(job) || e.info["직업"] === "공용") && Number(e.info["레벨제한"]) >= lo - 5 && Number(e.info["레벨제한"]) <= hi + 5)
         .sort((a, b) => Number(b.e.info["레벨제한"]) - Number(a.e.info["레벨제한"]))
         .slice(0, askedRange ? 24 : 16);
       if (gear.length) {

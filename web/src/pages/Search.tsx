@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Wiki } from "../types";
-import { search } from "../search";
+import { search, searchPosts } from "../search";
 import { go } from "../router";
 import { FavStar, PicImg, TopBar } from "../ui";
-import { monstersByName } from "../data";
+import { bookOf, loadBook, monstersByName, useAsync } from "../data";
+import type { Book, BookVariant } from "../data";
+import { cafeUrl, isOriginalOnly } from "../cafe";
 import { forgetSearch, recentSearches, rememberSearch, useFavorites } from "../favorites";
 import type { FavKind } from "../favorites";
 import { TYPE_NAME, fetchOfficial } from "../official";
@@ -14,8 +16,12 @@ import type { ScamList } from "./Scam";
 const KIND = { item: "아이템", monster: "몬스터", place: "사냥터" } as const;
 
 /** 검색 결과와 즐겨찾기에 같이 쓰는 한 줄 */
-function HitRow({ wiki, byName, kind, name, fkey, to, onOpen }: {
+function HitRow({ wiki, book, byName, kind, name, fkey, to, via, onOpen }: {
   wiki: Wiki;
+  /** 아이템 책 (받았으면): 위키에 없는 게임 아이템의 그림과 한 줄 설명 */
+  book?: Book | null;
+  /** 줄임말로 찾은 줄이면 그 줄임말 */
+  via?: string;
   byName: ReturnType<typeof monstersByName>;
   kind: FavKind;
   name: string;
@@ -23,10 +29,11 @@ function HitRow({ wiki, byName, kind, name, fkey, to, onOpen }: {
   to: string;
   onOpen?: () => void;
 }) {
-  const pic = kind === "item" ? wiki.items[name]?.icon : kind === "monster" ? byName.get(name)?.[0]?.img : null;
+  const vs = kind === "item" ? bookOf(book, name) : [];
+  const pic = kind === "item" ? (wiki.items[name]?.icon ?? vs.find((v) => v.pic)?.pic) : kind === "monster" ? byName.get(name)?.[0]?.img : null;
   const sub =
     kind === "monster" ? (byName.get(name) ?? []).map((m) => wiki.places[m.place]?.name).filter(Boolean).join(", ")
-    : kind === "item" ? (wiki.items[name] ? itemSub(wiki, name) : "")
+    : kind === "item" ? [via ? `'${via}'` : "", wiki.items[name] ? itemSub(wiki, name) : "", wiki.items[name]?.equip.length ? "" : bookSub(vs)].filter(Boolean).join(" · ")
     : wiki.places[fkey]?.region;
   return (
     <li className="hit">
@@ -101,7 +108,17 @@ const linkOf = (kind: FavKind, key: string) =>
   kind === "place" ? "#/place/" + key : `#/${kind}/` + encodeURIComponent(key);
 
 export function Search({ wiki, q }: { wiki: Wiki; q: string }) {
-  const hits = useMemo(() => search(wiki, q), [wiki, q]);
+  // 아이템 책: 위키 드랍표에 없는 게임 아이템(코스튬·펫·소모품·상점 상품)과 줄임말 (제작자 2026-11-12 '검색이 챗봇 답변과 너무 상이해'). 받기 전에는 위키 것만
+  const { data: book } = useAsync(useCallback(() => loadBook(), []), "book");
+  const hits = useMemo(() => search(wiki, q, 60, book), [wiki, q, book]);
+  const posts = useMemo(() => searchPosts(wiki, q), [wiki, q]);
+  // 줄임말 풀이 ('월거' = 월드거래 …): 친 말이 줄임말 표에 그대로 있으면 맨 위에 한 줄
+  const slang = useMemo(() => {
+    if (!book || !q.trim()) return [];
+    const key = (s: string) => s.replace(/\s+/g, "").toLowerCase();
+    const words = new Set([key(q), ...q.trim().split(/\s+/).map(key)]);
+    return Object.entries(book.slang).filter(([a]) => words.has(key(a)));
+  }, [book, q]);
   const byName = useMemo(() => monstersByName(wiki), [wiki]);
   // 입력칸 글자는 주소(q)를 따라간다. 뒤로 가기나 다른 링크로 주소가 바뀌어도 칸이 옛 글자로 남지 않게
   const [text, setText] = useState(q);
@@ -176,7 +193,7 @@ export function Search({ wiki, q }: { wiki: Wiki; q: string }) {
           <h2 className="panel-title">즐겨찾기 {favorites.length}</h2>
           <ul className="list">
             {favorites.map((f) => (
-              <HitRow key={f.kind + f.key} wiki={wiki} byName={byName} kind={f.kind} name={f.name} fkey={f.key} to={linkOf(f.kind, f.key)} />
+              <HitRow key={f.kind + f.key} wiki={wiki} book={book} byName={byName} kind={f.kind} name={f.name} fkey={f.key} to={linkOf(f.kind, f.key)} />
             ))}
           </ul>
         </section>
@@ -188,13 +205,44 @@ export function Search({ wiki, q }: { wiki: Wiki; q: string }) {
           <div className="scam-foot">{scamSource(scam.list)}</div>
         </section>
       )}
-      {q && !hits.length && !scam && official && !official.length && <div className="empty">"{q}" 검색 결과가 없어요.</div>}
+      {q && !hits.length && !posts.length && !slang.length && !scam && official && !official.length && <div className="empty">"{q}" 검색 결과가 없어요.</div>}
+      {slang.length > 0 && (
+        <div className="search-slang">
+          {slang.map(([a, full]) => (
+            <div key={a}>
+              <b>{a}</b> = {full}
+            </div>
+          ))}
+        </div>
+      )}
       <ul className="list">
         {hits.map((h) => {
           const key = h.kind === "place" ? h.to.split("/").pop()! : h.name;
-          return <HitRow key={h.kind + h.name} wiki={wiki} byName={byName} kind={h.kind} name={h.name} fkey={key} to={h.to} onOpen={remember} />;
+          return <HitRow key={h.kind + h.name} wiki={wiki} book={book} byName={byName} kind={h.kind} name={h.name} fkey={key} to={h.to} via={h.via} onOpen={remember} />;
         })}
       </ul>
+      {posts.length > 0 && (
+        <section className="search-off">
+          <h2 className="panel-title">위키 글 {posts.length}</h2>
+          <ul className="list">
+            {posts.map((p) => {
+              // 원글에서만 보는 글(공략, 지도·스샷뿐인 글)은 메뉴와 같이 바로 카페 원글로
+              const out = isOriginalOnly(wiki, p.id);
+              return (
+                <li key={p.id} className="hit">
+                  <a className="row" href={out ? cafeUrl(p.id) : "#/post/" + p.id} {...(out ? { target: "_blank", rel: "noopener noreferrer" } : {})} onClick={remember}>
+                    <span className="row-main">
+                      <span className="row-title">{p.title}</span>
+                      <span className="row-sub">{p.section}{out ? " · 원글 ↗" : ""}</span>
+                    </span>
+                    <span className="kind kind-post">글</span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
       {q && !!official?.length && (
         <section className="search-off">
           <h2 className="panel-title">아이모 소식 {official.length > OFFICIAL_MAX ? `${OFFICIAL_MAX}+` : official.length}</h2>
@@ -218,6 +266,18 @@ export function Search({ wiki, q }: { wiki: Wiki; q: string }) {
       )}
     </>
   );
+}
+
+/** 위키에 없는 게임 아이템의 한 줄: '코스튬 모자 · 희귀 · Lv.9', '상점 13,000 플래티넘' */
+function bookSub(vs: BookVariant[]): string {
+  const v = vs[0];
+  if (!v) return "";
+  const parts = [v.t === "일반" ? (v.s ?? "") : v.t + (v.s && v.t !== "가챠" ? " " + v.s : "")];
+  if (v.g) parts.push(v.g);
+  if (v.lv) parts.push("Lv." + v.lv);
+  if (v.plat != null) parts.push(v.plat.toLocaleString() + " 플래티넘");
+  if (vs.length > 1 && vs.some((x) => x.t !== v.t)) parts.push("+" + [...new Set(vs.slice(1).map((x) => x.t))].filter((t) => t !== v.t).join("·"));
+  return parts.filter(Boolean).join(" · ");
 }
 
 function itemSub(wiki: Wiki, name: string): string {

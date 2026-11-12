@@ -214,12 +214,12 @@ def enrich(it: dict, wiki_items: dict, skill: bool = False) -> None:
     for k in ([kc] if kc else []):
         f = ref["cut"].get(k)
         if f:
-            TREND_OUT.mkdir(parents=True, exist_ok=True)
-            fn = "c_" + re.sub(r'[\/:*?"<>|]', "_", k) + ".png"
-            if not (TREND_OUT / fn).exists():
-                shutil.copy2(f, TREND_OUT / fn)
-            it["icon"], it["iconHQ"] = f"/data/trend/{fn}", True
-            break
+            # 오린 아이콘은 data/icon/ 에 한 벌만 올라간다 (build_book.py copy_icons, 위키·도감 계산기와 같이 쓴다)
+            import build_book
+            c = build_book.cut_index()["stem"].get(f.stem)
+            if c:
+                it["icon"], it["iconHQ"] = "/data/icon/" + c["url"], True
+                break
     info = dict(ref["info"][ki]) if ki else None
     if info and ki not in keys and ki not in [_nk(n) for n in _base_names(it["name"])]:
         info["part"] = ki  # 세트·비슷한 이름이면 정보를 가져온 아이템 이름
@@ -523,7 +523,7 @@ ALIASES: dict[str, str | None] = {
     "의망": "의지의 망토", "반죽망": "반죽음의망토", "죽망": "죽음의망토", "헌보": "헌터보우",
     # 닼 혼자(8닼, 팔닼)는 다크스틸소드 (제작자 2026-11-04)
     "닼": "다크스틸소드", "닼스": "다크스컬", "닼소": "다크스틸소드", "닼쉴": "다크스틸쉴드", "닼아": "다크스틸아머", "닼투": "다크스틸투구",
-    "뿌벨": "거친뿌리의벨트", "뿌리벨": "거친뿌리의벨트", "건마벨": "건조한마력의벨트", "마재벨": "마나재생벨트", "서약벨": "서약자의벨트",
+    "뿌벨": "거친뿌리의벨트", "뿌리벨": "거친뿌리의벨트", "건마벨": "건조한마력의벨트", "마재벨": "마력재생벨트", "서약벨": "서약자의벨트",
     "가지갑": "세계수가지갑옷", "껍갑": "세계수껍질갑옷", "세계롭": "세계수잎로브", "세계수롭": "세계수잎로브",
     "광전사": "광전사의부츠", "정반": "정화된힘의반지", "약반": "약속의반지", "현인장": "현인의장갑", "정화장": "정화의장갑",
     "카소": "카이저소드", "파홀": "파괴의홀", "임페": "임페리얼보우", "스카장": "스카우트장갑", "학모": "학자의모자", "방모": "방랑자의모자",

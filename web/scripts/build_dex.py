@@ -215,15 +215,18 @@ def main() -> None:
     pics = {n: crops.get(n) or cafe.get(n) or book_pics.get(n) for n in names if n not in wiki and (crops.get(n) or cafe.get(n) or book_pics.get(n))}
     # 영상에서 아이템만 오린 아이콘 (자료/이미지/도감아이콘, 육각형·칸 바탕 없이, 고화질): 위키 그림이 있어도 이것을 먼저 쓴다
     # (제작자 2026-11-12 '아이콘은 해당 아이템 그 자체를 누끼', '화질 구린 거 이번 영상 화질로 싹 교체')
-    exact_src: dict[str, Path] = {}
-    cut_dir = DATA / "이미지" / "도감아이콘"
-    cut_list = cut_dir / "목록.json"
-    if cut_list.exists():
-        for nm in json.loads(cut_list.read_text(encoding="utf-8")):
-            f = cut_dir / (re.sub(r'[\/:*?"<>|]', "_", nm) + ".png")
-            if f.exists() and key(nm) in names:
-                pics[key(nm)] = f
-                exact_src[nm] = f
+    # 이 아이콘은 data/icon/ 에 한 벌만 올라가고(build_book.py, 위키·시세 동향과 같이 쓴다) 여기서는 주소만 적는다.
+    # 이름이 같아도 탭이 다르면 다른 그림 (코스튬 '동그리모자', 펫 '집토끼', 띄어쓰기만 다른 펫): 도감 항목의 종류(일반·코스튬·펫)로 고른다
+    import build_book
+    hq_url: dict[tuple, str | None] = {}
+    def hq(base: str, cat: str | None) -> str | None:
+        k = (cat or "일반", base)
+        if k not in hq_url:
+            hq_url[k] = build_book.tab_icon_url(base, cat or "일반")
+        return hq_url[k]
+    has_hq = {key(re.sub(r"^\+\d+\s*", "", it["name"])) for e in raw["entries"] for it in e["items"]
+              if it.get("name") and hq(re.sub(r"^\+\d+\s*", "", it["name"]), e.get("category"))}
+    pics = {n: f for n, f in pics.items() if n not in has_hq}
     out_pics = OUT / "dex"
     if out_pics.exists():
         shutil.rmtree(out_pics)
@@ -231,16 +234,7 @@ def main() -> None:
         out_pics.mkdir(parents=True)
         for n, f in pics.items():
             shutil.copy2(f, out_pics / f"{n}.png")
-    # 띄어쓰기만 다른 이름이 둘 이상인 것만 이름 그대로 따로 복사 (그 밖은 key 이름 하나)
-    from collections import Counter as _C
-    _dup = _C(key(n) for n in exact_src)
-    exact_pics: dict[str, str] = {}
-    for nm, f in exact_src.items():
-        if _dup[key(nm)] > 1:
-            fn = "x_" + re.sub(r'[\/:*?"<>|\s]', "_", nm) + ".png"
-            shutil.copy2(f, out_pics / fn)
-            exact_pics[nm] = fn
-    no_pic = sorted(n for n in names if n not in wiki and n not in pics)
+    no_pic = sorted(n for n in names if n not in wiki and n not in pics and n not in has_hq)
     # 영상 툴팁에서 받아 적은 아이템 정보(요구 레벨·방어력·옵션, 재료면 설명). 같은 이름의 다른 칸에만 적힌 것도 쓴다 (제작자 2026-11-10 '이미지랑 내용 장비옵션 다 db화')
     def clean_info(t: str) -> str:
         return re.sub(r"\s*\([^)]*(파란|글씨|색)[^)]*\)", "", t or "").strip()
@@ -288,8 +282,8 @@ def main() -> None:
                 d["sg"], d["sn"] = (m.group(1) or "") + m.group(2).upper(), int(m.group(3))
             elif "불가" in st:
                 d["sg"] = "불가"
-            if base and base in exact_pics:
-                d["pic"] = f"/data/dex/{exact_pics[base]}"
+            if base and hq(base, e.get("category")):
+                d["pic"] = hq(base, e.get("category"))
             elif base and key(base) in pics:
                 d["pic"] = f"/data/dex/{key(base)}.png"
             info = clean_info(it.get("info")) or (infos.get(key(base)) if base else None)
@@ -323,11 +317,11 @@ def main() -> None:
                     it["pk"] = pk if pk in price["gear"] else ""
                 if it.get("pk") is None:
                     it.pop("pk", None)
-        print("도감 시세", {"날짜": price["date"], "시세 있는 장비": len(price["gear"]), "레벨 모름": sorted(k for k, g in price["gear"].items() if not g["lv"]),
-                         "종류 모름": sorted(k for k, g in price["gear"].items() if not g["k"]), "아바돈 판매": price.get("sale")})
+        print("도감 시세", {"날짜": price["date"], "시세 있는 물건": len(price["gear"]), "레벨 모름": sum(1 for g in price["gear"].values() if not g["lv"]),
+                         "종류 모름": sum(1 for g in price["gear"].values() if not g["k"]), "아바돈 판매": price.get("sale")})
     (OUT / "dex.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print("도감 계산기", {"항목": len(entries), "뺀 이벤트 도감": len(events), "아이템 칸": sum(len(e["items"]) for e in entries),
-                     "이름 모름": sum(1 for e in entries for i in e["items"] if not i["name"]), "그림": len(pics),
+                     "이름 모름": sum(1 for e in entries for i in e["items"] if not i["name"]), "오린 아이콘": len(has_hq), "그 밖의 그림": len(pics),
                      "정보 없는 칸": sum(1 for e in entries for i in e["items"] if i["name"] and not i.get("info")), "그림 없음": no_pic,
                      "순서표에 없는 능력치": unknown})
 

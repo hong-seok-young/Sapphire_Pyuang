@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { peekMemo, putMemo } from "./memo";
-import type { Monster, Post, Wiki } from "./types";
+import type { Monster, Pic, Post, Wiki } from "./types";
 
 const BASE = "data/";
 
@@ -136,6 +136,39 @@ export interface DexPrice {
 }
 export interface Dex { source: string; built: string; order: string[]; entries: DexEntry[]; price?: DexPrice }
 export const loadDex = () => getJson<Dex>("dex");
+
+/** 아이템 책 (제작자 2026-11-12 'DB 에는 있는데 웹이 못 쓰는 것 전부', scripts/build_book.py): 비공개 자료의 게임 도감 정보 사전, 게임 거래소 녹화 값,
+ *  도감 퀘스트, 톡방 시세, 게임 상점, 줄임말을 아이템 이름으로 묶은 것. 검색과 아이템 화면이 필요할 때 받는다.
+ *  한 이름에 변형이 여럿일 수 있다 (투구 '동그리모자' / 코스튬 '동그리모자', 거래 가능 / 거래불가 판).
+ *  t = 게임 탭 (일반·코스튬·펫·라이딩) 또는 상점·상자·가챠, s = 고르기(갑옷, 모자 …), g = 등급, st = 능력치 [이름, 값('??' 는 게임이 가린 값)],
+ *  nt = 거래불가, cash = 캐쉬샵 상태, lines = 사전에 없을 때 거래소 정보창·도감 툴팁·상점 글, more = 색만 다른 같은 아이템의 다른 그림,
+ *  gx = 게임 거래소 최저가 (p: 강화 단계 -> 골드, d: 녹화 날짜, n: 매물 수, u: 묶음 물건의 개당 값), dex = 들어가는 도감 [항목, 강화, 개수],
+ *  tk = 거래 톡방 팝니다 중간값(만 원)·글 수·마지막 날, plat = 상점 플래티넘 값, cnt = 한 번에 받는 개수, limit = 구매 제한 글, parts = 구성품 [이름, 개수] */
+export interface BookVariant {
+  t: "일반" | "코스튬" | "펫" | "라이딩" | "상점" | "상자" | "가챠"; s?: string; src?: string;
+  g?: string; lv?: number; jobs?: string[]; sex?: string[]; st?: [string, string][]; set?: string[]; cd?: number; desc?: string; nt?: 1; cash?: string;
+  lines?: string[]; pic?: Pic; more?: Pic[];
+  gx?: { p: Record<string, number>; d: string; n?: number; u?: 1 };
+  dex?: [string, number, number][];
+  tk?: { med: number; n: number; to?: string };
+  plat?: number; cnt?: number; limit?: string; parts?: [string, number][];
+}
+/** abbr = 줄임말 -> 아이템 이름들 ('고봉' -> 고대의봉), slang = 줄임말 풀이 글 (아이템이 아닌 말도: '월거' = 월드거래) */
+export interface Book { built: string; src: { book: string; gx: string[] }; items: Record<string, BookVariant[]>; abbr: Record<string, string[]>; slang: Record<string, string> }
+let bookPromise: Promise<Book> | null = null;
+/** 한 번 받으면 이번에 연 동안 그대로. 못 받으면 다음에 다시 */
+export function loadBook(): Promise<Book> {
+  bookPromise ??= getJson<Book>("book").catch((e) => {
+    bookPromise = null;
+    throw e;
+  });
+  return bookPromise;
+}
+/** 아이템 이름의 책 변형들. 위키 이름 뒤의 '(거불)'·'(5칸)' 같은 꼬리표를 떼고도 찾는다 */
+export function bookOf(book: Book | null | undefined, name: string): BookVariant[] {
+  if (!book) return [];
+  return book.items[name] ?? book.items[name.replace(/\s*\([^)]*\)\s*$/, "")] ?? [];
+}
 
 /** key 를 주면 이번에 연 동안 받은 것을 받는 동안 바로 보인다 (src/memo.ts) */
 export function useAsync<T>(fn: () => Promise<T>, key?: string): { data?: T; error?: string } {
