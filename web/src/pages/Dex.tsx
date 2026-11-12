@@ -174,15 +174,16 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   // 이벤트 도감 넣기·빼기 (제작자 2026-11-12 '체크박스와 이벤트, 이벤트 제외하거나 포함해서 최대치도 비용 계산도'): 빼면 최대·합계·비용·목록 모두에서 뺀다. 이 기기에 계정별로
   const [withEv, setWithEvState] = useState(() => {
     try {
-      return localStorage.getItem(`sapphire.dex.ev.${me.id}`) !== "0";
+      // 처음엔 뺀다 (제작자 2026-11-12 '이벤트 도감은 디폴트로 빼고 생각해'). 켠 것만 기억 (예전 키 ev 는 처음엔 켜짐이라 새 키 ev2)
+      return localStorage.getItem(`sapphire.dex.ev2.${me.id}`) === "1";
     } catch {
-      return true;
+      return false;
     }
   });
   const setWithEv = (v: boolean) => {
     setWithEvState(v);
     try {
-      localStorage.setItem(`sapphire.dex.ev.${me.id}`, v ? "1" : "0");
+      localStorage.setItem(`sapphire.dex.ev2.${me.id}`, v ? "1" : "0");
     } catch {
       /* 이번에 연 동안만 */
     }
@@ -949,7 +950,7 @@ export function DexSnippet({ spec }: { spec: string }) {
   // 손으로 고친 마법서·스탬프 값과 '도감 계산기에서 보기'의 목표는 계정별로 둬서 누구인지 묻는다
   const { data: me } = useAsync(useCallback(() => fetchMe(), []), "me");
   const { data: market } = useAsync(useCallback(() => fetchMarket(), []), "market");
-  const [withEv, setWithEv] = useState(true);
+  const [withEv, setWithEv] = useState(false); // 이벤트 도감은 처음엔 뺀다 (제작자 2026-11-12)
   const [open, setOpen] = useState(false);
   const rate = market?.goldRate || 75;
   const plan = useMemo(() => {
