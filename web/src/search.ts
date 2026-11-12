@@ -299,12 +299,18 @@ export function pickNames(
 export function pickItems(wiki: Wiki | null | undefined, book: Book | null | undefined, query: string, limit = 8, keep?: (name: string) => boolean): NameHit[] {
   const names: string[] = wiki ? Object.keys(wiki.items) : [];
   if (book) for (const n of Object.keys(book.items)) if (!wiki?.items[n] && (!keep || keep(n))) names.push(n);
-  return pickNames(query, names, {
+  const hits = pickNames(query, names, {
     limit,
     book,
     aka: (n) => wiki?.items[n]?.aka,
     bonus: (n) => (wiki?.items[n] ? 0.2 : 0.1),
   });
+  // 부위 말을 바꿔 적은 이름도 추천에 ('리엘신발' -> 리엘의부츠, '회색리본머리띠' -> 회색리본머리핀. 제작자 2026-11-12, guessItem)
+  if (hits.length < limit && [...norm(query)].length >= 3) {
+    const g = guessItem(wiki, book, query);
+    if (g && !hits.some((h) => h.name === g) && (wiki?.items[g] || !keep || keep(g))) hits.push({ name: g, score: 0.4 });
+  }
+  return hits;
 }
 
 /**
@@ -320,4 +326,128 @@ export function filterByName<T>(list: T[], query: string, names: (x: T) => (stri
   const qj = jamo(q);
   const got = new Set(plain);
   return list.filter((x) => got.has(x) || names(x).some((n) => !!n && fuzzy(n, q, qj) > 0));
+}
+
+// ---------- 글에 적은 이름 -> 게임 아이템 이름 (그림 찾기) ----------
+// 제작자 2026-11-12 '아이콘이 비어 있다, 제발 비지 않게': 중개인 글 '회색리본머리띠'(게임 이름 회색리본머리핀), '리엘신발'(리엘의부츠)처럼
+// 길드원이 손으로 적은 이름이 게임 이름과 조금 달라 그림을 못 찾았다. 그대로 -> 꼬리표 떼기 -> 줄임말 -> 부위 말 바꾸기 -> 이름 고르기(들어 있음·오타) 차례로 찾는다.
+
+type Part = "head" | "body" | "hands" | "feet" | "back" | "weapon" | "sub";
+/** 이름 끝의 부위 말 (긴 말부터 본다). 한 글자 줄임말('해니아모', '드롤장')은 앞말이 두 글자 넘을 때만 */
+const PART_WORDS: [Part, string[]][] = [
+  ["feet", ["신발", "부츠", "장화", "구두", "덧신", "단화", "슈즈", "샌들", "발걸음", "신"]],
+  ["head", ["머리띠", "머리핀", "머리끈", "모자", "투구", "헬멧", "두건", "왕관", "고깔", "리본", "모"]],
+  ["hands", ["장갑", "건틀릿", "건틀렛", "글러브", "손덮개", "손아귀", "토시", "장"]],
+  ["body", ["갑옷", "로브", "드레스", "아머", "경갑", "도복", "코트", "옷", "롭", "갑"]],
+  ["back", ["망토", "날개", "케이프"]],
+];
+const SUFFIXES = PART_WORDS.flatMap(([p, ws]) => ws.map((w) => [w, p] as const)).sort((a, b) => b[0].length - a[0].length);
+/** 위키 장비 부위·책의 고르기 -> 부위 */
+const SLOT_PART: Record<string, Part> = {
+  투구: "head", 모자: "head", 갑옷: "body", 장갑: "hands", 신발: "feet", 망토: "back",
+  "전사 무기": "weapon", "레인저 무기": "weapon", "마법사 무기": "weapon", "무도가 무기": "weapon", 무기: "weapon", 주장비: "weapon",
+  "보조 장비": "sub", 보조장비: "sub",
+};
+const GAME_TABS = new Set(["일반", "코스튬", "펫", "라이딩"]);
+
+interface GuessIndex {
+  /** 그림이 있는 게임 아이템 이름 (위키 + 책의 게임 아이템) */
+  names: string[];
+  /** 띄어쓰기 없는 이름 -> 이름 */
+  squash: Map<string, string>;
+  part: Map<string, Part>;
+  memo: Map<string, string | null>;
+}
+const guessIdx = new WeakMap<object, WeakMap<object, GuessIndex>>();
+const NO_BOOK = {};
+
+function guessIndex(wiki: Wiki | null | undefined, book: Book | null | undefined): GuessIndex {
+  const wk = (wiki ?? NO_BOOK) as object;
+  const bk = (book ?? NO_BOOK) as object;
+  let byBook = guessIdx.get(wk);
+  if (!byBook) guessIdx.set(wk, (byBook = new WeakMap()));
+  let g = byBook.get(bk);
+  if (g) return g;
+  const names: string[] = [];
+  const part = new Map<string, Part>();
+  const suffixPart = (n: string) => {
+    const s = norm(n);
+    for (const [w, p] of SUFFIXES) if (w.length >= 2 && s.endsWith(w)) return p;
+    return undefined;
+  };
+  for (const [n, it] of Object.entries(wiki?.items ?? {})) {
+    const p = SLOT_PART[it.equip?.[0]?.slot ?? ""] ?? suffixPart(n);
+    if (p) part.set(n, p);
+    if (it.icon) names.push(n);
+  }
+  for (const [n, vs] of Object.entries(book?.items ?? {})) {
+    if (wiki?.items[n]?.icon) continue;
+    const game = vs.filter((v) => GAME_TABS.has(v.t));
+    if (!game.some((v) => v.pic)) continue;
+    names.push(n);
+    const p = game.map((v) => SLOT_PART[v.s ?? ""]).find(Boolean) ?? suffixPart(n);
+    if (p && !part.has(n)) part.set(n, p);
+  }
+  g = { names, squash: new Map(names.map((n) => [norm(n), n])), part, memo: new Map() };
+  byBook.set(bk, g);
+  return g;
+}
+
+/** 강화(+8, 8강, 노강), 괄호 설명, 개수(x10, 10개), 앞뒤의 '코스튬'·'코튬' 을 뗀다 */
+function guessKey(raw: string): string {
+  return norm(
+    raw
+      .replace(/\[[^\]]*\]|\([^)]*\)/g, " ")
+      .replace(/^\s*\+\d+\s*/, "")
+      .replace(/^\s*(\d+강|노강)\s*/, "")
+      .replace(/\s*[xX×]\s*\d[\d,]*\s*(개)?\s*$/, "")
+      .replace(/\s*\d[\d,]*\s*개\s*$/, "")
+      .replace(/^\s*(코스튬|코튬)\s*/, "")
+      .replace(/\s*(코스튬|코튬)\s*$/, ""),
+  );
+}
+
+/** 부위 말 바꾸기: '리엘신발' -> 앞말 '리엘' 로 시작하고 부위가 신발인 것 (리엘의부츠), '회색리본머리띠' -> 회색리본머리핀 */
+function swapPart(g: GuessIndex, q: string): string | undefined {
+  for (const [w, p] of SUFFIXES) {
+    if (!q.endsWith(w) || q.length <= w.length) continue;
+    const owner = q.slice(0, q.length - w.length).replace(/의$/, "");
+    if ([...owner].length < (w.length === 1 ? 3 : 2)) continue;
+    const hits = g.names.filter((n) => g.part.get(n) === p && norm(n).startsWith(owner));
+    if (hits.length) return hits.sort((a, b) => a.length - b.length)[0];
+  }
+  return undefined;
+}
+
+/**
+ * 손으로 적은 이름이 가리키는 게임 아이템 이름 (그림이 있는 것만). 못 찾으면 undefined.
+ * 그림·종류 한마디를 붙이는 데만 쓴다 (글에 적은 이름은 그대로 둔다)
+ */
+export function guessItem(wiki: Wiki | null | undefined, book: Book | null | undefined, raw: string): string | undefined {
+  const g = guessIndex(wiki, book);
+  const q = guessKey(raw);
+  if (!q) return undefined;
+  const had = g.memo.get(q);
+  if (had !== undefined) return had ?? undefined;
+  const found = (() => {
+    const exact = g.squash.get(q) ?? g.squash.get(norm(raw));
+    if (exact) return exact;
+    const ab = book ? abbrMap(book).get(q)?.[1].find((n) => g.squash.has(norm(n))) : undefined;
+    if (ab) return g.squash.get(norm(ab));
+    const swapped = swapPart(g, q);
+    if (swapped) return swapped;
+    const len = [...q].length;
+    if (len < 2) return undefined;
+    const hits = pickNames(q, g.names, { limit: 2, book, aka: (n) => wiki?.items[n]?.aka, bonus: (n) => (wiki?.items[n] ? 0.2 : 0.1) });
+    const top = hits[0];
+    if (!top) return undefined;
+    // 앞이 맞거나 줄임말: 그대로. 이름 안에 든 것: 세 글자 넘고 이름이 많이 길지 않을 때만. 오타: 세 글자 넘고 하나로 갈릴 때만
+    if (top.score >= 2.5) return top.name;
+    if (top.score >= 1) return len >= 3 && [...norm(top.name)].length <= len + 3 ? top.name : undefined;
+    return len >= 3 && (!hits[1] || hits[1].score < top.score) ? top.name : undefined;
+  })();
+  // 톡방처럼 강화를 이름 앞에 붙인 것 ('8헌보' = +8 헌터보우)
+  const result = found ?? (/^\d{1,2}[가-힣]/.test(q) ? guessItem(wiki, book, q.replace(/^\d{1,2}/, "")) : undefined);
+  g.memo.set(q, result ?? null);
+  return result;
 }

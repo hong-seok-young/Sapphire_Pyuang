@@ -10,7 +10,7 @@ import {
   positionOf,
 } from "../auth";
 import type { Me } from "../auth";
-import { bookPic, useAsync, useBook } from "../data";
+import { bookPic, itemPic, useAsync, useBook } from "../data";
 import {
   AUCTION_HOURS,
   bookCategory,
@@ -20,6 +20,7 @@ import {
   ENCHANT_CATEGORIES,
   ENHANCE_CATEGORIES,
   MARKET_PIC,
+  categoryPic,
   OTHER_CATEGORIES,
   auctionOver,
   bidListing,
@@ -107,17 +108,21 @@ function Slot({
     enhance: number;
     qty: number;
     shot?: boolean;
+    category?: string;
   };
   size?: number;
 }) {
   const it = wikiItem(wiki, l.item);
-  // 위키에 없는 물건(코스튬·펫·소모품 …)은 아이템 책의 오린 아이콘 (제작자 2026-11-12 'DB 에 있는데 웹이 못 쓰는 것'). 책에도 없으면 판 사람 스샷
+  // 위키에 없는 물건(코스튬·펫·소모품 …)은 아이템 책의 오린 아이콘 (제작자 2026-11-12 'DB 에 있는데 웹이 못 쓰는 것'). 책에도 없으면 판 사람 스샷,
+  // 스샷도 없으면 적은 이름이 가리키는 게임 아이템 그림('회색리본머리띠' -> 회색리본머리핀, '리엘신발' -> 리엘의부츠), 그래도 없으면 종류 그림
+  // (제작자 2026-11-12 '아이콘이 비어 있다, 제발 비지 않게': 전에는 '?' 칸)
   const book = useBook();
-  const pic = it?.icon ?? bookPic(book, l.item);
+  const exact = it?.icon ?? bookPic(book, l.item);
+  const guessed = exact || (l.shot && l.id) ? undefined : itemPic(wiki, book, l.item);
   return (
     <span className="mk-slot" style={{ width: size + 10, height: size + 10 }}>
-      {pic ? (
-        <PicImg pic={pic} fit={size} />
+      {exact ? (
+        <PicImg pic={exact} fit={size} />
       ) : l.shot && l.id ? (
         // 위키에 없는 물건: 판 사람이 붙인 스샷 (제작자 요청 2026-11-02)
         <img
@@ -126,8 +131,10 @@ function Slot({
           alt=""
           loading="lazy"
         />
+      ) : guessed ? (
+        <PicImg pic={guessed} fit={size} />
       ) : (
-        <span className="mk-slot-none">?</span>
+        <img className="mk-slot-cat" src={categoryPic(l.category)} alt={l.category} style={{ width: size * 0.8, height: size * 0.8 }} />
       )}
       {l.enhance > 0 && <b className="mk-plus">+{l.enhance}</b>}
       {l.qty > 1 && <b className="mk-qty">{l.qty}</b>}

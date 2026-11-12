@@ -20,7 +20,7 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { useBook } from "../data";
+import { itemPic, useBook } from "../data";
 import { pickNames } from "../search";
 import { go, useEntryState } from "../router";
 import { isSample, sampleRentItem } from "../sample";
@@ -73,7 +73,7 @@ import type {
   RentLogRow,
   RentTerm,
 } from "../rental";
-import { MARKET_PIC, itemFacts, rollHint } from "../market";
+import { MARKET_PIC, categoryPic, itemFacts, rollHint } from "../market";
 import { readShot, shrinkShot } from "../shot";
 import { KakaoButton, useKakao, Nick } from "../kakao";
 import { useBackClose } from "../backClose";
@@ -486,12 +486,13 @@ export function RentalPage({
   );
 }
 
-/** 무기 그림 칸 (+강 표) */
+/** 무기 그림 칸 (+강 표). 위키 무기가 아니면 아이템 책·비슷한 이름의 그림, 그래도 없으면 종류 그림 (제작자 2026-11-12 '아이콘이 비지 않게', 전에는 '?') */
 function Slot({ wiki, item }: { wiki: Wiki; item: { weapon: string } }) {
-  const it = weaponOf(wiki, item.weapon);
+  const book = useBook();
+  const pic = weaponOf(wiki, item.weapon)?.icon ?? itemPic(wiki, book, item.weapon);
   return (
     <span className="rent-slot">
-      {it?.icon ? <PicImg pic={it.icon} fit={20} /> : "?"}
+      {pic ? <PicImg pic={pic} fit={20} /> : <img className="mk-slot-cat" src={categoryPic("주장비")} alt="" style={{ width: 16, height: 16 }} />}
     </span>
   );
 }

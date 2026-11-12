@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { peekMemo, putMemo } from "./memo";
 import type { Monster, Pic, Post, Wiki } from "./types";
+import { guessItem } from "./search";
 
 const BASE = "data/";
 
@@ -216,10 +217,16 @@ export function knownItem(wiki: Wiki | null | undefined, book: Book | null | und
   if (!k) return undefined;
   return (wiki && bySquash(wiki.items).get(k)) || (book && bySquash(book.items).get(k)) || undefined;
 }
-/** 아이템 그림: 위키 그림, 없으면 책 그림 (띄어쓰기 상관없이) */
+/**
+ * 아이템 그림: 위키 그림, 없으면 책 그림 (띄어쓰기 상관없이). 그래도 없으면 손으로 적은 이름이 가리키는 게임 아이템의 그림
+ * ('회색리본머리띠' -> 회색리본머리핀, '리엘신발' -> 리엘의부츠, search.ts guessItem. 제작자 2026-11-12 '아이콘이 비지 않게')
+ */
 export function itemPic(wiki: Wiki | null | undefined, book: Book | null | undefined, name: string): Pic | undefined {
   const n = knownItem(wiki, book, name) ?? name;
-  return wiki?.items[n]?.icon ?? bookPic(book, n);
+  const pic = wiki?.items[n]?.icon ?? bookPic(book, n);
+  if (pic) return pic;
+  const g = guessItem(wiki, book, name);
+  return g ? (wiki?.items[g]?.icon ?? bookPic(book, g)) : undefined;
 }
 /** 아이템 종류 한마디 ('레인저 무기', '코스튬 모자', '펫', '소모품') */
 export function itemKind(wiki: Wiki | null | undefined, book: Book | null | undefined, name: string): string {

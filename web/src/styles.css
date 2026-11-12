@@ -718,6 +718,8 @@ button { font: inherit; color: inherit; }
 .mk-done .mk-row { opacity: 0.6; }
 .mk-slot { position: relative; flex: none; display: flex; align-items: center; justify-content: center; background: var(--lo); border: 1px solid var(--edge); }
 .mk-slot-none { color: var(--muted); }
+/* 그림을 못 찾은 물건: 종류 그림을 흐리게 (제작자 2026-11-12 '아이콘이 비지 않게', 전에는 '?') */
+.mk-slot-cat { display: block; object-fit: contain; opacity: 0.55; image-rendering: pixelated; }
 .mk-plus, .mk-qty {
   position: absolute; right: 1px; font-size: 11px; line-height: 1; color: #fff;
   text-shadow: -1px 0 var(--edge), 1px 0 var(--edge), 0 -1px var(--edge), 0 1px var(--edge);

@@ -34,6 +34,12 @@ export const MAX_NOTE = 60;
 
 /** 게임 거래소 스샷에서 자른 그림 (자료/scripts/make_market_marks.py). 2026-11-03 개편 뒤에는 동전과 정보창의 직업 그림만 쓴다 (종류·탭 그림은 뺐다, 제작자 '이모지 다 빼') */
 export const MARKET_PIC = "/data/market/";
+/** 종류 그림 (게임 거래소 종류 단추에서 자른 것). 그림을 못 찾은 물건 칸에 '?' 대신 (제작자 2026-11-12 '아이콘이 비지 않게') */
+const CATEGORY_PIC: Record<Category, string> = {
+  갑옷: "armor", 주장비: "weapon", 투구: "helmet", 보조장비: "sub", 장갑: "gloves", 신발: "shoes", 벨트: "belt", 망토: "cape",
+  목걸이: "necklace", 반지: "ring", 가방: "bag", 소모품: "potion", 인챈트: "enchant", 기타: "etc", 스킬북: "skillbook", 펫: "pet", 코스튬: "costume",
+};
+export const categoryPic = (c: string | undefined) => `${MARKET_PIC}cat_${CATEGORY_PIC[c as Category] ?? "etc"}.png`;
 
 /** 팝니다 | 삽니다 (제작자 2026-11-03 '템도 팝니다 삽니다'): 삽니다 글은 price 가 희망가, note 가 조건, 팔 사람이 '팔래요'(살래요와 같은 want) */
 export type Side = "sell" | "buy";
