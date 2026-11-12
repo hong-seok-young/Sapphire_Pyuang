@@ -193,7 +193,9 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   const [done, setDone] = useState<Set<string>>(() => readDone(me));
   const [tab, setTab] = useEntryState<Tab>("dex.tab", "todo");
   const [q, setQ] = useEntryState("dex.q", "");
-  const [stat, setStat] = useEntryState<string | null>("dex.stat", null);
+  // 능력치 칸은 여러 개 고를 수 있다 (제작자 2026-11-12 '능력치 두 개 누르면 그 두 개를 위한 것들을, 중복 선택되게')
+  const [selArr, setSel] = useEntryState<string[]>("dex.sel", []);
+  const sel = useMemo(() => new Set(selArr), [selArr.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
   const [cat, setCat] = useEntryState<string>("dex.cat", "all");
   const [showNeed, setShowNeed] = useState(false);
   // 목록 폭 (한 줄에 아이템 칸을 몇 px 로 넣을지 정한다)
@@ -236,12 +238,12 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   );
   const matchQ = (e: DexEntry) => !qHits || qHits.has(e);
   // 능력치 칸을 누르면 그 능력치(고정값·% 따로)를 주는 항목만 (제작자 2026-11-10 '해당 속성 누르면 해당하는 리스트가 아래에 뜨게, 밑에 필터링 버튼들 없애고')
-  const matchStat = (e: DexEntry) => !stat || e.effects.some(([s, , pct]) => rowKey(s, pct) === stat);
+  const matchStat = (e: DexEntry) => !sel.size || e.effects.some(([s, , pct]) => sel.has(rowKey(s, pct)));
   const statBar = useRef<HTMLDivElement>(null);
   const pickStat = (k: string) => {
-    const next = stat === k ? null : k;
-    setStat(next);
-    if (next) window.setTimeout(() => statBar.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    const on = !sel.has(k);
+    setSel(on ? [...selArr, k] : selArr.filter((x) => x !== k));
+    if (on && !sel.size) window.setTimeout(() => statBar.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   };
   const inCat = (e: DexEntry) => cat === "all" || (e.cat ?? "일반") === cat;
   const inTab = (e: DexEntry) => inCat(e) && (tab === "all" ? true : tab === "done" ? done.has(e.name) : !done.has(e.name));
@@ -294,9 +296,8 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
     }
     return { steps, gold, unknown, reached: got >= need - 1e-9 };
   };
-  const goal = stat && over[stat] != null ? goalOf(stat, over[stat]) : null;
   // 적어 둔 목표를 모두 채우는 가장 싼 항목 묶음 (제작자 2026-11-12 '수치 입력하면 그걸 달성하기 위한 최소 세팅을 아래에, 금액도 그것으로'):
-  // 지금 완료한 것에서 모자란 만큼만, 아직 안 한 항목으로 챗봇 도감 칸과 같은 셈(planTargets). 능력치 칸을 누르면 그 능력치 하나만(goal)
+  // 지금 완료한 것에서 모자란 만큼만, 아직 안 한 항목으로 챗봇 도감 칸과 같은 셈(planTargets). 능력치 칸을 누르면(여럿 고를 수 있다) 고른 능력치의 목표만
   const needs = useMemo(() => {
     const m = new Map<string, number>();
     for (const [k, v] of Object.entries(over)) {
@@ -305,14 +306,17 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
     }
     return m;
   }, [over, have]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 고른 능력치가 있으면 그중 목표가 있는 것만, 없으면 목표 모두
+  const planNeeds = useMemo(() => (sel.size ? new Map([...needs].filter(([k]) => sel.has(k))) : needs), [needs, sel]);
   const multi = useMemo(
-    () => (price && needs.size ? planTargets(dex.entries.filter((e) => !done.has(e.name)), needs, (e, mode) => (mode === "normal" ? entryGold.get(e.name) ?? null : null)) : null),
-    [needs, dex, done, entryGold, price],
+    () => (price && planNeeds.size ? planTargets(dex.entries.filter((e) => !done.has(e.name)), planNeeds, (e, mode) => (mode === "normal" ? entryGold.get(e.name) ?? null : null)) : null),
+    [planNeeds, dex, done, entryGold, price],
   );
   const [allList, setAllList] = useEntryState("dex.allList", false);
-  const multiOn = !!multi && !goal && !stat && !allList;
-  const multiShort = multi ? [...needs].some(([k, v]) => (multi.got.get(k) ?? 0) < v - 1e-9) : false;
-  const goalNames = goal ? new Map(goal.steps.map((x, i) => [x.e.name, i])) : multiOn ? new Map(multi!.picks.map((x, i) => [x.e.name, i])) : null;
+  const multiOn = !!multi && (sel.size > 0 || !allList);
+  const multiShort = multi ? [...planNeeds].some(([k, v]) => (multi.got.get(k) ?? 0) < v - 1e-9) : false;
+  const goalNames = multiOn ? new Map(multi!.picks.map((x, i) => [x.e.name, i])) : null;
+  const selLabel = [...sel].map((k) => (SHORT[k.replace(/%$/, "")] ?? k.replace(/%$/, "")) + (k.endsWith("%") ? "%" : "")).join(" · ");
   const listed = goalNames
     ? dex.entries.filter((e) => goalNames.has(e.name) && matchQ(e)).sort((a, b) => goalNames.get(a.name)! - goalNames.get(b.name)!)
     : dex.entries.filter((e) => inTab(e) && matchQ(e) && matchStat(e));
@@ -342,7 +346,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
 
   return (
     <div className="dex">
-      <StatPanel have={have} full={full} over={over} setOver={setOver} stat={stat} onPick={pickStat} doneN={doneEntries.length} total={dex.entries.length}
+      <StatPanel have={have} full={full} over={over} setOver={setOver} sel={sel} onPick={pickStat} doneN={doneEntries.length} total={dex.entries.length}
         goalOf={price ? goalOf : null} stepsOf={(k) => planFor(k).map((x) => x.v)} withEv={withEv} setWithEv={setWithEv} />
 
       <div className="mk-cats dex-cats">
@@ -384,14 +388,14 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
         )}
       </div>
 
-      {!stat && multi && (
+      {!sel.size && multi && (
         <div className="dex-statbar">
           <span>
             {allList ? (
-              <>목표 {needs.size}개 능력치</>
+              <>목표 {planNeeds.size}개 능력치</>
             ) : (
               <>
-                목표 {needs.size}개 능력치 채우기 <b>{multi.picks.length}</b>개
+                목표 {planNeeds.size}개 능력치 채우기 <b>{multi.picks.length}</b>개
                 {multi.unknown > 0 && <> · 값 모름 {multi.unknown}</>}
                 {multiShort && <> · 다 해도 모자람</>}
               </>
@@ -403,21 +407,21 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
         </div>
       )}
 
-      {stat && (
+      {sel.size > 0 && (
         <div className="dex-statbar" ref={statBar}>
           <span>
-            <b>{SHORT[stat.replace(/%$/, "")] ?? stat.replace(/%$/, "")}{stat.endsWith("%") ? "%" : ""}</b>{" "}
-            {goal ? (
+            <b>{selLabel}</b>{" "}
+            {multi ? (
               <>
-                {num(over[stat])}까지 싼 순서 <b>{goal.steps.length}</b>개 · <b>{fmtGold(goal.gold)}</b>
-                {goal.unknown > 0 && <> · 값 모름 {goal.unknown}</>}
-                {!goal.reached && <> · 다 해도 모자람</>}
+                목표까지 싼 순서 <b>{multi.picks.length}</b>개 · <b>{fmtGold(multi.gold)}</b>
+                {multi.unknown > 0 && <> · 값 모름 {multi.unknown}</>}
+                {multiShort && <> · 다 해도 모자람</>}
               </>
             ) : (
               <>주는 항목 <b>{listed.length}</b>개</>
             )}
           </span>
-          <button type="button" className="sub-tab" onClick={() => setStat(null)}>
+          <button type="button" className="sub-tab" onClick={() => setSel([])}>
             ✕ 전체 보기
           </button>
         </div>
@@ -454,7 +458,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
 
       <ul className="dex-list" ref={listRef}>
         {listed.map((e) => (
-          <EntryRow key={e.name} e={e} listW={listW} done={done.has(e.name)} onToggle={() => toggle(e.name)} iconOf={iconOf} stat={stat} onItem={(name) => setQ(name)} wiki={wiki} price={price} pset={pset} />
+          <EntryRow key={e.name} e={e} listW={listW} done={done.has(e.name)} onToggle={() => toggle(e.name)} iconOf={iconOf} sel={sel} onItem={(name) => setQ(name)} wiki={wiki} price={price} pset={pset} />
         ))}
       </ul>
       {!listed.length && <p className="muted dex-empty">맞는 항목이 없어요</p>}
@@ -469,9 +473,9 @@ interface Goal { steps: GoalStep[]; gold: number; unknown: number; reached: bool
 /** 획득 옵션: 게임 창의 37줄을 비슷한 것끼리 좌우 두 칸으로 (OPTION_PAIRS). 칸마다 이름, 그 아래 '최대'(도감을 다 채웠을 때, 제작자 2026-11-10 '최대치만'),
  *  오른쪽 숫자 칸은 완료로 누른 항목의 합, 거기에 목표를 적거나 좌우로 끌면 이름 아래에 그 수치까지 1 당 싼 항목부터 채우는 골드와 항목 수 (제작자 2026-11-12),
  *  이름을 누르면 그 항목들이 싼 순서로 아래 목록에 (슬라이더는 '바를 빼는 게 좋을 듯'으로 뺐다) */
-function StatPanel({ have, full, over, setOver, stat, onPick, doneN, total, goalOf, stepsOf, withEv, setWithEv }: {
+function StatPanel({ have, full, over, setOver, sel, onPick, doneN, total, goalOf, stepsOf, withEv, setWithEv }: {
   have: Sum; full: Sum; over: Record<string, number>; setOver: (v: Record<string, number>) => void;
-  stat: string | null; onPick: (k: string) => void; doneN: number; total: number;
+  sel: Set<string>; onPick: (k: string) => void; doneN: number; total: number;
   goalOf: ((k: string, target: number) => Goal | null) | null; stepsOf: (k: string) => number[];
   withEv: boolean; setWithEv: (v: boolean) => void;
 }) {
@@ -501,8 +505,8 @@ function StatPanel({ have, full, over, setOver, stat, onPick, doneN, total, goal
     const cur = pick(have, s, pct);
     const g = goalOf && k in over ? goalOf(k, over[k]) : null;
     return (
-      <div key={k} className={"dex-cell" + (stat === k ? " dex-cell-on" : "") + (k in over ? " dex-cell-set" : "") + (g ? " dex-cell-goal" : "")}>
-        <button type="button" className="dex-cell-name" onClick={() => onPick(k)} disabled={!mx} aria-pressed={stat === k}>
+      <div key={k} className={"dex-cell" + (sel.has(k) ? " dex-cell-on" : "") + (k in over ? " dex-cell-set" : "") + (g ? " dex-cell-goal" : "")}>
+        <button type="button" className="dex-cell-name" onClick={() => onPick(k)} disabled={!mx} aria-pressed={sel.has(k)}>
           <b title={s}>{SHORT[s] ?? s}{pct && <small>%</small>}</b>
           {g ? (
             <small className="dex-goal">
@@ -630,8 +634,8 @@ function ItemInfo({ it, wiki }: { it: DexItem; wiki: Wiki | null }) {
   );
 }
 
-function EntryRow({ e, listW, done, onToggle, iconOf, stat, onItem, wiki, price, pset }: {
-  e: DexEntry; listW: number; done: boolean; onToggle: () => void; iconOf: IconOf; stat: string | null; onItem: (name: string) => void; wiki: Wiki | null;
+function EntryRow({ e, listW, done, onToggle, iconOf, sel: stats, onItem, wiki, price, pset }: {
+  e: DexEntry; listW: number; done: boolean; onToggle: () => void; iconOf: IconOf; sel: Set<string>; onItem: (name: string) => void; wiki: Wiki | null;
   price?: DexPrice; pset: PriceSet;
 }) {
   const [sel, setSel] = useState<number | null>(null);
@@ -660,7 +664,7 @@ function EntryRow({ e, listW, done, onToggle, iconOf, stat, onItem, wiki, price,
         </div>
         <div className="dex-effects">
           {e.effects.map((f, i) => (
-            <span key={i} className={"dex-eff" + (stat === rowKey(f[0], f[2]) ? " dex-eff-on" : "")}>{effectText(f)}</span>
+            <span key={i} className={"dex-eff" + (stats.has(rowKey(f[0], f[2])) ? " dex-eff-on" : "")}>{effectText(f)}</span>
           ))}
         </div>
       </div>
