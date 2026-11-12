@@ -211,10 +211,11 @@ function build(dock: string[], slots: string[], search: boolean): Layout {
   while (s.length && s[s.length - 1] === EMPTY) s.pop();
   return { dock, grid: [...(search ? ["search"] : []), ...s, ...tail].slice(0, MAX_SLOTS + 1) };
 }
-/** 처음 배치 (제작자 요청 2026-11-02: 제작자 폰의 배치 그대로 '이걸 기본 배치로') */
+/** 처음 배치 (제작자 요청 2026-11-02: 제작자 폰의 배치 그대로 '이걸 기본 배치로'. 2026-11-12 다시 제작자 폰의 배치로 '이 순서를 기본 세팅으로, 권한별로 안 보이는 거 있으면 빼고 위로 정렬':
+ *  안 보이는 칸은 normalize 가 빼고 위부터 채운다. 개발 중 칸은 뒤에 두어 '개발 중' 묶음 순서) */
 export const DEFAULT_LAYOUT: Layout = {
   dock: ["home", "board", "info", "search", "chat"],
-  grid: ["shop", "ranking", "market", "todo", "match", "requests", "rent", "admin", "log", "gaps", "trend", "dex", "enhance", "damage", "sim", "simtest", "devreq", "suggest", "fit", "app", "smack", "gcoin", "hall"],
+  grid: ["ranking", "hall", "shop", "gcoin", "market", "match", "rent", "enhance", "todo", "requests", "suggest", "devreq", "admin", "gaps", "log", "trend", "dex", "damage", "sim", "simtest", "fit", "app", "smack"],
 };
 
 /**
