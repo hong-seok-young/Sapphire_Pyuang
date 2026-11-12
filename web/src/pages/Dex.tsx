@@ -391,7 +391,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
         </div>
       )}
 
-      {price && tot && todoListed.length > 0 && tot.slots > 0 && <CostPanel price={price} tot={tot} pset={pset} setPset={setPset} canEdit={canSetPrice} n={todoListed.length} />}
+      {price && tot && todoListed.length > 0 && tot.slots > 0 && <CostPanel price={price} tot={tot} pset={pset} setPset={setPset} canEdit={canSetPrice} />}
 
       {todoListed.length > 0 && (
         <Panel className="dex-need">
@@ -697,7 +697,7 @@ function intUnit(v: number): string {
   if (v >= 1e4) return `${Math.round(v / 1e4).toLocaleString("ko-KR")}만`;
   return Math.round(v).toLocaleString("ko-KR");
 }
-function CostPanel({ price, tot, pset, setPset, canEdit, n }: { price: DexPrice; tot: Totals; pset: PriceSet; setPset: (v: PriceSet) => void; canEdit: boolean; n: number }) {
+function CostPanel({ price, tot, pset, setPset, canEdit }: { price: DexPrice; tot: Totals; pset: PriceSet; setPset: (v: PriceSet) => void; canEdit: boolean }) {
   const [open, setOpen] = useState(false);
   const on = saleOn(price);
   // 현금 어림 (제작자 2026-11-12 '현금으로 얼만지도 평소와 아바돈 아래에'): 중개인 골드 팝니다 평균 시세, 없으면 75:1 (1만 원에 75만 골드)
@@ -735,7 +735,6 @@ function CostPanel({ price, tot, pset, setPset, canEdit, n }: { price: DexPrice;
   };
   const scrolls = [...new Set([...tot.scrolls.keys(), ...Object.keys(pset.scroll)])].sort();
   const touched = Object.keys(pset.scroll).length + Object.keys(pset.stamp).length > 0 || pset.plat != null;
-  const missingN = [...tot.missing.values()].reduce((a, b) => a + b, 0);
   return (
     <Panel className="dex-need dex-cost">
       <button type="button" className="dex-need-head" onClick={() => setOpen(!open)} aria-expanded={open}>
@@ -761,17 +760,16 @@ function CostPanel({ price, tot, pset, setPset, canEdit, n }: { price: DexPrice;
                     {on ? "판매 중" : "지난 판매"} · {price.sale.text}
                   </span>
                 )}
-                <small>{m.label}</small>
+                <small className="dex-cost-label">
+                  {m.label}
+                  {/* 이벤트 때 아끼는 골드 (제작자 2026-11-12 '절감액은 여기에 간단히') */}
+                  {m.key === "event" && save > 0 && <em className="dex-cost-save">−{fmtGold(save)}</em>}
+                </small>
                 <b>{fmtGold(tot.by[m.key].sum)} 골드</b>
                 <small className="muted">≈ {wonText(Math.round(tot.by[m.key].sum / rate / 10_000) * 10_000)}</small>
               </div>
             ))}
           </div>
-          <p className="dex-cost-note">
-            미완료 {n}개의 값 있는 칸 {tot.slots}개{save > 0 ? <> · 이벤트 때 채우면 <b>{fmtGold(save)}</b> 골드 아껴요</> : null}
-            {tot.none > 0 && <span className="muted"> · 값 없는 칸 {tot.none}개 (거래소 시세가 없고 스탬프로도 안 됨)</span>}
-            {missingN > 0 && <span className="muted"> · 마법서 값이 없어 골드로 못 센 칸 {missingN}개</span>}
-          </p>
 
           {scrolls.length > 0 && (
             <div className="dex-cost-set">
@@ -787,7 +785,6 @@ function CostPanel({ price, tot, pset, setPset, canEdit, n }: { price: DexPrice;
                   );
                 })}
               </div>
-              {canEdit && <small className="muted">마법서 등급은 장비 요구 레벨로 (D 10 미만 · C 20 · B 30 · A 40 · S 50 미만). 값을 넣으면 강화 칸도 '노강 + 마법서'로 셈</small>}
             </div>
           )}
 
