@@ -278,6 +278,8 @@ def main() -> None:
             name = it.get("name")
             base = re.sub(r"^\+\d+\s*", "", name) if name else None
             d = {"name": name, "n": int(it.get("count") or 1), "plus": it.get("plus")}
+            if (it.get("tooltip") or {}).get("이름색"):
+                d["color"] = it["tooltip"]["이름색"]
             if not name and it.get("icon"):
                 d["icon"] = it["icon"]
             if str(it.get("src", "")).startswith("그림으로") or it.get("est"):
@@ -397,6 +399,15 @@ def main() -> None:
                     n_nt += 1
                     continue
                 gr = grade_of(e["cat"], k)
+                if not gr and not bs:
+                    # 사전에 없는 칸(새로 나온 펫 등)은 툴팁 이름 색으로 등급: 흰 일반 · 초록 고급 · 파랑 희귀 · 보라 영웅 (사전과 견줘 1,319칸 중 1칸만 다름)
+                    gr = {"흰": "일반", "초록": "고급", "파랑": "희귀", "보라": "영웅"}.get(it.get("color") or "")
+                    # 같은 항목의 다른 칸이 모두 거래불가면 이 칸도 거래불가로 본다 (블랙보리 묶음)
+                    others = [x for x in e["items"] if x is not it]
+                    if others and all(x.get("nt") or all(b.get("거래불가") for b in by_tab.get((e["cat"], key(x.get("name") or "")), [{"거래불가": False}])) for x in others):
+                        it["nt"] = True
+                        n_nt += 1
+                        continue
                 if gr and f"{e['cat']}|{gr}" in grade_price:
                     it["gr"] = f"{e['cat']}|{gr}"
                     n_gr += 1
