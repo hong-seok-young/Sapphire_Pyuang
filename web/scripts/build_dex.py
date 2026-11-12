@@ -109,16 +109,19 @@ def price_data(key, wanted: set, infos: dict) -> dict | None:
                 byp[k] = {"0": o["unit_min"]}
         # 거래소 매물이 없던 재료는 제작자가 준 값 (자료 시세/수동_값.json, 개당 골드, 0 = 값어치 없음. 거래소 값이 먼저)
         manual = DATA / "시세" / "수동_값.json"
-        for n, v in (json.loads(manual.read_text(encoding="utf-8")).get("값", {}) if manual.exists() else {}).items():
-            byp.setdefault(key(n), {"0": v, "m": True})
+        mj = json.loads(manual.read_text(encoding="utf-8")) if manual.exists() else {}
+        guess = {key(n) for n in mj.get("추정", {})}  # 제작자가 준 값이 아니라 Claude 가 비슷한 아이템으로 추정한 값 (화면 '추정 값')
+        for n, v in mj.get("값", {}).items():
+            byp.setdefault(key(n), {"0": v, "m": "e" if key(n) in guess else True})
         for k, p in byp.items():
             if k.removeprefix("C:") not in wanted and not (k.startswith("P:") and key(k[2:]) in wanted) or not p:
                 continue
             kind = None if k[:2] in ("C:", "P:") else (kinds.get(k) or ("갑옷류" if tabs.get(k, set()) & ARMOR_TABS else None))
             mm = re.search(r"요구\s*레벨\s*(\d+)", infos.get(k, ""))
             lv = wiki_lv.get(k) or seen_lv.get(k) or (int(mm.group(1)) if mm else None)
-            if p.pop("m", None):
-                gear[k] = {"k": kind, "lv": lv, "p": p, "m": True}
+            mm_ = p.pop("m", None)
+            if mm_:
+                gear[k] = {"k": kind, "lv": lv, "p": p, "m": True, **({"guess": True} if mm_ == "e" else {})}
                 continue
             gear[k] = {"k": kind, "lv": lv, "p": p, "d": date_}
     s = {"날짜": max(g["d"] for g in gear.values() if g.get("d")) if gear else days[-1].parent.name}
@@ -391,7 +394,19 @@ def main() -> None:
                     g["p"] = {k: min(v, cap) for k, v in g["p"].items()}
                     g["noench"] = True
                     capped += 1
-        print("속성부여 펫", {"정보창에 속성": len(enchanted), "노작 값으로 낮춤": capped})
+        # 같은 등급 가운데값의 100배가 넘는 코스튬·펫 매물은 장난 매물로 보고 그 등급 가운데값으로 (2026-11-12: 펫 귀여운예티 999,999,999 한 줄이 도감 비용에 10억을 더했다)
+        odd = 0
+        for pk, g in price["gear"].items():
+            if pk[:2] not in ("C:", "P:") or not g["p"]:
+                continue
+            tab = "코스튬" if pk.startswith("C:") else "펫"
+            gr = grade_of(tab, pk[2:] if tab == "코스튬" else key(pk[2:]))
+            med = grade_price.get(f"{tab}|{gr}", {}).get("med") if gr else None
+            if med and min(g["p"].values()) > med * 100:
+                g["p"] = {"0": med}
+                g["odd"] = True
+                odd += 1
+        print("속성부여 펫", {"정보창에 속성": len(enchanted), "노작 값으로 낮춤": capped, "장난 매물": odd})
         n_gr = n_nt = 0
         for e in entries:
             if e.get("cat") not in ("코스튬", "펫"):

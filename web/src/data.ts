@@ -128,8 +128,9 @@ export interface DexEntry { name: string; effects: [string, number, boolean][]; 
  *  sale = 가장 최근 아바돈 장비 스탬프 판매 기간 (공식 패치노트) */
 /** d = 그 값을 읽은 암거래중개인 녹화 날짜 */
 /** noench: 속성부여된 펫 매물이라 같은 등급 노작 가운데값으로 낮춘 값 */
-/** m: 거래소 매물이 없어 제작자가 준 값 (자료 시세/수동_값.json) */
-export interface DexGearPrice { k: string | null; lv: number | null; p: Record<string, number>; d?: string; noench?: boolean; m?: boolean }
+/** odd: 같은 등급 가운데값의 100배가 넘는 장난 매물이라 그 등급 가운데값으로 바꾼 값 */
+/** m: 거래소 매물이 없어 제작자가 준 값 (자료 시세/수동_값.json), guess: 그중 비슷한 아이템으로 추정한 값 (같은 파일의 '추정') */
+export interface DexGearPrice { k: string | null; lv: number | null; p: Record<string, number>; d?: string; noench?: boolean; m?: boolean; guess?: boolean; odd?: boolean }
 export interface DexPrice {
   date: string; src: string; gear: Record<string, DexGearPrice>;
   /** 값을 읽은 녹화 날짜들 (탭마다 찍은 날이 다르다) */
