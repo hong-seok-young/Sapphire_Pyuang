@@ -9,6 +9,7 @@ import type { GoldDay, Trend, TrendCat, TrendChar, TrendGroup, TrendItem, TrendP
 import { MARKET_PIC, goldWords, wonText } from "../market";
 import { Loading, Panel, PicImg, TopBar } from "../ui";
 import type { Wiki } from "../types";
+import { filterByName } from "../search";
 
 /** 가격은 만 원 단위 (17 = 17만 원, 0.5 = 5000원) */
 const priceText = (manwon: number) => wonText(Math.round(manwon * 10_000));
@@ -533,11 +534,11 @@ function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
   const [open, setOpen] = useState<string | null>(null);
   const source = side === "sell" ? t.items : t.itemsBuy;
   const list = useMemo(() => {
-    const needle = q.trim().replace(/\s/g, "").toLowerCase();
-    const xs = source.filter(
-      (it) =>
-        inFilter(it, filter) &&
-        (!needle || it.name.replace(/\s/g, "").toLowerCase().includes(needle) || it.abbr.some((a) => a.toLowerCase().includes(needle))),
+    // 물건 이름·톡방 줄임말: 띄어쓰기·초성·오타까지 (src/search.ts filterByName)
+    const xs = filterByName(
+      source.filter((it) => inFilter(it, filter)),
+      q,
+      (it) => [it.name, ...it.abbr],
     );
     if (sort === "price") xs.sort((a, b) => b.med - a.med);
     else if (sort === "recent") xs.sort((a, b) => (a.last < b.last ? 1 : a.last > b.last ? -1 : b.n - a.n));

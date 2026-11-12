@@ -25,6 +25,7 @@ import { api } from "../auth";
 import { fetchEventOdds } from "../official";
 import { IconCtx, iconLookup, useIcon } from "../simIcons";
 import { useBook } from "../data";
+import { filterByName } from "../search";
 import type { IconOf } from "../simIcons";
 import type { Pic } from "../types";
 import { useBackClose } from "../backClose";
@@ -1458,8 +1459,7 @@ function OptionSim({ odds }: { odds: Odds }) {
   const [name, setName] = useEntryState("sim.oitem", "");
   const items = source?.items ?? [];
   const item = items.find((x) => x.name === name) ?? null;
-  const flat = (s: string) => s.replace(/\s+/g, "");
-  const found = q.trim() ? items.filter((x) => flat(x.name).includes(flat(q))) : items;
+  const found = q.trim() ? filterByName(items, q, (x) => [x.name]) : items;
   if (!source) return <div className="empty">옵션 자료가 없어요</div>;
   return (
     <div className="sim">

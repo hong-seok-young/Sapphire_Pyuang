@@ -1,6 +1,6 @@
 // 명예의 전당 (개발중, 제작자 2026-11-10 마을모금함 '마일리지 순위표, 명예의 전당' -> 퓨앙 '명예의 전당은 별도 버튼으로, 최대한 고급지고 화려하고 가장 임팩트 있게').
 // 기부(기부함 확정 + 장비대여 기부)로 쌓인 마일리지 순. 1~3위 단상(빛기둥·마법진·상장 리본·왕관), 4위부터 금속 명판, 누르면 그 사람의 기부.
-// 서버 functions/api/donate/hall.ts (server/donate.ts hallOfFame). 움직임은 보는 동안만 transform·opacity, 움직임 줄이기면 멈춘다
+// 기부함은 '전체 · 이번 달' 오른쪽 단추로 들어간다 (GiveButton). 서버 functions/api/donate/hall.ts (server/donate.ts hallOfFame). 움직임은 보는 동안만 transform·opacity, 움직임 줄이기면 멈춘다
 import { useCallback, useState } from "react";
 import { avatarUrl } from "../auth";
 import type { Me } from "../auth";
@@ -12,6 +12,8 @@ import { useEntryState } from "../router";
 import { Loading, TopBar } from "../ui";
 import { PLACE_NAME, dayText, fetchHall, goldText, mileText, sampleHall } from "../donate";
 import type { GiftLine, HallRow } from "../donate";
+import type { Wiki } from "../types";
+import { GiftIconOf, GiftTitleOf } from "./GiftName";
 
 function Face({ h, size, rank }: { h: HallRow; size: number; rank: number }) {
   if (h.avatar) return <img className="growth-face" src={avatarUrl(h.name, h.avatar)} alt="" style={{ maxWidth: size, maxHeight: size }} draggable={false} />;
@@ -270,15 +272,16 @@ function Mile({ m, full }: { m: number; full: boolean }) {
 }
 
 /** 그 사람의 기부 (누르면 펼침) */
-function Gifts({ lines }: { lines: GiftLine[] }) {
+function Gifts({ lines, wiki }: { lines: GiftLine[]; wiki: Wiki | null }) {
   if (!lines.length) return null;
   return (
     <ul className="hof-gifts">
       {lines.map((l) => (
         <li key={l.id}>
           <span className="hof-g-day">{dayText(l.at)}</span>
+          <GiftIconOf label={l.label} wiki={wiki} size={18} />
           <span className="hof-g-name">
-            {l.label}
+            <GiftTitleOf label={l.label} wiki={wiki} />
             {l.from === "rent" && <em>장비대여</em>}
             {l.place && l.place !== "keep" && <em>{PLACE_NAME[l.place]}</em>}
           </span>
@@ -328,7 +331,46 @@ function Podium({ rank, h, me, open, onToggle }: { rank: 1 | 2 | 3; h: HallRow; 
   );
 }
 
-export function HallPage({ me }: { me: Me }) {
+/** 도트 선물 상자 (10 x 10 칸) */
+const GIFT_PX: [number, number, number, number, string][] = [
+  // 리본 매듭
+  [2, 0, 2, 1, "#ff5a8a"], [6, 0, 2, 1, "#ff5a8a"], [1, 1, 1, 2, "#ff5a8a"], [4, 1, 2, 2, "#ff2e6b"], [8, 1, 1, 2, "#ff5a8a"], [2, 2, 2, 1, "#c8205a"], [6, 2, 2, 1, "#c8205a"],
+  // 뚜껑과 상자
+  [0, 3, 10, 2, "#ffd55a"], [0, 3, 10, 1, "#fff0b0"], [1, 5, 8, 5, "#f0a52a"], [1, 9, 8, 1, "#b8701a"],
+  // 세로 리본
+  [4, 3, 2, 7, "#ff2e6b"], [4, 3, 1, 7, "#ff7aa2"],
+];
+function GiftPx() {
+  return (
+    <svg className="hof-give-ic" viewBox="0 0 10 10" shapeRendering="crispEdges" aria-hidden>
+      {GIFT_PX.map(([x, y, w, h, c], i) => (
+        <rect key={i} x={x} y={y} width={w} height={h} fill={c} />
+      ))}
+    </svg>
+  );
+}
+
+/**
+ * '전체 · 이번 달' 오른쪽 기부함 단추 (제작자 2026-11-12 '기부함을 명예의 전당 안에', '이번 달 우측에 기부함 버튼 편입, 사람들이 잘 인지할 수 있게, 애니메이션 등'):
+ * 금빛 단추에 빛이 지나가고, 둘레로 고리가 퍼지고, 선물 상자가 통통 뛰며 별이 반짝인다 (transform·opacity 만, 움직임 줄이기면 멈춤)
+ */
+function GiveButton() {
+  return (
+    <a className="hof-give" href="#/donate">
+      <span className="hof-give-ping" aria-hidden />
+      <span className="hof-give-face">
+        <span className="hof-give-sheen" aria-hidden />
+        <GiftPx />
+        <b>기부함</b>
+        <i className="hof-give-star hof-give-star-1" aria-hidden />
+        <i className="hof-give-star hof-give-star-2" aria-hidden />
+        <i className="hof-give-star hof-give-star-3" aria-hidden />
+      </span>
+    </a>
+  );
+}
+
+export function HallPage({ me, wiki }: { me: Me; wiki: Wiki | null }) {
   const [period, setPeriod] = useEntryState<"all" | "month">("hof.period", "all");
   const [open, setOpen] = useState<string | null>(null);
   // 누적 마일리지 칸과 아래 내 순위 줄은 눌러서 소수까지
@@ -365,6 +407,7 @@ export function HallPage({ me }: { me: Me }) {
             {p === "all" ? "전체" : "이번 달"}
           </button>
         ))}
+        <GiveButton />
       </nav>
 
       <section className="hof-stage">
@@ -403,7 +446,7 @@ export function HallPage({ me }: { me: Me }) {
       </section>
       {openRow && (
         <div className="hof-drawer">
-          <Gifts lines={linesOf(openRow)} />
+          <Gifts lines={linesOf(openRow)} wiki={wiki} />
         </div>
       )}
 
@@ -426,7 +469,7 @@ export function HallPage({ me }: { me: Me }) {
               </span>
               {i < 7 && <span className="hof-sheen" aria-hidden />}
             </button>
-            {open === h.name && <Gifts lines={linesOf(h)} />}
+            {open === h.name && <Gifts lines={linesOf(h)} wiki={wiki} />}
           </li>
         ))}
       </ol>

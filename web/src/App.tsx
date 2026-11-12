@@ -527,7 +527,7 @@ function Wiki({
   // 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (launcher.ts canDonate, 서버 server/donate.ts)
   else if (page === "donate") body = canDonate(me) ? <DonatePage wiki={wiki ?? null} me={me} /> : <DevSoon title="기부함" />;
   // 명예의 전당 (개발중, 제작자 2026-11-10 '별도 버튼으로'): 기부함과 같은 사람이 본다
-  else if (page === "hall") body = canDonate(me) ? <HallPage me={me} /> : <DevSoon title="명예의 전당" />;
+  else if (page === "hall") body = canDonate(me) ? <HallPage me={me} wiki={wiki ?? null} /> : <DevSoon title="명예의 전당" />;
   else if (!wiki)
     body = (
       <Loading

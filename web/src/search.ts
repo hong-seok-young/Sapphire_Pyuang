@@ -230,3 +230,94 @@ export function searchPosts(wiki: Wiki, query: string, limit = 8): { id: string;
   }
   return out.sort((a, b) => b.score - a.score || a.title.length - b.title.length).slice(0, limit);
 }
+
+// ---------- 이름 고르기 칸 (제작자 2026-11-12 '왜 템 검색이 안 돼, 템 검색하는 모든 곳에서 템 검색이 모두 잘 되게') ----------
+// 기부함에서 '해니아'가 안 나왔다: 칸마다 위키 드랍표 아이템(items.json)만 '들어 있음'으로 찾아서, 아이템 책에만 있는 코스튬·펫·소모품과
+// 줄임말('사멧'), 초성('ㅎㄴㅇ'), 오타('헤니아')를 못 찾았다. 검색 화면(search)과 같은 규칙을 이름 고르기 칸과 목록 거르기에도 쓴다.
+
+export interface NameHit {
+  name: string;
+  score: number;
+  /** 줄임말로 찾았으면 그 줄임말 ('사멧' -> 사나운멧돼지인형) */
+  via?: string;
+}
+
+/** 이름 앞의 '+7 ', '7강 ' 같은 강화를 뗀다 (강화는 따로 적는 칸이 있다) */
+const bare = (q: string) => q.replace(/^\+\d+\s*/, "").replace(/^\d+강\s*/, "");
+
+/**
+ * 이름 목록에서 고르기: 띄어쓰기·대소문자 상관없이 이름(과 다른 이름 aka)에 든 것, 초성, 줄임말(book.abbr), 그래도 적으면 자모 한두 개 틀린 오타까지.
+ * bonus 는 같은 점수일 때 위로 올릴 이름 (위키 아이템 등). 처음부터 맞는 것, 짧은 이름이 위
+ */
+export function pickNames(
+  query: string,
+  names: Iterable<string>,
+  o: { limit?: number; aka?: (name: string) => string[] | undefined; bonus?: (name: string) => number; book?: Book | null } = {},
+): NameHit[] {
+  const q = norm(bare(query.trim()));
+  if (!q) return [];
+  const limit = o.limit ?? 8;
+  const all = [...new Set(names)];
+  const best = new Map<string, NameHit>();
+  const put = (name: string, s: number, via?: string) => {
+    const old = best.get(name);
+    if (!old || old.score < s) best.set(name, { name, score: s, via: via ?? old?.via });
+  };
+  for (const name of all) {
+    let s = score(name, q);
+    for (const a of o.aka?.(name) ?? []) s = Math.max(s, score(a, q));
+    if (s) put(name, s + (o.bonus?.(name) ?? 0));
+  }
+  // 줄임말이 딱 맞거나 줄임말로 시작하면 ('사멧' -> 사나운멧돼지인형, '고봉' -> 고대의봉)
+  if (o.book && !onlyCho(q)) {
+    const inList = new Set(all);
+    for (const [a, [shown, targets]] of abbrMap(o.book)) {
+      const s = a === q ? 4.6 : a.length >= 2 && q.length >= 2 && a.startsWith(q) ? 2.5 : 0;
+      if (!s) continue;
+      // 줄임말 표시는 딱 맞을 때만 (앞만 맞은 '헤니아모' 같은 말까지 붙이면 어지럽다)
+      for (const name of targets) if (inList.has(name)) put(name, s, a === q ? shown : undefined);
+    }
+  }
+  // 오타: 그냥 찾은 것이 적을 때만 (두 글자는 하나도 없을 때만, search 와 같은 규칙)
+  const len = [...q].length;
+  if (!onlyCho(q) && (len >= 3 ? best.size < FUZZY_BELOW : len === 2 && best.size === 0)) {
+    const qj = jamo(q);
+    for (const name of all) {
+      if (best.has(name)) continue;
+      let f = fuzzy(name, q, qj);
+      for (const a of o.aka?.(name) ?? []) f = Math.max(f, fuzzy(a, q, qj));
+      if (f) put(name, f + (o.bonus?.(name) ?? 0) / 10);
+    }
+  }
+  return [...best.values()].sort((a, b) => b.score - a.score || a.name.length - b.name.length).slice(0, limit);
+}
+
+/**
+ * 게임 아이템 이름 고르기: 위키 아이템(다른 이름 포함) + 아이템 책에만 있는 게임 아이템(코스튬·펫·소모품·상점 상품 …) + 줄임말.
+ * keep 으로 책 아이템을 거른다 (예: 중개인은 거래불가뿐인 것을 뺀다). 위키 아이템이 같은 점수면 위
+ */
+export function pickItems(wiki: Wiki | null | undefined, book: Book | null | undefined, query: string, limit = 8, keep?: (name: string) => boolean): NameHit[] {
+  const names: string[] = wiki ? Object.keys(wiki.items) : [];
+  if (book) for (const n of Object.keys(book.items)) if (!wiki?.items[n] && (!keep || keep(n))) names.push(n);
+  return pickNames(query, names, {
+    limit,
+    book,
+    aka: (n) => wiki?.items[n]?.aka,
+    bonus: (n) => (wiki?.items[n] ? 0.2 : 0.1),
+  });
+}
+
+/**
+ * 목록 거르기 (도감·시세 동향·시뮬레이터 …): 이름들 중 하나라도 맞으면. 그냥 맞는 것(들어 있음·초성)이 적으면 오타로도.
+ * names(x) 는 그 줄을 찾을 이름들 (항목 이름, 들어가는 아이템, 줄임말 …)
+ */
+export function filterByName<T>(list: T[], query: string, names: (x: T) => (string | undefined | null)[]): T[] {
+  const q = norm(bare(query.trim()));
+  if (!q) return list;
+  const plain = list.filter((x) => names(x).some((n) => !!n && score(n, q) > 0));
+  const len = [...q].length;
+  if (onlyCho(q) || !(len >= 3 ? plain.length < FUZZY_BELOW : len === 2 && plain.length === 0)) return plain;
+  const qj = jamo(q);
+  const got = new Set(plain);
+  return list.filter((x) => got.has(x) || names(x).some((n) => !!n && fuzzy(n, q, qj) > 0));
+}

@@ -3,13 +3,15 @@
 import { useCallback, useMemo, useState } from "react";
 import { errorText } from "../auth";
 import type { Me } from "../auth";
-import { useAsync } from "../data";
+import { itemKind, itemPic, useAsync, useBook } from "../data";
+import { pickItems } from "../search";
+import { GiftIconOf, GiftTitleOf } from "./GiftName";
 import { Nick } from "../kakao";
 import { useEntryState } from "../router";
 import { weaponOf } from "../rental";
 import { ENCHANTS, ENCHANT_CATEGORIES, ENHANCE_CATEGORIES, categoryOf, inRoll, itemFacts, rollHint } from "../market";
 import type { Enchant } from "../market";
-import type { Item, Wiki } from "../types";
+import type { Wiki } from "../types";
 import { FitLine, Loading, PicImg, TopBar } from "../ui";
 import {
   PLACE_NAME,
@@ -40,27 +42,29 @@ type StoreFilter = "keep" | "rent" | "used" | "all";
 const num = (s: string) => (s.trim() === "" ? null : Number(s.replace(/[,\s]/g, "")));
 
 function ItemIcon({ wiki, name, size = 22 }: { wiki: Wiki | null; name: string; size?: number }) {
-  const it = wiki ? weaponOf(wiki, name) : undefined;
-  return <span className="dn-ic">{it?.icon ? <PicImg pic={it.icon} fit={size} /> : "🎁"}</span>;
+  const book = useBook();
+  const pic = itemPic(wiki, book, name);
+  return <span className="dn-ic">{pic ? <PicImg pic={pic} fit={size} /> : "🎁"}</span>;
 }
 
-/** 아이템 이름 칸과 위키 이름 고르기 (위키에 없으면 적은 그대로) */
+/**
+ * 아이템 이름 칸과 이름 고르기 (위키에 없으면 적은 그대로). 위키 아이템과 아이템 책의 게임 아이템(코스튬·펫·소모품 …), 줄임말·초성·오타까지
+ * (제작자 2026-11-12 '왜 템 검색이 안 돼': 위키 드랍표만 찾아서 '해니아'가 안 나왔다, src/search.ts pickItems)
+ */
 function ItemName({ wiki, value, onChange }: { wiki: Wiki | null; value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
+  const book = useBook();
   const hits = useMemo(() => {
-    const q = value.replace(/\s+/g, "");
-    if (!wiki || q.length < 1 || wiki.items[value]) return [] as Item[];
-    return Object.values(wiki.items)
-      .filter((it) => it.name.replace(/\s+/g, "").includes(q))
-      .sort((a, b) => (a.name.replace(/\s+/g, "").startsWith(q) ? 0 : 1) - (b.name.replace(/\s+/g, "").startsWith(q) ? 0 : 1) || a.name.length - b.name.length)
-      .slice(0, 6);
-  }, [wiki, value]);
+    const got = pickItems(wiki, book, value, 8);
+    // 고른 이름 그대로면 목록을 닫는다 (같은 이름으로 시작하는 다른 것이 있으면 그대로 보인다: '해니아' -> 해니아의모자 …)
+    return got.length === 1 && got[0].name === value.trim() ? [] : got;
+  }, [wiki, book, value]);
   return (
     <div className="dn-name">
       <input
         value={value}
         maxLength={40}
-        placeholder="아이템 이름"
+        placeholder="아이템 이름 · 줄임말 · 초성"
         onChange={(e) => {
           onChange(e.target.value);
           setOpen(true);
@@ -69,19 +73,24 @@ function ItemName({ wiki, value, onChange }: { wiki: Wiki | null; value: string;
       />
       {open && hits.length > 0 && (
         <div className="dn-hits">
-          {hits.map((it) => (
-            <button
-              key={it.name}
-              type="button"
-              onClick={() => {
-                onChange(it.name);
-                setOpen(false);
-              }}
-            >
-              {it.icon ? <PicImg pic={it.icon} fit={18} /> : <span className="dn-ic">🎁</span>}
-              {it.name}
-            </button>
-          ))}
+          {hits.map((h) => {
+            const pic = itemPic(wiki, book, h.name);
+            const sub = itemKind(wiki, book, h.name);
+            return (
+              <button
+                key={h.name}
+                type="button"
+                onClick={() => {
+                  onChange(h.name);
+                  setOpen(false);
+                }}
+              >
+                {pic ? <PicImg pic={pic} fit={18} /> : <span className="dn-ic">🎁</span>}
+                <span className="dn-hit-name">{h.name}</span>
+                {(h.via || sub) && <small className="dn-hit-sub">{h.via ? `${h.via} · ` : ""}{sub}</small>}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
@@ -270,9 +279,11 @@ function Lines({ data, wiki }: { data: DonateData; wiki: Wiki | null }) {
       {data.lines.map((l) => (
         <li key={l.id} className="dn-line">
           <span className="dn-day">{dayText(l.at)}</span>
-          <ItemIcon wiki={wiki} name={l.label.replace(/^\+\d+ /, "").replace(/ x\d+$/, "")} size={20} />
+          <GiftIconOf label={l.label} wiki={wiki} size={20} />
           <span className="dn-line-name">
-            <span className="dn-label">{l.label}</span>
+            <span className="dn-label">
+              <GiftTitleOf label={l.label} wiki={wiki} />
+            </span>
             <small>
               <Nick name={l.who} />
               {l.from === "rent" && <em className="dn-tag">장비대여</em>}
@@ -357,9 +368,11 @@ function Give({ data, wiki, me, done }: { data: DonateData; wiki: Wiki | null; m
           {data.mine.map((r) => (
             <li key={r.id} className="dn-card">
               <div className="dn-line dn-line-flat">
-                <ItemIcon wiki={wiki} name={r.item} size={20} />
+                <GiftIconOf label={donateLabel(r)} wiki={wiki} size={20} />
                 <span className="dn-line-name">
-                  <span className="dn-label">{donateLabel(r)}</span>
+                  <span className="dn-label">
+                    <GiftTitleOf label={donateLabel(r)} wiki={wiki} />
+                  </span>
                   {donateExtra(r) && <small className="dn-extra">{donateExtra(r)}</small>}
                   <small>
                     {dayText(r.created_at)}
@@ -443,9 +456,11 @@ function Pending({ rows, wiki, done }: { rows: DonateRow[]; wiki: Wiki | null; d
               setSure(null);
             }}
           >
-            <ItemIcon wiki={wiki} name={r.item} size={20} />
+            <GiftIconOf label={donateLabel(r)} wiki={wiki} size={20} />
             <span className="dn-line-name">
-              <span className="dn-label">{donateLabel(r)}</span>
+              <span className="dn-label">
+                    <GiftTitleOf label={donateLabel(r)} wiki={wiki} />
+                  </span>
                   {donateExtra(r) && <small className="dn-extra">{donateExtra(r)}</small>}
               <small>
                 <Nick name={r.who} /> · {dayText(r.created_at)}
@@ -573,9 +588,11 @@ function Store({ rows, wiki, done }: { rows: DonateRow[]; wiki: Wiki | null; don
                   setSure(null);
                 }}
               >
-                <ItemIcon wiki={wiki} name={r.item} size={20} />
+                <GiftIconOf label={donateLabel(r)} wiki={wiki} size={20} />
                 <span className="dn-line-name">
-                  <span className="dn-label">{donateLabel(r)}</span>
+                  <span className="dn-label">
+                    <GiftTitleOf label={donateLabel(r)} wiki={wiki} />
+                  </span>
                   {donateExtra(r) && <small className="dn-extra">{donateExtra(r)}</small>}
                   <small>
                     <Nick name={r.who} /> · {dayText(r.done_at ?? r.created_at)}

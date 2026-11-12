@@ -59,6 +59,7 @@ import {
 } from "../market";
 import { readShot, shrinkShot } from "../shot";
 import { isSample, sampleListing } from "../sample";
+import { pickItems } from "../search";
 import { useSample } from "../tutorialState";
 import { KakaoButton, Nick } from "../kakao";
 import type { Shot } from "../shot";
@@ -1037,26 +1038,21 @@ function SellForm({
   // 이름 추천: 위키 아이템, 그다음 아이템 책에만 있는 게임 아이템(코스튬·펫·소모품 …, 거래불가뿐인 것은 빼고). 책 아이템은 고르면 종류도 채운다
   const book = useBook();
   const suggestions = useMemo(() => {
-    const q = squash(name);
-    if (!q) return [];
+    if (!squash(name)) return [];
     type Sug = { name: string; icon: Item["icon"] | undefined; sub: string; cat?: Category };
-    const order = (a: Sug, b: Sug) =>
-      Number(!squash(a.name).startsWith(q)) - Number(!squash(b.name).startsWith(q)) || a.name.length - b.name.length;
-    const fromWiki: Sug[] = Object.values(wiki.items)
-      .filter((it) => squash(it.name).includes(q))
-      .map((it) => ({ name: it.name, icon: it.icon, sub: it.equip[0]?.slot ?? "" }))
-      .sort(order);
-    const fromBook: Sug[] = [];
-    if (book && fromWiki.length < 12) {
-      for (const [n, vs] of Object.entries(book.items)) {
-        if (wiki.items[n] || !squash(n).includes(q)) continue;
-        const v = bookTradable(vs);
-        if (!v) continue;
-        fromBook.push({ name: n, icon: v.pic ?? vs.find((x) => x.pic)?.pic, sub: v.t === "일반" ? (v.s ?? "") : v.t + (v.s ? " " + v.s : ""), cat: bookCategory(v) });
-      }
-      fromBook.sort(order);
-    }
-    return [...fromWiki, ...fromBook].slice(0, 12);
+    // 위키·책 아이템을 한 규칙으로 (줄임말·초성·오타까지, src/search.ts pickItems. 제작자 2026-11-12 '템 검색하는 모든 곳에서 잘 되게')
+    return pickItems(wiki, book, name, 12, (n) => !!bookTradable(book?.items[n] ?? [])).map((h): Sug => {
+      const it = wiki.items[h.name];
+      if (it) return { name: it.name, icon: it.icon, sub: (h.via ? h.via + " · " : "") + (it.equip[0]?.slot ?? "") };
+      const vs = book?.items[h.name] ?? [];
+      const v = bookTradable(vs);
+      return {
+        name: h.name,
+        icon: v?.pic ?? vs.find((x) => x.pic)?.pic,
+        sub: (h.via ? h.via + " · " : "") + (!v ? "" : v.t === "일반" ? (v.s ?? "") : v.t + (v.s ? " " + v.s : "")),
+        cat: bookCategory(v),
+      };
+    });
   }, [wiki, name, book]);
   const optionsFilled = buy || rolls.every((r) => (optionText[r.name] ?? "") !== "");
   const ok =

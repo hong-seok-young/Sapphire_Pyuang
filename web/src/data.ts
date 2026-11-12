@@ -194,6 +194,37 @@ export function useBook(): Book | null {
 /** 아이템 이름의 책 그림 (띄어쓰기는 상관없이 찾지 않는다: 이름 그대로와 꼬리표 뗀 이름만) */
 export const bookPic = (book: Book | null | undefined, name: string): Pic | undefined => bookOf(book, name).find((v) => v.pic)?.pic;
 
+/** 띄어쓰기를 뺀 이름 -> 이름 (위키·책마다 한 번) */
+const squashIndex = new WeakMap<object, Map<string, string>>();
+function bySquash(obj: Record<string, unknown>): Map<string, string> {
+  let m = squashIndex.get(obj);
+  if (!m) {
+    m = new Map(Object.keys(obj).map((n) => [n.replace(/\s+/g, ""), n]));
+    squashIndex.set(obj, m);
+  }
+  return m;
+}
+/** 위키나 책에 있는 그 아이템의 이름 (띄어쓰기 상관없이), 없으면 undefined */
+export function knownItem(wiki: Wiki | null | undefined, book: Book | null | undefined, name: string): string | undefined {
+  const k = name.trim().replace(/\s+/g, "");
+  if (!k) return undefined;
+  return (wiki && bySquash(wiki.items).get(k)) || (book && bySquash(book.items).get(k)) || undefined;
+}
+/** 아이템 그림: 위키 그림, 없으면 책 그림 (띄어쓰기 상관없이) */
+export function itemPic(wiki: Wiki | null | undefined, book: Book | null | undefined, name: string): Pic | undefined {
+  const n = knownItem(wiki, book, name) ?? name;
+  return wiki?.items[n]?.icon ?? bookPic(book, n);
+}
+/** 아이템 종류 한마디 ('레인저 무기', '코스튬 모자', '펫', '소모품') */
+export function itemKind(wiki: Wiki | null | undefined, book: Book | null | undefined, name: string): string {
+  const n = knownItem(wiki, book, name) ?? name;
+  const slot = wiki?.items[n]?.equip?.[0]?.slot;
+  if (slot) return slot;
+  const v = bookOf(book, n).find((x) => x.t === "일반" || x.t === "코스튬" || x.t === "펫" || x.t === "라이딩") ?? bookOf(book, n)[0];
+  if (!v) return "";
+  return v.t === "일반" ? (v.s ?? "") : v.t + (v.s && v.s !== v.t ? " " + v.s : "");
+}
+
 /** 아이템 이름의 책 변형들. 위키 이름 뒤의 '(거불)'·'(5칸)' 같은 꼬리표를 떼고도 찾는다 */
 export function bookOf(book: Book | null | undefined, name: string): BookVariant[] {
   if (!book) return [];

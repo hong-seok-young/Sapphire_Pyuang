@@ -17,6 +17,7 @@ import type { Me } from "../auth";
 import { fetchMe } from "../auth";
 import type { Wiki } from "../types";
 import { iconLookup } from "../simIcons";
+import { filterByName } from "../search";
 import { weaponOf } from "../rental";
 import type { IconOf } from "../simIcons";
 import { Loading, Panel, PicImg, TopBar } from "../ui";
@@ -231,8 +232,12 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   };
 
   const query = norm(q);
-  const matchQ = (e: DexEntry) =>
-    !query || norm(e.name).includes(query) || e.items.some((it) => it.name && norm(it.name).replace(/^\+\d+/, "").includes(query.replace(/^\+\d+/, "")));
+  // 항목·아이템 이름 찾기: 띄어쓰기·초성·오타까지 (src/search.ts filterByName, 제작자 2026-11-12 '템 검색하는 모든 곳에서 잘 되게')
+  const qHits = useMemo(
+    () => (query ? new Set(filterByName(dex.entries, q, (e) => [e.name, ...e.items.map((it) => it.name)])) : null),
+    [dex, q, query],
+  );
+  const matchQ = (e: DexEntry) => !qHits || qHits.has(e);
   // 능력치 칸을 누르면 그 능력치(고정값·% 따로)를 주는 항목만 (제작자 2026-11-10 '해당 속성 누르면 해당하는 리스트가 아래에 뜨게, 밑에 필터링 버튼들 없애고')
   const matchStat = (e: DexEntry) => !stat || e.effects.some(([s, , pct]) => rowKey(s, pct) === stat);
   const statBar = useRef<HTMLDivElement>(null);

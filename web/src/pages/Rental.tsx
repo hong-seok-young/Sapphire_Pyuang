@@ -20,6 +20,8 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
+import { useBook } from "../data";
+import { pickNames } from "../search";
 import { go, useEntryState } from "../router";
 import { isSample, sampleRentItem } from "../sample";
 import { useSample } from "../tutorialState";
@@ -1588,14 +1590,14 @@ function ItemForm({
         .sort((a, b) => a.level - b.level),
     [wiki, f.job],
   );
-  const q = f.weapon.trim().replace(/\s+/g, "");
-  const hits = q
-    ? weapons
-        .filter(
-          (w) => w.name.replace(/\s+/g, "").includes(q) && w.name !== f.weapon,
-        )
-        .slice(0, 6)
-    : [];
+  // 이름 찾기: 띄어쓰기·초성·줄임말·오타까지 (src/search.ts pickNames, 제작자 2026-11-12 '템 검색하는 모든 곳에서 잘 되게')
+  const book = useBook();
+  const hits = useMemo(() => {
+    const byName = new Map(weapons.map((w) => [w.name, w]));
+    return pickNames(f.weapon, byName.keys(), { limit: 6, book, aka: (n) => wiki.items[n]?.aka })
+      .filter((h) => h.name !== f.weapon)
+      .map((h) => byName.get(h.name)!);
+  }, [weapons, f.weapon, book, wiki]);
   // 위키 무기면 그 무기에 뜰 수 있는 옵션(명중 0~6, 크리티컬 0~5 …)을 칸으로 보이고 값만 적게 한다 (제작자 요청 2026-11-02: 아이템 자료 연동, 옵션 자동완성)
   const rolls = itemFacts(weaponOf(wiki, f.weapon)).options.rolls;
   const values = new Map(optionFull(f.options));
@@ -2388,16 +2390,13 @@ function DonationForm({
         })),
     [wiki],
   );
-  const q = item.trim().replace(/\s+/g, "");
-  const hits = q
-    ? gear
-        .filter(
-          (g) =>
-            g.name.replace(/\s+/g, "").includes(q) && g.name !== item.trim(),
-        )
-        .sort((a, b) => a.name.length - b.name.length || a.level - b.level)
-        .slice(0, 6)
-    : [];
+  const book = useBook();
+  const hits = useMemo(() => {
+    const byName = new Map(gear.map((g) => [g.name, g]));
+    return pickNames(item, byName.keys(), { limit: 6, book, aka: (n) => wiki.items[n]?.aka })
+      .filter((h) => h.name !== item.trim())
+      .map((h) => byName.get(h.name)!);
+  }, [gear, item, book, wiki]);
   const known = gear.some((g) => g.name === item.trim());
   const save = async () => {
     setBusy(true);
