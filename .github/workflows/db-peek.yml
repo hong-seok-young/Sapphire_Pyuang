@@ -35,9 +35,5 @@ jobs:
           q dev_request_steps "SELECT * FROM dev_request_steps ORDER BY id"
           q dev_request_talk "SELECT * FROM dev_request_talk ORDER BY id"
           q chat_gaps "SELECT * FROM chat_gaps ORDER BY id"
-          # 최근 공식 글(패치노트)의 펫·도감 이야기: 새 펫 도감 찾기 (2026-11-12 펫 322 -> 324)
-          q official_recent "SELECT id, kind, title, start_date, length(body) AS len FROM official_news WHERE start_date >= '2026-11-10' ORDER BY id"
-          for k in 1 2 3 4 5 6; do q "official_pet_$k" "SELECT id, title, substr(body, instr(body, '펫') + ($k - 1) * 1500 - 300, 1500) AS part FROM official_news WHERE start_date >= '2026-11-10' AND title LIKE '%패치노트%' AND instr(body, '펫') > 0"; done
-          q official_img_pet "SELECT g.url, substr(g.text, 1, 1500) AS text FROM official_img g WHERE g.text LIKE '%펫%' AND g.url IN (SELECT value FROM official_rich r, json_each(r.images) WHERE r.id IN (SELECT id FROM official_news WHERE start_date >= '2026-11-10')) LIMIT 20"
           # 열린 항목마다 그 답(msg_id 는 그 답의 번호)에 붙었던 자료 이름(화면이 찾은 위키 자료 found)과 한 일(웹 찾기 등) 수: 자료가 있는데 안 붙은 것인지 가리려고 (챗봇 개선 2026-11-10)
           q chat_gaps_found "SELECT g.id AS gap, a.id AS answer_id, a.found AS found, length(COALESCE(a.steps, '')) AS steps_len, length(a.text) AS answer_len, a.think_ms AS think_ms FROM chat_gaps g LEFT JOIN chat_msgs a ON a.id = g.msg_id WHERE g.status = 'open' ORDER BY g.id"
