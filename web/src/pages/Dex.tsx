@@ -17,6 +17,7 @@ import type { Me } from "../auth";
 import { fetchMe } from "../auth";
 import type { Wiki } from "../types";
 import { iconLookup } from "../simIcons";
+import { canPreview } from "../launcher";
 import { filterByName } from "../search";
 import { weaponOf } from "../rental";
 import type { IconOf } from "../simIcons";
@@ -1144,7 +1145,9 @@ export function DexSnippet({ spec }: { spec: string }) {
           <SnipSplit s={plan.split.event} />
         </div>
       </div>
-      <button type="button" className="dex-go" onClick={goDex}>
+      {/* 도감 계산기는 아직 개발 중이라 들어갈 수 있는 사람(운영진·미리 보는 사람)에게만 단추를 보인다. 길드원이 누르면 '개발 중이에요' 화면뿐이라 */}
+      {me && canPreview(me) && (
+        <button type="button" className="dex-go" onClick={goDex}>
         <span className="dex-go-clip" aria-hidden>
           <span className="dex-go-shine" />
         </span>
@@ -1156,6 +1159,7 @@ export function DexSnippet({ spec }: { spec: string }) {
         <span className="dex-go-txt">도감 계산기에서 보기</span>
         <span className="dex-go-arrow" aria-hidden>›</span>
       </button>
+      )}
       <button type="button" className="dex-snip-list-head" onClick={() => setOpen(!open)} aria-expanded={open}>
         항목 {plan.picks.length}개{plan.unknown ? ` · 값 모름 ${plan.unknown}` : ""}
         {plan.bad.length > 0 && <span className="muted"> · 모르는 능력치 {plan.bad.join(", ")}</span>}
