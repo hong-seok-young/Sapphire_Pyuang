@@ -5371,3 +5371,11 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 @media (prefers-reduced-motion: reduce) { .scam-band-dot, .scam-rule-dot { animation: none; } }
 .search-scam { margin-top: 10px; }
 .search-scam .scam-foot { margin-top: 4px; }
+
+/* 시세 동향 물건 정보 (2026-11-12): 도감·거래소 정보와 게임 거래소 최저가 */
+.trend-info { display: flex; flex-direction: column; gap: 3px; margin: 2px 0 6px; padding: 6px 8px; font-size: 11px; background: rgba(7, 6, 15, 0.3); border: var(--px) solid var(--edge); }
+.trend-gx { font-size: 12px; }
+.trend-gx b { color: var(--gold); }
+.trend-info-lines { display: flex; flex-direction: column; gap: 1px; }
+.trend-info-lines small { font-size: 11px; color: var(--text); overflow-wrap: anywhere; }
+.trend-info-src { font-size: 10px; }

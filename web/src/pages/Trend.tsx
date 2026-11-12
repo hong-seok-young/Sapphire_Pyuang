@@ -427,7 +427,8 @@ function ItemRow({ it, t, wiki, side, open, onToggle }: { it: TrendItem; t: Tren
     <li className={"trend-item" + (open ? " mk-open" : "")}>
       <button type="button" className="trend-itemrow" onClick={onToggle}>
         <span className="mk-slot trend-slot">
-          {pic ? <PicImg pic={pic} max={30} /> : it.icon ? <img className="trend-icon" src={encodeURI(it.icon)} alt="" /> : <img className="mk-coin" src={MARKET_PIC + "coin.png"} alt="" />}
+          {/* 영상에서 오린 고화질 아이콘(iconHQ)이 먼저 (제작자 2026-11-12 '시세동향에서도 이미지 없는 거 싹 채워') */}
+          {it.iconHQ && it.icon ? <img className="trend-icon" src={encodeURI(it.icon)} alt="" /> : pic ? <PicImg pic={pic} max={30} /> : it.icon ? <img className="trend-icon" src={encodeURI(it.icon)} alt="" /> : <img className="mk-coin" src={MARKET_PIC + "coin.png"} alt="" />}
         </span>
         <span className="trend-itemmain">
           <span className="trend-itemtitle">
@@ -452,6 +453,7 @@ function ItemRow({ it, t, wiki, side, open, onToggle }: { it: TrendItem; t: Tren
       </button>
       {open && (
         <div className="trend-itembody">
+          <ItemInfo it={it} />
           <ItemChart it={it} />
           <GroupTable it={it} t={t} />
         </div>
@@ -786,6 +788,31 @@ export function TrendSnippet({ query, wiki }: { query: string; wiki: Wiki }) {
       <ul className="mk-list trend-list">
         <ItemRow key={nowSide} it={shown} t={t} wiki={wiki} side={nowSide} open={open} onToggle={() => setOpen(!open)} />
       </ul>
+    </div>
+  );
+}
+
+/** 물건 정보와 게임 거래소 최저가 (제작자 2026-11-12 '정보 없는 거 싹 채워'): 도감 정보 사전·도감 툴팁·게임 거래소 정보창·위키 표에서 */
+function ItemInfo({ it }: { it: TrendItem }) {
+  if (!it.info && !it.gx) return null;
+  return (
+    <div className="trend-info">
+      {it.gx && (
+        <div className="trend-gx">
+          게임 거래소 최저 <b>{it.gx.min.toLocaleString("ko-KR")}</b> 골드{it.gx.unit ? " (개당)" : ""}
+          <small className="muted"> · {it.gx.date.slice(5).replace("-", "/")} 녹화{it.gx.n ? ` · 매물 ${it.gx.n}` : ""}</small>
+        </div>
+      )}
+      {it.info && (
+        <>
+          <div className="trend-info-lines">
+            {it.info.lines.map((l, i) => (
+              <small key={i}>{l}</small>
+            ))}
+          </div>
+          <small className="muted trend-info-src">{it.info.part ? `${it.info.part} 정보 · ` : ""}{it.info.src}</small>
+        </>
+      )}
     </div>
   );
 }

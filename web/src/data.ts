@@ -83,6 +83,12 @@ export interface TrendItem extends TrendVariant {
   cat: TrendCat;
   /** 위키에 없는 물건의 그림 주소 (/data/trend/…png 제작자 도감 스샷에서 자른 것, 스킬북은 /img/… 위키 직업별 스킬의 아이콘) */
   icon?: string;
+  /** icon 이 영상에서 아이템만 오린 고화질 아이콘이면 true (위키 그림보다 먼저 쓴다) */
+  iconHQ?: boolean;
+  /** 물건 정보 (도감 정보 사전·도감 툴팁·게임 거래소 정보창·위키 표, src = 출처, part = 세트·비슷한 이름이면 정보를 가져온 아이템) */
+  info?: { lines: string[]; src: string; part?: string };
+  /** 게임 거래소(암거래중개인) 녹화의 최저가 골드 (unit = 묶음이면 개당), 녹화 날짜, 매물 수 */
+  gx?: { min: number; date: string; n?: number; unit?: boolean };
   /** enchant = 속성부여 부위 (벨트, 망토, 목걸이, 반지), enhance = 강화 부위, none = 그 밖 */
   kind: "enchant" | "enhance" | "none"; groups: TrendGroup[]; variants: TrendVariant[];
   /** 반대쪽(팝니다 목록이면 삽니다)의 중간값과 글 수. 없으면 null */

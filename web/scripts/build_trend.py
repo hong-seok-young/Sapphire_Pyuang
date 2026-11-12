@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import os
 import math
 import re
 import shutil
@@ -23,19 +24,20 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
 ROOT = Path(__file__).resolve().parents[2]
-SRC = ROOT / "자료" / "카톡"
+DATA = Path(os.environ.get("SAPPHIRE_DATA") or ROOT / "자료")  # 시험할 때 SAPPHIRE_DATA 로 다른 자료 사본
+SRC = DATA / "카톡"
 OUT = ROOT / "web" / "public" / "data" / "trend.json"
 # 챗봇이 쓰는 작은 시세·줄임말 자료 (챗봇 개선 2026-11-09: '시세', '돈벌이', '충격샷4 가격', '월거', '광부 신발'을 못 답했다)
 CHAT_OUT = ROOT / "web" / "public" / "data" / "chatmarket.json"
-ICON_DIR = ROOT / "자료" / "이미지" / "시세동향"
+ICON_DIR = DATA / "이미지" / "시세동향"
 # 세트·묶음 이름이면 그 코스튬의 몸통 부위 그림 (플랑 세트 -> 플랑의드레스)
 BODY = re.compile(r"갑옷|옷|로브|드레스|비늘|흉골|협의|화복|풍운의|경갑|경기의상|나들이복")
 
 
 # 시세동향 그림이 없을 때 찾아보는 다른 그림 (2026-11-10 제작자 '다른 쪽에 이미지 다 있을 텐데'): 성장코인샵 물건 칸(이미 /data/gcoin/ 으로 나감),
 # 도감 영상에서 자른 것, 카페 글의 아이템 그림 (둘은 /data/trend/ 로 복사)
-GCOIN_DIR = ROOT / "자료" / "이미지" / "성장코인샵"
-MORE_DIRS = [ROOT / "자료" / "이미지" / "도감", ROOT / "자료" / "이미지" / "아이템"]
+GCOIN_DIR = DATA / "이미지" / "성장코인샵"
+MORE_DIRS = [DATA / "이미지" / "도감", DATA / "이미지" / "아이템"]
 TREND_OUT = ROOT / "web" / "public" / "data" / "trend"
 _more: dict[str, Path] | None = None
 
@@ -88,6 +90,156 @@ def icon_for(name: str) -> str | None:
         return other_icon(base)
     body = [c for c in cands if BODY.search(c[len(head):])]
     return f"/data/trend/{(body or cands)[0]}.png"
+
+
+# ---- 2026-11-12 영상 자료로 그림·정보 채우기 (제작자 '시세동향에서도 이미지 없는 거랑 정보 없는 거 싹 채워')
+# 그림: 영상에서 아이템만 오린 고화질 아이콘 (자료/이미지/도감아이콘) 이 먼저 -> 화면도 위키 그림보다 이것을 먼저 (iconHQ)
+# 정보: 도감 정보 사전(도감/아이템/아이템.json) -> 도감 칸 툴팁(도감/일반·코스튬·펫.json) -> 거래소 정보창(시세/암거래중개인) -> 위키 장비표
+#      + 게임 거래소(암거래중개인) 최저가 (gx: 날짜별 시세를 합쳐 가장 새 값, 묶음 물건은 개당)
+_nk = lambda s: re.sub(r"\s", "", s or "")
+_ref: dict | None = None
+
+
+def _load_ref() -> dict:
+    global _ref
+    if _ref is not None:
+        return _ref
+    ref = {"cut": {}, "info": {}, "gx": {}}
+    cd = DATA / "이미지" / "도감아이콘"
+    if (cd / "목록.json").exists():
+        for nm in json.loads((cd / "목록.json").read_text(encoding="utf-8")):
+            f = cd / (re.sub(r'[\/:*?"<>|]', "_", nm) + ".png")
+            if f.exists():
+                ref["cut"].setdefault(_nk(nm), f)
+    def put(k, lines, src):
+        lines = [str(x).strip() for x in lines if str(x or "").strip()]
+        if k and lines and (k not in ref["info"] or len(lines) > len(ref["info"][k]["lines"]) and ref["info"][k]["src"] != "도감 정보"):
+            ref["info"][k] = {"lines": lines, "src": src}
+    bp = DATA / "도감" / "아이템" / "아이템.json"
+    if bp.exists():
+        for b in json.loads(bp.read_text(encoding="utf-8")).get("아이템", []):
+            if not b.get("이름"):
+                continue
+            head = [x for x in (b.get("등급"), f"요구 레벨 {b['요구레벨']}" if b.get("요구레벨") else None, "·".join(b.get("직업") or []) or None) if x]
+            body = [g["글"] for g in (b.get("정보줄") or [])]
+            put(_nk(b["이름"]), [" · ".join(head)] + body if head else body, "도감 정보")
+    for fn in ("일반.json", "코스튬.json", "펫.json"):
+        fp = DATA / "도감" / fn
+        if fp.exists():
+            for e in json.loads(fp.read_text(encoding="utf-8")).get("entries", []):
+                for it in e.get("items", []):
+                    if it.get("name") and it.get("info"):
+                        put(_nk(re.sub(r"^\+\d+\s*", "", it["name"])), re.split(r"\s*·\s*", it["info"]), "도감 툴팁")
+    days = sorted((DATA / "시세" / "암거래중개인").glob("*/시세.json"))
+    for day in days:
+        s = json.loads(day.read_text(encoding="utf-8"))
+        d = s.get("날짜") or day.parent.name
+        for it in s.get("items", []):
+            k = _nk(it.get("base"))
+            if it.get("info"):
+                put(k, it["info"], "게임 거래소 정보창")
+            cur = ref["gx"].get(k)
+            if it.get("plus") in (0, None) and it.get("min") is not None and (not cur or cur["date"] < d or (cur["date"] == d and it["min"] < cur["min"])):
+                ref["gx"][k] = {"min": it["min"], "date": d, "n": it.get("count")}
+        for o in s.get("others", []):
+            k = _nk(o.get("base"))
+            if o.get("info"):
+                put(k, o["info"], "게임 거래소 정보창")
+            if o.get("unit_min") is not None:
+                ref["gx"][k] = {"min": o["unit_min"], "date": d, "n": o.get("count"), "unit": True}
+    _ref = ref
+    return ref
+
+
+def _base_names(name: str) -> list[str]:
+    base = re.sub(r"\s*\(.*\)\s*$", "", name).strip()
+    out = [name, base]
+    sk = re.fullmatch(r"(.+?)\s*(\d)단", base)  # 스킬북 '화염폭풍 2단' -> 거래소 '화염 폭풍 2'
+    if sk:
+        out.append(f"{sk.group(1)} {sk.group(2)}")
+    base = re.sub(r"\s*(세트|셋)$", "", base)
+    out.append(base)
+    # '에이기스 모자·갑옷', '네블루 귀·꼬리' -> 앞말 + 첫 부위
+    parts = re.split(r"[·,]", base)
+    if len(parts) > 1:
+        head = parts[0]
+        out.append(head)
+        stem = head.rsplit(" ", 1)[0] if " " in head else head
+        for part in parts[1:]:
+            out.append(f"{stem} {part.strip()}")
+    m = re.fullmatch(r"(SS|S|A|B|C|D)등급\s*(무기|갑옷)마법서", base)
+    if m:
+        out.append(f"{m.group(2)}마법서({m.group(1)} 등급)")
+        out.append(f"{m.group(2)}마법서({m.group(1)}등급)")
+    return out
+
+
+_PART = {"모자": r"모자|헤드|투구|베레모|크레스트|왕관|정관|후드|헬멧|머리", "갑옷": r"갑옷|로브|경갑|웨어|드레스|흉골|협의|나들이복|옷|운갑|천운수",
+         "신발": r"신발|장화|부츠|단화|그리브|운화|협운화", "장갑": r"장갑|건틀릿|손|토시|덮개", "귀": r"귀", "꼬리": r"꼬리", "날개": r"날개"}
+_loose = lambda s: re.sub(r"[\s!?.~·]|의", "", s or "")
+
+
+def _fuzzy(keys: list[str], pool: dict, name: str = "") -> str | None:
+    """정확히 같은 이름 -> 앞말이 같은 이름 ('세레인사파이어' -> '세레인의사파이어(3단계)'), '의'·띄어쓰기·느낌표 무시.
+    세트·여러 부위 이름('에이기스 모자·갑옷', '플랑 세트')은 이름에 나온 부위(없으면 몸통)를 고른다"""
+    for k in keys:
+        if k in pool:
+            return k
+    loose = {}
+    for x in pool:
+        loose.setdefault(_loose(x), x)
+    for k in keys:
+        if _loose(k) in loose:
+            return loose[_loose(k)]
+    base = re.sub(r"\s*\(.*\)\s*$", "", name)
+    stem = _loose(re.split(r"[\s·,]", re.sub(r"\s*(세트|셋)$", "", base).strip())[0])
+    if len(stem) < 2:
+        return None
+    cands = sorted((x for lx, x in loose.items() if lx.startswith(stem)), key=len)
+    if not cands:
+        return None
+    want = [w for w in _PART if w in base] or ["갑옷"]
+    for w in want:
+        hit = [c for c in cands if re.search(_PART[w], c[len(stem):] if c.startswith(stem) else c)]
+        if hit:
+            return hit[0]
+    return cands[0] if len(stem) >= 3 else None
+
+
+def enrich(it: dict, wiki_items: dict, skill: bool = False) -> None:
+    ref = _load_ref()
+    keys = [_nk(n) for n in _base_names(it["name"])]
+    kc, ki, kg = (None if skill else _fuzzy(keys, ref["cut"], it["name"])), _fuzzy(keys, ref["info"], it["name"]), _fuzzy(keys, ref["gx"], it["name"])
+    keys = [x for x in (kc,) if x] + keys
+    for k in ([kc] if kc else []):
+        f = ref["cut"].get(k)
+        if f:
+            TREND_OUT.mkdir(parents=True, exist_ok=True)
+            fn = "c_" + re.sub(r'[\/:*?"<>|]', "_", k) + ".png"
+            if not (TREND_OUT / fn).exists():
+                shutil.copy2(f, TREND_OUT / fn)
+            it["icon"], it["iconHQ"] = f"/data/trend/{fn}", True
+            break
+    info = dict(ref["info"][ki]) if ki else None
+    if info and ki not in keys and ki not in [_nk(n) for n in _base_names(it["name"])]:
+        info["part"] = ki  # 세트·비슷한 이름이면 정보를 가져온 아이템 이름
+    if not info:
+        w = next((wiki_items.get(n) for n in _base_names(it["name"]) if wiki_items.get(n)), None) \
+            or next((v for v in wiki_items.values() if _nk(v["name"]) in keys), None)
+        if w and w.get("equip"):
+            e = w["equip"][0]["info"]
+            lines = [f"{w['equip'][0].get('slot', '')} · 레벨 {e.get('레벨제한', '?')} · {e.get('직업', '')}".strip(" ·")]
+            lines += [f"{k} {v}" for k, v in e.items() if k in ("공격", "방어력", "속도", "막기", "옵션") and v and v != "-"]
+            if e.get("획득처"):
+                lines.append("얻는 곳 " + e["획득처"])
+            info = {"lines": lines, "src": "위키 장비표"}
+        elif w and w.get("from"):
+            info = {"lines": ["떨구는 몬스터 " + ", ".join(x.split("@")[0] for x in w["from"][:6])], "src": "위키 드랍표"}
+    if info:
+        it["info"] = info
+    gx = ref["gx"].get(kg) if kg else None
+    if gx:
+        it["gx"] = gx
 
 POSTS_JSON = ROOT / "web" / "public" / "data" / "posts.json"
 MENU_JSON = ROOT / "web" / "public" / "data" / "menu.json"
@@ -1630,10 +1782,12 @@ def main() -> None:
             it["other"] = {"med": o["med"], "n": o["n"]} if o else None
     chars = char_prices(msgs, rs)
     # 위키에 없는 물건의 그림: 자료/이미지/시세동향/<이름>.png (제작자 도감 스샷에서 자른 것, make_trend_icons.py). 이름의 괄호 설명은 뺀다
+    wiki_items = json.loads((ROOT / "web" / "public" / "data" / "items.json").read_text(encoding="utf-8")) if (ROOT / "web" / "public" / "data" / "items.json").exists() else {}
     for it in items + items_buy:
         icon = SKILL_ICONS.get(it["name"]) or icon_for(it["name"])
         if icon:
             it["icon"] = icon
+        enrich(it, wiki_items, skill=bool(SKILL_ICONS.get(it["name"])))
     data = {
         "source": {"rooms": sorted(set(rooms)), "from": dates[0], "to": dates[-1], "messages": len(msgs),
                    "built": datetime.date.today().isoformat(), "rate": USUAL_RATE},
