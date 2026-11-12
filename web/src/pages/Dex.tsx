@@ -169,7 +169,23 @@ export function DexPage({ wiki, me }: { wiki: Wiki | null; me: Me }) {
 function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
   const now = useEventClock(all.entries);
   const liveKey = all.entries.map((e) => (isLive(e, now) ? 1 : 0)).join("");
-  const dex = useMemo(() => ({ ...all, entries: all.entries.filter((e) => isLive(e, now)) }), [all, liveKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 이벤트 도감 넣기·빼기 (제작자 2026-11-12 '체크박스와 이벤트, 이벤트 제외하거나 포함해서 최대치도 비용 계산도'): 빼면 최대·합계·비용·목록 모두에서 뺀다. 이 기기에 계정별로
+  const [withEv, setWithEvState] = useState(() => {
+    try {
+      return localStorage.getItem(`sapphire.dex.ev.${me.id}`) !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const setWithEv = (v: boolean) => {
+    setWithEvState(v);
+    try {
+      localStorage.setItem(`sapphire.dex.ev.${me.id}`, v ? "1" : "0");
+    } catch {
+      /* 이번에 연 동안만 */
+    }
+  };
+  const dex = useMemo(() => ({ ...all, entries: all.entries.filter((e) => isLive(e, now) && (withEv || e.cat !== "이벤트")) }), [all, liveKey, withEv]); // eslint-disable-line react-hooks/exhaustive-deps
   const [done, setDone] = useState<Set<string>>(() => readDone(me));
   const [tab, setTab] = useEntryState<Tab>("dex.tab", "todo");
   const [q, setQ] = useEntryState("dex.q", "");
@@ -308,7 +324,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   return (
     <div className="dex">
       <StatPanel have={have} full={full} over={over} setOver={setOver} stat={stat} onPick={pickStat} doneN={doneEntries.length} total={dex.entries.length}
-        goalOf={price ? goalOf : null} stepsOf={(k) => planFor(k).map((x) => x.v)} />
+        goalOf={price ? goalOf : null} stepsOf={(k) => planFor(k).map((x) => x.v)} withEv={withEv} setWithEv={setWithEv} />
 
       <div className="mk-cats dex-cats">
         {CATS.map((c) => {
@@ -423,10 +439,11 @@ interface Goal { steps: GoalStep[]; gold: number; unknown: number; reached: bool
 /** 획득 옵션: 게임 창의 37줄을 비슷한 것끼리 좌우 두 칸으로 (OPTION_PAIRS). 칸마다 이름, 그 아래 '최대'(도감을 다 채웠을 때, 제작자 2026-11-10 '최대치만'),
  *  오른쪽 숫자 칸은 완료로 누른 항목의 합, 거기에 목표를 적거나 좌우로 끌면 이름 아래에 그 수치까지 1 당 싼 항목부터 채우는 골드와 항목 수 (제작자 2026-11-12),
  *  이름을 누르면 그 항목들이 싼 순서로 아래 목록에 (슬라이더는 '바를 빼는 게 좋을 듯'으로 뺐다) */
-function StatPanel({ have, full, over, setOver, stat, onPick, doneN, total, goalOf, stepsOf }: {
+function StatPanel({ have, full, over, setOver, stat, onPick, doneN, total, goalOf, stepsOf, withEv, setWithEv }: {
   have: Sum; full: Sum; over: Record<string, number>; setOver: (v: Record<string, number>) => void;
   stat: string | null; onPick: (k: string) => void; doneN: number; total: number;
   goalOf: ((k: string, target: number) => Goal | null) | null; stepsOf: (k: string) => number[];
+  withEv: boolean; setWithEv: (v: boolean) => void;
 }) {
   // 숫자 칸을 좌우로 끌면 싼 순서의 다음 항목만큼 오르내린다 (제작자 2026-11-12 '바로 좌우로 조정', 바는 '목록이 길어져서 싫다')
   const drag = useRef<{ k: string; x: number; moved: boolean; marks: number[]; i0: number } | null>(null);
@@ -534,7 +551,9 @@ function StatPanel({ have, full, over, setOver, stat, onPick, doneN, total, goal
           </button>
         )}
       </div>
-      <p className="dex-legend muted">최대 = 도감 {total}개를 다 채웠을 때</p>
+      <button type="button" className="dex-evtoggle" aria-pressed={withEv} onClick={() => setWithEv(!withEv)}>
+        <span className="dex-evbox">{withEv ? "✓" : ""}</span>이벤트
+      </button>
     </Panel>
   );
 }
