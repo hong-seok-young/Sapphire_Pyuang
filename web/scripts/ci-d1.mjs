@@ -946,3 +946,39 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
     }
   }
 }
+
+// 홈 배치 빈 칸 고침 (2026-11-12 제작자 '고쳐'): 기부함 칸(donate)을 없앤 뒤 성장코인샵 위로 빈 칸이 생긴 채(launcher.ts normalize 고치기 전) 배치를 저장한 사람은
+// 그 빈 칸이 서버에 '사람이 둔 빈 자리'로 남아 있다. 기부함 칸을 없앤 뒤(11/12 13:00 UTC) 저장된 배치 중 성장코인샵 바로 앞에 빈 자리가 이어지고 그 뒤에는 빈 자리가 없는 것만
+// 그 빈 자리들을 뺀다 (그 뒤는 안 보이는 칸들이라 화면이 다시 맞춘다). 공개 실행 기록에는 수만. setup 'layout_gap_fix_20261112' 로 한 번만
+{
+  const KEY = "layout_gap_fix_20261112";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const since = Date.UTC(2026, 10, 12, 13, 0, 0);
+    const rows = parseJson(wrangler("d1", "execute", DB, "--remote", "--json", "--command", `SELECT user_id, data FROM layouts WHERE updated_at >= ${since}`))[0]?.results ?? [];
+    const lines = fixLayoutGaps(rows);
+    runSql([...lines, `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`]);
+    console.log(`홈 배치 빈 칸 고침: ${rows.length}개 중 ${lines.length}개 (한 번)`);
+  }
+}
+
+/** 성장코인샵 바로 앞에 이어진 빈 자리("")를 뺀 배치의 UPDATE 줄들 (그 뒤에 빈 자리가 있으면 사람이 둔 것일 수 있어 건드리지 않는다) */
+function fixLayoutGaps(rows) {
+  const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+  const lines = [];
+  for (const r of rows) {
+    let l;
+    try {
+      l = JSON.parse(r.data);
+    } catch {
+      continue;
+    }
+    const grid = Array.isArray(l?.grid) ? l.grid : null;
+    const at = grid ? grid.indexOf("gcoin") : -1;
+    if (at < 1 || grid[at - 1] !== "" || grid.slice(at + 1).includes("")) continue;
+    let from = at;
+    while (from > 0 && grid[from - 1] === "") from--;
+    const fixed = { ...l, grid: [...grid.slice(0, from), ...grid.slice(at)] };
+    lines.push(`UPDATE layouts SET data = ${q(JSON.stringify(fixed))} WHERE user_id = ${q(r.user_id)};`);
+  }
+  return lines;
+}
