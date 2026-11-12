@@ -37,3 +37,7 @@ jobs:
           q chat_gaps "SELECT * FROM chat_gaps ORDER BY id"
           # 열린 항목마다 그 답(msg_id 는 그 답의 번호)에 붙었던 자료 이름(화면이 찾은 위키 자료 found)과 한 일(웹 찾기 등) 수: 자료가 있는데 안 붙은 것인지 가리려고 (챗봇 개선 2026-11-10)
           q chat_gaps_found "SELECT g.id AS gap, a.id AS answer_id, a.found AS found, length(COALESCE(a.steps, '')) AS steps_len, length(a.text) AS answer_len, a.think_ms AS think_ms FROM chat_gaps g LEFT JOIN chat_msgs a ON a.id = g.msg_id WHERE g.status = 'open' ORDER BY g.id"
+          # 물건 이름 (제작자 2026-11-12 '아이콘이 비어 있다': 글에 적은 이름이 게임 이름과 달라 그림을 못 찾는 것을 가리려고. 이름·종류만, 사람 이름은 읽지 않는다)
+          q market_items "SELECT l.id, l.item, l.category, l.side, l.status, (SELECT COUNT(*) FROM listing_shots s WHERE s.listing_id = l.id) AS shot FROM listings l ORDER BY l.id"
+          q rental_weapons "SELECT weapon, COUNT(*) AS n FROM rental_items WHERE status != 'gone' GROUP BY weapon ORDER BY weapon"
+          q donate_names "SELECT item, COUNT(*) AS n FROM donate_items WHERE status IN ('request', 'done', 'hall', 'honor') GROUP BY item ORDER BY item"
