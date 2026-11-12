@@ -5,6 +5,7 @@ import { useEntryState } from "../router";
 // - 완료로 표시한 항목의 효과를 게임 '획득 옵션' 창 순서(시세 동향 캐릭터의 도감 표와 같은 DEX_ORDER)로 합친다.
 // - 지금 목록(칸 · 찾기 · 능력치 거르기)의 미완료 항목을 다 하면 더 오르는 값(+)과, 그러려면 필요한 재료 합계.
 // - 완료 표시는 이 기기에 계정별로 (localStorage sapphire.dex.done.<아이디>).
+// - 기간이 있는 이벤트 도감은 '이벤트' 칸, 기간(한국 시간 시작 날 ~ 끝 날, 둘 다 정기 점검 시작 10:30) 안의 것만 보인다 (제작자 2026-11-12 '이벤트로 따로 넣고 기간 끝나면 자동으로 사라지게').
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { loadDex, useAsync } from "../data";
@@ -24,6 +25,30 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "done", label: "완료" },
   { key: "all", label: "전체" },
 ];
+
+/** 이벤트 도감 기간: 시작 날 정기 점검(10:30) ~ 끝 날 정기 점검 시작(10:30) 전 (한국 시간. 공식 패치노트 '점검 후 ~ 11/12 점검 전까지') */
+const startAt = (e: DexEntry) => (e.from ? Date.parse(e.from + "T10:30:00+09:00") : -Infinity);
+const endAt = (e: DexEntry) => (e.to ? Date.parse(e.to + "T10:30:00+09:00") : Infinity);
+const isLive = (e: DexEntry, now: number) => startAt(e) <= now && now < endAt(e);
+/** 이벤트 도감이 끝나거나 시작하는 때가 오면 다시 그린다 (켜 둔 화면도, 폰이 잠들었다 돌아와도) */
+function useEventClock(entries: DexEntry[]): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const check = () => setNow(Date.now());
+    const cur = Date.now();
+    const next = Math.min(...entries.flatMap((e) => [startAt(e), endAt(e)]).filter((t) => t > cur));
+    const t = Number.isFinite(next) ? window.setTimeout(check, Math.min(next - cur + 1000, 86400_000)) : 0;
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      window.clearTimeout(t);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [entries, now]);
+  return now;
+}
+/** '이벤트 ~11/26' */
+const untilText = (to?: string) => (to ? `~${+to.slice(5, 7)}/${+to.slice(8, 10)}` : "");
+const CATS = ["all", "일반", "코스튬", "펫", "이벤트"];
 
 const storeKey = (me: Me) => `sapphire.dex.done.${me.id}`;
 function readDone(me: Me): Set<string> {
@@ -125,7 +150,10 @@ export function DexPage({ wiki, me }: { wiki: Wiki | null; me: Me }) {
   );
 }
 
-function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
+function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
+  const now = useEventClock(all.entries);
+  const liveKey = all.entries.map((e) => (isLive(e, now) ? 1 : 0)).join("");
+  const dex = useMemo(() => ({ ...all, entries: all.entries.filter((e) => isLive(e, now)) }), [all, liveKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const [done, setDone] = useState<Set<string>>(() => readDone(me));
   const [tab, setTab] = useEntryState<Tab>("dex.tab", "todo");
   const [q, setQ] = useEntryState("dex.q", "");
@@ -213,7 +241,7 @@ function DexBody({ dex, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }) {
       <StatPanel have={have} full={full} over={over} setOver={setOver} stat={stat} onPick={pickStat} doneN={doneEntries.length} total={dex.entries.length} />
 
       <div className="mk-cats dex-cats">
-        {["all", "일반", "코스튬", "펫"].map((c) => {
+        {CATS.map((c) => {
           const n = c === "all" ? dex.entries.length : dex.entries.filter((e) => (e.cat ?? "일반") === c).length;
           return n ? (
             <button key={c} type="button" className={"sub-tab" + (cat === c ? " sub-tab-on" : "")} onClick={() => setCat(c)}>
@@ -433,7 +461,7 @@ function EntryRow({ e, listW, done, onToggle, iconOf, stat, onItem, wiki, price,
       <div className="dex-main">
         <div className="dex-title">
           <b>{e.name}</b>
-          {e.cat && <small className="dex-cat">{e.cat}</small>}
+          {e.cat && <small className={"dex-cat" + (e.to ? " dex-cat-ev" : "")}>{e.cat}{e.to ? " " + untilText(e.to) : ""}</small>}
         </div>
         <div className="dex-effects">
           {e.effects.map((f, i) => (

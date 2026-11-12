@@ -259,12 +259,19 @@ def main() -> None:
             if k and k not in infos and o.get("info"):
                 infos[k] = " · ".join(map(str, o["info"]))
     entries = []
-    # 기간이 있는 이벤트성 도감(특정 기간만 효과)은 계산기에서 다루지 않는다 (제작자 2026-11-10 '이벤트성 도감은 취급하지 않음').
-    # 자료 파일에는 기록으로 남겨 둔다
+    # 기간이 있는 이벤트성 도감(특정 기간만 효과)은 '이벤트' 칸으로 따로 넣고 화면이 기간 안의 것만 보인다
+    # (제작자 2026-11-10 '이벤트성 도감은 취급하지 않음' -> 2026-11-12 '이벤트로 따로 넣고 기간 끝나면 자동으로 사라지게').
+    # period '2026/9/10 ~ 2026/11/12' -> from '2026-09-10', to '2026-11-12'. 공식 패치노트는 모두 '~11/12 점검 전까지'라
+    # 화면(Dex.tsx isLive)이 끝 날 정기 점검 시작(10:30, 한국 시간)에 뺀다
     events = [e["name"] for e in raw["entries"] if e.get("period")]
+    def period_of(t: str | None) -> dict:
+        ds = re.findall(r"(\d{4})\s*[/.-]\s*(\d{1,2})\s*[/.-]\s*(\d{1,2})", t or "")
+        if len(ds) != 2:
+            if t:
+                print("  도감 기간을 못 읽음:", t)
+            return {}
+        return {"from": "%s-%02d-%02d" % (ds[0][0], int(ds[0][1]), int(ds[0][2])), "to": "%s-%02d-%02d" % (ds[1][0], int(ds[1][1]), int(ds[1][2]))}
     for e in raw["entries"]:
-        if e.get("period"):
-            continue
         items = []
         for it in e["items"]:
             name = it.get("name")
@@ -272,8 +279,8 @@ def main() -> None:
             d = {"name": name, "n": int(it.get("count") or 1), "plus": it.get("plus")}
             if not name and it.get("icon"):
                 d["icon"] = it["icon"]
-            if str(it.get("src", "")).startswith("그림으로"):
-                d["est"] = True  # 툴팁은 못 보고 다른 항목에서 이름이 확인된 같은 그림으로 정한 칸
+            if str(it.get("src", "")).startswith("그림으로") or it.get("est"):
+                d["est"] = True  # 툴팁은 못 보고 다른 항목에서 이름이 확인된 같은 그림으로 정한 칸 (est: 툴팁 능력치로 정한 칸)
             # 도감 등록 창: '…는 장비스탬프B 11개로 대체 등록이 가능합니다' -> sg 'B', sn 11 / '대체 등록이 불가능한 수집 품목' -> sg '불가'
             st = it.get("stamp") or ""
             # '아바돈장비스탬프A 7개' 는 일반 장비스탬프와 다른 스탬프라 등급 앞에 '아바돈' 을 붙인다 (제작자 2026-11-10 'B A 아바돈 등등')
@@ -290,8 +297,9 @@ def main() -> None:
             if info:
                 d["info"] = info
             items.append(d)
+        cat = "이벤트" if e.get("period") else e.get("category")
         entries.append({"name": e["name"], "effects": [effect(s, v) for s, v in e["effects"]],
-                        "period": e.get("period"), "items": items, **({"cat": e["category"]} if e.get("category") else {})})
+                        "period": e.get("period"), **period_of(e.get("period")), "items": items, **({"cat": cat} if cat else {})})
     # 게임 화면에 같은 제목이 두 번 있는 항목 (코스튬 '크라운락의 작은 눈덩이 I'): 완료 표시가 섞이지 않게 두 번째부터 '(2번째)'
     seen_names: dict[str, int] = {}
     for e in entries:
@@ -320,7 +328,7 @@ def main() -> None:
         print("도감 시세", {"날짜": price["date"], "시세 있는 물건": len(price["gear"]), "레벨 모름": sum(1 for g in price["gear"].values() if not g["lv"]),
                          "종류 모름": sum(1 for g in price["gear"].values() if not g["k"]), "아바돈 판매": price.get("sale")})
     (OUT / "dex.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    print("도감 계산기", {"항목": len(entries), "뺀 이벤트 도감": len(events), "아이템 칸": sum(len(e["items"]) for e in entries),
+    print("도감 계산기", {"항목": len(entries), "이벤트 도감": len(events), "아이템 칸": sum(len(e["items"]) for e in entries),
                      "이름 모름": sum(1 for e in entries for i in e["items"] if not i["name"]), "오린 아이콘": len(has_hq), "그 밖의 그림": len(pics),
                      "정보 없는 칸": sum(1 for e in entries for i in e["items"] if i["name"] and not i.get("info")), "그림 없음": no_pic,
                      "순서표에 없는 능력치": unknown})

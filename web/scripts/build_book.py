@@ -297,6 +297,8 @@ def main() -> None:
     # 3) 도감 퀘스트: 그 아이템이 들어가는 항목 (이름, 강화, 개수)
     dex = _read("dex.json") or {}
     for e in dex.get("entries", []):
+        if e.get("period"):
+            continue  # 기간이 있는 이벤트 도감은 도감 계산기에서만 (기간이 끝나면 화면이 빼는데 책은 배포 때만 다시 만들어서)
         t = e.get("cat") or "일반"
         for it in e.get("items", []):
             if not it.get("name"):

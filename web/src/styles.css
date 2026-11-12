@@ -5048,6 +5048,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 /* 도감 계산기: 일반 · 코스튬 · 펫 칩, 항목 옆 표, 아바돈 스탬프 */
 .dex-cats { margin-bottom: 6px; }
 .dex-cat { padding: 0 4px; font-size: 10px; color: #c9b8ff; border: 1px solid currentColor; }
+.dex-cat-ev { flex: none; color: #ffb35c; white-space: nowrap; }
 .dex-stamp-AB { color: #ff7a6b; }
 .dex-stamp-no { color: var(--muted); border-style: dashed; }
 

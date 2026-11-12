@@ -160,6 +160,7 @@ export function totals(items: DexItem[], price: DexPrice, set: PriceSet): Totals
 /** 아바돈 장비 스탬프 판매 중인지 (끝나는 날 아침 점검 전까지, 한국 시간) */
 export function saleOn(price: DexPrice, now = new Date()): boolean {
   if (!price.sale) return false;
-  const kst = new Date(now.getTime() + 9 * 3600_000).toISOString().slice(0, 10);
-  return kst >= price.sale.start && kst <= price.sale.end;
+  // '10/29(목) 점검 후 ~ 11/12(목) 점검 전까지': 정기 점검 시작 10:30 (한국 시간)으로 본다 (도감 이벤트와 같은 규칙, Dex.tsx isLive)
+  const t = now.getTime();
+  return t >= Date.parse(price.sale.start + "T10:30:00+09:00") && t < Date.parse(price.sale.end + "T10:30:00+09:00");
 }

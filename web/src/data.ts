@@ -120,8 +120,8 @@ export const loadEnhance = () => getJson<Enhance>("enhance");
  *  name 이 null 이면 영상에서 칸을 누르지 않아 이름을 모르는 칸 (icon = 생김새), est = 같은 그림으로 이름을 추정한 칸,
  *  sg·sn = 도감 등록 창의 대체 스탬프 (장비스탬프 등급 'S'·'A'·'B' 와 개수, 대체 안 되면 sg '불가') */
 export interface DexItem { name: string | null; n: number; plus: number | null; icon?: string | null; pic?: string | null; stamp?: string | null; est?: boolean; sg?: string; sn?: number; info?: string; pk?: string }
-/** cat: 코스튬 · 펫 (없으면 일반) */
-export interface DexEntry { name: string; effects: [string, number, boolean][]; period?: string | null; items: DexItem[]; cat?: string }
+/** cat: 코스튬 · 펫 · 이벤트 (없으면 일반). 이벤트는 period 화면 글과 from·to 한국 날짜 (to 그날 24시까지) */
+export interface DexEntry { name: string; effects: [string, number, boolean][]; period?: string | null; from?: string; to?: string; items: DexItem[]; cat?: string }
 /** 도감 시세 (제작자 요청 2026-11-11, build_dex.py price_data): 장비 이름 key(띄어쓰기·괄호 뺌) -> 종류(무기/갑옷류/기타), 요구 레벨, 강화 단계마다 거래소 최저가.
  *  stamp = 스탬프 1장 플래티넘 값(평소 · 아바돈 이벤트), abaddon = 아바돈 1장이 일반 몇 장, platGold = 플래티넘 1 의 골드. scroll = 마법서 골드 값(등급마다, 자료에 있으면),
  *  sale = 가장 최근 아바돈 장비 스탬프 판매 기간 (공식 패치노트) */
