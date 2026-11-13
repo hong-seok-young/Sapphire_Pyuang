@@ -1,0 +1,49 @@
+# 이번 달 AI 비용을 Claude 콘솔에서 받아 D1 에 적는다 (제작자 2026-11-13 '클로드 콘솔 연결해서 실시간으로 달러 사용 현황', web/scripts/ai-cost.mjs).
+# 사용 기록 대시보드의 '11월 누적'이 이 값(콘솔 기준, 보통 4시간쯤 늦음) + 그 뒤 앱이 센 만큼이 된다 (server/apiUsage.ts monthUsd).
+# ANTHROPIC_ADMIN_KEY(콘솔 Admin API 키)가 저장소 비밀값에 없으면 아무것도 안 하고 끝난다. 공개 실행 기록이라 금액은 찍지 않는다.
+name: AI cost
+
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-cost
+  cancel-in-progress: false
+
+jobs:
+  cost:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      ANTHROPIC_ADMIN_KEY: ${{ secrets.ANTHROPIC_ADMIN_KEY }}
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - name: Check key
+        id: key
+        run: |
+          if [ -n "$ANTHROPIC_ADMIN_KEY" ]; then echo "has=1" >> "$GITHUB_OUTPUT"; else echo "ANTHROPIC_ADMIN_KEY 없음: 건너뜀"; fi
+      - uses: actions/checkout@v4
+        if: steps.key.outputs.has == '1'
+        with:
+          sparse-checkout: web
+      - uses: actions/setup-node@v4
+        if: steps.key.outputs.has == '1'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        if: steps.key.outputs.has == '1'
+        working-directory: web
+        run: npm ci
+      - name: Fetch cost
+        if: steps.key.outputs.has == '1'
+        working-directory: web
+        run: WRANGLER="$GITHUB_WORKSPACE/web/node_modules/.bin/wrangler" node scripts/ai-cost.mjs

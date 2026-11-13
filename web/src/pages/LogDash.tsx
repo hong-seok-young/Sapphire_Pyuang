@@ -49,6 +49,8 @@ export function tokText(n: number): string {
 }
 /** 달러: '$0.42' · '$12.30' · '$216.5' (100 넘으면 소수 첫째까지) */
 export const usdText = (n: number) => (n >= 100 ? `$${n.toFixed(1)}` : `$${n.toFixed(2)}`);
+/** '3시간 전' · '40분 전' */
+const agoText = (ms: number) => (ms < 3_600_000 ? `${Math.max(1, Math.round(ms / 60_000))}분 전` : `${Math.round(ms / 3_600_000)}시간 전`);
 /** API 월 한도 (제작자 2026-11-13 '맥시멈 340') */
 const AI_MONTH_LIMIT = 340;
 export function lastText(last: number | null, today: number): string {
@@ -827,6 +829,11 @@ export function AiPanel({ dash }: { dash: Dash }) {
           <i>
             <i style={{ transform: `scaleX(${Math.min(1, month.usd / AI_MONTH_LIMIT)})` }} />
           </i>
+          <em>
+            {month.console && month.refreshedAt
+              ? `콘솔 기준 (${agoText(dash.now - month.refreshedAt)}까지) + 그 뒤 어림`
+              : "앱이 센 어림값"}
+          </em>
         </div>
       )}
       <div className="ld-ai-kpis">

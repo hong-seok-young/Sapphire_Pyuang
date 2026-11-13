@@ -124,9 +124,29 @@ export const usdOf = (r: { input: number; output: number; cr: number; cw: number
 /** 2026-11 은 콘솔에서 본 값($216.46, 11/13 제작자)에 그 뒤 앱이 센 만큼을 더한다: 배포(ci-d1 setup AI_USD_SNAP)가 그때까지 센 값을 마이크로 달러로 적어 둔다 */
 export const AI_USD_BASE = { month: "2026-11", usd: 216.46 };
 export const AI_USD_SNAP = "ai_usd_snap_20261113";
-/** 앱 바깥(GitHub Actions 의 번역·정리·시험)에서 쓴 것은 api_usage 에 없어서 콘솔보다 조금 적게 나올 수 있다 */
-export async function monthUsd(env: Env): Promise<{ month: string; usd: number; base: number | null }> {
-  const month = new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 7);
+/**
+ * 이번 달 AI 비용 (달러). 콘솔과 같게 UTC 달로 센다.
+ * 1) 콘솔 값이 있으면 (GitHub Actions ai-cost.yml 이 1시간마다 ai_cost 에 적음, 제작자 2026-11-13 '클로드 콘솔 연결해서 실시간으로'):
+ *    콘솔 금액(refreshed_at 까지의 사용, 보통 4시간쯤 늦다) + 그 뒤 앱이 센 만큼(ai_snap 의 refreshed_at 바로 앞 값과 지금의 차이)
+ * 2) 없으면 앱 어림: 11월은 콘솔에서 본 $216.46 + 그 뒤 센 만큼, 그 뒤 달은 그 달 api_usage 합
+ *    (앱 바깥(GitHub Actions 의 번역·정리·시험)에서 쓴 것은 api_usage 에 없어서 콘솔보다 조금 적게 나올 수 있다)
+ */
+export async function monthUsd(env: Env): Promise<{ month: string; usd: number; base: number | null; console: boolean; refreshedAt: number | null }> {
+  const month = new Date().toISOString().slice(0, 7);
+  const official = await env.DB.prepare("SELECT usd, refreshed_at AS r FROM ai_cost WHERE month = ?")
+    .bind(month)
+    .first<{ usd: number; r: number | null }>()
+    .catch(() => null);
+  if (official && official.r) {
+    const [all, snap] = await env.DB.batch([
+      env.DB.prepare(`SELECT COALESCE(SUM(${USD_MICRO_SQL}), 0) AS m FROM api_usage`),
+      env.DB.prepare("SELECT micro AS m FROM ai_snap WHERE at <= ? ORDER BY at DESC LIMIT 1").bind(official.r),
+    ]);
+    const a = Number((all.results[0] as { m: number } | undefined)?.m ?? 0);
+    const s = (snap.results[0] as { m: number } | undefined)?.m;
+    const after = s === undefined ? 0 : Math.max(0, a - Number(s)) / 1e6;
+    return { month, usd: Number(official.usd) + after, base: null, console: true, refreshedAt: official.r };
+  }
   if (month === AI_USD_BASE.month) {
     const [all, snap] = await env.DB.batch([
       env.DB.prepare(`SELECT COALESCE(SUM(${USD_MICRO_SQL}), 0) AS m FROM api_usage`),
@@ -135,8 +155,8 @@ export async function monthUsd(env: Env): Promise<{ month: string; usd: number; 
     const a = Number((all.results[0] as { m: number } | undefined)?.m ?? 0);
     const s = (snap.results[0] as { m: number } | undefined)?.m;
     const after = s === undefined ? 0 : Math.max(0, a - Number(s)) / 1e6;
-    return { month, usd: AI_USD_BASE.usd + after, base: AI_USD_BASE.usd };
+    return { month, usd: AI_USD_BASE.usd + after, base: AI_USD_BASE.usd, console: false, refreshedAt: null };
   }
   const row = await env.DB.prepare(`SELECT COALESCE(SUM(${USD_MICRO_SQL}), 0) AS m FROM api_usage WHERE day >= ?`).bind(`${month}-01`).first<{ m: number }>();
-  return { month, usd: Number(row?.m ?? 0) / 1e6, base: null };
+  return { month, usd: Number(row?.m ?? 0) / 1e6, base: null, console: false, refreshedAt: null };
 }

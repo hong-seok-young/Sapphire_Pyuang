@@ -1139,6 +1139,9 @@ CREATE TABLE IF NOT EXISTS api_usage (
   PRIMARY KEY (user_id, day, kind)
 );
 CREATE INDEX IF NOT EXISTS api_usage_day ON api_usage (day);
+-- 콘솔이 센 이번 달 AI 비용 (GitHub Actions ai-cost.yml 이 1시간마다, web/scripts/ai-cost.mjs) 과 그때까지 앱이 센 값 (server/apiUsage.ts monthUsd)
+CREATE TABLE IF NOT EXISTS ai_cost (month TEXT PRIMARY KEY, usd REAL NOT NULL, refreshed_at INTEGER, fetched_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS ai_snap (at INTEGER PRIMARY KEY, micro INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS chat_usage_day ON chat_usage (day);
 
 -- 사용 기록 대시보드의 하루 요약 (server/actDash.ts, 제작자 2026-11-13 '사용기록 ui 싹 개편'). 지난 날은 한 번만 사용 기록 DB 를 훑어 여기 적고, 오늘은 그때그때 센다

@@ -1542,6 +1542,9 @@
   기간 칸의 '비용', 종류마다 달러. 값은 api_usage 토큰 x Claude Opus 5.5 값(입력 $4 · 출력 $20 · 캐시 읽기 $0.2 · 캐시 쓰기 $5 /백만, 웹 찾기 $0.01, `server/apiUsage.ts` `usdOf`·`USD_MICRO_SQL`, 모델을 바꾸면 같이).
   2026-11 은 콘솔 값 $216.46 에 그 뒤 앱이 센 만큼만 더한다 (`AI_USD_BASE`, 배포가 그때까지 센 값을 setup 'ai_usd_snap_20261113' 에 마이크로 달러로 한 번 적음), 12월부터는 그 달 api_usage 합.
   GitHub Actions 에서 쓴 AI(번역·To do 정리·시험)는 api_usage 에 없어 콘솔보다 조금 적게 나올 수 있다.
+  콘솔 실제 금액 (제작자 2026-11-13 '클로드 콘솔 연결해서 실시간으로 달러 사용 현황'): GitHub Actions `ai-cost.yml`(1시간마다·손으로)이 `web/scripts/ai-cost.mjs` 로 Usage and Cost Analytics API(`/v1/organizations/analytics/cost`, beta `analytics-usage-cost-2026-08-24`)에서
+  이번 달(UTC) 합을 받아 D1 `ai_cost` 에, 그때까지 앱이 센 값을 `ai_snap` 에 적는다. 사이트는 '콘솔 금액(data_refreshed_at 까지, 보통 4시간쯤 늦음) + 그 뒤 앱이 센 만큼'(`monthUsd`), 줄 아래 '콘솔 기준 (3시간 전까지) + 그 뒤 어림'.
+  저장소 비밀값 `ANTHROPIC_ADMIN_KEY`(콘솔 Settings > Admin keys 의 sk-ant-admin 키, 제작자가 넣는다)가 없으면 건너뛰고 앱 어림값만. Admin 키는 키·멤버 관리까지 되는 키라 사이트 서버(Cloudflare)에는 넣지 않고 Actions 에만, 실행 기록에는 금액도 안 찍는다.
 
 ## 연동 기능은 흐름 시험 (제작자 2026-11-10 '기부함 / 마일리지 / 장비대여 / 명예의 전당처럼 데이터가 실시간으로 연동되어야 하는 것들은 개발할 때 상호 흐름·기능 검사 테스트를 꼭')
 - 한 화면에서 고친 값이 다른 메뉴에 바로 이어지는 기능(기부함 확정 -> 마일리지 장부 -> 장비대여 보증금·신청함 -> 명예의 전당, 기부 -> 장비대여 물건 추가 -> 대여 목록)은
