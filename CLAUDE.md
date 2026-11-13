@@ -1519,7 +1519,12 @@
     대신 읽는 양을 줄이고(색인, 캐시) 계정을 나눈다. 감시는 알림만: GitHub Actions `.github/workflows/d1-guard.yml`(15분마다, `web/scripts/d1-guard.mjs`)이 계정마다 오늘(UTC) 읽은 줄/500만·쓴 줄/10만을 재서
     50%·70%·90% 를 넘을 때마다 앱개발자에게 알림 한 번 (setup 'd1_main_alert_<날짜>_<%>'). 알림이 오면 `d1-usage.yml` 로 무엇이 읽는지 보고 고친다. 공개 실행 기록에는 % 만.
     같은 날 줄인 것: 자료 저장소 조각 수 하루 캐시(`library.ts` chunkCount), 아이모 소식 찾기 10분 캐시, 새 글 숫자가 훑던 표에 created_at 색인(schema.sql 맨 아래). '지금 접속 중'은 그대로 둔다(최근 기록만 읽고 30초 캐시).
-    둘째 클라우드플레어 계정(제작자 2026-11-14 '계정 하나 더 팔게'): 사용 기록 DB 를 그쪽으로 옮긴다 (저장소 비밀값 `CF2_API_TOKEN`·`CF2_ACCOUNT_ID`, 토큰 권한 D1 Edit · Workers Scripts Edit · Account Analytics Read).
+  - **사용 기록은 둘째 Cloudflare 계정에** (제작자 2026-11-14 '계정 하나 더 팔게' -> '사용 기록 쪽에서 쓰는 건 새로운 계정으로 옮겨, 확인하고'): 계정이 다르면 사이트가 D1 에 바로 못 붙어서
+    둘째 계정에 D1 `sapphire-log-r1` 과 그 DB 를 대신 읽고 쓰는 일꾼 `web/logworker`(sapphire-log, workers.dev, 열쇠 x-log-key)를 두고 사이트는 `server/remoteD1.ts`(D1Database 처럼 보이는 HTTP 감싸개)로 부른다.
+    `server/logdb.ts` 의 `REMOTE_N` = 101: 설정(Pages 비밀값 LOG_REMOTE_URL·LOG_REMOTE_KEY)이 있으면 `currentLog` 가 한 번 log_ring 에 101 을 열고(번호는 지금 DB 마지막 + 10만) 새 기록은 거기에,
+    예전 기록(DB 1~10)은 그대로 두고 이어서 읽는다(logDbs·covering·eachLog 에 101 도). 일꾼이 안 되면 5분 동안 첫째 계정에 그대로 쓴다. 둘째 계정 DB 가 거의 차면 알림만.
+    올리기: `web/scripts/log-worker.mjs`(배포 'Log worker (second account)', 손 시험 `log-worker.yml`): DB·workers.dev 주소가 없으면 만들고, 일꾼을 올리고 열쇠(CF2_API_TOKEN 에서 만든 값)를 넣고, 답하면 Pages 비밀값을 넣는다.
+    저장소 비밀값 `CF2_API_TOKEN`(D1 Edit · Workers Scripts Edit · Account Analytics Read)·`CF2_ACCOUNT_ID`. `ci-d1.mjs` 는 101 에 쓰는 동안 DB 2~10 돌리기를 하지 않는다. 사용 기록 '저장소' 칸에 '둘째' 칸.
   - 로컬 시험 2026-11-13: 가짜 길드원 36명·18일 기록 1만 줄로 요약 합이 원본과 같음(화면 8,036 · 로그인 654), 오피서(멍멍) 403, 유어아너 200, 320·360·412px 넘침 없음.
 - 누구나 읽는 말로 (제작자 요청 2026-11-02 '이런 코드 말고 비개발자가 봐도 얘가 들어가서 뭐 했는지'): 한 일은 경로·보낸 자료 대신 '길드 던전 시간표 저장 · 8.5시간',
   '홈 배치 바꿈 · 아래 탭 …', '대여 완료 (건네줌) · 보증금 💎5 + 70만 골드' 처럼 (`src/activity.ts` `ACTIONS`, 이름을 안 붙인 한 일은 '장비대여에서 고침'처럼 메뉴와 동작만).

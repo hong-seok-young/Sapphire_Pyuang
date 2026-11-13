@@ -609,20 +609,23 @@ function StorageTab() {
   );
 }
 
-/** 사용 기록 DB 2~10: 칸마다 찬 만큼, 지금 쓰는 칸은 금색 테두리 */
+/** 둘째 Cloudflare 계정의 사용 기록 DB 는 101 (server/logdb.ts REMOTE_N) */
+const logName = (n: number) => (n === 101 ? "둘째 계정 DB" : `DB ${n}`);
+
+/** 사용 기록 DB 2~10 과 둘째 계정 DB: 칸마다 찬 만큼, 지금 쓰는 칸은 금색 테두리 */
 function LogRing({ logs, full }: { logs: LogDbInfo[]; full: number }) {
   const cur = logs.find((l) => l.cur);
   return (
     <>
       <span className="log-storage-line">
-        <b>사용 기록 DB 2~10</b>
-        {cur && cur.bytes !== null && ` 지금 DB ${cur.n} ${mbText(cur.bytes)} / ${mbText(full)}`}
+        <b>사용 기록 DB</b>
+        {cur && cur.bytes !== null && ` 지금 ${logName(cur.n)} ${mbText(cur.bytes)} / ${mbText(full)}`}
       </span>
-      <span className="log-ring" role="img" aria-label={`사용 기록 DB ${cur ? cur.n : 2}에 쓰는 중`}>
+      <span className="log-ring" role="img" aria-label={`사용 기록 ${cur ? logName(cur.n) : "DB 2"}에 쓰는 중`}>
         {logs.map((l) => (
           <span key={l.n} className={"log-ring-cell" + (l.cur ? " log-ring-cur" : "") + (l.since === null ? " log-ring-empty" : "")}>
             <i style={{ height: `${l.since === null || l.bytes === null ? 0 : Math.min(100, Math.max(4, (l.bytes / full) * 100))}%` }} />
-            <small>{l.n}</small>
+            <small>{l.n === 101 ? "둘째" : l.n}</small>
           </span>
         ))}
       </span>

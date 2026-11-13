@@ -179,7 +179,8 @@ for (const [table, column, type] of ADDED_COLUMNS) {
   const ring = parseJson(
     wrangler("d1", "execute", DB, "--remote", "--json", "--command", "SELECT n, started_at FROM log_ring WHERE started_at IS NOT NULL ORDER BY started_at DESC"),
   )[0]?.results ?? [];
-  if (ring.length) {
+  // 둘째 계정에 쓰는 중이면(n 101, server/logdb.ts REMOTE_N) 첫째 계정의 DB 2~10 은 돌리지 않는다
+  if (ring.length && LOG_NUMS.includes(Number(ring[0].n))) {
     const cur = Number(ring[0].n);
     const next = LOG_NUMS[(LOG_NUMS.indexOf(cur) + 1) % LOG_NUMS.length];
     const size = Number(parseJson(wrangler("d1", "execute", logName(cur), "--remote", "--json", "--command", "SELECT 1 AS one"))[0]?.meta?.size_after ?? 0);

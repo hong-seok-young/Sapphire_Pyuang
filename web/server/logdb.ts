@@ -7,12 +7,19 @@
 // 어느 DB 를 언제부터 썼는지는 DB 1 의 log_ring 에 둔다 (n, started_at, base). 기록 번호(id)는 DB 를 넘어가도 이어진다:
 // 새 DB 는 앞 DB 의 마지막 번호 + GAP 부터 (넘어가는 동안 다른 서버가 앞 DB 에 조금 더 써도 번호가 겹치지 않게).
 import type { Env } from "./auth";
+import { remoteLog } from "./remoteD1";
 
 /** 사용 기록 DB 번호 (wrangler.toml 의 LOG2 ~ LOG10, D1 sapphire-log-2 ~ 10) */
 export const LOG_NUMS = [2, 3, 4, 5, 6, 7, 8, 9, 10];
 /** 이만큼 차면 다음 DB 로 (무료 한도 500MB 에 조금 남겨 둔다) */
 export const LOG_FULL = 450 * 1024 * 1024;
 const GAP = 100_000;
+/**
+ * 둘째 Cloudflare 계정의 사용 기록 DB (제작자 2026-11-14 '사용 기록 쪽에서 쓰는 건 새로운 계정으로 옮겨', server/remoteD1.ts).
+ * 설정(LOG_REMOTE_URL·LOG_REMOTE_KEY)이 있으면 새 기록은 여기에 쓰고, 예전 기록(DB 1~10)은 그대로 두고 이어서 읽는다.
+ * 그 계정의 D1 한도를 따로 써서 사용 기록을 아무리 읽어도 계정·글 DB 의 하루 읽기 한도를 쓰지 않는다
+ */
+export const REMOTE_N = 101;
 
 /** 사용 기록 표 (schema.sql 의 activity 와 같다. scripts/ci-d1.mjs 가 schema-log.sql 로 넣는 것과도 같게) */
 export const LOG_SCHEMA = [
@@ -33,6 +40,7 @@ export interface LogDb {
 }
 
 export function logBinding(env: Env, n: number): D1Database | undefined {
+  if (n === REMOTE_N) return remoteLog(env);
   return (env as unknown as Record<string, D1Database | undefined>)[`LOG${n}`];
 }
 
@@ -80,8 +88,21 @@ export function covering(list: LogDb[], from: number): LogDb[] {
 }
 
 /** 지금 쓰는 DB. 처음이면 DB 2 를 연다 (LOG 바인딩이 없으면 DB 1) */
+let remoteFailedAt = 0;
+
 export async function currentLog(env: Env): Promise<LogDb> {
   const list = await logDbs(env);
+  // 둘째 계정으로 옮긴다 (한 번만, 번호는 지금 DB 의 마지막 번호 + GAP 부터). 일꾼이 안 되면 5분 동안은 지금 DB 에 그대로 쓴다
+  if (list[0].n !== REMOTE_N && remoteLog(env) && Date.now() - remoteFailedAt > 5 * 60_000) {
+    try {
+      const top = await list[0].db.prepare("SELECT MAX(id) AS m FROM activity").first<{ m: number | null }>();
+      await startLog(env, REMOTE_N, (top?.m ?? list[0].base) + GAP);
+      const again = await logDbs(env);
+      if (again[0].n === REMOTE_N) return again[0];
+    } catch {
+      remoteFailedAt = Date.now();
+    }
+  }
   if (list[0].n !== 1) return list[0];
   if (!logBinding(env, LOG_NUMS[0])) return list[0];
   const top = await env.DB.prepare("SELECT MAX(id) AS m FROM activity").first<{ m: number | null }>();
@@ -108,6 +129,12 @@ async function startLog(env: Env, n: number, base: number): Promise<void> {
  */
 export async function advanceLog(env: Env, cur: LogDb, alarm: (text: string) => Promise<void>): Promise<void> {
   if (cur.n === 1) return;
+  if (cur.n === REMOTE_N) {
+    // 둘째 계정은 DB 하나: 거의 차면 알리기만 한다 (500MB 를 넘으면 기록만 안 남고 앱은 그대로)
+    const res = await env.DB.prepare("INSERT OR IGNORE INTO setup (key, done_at) VALUES (?, ?)").bind(`log_full_remote_${cur.since}`, Date.now()).run();
+    if (res.meta.changes) await alarm("둘째 계정의 사용 기록 DB 가 거의 찼어요. 그 계정에 DB 를 하나 더 만들어 이어 쓰게 해야 해요");
+    return;
+  }
   const next = nextLog(cur.n);
   const used = logBinding(env, next)
     ? await env.DB.prepare("SELECT started_at FROM log_ring WHERE n = ? AND started_at IS NOT NULL").bind(next).first<{ started_at: number }>()
@@ -154,7 +181,7 @@ export async function newestLogs<T>(list: LogDb[], limit: number, make: (db: D1D
 /** 사용 기록 DB 2~10 모두에 같은 일 (닉네임 바꾸기, 계정 삭제). 표가 없는 DB 는 건너뛴다 */
 export async function eachLog(env: Env, sql: string, ...binds: unknown[]): Promise<void> {
   await Promise.all(
-    LOG_NUMS.map(async (n) => {
+    [...LOG_NUMS, REMOTE_N].map(async (n) => {
       const db = logBinding(env, n);
       if (!db) return;
       try {

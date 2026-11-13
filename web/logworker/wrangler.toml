@@ -1,0 +1,12 @@
+# 사용 기록 일꾼 (제작자 2026-11-14 '사용 기록 쪽에서 쓰는 건 새로운 계정으로 옮겨'): 둘째 Cloudflare 계정에 사용 기록 DB(sapphire-log-r1)와
+# 그 DB 를 대신 읽고 써 주는 이 일꾼을 둔다. 계정이 다르면 사이트(Pages)가 D1 에 바로 붙지 못해서 사이트는 이 일꾼을 HTTP 로 부른다 (server/remoteD1.ts).
+# 자동 배포(.github/workflows/deploy-web.yml 'Log worker')가 CF2_API_TOKEN·CF2_ACCOUNT_ID 로 DB 를 만들고 database_id 를 바꾼 뒤 올린다.
+name = "sapphire-log"
+main = "index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[[d1_databases]]
+binding = "LOG"
+database_name = "sapphire-log-r1"
+database_id = "00000000-0000-0000-0000-000000000000"

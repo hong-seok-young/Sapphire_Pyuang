@@ -186,6 +186,15 @@ jobs:
           printf '\n[[durable_objects.bindings]]\nname = "CHATRUN"\nclass_name = "ChatRun"\nscript_name = "sapphire-chat-runner"\n' >> wrangler.toml
           echo "챗봇 답 받기 일꾼을 올렸어요"
 
+      # 사용 기록은 둘째 Cloudflare 계정에 (제작자 2026-11-14, web/scripts/log-worker.mjs, server/remoteD1.ts). 비밀값이 없거나 실패하면 첫째 계정에 그대로 쓴다
+      - name: Log worker (second account)
+        continue-on-error: true
+        working-directory: web
+        env:
+          CF2_API_TOKEN: ${{ secrets.CF2_API_TOKEN }}
+          CF2_ACCOUNT_ID: ${{ secrets.CF2_ACCOUNT_ID }}
+        run: node scripts/log-worker.mjs
+
       - name: Deploy to Cloudflare Pages
         working-directory: web
         run: |

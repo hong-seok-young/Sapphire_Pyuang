@@ -14,7 +14,7 @@ import { canSeeLog, record, whereOf } from "../../server/activity";
 import { dashboard, liveNow, personDash } from "../../server/actDash";
 import { canSim, earn } from "../../server/simcoin";
 import { anonView } from "../../server/board";
-import { LOG_FULL, LOG_NUMS, covering, fromLogs, logBinding, logDbs, newestLogs } from "../../server/logdb";
+import { LOG_FULL, LOG_NUMS, REMOTE_N, covering, fromLogs, logBinding, logDbs, newestLogs } from "../../server/logdb";
 import type { LogDb } from "../../server/logdb";
 
 const PAGE = 150;
@@ -101,8 +101,9 @@ async function usage(env: Env) {
 async function logSizes(env: Env) {
   const list = await logDbs(env);
   const cur = list[0].n;
+  const nums = logBinding(env, REMOTE_N) ? [...LOG_NUMS, REMOTE_N] : LOG_NUMS;
   return Promise.all(
-    LOG_NUMS.map(async (n) => {
+    nums.map(async (n) => {
       const db = logBinding(env, n);
       const seg = list.find((d) => d.n === n);
       if (!db) return { n, bytes: null, rows: 0, since: null, cur: false };
