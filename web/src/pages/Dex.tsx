@@ -17,6 +17,7 @@ import type { Me } from "../auth";
 import { fetchMe } from "../auth";
 import type { Wiki } from "../types";
 import { iconLookup } from "../simIcons";
+import { solveCover } from "../dexSolve";
 import { canPreview } from "../launcher";
 import { filterByName } from "../search";
 import { weaponOf } from "../rental";
@@ -309,10 +310,9 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   }, [over, have]); // eslint-disable-line react-hooks/exhaustive-deps
   // 고른 능력치가 있으면 그중 목표가 있는 것만, 없으면 목표 모두
   const planNeeds = useMemo(() => (sel.size ? new Map([...needs].filter(([k]) => sel.has(k))) : needs), [needs, sel]);
-  const multi = useMemo(
-    () => (price && planNeeds.size ? planTargets(dex.entries.filter((e) => !done.has(e.name)), planNeeds, (e, mode) => (mode === "normal" ? entryGold.get(e.name) ?? null : null)) : null),
-    [planNeeds, dex, done, entryGold, price],
-  );
+  const notDone = useMemo(() => (price ? dex.entries.filter((e) => !done.has(e.name)) : null), [dex, done, price]);
+  const planCost = useCallback((e: DexEntry, mode: "normal" | "event") => (mode === "normal" ? entryGold.get(e.name) ?? null : null), [entryGold]);
+  const multi = useBestPlan(notDone, planNeeds, planCost);
   const [allList, setAllList] = useEntryState("dex.allList", false);
   const multiOn = !!multi && (sel.size > 0 || !allList);
   const multiShort = multi ? [...planNeeds].some(([k, v]) => (multi.got.get(k) ?? 0) < v - 1e-9) : false;
@@ -1033,6 +1033,58 @@ function planTargets(entries: DexEntry[], targets: Map<string, number>, costOf: 
   return { picks, got, gold: picks.reduce((a, p) => a + (p.g ?? 0), 0), goldEv: picks.reduce((a, p) => a + (p.ge ?? p.g ?? 0), 0), unknown: picks.filter((p) => p.g == null).length };
 }
 
+/** 목표를 모두 채우는 가장 싼 묶음: 먼저 차례로 고른 묶음(planTargets)을 보이고, 일꾼이 정수 최적화로 정확히 푼 답이 오면 바꿔 끼운다
+ * (제작자 2026-11-13 '어느 옵션을 적더라도 최저가로 그 도감을 만드는 조합과 가격이 떠야 해', dexSolve.ts) */
+const EMPTY_TARGETS = new Map<string, number>();
+const NO_COST = () => null;
+function useBestPlan(entries: DexEntry[] | null, targets: Map<string, number>, costOf: (e: DexEntry, mode: "normal" | "event") => number | null): MultiPlan | null {
+  const greedy = useMemo(() => (entries && targets.size ? planTargets(entries, targets, costOf) : null), [entries, targets, costOf]);
+  const job = useMemo(() => {
+    if (!entries || !targets.size) return null;
+    const keys = [...targets.keys()];
+    const cands = entries.filter((e) => e.effects.some(([s, , p]) => targets.has(rowKey(s, p))));
+    const known = cands.map((e) => costOf(e, "normal"));
+    // 값 모르는 항목은 값 있는 어떤 묶음보다 비싸게 쳐서 마지막에만 쓴다
+    const big = known.reduce<number>((a, g) => a + (g ?? 0), 0) + 1e9;
+    const vals = cands.map((e) => {
+      const m = new Map<number, number>();
+      for (const [s, v, p] of e.effects) {
+        const j = keys.indexOf(rowKey(s, p));
+        if (j >= 0) m.set(j, (m.get(j) ?? 0) + v);
+      }
+      return [...m] as [number, number][];
+    });
+    const costs = known.map((g) => g ?? big);
+    const key = keys.map((k) => `${k}=${targets.get(k)}`).join(";") + "|" + cands.map((e, i) => `${e.name}:${Math.round(costs[i])}`).join(",");
+    return { key, cands, costs, vals, targets: keys.map((k) => targets.get(k)!) };
+  }, [entries, targets, costOf]);
+  const [exact, setExact] = useState<{ key: string; plan: MultiPlan } | null>(null);
+  useEffect(() => {
+    if (!job) return;
+    let live = true;
+    const t = window.setTimeout(() => {
+      solveCover(job.key, job.costs, job.vals, job.targets).then((idx) => {
+        if (!live || !idx) return;
+        const chosen = idx.map((i) => job.cands[i]);
+        const got = new Map([...targets.keys()].map((k) => [k, 0]));
+        for (const e of chosen) for (const [s, v, p] of e.effects) if (got.has(rowKey(s, p))) got.set(rowKey(s, p), got.get(rowKey(s, p))! + v);
+        const picks = chosen
+          .map((e) => ({ e, g: costOf(e, "normal"), ge: costOf(e, "event") }))
+          .sort((a, b) => (a.g ?? Infinity) - (b.g ?? Infinity));
+        const plan: MultiPlan = { picks, got, gold: picks.reduce((a, p) => a + (p.g ?? 0), 0), goldEv: picks.reduce((a, p) => a + (p.ge ?? p.g ?? 0), 0), unknown: picks.filter((p) => p.g == null).length };
+        // 정수 최적화가 차례로 고른 것보다 비싸게 나오는 일은 없지만, 혹시 그러면 차례로 고른 것을 둔다
+        if (greedy && greedy.unknown <= plan.unknown && greedy.gold <= plan.gold) return;
+        setExact({ key: job.key, plan });
+      });
+    }, 250);
+    return () => {
+      live = false;
+      window.clearTimeout(t);
+    };
+  }, [job]); // eslint-disable-line react-hooks/exhaustive-deps
+  return exact && job && exact.key === job.key ? exact.plan : greedy;
+}
+
 /** 챗봇 도감 칸: 골드로 살 칸의 골드 + 스탬프로 할 칸의 장 수 */
 function SnipSplit({ s }: { s: { gold: number; stamps: (readonly [string, number])[] } }) {
   if (!s.stamps.length) return null;
@@ -1055,7 +1107,7 @@ export function DexSnippet({ spec }: { spec: string }) {
   const [withEv, setWithEv] = useState(false); // 이벤트 도감은 처음엔 뺀다 (제작자 2026-11-12)
   const [open, setOpen] = useState(false);
   const rate = market?.goldRate || 75;
-  const plan = useMemo(() => {
+  const base = useMemo(() => {
     if (!all) return null;
     const now = Date.now();
     const entries = all.entries.filter((e) => isLive(e, now) && (withEv || e.cat !== "이벤트"));
@@ -1085,7 +1137,12 @@ export function DexSnippet({ spec }: { spec: string }) {
       return g;
     };
     const max = addUp(entries);
-    const res = planTargets(entries, targets, costOf);
+    return { targets, bad, max, entries, costOf, price };
+  }, [all, spec, withEv, pset]);
+  const res = useBestPlan(base?.entries ?? null, base?.targets ?? EMPTY_TARGETS, base?.costOf ?? NO_COST);
+  const plan = useMemo(() => {
+    if (!base || !res) return null;
+    const { targets, bad, max, price } = base;
     // 칸마다 가장 싼 수단: 골드가 싼 칸은 골드, 장비스탬프가 싼 칸은 스탬프 장 수로 (도감 계산기 필요 재료와 같은 셈, 제작자 2026-11-12 '챗봇 쪽에서도 반영')
     const split = (mode: "normal" | "event") => {
       const st = new Map<string, number>();
@@ -1102,7 +1159,7 @@ export function DexSnippet({ spec }: { spec: string }) {
       return { gold, stamps: order.map((g) => [g, st.get(g)!] as const) };
     };
     return { targets, bad, max, ...res, split: { normal: split("normal"), event: split("event") } };
-  }, [all, spec, withEv, pset]);
+  }, [base, res, pset]);
   if (!all || !plan || !plan.targets.size) return null;
   const goDex = () => {
     if (me) writeStats(me, Object.fromEntries(plan.targets));
