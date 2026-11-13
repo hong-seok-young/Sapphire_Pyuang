@@ -255,14 +255,16 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   const price = dex.price;
   // 목표 수치까지 (제작자 2026-11-12 '수치 입력하거나 좌우로 조정하면 그 수치까지 도감 싼 순서대로 찍는 데 얼마'):
   // 아직 안 한 항목 중 그 능력치 1 당 골드가 가장 싼 것부터 (평소 값, 칸마다 골드로 사기 vs 스탬프 중 싼 쪽). 값을 모르는 칸이 있는 항목은 맨 뒤
-  const entryGold = useMemo(() => {
+  // 최저가를 고르는 기준 값: 평소 | 아바돈 이벤트 (제작자 2026-11-13 '아바돈 이벤트 적용 최저가로도 볼 수 있게' 2안, 처음은 평소)
+  const [basis, setBasis] = useEntryState<"normal" | "event">("dex.basis", "normal");
+  const entryGoldOf = (mode: "normal" | "event") => {
     const m = new Map<string, number | null>();
     if (!price) return m;
     for (const e of dex.entries) {
       let g = 0;
       let ok = true;
       for (const it of e.items) {
-        const w = pickWay(slotCost(it, price, pset), "normal");
+        const w = pickWay(slotCost(it, price, pset), mode);
         if (!w) {
           ok = false;
           break;
@@ -272,7 +274,10 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
       m.set(e.name, ok ? g : null);
     }
     return m;
-  }, [dex, price, pset]);
+  };
+  const goldNormal = useMemo(() => entryGoldOf("normal"), [dex, price, pset]); // eslint-disable-line react-hooks/exhaustive-deps
+  const goldEvent = useMemo(() => entryGoldOf("event"), [dex, price, pset]); // eslint-disable-line react-hooks/exhaustive-deps
+  const entryGold = basis === "event" ? goldEvent : goldNormal;
   const planFor = (k: string): GoalStep[] => {
     const c = dex.entries
       .filter((e) => !done.has(e.name))
@@ -311,7 +316,8 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   // 고른 능력치가 있으면 그중 목표가 있는 것만, 없으면 목표 모두
   const planNeeds = useMemo(() => (sel.size ? new Map([...needs].filter(([k]) => sel.has(k))) : needs), [needs, sel]);
   const notDone = useMemo(() => (price ? dex.entries.filter((e) => !done.has(e.name)) : null), [dex, done, price]);
-  const planCost = useCallback((e: DexEntry, mode: "normal" | "event") => (mode === "normal" ? entryGold.get(e.name) ?? null : null), [entryGold]);
+  // "normal" 자리 = 고르는 기준 값(평소 또는 이벤트), "event" 자리 = 이벤트 값
+  const planCost = useCallback((e: DexEntry, mode: "normal" | "event") => (mode === "normal" ? entryGold.get(e.name) ?? null : goldEvent.get(e.name) ?? null), [entryGold, goldEvent]);
   const { plan: multi, busy: solving } = useBestPlan(notDone, planNeeds, planCost);
   // 능력치 칸마다의 목표 비용도 정수 최적화로 정확히 (제작자 2026-11-13 'pve 1퍼 이동속도 8 각각 올리면 더 싸게 되는데':
   // 칸 하나의 목표 비용이 차례로 고른 값이라 PVE 데미지% 1 이 106.6만 · 2개로 떴다. 정확히는 74.2만 · 1개)
@@ -353,14 +359,18 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
     const order = ["S", "A", "B", ...[...stamp.keys()].filter((g) => !["S", "A", "B"].includes(g)).sort()].filter((g) => stamp.has(g));
     return { stamp, order, items, gold };
   };
-  const pn = plan("normal");
-  const pe = price ? plan("event") : null;
+  const pNormal = plan("normal");
+  const pEvent = price ? plan("event") : null;
+  // 필요 재료 머리는 고른 기준 값으로, 펼친 띠에 다른 쪽 값
+  const ev = basis === "event" && !!pEvent;
+  const pn = ev ? pEvent! : pNormal;
+  const pe = ev ? pNormal : pEvent;
   const stamps = pn.stamp;
   const stampSum = pn.order;
   const stampList = (q: ReturnType<typeof plan>) => q.order.map((g) => `${g} ${q.stamp.get(g)!.toLocaleString("ko-KR")}장`).join(" · ");
   const stampNote =
-    "칸마다 가장 싼 수단 · 골드가 싼 칸은 재료로 사고 스탬프가 싼 칸은 스탬프로 · 평소 값 기준" +
-    (pe ? ` · 아바돈 이벤트 때는 골드 ${fmtGold(pe.gold)}${pe.order.length ? ` · 스탬프 ${stampList(pe)}` : ""}` : "");
+    `칸마다 가장 싼 수단 · 골드가 싼 칸은 재료로 사고 스탬프가 싼 칸은 스탬프로 · ${ev ? "아바돈 이벤트" : "평소"} 값 기준` +
+    (pe ? ` · ${ev ? "평소에는" : "아바돈 이벤트 때는"} 골드 ${fmtGold(pe.gold)}${pe.order.length ? ` · 스탬프 ${stampList(pe)}` : ""}` : "");
 
   // 사야 할 재료 (같은 이름·강화끼리 더한다)
   const need = useMemo(() => {
@@ -467,7 +477,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
         </div>
       )}
 
-      {price && tot && todoListed.length > 0 && tot.slots > 0 && <CostPanel price={price} tot={tot} pset={pset} setPset={setPset} canEdit={canSetPrice} />}
+      {price && tot && todoListed.length > 0 && tot.slots > 0 && <CostPanel price={price} tot={tot} pset={pset} setPset={setPset} canEdit={canSetPrice} basis={basis} setBasis={setBasis} />}
 
       {todoListed.length > 0 && (
         <Panel className="dex-need">
@@ -808,7 +818,10 @@ function FoldHead({ open, onClick, children }: { open: boolean; onClick: () => v
   );
 }
 
-function CostPanel({ price, tot, pset, setPset, canEdit }: { price: DexPrice; tot: Totals; pset: PriceSet; setPset: (v: PriceSet) => void; canEdit: boolean }) {
+function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis }: {
+  price: DexPrice; tot: Totals; pset: PriceSet; setPset: (v: PriceSet) => void; canEdit: boolean;
+  basis: "normal" | "event"; setBasis: (v: "normal" | "event") => void;
+}) {
   const [open, setOpen] = useState(false);
   // 마법서·스탬프 값 칸은 접어 둔다 (제작자 2026-11-12 '마법서 가격으로 해서 접어놓고 스탬프 가격으로 해서 접어놔')
   const [foldScroll, setFoldScroll] = useState(false);
@@ -863,9 +876,17 @@ function CostPanel({ price, tot, pset, setPset, canEdit }: { price: DexPrice; to
       </button>
       {open && (
         <div className="dex-cost-body">
+          {/* 어느 값으로 최저가 조합을 고를지 (제작자 2026-11-13 2안 '평소 최저가 | 아바돈 이벤트 최저가', 처음은 평소) */}
+          <div className="dex-basis" role="tablist">
+            {MODES.map((m) => (
+              <button key={m.key} type="button" role="tab" aria-selected={basis === m.key} className={basis === m.key ? "dex-basis-on" : ""} onClick={() => setBasis(m.key)}>
+                {m.key === "event" ? "아바돈 이벤트" : m.label} 최저가
+              </button>
+            ))}
+          </div>
           <div className="dex-cost-cols">
             {MODES.map((m) => (
-              <div key={m.key} className={"dex-cost-col" + (m.key === "event" && on ? " dex-cost-now" : "")}
+              <div key={m.key} className={"dex-cost-col" + (m.key === "event" && on ? " dex-cost-now" : "") + (basis === m.key ? " dex-cost-pick" : " dex-cost-dim")}
                 onClick={m.key === "event" && price.sale ? showTip : undefined} role={m.key === "event" && price.sale ? "button" : undefined}>
                 {m.key === "event" && tip && price.sale && (
                   <span className={"dex-cost-tip" + (on ? " dex-sale-on" : "")}>
