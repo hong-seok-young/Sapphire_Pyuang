@@ -538,6 +538,14 @@ function StatPanel({ have, full, over, setOver, sel, onPick, doneN, total, goalO
   for (let i = 0; i < extra.length; i += 2) pairs.push([extra[i], extra[i + 1] ?? null]);
   const valueOf = (s: string, pct: boolean) => over[rowKey(s, pct)] ?? pick(have, s, pct);
   const set = (k: string, v: number) => setOver({ ...over, [k]: Math.max(0, Math.round(v * 100) / 100) });
+  // 칸을 비우거나 ✕ 를 누르면 그 목표를 지운다 (제작자 2026-11-13 '수치 지우면 자동으로 0, 수치 칸 우측에 x')
+  const clear = (k: string) => {
+    if (k in over) {
+      const o = { ...over };
+      delete o[k];
+      setOver(o);
+    }
+  };
   const live = (r: Row | null) => !!r && (valueOf(r[0], r[1]) > 0 || pick(full, r[0], r[1]) > 0 || rowKey(r[0], r[1]) in over);
   const shown = all ? pairs : pairs.filter(([a, b]) => live(a) || live(b));
   const folded = all ? FOLDED_PAIRS : [];
@@ -603,12 +611,22 @@ function StatPanel({ have, full, over, setOver, sel, onPick, doneN, total, goalO
             setDraft({ ...draft, [k]: e.target.value });
             const n = parseFloat(e.target.value);
             if (!Number.isNaN(n)) set(k, n);
+            else if (e.target.value.trim() === "") clear(k);
           }}
           onBlur={() => {
             const d = { ...draft };
             delete d[k];
             setDraft(d);
           }} />
+        {k in over ? (
+          <button type="button" className="dex-cell-x" aria-label={`${s}${pct ? " %" : ""} 지우기`}
+            onClick={() => {
+              clear(k);
+              const d = { ...draft };
+              delete d[k];
+              setDraft(d);
+            }}>✕</button>
+        ) : <span className="dex-cell-x" aria-hidden="true" />}
       </div>
     );
   };

@@ -5040,6 +5040,8 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .dex-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .dex-row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) 54px 44px; align-items: center; gap: 6px; min-height: 28px; font-size: 11px;
   border-bottom: 1px dashed rgba(169, 162, 207, 0.2); }
+.dex-cell-x { width: 14px; height: 24px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 11px; line-height: 24px; text-align: center; cursor: pointer; }
+.dex-cell-x:active { color: var(--gold); transform: scale(0.85); }
 .dex-row-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dex-row-name small { margin-left: 2px; font-size: 10px; color: var(--muted); }
 .dex-row-name small.dex-gain { color: #3fe0a0; }
@@ -5155,7 +5157,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .dex-entry-wide .dex-items { grid-column: 2 / -1; flex-wrap: wrap; justify-content: flex-start; }
 /* 도감 계산기: 획득 옵션 좌우 두 칸 (비슷한 능력치끼리 짝, 슬라이더 없음) */
 .dex-cells { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 10px; }
-.dex-cell { display: grid; grid-template-columns: minmax(0, 1fr) 46px; align-items: center; gap: 4px; min-height: 34px; padding: 2px 0;
+.dex-cell { display: grid; grid-template-columns: minmax(0, 1fr) 46px 14px; align-items: center; gap: 0 3px; min-height: 34px; padding: 2px 0;
   border-bottom: 1px dashed rgba(169, 162, 207, 0.2); }
 .dex-cell-name { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
 .dex-cell-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: normal; }
