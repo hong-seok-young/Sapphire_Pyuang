@@ -388,6 +388,10 @@ button { font: inherit; color: inherit; }
   font-size: 10px; white-space: nowrap; color: var(--text); text-shadow: 1px 1px 0 var(--edge), -1px -1px 0 var(--edge), 1px -1px 0 var(--edge), -1px 1px 0 var(--edge);
 }
 .chat-use-lbl b { font-weight: 400; color: #fff3c4; }
+.chat-use-bar { cursor: pointer; }
+.chat-use-bar:active { transform: scale(0.98); }
+.chat-use-info { animation: chat-use-in 0.25s ease-out; }
+@keyframes chat-use-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .chat-use-shine, .chat-use-pop { animation: none; display: none; } .chat-use-all, .chat-use-me { transition: none; } }
 
 /* job and level (profile setup, my info, member admin) */
