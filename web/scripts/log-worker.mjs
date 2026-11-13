@@ -58,20 +58,23 @@ const url = `https://sapphire-log.${sub}.workers.dev`;
 
 // 3. 답하는지 (새 workers.dev 주소는 퍼지는 데 조금 걸린다)
 let ok = false;
-for (let i = 0; i < 24 && !ok; i++) {
+let last = "";
+for (let i = 0; i < 36 && !ok; i++) {
   try {
     const r = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json", "x-log-key": key },
       body: JSON.stringify({ batch: [{ sql: "SELECT 1 AS one", params: [] }] }),
     });
-    ok = r.ok && (await r.json())?.[0]?.results?.[0]?.one === 1;
-  } catch {
-    // 아직
+    const text = await r.text();
+    last = `${r.status} ${text.slice(0, 120)}`;
+    ok = r.ok && JSON.parse(text)?.[0]?.results?.[0]?.one === 1;
+  } catch (e) {
+    last = e instanceof Error ? `${e.message} ${e.cause ? String(e.cause) : ""}` : String(e);
   }
   if (!ok) await new Promise((r) => setTimeout(r, 5000));
 }
-if (!ok) throw new Error("사용 기록 일꾼이 답하지 않아요 (2분 기다림)");
+if (!ok) throw new Error("사용 기록 일꾼이 답하지 않아요 (3분 기다림): " + last.replace(sub, "…"));
 console.log("사용 기록 일꾼이 답해요");
 wr(["pages", "secret", "put", "LOG_REMOTE_URL", "--project-name", "sapphire-guild"], url, process.env);
 wr(["pages", "secret", "put", "LOG_REMOTE_KEY", "--project-name", "sapphire-guild"], key, process.env);
