@@ -29,6 +29,7 @@ import {
   canSmack,
   canSuggest,
   canSee,
+  canSeeLog,
   clickItem,
   isLocked,
   isUpdated,
@@ -152,14 +153,15 @@ const HallPage = lazy(() => CHUNKS.Hall().then((m) => ({ default: m.HallPage }))
  * 홈이 뜬 뒤 쉬는 때에 자주 여는 화면의 조각을 하나씩 미리 받아 둔다 (제작자 2026-11-04 '화면 전환이나 버튼 동작별로 반응이 늦거나 렉').
  * 처음 들어갈 때 '불러오는 중' 없이 바로 열린다. 데이터 아끼기(saveData)나 2G 면 받지 않는다. 운영진 화면은 운영진만
  */
-function prefetchPages(staff: boolean, master: boolean) {
+function prefetchPages(staff: boolean, master: boolean, logViewer = master) {
   const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
   if (conn?.saveData || /(^|-)2g$/.test(conn?.effectiveType ?? "")) return () => undefined;
   const list: (keyof typeof CHUNKS)[] = ["Board", "Ranking", "Market", "Todo", "GuildDungeon", "Requests", "Rental", "Enhance", "DevRequests", "Chat", "Profile", "Alerts", "PlatShop", "Official"];
   if (GCOIN_OPEN) list.push("GrowthShop");
   if (DONATE_OPEN) list.push("Hall", "Donate");
   if (staff) list.push("Admin");
-  if (master) list.push("ActivityLog", "ChatGaps");
+  if (master) list.push("ChatGaps");
+  if (logViewer) list.push("ActivityLog");
   let stop = false;
   let timer = 0;
   const idle = (fn: () => void) => {
@@ -280,10 +282,11 @@ export function App() {
   }, []);
   // 로그인한 뒤 쉬는 때에 자주 여는 화면 조각을 미리 받아 둔다
   const loggedRole = me ? me.role : null;
+  const logViewer = me ? canSeeLog(me) : false;
   useEffect(() => {
     if (!loggedRole) return;
-    return prefetchPages(RANK[loggedRole] >= 1, RANK[loggedRole] >= 2);
-  }, [loggedRole]);
+    return prefetchPages(RANK[loggedRole] >= 1, RANK[loggedRole] >= 2, logViewer);
+  }, [loggedRole, logViewer]);
   // 다시 연결되거나 앱으로 돌아오면 저절로 다시
   useEffect(() => {
     if (!bootError) return;
@@ -574,8 +577,8 @@ function Wiki({
   else if (page === "simtest") body = me.role === "developer" || TEST_IDS.includes(me.id) ? <SimulatorPage key="test" wiki={wiki} me={me} space="test" /> : <DevSoon title="확률 시뮬레이터" />;
   else if (page === "log")
     body =
-      RANK[me.role] >= 2 ? (
-        <ActivityLogPage wiki={wiki} role={me.role} />
+      canSeeLog(me) ? (
+        <ActivityLogPage wiki={wiki} me={me} />
       ) : (
         <NotFound what="페이지" />
       );

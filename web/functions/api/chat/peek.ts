@@ -7,6 +7,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
+import { trackUsage } from "../../../server/apiUsage";
 
 /** 제작자 요청 2026-11-02 '무조건 퀄리티': 가장 좋은 모델 (예전에는 빠르고 싼 모델) */
 const PEEK_MODEL = "claude-opus-5-5";
@@ -117,6 +118,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       console.error("chat peek without schema", String(e.message).slice(0, 200));
       res = await read(false);
     }
+    await trackUsage(env, me.id, "peek", res);
     const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
     const seen = parseSeen(text);
     if (!seen.job && !seen.level && !seen.names.length) console.error("chat peek empty", res.stop_reason, text.slice(0, 300));

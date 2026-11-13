@@ -3,6 +3,7 @@
 // 여럿이 같이 열어도 한 번만 만든다 (claimed_at, 90초 안이면 다른 곳이 만드는 중). 공식 홈페이지의 공개 글을 읽을 뿐 게임은 읽지 않는다.
 import Anthropic from "@anthropic-ai/sdk";
 import type { Env } from "./auth";
+import { APP_USER, trackUsage } from "./apiUsage";
 
 export const SUMMARY_MODEL = "claude-opus-5-5";
 const JOBS = ["전사", "레인저", "마법사", "무도가"] as const;
@@ -91,6 +92,7 @@ export async function makeSummary(
         },
       ],
     } as Anthropic.Beta.MessageCreateParamsNonStreaming);
+    await trackUsage(env, APP_USER, "summary", res);
     if (res.stop_reason === "refusal") throw new Error("refusal");
     const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
     const raw = JSON.parse(text) as { lines?: unknown; jobs?: Record<string, unknown> };

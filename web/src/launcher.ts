@@ -49,6 +49,8 @@ export interface LaunchItem {
   developer?: boolean;
   /** 길드마스터와 앱개발자만 (사용 기록, 챗봇 개선: 제작자 요청 2026-11-02 '길드마스터도 보이게') */
   masters?: boolean;
+  /** 사용 기록: 길드마스터·앱개발자와 유어아너 (canSeeLog) */
+  logViewer?: boolean;
   /** 플래티넘 할인 상점: 상점 설정의 '오픈'을 켜기 전에는 운영진만 (개발 중 묶음에 넣지 않고 제자리) */
   shopGate?: boolean;
 }
@@ -135,7 +137,7 @@ export const ITEMS: LaunchItem[] = [
   // 시계와 보스 타이머는 안드로이드 앱에만 있다. 앱은 검토 후 오픈 (제작자 요청 2026-10-31: 지금은 웹만)
   { key: "app", title: "안드로이드 앱 받기", short: "앱 받기", to: "#/app", icon: "📲", androidOnly: true, soon: !APP_OPEN, badge: "검토 후 오픈", match: [] },
   { key: "admin", title: "길드원 관리", short: "관리", to: "#/admin", icon: "👥", managers: true, ribbon: "운영진", ring: "blue", match: ["admin"] },
-  { key: "log", title: "사용 기록", to: "#/log", icon: "📊", masters: true, ribbon: "길마", ring: "purple", match: ["log"] },
+  { key: "log", title: "사용 기록", to: "#/log", icon: "📊", logViewer: true, ribbon: "길마", ring: "purple", match: ["log"] },
   // 챗봇이 모르는 질문 (제작자 요청: 보고 고친 뒤 물은 사람에게 알린다)
   // 아이콘은 고치는 연장 (제작자 요청 2026-11-02 '챗봇 개선 아이콘은 좀 바꾸자', 예전 🧙)
   { key: "gaps", title: "챗봇 개선", to: "#/gaps", icon: "🛠️", masters: true, ribbon: "길마", ring: "purple", match: ["gaps"] },
@@ -170,9 +172,14 @@ export const canPreview = (me: Me) =>
 /** 눌러도 안 열리는 칸인지: 개발 중인 칸은 길드원에게만 막는다 */
 export const isLocked = (item: LaunchItem, me: Me) => !!item.locked && !canPreview(me);
 
+/** 사용 기록을 보는 사람 (서버 server/activity.ts LOG_VIEWERS 와 같은 목록): 길드마스터·앱개발자와 유어아너 (제작자 2026-11-13 '유어아너도 볼 수 있게').
+ *  사람(묶은 캐릭터 중 하나라도)으로 정한다. 닉네임을 바꾸면 두 곳을 고친다 */
+export const LOG_VIEWERS = ["유어아너"];
+export const canSeeLog = (me: Me) => RANK[me.role] >= 2 || [me.id, ...(me.characters ?? []).map((c) => c.id)].some((c) => LOG_VIEWERS.includes(c));
+
 /** 이 사람에게 보이는 칸인지 */
 export const canSee = (item: LaunchItem, me: Me) =>
-  (!item.androidOnly || (isAndroid && !inApp)) && (!item.managers || RANK[me.role] >= 1) && (!item.shopGate || me.shopOpen === true || RANK[me.role] >= 1) && (!item.developer || me.role === "developer") && (!item.masters || RANK[me.role] >= 2);
+  (!item.androidOnly || (isAndroid && !inApp)) && (!item.managers || RANK[me.role] >= 1) && (!item.shopGate || me.shopOpen === true || RANK[me.role] >= 1) && (!item.developer || me.role === "developer") && (!item.masters || RANK[me.role] >= 2) && (!item.logViewer || canSeeLog(me));
 
 /** 'UPDATE' 를 달지 (updates.ts). '정보'는 안의 칸이 고쳐졌을 때도 */
 export const isUpdated = (user: string, item: LaunchItem) =>

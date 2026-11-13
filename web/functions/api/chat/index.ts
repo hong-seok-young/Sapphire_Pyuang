@@ -139,7 +139,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
   // 글이 조금 달라도: 낱말이 많이 겹치는 앞선 글이 있으면 짧은 API 한 번으로 같은 매물인지·따로 묻는 요청을 가린다 (못 가리면 보통대로)
   if (qkey && !hit) {
     const near = await similarQuestion(env, first.text).catch(() => null);
-    const r = near ? await routeSame(env, near.question, first.text).catch((e) => (console.error("chat route failed", e), null)) : null;
+    const r = near ? await routeSame(env, near.question, first.text, me.id).catch((e) => (console.error("chat route failed", e), null)) : null;
     if (near && r?.same) {
       hit = await cachedAnswer(env, near.qkey).catch(() => null);
       followup = r.extra;

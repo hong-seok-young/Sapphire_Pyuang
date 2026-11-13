@@ -24,6 +24,7 @@ import { ASK_MORE, mineExtras, newsNow, shopCatalog } from "./chatmine";
 import { canUseDevReq } from "./devreq";
 import { scamContext } from "./scam";
 import { canUseDonate, hallOfFame } from "./donate";
+import { canSeeLog } from "./activity";
 
 
 /** 길드 앱 자료 전체 글자 수 (내 정보, 아이모 소식, 장비대여를 더해 늘렸다. 2026-11-02) */
@@ -440,8 +441,8 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
     parts.push(section(`To do: ${me.id}의 레벨·직업에 맞는 할 일 (홈 'To do' 화면, 공식 글에서 뽑은 이벤트 할 일 포함)`, lines));
   }
 
-  // ---------- 길드마스터와 앱개발자만: 사용 기록, 챗봇 개선 (2026-11-02 길드마스터에게도 열었다) ----------
-  if (RANK[me.role] >= 2 && (ASK.logs.test(q) || mentioned.length)) parts.push(...(await activityParts(env, mentioned, now, today)));
+  // ---------- 길드마스터와 앱개발자만: 사용 기록(유어아너도, 2026-11-13), 챗봇 개선 (2026-11-02 길드마스터에게도 열었다) ----------
+  if (canSeeLog(me) && (ASK.logs.test(q) || mentioned.length)) parts.push(...(await activityParts(env, mentioned, now, today)));
   if (RANK[me.role] >= 2 && ASK.gaps.test(q)) {
     const day = new Date(now + KST).toISOString().slice(0, 10);
     const [gapsR, usageR] = await env.DB.batch([

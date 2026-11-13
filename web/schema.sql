@@ -1122,3 +1122,29 @@ CREATE TABLE IF NOT EXISTS chat_cache (
   hits INTEGER NOT NULL DEFAULT 0,
   question TEXT
 );
+
+-- AI(Claude API) 사용량 (server/apiUsage.ts, 제작자 2026-11-13 '누가 웹과 챗봇 api 등 사용량이 많은가 대시보드'): 사람·한국 날짜·종류마다 부른 수와 토큰.
+-- kind: chat(챗봇 답), chat_route(같은 매물 글 가리기), peek(챗봇 사진 읽기), read_market·read_rental(스샷 읽기), polish(공지 다듬기), avatar(캐릭터 사진 AI 검수), summary(공식 글 요약, user '_app').
+-- 2026-11-13 부터 센다 (그 전은 질문 수 chat_usage, 횟수 ai_usage 만). 지우지 않는다
+CREATE TABLE IF NOT EXISTS api_usage (
+  user_id TEXT NOT NULL,
+  day TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  calls INTEGER NOT NULL DEFAULT 0,
+  input INTEGER NOT NULL DEFAULT 0,
+  output INTEGER NOT NULL DEFAULT 0,
+  cache_read INTEGER NOT NULL DEFAULT 0,
+  cache_write INTEGER NOT NULL DEFAULT 0,
+  web INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, day, kind)
+);
+CREATE INDEX IF NOT EXISTS api_usage_day ON api_usage (day);
+CREATE INDEX IF NOT EXISTS chat_usage_day ON chat_usage (day);
+
+-- 사용 기록 대시보드의 하루 요약 (server/actDash.ts, 제작자 2026-11-13 '사용기록 ui 싹 개편'). 지난 날은 한 번만 사용 기록 DB 를 훑어 여기 적고, 오늘은 그때그때 센다
+-- (무료 요금제의 하루 읽기 500만 줄을 아끼려고). day 는 한국 날짜 번호 = (시각 + 9시간) / 하루. 기록에서 다시 만들 수 있는 요약이라 지워도 된다
+CREATE TABLE IF NOT EXISTS act_day_user (day INTEGER NOT NULL, user_id TEXT NOT NULL, visits INTEGER NOT NULL, views INTEGER NOT NULL, acts INTEGER NOT NULL, mins INTEGER NOT NULL, PRIMARY KEY (day, user_id));
+CREATE TABLE IF NOT EXISTS act_day_hour (day INTEGER NOT NULL, hour INTEGER NOT NULL, n INTEGER NOT NULL, users INTEGER NOT NULL, PRIMARY KEY (day, hour));
+CREATE TABLE IF NOT EXISTS act_day_sec (day INTEGER NOT NULL, sec TEXT NOT NULL, n INTEGER NOT NULL, users INTEGER NOT NULL, PRIMARY KEY (day, sec));
+CREATE TABLE IF NOT EXISTS act_day_via (day INTEGER NOT NULL, via TEXT NOT NULL, n INTEGER NOT NULL, users INTEGER NOT NULL, PRIMARY KEY (day, via));
+CREATE TABLE IF NOT EXISTS act_rollup (day INTEGER PRIMARY KEY, done_at INTEGER NOT NULL);

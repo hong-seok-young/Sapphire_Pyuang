@@ -4,7 +4,8 @@ import { api, apiHeaders } from "./auth";
 import type { Role } from "./auth";
 import type { Wiki } from "./types";
 import { CAT_NAME } from "./board";
-import { ITEMS } from "./launcher";
+import { INFO_TILES, ITEMS } from "./launcher";
+import type { LaunchItem } from "./launcher";
 import { slotText } from "./gdungeon";
 import { weekStart } from "./week";
 import type { Cat } from "./board";
@@ -504,3 +505,139 @@ export function sectionOf(r: ActivityRow): string | null {
   if (r.kind === "act") return ACT_SECTION.find(([re]) => re.test(r.what))?.[1] ?? null;
   return null;
 }
+
+// ---------- 대시보드 (2026-11-13 개편, 제작자 '사용기록 ui 싹 개편, 누가 웹과 챗봇 api 등 사용량이 많은가', '잘 쓰는 사람과 안 쓰는 사람') ----------
+
+export { LOG_VIEWERS, canSeeLog } from "./launcher";
+
+export type Period = 1 | 7 | 30;
+
+export interface DashPerson {
+  id: string;
+  role: Role;
+  alts: string[];
+  /** 기간 안에 들어온 날 수 */
+  days: number;
+  v: number;
+  w: number;
+  a: number;
+  /** 5분 칸 수 (x5 = 사용 시간 분) */
+  m: number;
+  /** 챗봇 질문 */
+  q: number;
+  tok: number;
+  tokIn: number;
+  tokOut: number;
+  web: number;
+  calls: number;
+  /** 날마다 화면 + 한 일 */
+  spark: number[];
+  /** 마지막으로 들어온 날 번호 (한 번도 없으면 null) */
+  last: number | null;
+  score: number;
+  prevScore: number;
+  prev: { v: number; w: number; a: number; m: number; q: number; days: number };
+}
+
+export interface DashDay {
+  d: number;
+  users: number;
+  v: number;
+  w: number;
+  a: number;
+  m: number;
+  q: number;
+  tok: number;
+}
+
+export interface Dash {
+  now: number;
+  today: number;
+  period: Period;
+  partial: boolean;
+  daily: DashDay[];
+  heat: number[][];
+  heatUsers: number[][];
+  heatDays: number;
+  hourly: { today: number[]; avg: number[] };
+  secs: { s: string; n: number; us: number }[];
+  vias: { via: string; n: number; us: number }[];
+  people: DashPerson[];
+  ai: { kind: string; calls: number; input: number; output: number; cache: number; web: number; users: number }[];
+  aiSince: number | null;
+}
+
+export interface LiveNow {
+  now: number;
+  people: { id: string; char: string; at: number; kind: Kind; what: string; detail: string | null; via: Via | null; n: number }[];
+  perMin: number[];
+}
+
+export interface PersonDash {
+  period: Period;
+  today: number;
+  daily: { d: number; v: number; w: number; a: number; m: number; q: number }[];
+  heat: number[][];
+  secs: { s: string; n: number }[];
+  questions: { at: number; text: string; photos: number }[];
+  ai: { kind: string; calls: number; input: number; output: number; web: number }[];
+  devices: DeviceInfo[];
+  overlaps: OverlapInfo[];
+}
+
+export const fetchDash = (days: Period) => api<Dash>(`/api/activity?part=dash&days=${days}`);
+export const fetchLive = () => api<LiveNow>("/api/activity?part=live");
+export const fetchPerson = (user: string, days: Period) => api<PersonDash>(`/api/activity?part=person&days=${days}&user=${encodeURIComponent(user)}`);
+
+/** 한국 날짜 번호 -> Date (그날 0시 UTC 로, 요일·날짜만 읽는다) */
+export const dayDate = (d: number) => new Date(d * 86_400_000);
+export const dayMD = (d: number) => `${dayDate(d).getUTCMonth() + 1}/${dayDate(d).getUTCDate()}`;
+export const WEEK = "일월화수목금토";
+export const dayWeek = (d: number) => WEEK[dayDate(d).getUTCDay()];
+
+/** 잘 쓰는 정도 (점수는 서버 server/actDash.ts scoreOf: 들어온 날 40 · 사용 시간 25 · 접속 15 · 한 일 10 · 챗봇 10) */
+export type Tier = "core" | "active" | "light" | "idle";
+export const TIERS: { key: Tier; name: string; min: number }[] = [
+  { key: "core", name: "핵심", min: 60 },
+  { key: "active", name: "활발", min: 30 },
+  { key: "light", name: "가끔", min: 8 },
+  { key: "idle", name: "잠수", min: 0 },
+];
+export const tierOf = (score: number): Tier => (TIERS.find((t) => score >= t.min) ?? TIERS[3]).key;
+export const TIER_NAME: Record<Tier, string> = { core: "핵심", active: "활발", light: "가끔", idle: "잠수" };
+
+/** 메뉴 칸 이름: 'view:board' · 'act:market' -> 홈 칸 이름 (launcher.ts ITEMS 의 match) */
+const SEC_EXTRA: Record<string, string> = {
+  "": "home", me: "me", password: "me", profile: "me", avatar: "me", kakao: "me", characters: "me", "delete-requests": "admin", users: "admin", signup: "admin",
+  monster: "info", item: "info", place: "info", favorites: "info", gold: "market", gd: "match", donate: "hall", official: "board", as: "home", alerts: "alerts", push: "alerts",
+  layout: "home", news: "home", patch: "patch", bday: "bday", activity: "home",
+};
+const SEC_SELF: Record<string, { title: string; icon: string }> = {
+  me: { title: "설정", icon: "⚙️" },
+  alerts: { title: "알림", icon: "🔔" },
+  patch: { title: "패치 내역", icon: "📝" },
+  bday: { title: "생일 스티커", icon: "🎂" },
+};
+export function secItem(key: string): { key: string; title: string; icon: string; item?: LaunchItem } {
+  const seg = key.replace(/^(view|act):/, "");
+  const k = SEC_EXTRA[seg] ?? seg;
+  if (SEC_SELF[k]) return { key: k, ...SEC_SELF[k] };
+  const item = ITEMS.find((i) => i.key === k || i.match.includes(k)) ?? INFO_TILES.find((i) => i.key === k);
+  if (item) {
+    const info = INFO_TILES.includes(item);
+    return info ? { key: "info", title: "정보", icon: "📚", item: ITEMS.find((i) => i.key === "info") } : { key: item.key, title: item.title, icon: item.icon, item };
+  }
+  return { key: k || "etc", title: k ? k : "기타", icon: "•" };
+}
+
+/** AI 종류 이름 (server/apiUsage.ts) */
+export const AI_NAME: Record<string, string> = {
+  chat: "챗봇 답",
+  chat_route: "같은 매물 가리기",
+  peek: "챗봇 사진 읽기",
+  read_market: "중개인 스샷 읽기",
+  read_rental: "장비대여 스샷 읽기",
+  polish: "공지 AI 다듬기",
+  avatar: "캐릭터 사진 AI",
+  summary: "공식 글 요약",
+};

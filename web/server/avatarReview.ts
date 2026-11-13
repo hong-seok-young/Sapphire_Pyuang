@@ -100,7 +100,16 @@ export function removePoints(raw: unknown, w: number, h: number): RemovePoint[] 
 }
 
 /** 원래 그림(JPEG base64)과 배경을 지운 그림(PNG base64, 지운 곳은 자홍색)을 보여 주고 점을 받는다. 거절이면 빈 목록 */
-export async function reviewPoints(client: Anthropic, original: string, cutout: string, w: number, h: number, again = false): Promise<{ remove: RemovePoint[]; keep: Point[] }> {
+export async function reviewPoints(
+  client: Anthropic,
+  original: string,
+  cutout: string,
+  w: number,
+  h: number,
+  again = false,
+  /** 쓴 토큰을 알린다 (사용 기록 대시보드, server/apiUsage.ts) */
+  onUsage?: (res: Anthropic.Message) => unknown,
+): Promise<{ remove: RemovePoint[]; keep: Point[] }> {
   const res = await client.messages.create({
     model: MODEL,
     max_tokens: 16000,
@@ -116,6 +125,7 @@ export async function reviewPoints(client: Anthropic, original: string, cutout: 
       },
     ],
   });
+  await onUsage?.(res);
   if (res.stop_reason === "refusal") return { remove: [], keep: [] };
   const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
   const raw = JSON.parse(text) as { remove?: unknown; keep?: unknown };

@@ -15,6 +15,7 @@ import { notify } from "./alerts";
 import { GAP_TOKEN, MAX_ANSWER, MAX_THINKING, addMsg, recordGap } from "./chatlog";
 import { errorCause, errorText, isWebOff } from "./chatErrors";
 import { rememberAnswer } from "./chatCache";
+import { recordUsage, usageFromSse } from "./apiUsage";
 
 /** 일꾼에게 맡기는 것 (functions/api/chat/index.ts 가 보낸다) */
 export interface RunStart {
@@ -431,9 +432,6 @@ export class ChatRun extends DurableObject<Env> {
       }
     }
     clearTimeout(timer);
-    if (job.stopped) return; // 화면이 중지했거나 같은 대화에 새로 물었다: 넣지 않는다
-
-    // 다 받았다: 답을 대화에 넣는다
     const size = job.chunks.reduce((n, c) => n + c.length, 0);
     const all = new Uint8Array(size);
     let at = 0;
@@ -441,7 +439,13 @@ export class ChatRun extends DurableObject<Env> {
       all.set(c, at);
       at += c.length;
     }
-    const got = summarizeSse(new TextDecoder().decode(all));
+    const raw = new TextDecoder().decode(all);
+    // 쓴 토큰은 중지했어도 남긴다 (사용 기록 대시보드, server/apiUsage.ts)
+    await recordUsage(env, meta.userId, "chat", usageFromSse(raw));
+    if (job.stopped) return; // 화면이 중지했거나 같은 대화에 새로 물었다: 넣지 않는다
+
+    // 다 받았다: 답을 대화에 넣는다
+    const got = summarizeSse(raw);
     let savedId: number | null = null;
     if (got.finished && got.text.trim()) {
       try {

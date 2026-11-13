@@ -2,9 +2,17 @@
 // 접속(웹이나 앱을 닫았다가 다시 열면 하나), 화면(본 화면 주소), 한 일(API 로 바꾼 것)을 남기고 지우지 않는다 (제작자 요청: 영구 보관).
 // 제작자 요청으로 비밀번호만 빼고 모두 남긴다: 보낸 내용(한마디, 흥정 가격, 입찰 금액, 경험치, 챗봇 질문, 토론방 글 ...),
 // IP, 대략의 위치(Cloudflare 가 아는 도시), 기기. 사진은 그림 대신 장 수와 크기만 적는다.
-import type { Env } from "./auth";
+import type { Env, User } from "./auth";
+import { RANK } from "./auth";
 import { notify } from "./alerts";
 import { LOG_FULL, advanceLog, currentLog } from "./logdb";
+
+/**
+ * 사용 기록을 보는 사람: 길드마스터·앱개발자, 그리고 유어아너 (제작자 2026-11-13 '유어아너도 볼 수 있게').
+ * 사람(묶은 캐릭터 모두)으로 정한다. 닉네임을 바꾸면 여기와 화면 src/activity.ts LOG_VIEWERS 를 같이 고친다
+ */
+export const LOG_VIEWERS = ["유어아너"];
+export const canSeeLog = (me: User) => RANK[me.role] >= 2 || (me.chars ?? [me.id]).some((c) => LOG_VIEWERS.includes(c));
 
 /** 남기지 않는 칸: 비밀번호 (로그인, 계정 만들기, 초기화의 password, 비밀번호 바꾸기의 current, next) */
 const SECRET = /pass|^current$|^next$/i;

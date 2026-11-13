@@ -4,6 +4,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { FORBIDDEN, NEED_LOGIN, RANK, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
+import { trackUsage } from "../../../server/apiUsage";
 
 const POLISH_MODEL = "claude-opus-5-5";
 const DAILY = 30;
@@ -56,6 +57,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       system: SYSTEM,
       messages: [{ role: "user", content: `[${b.cat === "notice" ? "공지사항" : "길드 이벤트"}]\n제목: ${title || "(없음)"}\n\n${body}` }],
     } as Anthropic.Beta.MessageCreateParamsNonStreaming);
+    await trackUsage(env, me.id, "polish", res);
     if (res.stop_reason === "refusal") throw new Error("refusal");
     const out = JSON.parse(res.content.map((c) => (c.type === "text" ? c.text : "")).join("")) as { title?: unknown; body?: unknown };
     const newTitle = typeof out.title === "string" && out.title.trim() ? out.title.trim().slice(0, TITLE_MAX) : title;

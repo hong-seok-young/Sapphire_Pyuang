@@ -8,9 +8,10 @@
 //      같은 때(10분 안) 다른 기기가 다른 도시에서 쓴 번 수(together). user 로 고르면 그 사람의 기기 목록(devices, 60일)과
 //      그 겹친 때의 목록(overlaps, 60일: 언제, 어느 기기가 어느 도시에서 ↔ 어느 기기가 어느 도시에서. 제작자 2026-11-03: 붉은 표만으로는 뭔지 몰랐다).
 //      기기는 화면이 보내는 기기 표(activity.dev)로 가린다. 기기 표가 없던 예전 기록은 기기 글(device)로 묶어 목록에만 보인다
-import { FORBIDDEN, NEED_LOGIN, RANK, currentUser, json, readJson } from "../../server/auth";
+import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../server/auth";
 import type { Env } from "../../server/auth";
-import { record, whereOf } from "../../server/activity";
+import { canSeeLog, record, whereOf } from "../../server/activity";
+import { dashboard, liveNow, personDash } from "../../server/actDash";
 import { canSim, earn } from "../../server/simcoin";
 import { anonView } from "../../server/board";
 import { LOG_FULL, LOG_NUMS, covering, fromLogs, logBinding, logDbs, newestLogs } from "../../server/logdb";
@@ -137,10 +138,21 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  // 길드마스터와 앱개발자 (제작자 요청 2026-11-02 '사용 기록하고 챗봇 개선은 길드마스터도')
-  if (RANK[me.role] < 2) return FORBIDDEN();
+  // 길드마스터와 앱개발자 (제작자 요청 2026-11-02 '사용 기록하고 챗봇 개선은 길드마스터도'), 유어아너 (2026-11-13)
+  if (!canSeeLog(me)) return FORBIDDEN();
   const q = new URL(request.url).searchParams;
   if (q.get("usage")) return json(await usage(env));
+  // 대시보드 (2026-11-13 개편, server/actDash.ts): 기간 1·7·30일
+  const period = [1, 7, 30].includes(Number(q.get("days"))) ? Number(q.get("days")) : 7;
+  if (q.get("part") === "dash") return json(await dashboard(env, period));
+  if (q.get("part") === "live") return json(await liveNow(env));
+  if (q.get("part") === "person") {
+    const who = q.get("user");
+    if (!who) return json({ error: "누구인지 알려 주세요" }, 400);
+    const dbs0 = await logDbs(env);
+    const [dash, devices, overlaps] = await Promise.all([personDash(env, await charIds(env, who), period), devicesOf(env, dbs0, who), overlapsOf(env, dbs0, who)]);
+    return json({ ...dash, devices, overlaps });
+  }
   // 화면은 기록(part=rows)과 요약(part=summary)을 따로 동시에 받아 기록부터 그린다 (제작자 2026-11-04 '사용 기록 들어갈 때 로딩이 길어').
   // part 가 없으면 예전처럼 둘 다 (배포 중 예전 화면)
   const part = q.get("part");

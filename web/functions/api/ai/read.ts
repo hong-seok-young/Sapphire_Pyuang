@@ -9,6 +9,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { canEnter, isManager } from "../../../server/rental";
+import { trackUsage } from "../../../server/apiUsage";
 
 /** 제작자 요청 2026-11-02 '비용 신경 쓰지 말고 무조건 퀄리티': 가장 좋은 모델로 읽는다 */
 const READ_MODEL = "claude-opus-5-5";
@@ -111,6 +112,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         },
       ],
     });
+    await trackUsage(env, me.id, `read_${kind}`, res);
     if (res.stop_reason === "refusal") return json({ error: "이 스샷은 읽지 못했어요" }, 422);
     const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
     const raw = JSON.parse(text) as Record<string, unknown>;

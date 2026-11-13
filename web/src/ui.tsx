@@ -829,14 +829,17 @@ export const NewTag = ({ on }: { on: boolean }) => (on ? <i className="new-tag">
 export function MasterNote({
   role,
   children,
+  who = "길드마스터와 개발자에게만 보이는 메뉴예요",
 }: {
   role: string;
   children: ReactNode;
+  /** 누구에게 보이는 메뉴인지 (사용 기록은 유어아너도, 2026-11-13) */
+  who?: string;
 }) {
   if (role !== "master") return null;
   return (
     <div className="panel master-note">
-      <b>길드마스터와 개발자에게만 보이는 메뉴예요</b>
+      <b>{who}</b>
       <p>{children}</p>
     </div>
   );

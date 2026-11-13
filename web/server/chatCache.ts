@@ -9,6 +9,7 @@
 // - D1 chat_cache (qkey = 정리한 글의 SHA-256, msg_id = 처음 답, question = 처음 질문 글, hits)
 import Anthropic from "@anthropic-ai/sdk";
 import type { Env } from "./auth";
+import { trackUsage } from "./apiUsage";
 
 export const CACHE_MS = 3 * 24 * 3_600_000;
 const CACHEABLE = /\[\[(도감|시세):/;
@@ -96,7 +97,7 @@ const ROUTE_SCHEMA = {
 };
 
 /** 두 글이 같은 매물인지, 새 글에 매물 말고 따로 묻는 것이 있는지 (짧은 API 한 번, 두 글만) */
-export async function routeSame(env: Env, before: string, now: string): Promise<{ same: boolean; extra: string | null } | null> {
+export async function routeSame(env: Env, before: string, now: string, userId?: string): Promise<{ same: boolean; extra: string | null } | null> {
   if (!env.ANTHROPIC_API_KEY) return null;
   const workspace = env.ANTHROPIC_WORKSPACE_ID?.trim();
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, ...(workspace ? { defaultHeaders: { "anthropic-workspace-id": workspace } } : {}) });
@@ -125,6 +126,7 @@ ${now}`;
     if (!(e instanceof Anthropic.BadRequestError)) throw e;
     res = await ask(false);
   }
+  if (userId) await trackUsage(env, userId, "chat_route", res);
   const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
   const m = text.match(/\{[\s\S]*\}/);
   if (!m) return null;

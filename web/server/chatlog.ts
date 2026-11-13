@@ -4,6 +4,7 @@
 import type { Env } from "./auth";
 import { notify } from "./alerts";
 import { rememberAnswer } from "./chatCache";
+import { recordUsage, usageFromSse } from "./apiUsage";
 
 /** 그 대화의 답 받기 일꾼 (server/chatRun.ts, 대화마다 하나) */
 export const runStub = (ns: DurableObjectNamespace, threadId: number) => ns.get(ns.idFromName(`thread:${threadId}`));
@@ -184,6 +185,11 @@ export async function finishInBackground(
     }
   } catch {
     return; // 답이 끊겼으면 화면이 다시 묻는다
+  }
+  // 쓴 토큰 (사용 기록 대시보드, server/apiUsage.ts)
+  {
+    const d = new TextDecoder();
+    await recordUsage(env, userId, "chat", usageFromSse(chunks.map((c) => d.decode(c, { stream: true })).join("") + d.decode())).catch(() => undefined);
   }
   await new Promise((r) => setTimeout(r, 3000));
   try {

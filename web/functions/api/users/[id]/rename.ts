@@ -10,7 +10,7 @@ import { eachLog } from "../../../../server/logdb";
 const ID_COLUMNS: [string, string][] = [
   ["delete_requests", "user_id"], ["sim_records", "user_id"], ["sim_wallet", "user_id"], ["sim_earn", "user_id"], ["sim_feed", "user_id"], ["sim_unlocks", "user_id"], ["sim_state", "user_id"],
   ["sim_t_records", "user_id"], ["sim_t_wallet", "user_id"], ["sim_t_earn", "user_id"], ["sim_t_feed", "user_id"], ["sim_t_unlocks", "user_id"], ["sim_t_state", "user_id"],
-  ["users", "created_by"], ["sessions", "user_id"], ["chat_usage", "user_id"], ["ai_usage", "user_id"], ["profiles", "user_id"], ["profiles", "updated_by"],
+  ["users", "created_by"], ["sessions", "user_id"], ["chat_usage", "user_id"], ["ai_usage", "user_id"], ["api_usage", "user_id"], ["act_day_user", "user_id"], ["profiles", "user_id"], ["profiles", "updated_by"],
   ["level_log", "user_id"], ["level_log_archive", "user_id"], ["avatars", "user_id"], ["avatars", "updated_by"], ["listings", "seller"], ["listing_wants", "user_id"],
   ["listing_bids", "user_id"], ["gold_offers", "owner"], ["gold_wants", "user_id"], ["requests", "owner"], ["requests", "accepter"], ["request_offers", "user_id"],
   ["activity", "user_id"], ["alerts", "user_id"], ["gd_parties", "leader"], ["gd_members", "user_id"], ["gd_avail", "user_id"], ["gd_answers", "user_id"], ["alert_prefs", "user_id"], ["listing_talk", "user_id"], ["plat_orders", "user_id"],

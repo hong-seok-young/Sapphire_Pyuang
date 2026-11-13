@@ -10,6 +10,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import { reviewPoints } from "../../../server/avatarReview";
 import type { Env } from "../../../server/auth";
+import { trackUsage } from "../../../server/apiUsage";
 
 const MAX_B64 = 2_500_000;
 
@@ -29,7 +30,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     ...(workspace ? { defaultHeaders: { "anthropic-workspace-id": workspace } } : {}),
   });
   try {
-    return json(await reviewPoints(client, body.original, body.cutout, w, h, body.again === true));
+    return json(await reviewPoints(client, body.original, body.cutout, w, h, body.again === true, (res) => trackUsage(env, me.id, "avatar", res)));
   } catch (e) {
     console.error("avatar review", String((e as Error).message).slice(0, 300));
     return json(empty);

@@ -59,6 +59,8 @@ export async function deleteAccountData(env: Env, user: { id: string; main_id: s
     env.DB.prepare("DELETE FROM plat_wallets WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM layouts WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM chat_usage WHERE user_id = ?").bind(user.id),
+    // 사용 기록 대시보드의 하루 요약 (사용 기록과 같이 지운다). AI 사용량(api_usage)은 길드 전체 합이라 남긴다
+    env.DB.prepare("DELETE FROM act_day_user WHERE user_id = ?").bind(user.id),
     // 게시판: 그 사람의 글(과 거기 딸린 사진, 댓글, 좋아요), 다른 글에 단 댓글과 좋아요
     env.DB.prepare("DELETE FROM board_files WHERE post_id IN (SELECT id FROM board_posts WHERE author = ?)").bind(user.id),
     env.DB.prepare("DELETE FROM board_comments WHERE user_id = ? OR post_id IN (SELECT id FROM board_posts WHERE author = ?)").bind(user.id, user.id),
