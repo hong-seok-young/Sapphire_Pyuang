@@ -313,6 +313,14 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   const notDone = useMemo(() => (price ? dex.entries.filter((e) => !done.has(e.name)) : null), [dex, done, price]);
   const planCost = useCallback((e: DexEntry, mode: "normal" | "event") => (mode === "normal" ? entryGold.get(e.name) ?? null : null), [entryGold]);
   const { plan: multi, busy: solving } = useBestPlan(notDone, planNeeds, planCost);
+  // 능력치 칸마다의 목표 비용도 정수 최적화로 정확히 (제작자 2026-11-13 'pve 1퍼 이동속도 8 각각 올리면 더 싸게 되는데':
+  // 칸 하나의 목표 비용이 차례로 고른 값이라 PVE 데미지% 1 이 106.6만 · 2개로 떴다. 정확히는 74.2만 · 1개)
+  const cellGoals = useCellGoals(notDone, needs, planCost);
+  const exactGoalOf = (k: string, target: number): Goal | "busy" | null => {
+    if (!(k in over) || over[k] !== target) return goalOf(k, target);
+    const g = cellGoals.get(k);
+    return g === undefined ? goalOf(k, target) : g;
+  };
   const [allList, setAllList] = useEntryState("dex.allList", false);
   const multiOn = (!!multi || solving) && (sel.size > 0 || !allList);
   const multiShort = multi ? [...planNeeds].some(([k, v]) => (multi.got.get(k) ?? 0) < v - 1e-9) : false;
@@ -375,7 +383,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   return (
     <div className="dex">
       <StatPanel have={have} full={full} over={over} setOver={setOver} sel={sel} onPick={pickStat} doneN={doneEntries.length} total={dex.entries.length}
-        goalOf={price ? goalOf : null} stepsOf={(k) => planFor(k).map((x) => x.v)} withEv={withEv} setWithEv={setWithEv} />
+        goalOf={price ? exactGoalOf : null} stepsOf={(k) => planFor(k).map((x) => x.v)} withEv={withEv} setWithEv={setWithEv} />
 
       <div className="mk-cats dex-cats">
         {CATS.map((c) => {
@@ -508,7 +516,6 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
         ))}
       </ul>
       {!listed.length && !(solving && multiOn) && <p className="muted dex-empty">맞는 항목이 없어요</p>}
-      <p className="muted dex-src">{dex.source}</p>
     </div>
   );
 }
@@ -522,7 +529,7 @@ interface Goal { steps: GoalStep[]; gold: number; unknown: number; reached: bool
 function StatPanel({ have, full, over, setOver, sel, onPick, doneN, total, goalOf, stepsOf, withEv, setWithEv }: {
   have: Sum; full: Sum; over: Record<string, number>; setOver: (v: Record<string, number>) => void;
   sel: Set<string>; onPick: (k: string) => void; doneN: number; total: number;
-  goalOf: ((k: string, target: number) => Goal | null) | null; stepsOf: (k: string) => number[];
+  goalOf: ((k: string, target: number) => Goal | "busy" | null) | null; stepsOf: (k: string) => number[];
   withEv: boolean; setWithEv: (v: boolean) => void;
 }) {
   // 숫자 칸을 좌우로 끌면 싼 순서의 다음 항목만큼 오르내린다 (제작자 2026-11-12 '바로 좌우로 조정', 바는 '목록이 길어져서 싫다')
@@ -562,7 +569,9 @@ function StatPanel({ have, full, over, setOver, sel, onPick, doneN, total, goalO
       <div key={k} className={"dex-cell" + (sel.has(k) ? " dex-cell-on" : "") + (k in over ? " dex-cell-set" : "") + (g ? " dex-cell-goal" : "")}>
         <button type="button" className="dex-cell-name" onClick={() => onPick(k)} disabled={!mx} aria-pressed={sel.has(k)}>
           <b title={s}>{SHORT[s] ?? s}{pct && <small>%</small>}</b>
-          {g ? (
+          {g === "busy" ? (
+            <small className="dex-goal dex-goal-busy">최저가 찾는 중</small>
+          ) : g ? (
             <small className="dex-goal">
               {fmtGold(g.gold)}{g.unknown ? "+?" : ""} · {g.steps.length}개{g.reached ? "" : " 모자람"}
             </small>
@@ -1113,6 +1122,54 @@ function useBestPlan(entries: DexEntry[] | null, targets: Map<string, number>, c
   if (!job) return { plan: null, busy: false };
   if (!ready) return { plan: null, busy: true };
   return { plan: res!.plan ?? fallback, busy: false };
+}
+
+/** 능력치 칸마다 그 목표 하나만 채우는 최저가 묶음 (정수 최적화). 푸는 동안은 "busy", 못 풀면(다 해도 모자람 등) 칸에서 차례로 고른 값으로 */
+function useCellGoals(entries: DexEntry[] | null, needs: Map<string, number>, costOf: (e: DexEntry, mode: "normal" | "event") => number | null): Map<string, Goal | "busy"> {
+  const jobs = useMemo(() => {
+    if (!entries) return [];
+    return [...needs].map(([k, need]) => {
+      const cands = entries.filter((e) => e.effects.some(([s, , p]) => rowKey(s, p) === k));
+      const known = cands.map((e) => costOf(e, "normal"));
+      const big = known.reduce<number>((a, g) => a + (g ?? 0), 0) + 1e9;
+      const vals = cands.map((e) => [[0, e.effects.filter(([s, , p]) => rowKey(s, p) === k).reduce((a, [, v]) => a + v, 0)]] as [number, number][]);
+      const costs = known.map((g) => g ?? big);
+      const key = `${k}=${need}|` + cands.map((e, i) => `${e.name}:${Math.round(costs[i])}`).join(",");
+      return { k, key, cands, known, costs, vals, need };
+    });
+  }, [entries, needs, costOf]);
+  const [done, setDone] = useState<Map<string, Goal | null>>(new Map());
+  useEffect(() => {
+    let live = true;
+    const t = window.setTimeout(() => {
+      for (const j of jobs) {
+        if (done.has(j.key)) continue;
+        solveCover(j.key, j.costs, j.vals, [j.need]).then((idx) => {
+          if (!live) return;
+          let goal: Goal | null = null;
+          if (idx) {
+            const steps = idx.map((i) => ({ e: j.cands[i], v: j.vals[i][0][1], g: j.known[i] })).sort((a, b) => (a.g ?? Infinity) - (b.g ?? Infinity));
+            const got = steps.reduce((a, x) => a + x.v, 0);
+            goal = { steps, gold: steps.reduce((a, x) => a + (x.g ?? 0), 0), unknown: steps.filter((x) => x.g == null).length, reached: got >= j.need - 1e-9 };
+          }
+          setDone((m) => new Map(m).set(j.key, goal));
+        });
+      }
+    }, 250);
+    return () => {
+      live = false;
+      window.clearTimeout(t);
+    };
+  }, [jobs]); // eslint-disable-line react-hooks/exhaustive-deps
+  const out = new Map<string, Goal | "busy">();
+  for (const j of jobs) {
+    if (!done.has(j.key)) out.set(j.k, "busy");
+    else {
+      const g = done.get(j.key);
+      if (g) out.set(j.k, g);
+    }
+  }
+  return out;
 }
 
 /** 최저가 조합을 푸는 동안 (제작자 2026-11-13 '정수 최적화 엔진 최저가 조합 찾는 중이라고 띄우고') */

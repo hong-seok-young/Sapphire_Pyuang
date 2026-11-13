@@ -5640,3 +5640,6 @@ html.space-on body { background: transparent; }
 @keyframes dex-solve-spin { from { transform: rotate(45deg); } to { transform: rotate(405deg); } }
 @keyframes dex-solve-dot { 0%, 100% { transform: translateY(0); opacity: 0.4; } 50% { transform: translateY(-3px); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .dex-solving-gem, .dex-solving-dots b { animation: none; } }
+.dex-goal-busy { color: var(--muted) !important; animation: dex-busy-blink 1s ease-in-out infinite; }
+@keyframes dex-busy-blink { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .dex-goal-busy { animation: none; } }
