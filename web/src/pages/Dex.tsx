@@ -630,10 +630,11 @@ function StatPanel({ have, full, over, setOver, sel, onPick, doneN, total, goalO
             목표 지우기
           </button>
         )}
+        {/* 목표 지우기 줄 오른쪽 끝 (제작자 2026-11-13 '목표 지우기 행에서 우측 정렬로, 이벤트 도감 포함') */}
+        <button type="button" className="dex-evtoggle dex-ev-right" aria-pressed={withEv} onClick={() => setWithEv(!withEv)}>
+          <span className="dex-evbox">{withEv ? "✓" : ""}</span>이벤트 도감 포함
+        </button>
       </div>
-      <button type="button" className="dex-evtoggle" aria-pressed={withEv} onClick={() => setWithEv(!withEv)}>
-        <span className="dex-evbox">{withEv ? "✓" : ""}</span>이벤트
-      </button>
     </Panel>
   );
 }

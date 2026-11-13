@@ -5051,7 +5051,7 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .dex-row-num::-webkit-outer-spin-button, .dex-row-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .dex-row-set .dex-row-num { color: var(--gold); border-color: var(--gold); }
 .dex-row-max { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dex-sum-foot { display: flex; gap: 6px; margin-top: 6px; }
+.dex-sum-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
 .dex-row-name small.dex-gain { display: block; margin: 0; line-height: 1.1; }
 
 /* 성장코인샵 담당자: 두 번 눌러야 하는 단추 (지급 완료·되돌리기) */
@@ -5485,6 +5485,7 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 .dex-snip-head b { color: var(--gold); font-size: 13px; }
 .dex-snip-head small { flex: 1; min-width: 0; font-size: 10px; }
 .dex-snip-head .dex-evtoggle { margin: 0; }
+.dex-sum-foot .dex-ev-right { margin: 0 0 0 auto; }
 .dex-snip-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
 .dex-snip-stat { display: flex; flex-direction: column; min-width: 0; padding: 3px 5px; background: rgba(7, 6, 15, 0.35); border: 1px solid rgba(169, 162, 207, 0.15); }
 .dex-snip-stat span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--muted); }
