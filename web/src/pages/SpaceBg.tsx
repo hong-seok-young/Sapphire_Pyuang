@@ -10,6 +10,13 @@ import type { SpaceRun } from "../space";
 export function SpaceBackground({ me }: { me: Me }) {
   const [cfg, setCfg] = useState<BgCfg>(() => loadBg(me.id));
   const [day, setDay] = useState(todayScene);
+  // 설정의 미리 보기가 열린 동안은 쉰다 (미리 보기가 따로 그린다)
+  const [paused, setPaused] = useState(false);
+  useEffect(() => {
+    const on = (e: Event) => setPaused(!!(e as CustomEvent).detail);
+    addEventListener("sapphire:bg-preview", on);
+    return () => removeEventListener("sapphire:bg-preview", on);
+  }, []);
   useEffect(() => {
     setCfg(loadBg(me.id));
     const on = () => setCfg(loadBg(me.id));
@@ -33,7 +40,7 @@ export function SpaceBackground({ me }: { me: Me }) {
   const host = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = host.current;
-    if (!enabled || !el) return;
+    if (!enabled || paused || !el) return;
     let run: SpaceRun | null = null;
     let dead = false;
     let rt = 0;
@@ -63,7 +70,7 @@ export function SpaceBackground({ me }: { me: Me }) {
       removeEventListener("sapphire:bg-boom", boom);
       removeEventListener("resize", resize);
     };
-  }, [enabled, scene, cfg.px]);
+  }, [enabled, paused, scene, cfg.px]);
   if (!enabled) return null;
   return <div className="space-bg" ref={host} aria-hidden />;
 }

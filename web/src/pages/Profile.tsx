@@ -371,7 +371,7 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
               <WeatherBody on={wxOn} onChange={setWxOn} />
             </MeRow>
           )}
-          {/* 우주 배경 (제작자 2026-11-12, 개발 중이라 미리 보는 사람만: bgSettings.ts, pages/SpaceBg.tsx) */}
+          {/* 우주 배경 (제작자 2026-11-12, 2026-11-13 모두에게: bgSettings.ts, pages/SpaceBg.tsx, 미리 보기 pages/BgSettings.tsx) */}
           {canUseBg(me) && (
             <MeRow label="배경화면" value={bg.on ? `${BG_NAMES[bg.scene]} · ${bg.px}px` : "꺼짐"} {...row("bg")}>
               <BgSettingsBody me={me} onChange={setBg} />

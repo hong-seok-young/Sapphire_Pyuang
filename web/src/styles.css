@@ -5566,21 +5566,21 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 /* 첫 화면(index.html)이 html 에 바탕색을 칠해 두어서, body 바탕이 있으면 그 위에 덮인다: 켜면 body 를 비운다 */
 html.space-on { background: #070a1e; }
 html.space-on body { background: transparent; }
-html.space-on .tile, html.space-on .search-entry { background: rgb(38 33 80 / var(--bt-a, 0.6)); text-shadow: 1px 1px 0 var(--edge); }
+:is(html.space-on, .bg-preview) :is(.tile, .search-entry) { background: rgb(38 33 80 / var(--bt-a, 0.6)); text-shadow: 1px 1px 0 var(--edge); }
 /* 도는 빛 테두리 칸: 바탕이 비치니 빛을 테두리(3px) 안에만 가두는 틀로 바꾼다 (Home.tsx) */
 .tile-ring-fx { display: none; }
-html.space-on .tile-ring::before, html.space-on .tile-ring::after { display: none; }
-html.space-on .tile-ring > .tile-ring-fx {
+:is(html.space-on, .bg-preview) .tile-ring::before, :is(html.space-on, .bg-preview) .tile-ring::after { display: none; }
+:is(html.space-on, .bg-preview) .tile-ring > .tile-ring-fx {
   display: block; position: absolute; inset: 0; z-index: 0; overflow: hidden; padding: 3px; pointer-events: none;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
-html.space-on .tile-ring-fx::before {
+:is(html.space-on, .bg-preview) .tile-ring-fx::before {
   content: ""; position: absolute; left: 50%; top: 50%; width: 220%; aspect-ratio: 1;
   background: conic-gradient(transparent 0 62%, var(--ring-a) 74%, var(--ring-b) 80%, var(--ring-a) 86%, transparent 96%);
   transform: translate(-50%, -50%); animation: ring-spin 2.6s linear infinite;
 }
-@media (prefers-reduced-motion: reduce) { .sp-win, .space-bg canvas, html.space-on .tile-ring-fx::before { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .sp-win, .space-bg canvas, :is(html.space-on, .bg-preview) .tile-ring-fx::before { animation: none; } }
 /* 설정의 배경화면 칸 */
 .bg-set { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .bg-set-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
@@ -5592,3 +5592,21 @@ html.space-on .tile-ring-fx::before {
 .bg-range { width: 100%; accent-color: var(--gold); }
 .bg-boom { margin-top: 4px; }
 .bg-boom:disabled { opacity: 0.45; }
+/* 배경화면 미리 보기 (pages/BgSettings.tsx): 화면 가득 배경 + 내 홈 + 아래 조절 칸 */
+.bg-pv-open { width: 100%; padding: 11px; font-size: 14px; color: var(--edge); background: var(--gold); }
+.bg-preview { position: fixed; inset: 0; z-index: 300; overflow: hidden; background: #070a1e; }
+.bg-preview .space-bg { position: absolute; z-index: 0; }
+.bg-pv-home { position: absolute; inset: 0; z-index: 1; max-width: 640px; margin: 0 auto; padding: calc(18px + env(safe-area-inset-top)) 12px 0; pointer-events: none; }
+.bg-pv-hero { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.bg-pv-hero img { width: 48px; height: 48px; image-rendering: pixelated; border: var(--px) solid var(--edge); box-shadow: 0 0 0 var(--px) var(--hi); }
+.bg-pv-title { font-size: 28px; line-height: 1.1; color: var(--gold); text-shadow: 2px 2px 0 var(--edge); }
+.bg-pv-title small { font-size: 14px; color: var(--sapphire); }
+.bg-pv-sub { font-size: 12px; color: var(--muted); text-shadow: 1px 1px 0 var(--edge); }
+.bg-pv-panel { position: absolute; z-index: 2; left: 8px; right: 8px; bottom: calc(10px + env(safe-area-inset-bottom)); max-width: 624px; margin: 0 auto;
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 8px; background: rgba(9, 10, 28, 0.9); border: var(--px) solid var(--edge); box-shadow: 0 0 0 var(--px) var(--hi); }
+.bg-pv-row6 { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+.bg-pv-row4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.bg-pv-row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.bg-pv-panel .pill { padding: 8px 2px; font-size: 12px; white-space: nowrap; }
+.bg-pv-clear { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+.bg-pv-clear b { color: var(--gold); font-weight: 400; }

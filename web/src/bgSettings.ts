@@ -1,10 +1,9 @@
 /**
  * 배경화면 설정 (설정 > 앱 설정 > 배경화면, 제작자 2026-11-12 '배경화면 설정하기 누르면 픽셀도 2px 3px, 버튼 투명도 0~100, 배경도 고르게, 아니면 매일 랜덤').
  * 이 기기에 계정마다 둔다 (폰마다 성능·취향이 달라서). 바꾸면 'sapphire:bg' 로 알려 배경(pages/SpaceBg.tsx)이 바로 바뀐다.
- * 개발 중이라 미리 보는 사람(canPreview)만 고른다. 처음은 꺼짐.
+ * 모두가 쓴다 (제작자 2026-11-13 '모두에게 보이게 해도 돼', 처음엔 미리 보는 사람만). 처음은 꺼짐.
  */
 import type { Me } from "./auth";
-import { canPreview } from "./launcher";
 
 /** 0 = 매일 랜덤, 1~5 = 장면 */
 export type BgScene = 0 | 1 | 2 | 3 | 4 | 5;
@@ -20,7 +19,7 @@ export const BG_NAMES = ["매일 랜덤", "은하수", "노을", "성운", "행�
 const DEF: BgCfg = { on: false, scene: 0, px: 2, clear: 40 };
 const key = (id: string) => `sapphire.bg.${id}`;
 
-export const canUseBg = (me: Me) => canPreview(me);
+export const canUseBg = (_me: Me) => true;
 
 export function loadBg(id: string): BgCfg {
   try {
