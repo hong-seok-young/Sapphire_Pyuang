@@ -16,8 +16,8 @@ export interface BgCfg {
   clear: number;
 }
 export const BG_NAMES = ["매일 랜덤", "은하수", "노을", "성운", "행성", "오로라"] as const;
-// 처음 값 (제작자 2026-11-13 '기본세팅을 은하수 / 투명도 100 으로'): 아직 안 고친 사람은 은하수·버튼 바탕 완전 투명으로 시작 (켜는 것은 각자)
-const DEF: BgCfg = { on: false, scene: 1, px: 2, clear: 100 };
+// 처음 값 (제작자 2026-11-13 '기본세팅을 은하수 / 투명도 100 으로' -> 같은 날 '노을로 하자, 노을이 더 이쁘다'): 아직 안 고친 사람은 노을·버튼 바탕 완전 투명으로 시작 (켜는 것은 각자)
+const DEF: BgCfg = { on: false, scene: 2, px: 2, clear: 100 };
 const key = (id: string) => `sapphire.bg.${id}`;
 
 export const canUseBg = (_me: Me) => true;
