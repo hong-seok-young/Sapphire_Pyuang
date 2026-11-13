@@ -4,6 +4,10 @@ name: D1 usage
 
 on:
   workflow_dispatch:
+    inputs:
+      day:
+        description: "UTC 날짜 (비우면 오늘)"
+        required: false
 
 permissions:
   contents: read
@@ -13,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
+      DAY: ${{ inputs.day }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
@@ -25,10 +30,11 @@ jobs:
             return r.json();
           };
           const end = new Date(), start = new Date(end.getTime() - 24 * 3600e3);
-          const day = end.toISOString().slice(0, 10), prev = start.toISOString().slice(0, 10);
+          const day = process.env.DAY || end.toISOString().slice(0, 10), prev = start.toISOString().slice(0, 10);
+          const until = process.env.DAY ? `${day}T23:59:59Z` : end.toISOString();
           const a = await gql(`query($a:String!,$s:Date!,$e:Date!){viewer{accounts(filter:{accountTag:$a}){d1AnalyticsAdaptiveGroups(limit:200,filter:{date_geq:$s,date_leq:$e},orderBy:[date_ASC]){sum{readQueries writeQueries rowsRead rowsWritten} dimensions{date databaseId}}}}}`, { a: acc, s: prev, e: day });
           console.log("== per db per day"); console.log(JSON.stringify(a.errors ?? a.data?.viewer?.accounts?.[0]?.d1AnalyticsAdaptiveGroups, null, 0).slice(0, 6000));
-          const q = await gql(`query($a:String!,$s:Time!,$e:Time!){viewer{accounts(filter:{accountTag:$a}){d1QueriesAdaptiveGroups(limit:60,filter:{datetime_geq:$s,datetime_leq:$e},orderBy:[sum_rowsRead_DESC]){sum{rowsRead rowsWritten} count dimensions{query databaseId}}}}}`, { a: acc, s: `${day}T00:00:00Z`, e: end.toISOString() });
+          const q = await gql(`query($a:String!,$s:Time!,$e:Time!){viewer{accounts(filter:{accountTag:$a}){d1QueriesAdaptiveGroups(limit:120,filter:{datetime_geq:$s,datetime_leq:$e},orderBy:[sum_rowsRead_DESC]){sum{rowsRead rowsWritten} count dimensions{query databaseId}}}}}`, { a: acc, s: `${day}T00:00:00Z`, e: until });
           console.log("== top queries today (UTC)");
           const rows = q.data?.viewer?.accounts?.[0]?.d1QueriesAdaptiveGroups;
           if (!rows) console.log(JSON.stringify(q).slice(0, 3000));
