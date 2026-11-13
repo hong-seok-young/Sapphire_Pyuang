@@ -131,8 +131,26 @@ export const AI_USD_SNAP = "ai_usd_snap_20261113";
  * 2) 없으면 앱 어림: 11월은 콘솔에서 본 $216.46 + 그 뒤 센 만큼, 그 뒤 달은 그 달 api_usage 합
  *    (앱 바깥(GitHub Actions 의 번역·정리·시험)에서 쓴 것은 api_usage 에 없어서 콘솔보다 조금 적게 나올 수 있다)
  */
-export async function monthUsd(env: Env): Promise<{ month: string; usd: number; base: number | null; console: boolean; refreshedAt: number | null }> {
+export async function monthUsd(env: Env): Promise<{ month: string; usd: number; base: number | null; console: boolean; refreshedAt: number | null; limit: number }> {
   const month = new Date().toISOString().slice(0, 7);
+  return { ...(await monthUsdOf(env, month)), limit: aiLimit(month) };
+}
+
+/** API 월 한도 (제작자 2026-11-13 '맥시멈 340' -> '이번 달은 300 한도'): 달마다 다르면 AI_LIMITS 에 그 달을 적는다, 없으면 340 */
+const AI_LIMITS: Record<string, number> = { "2026-11": 300 };
+export const aiLimit = (month: string) => AI_LIMITS[month] ?? 340;
+
+/** 이번 달 이 사람(묶은 캐릭터 모두)이 쓴 AI 비용 (달러, api_usage 로 센 만큼: 2026-11-13 부터) */
+export async function personMonthUsd(env: Env, ids: string[], month = new Date().toISOString().slice(0, 7)): Promise<number> {
+  const row = await env.DB.prepare(
+    `SELECT COALESCE(SUM(${USD_MICRO_SQL}), 0) AS m FROM api_usage WHERE user_id IN (SELECT value FROM json_each(?1)) AND day >= ?2`,
+  )
+    .bind(JSON.stringify(ids), `${month}-01`)
+    .first<{ m: number }>();
+  return Number(row?.m ?? 0) / 1e6;
+}
+
+async function monthUsdOf(env: Env, month: string): Promise<{ month: string; usd: number; base: number | null; console: boolean; refreshedAt: number | null }> {
   const official = await env.DB.prepare("SELECT usd, refreshed_at AS r FROM ai_cost WHERE month = ?")
     .bind(month)
     .first<{ usd: number; r: number | null }>()

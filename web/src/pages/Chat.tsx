@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ChatUsageBar, chatUsed } from "./ChatUsage";
 import type { FormEvent, KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import type { Wiki } from "../types";
@@ -177,7 +178,6 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
   /** 다시 열었을 때 답이 없는 질문이 있으면 서버가 받던 답을 기다리거나 다시 묻는다 (old: RESUME_MS 보다 오래된 질문이라 바로 다시 묻는다) */
   const [resume, setResume] = useState<null | "fresh" | "old">(null);
   const [busy, setBusy] = useState(false);
-  const [left, setLeft] = useState<number | null>(null);
   const threadRef = useRef<number | null>(null);
   const runRef = useRef(0);
   const ctrlRef = useRef<AbortController | null>(null);
@@ -478,7 +478,6 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
           await sleep(3000);
         }
       }
-      if (r.left !== null) setLeft(r.left);
       const thinkMs = (firstText ?? Date.now()) - startedAt;
       let note: string | undefined;
       if (r.refused) {
@@ -512,6 +511,7 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
     } catch (err) {
       update(() => ({ role: "assistant", text: err instanceof Error ? err.message : String(err), error: true }));
     } finally {
+      chatUsed();
       if (live()) {
         setBusy(false);
           }
@@ -606,6 +606,7 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
   const lastAnswer = turns.length - 1;
   const compose = (
     <form ref={composeRef} className="chat-compose chat-compose-fixed" onSubmit={send}>
+      <ChatUsageBar />
       {(pending.length > 0 || pendingFiles.length > 0) && (
         <div className="chat-pending">
           {pending.map((p, i) => (
@@ -668,7 +669,6 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
           </button>
         )}
       </div>
-      <p className="chat-note">아이모 자료와 웹을 찾아 답해서 틀릴 수도 있어요{left !== null ? ` · 오늘 남은 질문 ${left}번` : ""}</p>
     </form>
   );
 

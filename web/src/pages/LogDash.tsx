@@ -51,9 +51,7 @@ export function tokText(n: number): string {
 export const usdText = (n: number) => (n >= 100 ? `$${n.toFixed(1)}` : `$${n.toFixed(2)}`);
 /** '3시간 전' · '40분 전' */
 const agoText = (ms: number) => (ms < 3_600_000 ? `${Math.max(1, Math.round(ms / 60_000))}분 전` : `${Math.round(ms / 3_600_000)}시간 전`);
-/** API 월 한도 (제작자 2026-11-13 '맥시멈 340' -> '이번 달은 300 한도'): 달마다 다르면 AI_LIMITS 에 그 달을 적는다, 없으면 340 */
-const AI_LIMITS: Record<string, number> = { "2026-11": 300 };
-const aiLimit = (month: string) => AI_LIMITS[month] ?? 340;
+// API 월 한도는 서버가 준다 (server/apiUsage.ts AI_LIMITS, 11월 300 · 그 뒤 340)
 export function lastText(last: number | null, today: number): string {
   if (last === null) return "들어온 적 없음";
   const d = today - last;
@@ -825,10 +823,10 @@ export function AiPanel({ dash }: { dash: Dash }) {
             <b>
               <Pop v={Math.round(month.usd * 100)}>{usdText(month.usd)}</Pop>
             </b>
-            <small>/ ${aiLimit(month.month)}</small>
+            <small>/ ${month.limit ?? 340}</small>
           </div>
           <i>
-            <i style={{ transform: `scaleX(${Math.min(1, month.usd / aiLimit(month.month))})` }} />
+            <i style={{ transform: `scaleX(${Math.min(1, month.usd / (month.limit ?? 340))})` }} />
           </i>
           <em>
             {month.console && month.refreshedAt

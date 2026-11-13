@@ -566,7 +566,7 @@ export interface Dash {
   ai: { kind: string; calls: number; input: number; output: number; cache: number; web: number; usd?: number; users: number }[];
   aiSince: number | null;
   /** 이번 달 AI 비용 (달러, server/apiUsage.ts monthUsd) */
-  aiMonth?: { month: string; usd: number; base: number | null; console?: boolean; refreshedAt?: number | null } | null;
+  aiMonth?: { month: string; usd: number; base: number | null; console?: boolean; refreshedAt?: number | null; limit?: number } | null;
 }
 
 export interface LiveNow {
