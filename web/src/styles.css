@@ -5553,3 +5553,42 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 .gf-note { font-style: normal; font-size: 10px; padding: 0 3px; color: var(--muted); border: 1px solid rgba(160, 150, 220, 0.4); }
 .gf-opts { flex-basis: 100%; font-size: 10px; color: #f0a35a; }
 .gf-part > .pic-fit + .gf-main + .gf-opts, .gf-part > .gf-coin + .gf-main + .gf-opts, .gf-part > .gf-glyph + .gf-main + .gf-opts { padding-left: 19px; }
+
+/* ---------- 우주 배경 (설정 > 배경화면, 제작자 2026-11-12. pages/SpaceBg.tsx, src/space.ts) ----------
+   모든 화면 뒤 (z-index -1: 바탕보다 위, 화면 글·칸보다 아래). 켜면 <html> 에 space-on 이 붙고 홈·정보 칸과 검색 칸은 바탕만 반투명 (--bt-a),
+   아이콘·글씨는 그대로 (제작자 '버튼의 배경만 반투명, 아이콘이나 글씨는 불투명'). 글씨에는 검은 도트 그림자를 더해 움직이는 배경 위에서도 읽힌다 */
+.space-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.space-bg > * { position: absolute; }
+.space-bg canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+.sp-win { background: #ffd27a; box-shadow: 0 0 8px 3px rgba(255, 195, 92, 0.6); animation: sp-breathe 2.6s ease-in-out infinite alternate; }
+@keyframes sp-breathe { from { opacity: 0.55; } to { opacity: 1; } }
+@keyframes sp-drift { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(var(--dx), var(--dy), 0); } }
+/* 첫 화면(index.html)이 html 에 바탕색을 칠해 두어서, body 바탕이 있으면 그 위에 덮인다: 켜면 body 를 비운다 */
+html.space-on { background: #070a1e; }
+html.space-on body { background: transparent; }
+html.space-on .tile, html.space-on .search-entry { background: rgb(38 33 80 / var(--bt-a, 0.6)); text-shadow: 1px 1px 0 var(--edge); }
+/* 도는 빛 테두리 칸: 바탕이 비치니 빛을 테두리(3px) 안에만 가두는 틀로 바꾼다 (Home.tsx) */
+.tile-ring-fx { display: none; }
+html.space-on .tile-ring::before, html.space-on .tile-ring::after { display: none; }
+html.space-on .tile-ring > .tile-ring-fx {
+  display: block; position: absolute; inset: 0; z-index: 0; overflow: hidden; padding: 3px; pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+html.space-on .tile-ring-fx::before {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 220%; aspect-ratio: 1;
+  background: conic-gradient(transparent 0 62%, var(--ring-a) 74%, var(--ring-b) 80%, var(--ring-a) 86%, transparent 96%);
+  transform: translate(-50%, -50%); animation: ring-spin 2.6s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .sp-win, .space-bg canvas, html.space-on .tile-ring-fx::before { animation: none; } }
+/* 설정의 배경화면 칸 */
+.bg-set { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.bg-set-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.bg-scenes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.bg-set .pill { padding: 8px 4px; font-size: 13px; }
+.bg-set-label { margin-top: 4px; font-size: 12px; color: var(--muted); }
+.bg-set-label b { color: var(--gold); font-weight: 400; }
+.bg-set-note { margin-top: -2px; font-size: 12px; color: var(--sapphire); }
+.bg-range { width: 100%; accent-color: var(--gold); }
+.bg-boom { margin-top: 4px; }
+.bg-boom:disabled { opacity: 0.45; }

@@ -64,6 +64,7 @@ import {
 import { LoginPage, PasswordPage } from "./pages/Login";
 import { GuideHost } from "./tutorial";
 import { BirthdaySticker } from "./birthday";
+import { SpaceBackground } from "./pages/SpaceBg";
 import { CoinToast, RaceToast } from "./coinToast";
 import { Opening, shouldCelebrate } from "./pages/Opening";
 import { reportOpen, reportView } from "./activity";
@@ -608,6 +609,8 @@ function Wiki({
       )}
       {/* 화면이 바뀔 때 0.16초 안에 살짝 떠오른다 (주소의 ? 뒤만 바뀌면 그대로) */}
       {/* 챗봇은 새 대화가 #/chat -> #/chat/번호 로 바뀌어도, 목록을 다녀와도 받던 답이 이어지게 한 화면으로 둔다 */}
+      {/* 우주 배경 (설정 > 배경화면, 켠 사람만. 모든 화면 뒤, pages/SpaceBg.tsx) */}
+      <SpaceBackground me={me} />
       <main
         className="page"
         key={page === "chat" ? "chat" : route.parts.join("/")}

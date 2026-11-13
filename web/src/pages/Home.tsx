@@ -84,6 +84,8 @@ function TileCell({
     (dragKey === t.key ? " launch-drag-src" : "");
   const inside = (
     <>
+      {/* 우주 배경을 켜면 칸 바탕이 반투명이라, 도는 빛은 테두리 안에만 (styles.css .tile-ring-fx) */}
+      {t.ring && <i className="tile-ring-fx" aria-hidden />}
       {t.ribbon && <span className="tile-ribbon">{t.ribbon}</span>}
       {/* 오른쪽 위 글자만 (장비대여 담당자 '담당자' / '멍멍', 제작자 요청 2026-11-03). UPDATE 표와 자리가 같아 표가 붙어 있는 동안은 숨기고,
           표가 사라지면(한 번 들어가면) 보인다 (제작자: '업데이트는 어차피 한 번 누르면 사라지니까 우측 위로 해도 돼') */}

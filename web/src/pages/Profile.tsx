@@ -20,6 +20,8 @@ import type { Weather } from "../weather";
 import { goCharacter, refreshMe } from "../characters";
 import { useBackClose } from "../backClose";
 import { AlertSettings } from "./AlertSettings";
+import { BgSettingsBody } from "./BgSettings";
+import { BG_NAMES, canUseBg, loadBg } from "../bgSettings";
 import { canPreview } from "../launcher";
 import { pushState } from "../push";
 import type { PushState } from "../push";
@@ -208,7 +210,7 @@ export function ProfileSetupPage({
   );
 }
 
-type MenuKey = "info" | "photo" | "chars" | "rename" | "kakao" | "alerts" | "weather" | "test";
+type MenuKey = "info" | "photo" | "chars" | "rename" | "kakao" | "alerts" | "weather" | "bg" | "test";
 
 /** 펼치는 줄의 오른쪽 꺾쇠 (이모지·글자 대신 선으로 그린다, 펼치면 아래로) */
 const Chevron = () => <span className="me-chev" aria-hidden />;
@@ -261,10 +263,11 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
   const asked = new URLSearchParams(location.hash.split("?")[1] ?? "").get("open");
   const [open, setOpen] = useEntryState<MenuKey | null>(
     "me.open",
-    asked === "kakao" || asked === "photo" || asked === "info" || asked === "weather" || asked === "alerts" ? asked : null,
+    asked === "kakao" || asked === "photo" || asked === "info" || asked === "weather" || asked === "alerts" || asked === "bg" ? asked : null,
   );
   const { links } = useKakao();
   const [wxOn, setWxOn] = useState(weatherOn);
+  const [bg, setBg] = useState(() => loadBg(me.id));
   const [phone, setPhone] = useState<PushState | null>(null);
   useEffect(() => {
     pushState().then(setPhone, () => setPhone("unsupported"));
@@ -361,11 +364,19 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
       </MeGroup>
 
       {/* 날씨 반영 (제작자 요청 2026-11-02 '내 정보에서 위치 허용하게, 날씨 반영된다고'). 쓰는 사람에게만 (canUseWeather, 지금은 모두) */}
-      {canUseWeather(me) && (
+      {(canUseWeather(me) || canUseBg(me)) && (
         <MeGroup title="앱 설정">
-          <MeRow label="날씨 반영" value={wxOn ? "켜짐" : "꺼짐"} {...row("weather")}>
-            <WeatherBody on={wxOn} onChange={setWxOn} />
-          </MeRow>
+          {canUseWeather(me) && (
+            <MeRow label="날씨 반영" value={wxOn ? "켜짐" : "꺼짐"} {...row("weather")}>
+              <WeatherBody on={wxOn} onChange={setWxOn} />
+            </MeRow>
+          )}
+          {/* 우주 배경 (제작자 2026-11-12, 개발 중이라 미리 보는 사람만: bgSettings.ts, pages/SpaceBg.tsx) */}
+          {canUseBg(me) && (
+            <MeRow label="배경화면" value={bg.on ? `${BG_NAMES[bg.scene]} · ${bg.px}px` : "꺼짐"} {...row("bg")}>
+              <BgSettingsBody me={me} onChange={setBg} />
+            </MeRow>
+          )}
         </MeGroup>
       )}
 
