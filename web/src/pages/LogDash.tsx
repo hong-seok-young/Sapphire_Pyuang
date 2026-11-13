@@ -49,8 +49,8 @@ export function tokText(n: number): string {
 }
 /** 달러: '$0.42' · '$12.30' · '$216.5' (100 넘으면 소수 첫째까지) */
 export const usdText = (n: number) => (n >= 100 ? `$${n.toFixed(1)}` : `$${n.toFixed(2)}`);
-/** API 월 한도 (CLAUDE.md '챗봇': API 월 300달러) */
-const AI_MONTH_LIMIT = 300;
+/** API 월 한도 (제작자 2026-11-13 '맥시멈 340') */
+const AI_MONTH_LIMIT = 340;
 export function lastText(last: number | null, today: number): string {
   if (last === null) return "들어온 적 없음";
   const d = today - last;
