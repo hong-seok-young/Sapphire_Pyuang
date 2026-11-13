@@ -291,3 +291,11 @@
   .ld-row > button, .ld-row > .ld-row-in { grid-template-columns: 20px minmax(0, 6em) minmax(0, 1fr) auto; gap: 4px; }
   .ld-person-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+/* AI 이번 달 누적 달러와 월 한도 막대 (LogDash.tsx AiPanel) */
+.ld-ai-month { display: grid; gap: 4px; margin-bottom: 8px; padding: 6px 8px; background: rgba(11, 10, 26, 0.35); border-left: 3px solid var(--gold); }
+.ld-ai-month > div { display: flex; align-items: baseline; gap: 6px; }
+.ld-ai-month span { font-size: 11px; color: var(--muted); }
+.ld-ai-month b { font-size: 19px; font-weight: 400; color: var(--gold); }
+.ld-ai-month small { font-size: 11px; color: var(--muted); }
+.ld-ai-month > i { display: block; height: 6px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.ld-ai-month > i > i { display: block; height: 100%; background: linear-gradient(90deg, #7dffb0, var(--gold), #ff7a7a); transform-origin: left; transition: transform 0.6s ease; }

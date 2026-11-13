@@ -114,3 +114,29 @@ export async function recordUsage(env: Env, userId: string, kind: string, u: Usa
 /** 스트리밍이 아닌 답 하나를 기록 (부르는 곳에서 한 줄로) */
 export const trackUsage = (env: Env, userId: string, kind: string, res: { usage?: RawUsage | null } | null | undefined) =>
   recordUsage(env, userId, kind, usageOf(res));
+
+// ---------- 달러로 (제작자 2026-11-13 'AI 사용량은 달러로 표시해 줄 수 있나, 지금 216.46 달러 썼어') ----------
+// Claude Opus 5.5 값 ($/백만 토큰): 입력 4 · 출력 20 · 캐시 읽기 0.2 · 캐시 쓰기(5분) 5, 웹 찾기 1번 0.01 (글 읽기는 토큰값만이라 웹 수에 같이 들어 조금 더 크게 잡힌다).
+// 토큰 x ($/백만) = 백만분의 1 달러(마이크로 달러). 모든 AI 가 claude-opus-5-5 라 한 값으로 센다 (모델을 바꾸면 여기도)
+export const USD_MICRO_SQL = "(input * 4 + cache_write * 5 + cache_read * 0.2 + output * 20 + web * 10000)";
+export const usdOf = (r: { input: number; output: number; cr: number; cw: number; web: number }) =>
+  (r.input * 4 + r.cw * 5 + r.cr * 0.2 + r.output * 20 + r.web * 10000) / 1e6;
+/** 2026-11 은 콘솔에서 본 값($216.46, 11/13 제작자)에 그 뒤 앱이 센 만큼을 더한다: 배포(ci-d1 setup AI_USD_SNAP)가 그때까지 센 값을 마이크로 달러로 적어 둔다 */
+export const AI_USD_BASE = { month: "2026-11", usd: 216.46 };
+export const AI_USD_SNAP = "ai_usd_snap_20261113";
+/** 앱 바깥(GitHub Actions 의 번역·정리·시험)에서 쓴 것은 api_usage 에 없어서 콘솔보다 조금 적게 나올 수 있다 */
+export async function monthUsd(env: Env): Promise<{ month: string; usd: number; base: number | null }> {
+  const month = new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 7);
+  if (month === AI_USD_BASE.month) {
+    const [all, snap] = await env.DB.batch([
+      env.DB.prepare(`SELECT COALESCE(SUM(${USD_MICRO_SQL}), 0) AS m FROM api_usage`),
+      env.DB.prepare("SELECT done_at AS m FROM setup WHERE key = ?").bind(AI_USD_SNAP),
+    ]);
+    const a = Number((all.results[0] as { m: number } | undefined)?.m ?? 0);
+    const s = (snap.results[0] as { m: number } | undefined)?.m;
+    const after = s === undefined ? 0 : Math.max(0, a - Number(s)) / 1e6;
+    return { month, usd: AI_USD_BASE.usd + after, base: AI_USD_BASE.usd };
+  }
+  const row = await env.DB.prepare(`SELECT COALESCE(SUM(${USD_MICRO_SQL}), 0) AS m FROM api_usage WHERE day >= ?`).bind(`${month}-01`).first<{ m: number }>();
+  return { month, usd: Number(row?.m ?? 0) / 1e6, base: null };
+}

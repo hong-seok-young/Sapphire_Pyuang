@@ -47,6 +47,10 @@ export function tokText(n: number): string {
   if (n < 100_000_000) return `${(n / 10_000).toFixed(n < 100_000 ? 1 : 0)}만`;
   return `${(n / 100_000_000).toFixed(1)}억`;
 }
+/** 달러: '$0.42' · '$12.30' · '$216.5' (100 넘으면 소수 첫째까지) */
+export const usdText = (n: number) => (n >= 100 ? `$${n.toFixed(1)}` : `$${n.toFixed(2)}`);
+/** API 월 한도 (CLAUDE.md '챗봇': API 월 300달러) */
+const AI_MONTH_LIMIT = 300;
 export function lastText(last: number | null, today: number): string {
   if (last === null) return "들어온 적 없음";
   const d = today - last;
@@ -802,12 +806,29 @@ export function AiPanel({ dash }: { dash: Dash }) {
   const tok = dash.ai.reduce((t, k) => t + k.input + k.output + k.cache, 0);
   const out = dash.ai.reduce((t, k) => t + k.output, 0);
   const web = dash.ai.reduce((t, k) => t + k.web, 0);
+  const usd = dash.ai.reduce((t, k) => t + (k.usd ?? 0), 0);
+  const month = dash.aiMonth;
   const n = days.length;
   const sel = pick ?? n - 1;
   const maxCalls = Math.max(1, ...dash.ai.map((k) => k.calls));
   return (
     <section className="panel ld-ai">
       <h2 className="panel-title">챗봇 · AI 사용량</h2>
+      {/* 이번 달 누적 (달러, 제작자 2026-11-13 '달러로 표시'): 11월은 콘솔 값 $216.46 에 그 뒤 앱이 센 만큼 */}
+      {month && (
+        <div className="ld-ai-month">
+          <div>
+            <span>{Number(month.month.slice(5))}월 누적</span>
+            <b>
+              <Pop v={Math.round(month.usd * 100)}>{usdText(month.usd)}</Pop>
+            </b>
+            <small>/ ${AI_MONTH_LIMIT}</small>
+          </div>
+          <i>
+            <i style={{ transform: `scaleX(${Math.min(1, month.usd / AI_MONTH_LIMIT)})` }} />
+          </i>
+        </div>
+      )}
       <div className="ld-ai-kpis">
         <div>
           <b>
@@ -823,9 +844,9 @@ export function AiPanel({ dash }: { dash: Dash }) {
         </div>
         <div>
           <b>
-            <Pop v={web}>{num(web)}</Pop>
+            <Pop v={Math.round(usd * 100)}>{usdText(usd)}</Pop>
           </b>
-          <small>웹 찾기·읽기</small>
+          <small>비용 · 웹 {num(web)}번</small>
         </div>
       </div>
       <p className="ld-readout">
@@ -845,7 +866,7 @@ export function AiPanel({ dash }: { dash: Dash }) {
                 <i className="ld-seg-5" style={{ width: `${(k.calls / maxCalls) * 100}%` }} />
               </span>
               <b>
-                {num(k.calls)}번 <small>{tokText(k.input + k.output + k.cache)}</small>
+                {num(k.calls)}번 <small>{k.usd !== undefined ? usdText(k.usd) : tokText(k.input + k.output + k.cache)}</small>
               </b>
             </li>
           ))}

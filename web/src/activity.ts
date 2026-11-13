@@ -563,8 +563,10 @@ export interface Dash {
   secs: { s: string; n: number; us: number }[];
   vias: { via: string; n: number; us: number }[];
   people: DashPerson[];
-  ai: { kind: string; calls: number; input: number; output: number; cache: number; web: number; users: number }[];
+  ai: { kind: string; calls: number; input: number; output: number; cache: number; web: number; usd?: number; users: number }[];
   aiSince: number | null;
+  /** 이번 달 AI 비용 (달러, server/apiUsage.ts monthUsd) */
+  aiMonth?: { month: string; usd: number; base: number | null } | null;
 }
 
 export interface LiveNow {

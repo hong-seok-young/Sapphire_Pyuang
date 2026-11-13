@@ -948,6 +948,10 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
   }
 }
 
+// AI 비용 기준점 (2026-11-13 제작자 'AI 사용량은 달러로, 지금 216.46 달러 썼어'): 지금까지 api_usage 에 센 값(마이크로 달러, Opus 5.5 값)을 한 번 적어 두고
+// 사용 기록의 '11월 누적' = $216.46 + (그 뒤 늘어난 만큼). 식은 server/apiUsage.ts USD_MICRO_SQL 과 같게
+runSql([`INSERT OR IGNORE INTO setup (key, done_at) SELECT 'ai_usd_snap_20261113', CAST(ROUND(COALESCE(SUM(input * 4 + cache_write * 5 + cache_read * 0.2 + output * 20 + web * 10000), 0)) AS INTEGER) FROM api_usage;`]);
+
 // 홈 배치 빈 칸 고침 (2026-11-12 제작자 '고쳐'): 기부함 칸(donate)을 없앤 뒤 성장코인샵 위로 빈 칸이 생긴 채(launcher.ts normalize 고치기 전) 배치를 저장한 사람은
 // 그 빈 칸이 서버에 '사람이 둔 빈 자리'로 남아 있다. 기부함 칸을 없앤 뒤(11/12 13:00 UTC) 저장된 배치 중 성장코인샵 바로 앞에 빈 자리가 이어지고 그 뒤에는 빈 자리가 없는 것만
 // 그 빈 자리들을 뺀다 (그 뒤는 안 보이는 칸들이라 화면이 다시 맞춘다). 공개 실행 기록에는 수만. setup 'layout_gap_fix_20261112' 로 한 번만

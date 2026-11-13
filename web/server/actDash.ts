@@ -8,7 +8,7 @@ import { TEST_IDS } from "./auth";
 import type { Env, Role } from "./auth";
 import { covering, fromLogs, logDbs } from "./logdb";
 import type { LogDb } from "./logdb";
-import { APP_USER } from "./apiUsage";
+import { APP_USER, monthUsd, usdOf } from "./apiUsage";
 
 const DAY = 86_400_000;
 const KST = 9 * 3_600_000;
@@ -141,7 +141,7 @@ export async function dashboard(env: Env, period: number) {
   const partial = await fill(env, dbs, past);
   const liveFrom = dayStart(lastDone + 1);
 
-  const [live, uRows, hRows, sRows, vRows, users, chat, api, lastRows] = await Promise.all([
+  const [live, uRows, hRows, sRows, vRows, users, chat, api, lastRows, aiMonth] = await Promise.all([
     aggregate(dbs, liveFrom, now + 60_000),
     env.DB.prepare("SELECT day AS d, user_id AS u, visits AS v, views AS w, acts AS a, mins AS m FROM act_day_user WHERE day >= ?").bind(histFrom).all<UR>(),
     env.DB.prepare("SELECT day AS d, hour AS h, n, users AS us FROM act_day_hour WHERE day > ?").bind(today - Math.max(period, 8)).all<HR>(),
@@ -154,6 +154,8 @@ export async function dashboard(env: Env, period: number) {
     ).bind(dayKey(histFrom)).all<{ u: string; day: string; kind: string; calls: number; input: number; output: number; cr: number; cw: number; web: number }>(),
     // 마지막으로 들어온 날 (요약 전체에서, 잠수 며칠째)
     env.DB.prepare("SELECT user_id AS u, MAX(day) AS d FROM act_day_user GROUP BY user_id").all<{ u: string; d: number }>(),
+    // 이번 달 AI 비용 (달러, 콘솔 값 기준 어림)
+    monthUsd(env).catch(() => null),
   ]);
 
   const ownerOf = new Map(users.results.map((u) => [u.id, u.main_id ?? u.id]));
@@ -240,18 +242,19 @@ export async function dashboard(env: Env, period: number) {
     else if (d >= prevFrom) get(r.u).prev.q += r.count;
   }
   // AI: 종류마다, 사람마다 (이번 기간)
-  const kinds = new Map<string, { kind: string; calls: number; input: number; output: number; cache: number; web: number; users: Set<string> }>();
+  const kinds = new Map<string, { kind: string; calls: number; input: number; output: number; cache: number; web: number; usd: number; users: Set<string> }>();
   let aiSince: number | null = null;
   for (const r of api.results) {
     const d = keyDay(r.day);
     aiSince = aiSince === null ? d : Math.min(aiSince, d);
     if (d < from) continue;
-    const k = kinds.get(r.kind) ?? (kinds.set(r.kind, { kind: r.kind, calls: 0, input: 0, output: 0, cache: 0, web: 0, users: new Set() }), kinds.get(r.kind)!);
+    const k = kinds.get(r.kind) ?? (kinds.set(r.kind, { kind: r.kind, calls: 0, input: 0, output: 0, cache: 0, web: 0, usd: 0, users: new Set() }), kinds.get(r.kind)!);
     k.calls += r.calls;
     k.input += r.input;
     k.output += r.output;
     k.cache += r.cr + r.cw;
     k.web += r.web;
+    k.usd += usdOf(r);
     k.users.add(owner(r.u));
     if (skip(r.u)) continue;
     const p = get(r.u);
@@ -331,6 +334,7 @@ export async function dashboard(env: Env, period: number) {
     people: out,
     ai: [...kinds.values()].map((k) => ({ ...k, users: k.users.size })).sort((a, b) => b.calls - a.calls),
     aiSince,
+    aiMonth,
   };
 }
 
