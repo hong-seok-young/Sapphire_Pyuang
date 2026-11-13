@@ -1515,6 +1515,13 @@
     시간으로 거르고 사람으로 묶는 activity 쿼리는 `INDEXED BY activity_at` 를 붙인다 (`actDash.ts` liveNow, `functions/api/activity.ts` 요약·기기, `chatapp.ts`). 대시보드 3분 · 지금 접속 중 30초(화면도 30초마다) · 사람 2분 · 요약 5분은
     Cloudflare 캐시(`functions/api/activity.ts` `cached`, partial 은 안 둠). 어떤 쿼리가 읽는지는 손 작업 `.github/workflows/d1-usage.yml`(GraphQL d1QueriesAdaptiveGroups, 쿼리 글과 읽은 줄 수만)로 본다.
     새 기능을 열면 다음 날 이것으로 읽은 줄을 확인한다.
+    '지금 접속 중' 칸은 뺐다 (제작자 2026-11-14 '지금 접속 중 중요하지 않아', `part=live` 는 빈 답).
+  - **D1 하루 사용량 감시** (제작자 2026-11-14 '무료 한도 내에서 무조건 해결되게'): GitHub Actions `.github/workflows/d1-guard.yml`(15분마다, `web/scripts/d1-guard.mjs`)이 계정마다 오늘(UTC) 읽은 줄/500만·쓴 줄/10만을 재서
+    60% 넘으면 1단계, 80% 넘으면 2단계를 setup 'read_saver_<날짜>'(계정·글 DB 쪽)·'log_saver_<날짜>'(사용 기록 쪽 둘째 계정)에 적고 단계가 오를 때 앱개발자에게 알림.
+    서버 `server/readSaver.ts`(일꾼마다 1분에 한 번 읽음): 1단계면 사용 기록 화면(503 '오전 9시에 다시 열려요')과 챗봇의 사용 기록 자료를 쉬고, 2단계면 새 글 배지의 글·물건 따라가기(things),
+    챗봇 자료 저장소 찾기, 아이모 소식 글자 찾기도 쉰다. 로그인·정보·게시판·챗봇 답은 그대로. 공개 실행 기록에는 % 만.
+    같은 날 줄인 것: 자료 저장소 조각 수 하루 캐시(`library.ts` chunkCount), 아이모 소식 찾기 10분 캐시, 새 글 숫자가 훑던 표에 created_at 색인(schema.sql 맨 아래).
+    둘째 클라우드플레어 계정(제작자 2026-11-14 '계정 하나 더 팔게'): 사용 기록 DB 를 그쪽으로 옮긴다 (저장소 비밀값 `CF2_API_TOKEN`·`CF2_ACCOUNT_ID`, 토큰 권한 D1 Edit · Workers Scripts Edit · Account Analytics Read).
   - 로컬 시험 2026-11-13: 가짜 길드원 36명·18일 기록 1만 줄로 요약 합이 원본과 같음(화면 8,036 · 로그인 654), 오피서(멍멍) 403, 유어아너 200, 320·360·412px 넘침 없음.
 - 누구나 읽는 말로 (제작자 요청 2026-11-02 '이런 코드 말고 비개발자가 봐도 얘가 들어가서 뭐 했는지'): 한 일은 경로·보낸 자료 대신 '길드 던전 시간표 저장 · 8.5시간',
   '홈 배치 바꿈 · 아래 탭 …', '대여 완료 (건네줌) · 보증금 💎5 + 70만 골드' 처럼 (`src/activity.ts` `ACTIONS`, 이름을 안 붙인 한 일은 '장비대여에서 고침'처럼 메뉴와 동작만).

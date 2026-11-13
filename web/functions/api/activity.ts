@@ -11,7 +11,8 @@
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../server/auth";
 import type { Env } from "../../server/auth";
 import { canSeeLog, record, whereOf } from "../../server/activity";
-import { dashboard, liveNow, personDash } from "../../server/actDash";
+import { RESTING_TEXT, logResting } from "../../server/readSaver";
+import { dashboard, personDash } from "../../server/actDash";
 import { canSim, earn } from "../../server/simcoin";
 import { anonView } from "../../server/board";
 import { LOG_FULL, LOG_NUMS, covering, fromLogs, logBinding, logDbs, newestLogs } from "../../server/logdb";
@@ -157,11 +158,13 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
   // 길드마스터와 앱개발자 (제작자 요청 2026-11-02 '사용 기록하고 챗봇 개선은 길드마스터도'), 유어아너 (2026-11-13)
   if (!canSeeLog(me)) return FORBIDDEN();
   const q = new URL(request.url).searchParams;
+  // D1 하루 읽기를 아끼는 날은 사용 기록을 쉰다 (server/readSaver.ts)
+  if (await logResting(env)) return json({ error: RESTING_TEXT }, 503);
   if (q.get("usage")) return json(await usage(env));
   // 대시보드 (2026-11-13 개편, server/actDash.ts): 기간 1·7·30일
   const period = [1, 7, 30].includes(Number(q.get("days"))) ? Number(q.get("days")) : 7;
   if (q.get("part") === "dash") return cached(request, 180, waitUntil, () => dashboard(env, period));
-  if (q.get("part") === "live") return cached(request, 30, waitUntil, () => liveNow(env));
+  if (q.get("part") === "live") return json({ now: Date.now(), people: [], perMin: [] });
   if (q.get("part") === "person") {
     const who = q.get("user");
     if (!who) return json({ error: "누구인지 알려 주세요" }, 400);

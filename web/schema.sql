@@ -1151,3 +1151,11 @@ CREATE TABLE IF NOT EXISTS act_day_hour (day INTEGER NOT NULL, hour INTEGER NOT 
 CREATE TABLE IF NOT EXISTS act_day_sec (day INTEGER NOT NULL, sec TEXT NOT NULL, n INTEGER NOT NULL, users INTEGER NOT NULL, PRIMARY KEY (day, sec));
 CREATE TABLE IF NOT EXISTS act_day_via (day INTEGER NOT NULL, via TEXT NOT NULL, n INTEGER NOT NULL, users INTEGER NOT NULL, PRIMARY KEY (day, via));
 CREATE TABLE IF NOT EXISTS act_rollup (day INTEGER PRIMARY KEY, done_at INTEGER NOT NULL);
+
+-- 2026-11-14 D1 하루 읽기 한도: 2분마다 도는 새 글 숫자(/api/news)가 이 표들을 통째로 훑었다
+CREATE INDEX IF NOT EXISTS rental_items_created ON rental_items (created_at);
+CREATE INDEX IF NOT EXISTS rental_requests_created ON rental_requests (created_at);
+CREATE INDEX IF NOT EXISTS rental_talk_created ON rental_talk (created_at);
+CREATE INDEX IF NOT EXISTS board_comments_created ON board_comments (created_at);
+CREATE INDEX IF NOT EXISTS listing_talk_created ON listing_talk (created_at);
+CREATE INDEX IF NOT EXISTS alerts_user_kind ON alerts (user_id, kind, created_at);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useEntryState } from "../router";
 import { errorText } from "../auth";
 import type { Me } from "../auth";
@@ -12,7 +12,6 @@ import {
   HeatPanel,
   KpiGrid,
   LeadPanel,
-  LivePanel,
   MenuPanel,
   MiniBars,
   PersonPanel,
@@ -25,9 +24,10 @@ import {
   num,
   tokText,
   useDash,
-  useLive,
   usePerson,
 } from "./LogDash";
+
+const NO_LIVE = new Set<string>();
 
 const KINDS: (Kind | null)[] = [null, "visit", "view", "act"];
 
@@ -111,8 +111,8 @@ export function ActivityLogPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const [period, setPeriod] = useEntryState<Period>("log.period", 7);
   const [user, setUser] = useEntryState<string | null>("log.user", null);
   const { dash, error } = useDash(period);
-  const live = useLive();
-  const liveIds = useMemo(() => new Set((live?.people ?? []).map((p) => p.id)), [live]);
+  // '지금 접속 중'은 뺐다 (2026-11-14 제작자 '지금 접속 중 중요하지 않아': 30초마다 기록 DB 를 읽어 D1 하루 읽기를 많이 썼다)
+  const liveIds = NO_LIVE;
   const pick = (id: string) => {
     setUser(id);
     setTab("people");
@@ -148,7 +148,6 @@ export function ActivityLogPage({ wiki, me }: { wiki: Wiki; me: Me }) {
           <Loading error={error} />
         ) : (
           <div className="ld-dash">
-            <LivePanel live={live} wiki={wiki} onPick={pick} />
             <KpiGrid dash={dash} />
             <TrendPanel dash={dash} />
             <TierPanel dash={dash} onPick={pick} />

@@ -3,6 +3,7 @@
 // 자료 저장소의 글 파일은 scripts/library-sync.mjs 가 조각으로 D1 lib_chunks 에 넣는다 (저장소 main 이 바뀌면 30분 안에, data-watch.yml).
 // 여기서는 질문 낱말이 든 조각을 골라 '<길드 자료 저장소>' 로 붙인다. 조각 글은 자르지 않는다 (CLAUDE.md 'AI 는 무조건 품질'), 몇 조각을 붙일지만 고른다.
 // 길드/ 아래(staff 1)는 운영진(오피서 이상)에게만.
+import { heavyResting } from "./readSaver";
 import { RANK } from "./auth";
 import type { Env, User } from "./auth";
 import { ASK_WORD } from "./official";
@@ -31,9 +32,19 @@ interface Hit {
   s: number;
 }
 
+async function chunkCount(env: Env, staff: number): Promise<number> {
+  const key = new Request(`https://cache.sapphire/lib-count/v1/${staff}`);
+  const cache = (caches as unknown as { default: Cache }).default;
+  const hit = await cache.match(key).catch(() => undefined);
+  if (hit) return Number(await hit.text()) || 0;
+  const n = (await env.DB.prepare("SELECT COUNT(*) AS n FROM lib_chunks WHERE staff <= ?").bind(staff).first<{ n: number }>())?.n ?? 0;
+  await cache.put(key, new Response(String(n), { headers: { "cache-control": "max-age=86400" } })).catch(() => undefined);
+  return n;
+}
+
 export async function libraryContext(env: Env, me: User, question: string): Promise<string> {
   const words = libraryWords(question);
-  if (!words.length) return "";
+  if (!words.length || (await heavyResting(env))) return "";
   const staff = RANK[me.role] >= 1 ? 1 : 0;
   // 조각마다 어느 낱말이 들었는지만 받는다 (글은 고른 뒤에, 요청 CPU 한도). 드문 낱말일수록 무겁게 (흔한 '시세', '얼마' 보다 '사멧')
   const flags = words.map((_, i) => `(instr(text, ?${i + 2}) > 0) AS w${i}`).join(", ");
@@ -41,12 +52,13 @@ export async function libraryContext(env: Env, me: User, question: string): Prom
   let rows: Record<string, number | string>[];
   let total = 0;
   try {
-    const [r, n] = await env.DB.batch([
-      env.DB.prepare(`SELECT path, part, ${flags} FROM lib_chunks WHERE staff <= ?1 AND (${any})`).bind(staff, ...words),
-      env.DB.prepare("SELECT COUNT(*) AS n FROM lib_chunks WHERE staff <= ?").bind(staff),
+    // 조각 수는 배포 때만 바뀌어 하루 캐시 (2026-11-14 D1 하루 읽기: 질문마다 5천 줄을 셌다)
+    const [r, n] = await Promise.all([
+      env.DB.prepare(`SELECT path, part, ${flags} FROM lib_chunks WHERE staff <= ?1 AND (${any})`).bind(staff, ...words).all(),
+      chunkCount(env, staff),
     ]);
     rows = r.results as Record<string, number | string>[];
-    total = (n.results[0] as { n: number } | undefined)?.n ?? 0;
+    total = n;
   } catch {
     return ""; // 아직 표가 없다 (자료를 한 번도 넣기 전)
   }
