@@ -40,4 +40,6 @@ jobs:
           # 물건 이름 (제작자 2026-11-12 '아이콘이 비어 있다': 글에 적은 이름이 게임 이름과 달라 그림을 못 찾는 것을 가리려고. 이름·종류만, 사람 이름은 읽지 않는다)
           q market_items "SELECT l.id, l.item, l.category, l.side, l.status, (SELECT COUNT(*) FROM listing_shots s WHERE s.listing_id = l.id) AS shot FROM listings l ORDER BY l.id"
           q rental_weapons "SELECT weapon, COUNT(*) AS n FROM rental_items WHERE status != 'gone' GROUP BY weapon ORDER BY weapon"
+          # 도감 계산기 시세 설정 (앱개발자가 앱에서 적은 마법서·스탬프·플래티넘 값, 제작자 2026-11-13 '마법서 가격은 내가 앱에 적어 둔 걸 써')
+          q dex_price_set "SELECT * FROM dex_price_set"
           q donate_names "SELECT item, COUNT(*) AS n FROM donate_items WHERE status IN ('request', 'done', 'hall', 'honor') GROUP BY item ORDER BY item"
