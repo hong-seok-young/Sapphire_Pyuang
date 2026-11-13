@@ -147,7 +147,7 @@ export function useLive() {
   useEffect(() => {
     load();
   }, []);
-  useVisibleTick(20_000, load);
+  useVisibleTick(30_000, load);
   return live;
 }
 

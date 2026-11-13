@@ -135,7 +135,23 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   return json({ ok: true });
 };
 
-export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
+/**
+ * 사용 기록 화면의 무거운 셈은 잠깐 Cloudflare 캐시에 둔다 (2026-11-14: 대시보드가 나온 날 D1 하루 읽기 500만 줄을 넘어 사이트가 멈췄다.
+ * 보는 사람 셋이 같은 숫자를 보므로 누가 열든 같은 답). 쓴 줄 수보다 몇 분 늦은 숫자가 낫다
+ */
+async function cached(request: Request, ttl: number, waitUntil: (p: Promise<unknown>) => void, make: () => Promise<Record<string, unknown>>): Promise<Response> {
+  const u = new URL(request.url);
+  u.searchParams.sort();
+  const key = new Request(`https://cache.sapphire/activity/v1${u.pathname}?${u.searchParams}`);
+  const cache = (caches as unknown as { default: Cache }).default;
+  const hit = await cache.match(key).catch(() => undefined);
+  if (hit) return json(await hit.json());
+  const body = await make();
+  if (!body.partial) waitUntil(cache.put(key, new Response(JSON.stringify(body), { headers: { "content-type": "application/json", "cache-control": `max-age=${ttl}` } })).catch(() => undefined));
+  return json(body);
+}
+
+export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   // 길드마스터와 앱개발자 (제작자 요청 2026-11-02 '사용 기록하고 챗봇 개선은 길드마스터도'), 유어아너 (2026-11-13)
@@ -144,14 +160,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (q.get("usage")) return json(await usage(env));
   // 대시보드 (2026-11-13 개편, server/actDash.ts): 기간 1·7·30일
   const period = [1, 7, 30].includes(Number(q.get("days"))) ? Number(q.get("days")) : 7;
-  if (q.get("part") === "dash") return json(await dashboard(env, period));
-  if (q.get("part") === "live") return json(await liveNow(env));
+  if (q.get("part") === "dash") return cached(request, 180, waitUntil, () => dashboard(env, period));
+  if (q.get("part") === "live") return cached(request, 30, waitUntil, () => liveNow(env));
   if (q.get("part") === "person") {
     const who = q.get("user");
     if (!who) return json({ error: "누구인지 알려 주세요" }, 400);
-    const dbs0 = await logDbs(env);
-    const [dash, devices, overlaps] = await Promise.all([personDash(env, await charIds(env, who), period), devicesOf(env, dbs0, who), overlapsOf(env, dbs0, who)]);
-    return json({ ...dash, devices, overlaps });
+    return cached(request, 120, waitUntil, async () => {
+      const dbs0 = await logDbs(env);
+      const [dash, devices, overlaps] = await Promise.all([personDash(env, await charIds(env, who), period), devicesOf(env, dbs0, who), overlapsOf(env, dbs0, who)]);
+      return { ...dash, devices, overlaps };
+    });
   }
   // 화면은 기록(part=rows)과 요약(part=summary)을 따로 동시에 받아 기록부터 그린다 (제작자 2026-11-04 '사용 기록 들어갈 때 로딩이 길어').
   // part 가 없으면 예전처럼 둘 다 (배포 중 예전 화면)
@@ -160,6 +178,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const kind = q.get("kind");
   const before = Number(q.get("before"));
   const older = Number.isInteger(before) && before > 0;
+  // 요약만 묻는 것은 5분 캐시 (60일 기기 기록을 훑는다)
+  if (part === "summary") return cached(request, 300, waitUntil, async () => (await summaryOf(env, await logDbs(env), user)) as Record<string, unknown>);
   const dbs = await logDbs(env);
   const [list, summary] = await Promise.all([
     part === "summary" ? null : logRows(env, dbs, user, kind, older ? before : 0),
@@ -228,7 +248,7 @@ async function summaryOf(env: Env, dbs: LogDb[], user: string | null) {
       db
         .prepare(
           "SELECT user_id AS id, SUM(kind = 'visit' AND at > ?1) AS visits7, SUM(kind = 'visit') AS visits30, " +
-            "SUM(kind = 'view' AND at > ?1) AS views7, SUM(kind = 'act' AND at > ?1) AS acts7 FROM activity WHERE at > ?2 GROUP BY user_id",
+            "SUM(kind = 'view' AND at > ?1) AS views7, SUM(kind = 'act' AND at > ?1) AS acts7 FROM activity INDEXED BY activity_at WHERE at > ?2 GROUP BY user_id",
         )
         .bind(now - 7 * DAY, now - 30 * DAY),
     ),
@@ -298,7 +318,7 @@ async function devEvents(dbs: LogDb[], since: number, ids?: string[]) {
   const rows = await fromLogs<{ user: string; dev: string; device: string | null; place: string | null; a1: number; a2: number }>(covering(dbs, since), (db) =>
     db
       .prepare(
-        "SELECT user_id AS user, dev, MAX(device) AS device, place, MIN(at) AS a1, MAX(at) AS a2 FROM activity WHERE at > ?1 AND dev IS NOT NULL" +
+        "SELECT user_id AS user, dev, MAX(device) AS device, place, MIN(at) AS a1, MAX(at) AS a2 FROM activity INDEXED BY activity_at WHERE at > ?1 AND dev IS NOT NULL" +
           (ids ? " AND user_id IN (SELECT value FROM json_each(?2))" : "") +
           ` GROUP BY user_id, dev, place, at / ${TOGETHER_MS}`,
       )
@@ -429,7 +449,7 @@ async function deviceFlags(env: Env, dbs: LogDb[], users: { id: string; main_id:
   const since = now - DEVICE_DAYS * DAY;
   const [devRows, events] = await Promise.all([
     fromLogs<{ user: string; dev: string; first: number; last: number }>(covering(dbs, since), (db) =>
-      db.prepare("SELECT user_id AS user, dev, MIN(at) AS first, MAX(at) AS last FROM activity WHERE at > ? AND dev IS NOT NULL GROUP BY user_id, dev").bind(since),
+      db.prepare("SELECT user_id AS user, dev, MIN(at) AS first, MAX(at) AS last FROM activity INDEXED BY activity_at WHERE at > ? AND dev IS NOT NULL GROUP BY user_id, dev").bind(since),
     ),
     devEvents(dbs, now - 7 * DAY),
   ]);

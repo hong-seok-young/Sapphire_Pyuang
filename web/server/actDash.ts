@@ -347,12 +347,12 @@ export async function liveNow(env: Env) {
       db
         .prepare(
           "SELECT a.user_id AS u, a.at AS at, a.kind AS kind, a.what AS what, a.detail AS detail, a.via AS via, m.n AS n FROM activity a " +
-            "JOIN (SELECT user_id, MAX(id) AS id, COUNT(*) AS n FROM activity WHERE at > ? GROUP BY user_id) m ON m.id = a.id",
+            "JOIN (SELECT user_id, MAX(id) AS id, COUNT(*) AS n FROM activity INDEXED BY activity_at WHERE at > ? GROUP BY user_id) m ON m.id = a.id",
         )
         .bind(now - 10 * 60_000),
     ),
     fromLogs<{ mi: number; n: number; us: number }>(dbs, (db) =>
-      db.prepare("SELECT at / 60000 AS mi, COUNT(*) AS n, COUNT(DISTINCT user_id) AS us FROM activity WHERE at > ? GROUP BY mi").bind(now - 60 * 60_000),
+      db.prepare("SELECT at / 60000 AS mi, COUNT(*) AS n, COUNT(DISTINCT user_id) AS us FROM activity INDEXED BY activity_at WHERE at > ? GROUP BY mi").bind(now - 60 * 60_000),
     ),
     env.DB.prepare("SELECT id, role, main_id FROM users").all<UserRow>(),
   ]);

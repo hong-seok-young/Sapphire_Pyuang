@@ -531,7 +531,7 @@ async function activityParts(env: Env, mentioned: string[], now: number, today: 
       db
         .prepare(
           "SELECT user_id, SUM(kind = 'visit') AS visits, SUM(kind = 'view') AS views, SUM(kind = 'act') AS acts, " +
-            "SUM(kind = 'visit' AND at >= ?2) AS today_visits, MAX(at) AS last FROM activity WHERE at > ?1 GROUP BY user_id",
+            "SUM(kind = 'visit' AND at >= ?2) AS today_visits, MAX(at) AS last FROM activity INDEXED BY activity_at WHERE at > ?1 GROUP BY user_id",
         )
         .bind(since, today),
     ),
@@ -539,7 +539,7 @@ async function activityParts(env: Env, mentioned: string[], now: number, today: 
       db
         .prepare(
           "SELECT a.user_id AS user_id, a.via AS via, a.place AS place, a.device AS device, a.at AS at FROM activity a " +
-            "JOIN (SELECT user_id, MAX(at) AS at FROM activity WHERE at > ? GROUP BY user_id) m ON m.user_id = a.user_id AND m.at = a.at",
+            "JOIN (SELECT user_id, MAX(at) AS at FROM activity INDEXED BY activity_at WHERE at > ? GROUP BY user_id) m ON m.user_id = a.user_id AND m.at = a.at",
         )
         .bind(since),
     ),

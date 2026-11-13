@@ -1510,6 +1510,11 @@
   - **AI 사용량** (`server/apiUsage.ts`, D1 `api_usage` 사람·한국 날짜·종류마다 부른 수·입력·출력·캐시·웹 찾기): 챗봇 답(답 받기 일꾼 `chatRun.ts`, 일꾼 없는 길 `chatlog.ts` finishInBackground 에서 SSE 의 usage 를 더함, 중지해도 셈),
     같은 매물 가리기, 챗봇 사진 읽기, 스샷 읽기, 공지 다듬기, 캐릭터 사진 AI 검수, 공식 글 요약('_app'). 2026-11-13 부터 센다(그 전은 질문 수 `chat_usage` 만). GitHub Actions 의 To do 정리·그림 읽기는 세지 않는다.
     새로 AI 를 부르는 곳을 만들면 `trackUsage(env, 사람, 종류, res)` 한 줄을 더하고 화면 `AI_NAME` 에 이름을 더한다. 비용(달러)은 보이지 않는다.
+  - **D1 읽기 한도 사고 2026-11-14** (제작자 스샷 '자료를 불러오지 못했어요: 서버에서 문제가 생겼어요'): 대시보드가 나온 11/13(UTC) 사용 기록 DB 읽기가 57만 -> 266만 줄로 늘어 DB 1 의 240만과 합쳐 하루 500만 줄을 넘었고
+    그 뒤 모든 요청이 0시 UTC(한국 9시)까지 막혔다. 범인은 '지금 접속 중'(20초마다)의 `WHERE at > ? GROUP BY user_id`: SQLite 가 GROUP BY 를 위해 activity_user_at 색인을 통째로 훑었다 (한 번에 1.3만 줄).
+    시간으로 거르고 사람으로 묶는 activity 쿼리는 `INDEXED BY activity_at` 를 붙인다 (`actDash.ts` liveNow, `functions/api/activity.ts` 요약·기기, `chatapp.ts`). 대시보드 3분 · 지금 접속 중 30초(화면도 30초마다) · 사람 2분 · 요약 5분은
+    Cloudflare 캐시(`functions/api/activity.ts` `cached`, partial 은 안 둠). 어떤 쿼리가 읽는지는 손 작업 `.github/workflows/d1-usage.yml`(GraphQL d1QueriesAdaptiveGroups, 쿼리 글과 읽은 줄 수만)로 본다.
+    새 기능을 열면 다음 날 이것으로 읽은 줄을 확인한다.
   - 로컬 시험 2026-11-13: 가짜 길드원 36명·18일 기록 1만 줄로 요약 합이 원본과 같음(화면 8,036 · 로그인 654), 오피서(멍멍) 403, 유어아너 200, 320·360·412px 넘침 없음.
 - 누구나 읽는 말로 (제작자 요청 2026-11-02 '이런 코드 말고 비개발자가 봐도 얘가 들어가서 뭐 했는지'): 한 일은 경로·보낸 자료 대신 '길드 던전 시간표 저장 · 8.5시간',
   '홈 배치 바꿈 · 아래 탭 …', '대여 완료 (건네줌) · 보증금 💎5 + 70만 골드' 처럼 (`src/activity.ts` `ACTIONS`, 이름을 안 붙인 한 일은 '장비대여에서 고침'처럼 메뉴와 동작만).
