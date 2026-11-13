@@ -312,11 +312,11 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   const planNeeds = useMemo(() => (sel.size ? new Map([...needs].filter(([k]) => sel.has(k))) : needs), [needs, sel]);
   const notDone = useMemo(() => (price ? dex.entries.filter((e) => !done.has(e.name)) : null), [dex, done, price]);
   const planCost = useCallback((e: DexEntry, mode: "normal" | "event") => (mode === "normal" ? entryGold.get(e.name) ?? null : null), [entryGold]);
-  const multi = useBestPlan(notDone, planNeeds, planCost);
+  const { plan: multi, busy: solving } = useBestPlan(notDone, planNeeds, planCost);
   const [allList, setAllList] = useEntryState("dex.allList", false);
-  const multiOn = !!multi && (sel.size > 0 || !allList);
+  const multiOn = (!!multi || solving) && (sel.size > 0 || !allList);
   const multiShort = multi ? [...planNeeds].some(([k, v]) => (multi.got.get(k) ?? 0) < v - 1e-9) : false;
-  const goalNames = multiOn ? new Map(multi!.picks.map((x, i) => [x.e.name, i])) : null;
+  const goalNames = multiOn ? new Map((multi?.picks ?? []).map((x, i) => [x.e.name, i])) : null;
   const selLabel = [...sel].map((k) => (SHORT[k.replace(/%$/, "")] ?? k.replace(/%$/, "")) + (k.endsWith("%") ? "%" : "")).join(" · ");
   const listed = goalNames
     ? dex.entries.filter((e) => goalNames.has(e.name) && matchQ(e)).sort((a, b) => goalNames.get(a.name)! - goalNames.get(b.name)!)
@@ -416,11 +416,13 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
         )}
       </div>
 
-      {!sel.size && multi && (
+      {!sel.size && (multi || solving) && (
         <div className="dex-statbar">
           <span>
             {allList ? (
               <>목표 {planNeeds.size}개 능력치</>
+            ) : !multi ? (
+              <Solving />
             ) : (
               <>
                 목표 {planNeeds.size}개 능력치 채우기 <b>{multi.picks.length}</b>개
@@ -439,9 +441,11 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
         <div className="dex-statbar" ref={statBar}>
           <span>
             <b>{selLabel}</b>{" "}
-            {multi ? (
+            {solving ? (
+              <Solving />
+            ) : multi ? (
               <>
-                목표까지 싼 순서 <b>{multi.picks.length}</b>개 · <b>{fmtGold(multi.gold)}</b>
+                최저가 <b>{multi.picks.length}</b>개 · <b>{fmtGold(multi.gold)}</b>
                 {multi.unknown > 0 && <> · 값 모름 {multi.unknown}</>}
                 {multiShort && <> · 다 해도 모자람</>}
               </>
@@ -503,7 +507,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
           <EntryRow key={e.name} e={e} listW={listW} done={done.has(e.name)} onToggle={() => toggle(e.name)} iconOf={iconOf} sel={sel} onItem={(name) => setQ(name)} wiki={wiki} price={price} pset={pset} />
         ))}
       </ul>
-      {!listed.length && <p className="muted dex-empty">맞는 항목이 없어요</p>}
+      {!listed.length && !(solving && multiOn) && <p className="muted dex-empty">맞는 항목이 없어요</p>}
       <p className="muted dex-src">{dex.source}</p>
     </div>
   );
@@ -1033,12 +1037,12 @@ function planTargets(entries: DexEntry[], targets: Map<string, number>, costOf: 
   return { picks, got, gold: picks.reduce((a, p) => a + (p.g ?? 0), 0), goldEv: picks.reduce((a, p) => a + (p.ge ?? p.g ?? 0), 0), unknown: picks.filter((p) => p.g == null).length };
 }
 
-/** 목표를 모두 채우는 가장 싼 묶음: 먼저 차례로 고른 묶음(planTargets)을 보이고, 일꾼이 정수 최적화로 정확히 푼 답이 오면 바꿔 끼운다
- * (제작자 2026-11-13 '어느 옵션을 적더라도 최저가로 그 도감을 만드는 조합과 가격이 떠야 해', dexSolve.ts) */
 const EMPTY_TARGETS = new Map<string, number>();
 const NO_COST = () => null;
-function useBestPlan(entries: DexEntry[] | null, targets: Map<string, number>, costOf: (e: DexEntry, mode: "normal" | "event") => number | null): MultiPlan | null {
-  const greedy = useMemo(() => (entries && targets.size ? planTargets(entries, targets, costOf) : null), [entries, targets, costOf]);
+/** 목표를 모두 채우는 가장 싼 묶음을 일꾼이 정수 최적화로 정확히 푼다 (제작자 2026-11-13 '어느 옵션을 적더라도 최저가로 그 도감을 만드는 조합과 가격이 떠야 해', dexSolve.ts).
+ * 푸는 동안은 busy 로 '최저가 조합 찾는 중'만 보이고 근사값을 먼저 띄우지 않는다 (제작자 2026-11-13 '떴다가 바뀌면 혼란스럽잖아, 진짜 최저가만').
+ * 일꾼을 못 쓰거나 못 풀면 그때만 차례로 고른 묶음(planTargets) */
+function useBestPlan(entries: DexEntry[] | null, targets: Map<string, number>, costOf: (e: DexEntry, mode: "normal" | "event") => number | null): { plan: MultiPlan | null; busy: boolean } {
   const job = useMemo(() => {
     if (!entries || !targets.size) return null;
     const keys = [...targets.keys()];
@@ -1058,23 +1062,25 @@ function useBestPlan(entries: DexEntry[] | null, targets: Map<string, number>, c
     const key = keys.map((k) => `${k}=${targets.get(k)}`).join(";") + "|" + cands.map((e, i) => `${e.name}:${Math.round(costs[i])}`).join(",");
     return { key, cands, costs, vals, targets: keys.map((k) => targets.get(k)!) };
   }, [entries, targets, costOf]);
-  const [exact, setExact] = useState<{ key: string; plan: MultiPlan } | null>(null);
+  const [res, setRes] = useState<{ key: string; plan: MultiPlan | null } | null>(null);
   useEffect(() => {
     if (!job) return;
     let live = true;
+    // 숫자를 적는 동안은 기다렸다가 한 번만
     const t = window.setTimeout(() => {
       solveCover(job.key, job.costs, job.vals, job.targets).then((idx) => {
-        if (!live || !idx) return;
+        if (!live) return;
+        if (!idx) {
+          setRes({ key: job.key, plan: null });
+          return;
+        }
         const chosen = idx.map((i) => job.cands[i]);
         const got = new Map([...targets.keys()].map((k) => [k, 0]));
         for (const e of chosen) for (const [s, v, p] of e.effects) if (got.has(rowKey(s, p))) got.set(rowKey(s, p), got.get(rowKey(s, p))! + v);
         const picks = chosen
           .map((e) => ({ e, g: costOf(e, "normal"), ge: costOf(e, "event") }))
           .sort((a, b) => (a.g ?? Infinity) - (b.g ?? Infinity));
-        const plan: MultiPlan = { picks, got, gold: picks.reduce((a, p) => a + (p.g ?? 0), 0), goldEv: picks.reduce((a, p) => a + (p.ge ?? p.g ?? 0), 0), unknown: picks.filter((p) => p.g == null).length };
-        // 정수 최적화가 차례로 고른 것보다 비싸게 나오는 일은 없지만, 혹시 그러면 차례로 고른 것을 둔다
-        if (greedy && greedy.unknown <= plan.unknown && greedy.gold <= plan.gold) return;
-        setExact({ key: job.key, plan });
+        setRes({ key: job.key, plan: { picks, got, gold: picks.reduce((a, p) => a + (p.g ?? 0), 0), goldEv: picks.reduce((a, p) => a + (p.ge ?? p.g ?? 0), 0), unknown: picks.filter((p) => p.g == null).length } });
       });
     }, 250);
     return () => {
@@ -1082,7 +1088,23 @@ function useBestPlan(entries: DexEntry[] | null, targets: Map<string, number>, c
       window.clearTimeout(t);
     };
   }, [job]); // eslint-disable-line react-hooks/exhaustive-deps
-  return exact && job && exact.key === job.key ? exact.plan : greedy;
+  const ready = !!job && res?.key === job.key;
+  const failed = ready && !res!.plan;
+  const fallback = useMemo(() => (failed && entries ? planTargets(entries, targets, costOf) : null), [failed, entries, targets, costOf]);
+  if (!job) return { plan: null, busy: false };
+  if (!ready) return { plan: null, busy: true };
+  return { plan: res!.plan ?? fallback, busy: false };
+}
+
+/** 최저가 조합을 푸는 동안 (제작자 2026-11-13 '정수 최적화 엔진 최저가 조합 찾는 중이라고 띄우고') */
+function Solving() {
+  return (
+    <span className="dex-solving">
+      <i className="dex-solving-gem" aria-hidden />
+      정수 최적화로 최저가 조합 찾는 중
+      <i className="dex-solving-dots" aria-hidden><b>.</b><b>.</b><b>.</b></i>
+    </span>
+  );
 }
 
 /** 챗봇 도감 칸: 골드로 살 칸의 골드 + 스탬프로 할 칸의 장 수 */
@@ -1139,7 +1161,7 @@ export function DexSnippet({ spec }: { spec: string }) {
     const max = addUp(entries);
     return { targets, bad, max, entries, costOf, price };
   }, [all, spec, withEv, pset]);
-  const res = useBestPlan(base?.entries ?? null, base?.targets ?? EMPTY_TARGETS, base?.costOf ?? NO_COST);
+  const { plan: res, busy: solving } = useBestPlan(base?.entries ?? null, base?.targets ?? EMPTY_TARGETS, base?.costOf ?? NO_COST);
   const plan = useMemo(() => {
     if (!base || !res) return null;
     const { targets, bad, max, price } = base;
@@ -1160,6 +1182,17 @@ export function DexSnippet({ spec }: { spec: string }) {
     };
     return { targets, bad, max, ...res, split: { normal: split("normal"), event: split("event") } };
   }, [base, res, pset]);
+  if (solving && base)
+    return (
+      <div className="dex-snip">
+        <div className="dex-snip-head">
+          <b>도감 계산기</b>
+        </div>
+        <div className="dex-snip-wait">
+          <Solving />
+        </div>
+      </div>
+    );
   if (!all || !plan || !plan.targets.size) return null;
   const goDex = () => {
     if (me) writeStats(me, Object.fromEntries(plan.targets));
@@ -1169,7 +1202,7 @@ export function DexSnippet({ spec }: { spec: string }) {
     <div className="dex-snip">
       <div className="dex-snip-head">
         <b>도감 계산기</b>
-        <small className="muted">처음부터 · 싼 순서</small>
+        <small className="muted">처음부터 · 최저가</small>
         <button type="button" className="dex-evtoggle" aria-pressed={withEv} onClick={() => setWithEv(!withEv)}>
           <span className="dex-evbox">{withEv ? "✓" : ""}</span>이벤트
         </button>

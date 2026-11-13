@@ -5626,3 +5626,14 @@ html.space-on body { background: transparent; }
 .bg-notice-sub { font-size: 12px !important; color: var(--muted); }
 .bg-notice .pill-row .pill-on { color: var(--edge); background: var(--gold); }
 @media (prefers-reduced-motion: reduce) { .bg-nt-star, .bg-nt-shoot { animation: none; } .bg-nt-shoot { opacity: 0; } }
+/* 도감 계산기 최저가 조합을 푸는 동안 (Dex.tsx Solving, 제작자 2026-11-13 '정수 최적화 엔진 최저가 조합 찾는 중이라고 띄우고 진짜 최저가만'):
+   도는 사파이어와 차례로 뛰는 점 셋, transform·opacity 만 */
+.dex-solving { display: inline-flex; align-items: center; gap: 6px; color: var(--gold); font-size: 12px; min-width: 0; }
+.dex-solving-gem { flex: none; width: 9px; height: 9px; background: #6fa8ff; box-shadow: 0 0 6px #6fa8ff; transform: rotate(45deg); animation: dex-solve-spin 1.2s linear infinite; }
+.dex-solving-dots b { display: inline-block; font-weight: 700; animation: dex-solve-dot 1s ease-in-out infinite; }
+.dex-solving-dots b:nth-child(2) { animation-delay: 0.15s; }
+.dex-solving-dots b:nth-child(3) { animation-delay: 0.3s; }
+.dex-snip-wait { padding: 10px 2px; }
+@keyframes dex-solve-spin { from { transform: rotate(45deg); } to { transform: rotate(405deg); } }
+@keyframes dex-solve-dot { 0%, 100% { transform: translateY(0); opacity: 0.4; } 50% { transform: translateY(-3px); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .dex-solving-gem, .dex-solving-dots b { animation: none; } }
