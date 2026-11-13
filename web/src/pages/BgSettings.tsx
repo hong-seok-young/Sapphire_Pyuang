@@ -117,7 +117,7 @@ export function BgNotice({ me }: { me: Me }) {
           <b>NEW</b>
         </div>
         <p className="rn-say">배경화면 설정 기능이 생겼어요</p>
-        <p className="bg-notice-sub">별똥별이 떨어지는 우주 배경 5가지 · 설정 &gt; 앱 설정 &gt; 배경화면</p>
+        <p className="bg-notice-sub">별똥별이 떨어지는 우주 배경 5가지 · 빈 곳을 누르면 별똥별이 부딪혀요 · 설정 &gt; 앱 설정 &gt; 배경화면</p>
         <div className="pill-row">
           <button type="button" className="pill" onClick={close}>
             나중에
@@ -170,7 +170,14 @@ function BgPreview({ me, cfg, set, onClose }: { me: Me; cfg: BgCfg; set: (p: Par
     .slice(0, 12);
   const names = ["랜덤", "은하수", "노을", "성운", "행성", "오로라"];
   return createPortal(
-    <div className="bg-preview" style={{ "--bt-a": 1 - cfg.clear / 100 } as CSSProperties}>
+    <div
+      className="bg-preview"
+      style={{ "--bt-a": 1 - cfg.clear / 100 } as CSSProperties}
+      onClick={(e) => {
+        // 빈 곳(조절 칸 밖)을 누르면 그 자리로 별똥별이 날아와 부딪힌다
+        if (!(e.target as Element).closest(".bg-pv-panel")) run.current?.boom(e.clientX, e.clientY);
+      }}
+    >
       <div className="space-bg" ref={host} aria-hidden />
       {!onlyBg && (
         <div className="bg-pv-home" aria-hidden>

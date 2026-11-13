@@ -7,6 +7,10 @@ import type { BgCfg } from "../bgSettings";
 import { inFloat } from "../platform";
 import type { SpaceRun } from "../space";
 
+/** 누르면 하는 일이 있는 곳 (여기를 누르면 별똥별을 부르지 않는다) */
+export const EMPTY_NOT =
+  "a, button, input, textarea, select, label, summary, [role=button], [role=dialog], [role=tab], [contenteditable], .tile, .tabbar, .search-entry, .bg-pv-panel, .rn-back";
+
 export function SpaceBackground({ me }: { me: Me }) {
   const [cfg, setCfg] = useState<BgCfg>(() => loadBg(me.id));
   const [day, setDay] = useState(todayScene);
@@ -61,12 +65,23 @@ export function SpaceBackground({ me }: { me: Me }) {
         if (Math.abs(innerWidth - w) > 40 || Math.abs(innerHeight - h) > 160) { w = innerWidth; h = innerHeight; void begin(); }
       }, 300);
     };
+    // 화면 빈 곳을 누르면 그 자리로 별똥별이 날아와 부딪힌다 (단추·칸·글 칸·창은 빼고, 끌어 스크롤한 것은 click 이 안 와서 빠진다)
+    let lastTap = 0;
+    const tap = (e: MouseEvent) => {
+      const t = e.target as Element | null;
+      if (!t || t.closest(EMPTY_NOT)) return;
+      if (e.timeStamp - lastTap < 250) return;
+      lastTap = e.timeStamp;
+      run?.boom(e.clientX, e.clientY);
+    };
+    document.addEventListener("click", tap);
     addEventListener("sapphire:bg-boom", boom);
     addEventListener("resize", resize);
     return () => {
       dead = true;
       clearTimeout(rt);
       run?.stop();
+      document.removeEventListener("click", tap);
       removeEventListener("sapphire:bg-boom", boom);
       removeEventListener("resize", resize);
     };

@@ -4,7 +4,7 @@
  *
  * - 작은 해상도(px 배 줄인) 그림판에 그리고 CSS 로 키워 도트로 보인다 (image-rendering: pixelated).
  * - 빛(별·별똥별·혜성·불티)은 매 프레임 한 그림판에 더해 그리고 한 번에 올린다 (Light). 칸 사이 자리는 네 칸에 나눠 그려 부드럽게 움직인다.
- * - 별똥별은 화면 밖에서 들어와 반대편 밖으로 나갈 때까지 날아간다 (중간에 꺼지지 않는다). 색 17 x 크기 5 + 깜박임·반짝 불티·긴 빛 자국·무지개·쌍둥이·쪼개짐.
+ * - 별똥별은 화면 밖에서 들어와 반대편 밖으로 나갈 때까지 날아간다 (중간에 꺼지지 않는다). 색 17 x 크기 5 + 깜박임·반짝 불티·긴 빛 자국·무지개·쪼개짐 (쌍둥이는 제작자 2026-11-13 '평행하게 쌍둥이처럼 날아가는 거 별로'로 뺐다). 빈 곳을 누르면 그 자리로 여럿이 날아와 부딪힌다 (boom(x, y)).
  * - 두 별똥별의 머리가 만나면 작은 쪽이 터진다 (번쩍, 충격파 고리, 파편, 연기). 큰 쪽은 잠깐 타오르고 조금 꺾인다.
  * - 혜성은 늘 움직인다: 머리(핵·코마)에서 알갱이가 계속 나와 곧은 이온 꼬리와 휘어 퍼지는 먼지 꼬리가 된다.
  * - 화면이 다른 앱에 가 있으면 requestAnimationFrame 이 멈춰 같이 쉰다. 움직임 줄이기면 한 장면만 그린다 (still).
@@ -20,7 +20,8 @@ export interface SpaceOpts {
 export interface SpaceRun {
   stop(): void;
   /** 별똥별 둘을 부딪히게 보낸다 (설정의 '충돌 보기') */
-  boom(): void;
+  /** 별똥별 충돌: 화면 좌표(clientX, clientY)를 주면 그 자리, 없으면 위쪽 가운데 */
+  boom(cx?: number, cy?: number): void;
 }
 
 type RGB = number[];
@@ -261,11 +262,6 @@ export function startSpace(host: HTMLElement, o: SpaceOpts): SpaceRun {
     if (k.size >= 3 && Math.random() < (k.size === 4 ? 0.45 : 0.15)) m.split = (back + rnd(0.15, 0.55) * exitDist(tx, ty, ux, uy)) / sp;
     Object.assign(m, extra);
     meteors.push(m);
-    if (!extra && k.size <= 2 && Math.random() < 0.05) { // 쌍둥이: 나란히 같이 떨어진다
-      const off = rnd(3, 5) * U, t2: Met = { ...m, x: m.x - uy * off, y: m.y + ux * off, sp: m.sp * 0.97, life: m.life / 0.97 };
-      t2.px = t2.x; t2.py = t2.y;
-      meteors.push(t2);
-    }
     return m;
   }
   /** 보통 별똥별: 대개 왼쪽 아래로, 넷에 하나는 오른쪽 아래로 */
@@ -650,16 +646,32 @@ export function startSpace(host: HTMLElement, o: SpaceOpts): SpaceRun {
 
   return {
     stop() { dead = true; cancelAnimationFrame(raf); host.innerHTML = ""; parts = []; meteors = []; comets = []; fxs = []; },
-    boom() {
+    boom(cx?: number, cy?: number) {
       if (o.still) return;
-      // 화면 위쪽 한 점에서 만나게: 큰 별똥별은 왼쪽 위에서, 작은 것은 오른쪽 위에서
-      const mx = cw * rnd(0.4, 0.6), my = ch * rnd(0.25, 0.4), tm = 1.3;
-      const send = (ang: number, size: number) => {
-        const a = (ang * Math.PI) / 180, z = SIZES[size], sp = rnd(z.sp[0], z.sp[1]) * U, from = { x: mx - Math.cos(a) * sp * tm, y: my - Math.sin(a) * sp * tm };
-        launch(mx, my, ang, from, { size, col: pick(Object.keys(MCOL)), sp }, { split: -1 });
+      // 한 점에서 만나게: 큰 별똥별 하나에 작은 것 서넛이 사방 위에서 같은 때 닿아 작은 것들이 터진다 (제작자 2026-11-13 '빈 곳 클릭하면 충돌해서 터지는 거 볼 수 있게 많이 떨어지게')
+      let mx = cw * rnd(0.4, 0.6), my = ch * rnd(0.25, 0.4);
+      if (cx !== undefined && cy !== undefined) {
+        const r = host.getBoundingClientRect();
+        mx = clamp((cx - r.left) / S, 2, cw - 2);
+        my = clamp((cy - r.top) / S, 2, ch - 2);
+      }
+      const tm = rnd(0.9, 1.2), cols = Object.keys(MCOL);
+      const send = (ang: number, size: number, t: number) => {
+        const a = (ang * Math.PI) / 180, z = SIZES[size], sp = rnd(z.sp[0], z.sp[1]) * U, from = { x: mx - Math.cos(a) * sp * t, y: my - Math.sin(a) * sp * t };
+        launch(mx, my, ang, from, { size, col: pick(cols), sp }, { split: -1 });
       };
-      send(rnd(28, 42), pick([3, 4]));
-      send(rnd(138, 152), pick([1, 2]));
+      const big = Math.random() < 0.5 ? rnd(25, 45) : rnd(135, 155);
+      send(big, pick([3, 4]), tm);
+      // 작은 것들은 큰 것과 30도 넘게 벌어진 방향에서 (평행하게 겹치지 않게)
+      const n = 3 + Math.floor(Math.random() * 2), used = [big];
+      for (let i = 0; i < n; i++) {
+        let ang = rnd(20, 160);
+        for (let k = 0; k < 12 && used.some((u) => Math.abs(u - ang) < 22); k++) ang = rnd(20, 160);
+        used.push(ang);
+        send(ang, pick([0, 1, 1, 2]), tm);
+      }
+      // 둘레로 별똥별 비도 조금
+      for (let i = 0; i < 5; i++) window.setTimeout(() => !dead && sporadic(), 150 + i * 220);
     },
   };
 }
