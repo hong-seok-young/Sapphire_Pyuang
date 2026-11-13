@@ -7,7 +7,6 @@
 import { NEED_LOGIN, currentUser, json } from "../../server/auth";
 import type { Env } from "../../server/auth";
 import { findOfficial } from "../../server/officialSearch";
-import { heavyResting } from "../../server/readSaver";
 
 const PAGE = 30;
 
@@ -22,8 +21,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
   const tab = p.get("tab");
   const q = (p.get("q") ?? "").trim().slice(0, 60);
   if (q) {
-    // 찾기는 공식 글·그림 글자를 다 훑어 한 번에 수천 줄을 읽는다 (D1 하루 읽기): 같은 말은 10분 캐시, 아끼는 날(server/readSaver.ts)은 쉰다
-    if (await heavyResting(env)) return json({ items: [], more: false, checkedAt: null });
+    // 찾기는 공식 글·그림 글자를 다 훑어 한 번에 수천 줄을 읽는다 (D1 하루 읽기): 같은 말은 10분 캐시
     const key = new Request(`https://cache.sapphire/official-find/v1/${encodeURIComponent(tab ?? "all")}/${encodeURIComponent(q.toLowerCase())}`);
     const cache = (caches as unknown as { default: Cache }).default;
     const hit = await cache.match(key).catch(() => undefined);

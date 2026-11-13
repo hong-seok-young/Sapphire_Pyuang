@@ -11,7 +11,6 @@
 //   중개인·골드·의뢰소·상점에서 내가 한 것, 장비대여 내 것 (server/chatmine.ts). 아이모 소식(진행 중 이벤트, 점검)도 늘 짧게
 // - To do 와 장비대여는 2026-11-02 열었다 (To do 는 server/todo.ts TODO_OPEN)
 // 칸마다 글자 수를 정해 두어 질문이 너무 길어지지 않게 한다.
-import { logResting } from "./readSaver";
 import { RANK, TEST_IDS } from "./auth";
 import { covering, fromLogs, logDbs, newestLogs } from "./logdb";
 import type { Env, Guild, Job, Role, User } from "./auth";
@@ -443,7 +442,7 @@ export async function appContext(env: Env, me: User, question: string, now = Dat
   }
 
   // ---------- 길드마스터와 앱개발자만: 사용 기록(유어아너도, 2026-11-13), 챗봇 개선 (2026-11-02 길드마스터에게도 열었다) ----------
-  if (canSeeLog(me) && (ASK.logs.test(q) || mentioned.length) && !(await logResting(env))) parts.push(...(await activityParts(env, mentioned, now, today)));
+  if (canSeeLog(me) && (ASK.logs.test(q) || mentioned.length)) parts.push(...(await activityParts(env, mentioned, now, today)));
   if (RANK[me.role] >= 2 && ASK.gaps.test(q)) {
     const day = new Date(now + KST).toISOString().slice(0, 10);
     const [gapsR, usageR] = await env.DB.batch([

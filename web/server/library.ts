@@ -3,7 +3,6 @@
 // 자료 저장소의 글 파일은 scripts/library-sync.mjs 가 조각으로 D1 lib_chunks 에 넣는다 (저장소 main 이 바뀌면 30분 안에, data-watch.yml).
 // 여기서는 질문 낱말이 든 조각을 골라 '<길드 자료 저장소>' 로 붙인다. 조각 글은 자르지 않는다 (CLAUDE.md 'AI 는 무조건 품질'), 몇 조각을 붙일지만 고른다.
 // 길드/ 아래(staff 1)는 운영진(오피서 이상)에게만.
-import { heavyResting } from "./readSaver";
 import { RANK } from "./auth";
 import type { Env, User } from "./auth";
 import { ASK_WORD } from "./official";
@@ -44,7 +43,7 @@ async function chunkCount(env: Env, staff: number): Promise<number> {
 
 export async function libraryContext(env: Env, me: User, question: string): Promise<string> {
   const words = libraryWords(question);
-  if (!words.length || (await heavyResting(env))) return "";
+  if (!words.length) return "";
   const staff = RANK[me.role] >= 1 ? 1 : 0;
   // 조각마다 어느 낱말이 들었는지만 받는다 (글은 고른 뒤에, 요청 CPU 한도). 드문 낱말일수록 무겁게 (흔한 '시세', '얼마' 보다 '사멧')
   const flags = words.map((_, i) => `(instr(text, ?${i + 2}) > 0) AS w${i}`).join(", ");

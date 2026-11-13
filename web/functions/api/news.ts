@@ -22,7 +22,6 @@ import { remindIfDue } from "../../server/gdungeon";
 import { announceApp } from "../../server/appNews";
 import { announceBday } from "../../server/birthday";
 import { drainPushQueue } from "../../server/push";
-import { heavyResting } from "../../server/readSaver";
 import { seesAllSuggest } from "../../server/board";
 
 const IMO: Record<string, string> = { "imo.notice": "type IN ('N', 'I', 'D')", "imo.maint": "type = 'C'", "imo.event": "type = 'E'" };
@@ -67,9 +66,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
   const imoFrom = new Date(now + 9 * 3_600_000 - IMO_DAYS * 86_400_000).toISOString().slice(0, 10);
   // 글·물건마다 따라가는 새 것 (things): 단추를 마지막으로 본 때와 14일 전 중 늦은 때부터
   const floor = (...keys: string[]) => Math.max(now - THING_DAYS * 86_400_000, Math.min(...keys.map(since)));
-  // D1 하루 읽기를 아끼는 날(server/readSaver.ts 2단계)은 글·물건 따라가기를 쉰다 (단추 숫자는 그대로)
-  const resting = await heavyResting(env);
-  const thingSql = resting ? [] : [
+  const thingSql = [
     q(`SELECT 'post:' || id AS k, 'board.' || cat AS c, created_at AS t, NULL AS s FROM board_posts WHERE created_at > ?1 AND author NOT IN ${MINE}${allSug ? "" : " AND cat != 'suggest'"}`, floor(...boardSince.map((_, j) => `board.${["notice", "event", "free", "suggest"][j]}`))),
     q(
       `SELECT 'post:' || c.post_id AS k, 'board.' || p.cat AS c, c.created_at AS t, NULL AS s FROM board_comments c JOIN board_posts p ON p.id = c.post_id ` +
