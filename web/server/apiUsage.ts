@@ -140,14 +140,40 @@ export async function monthUsd(env: Env): Promise<{ month: string; usd: number; 
 const AI_LIMITS: Record<string, number> = { "2026-11": 300 };
 export const aiLimit = (month: string) => AI_LIMITS[month] ?? 340;
 
-/** 이번 달 이 사람(묶은 캐릭터 모두)이 쓴 AI 비용 (달러, api_usage 로 센 만큼: 2026-11-13 부터) */
+/** 사람마다 AI 비용을 센 첫날 (api_usage, 한국 날짜). 그 전 질문은 질문 수로 어림한다 */
+const TRACK_DAY = "2026-11-13";
+/** 센 답이 너무 적을 때 쓰는 질문 하나의 값 (짐작) */
+const GUESS_PER_Q = 0.2;
+
+/**
+ * 이번 달 이 사람(묶은 캐릭터 모두)이 쓴 AI 비용 (달러).
+ * 센 것(api_usage) + 세기 전(2026-11-13 전) 챗봇 질문의 어림값 (제작자 2026-11-13 '추정해서 넣어야지'):
+ * 세기 전 질문 수(chat_usage, 센 첫날은 그날 질문 수 - 그날 센 답 수) x 센 뒤 챗봇 답 하나의 평균 값.
+ * 그 전 사진 읽기 등 다른 AI 는 질문에 딸린 것이 많아 따로 어림하지 않는다
+ */
 export async function personMonthUsd(env: Env, ids: string[], month = new Date().toISOString().slice(0, 7)): Promise<number> {
-  const row = await env.DB.prepare(
-    `SELECT COALESCE(SUM(${USD_MICRO_SQL}), 0) AS m FROM api_usage WHERE user_id IN (SELECT value FROM json_each(?1)) AND day >= ?2`,
-  )
-    .bind(JSON.stringify(ids), `${month}-01`)
-    .first<{ m: number }>();
-  return Number(row?.m ?? 0) / 1e6;
+  const who = JSON.stringify(ids);
+  const from = `${month}-01`;
+  const counted = env.DB.prepare(`SELECT COALESCE(SUM(${USD_MICRO_SQL}), 0) AS m FROM api_usage WHERE user_id IN (SELECT value FROM json_each(?1)) AND day >= ?2`).bind(who, from);
+  if (from > TRACK_DAY) {
+    const row = await counted.first<{ m: number }>();
+    return Number(row?.m ?? 0) / 1e6;
+  }
+  const [mine, avg, before, firstDay] = await env.DB.batch([
+    counted,
+    env.DB.prepare(`SELECT COALESCE(SUM(${USD_MICRO_SQL}), 0) AS m, COALESCE(SUM(calls), 0) AS c FROM api_usage WHERE kind = 'chat'`),
+    env.DB.prepare("SELECT COALESCE(SUM(count), 0) AS n FROM chat_usage WHERE user_id IN (SELECT value FROM json_each(?1)) AND day >= ?2 AND day < ?3").bind(who, from, TRACK_DAY),
+    env.DB.prepare(
+      "SELECT (SELECT COALESCE(SUM(count), 0) FROM chat_usage WHERE user_id IN (SELECT value FROM json_each(?1)) AND day = ?2) AS q, " +
+        "(SELECT COALESCE(SUM(calls), 0) FROM api_usage WHERE user_id IN (SELECT value FROM json_each(?1)) AND day = ?2 AND kind = 'chat') AS c",
+    ).bind(who, TRACK_DAY),
+  ]);
+  const one = <T,>(r: D1Result) => r.results[0] as T | undefined;
+  const a = one<{ m: number; c: number }>(avg);
+  const perQ = a && Number(a.c) >= 20 ? Number(a.m) / Number(a.c) / 1e6 : GUESS_PER_Q;
+  const f = one<{ q: number; c: number }>(firstDay);
+  const untracked = Number(one<{ n: number }>(before)?.n ?? 0) + Math.max(0, Number(f?.q ?? 0) - Number(f?.c ?? 0));
+  return Number(one<{ m: number }>(mine)?.m ?? 0) / 1e6 + untracked * perQ;
 }
 
 async function monthUsdOf(env: Env, month: string): Promise<{ month: string; usd: number; base: number | null; console: boolean; refreshedAt: number | null }> {

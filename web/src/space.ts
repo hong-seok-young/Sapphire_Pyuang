@@ -95,7 +95,21 @@ export function startSpace(host: HTMLElement, o: SpaceOpts): SpaceRun {
     host.appendChild(cv);
     return cv;
   }
+  // 한 번 그려 두는 그림판(하늘·산·성운)은 폰이 다른 앱에 갔다 오는 동안 지워질 수 있다 (안드로이드 크롬이 숨은 탭의 그림판 메모리를 비운다:
+  // 제작자 2026-11-13 노을을 골랐는데 별만 있는 까만 하늘이 떴다. 매 프레임 그리는 빛 그림판만 살아남았다).
+  // 그래서 무엇을 그렸는지 적어 두고, 그림판이 되살아났다고 알리거나(contextrestored) 화면이 다시 보이면 다시 칠한다
+  const painted: [HTMLCanvasElement, (x: number, y: number) => RGB | null | undefined][] = [];
   function paint(cv: HTMLCanvasElement, fn: (x: number, y: number) => RGB | null | undefined) {
+    if (!painted.some((q) => q[0] === cv && q[1] === fn)) {
+      painted.push([cv, fn]);
+      cv.addEventListener("contextrestored", () => repaint(cv));
+    }
+    fill(cv, fn);
+  }
+  function repaint(only?: HTMLCanvasElement) {
+    for (const [cv, fn] of painted) if (!only || cv === only) fill(cv, fn);
+  }
+  function fill(cv: HTMLCanvasElement, fn: (x: number, y: number) => RGB | null | undefined) {
     const g = cv.getContext("2d")!, im = g.createImageData(cv.width, cv.height), d = im.data;
     for (let y = 0; y < cv.height; y++)
       for (let x = 0; x < cv.width; x++) {
@@ -643,9 +657,19 @@ export function startSpace(host: HTMLElement, o: SpaceOpts): SpaceRun {
   }
   if (o.still) { while (T < 5) step(1 / 30); render(); }
   else raf = requestAnimationFrame(frame);
+  // 다른 앱에 갔다 오면 한 번 그려 둔 그림판을 다시 칠한다 (지워졌어도, 안 지워졌어도 같은 그림이라 티가 안 난다)
+  let hiddenAt = 0;
+  const onVis = () => {
+    if (document.hidden) { hiddenAt = Date.now(); return; }
+    if (hiddenAt && Date.now() - hiddenAt > 1500) repaint();
+    hiddenAt = 0;
+    last = 0;
+    if (o.still) render();
+  };
+  document.addEventListener("visibilitychange", onVis);
 
   return {
-    stop() { dead = true; cancelAnimationFrame(raf); host.innerHTML = ""; parts = []; meteors = []; comets = []; fxs = []; },
+    stop() { dead = true; cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", onVis); host.innerHTML = ""; parts = []; meteors = []; comets = []; fxs = []; },
     boom(cx?: number, cy?: number) {
       if (o.still) return;
       // 한 점에서 만나게: 큰 별똥별 하나에 작은 것 서넛이 사방 위에서 같은 때 닿아 작은 것들이 터진다 (제작자 2026-11-13 '빈 곳 클릭하면 충돌해서 터지는 거 볼 수 있게 많이 떨어지게')
