@@ -441,28 +441,15 @@ export function startSpace(host: HTMLElement, o: SpaceOpts): SpaceRun {
     paint(glow, (x, y) => { const gx = (x - cw * 0.5) / (cw * 0.75), gy = (y - ch * 0.32) / (ch * 0.2), a = Math.max(0, 1 - gx * gx - gy * gy); return a * 1.2 > bay(x, y) * 1.4 ? [255, 176, 96, Math.round(70 * a + 20)] : null; });
     const fg = layer(cw, ch, 0, 0, 3);
     const far = (x: number) => ch * 0.8 - fbm(x * 0.035 * Q, 1.5) * ch * 0.12, near = (x: number) => ch * 0.875 - fbm(x * 0.05 * Q + 9, 4) * ch * 0.07;
-    const tx = Math.round(cw * 0.64), tyBase = Math.round(far(tx));
-    const castle = (x: number, y: number) => {
-      const u = Math.round((x - tx) / U), v = Math.round((tyBase - y) / U);
-      if (u < -5 || u > 6 || v < -1 || v > 12) return false;
-      const tower = (u >= -5 && u <= -2 && v <= 11) || (u >= 3 && u <= 6 && v <= 11), wall = u > -2 && u < 3 && v <= 7;
-      return tower || wall || (v === 12 && (u === -5 || u === -3 || u === 3 || u === 5)) || (v === 8 && (u === -1 || u === 1));
-    };
-    const C1 = hex("#0b0716"), C2 = hex("#2a1430"), C3 = hex("#140c24"), C4 = hex("#22143a"), C5 = hex("#7a3550"), C6 = hex("#4a2550"), C7 = hex("#2a1840");
+    // 산 위의 성(네모난 실루엣)은 뺐다 (제작자 2026-11-13 '노을에서 산에 이상한 네모난 물체 실루엣 없애자')
+    const C1 = hex("#0b0716"), C2 = hex("#2a1430"), C3 = hex("#140c24"), C5 = hex("#7a3550"), C6 = hex("#4a2550"), C7 = hex("#2a1840");
     paint(fg, (x, y) => {
       const yf = far(x), yn = near(x);
       if (y >= ch * 0.95) return C1;
       if (y >= yn) return y < yn + 1 ? C2 : C3;
-      if (castle(x, y)) return C4;
       if (y >= yf) return y < yf + 1 ? C5 : y < yf + 3 && bay(x, y) < 0.4 ? C6 : C7;
       return null;
     });
-    for (const [wx, wy, d] of [[tx - 4 * U, tyBase - 9 * U, 0], [tx + 4 * U, tyBase - 9 * U, -1.3]]) {
-      const w = document.createElement("i");
-      w.className = "sp-win";
-      w.style.cssText = `left:${Math.round(wx) * S}px;top:${Math.round(wy) * S}px;width:${S * 2}px;height:${S * 2}px;animation-delay:${d}s`;
-      host.appendChild(w);
-    }
     bias = ["금빛", "호박", "불꽃", "장미", "흰빛", "자홍"];
     const stars = makeStars(0.009, ["#ffffff", "#d4dcff", "#aab8ff", "#ffe2b0"], 0.78);
     const fade = (_x: number, y: number) => clamp((ch * 0.72 - y) / (ch * 0.25), 0, 1);

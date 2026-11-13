@@ -6,7 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { Me } from "../auth";
-import { BG_NAMES, loadBg, saveBg, todayScene } from "../bgSettings";
+import { BG_NAMES, bgNoticeSeen, loadBg, markBgNotice, saveBg, todayScene } from "../bgSettings";
+import { tutorialOpen, useTutorial } from "../tutorialState";
 import type { BgCfg, BgScene } from "../bgSettings";
 import { useBackClose } from "../backClose";
 import { canSee, gridSlots, itemOf, loadLayout, useLauncher } from "../launcher";
@@ -60,6 +61,74 @@ export function BgSettingsBody({ me, onChange }: { me: Me; onChange: (c: BgCfg) 
       <input className="bg-range" type="range" min={0} max={100} step={1} value={c.clear} aria-label="버튼 투명도" onChange={(e) => set({ clear: +e.target.value })} />
       {preview && <BgPreview me={me} cfg={c} set={set} onClose={() => setPreview(false)} />}
     </div>
+  );
+}
+
+/** 새 기능 안내 창 (제작자 2026-11-13 '들어오면 배경화면 설정 기능 생겼다고 팝업, 팝업 버튼에 미리 보기, 한 번씩'):
+ *  홈에 들어오면 이 기기·계정마다 한 번. '미리 보기'는 바로 화면 가득 미리 보기(아래 BgPreview)로, '나중에'는 닫기만. 이미 켠 사람에게는 안 뜬다 */
+export function BgNotice({ me }: { me: Me }) {
+  const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState(false);
+  const [cfg, setCfg] = useState<BgCfg>(() => loadBg(me.id));
+  const tut = useTutorial();
+  useEffect(() => {
+    if (bgNoticeSeen(me.id) || loadBg(me.id).on) return;
+    // 홈이 다 그려진 뒤 잠깐 있다가 (다른 안내 창·튜토리얼이 먼저면 안 띄운다)
+    const t = window.setTimeout(() => {
+      if (!tutorialOpen() && !document.querySelector(".rn-back, .opening, [role=dialog]")) setOpen(true);
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [me.id]);
+  useEffect(() => {
+    if (tut) setOpen(false);
+  }, [tut]);
+  const close = () => {
+    markBgNotice(me.id);
+    setOpen(false);
+  };
+  useBackClose(open && !preview, close);
+  const set = (p: Partial<BgCfg>) => {
+    const n = { ...cfg, ...p };
+    setCfg(n);
+    saveBg(me.id, n);
+  };
+  if (!open) return null;
+  if (preview)
+    return (
+      <BgPreview
+        me={me}
+        cfg={cfg}
+        set={set}
+        onClose={() => {
+          setPreview(false);
+          close();
+        }}
+      />
+    );
+  return createPortal(
+    <div className="rn-back" onClick={close}>
+      <div className="rn-card bg-notice" role="dialog" aria-modal="true" aria-label="배경화면 설정" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-notice-sky" aria-hidden>
+          <i className="bg-nt-star s1" />
+          <i className="bg-nt-star s2" />
+          <i className="bg-nt-star s3" />
+          <i className="bg-nt-star s4" />
+          <i className="bg-nt-shoot" />
+          <b>NEW</b>
+        </div>
+        <p className="rn-say">배경화면 설정 기능이 생겼어요</p>
+        <p className="bg-notice-sub">별똥별이 떨어지는 우주 배경 5가지 · 설정 &gt; 앱 설정 &gt; 배경화면</p>
+        <div className="pill-row">
+          <button type="button" className="pill" onClick={close}>
+            나중에
+          </button>
+          <button type="button" className="pill pill-on" onClick={() => setPreview(true)}>
+            미리 보기
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

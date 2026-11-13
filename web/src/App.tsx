@@ -66,6 +66,7 @@ import { LoginPage, PasswordPage } from "./pages/Login";
 import { GuideHost } from "./tutorial";
 import { BirthdaySticker } from "./birthday";
 import { SpaceBackground } from "./pages/SpaceBg";
+import { BgNotice } from "./pages/BgSettings";
 import { CoinToast, RaceToast } from "./coinToast";
 import { Opening, shouldCelebrate } from "./pages/Opening";
 import { reportOpen, reportView } from "./activity";
@@ -80,7 +81,7 @@ import {
   fetchMe,
   switchAccount,
 } from "./auth";
-import { appMenu } from "./platform";
+import { appMenu, inFloat } from "./platform";
 import type { Me } from "./auth";
 
 // 자주 안 쓰는 화면은 따로 떼어 처음엔 받지 않는다 (2026-11-03 렉 검토: 코드 한 덩어리 558KB 를 폰이 다 읽고서야 홈이 떴다).
@@ -625,6 +626,8 @@ function Wiki({
       {body.type === Home && <HomeCorner />}
       {/* 내 지역 날씨로 비·눈 (초안, 앱개발자만. pages/Weather.tsx) */}
       {body.type === Home && <HomeWeather me={me} />}
+      {/* 배경화면 새 기능 안내 (홈에서 이 기기·계정마다 한 번, 미리 보기로 바로, pages/BgSettings.tsx) */}
+      {body.type === Home && !celebrate && !inFloat && <BgNotice me={me} />}
       {/* 메뉴 설명 칸과 튜토리얼 (제목을 누르면, src/tutorial.tsx) */}
       <GuideHost me={me} />
       {/* 생일 스티커 (그날 한국 시간 하루, src/birthday.tsx) */}

@@ -5560,7 +5560,6 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 .space-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 .space-bg > * { position: absolute; }
 .space-bg canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
-.sp-win { background: #ffd27a; box-shadow: 0 0 8px 3px rgba(255, 195, 92, 0.6); animation: sp-breathe 2.6s ease-in-out infinite alternate; }
 @keyframes sp-breathe { from { opacity: 0.55; } to { opacity: 1; } }
 @keyframes sp-drift { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(var(--dx), var(--dy), 0); } }
 /* 첫 화면(index.html)이 html 에 바탕색을 칠해 두어서, body 바탕이 있으면 그 위에 덮인다: 켜면 body 를 비운다 */
@@ -5580,7 +5579,7 @@ html.space-on body { background: transparent; }
   background: conic-gradient(transparent 0 62%, var(--ring-a) 74%, var(--ring-b) 80%, var(--ring-a) 86%, transparent 96%);
   transform: translate(-50%, -50%); animation: ring-spin 2.6s linear infinite;
 }
-@media (prefers-reduced-motion: reduce) { .sp-win, .space-bg canvas, :is(html.space-on, .bg-preview) .tile-ring-fx::before { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .space-bg canvas, :is(html.space-on, .bg-preview) .tile-ring-fx::before { animation: none; } }
 /* 설정의 배경화면 칸 */
 .bg-set { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .bg-set-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
@@ -5610,3 +5609,18 @@ html.space-on body { background: transparent; }
 .bg-pv-panel .pill { padding: 8px 2px; font-size: 12px; white-space: nowrap; }
 .bg-pv-clear { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
 .bg-pv-clear b { color: var(--gold); font-weight: 400; }
+/* 배경화면 새 기능 안내 창 (pages/BgSettings.tsx BgNotice): 작은 밤하늘과 별똥별 */
+.bg-notice { gap: 10px; }
+.bg-notice-sky { position: relative; height: 72px; margin: -14px -14px 0; overflow: hidden; background: linear-gradient(180deg, #050722, #1a1550 60%, #43205e); border-bottom: 1px solid rgba(255, 195, 92, 0.35); }
+.bg-notice-sky b { position: absolute; left: 10px; top: 8px; padding: 1px 6px; font-size: 11px; font-weight: 700; color: #3a0b22; background: #ff8fc8; border: 1px solid var(--edge); }
+.bg-nt-star { position: absolute; width: 2px; height: 2px; background: #fff; animation: bg-nt-tw 2.4s ease-in-out infinite alternate; }
+.bg-nt-star.s1 { left: 22%; top: 30%; }
+.bg-nt-star.s2 { left: 48%; top: 62%; animation-delay: -0.8s; }
+.bg-nt-star.s3 { left: 70%; top: 22%; animation-delay: -1.5s; background: #ffe2b0; }
+.bg-nt-star.s4 { left: 88%; top: 55%; animation-delay: -0.4s; background: #a9c4ff; }
+.bg-nt-shoot { position: absolute; left: 0; top: 0; width: 46px; height: 2px; background: linear-gradient(90deg, transparent, #fff); transform: translate(260px, 6px) rotate(152deg); transform-origin: right center; opacity: 0; animation: bg-nt-shoot 3.2s linear infinite; }
+@keyframes bg-nt-tw { from { opacity: 0.25; } to { opacity: 1; } }
+@keyframes bg-nt-shoot { 0% { opacity: 0; transform: translate(260px, 0) rotate(152deg); } 8% { opacity: 1; } 40% { opacity: 1; transform: translate(80px, 70px) rotate(152deg); } 45%, 100% { opacity: 0; transform: translate(70px, 74px) rotate(152deg); } }
+.bg-notice-sub { font-size: 12px !important; color: var(--muted); }
+.bg-notice .pill-row .pill-on { color: var(--edge); background: var(--gold); }
+@media (prefers-reduced-motion: reduce) { .bg-nt-star, .bg-nt-shoot { animation: none; } .bg-nt-shoot { opacity: 0; } }
