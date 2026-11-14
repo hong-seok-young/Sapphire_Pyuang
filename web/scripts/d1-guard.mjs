@@ -32,6 +32,7 @@ async function sql(text, params) {
   if (!id) throw new Error("no sapphire-accounts db");
   const r = await (await fetch(`${base}/${id}/query`, { method: "POST", headers: h, body: JSON.stringify({ sql: text, params }) })).json();
   if (!r.success) throw new Error("d1: " + JSON.stringify(r.errors).slice(0, 300));
+  return r.result?.[0]?.results ?? [];
 }
 
 let failed = false;
@@ -44,7 +45,7 @@ for (const acct of [A, B]) {
     const u = await usage(acct);
     const pct = Math.max(u.read / READ_LIMIT, u.write / WRITE_LIMIT);
     const level = pct >= 0.9 ? 90 : pct >= 0.7 ? 70 : pct >= 0.5 ? 50 : 0;
-    console.log(`${acct.name}: 읽기 ${((u.read / READ_LIMIT) * 100).toFixed(1)}% · 쓰기 ${((u.write / WRITE_LIMIT) * 100).toFixed(1)}%`);
+    console.log(`${acct.name}: 읽기 ${((u.read / READ_LIMIT) * 100).toFixed(1)}% · 쓰기 ${((u.write / WRITE_LIMIT) * 100).toFixed(1)}% (읽기 ${u.read}줄 · 쓰기 ${u.write}줄)`);
     if (level) {
       const now = Date.now();
       const mark = `${acct.key}_alert_${day}_${level}`;
@@ -59,5 +60,12 @@ for (const acct of [A, B]) {
     failed = true;
     console.log(`${acct.name}: 실패 ${e instanceof Error ? e.message : e}`);
   }
+}
+// 사용 기록을 지금 어느 DB 에 쓰는지 (101 = 둘째 계정)
+try {
+  const [ring] = await sql("SELECT n, started_at FROM log_ring ORDER BY started_at DESC LIMIT 1", []);
+  if (ring) console.log(`사용 기록 쓰는 곳: ${Number(ring.n) === 101 ? "둘째 계정" : "DB " + ring.n} (${new Date(Number(ring.started_at)).toISOString()} 부터)`);
+} catch (e) {
+  console.log(`사용 기록 쓰는 곳: 확인 실패 ${e instanceof Error ? e.message : e}`);
 }
 if (failed) process.exitCode = 1;
