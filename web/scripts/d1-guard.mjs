@@ -65,6 +65,8 @@ for (const acct of [A, B]) {
 try {
   const [ring] = await sql("SELECT n, started_at FROM log_ring ORDER BY started_at DESC LIMIT 1", []);
   if (ring) console.log(`사용 기록 쓰는 곳: ${Number(ring.n) === 101 ? "둘째 계정" : "DB " + ring.n} (${new Date(Number(ring.started_at)).toISOString()} 부터)`);
+  const errs = await sql("SELECT key, done_at FROM setup WHERE key LIKE 'log_remote_%' ORDER BY done_at DESC LIMIT 5", []);
+  for (const r of errs) console.log(`  ${new Date(Number(r.done_at)).toISOString()} ${String(r.key).replace(/https?:\/\/\S+/g, "(주소)")}`);
 } catch (e) {
   console.log(`사용 기록 쓰는 곳: 확인 실패 ${e instanceof Error ? e.message : e}`);
 }

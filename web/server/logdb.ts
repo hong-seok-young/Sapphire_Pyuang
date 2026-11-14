@@ -99,9 +99,14 @@ export async function currentLog(env: Env): Promise<LogDb> {
       await startLog(env, REMOTE_N, (top?.m ?? list[0].base) + GAP);
       const again = await logDbs(env);
       if (again[0].n === REMOTE_N) return again[0];
-    } catch {
+    } catch (e) {
       remoteFailedAt = Date.now();
+      // 왜 못 옮겼는지 남긴다 (D1 감시 d1-guard 가 찍는다, 주소는 지움)
+      const msg = String(e instanceof Error ? e.message : e).replace(/https?:\/\/\S+/g, "(주소)").slice(0, 160);
+      await env.DB.prepare("INSERT OR REPLACE INTO setup (key, done_at) VALUES (?, ?)").bind(`log_remote_err:${msg}`, Date.now()).run().catch(() => {});
     }
+  } else if (list[0].n !== REMOTE_N && !remoteLog(env)) {
+    await env.DB.prepare("INSERT OR IGNORE INTO setup (key, done_at) VALUES ('log_remote_unset', ?)").bind(Date.now()).run().catch(() => {});
   }
   if (list[0].n !== 1) return list[0];
   if (!logBinding(env, LOG_NUMS[0])) return list[0];
