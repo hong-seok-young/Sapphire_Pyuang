@@ -27,6 +27,8 @@ export interface GcItem {
   /** 담당자가 적은 골드 가치 (원 단위). 코인 = gold / 1000 반올림 */
   gold: number;
   active: boolean;
+  /** 남은 재고 (묶음 수, null 이면 한도 없음. 김다혜 2026-11-15 '갯수는 재고') */
+  stock?: number | null;
 }
 export type GcStatus = "pending" | "done" | "reject" | "cancel";
 export const STATUS_NAME: Record<GcStatus, string> = {
@@ -76,6 +78,8 @@ export interface GcRaceEntry {
   /** 목표를 정할 때 경험치(% x 1000): 그 자리가 달성률 0% */
   fromExp?: number;
   target: number;
+  /** 목표 경험치(% x 1000): 1군은 레벨업 없이 경험치까지 정한다 (제작자 2026-11-15) */
+  toExp?: number;
   level: number;
   exp: number | null;
   job: Job;
@@ -96,7 +100,7 @@ export interface GcRace {
   next?: number | null;
   nextEnd?: number | null;
   /** 쉬는 주에 다음 판에 정해 둔 목표 */
-  upcoming?: { id: string; fromLevel: number; target: number }[] | null;
+  upcoming?: { id: string; fromLevel: number; target: number; toExp?: number }[] | null;
   /** 1~5위 상금 */
   prizes: number[];
   list: GcRaceEntry[];
@@ -105,7 +109,9 @@ export interface GcRace {
 }
 /** 레벨을 저장해 달성률이 오르거나 목표를 찍었을 때 (팝업) */
 export interface RaceGain {
+  grp?: Grp;
   target: number;
+  toExp?: number;
   fromLevel: number;
   fromExp?: number;
   prevPct: number;
@@ -116,8 +122,11 @@ export interface RaceGain {
 }
 export const RACE_EVENT = "sapphire:gcrace";
 
+/** 1군 판 · 2군 판 (제작자 2026-11-15 '성장코인샵 버튼을 반으로, 왼쪽 1군 오른쪽 2군'): 주간 목표 판(기간·목표·상금·기록)만 따로, 상점·지갑·신청은 하나 */
+export type Grp = 1 | 2;
 export interface GcData {
   open: boolean;
+  grp: Grp;
   /** 한 주 상한 (낱개, 띄어쓰기 없는 이름: 사나운멧돼지인형 30)과 이번 주 내가 신청한 수 */
   caps?: Record<string, number>;
   weekBought?: Record<string, number>;
@@ -165,6 +174,7 @@ export interface GcRoundResult {
   userId: string;
   fromLevel: number;
   target: number;
+  toExp?: number;
   level: number;
   exp: number | null;
   doneAt: number | null;
@@ -172,15 +182,18 @@ export interface GcRoundResult {
   coins: number;
 }
 
-export const fetchGcoin = () => api<GcData>("/api/gcoin");
+/** 목표: 'Lv.52' 또는 'Lv.52 40%' (1군 목표 경험치, 서버 server/gcrace.ts goalText) */
+export const goalText = (target: number, toExp?: number) => `Lv.${target}${toExp ? ` ${Math.round(toExp / 10) / 100}%` : ""}`;
+
+export const fetchGcoin = (g: Grp = 2) => api<GcData>(`/api/gcoin?g=${g}`);
 /** 담당자: 이번 2주 목표 레벨 (null 이면 뺀다) */
 /** 판 기간 정하기: 한국 시간 from 날 0시 ~ to 날 24시 ('2026-11-11') */
-export const setRound = (from: string, to: string) =>
-  api<{ ok: boolean }>("/api/gcoin/round", "PUT", { from, to });
-export const setTarget = (userId: string, target: number | null, from?: number) =>
-  api<{ ok: boolean }>("/api/gcoin/targets", "PUT", { userId, target, from });
-/** 담당자: 목표 목록에서 빼기 (2군 본캐가 저절로 다시 들어오지 않게) */
-export const hideTarget = (userId: string) => api<{ ok: boolean }>("/api/gcoin/targets", "PUT", { userId, hide: true });
+export const setRound = (g: Grp, from: string, to: string) =>
+  api<{ ok: boolean }>("/api/gcoin/round", "PUT", { g, from, to });
+export const setTarget = (g: Grp, userId: string, target: number | null, toExp?: number) =>
+  api<{ ok: boolean }>("/api/gcoin/targets", "PUT", { g, userId, target, toExp });
+/** 담당자: 목표 목록에서 빼기 (그 군의 본캐가 저절로 다시 들어오지 않게) */
+export const hideTarget = (g: Grp, userId: string) => api<{ ok: boolean }>("/api/gcoin/targets", "PUT", { g, userId, hide: true });
 export const buyItem = (itemId: number, qty: number) =>
   api<{ ok: boolean; balance: number }>("/api/gcoin/orders", "POST", {
     itemId,
@@ -192,6 +205,7 @@ export const actOrder = (
   note?: string | null,
 ) => api<{ ok: boolean }>(`/api/gcoin/orders/${id}`, "PATCH", { action, note });
 export const saveGcSettings = (input: {
+  g?: Grp;
   levels?: GcCurve[];
   rank?: number[];
   cap?: { name: string; n: number };
@@ -200,6 +214,7 @@ export const addGcItem = (input: {
   name: string;
   unit: string | null;
   gold: number;
+  stock?: number | null;
 }) => api<{ ok: boolean }>("/api/gcoin/items", "POST", input);
 export const editGcItem = (
   id: number,
@@ -208,6 +223,7 @@ export const editGcItem = (
     unit: string | null;
     gold: number;
     active: boolean;
+    stock: number | null;
   }>,
 ) => api<{ ok: boolean }>(`/api/gcoin/items/${id}`, "PATCH", input);
 export const deleteGcItem = (id: number) =>
@@ -315,6 +331,11 @@ const ITEM_INFO: Record<string, string[]> = {
     "요구 레벨 27",
     "10초 동안 지속: 초당 100 체력 회복",
   ],
+  // 1군 성장코인샵 코스튬 (김다혜 2026-11-15 교환템 목록, 게임 도감 정보 사전 자료/도감/아이템/아이템.json)
+  꿈의형태: ["영웅 코스튬 · 장식", "체력 ??"],
+  풍향계측추진기: ["영웅 코스튬 · 망토", "체력 10"],
+  펌프퀸: ["영웅 코스튬 · 모자", "체력 10"],
+  플라즈마블레이드: ["영웅 코스튬 · 무기", "체력 10"],
 };
 /** 골드 -> 성장코인 (서버 server/gcoin.ts coinOfGold 와 같다) */
 /** 성장코인 1개 = 3만 골드 (김다혜 2026-11-09, 서버 server/gcoin.ts COIN_GOLD) */
@@ -511,7 +532,16 @@ export function sampleRace(start: number, now: number): GcRace {
 }
 
 /** 레벨 눈금의 자리(%): 목표를 정한 자리(레벨 + 경험치)가 0%, 목표 레벨이 100% */
-export function levelMark(fromLevel: number, fromExp: number | undefined, target: number, level: number): number {
+export function levelMark(fromLevel: number, fromExp: number | undefined, target: number, level: number, toExp = 0): number {
   const from = fromLevel + (fromExp ?? 0) / 100_000;
-  return target <= from ? 100 : ((level - from) / (target - from)) * 100;
+  const goal = target + toExp / 100_000;
+  return goal <= from ? 100 : ((level - from) / (goal - from)) * 100;
+}
+/** 시작 자리와 목표 사이의 레벨 눈금 (1군 목표 경험치면 목표 레벨도 눈금) */
+export function goalTicks(fromLevel: number, fromExp: number | undefined, target: number, toExp = 0): number[] {
+  const from = fromLevel + (fromExp ?? 0) / 100_000;
+  const goal = target + toExp / 100_000;
+  const out: number[] = [];
+  for (let l = Math.floor(from) + 1; l < goal; l++) out.push(l);
+  return out;
 }

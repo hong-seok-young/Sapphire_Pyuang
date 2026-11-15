@@ -5693,3 +5693,126 @@ a.cf-at { color: #9fb4ff; }
 .cf-more { margin-top: 6px; }
 .cf-eq { margin-left: 2px; }
 .cf-lab { font-size: 11px; color: var(--muted); }
+
+/* 누르면 좌우로 갈라지는 칸 (성장코인샵 1군 · 2군, 제작자 2026-11-15 '버튼을 누르면 좌우로 갈라지게, 애니메이션 지리게', Home.tsx SplitTile).
+   평소: 칸 한 장(같은 칸을 좌우 반씩 보이는 두 쪽이 겹침). 누르면: 움찔 → 가운데 번개 금 · 번쩍 · 충격파 · 불티 → 두 쪽이 문짝처럼 날아가고
+   금색 1군 · 은색 2군 단추가 튀어나온다. 열린 동안 둘레를 빛이 돌고 동전이 통통, 빛이 지나간다. 움직임은 transform·opacity 만 */
+.gsplit { cursor: pointer; overflow: visible; }
+.gsplit > .gs-face {
+  position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; padding: 20px 6px 8px; pointer-events: none;
+}
+.gs-face-l { clip-path: inset(-24px 50% -24px -24px); }
+.gs-face-r { clip-path: inset(-24px -24px -24px 50%); }
+.gsplit-open { background: var(--edge); animation: gs-shake 0.26s linear both; }
+.gsplit-open > .gs-face-l { animation: gs-fly-l 0.46s cubic-bezier(0.3, 0.7, 0.2, 1) 0.11s both; }
+.gsplit-open > .gs-face-r { animation: gs-fly-r 0.46s cubic-bezier(0.3, 0.7, 0.2, 1) 0.11s both; }
+@keyframes gs-shake {
+  0%, 100% { transform: none; } 15% { transform: translate(-2px, 1px) scale(0.96); } 30% { transform: translate(2px, -1px) scale(0.95); }
+  45% { transform: translate(-2px, 0) scale(0.97); } 60% { transform: translate(1px, 1px); } 80% { transform: translate(-1px, 0); }
+}
+@keyframes gs-fly-l { 0% { transform: none; opacity: 1; } 100% { transform: translate(-70%, 6px) rotate(-16deg) scale(0.86); opacity: 0; } }
+@keyframes gs-fly-r { 0% { transform: none; opacity: 1; } 100% { transform: translate(70%, 6px) rotate(16deg) scale(0.86); opacity: 0; } }
+
+/* 갈라지는 순간 */
+.gs-burst { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+.gs-flash {
+  position: absolute; left: 50%; top: 50%; width: 120%; aspect-ratio: 1; margin: -60% 0 0 -60%; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 18%, rgba(255, 230, 150, 0.55) 34%, transparent 66%);
+  animation: gs-flash 0.42s ease-out 0.08s both;
+}
+@keyframes gs-flash { 0% { opacity: 0; transform: scale(0.3); } 25% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.5); } }
+.gs-crack { position: absolute; left: calc(50% - 6px); top: -6px; width: 12px; height: calc(100% + 12px); overflow: visible; animation: gs-crack 0.5s ease-out both; transform-origin: 50% 50%; }
+.gs-crack polyline { fill: none; stroke: #fff; stroke-width: 1.6; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 2px #ffd34d) drop-shadow(0 0 4px #ffb020); }
+@keyframes gs-crack { 0% { transform: scaleY(0); opacity: 1; } 22% { transform: scaleY(1); opacity: 1; } 45% { opacity: 1; } 100% { transform: scaleY(1.08); opacity: 0; } }
+.gs-wave {
+  position: absolute; left: 50%; top: 50%; width: 70px; height: 70px; margin: -35px 0 0 -35px; border-radius: 50%;
+  border: 3px solid rgba(255, 233, 160, 0.9); animation: gs-wave 0.6s ease-out 0.1s both;
+}
+@keyframes gs-wave { 0% { opacity: 0.95; transform: scale(0.2); } 100% { opacity: 0; transform: scale(2.4); } }
+.gs-spark {
+  position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; background: #fff3b0;
+  box-shadow: 0 0 0 1px #ffb020; animation: gs-spark 0.55s cubic-bezier(0.2, 0.8, 0.4, 1) calc(0.1s + var(--sd)) both;
+}
+.gs-spark:nth-child(3n) { background: #fff; box-shadow: 0 0 0 1px #c9d3e6; }
+@keyframes gs-spark {
+  0% { opacity: 1; transform: translate(0, calc(var(--sy) * 0.6)) scale(1.3); }
+  100% { opacity: 0; transform: translate(var(--sx), calc(var(--sy) * 1.4)) scale(0.4) rotate(90deg); }
+}
+
+/* 두 단추 (칸 높이 꽉 차게, 가운데 3px 틈) */
+.gs-btn {
+  position: absolute; z-index: 3; top: 3px; bottom: 3px; display: block; overflow: hidden; isolation: isolate;
+  color: var(--text); text-decoration: none; opacity: 0; transform: scale(0.5); pointer-events: none;
+}
+.gs-btn-l { left: 3px; right: calc(50% + 1.5px); --c: #ffd34d; --c2: #fff3b0; }
+.gs-btn-r { right: 3px; left: calc(50% + 1.5px); --c: #c9d3e6; --c2: #ffffff; }
+.gsplit-open .gs-btn { pointer-events: auto; animation: gs-pop 0.56s cubic-bezier(0.2, 1.5, 0.4, 1) 0.2s both; }
+.gsplit-open .gs-btn-r { animation-delay: 0.27s; }
+@keyframes gs-pop {
+  0% { opacity: 0; transform: scale(0.35) translateY(8px); }
+  55% { opacity: 1; transform: scale(1.1) translateY(-2px); }
+  100% { opacity: 1; transform: none; }
+}
+/* 둘레를 도는 빛 (1군 전용 칸의 빛과 같은 방법: 큰 원뿔 빛이 돌고 안쪽을 칸 색으로 덮는다) */
+.gs-glow { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+.gs-glow::before {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 260%; aspect-ratio: 1;
+  background: conic-gradient(transparent 0 58%, var(--c) 72%, var(--c2) 80%, var(--c) 88%, transparent 98%);
+  transform: translate(-50%, -50%); animation: ring-spin 2.2s linear infinite;
+}
+.gs-btn-r .gs-glow::before { animation-direction: reverse; }
+.gs-glow::after {
+  content: ""; position: absolute; inset: 2px; background: color-mix(in srgb, var(--c) 24%, var(--panel));
+  box-shadow: inset 2px 2px 0 color-mix(in srgb, var(--c) 55%, transparent), inset -2px -2px 0 rgba(0, 0, 0, 0.35);
+}
+.gs-btn-in {
+  position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  height: 100%; overflow: hidden; transition: transform 0.08s;
+}
+/* 지나가는 빛 */
+.gs-btn-in::after {
+  content: ""; position: absolute; top: -20%; bottom: -20%; left: 0; width: 40%; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transform: translateX(-160%) skewX(-12deg); animation: gs-shine 2.6s ease-in-out 0.9s infinite;
+}
+.gs-btn-r .gs-btn-in::after { animation-delay: 1.5s; }
+@keyframes gs-shine { 0%, 55% { transform: translateX(-160%) skewX(-12deg); } 85%, 100% { transform: translateX(330%) skewX(-12deg); } }
+.gs-btn-in .tile-pic { height: 30px; animation: gs-bob 1.5s ease-in-out 0.8s infinite; }
+.gs-btn-r .gs-btn-in .tile-pic { animation-delay: 1.05s; }
+@keyframes gs-bob { 0%, 100% { transform: none; } 30% { transform: translateY(-4px) rotate(-6deg); } 55% { transform: translateY(0) rotate(4deg); } }
+.gs-btn-in b { font-size: 15px; line-height: 17px; color: var(--c); text-shadow: 1px 1px 0 var(--edge), -1px 0 0 var(--edge), 0 -1px 0 var(--edge); }
+.gs-btn:active .gs-btn-in { transform: translate(1px, 1px) scale(0.94); }
+@media (prefers-reduced-motion: reduce) {
+  .gsplit-open, .gsplit-open > .gs-face-l, .gsplit-open > .gs-face-r, .gsplit-open .gs-btn, .gs-glow::before, .gs-btn-in::after, .gs-btn-in .tile-pic { animation: none; }
+  .gs-burst { display: none; }
+  .gsplit-open > .gs-face { opacity: 0; }
+  .gsplit-open .gs-btn { opacity: 1; transform: none; }
+}
+
+/* 성장코인샵 안: 1군 · 2군 판 바꾸기, 재고, 1군 안내, 1군 추가 코인, 목표 경험치 */
+.gc-grp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0 0 8px; }
+.gc-grp-btn {
+  padding: 4px 0; font: inherit; font-size: 13px; color: var(--muted); background: var(--panel); border: 2px solid var(--edge); cursor: pointer;
+}
+.gc-grp-1.gc-grp-on { color: var(--edge); background: #ffd34d; box-shadow: inset 2px 2px 0 #fff3b0; }
+.gc-grp-2.gc-grp-on { color: var(--edge); background: #c9d3e6; box-shadow: inset 2px 2px 0 #fff; }
+.gc-grp-btn:active { transform: translate(1px, 1px); }
+.gc-stock-tag { position: absolute; z-index: 2; top: 3px; right: 3px; padding: 0 3px; font-size: 9px; line-height: 13px; color: var(--edge); background: #8fe3ff; border: 1px solid var(--edge); }
+.gc-stock-out { background: #ff7a7a; }
+.gc-soldout { opacity: 0.55; }
+/* 재고 칸이 생겨 좁은 폰(320px)에서 단추가 다음 줄 오른쪽으로 내려간다 (화면 폭 대원칙) */
+.gc-bundle:not(.gc-bundle-add) { flex-wrap: wrap; }
+.gc-bundle:not(.gc-bundle-add) > .mk-input + span + .mk-input { flex: 1 1 58px; width: 58px; min-width: 58px; }
+.gc-bundle:not(.gc-bundle-add) > span + .mk-input.gc-bundle-stock { flex: none; width: 38px; min-width: 0; text-align: center; letter-spacing: 0; }
+.gc-bundle:not(.gc-bundle-add) > .pill:first-of-type { margin-left: auto; }
+.gc-guide { margin: 0 0 8px; background: var(--panel); border: 2px solid var(--edge); }
+.gc-guide-head { display: flex; width: 100%; align-items: center; justify-content: space-between; padding: 6px 10px; font: inherit; font-size: 12px; color: var(--gold); background: none; border: 0; cursor: pointer; }
+.gc-guide-head i { font-style: normal; color: var(--muted); }
+.gc-guide-body { padding: 0 10px 8px; font-size: 12px; line-height: 17px; }
+.gc-guide-body p { margin: 4px 0 0; }
+.gc-guide-body b { display: inline-block; min-width: 4.2em; margin-right: 6px; color: #ffd34d; font-weight: 400; }
+.gc-bonus1 { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+.gr-tg-exp { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; color: var(--muted); }
+.gr-tg-exp .mk-input { width: 3.6em; padding: 2px 4px; text-align: right; }
+.gr-goal small { font-size: 9px; }

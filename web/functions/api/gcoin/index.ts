@@ -1,10 +1,10 @@
-// GET /api/gcoin -> 2군 성장코인샵 (server/gcoin.ts, src/pages/GrowthShop.tsx)
+// GET /api/gcoin?g=1|2 -> 성장코인샵 (1군 판 g=1, 2군 판은 없거나 2. 상점·지갑·신청은 하나, 주간 목표 판만 군마다) (server/gcoin.ts, src/pages/GrowthShop.tsx)
 //   { open, manage, member, start, wallet, history, items, curve, rank, week: { start, top }, lastWinners, admin? }
 //   member: 내가 2군 본캐인지 (아니면 지갑이 없다). admin(오피서 이상): 기다리는 신청, 2군 본캐 모두의 지갑, 최근 처리한 신청
 import { FORBIDDEN, NEED_LOGIN, TEST_IDS, currentUser, json } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { raceData, readRounds, roundResults, snapshotEnded } from "../../../server/gcrace";
-import { LEVEL_COINS, readCaps, weekBought, gcoinOpen, openCleanup, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
+import { grpOf, hidePrefix, LEVEL_COINS, readCaps, weekBought, gcoinOpen, openCleanup, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
 import { weekStart } from "../../../server/week";
 
 interface OrderRow {
@@ -41,13 +41,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (!me) return NEED_LOGIN();
   if (!canUseGcoin(me)) return FORBIDDEN();
   const manage = canManageGcoin(me);
+  const grp = grpOf(new URL(request.url).searchParams.get("g"));
   // DB 를 다녀오는 횟수를 줄인다 (제작자 2026-11-10 '전반적으로 렉이 좀 있어, 반응이 늦어'): 서로 기다릴 필요 없는 것은 한꺼번에.
   // 1) 설정들 2) 판 순위(상금 넣기) 3) 지갑·신청·장부 (상금을 넣은 뒤에 세야 지갑이 맞다)
   const [, curve, rounds, rank, caps, start, member] = await Promise.all([
     openCleanup(env),
     readCurve(env),
-    readRounds(env),
-    readRank(env),
+    readRounds(env, grp),
+    readRank(env, grp),
     readCaps(env),
     startAt(env),
     isMember(env, me.id),
@@ -56,19 +57,20 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   await settleWeeks(env, curve);
   // 주간 목표 선착순 (server/gcrace.ts): 순위·달성률·추월 차트. 달성한 1~5위 상금도 여기서 넣으므로 지갑보다 먼저
   const pre = { rounds, prizes: rank };
-  const [race] = await Promise.all([raceData(env, Date.now(), pre), snapshotEnded(env, Date.now(), pre)]);
+  const [race] = await Promise.all([raceData(env, grp, Date.now(), pre), snapshotEnded(env, Date.now())]);
 
   const now = Date.now();
   const ws = Math.max(weekStart(now), start);
   const [mine, items, top, myOrders, myLedger, winners, bought, adminRows] = await Promise.all([
     member ? wallets(env, curve, me.id, start) : Promise.resolve([]),
-    env.DB.prepare(`SELECT id, name, unit, price, gold, active FROM gc_items ${manage ? "" : "WHERE active = 1 AND price > 0 "}ORDER BY sort, id`).all<{
+    env.DB.prepare(`SELECT id, name, unit, price, gold, active, stock FROM gc_items ${manage ? "" : "WHERE active = 1 AND price > 0 "}ORDER BY sort, id`).all<{
       id: number;
       name: string;
       unit: string | null;
       price: number;
       gold: number | null;
       active: number;
+      stock: number | null;
     }>(),
     LEVEL_COINS ? weekRanking(env, ws, null, curve) : Promise.resolve([]),
     env.DB.prepare("SELECT * FROM gc_orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 60").bind(me.id).all<OrderRow>(),
@@ -82,12 +84,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
           env.DB.prepare("SELECT * FROM gc_orders WHERE status = 'pending' ORDER BY created_at ASC").all<OrderRow>(),
           env.DB.prepare("SELECT * FROM gc_orders WHERE status != 'pending' ORDER BY COALESCE(done_at, created_at) DESC LIMIT 60").all<OrderRow>(),
           wallets(env, curve, undefined, start),
-          roundResults(env),
+          roundResults(env, grp),
           // 주간 목표 대상으로 고를 수 있는 사람 (담당자 재량, 1군·2군 상관없이): 레벨을 적은 계정 모두
           env.DB.prepare("SELECT p.user_id AS id, p.level AS level, p.guild AS guild, u.main_id AS main FROM profiles p JOIN users u ON u.id = p.user_id WHERE p.level IS NOT NULL")
             .all<{ id: string; level: number; guild: string | null; main: string | null }>(),
           // 담당자가 목표 목록에서 뺀 사람 (2군 본캐가 저절로 다시 들어오지 않게)
-          env.DB.prepare("SELECT substr(key, 6) AS id FROM gc_settings WHERE key LIKE 'hide:%'").all<{ id: string }>(),
+          env.DB.prepare("SELECT substr(key, ?) AS id FROM gc_settings WHERE key LIKE ?").bind(hidePrefix(grp).length + 1, `${hidePrefix(grp)}%`).all<{ id: string }>(),
         ])
       : null,
   ]);
@@ -137,6 +139,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
   return json({
     open: gcoinOpen(),
+    grp,
     // 한 주 상한 (낱개, 띄어쓰기 없는 이름마다)과 이번 주 내가 신청한 수
     caps,
     weekBought: wallet ? bought : {},
@@ -149,7 +152,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     history: { levels, milestones, ledger: myLedger.results, orders: myOrders.results.map(orderOut) },
     nextMilestone,
     streak: { count: streak, next: streakBonus(streak + 1) },
-    items: items.results.map((i) => ({ id: i.id, name: i.name, unit: i.unit, price: i.price, gold: i.gold ?? i.price * 1000, active: i.active === 1 })),
+    items: items.results.map((i) => ({ id: i.id, name: i.name, unit: i.unit, price: i.price, gold: i.gold ?? i.price * 1000, active: i.active === 1, stock: i.stock })),
     curve,
     rank,
     week: { start: ws, top: weekTop },

@@ -81,9 +81,22 @@ export const streakBonus = (count: number) =>
 export const milestonesBetween = (base: number, top: number) =>
   MILESTONES.filter((m) => base < m.level && top >= m.level);
 
-/** 주간 2군 성장 1·2·3위 보너스 기본값 */
-/** 주간 순위 보너스 1~5위 (제작자 2026-11-09 '총 5위까지 추가 보상') */
+/** 주간 순위 보너스 1~5위 (제작자 2026-11-09 '총 5위까지 추가 보상'): 2군 */
 export const DEFAULT_RANK = [6, 4, 3, 2, 2];
+/** 1군 주간 목표 1~5위 (유어아너 공지 2026-11-15 '1등 10개, 2등 8개, 3등 6개, 4·5등 4개') */
+export const DEFAULT_RANK1 = [10, 8, 6, 4, 4];
+
+/**
+ * 성장코인샵은 1군·2군 두 판 (제작자 2026-11-15 '성장코인샵 버튼을 반으로, 왼쪽 1군 오른쪽 2군', 유어아너 1군 공지):
+ * 주간 목표 판(기간·목표·상금·기록)만 따로이고 상점·지갑·신청은 하나다. 화면·API 는 ?g=1 이 1군, 없거나 2 면 2군.
+ * 1군 판 번호(gc_rounds.id, gc_targets.round)는 홀수(시작 ms + 1), 2군은 짝수(시작 ms): 판 번호만 보고 어느 군인지 안다 (server/gcrace.ts)
+ */
+export type Grp = 1 | 2;
+export const grpOf = (v: unknown): Grp => (v === 1 || v === "1" ? 1 : 2);
+/** 상금 설정 키 ('rank1' 은 2군 그대로, 1군은 'g1rank1') */
+export const rankKey = (grp: Grp, i: number) => (grp === 1 ? `g1rank${i}` : `rank${i}`);
+/** 담당자가 목표 목록에서 뺀 사람 (그 군의 본캐가 저절로 다시 안 들어오게) */
+export const hidePrefix = (grp: Grp) => (grp === 1 ? "hide1:" : "hide:");
 /** 처음 물건 (코인 1개 = 1,000골드쯤) */
 // 자몽주스·자몽케이크는 50개, 나머지는 20개씩 판다 (제작자 2026-11-09). price 는 관리자가 적은 골드 가치(천 골드) = 성장코인.
 // 제작자가 처음 준 값(사나운 멧돼지 인형·망고워터·자몽주스·자몽케이크) 말고는 0 = 값을 정하기 전 (제작자 '스샷 골드 가격 무시해, 골드 값어치는 관리자가 쓸 거야').
@@ -179,12 +192,13 @@ export async function readCurve(env: Env): Promise<Curve[]> {
   return results.length ? results : DEFAULT_LEVELS;
 }
 
-export async function readRank(env: Env): Promise<number[]> {
+export async function readRank(env: Env, grp: Grp = 2): Promise<number[]> {
+  const keys = [1, 2, 3, 4, 5].map((i) => rankKey(grp, i));
   const { results } = await env.DB.prepare(
-    "SELECT key, value FROM gc_settings WHERE key IN ('rank1', 'rank2', 'rank3', 'rank4', 'rank5')",
+    `SELECT key, value FROM gc_settings WHERE key IN (${keys.map((k) => `'${k}'`).join(", ")})`,
   ).all<{ key: string; value: number }>();
   const m = new Map(results.map((r) => [r.key, r.value]));
-  return DEFAULT_RANK.map((d, i) => m.get(`rank${i + 1}`) ?? d);
+  return (grp === 1 ? DEFAULT_RANK1 : DEFAULT_RANK).map((d, i) => m.get(keys[i]) ?? d);
 }
 
 /** 코인을 세기 시작한 때. 없으면 지금으로 적는다 (배포가 처음 한 번 적는다, scripts/ci-d1.mjs) */
@@ -206,8 +220,9 @@ export async function startAt(env: Env): Promise<number> {
  * 대상: 2군 본캐 (부캐 빼고, 테스트 계정 빼고). 제작자 '2군 전원', 공지 '본캐이신 분들만'.
  * 그리고 담당자가 주간 목표를 정해 준 사람은 1군·부캐여도 (제작자 2026-11-10 '목표가 정해진 사람들은 다 출입 가능하게'): 어느 판이든 목표가 남아 있으면 지갑·신청을 쓴다 (받은 상금을 판이 끝난 뒤에도 쓰게, 담당자가 '빼기'하면 끝)
  */
+// 1군 본캐도 (제작자 2026-11-15 1군 성장코인샵, 유어아너 공지 '본캘만 참여가능'): 목표·추가 코인(기여도·길던, 이노워)을 받고 신청한다
 const MEMBERS_SQL =
-  "SELECT p.user_id FROM profiles p JOIN users u ON u.id = p.user_id WHERE ((p.guild = 'second' AND u.main_id IS NULL) OR p.user_id IN (SELECT user_id FROM gc_targets)) AND u.id NOT IN ('테스트1', '테스트2')";
+  "SELECT p.user_id FROM profiles p JOIN users u ON u.id = p.user_id WHERE ((p.guild IN ('main', 'second') AND u.main_id IS NULL) OR p.user_id IN (SELECT user_id FROM gc_targets)) AND u.id NOT IN ('테스트1', '테스트2')";
 
 interface Point {
   user_id: string;
@@ -406,7 +421,7 @@ export async function wallets(
 /** 코인을 쌓고 쓰는 사람인지: 2군 본캐, 또는 담당자가 주간 목표를 정해 준 적 있는 사람 (1군·부캐여도. 테스트 계정도: 앱개발자가 2군 쪽 화면을 시험하려고. 순위·현황에서는 빠진다) */
 export async function isMember(env: Env, id: string): Promise<boolean> {
   return !!(await env.DB.prepare(
-    "SELECT 1 AS x FROM profiles p JOIN users u ON u.id = p.user_id WHERE p.user_id = ? AND ((p.guild = 'second' AND u.main_id IS NULL) OR EXISTS (SELECT 1 FROM gc_targets t WHERE t.user_id = p.user_id))",
+    "SELECT 1 AS x FROM profiles p JOIN users u ON u.id = p.user_id WHERE p.user_id = ? AND ((p.guild IN ('main', 'second') AND u.main_id IS NULL) OR EXISTS (SELECT 1 FROM gc_targets t WHERE t.user_id = p.user_id))",
   )
     .bind(id)
     .first());

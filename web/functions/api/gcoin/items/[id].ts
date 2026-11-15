@@ -1,4 +1,4 @@
-// PATCH  /api/gcoin/items/:id { name?, unit?, gold?, active? } (골드 원 단위, 코인 = gold / 1000 반올림) -> 물건 고치기·판매 중지 (오피서 이상)
+// PATCH  /api/gcoin/items/:id { name?, unit?, gold?, active?, stock? } (stock: 남은 재고 묶음 수, null 이면 한도 없음) (골드 원 단위, 코인 = gold / 1000 반올림) -> 물건 고치기·판매 중지 (오피서 이상)
 // DELETE /api/gcoin/items/:id -> 물건 지우기 (이미 한 신청은 이름·값을 따로 남겨 두어 그대로 보인다)
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, paramId, readJson } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
@@ -26,7 +26,7 @@ async function guard(env: Env, request: Request, params: Record<string, string |
 export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params }) => {
   const g = await guard(env, request, params);
   if (!g.it) return g.res;
-  const b = await readJson<{ name: unknown; unit: unknown; gold: unknown; active: unknown }>(request);
+  const b = await readJson<{ name: unknown; unit: unknown; gold: unknown; active: unknown; stock?: unknown }>(request);
   let { name, unit, price, active } = g.it;
   if (b.name !== undefined) {
     const n = text(b.name, MAX_NAME);
@@ -46,7 +46,17 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
     price = coinOfGold(p);
   }
   if (b.active !== undefined) active = b.active === true ? 1 : 0;
-  await env.DB.prepare("UPDATE gc_items SET name = ?, unit = ?, price = ?, gold = COALESCE(?, gold), active = ? WHERE id = ?").bind(name, unit, price, gold, active, g.it.id).run();
+  let stockSql = "";
+  const binds: unknown[] = [];
+  if (b.stock !== undefined) {
+    const st = b.stock === null ? null : int(b.stock, 0, 100_000);
+    if (b.stock !== null && st === null) return json({ error: "재고가 맞지 않아요" }, 400);
+    stockSql = ", stock = ?";
+    binds.push(st);
+  }
+  await env.DB.prepare(`UPDATE gc_items SET name = ?, unit = ?, price = ?, gold = COALESCE(?, gold), active = ?${stockSql} WHERE id = ?`)
+    .bind(name, unit, price, gold, active, ...binds, g.it.id)
+    .run();
   return json({ ok: true });
 };
 

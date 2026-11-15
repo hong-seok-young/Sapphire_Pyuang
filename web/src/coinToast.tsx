@@ -3,7 +3,7 @@
 // 이번 주 2군 성장 순위를 보인다. 누르면 상점으로. src/auth.ts saveMyProfile 이 'sapphire:gcoin' 으로 알린다 (서버가 코인을 줄 때만: 지금은 앱개발자·테스트 계정)
 import { useEffect, useRef, useState } from "react";
 import { go } from "./router";
-import { COIN_EVENT, RACE_EVENT, levelMark, milestone } from "./gcoin";
+import { COIN_EVENT, RACE_EVENT, goalText, goalTicks, levelMark, milestone } from "./gcoin";
 import type { CoinGain, RaceGain } from "./gcoin";
 
 const SHOW_MS = 5200;
@@ -75,7 +75,7 @@ export function CoinToast() {
       className={"ct" + (king ? " ct-king" : "")}
       onClick={() => {
         setGain(null);
-        go("#/gcoin");
+        go("#/gcoin?g=2");
       }}
       aria-live="polite"
     >
@@ -235,7 +235,7 @@ export function RaceToast() {
       className={"ct ct-race" + (king ? " ct-king" : "")}
       onClick={() => {
         setG(null);
-        go("#/gcoin");
+        go(`#/gcoin?g=${g.grp ?? 2}`);
       }}
       aria-live="polite"
     >
@@ -274,7 +274,7 @@ export function RaceToast() {
           <>
             <b className="ct-num">{g.rank}위 확정!</b>
             <small>
-              목표 Lv.{g.target} 달성
+              목표 {goalText(g.target, g.toExp)} 달성
               {g.coins > 0 ? ` · 성장코인 +${g.coins}` : ""}
             </small>
           </>
@@ -284,7 +284,7 @@ export function RaceToast() {
               달성률 {up > 0 ? `+${up}%` : `${g.pct}%`}
             </b>
             <small>
-              목표 Lv.{g.target} · 지금 {g.rank}위
+              목표 {goalText(g.target, g.toExp)} · 지금 {g.rank}위
             </small>
           </>
         )}
@@ -300,10 +300,9 @@ export function RaceToast() {
           }}
         >
           <i className="ct-bar-fill" />
-          {Array.from(
-            { length: Math.max(0, g.target - g.fromLevel - 1) },
-            (_, i) => {
-              const at = levelMark(g.fromLevel, g.fromExp, g.target, g.fromLevel + i + 1);
+          {goalTicks(g.fromLevel, g.fromExp, g.target, g.toExp).map(
+            (lv, i) => {
+              const at = levelMark(g.fromLevel, g.fromExp, g.target, lv, g.toExp);
               const hit = at > g.prevPct + 1e-6 && at <= g.pct + 1e-6;
               return (
                 <span
@@ -321,7 +320,7 @@ export function RaceToast() {
                     ["--d" as string]: `${Math.round(((at - g.prevPct) / Math.max(0.001, g.pct - g.prevPct)) * FILL_MS) + 250}ms`,
                   }}
                 >
-                  {hit && <em>Lv.{g.fromLevel + i + 1}</em>}
+                  {hit && <em>Lv.{lv}</em>}
                 </span>
               );
             },
