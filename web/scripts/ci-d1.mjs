@@ -926,40 +926,6 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
   }
 }
 
-// 성장코인샵 교환템 (김다혜 2026-11-15 카톡 목록: '크리4물약 20개 1코인 (11통), 자몽케잌 50개 2코인 (12통), 사멧 10개 2코인 (9통), 자라노래 1개 1코인 (15개),
-// 우파노래 3개 1코인 (40개), 피심 5개 2코인 (40개), 꿈의형태 1개 125코인, 풍향계측추진기·펌프퀸·풀라즈마 블레이드 1개 65코인', '갯수는 재고지? 넵').
-// 이 목록으로 상점을 맞춘다: 목록에 있는 것은 값(1코인 = 3만 골드)·재고(묶음 수)를 넣고 판매, 없는 것은 판매 중지 (지우지 않는다).
-// 재고: '통'은 묶음 수 그대로, '개'는 낱개라 묶음으로 나눈 내림 (우파 40개 / 3 = 13, 피심 40개 / 5 = 8. 짐작, 담당자가 고친다). 코스튬은 재고를 안 적어 1개씩 (짐작).
-// setup 'gcoin_items_20261115' 로 한 번만 (그 뒤에는 담당자 > 물건에서 고친다)
-{
-  const KEY = "gcoin_items_20261115";
-  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
-    const LIST = [
-      ["망고워터", "20개", 1, 11],
-      ["자몽케이크", "50개", 2, 12],
-      ["사나운 멧돼지 인형", "10개", 2, 9],
-      ["자라의노래", "1개", 1, 15],
-      ["우파우파의노래", "3개", 1, 13],
-      ["피닉스의심장", "5개", 2, 8],
-      ["꿈의형태", "1개", 125, 1],
-      ["풍향 계측 추진기", "1개", 65, 1],
-      ["펌프퀸", "1개", 65, 1],
-      ["플라즈마 블레이드", "1개", 65, 1],
-    ];
-    const q = (v) => `'${String(v).replace(/'/g, "''")}'`;
-    const key = (n, u) => `replace(name, ' ', '') = ${q(n.replace(/ /g, ""))} AND unit = ${q(u)}`;
-    runSql([
-      "UPDATE gc_items SET active = 0;",
-      ...LIST.flatMap(([n, u, coin, stock], i) => [
-        `UPDATE gc_items SET name = ${q(n)}, price = ${coin}, gold = ${coin * 30000}, stock = ${stock}, active = 1, sort = ${i} WHERE ${key(n, u)};`,
-        `INSERT INTO gc_items (name, unit, price, gold, active, sort, stock) SELECT ${q(n)}, ${q(u)}, ${coin}, ${coin * 30000}, 1, ${i}, ${stock} WHERE NOT EXISTS (SELECT 1 FROM gc_items WHERE ${key(n, u)});`,
-      ]),
-      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
-    ]);
-    console.log("성장코인샵 교환템 목록·재고 (한 번)");
-  }
-}
-
 // 개발 요청 #13 (유어아너 '길드에 건의할 건의함좀 만들어주세여') 결재·완료 (제작자 2026-11-10 '유어아너 합의 길마결재 넣고 개발완료 처리해줘': 건의함은 이미 열었다).
 // 이번 차례에 유어아너 합의 · 마을모금함 결재 · 퓨앙 개발 완료를 결재 이력에 넣고 상태를 done 으로. 신청한 사람에게 개발 완료 알림. setup 'devreq13_done_20261110' 로 한 번만
 {
