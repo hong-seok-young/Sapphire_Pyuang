@@ -37,6 +37,7 @@ import {
   itemLabel,
   coinOfGold,
   itemInfo,
+  isSpecial,
   itemPic,
   packOf,
   qtyOf,
@@ -413,6 +414,10 @@ function ShopTab({
     groups.set(it.name, [...(groups.get(it.name) ?? []), it]);
   for (const list of groups.values())
     list.sort((a, b) => qtyOf(a.unit) - qtyOf(b.unit));
+  const all = [...groups.values()].flat();
+  // 1군 스페셜(영웅 코스튬, 단 1개씩)은 맨 위 따로
+  const special = data.grp === 1 ? all.filter((it) => isSpecial(it.name)) : [];
+  const regular = all.filter((it) => !special.includes(it));
 
   async function buy() {
     if (!picked) return;
@@ -439,8 +444,62 @@ function ShopTab({
       {!groups.size ? (
         <div className="empty">아직 파는 물건이 없어요</div>
       ) : (
+        <>
+        {special.length > 0 && (
+          <section className="gc-sp-sec">
+            <h3 className="gc-sp-head">
+              <span className="gc-sp-head-star" aria-hidden>✦</span>
+              <span className="gc-sp-head-text">SPECIAL</span>
+              <small>영웅 코스튬 · 단 하나씩</small>
+              <span className="gc-sp-head-star" aria-hidden>✦</span>
+            </h3>
+            <ul className="gc-sp-list">
+              {special.map((it) => {
+                const st = stockOf(it);
+                const short = !!wallet && balance < it.price;
+                return (
+                  <li key={it.id}>
+                    <button
+                      className={
+                        "gc-good gc-sp" +
+                        (picked?.id === it.id ? " gc-picked" : "") +
+                        (short ? " gc-short" : "") +
+                        (st === 0 ? " gc-soldout" : "")
+                      }
+                      onClick={() => {
+                        setPicked(picked?.id === it.id ? null : it);
+                        setQty(1);
+                        setError("");
+                      }}
+                    >
+                      <span className="gc-sp-ring" aria-hidden />
+                      <span className="gc-sp-body" aria-hidden />
+                      <span className="gc-sp-shine" aria-hidden />
+                      {[0, 1, 2, 3].map((k) => (
+                        <i key={k} className={`gc-sp-spark gc-sp-spark-${k}`} aria-hidden />
+                      ))}
+                      <span className="gc-sp-badge">SPECIAL</span>
+                      <span className={"gc-sp-stock" + (st === 0 ? " gc-stock-out" : "")}>
+                        {st === 0 ? "품절" : st === 1 || st === null ? "단 1개" : `${st}개`}
+                      </span>
+                      <span className="gc-sp-pic">
+                        <Pic name={it.name} />
+                      </span>
+                      <FitLine className="gc-good-name" text={it.name} wrap={false} />
+                      <b className="gc-good-price">
+                        <Coin />
+                        {it.price}
+                      </b>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+        {regular.length > 0 && (
         <ul className="gc-goods">
-          {[...groups.values()].flat().map((it) => {
+          {regular.map((it) => {
             const short = !!wallet && balance < it.price;
             const c = capOf(it);
             const st = stockOf(it);
@@ -487,6 +546,8 @@ function ShopTab({
             );
           })}
         </ul>
+        )}
+        </>
       )}
       {picked && (
         <div className="gc-buy">
@@ -1158,6 +1219,7 @@ function ItemInfo({ it }: { it: GcItem }) {
     <div className="gc-info">
       <Pic name={it.name} />
       <div className="gc-info-text">
+        {isSpecial(it.name) && <span className="gc-info-sp">SPECIAL · 단 하나뿐인 영웅 코스튬</span>}
         <b className="gc-info-name">{it.name}</b>
         {lines.map((l, i) => (
           <span

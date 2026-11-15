@@ -5830,3 +5830,65 @@ a.cf-at { color: #9fb4ff; }
 .lore-ask { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 14px 12px 24px; }
 .lore-ask-bot { color: var(--gold); border-color: var(--gold); }
 #lore-use, #lore-make, #lore-book, #lore-box, #lore-posts, #lore-drop { scroll-margin-top: 64px; }
+
+/* 1군 성장코인샵 스페셜 (제작자 2026-11-15 '코스튬은 스페셜 배지, 엄청 특별해 보이게 애니메이션, 딱 재고 1개씩, 엄청 특별한 이벤트'):
+   맨 위 따로 두 칸씩, 무지개 금빛 테두리가 돌고 빛이 지나가고 별이 반짝이고 그림이 떠 있다 (움직임은 transform·opacity 만) */
+.gc-sp-sec { margin: 0 0 10px; }
+.gc-sp-head { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 2px 0 6px; font-size: 15px; line-height: 1.2; }
+.gc-sp-head small { font-size: 11px; font-weight: 400; color: var(--muted); }
+.gc-sp-head-text {
+  font-weight: 800; letter-spacing: 2px;
+  background: linear-gradient(90deg, #ffd34d, #ff8ad8, #8fe3ff, #ffd34d); background-size: 300% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: gc-sp-text 3s linear infinite;
+}
+@keyframes gc-sp-text { to { background-position: 300% 0; } }
+.gc-sp-head-star { display: inline-block; color: var(--gold); animation: gc-sp-twinkle 1.6s ease-in-out infinite; }
+.gc-sp-head-star:last-child { animation-delay: 0.8s; }
+.gc-sp-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.gc-good.gc-sp { overflow: hidden; isolation: isolate; padding: 8px 4px 7px; border-color: transparent; background: transparent; box-shadow: 0 0 10px rgba(255, 211, 77, 0.35); }
+.gc-sp > :not(.gc-sp-ring):not(.gc-sp-body):not(.gc-sp-shine):not(.gc-sp-spark) { position: relative; z-index: 2; }
+.gc-sp-ring {
+  position: absolute; z-index: 0; left: 50%; top: 50%; width: 260%; aspect-ratio: 1; margin: -130% 0 0 -130%;
+  background: conic-gradient(#ffd34d, #ff8ad8, #b38bff, #8fe3ff, #7dffb2, #ffd34d);
+  animation: gc-sp-spin 3.2s linear infinite;
+}
+.gc-sp-body { position: absolute; z-index: 1; inset: 3px; background: radial-gradient(circle at 50% 30%, #3b2f6e, #1e1840 70%); }
+.gc-sp-shine {
+  position: absolute; z-index: 3; inset: 0; pointer-events: none;
+  background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.35) 50%, transparent 65%);
+  transform: translateX(-110%); animation: gc-sp-sweep 2.6s ease-in-out infinite;
+}
+.gc-sp-spark { position: absolute; z-index: 3; width: 7px; height: 7px; pointer-events: none; background: #fff6c8; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); animation: gc-sp-twinkle 1.8s ease-in-out infinite; }
+.gc-sp-spark-0 { top: 22%; left: 14%; }
+.gc-sp-spark-1 { top: 14%; right: 18%; animation-delay: 0.45s; width: 9px; height: 9px; }
+.gc-sp-spark-2 { top: 52%; left: 22%; animation-delay: 0.9s; width: 5px; height: 5px; }
+.gc-sp-spark-3 { top: 46%; right: 14%; animation-delay: 1.35s; }
+.gc-sp-badge {
+  position: absolute !important; top: 5px; left: 5px; padding: 0 4px; font-size: 9px; line-height: 14px; font-weight: 800; letter-spacing: 1px; color: #1a1630;
+  background: linear-gradient(90deg, #ffd34d, #ff8ad8); border: 1px solid #000; transform-origin: left center; animation: gc-sp-badge 1.4s ease-in-out infinite;
+}
+.gc-sp-stock { position: absolute !important; top: 5px; right: 5px; padding: 0 4px; font-size: 9px; line-height: 14px; font-weight: 800; color: #fff; background: #e0405a; border: 1px solid #000; animation: gc-sp-pulse 1s ease-in-out infinite; }
+.gc-sp-stock.gc-stock-out { background: #6b6b7a; animation: none; }
+.gc-sp-pic { display: block; margin-top: 10px; animation: gc-sp-float 2.4s ease-in-out infinite; }
+.gc-sp .gc-pic { width: 56px; height: 56px; filter: drop-shadow(0 0 4px rgba(255, 230, 140, 0.8)); }
+.gc-sp .gc-good-name { font-weight: 700; color: #fff3b0; }
+.gc-sp .gc-good-price { font-size: 15px; }
+.gc-sp.gc-soldout { box-shadow: none; }
+.gc-sp.gc-soldout .gc-sp-ring { background: #4a4a5a; }
+.gc-sp.gc-soldout .gc-sp-ring, .gc-sp.gc-soldout .gc-sp-shine, .gc-sp.gc-soldout .gc-sp-spark, .gc-sp.gc-soldout .gc-sp-pic, .gc-sp.gc-soldout .gc-sp-badge { animation: none; }
+.gc-sp.gc-soldout .gc-sp-shine, .gc-sp.gc-soldout .gc-sp-spark { display: none; }
+.gc-info-sp {
+  justify-self: start; padding: 0 5px; font-size: 10px; line-height: 15px; font-weight: 800; color: #1a1630;
+  background: linear-gradient(90deg, #ffd34d, #ff8ad8, #8fe3ff); border: 1px solid #000;
+}
+@keyframes gc-sp-spin { to { transform: rotate(360deg); } }
+@keyframes gc-sp-sweep { 0%, 50% { transform: translateX(-110%); } 100% { transform: translateX(110%); } }
+@keyframes gc-sp-twinkle { 0%, 100% { opacity: 0.15; transform: scale(0.5) rotate(0deg); } 50% { opacity: 1; transform: scale(1.15) rotate(45deg); } }
+@keyframes gc-sp-badge { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+@keyframes gc-sp-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+@keyframes gc-sp-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .gc-sp-head-text, .gc-sp-head-star, .gc-sp-ring, .gc-sp-shine, .gc-sp-spark, .gc-sp-badge, .gc-sp-stock, .gc-sp-pic { animation: none; }
+  .gc-sp-shine, .gc-sp-spark { display: none; }
+}

@@ -348,6 +348,9 @@ const ITEM_INFO: Record<string, string[]> = {
 export const COIN_GOLD = 30_000;
 export const coinOfGold = (gold: number) =>
   gold > 0 ? Math.max(1, Math.round(gold / COIN_GOLD)) : 0;
+/** 1군 성장코인샵의 스페셜 (제작자 2026-11-15 '코스튬은 스페셜 배지, 엄청 특별해 보이게, 딱 재고가 1개씩, 엄청 특별한 이벤트'): 영웅 코스튬 */
+export const isSpecial = (name: string): boolean =>
+  (ITEM_INFO[name.replace(/\s/g, "")]?.[0] ?? "").startsWith("영웅 코스튬");
 export const itemInfo = (name: string): string[] =>
   ITEM_INFO[name.replace(/\s/g, "")] ?? [];
 
