@@ -980,7 +980,8 @@ CREATE TABLE IF NOT EXISTS gc_items (
   gold INTEGER,                           -- 담당자가 적은 골드 가치 (원 단위 그대로, 없던 예전 줄은 price x 1000)
   info TEXT,                              -- 안 씀 (옵션은 고정이라 화면 src/gcoin.ts ITEM_INFO)
   active INTEGER NOT NULL DEFAULT 1,      -- 0 이면 판매 중지 (상점에 안 보인다)
-  sort INTEGER NOT NULL DEFAULT 0
+  sort INTEGER NOT NULL DEFAULT 0,
+  stock INTEGER                           -- 남은 재고 (묶음 수, NULL 이면 한도 없음). 신청하면 줄고 반려·취소면 돌아온다 (김다혜 2026-11-15 '갯수는 재고')
 );
 -- 구매 신청: 이름·단위·값은 신청 때 그대로 남긴다. 코인은 pending·done 인 동안 빠진다 (cancel·reject 면 돌아온다)
 CREATE TABLE IF NOT EXISTS gc_orders (
@@ -1029,6 +1030,7 @@ CREATE TABLE IF NOT EXISTS gc_round_results (
   user_id TEXT NOT NULL,
   from_level INTEGER NOT NULL,
   target INTEGER NOT NULL,
+  to_exp INTEGER,
   level INTEGER NOT NULL,
   exp INTEGER,
   done_at INTEGER,
@@ -1045,6 +1047,7 @@ CREATE TABLE IF NOT EXISTS gc_targets (
   set_at INTEGER NOT NULL,
   set_by TEXT,
   from_exp INTEGER,
+  to_exp INTEGER,                         -- 목표 경험치(% x 1000): 1군은 레벨업 없이 경험치까지 정한다 (제작자 2026-11-15)
   PRIMARY KEY (round, user_id)
 );
 -- 연속 성장 (server/gcoin.ts settleWeeks): 사람마다 마지막으로 코인을 번 주(시작 ms)와 그때까지 이어진 주 수. 2주째부터 연속 보너스 (gc_ledger kind streak)

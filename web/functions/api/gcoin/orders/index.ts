@@ -9,18 +9,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!me) return NEED_LOGIN();
   if (!canUseGcoin(me)) return FORBIDDEN();
   await openCleanup(env);
-  if (!(await isMember(env, me.id))) return json({ error: "2군 전용이에요" }, 403);
+  if (!(await isMember(env, me.id))) return json({ error: "본캐만 신청할 수 있어요" }, 403);
   const b = await readJson<{ itemId: unknown; qty: unknown }>(request);
   const itemId = int(b.itemId, 1, Number.MAX_SAFE_INTEGER);
   const qty = int(b.qty ?? 1, 1, MAX_QTY);
   if (itemId === null || qty === null) return json({ error: "물건이나 개수가 맞지 않아요" }, 400);
-  const item = await env.DB.prepare("SELECT id, name, unit, price FROM gc_items WHERE id = ? AND active = 1 AND price > 0").bind(itemId).first<{
+  const item = await env.DB.prepare("SELECT id, name, unit, price, stock FROM gc_items WHERE id = ? AND active = 1 AND price > 0").bind(itemId).first<{
     id: number;
     name: string;
     unit: string | null;
     price: number;
+    stock: number | null;
   }>();
   if (!item) return json({ error: "지금 팔지 않는 물건이에요" }, 404);
+  if (item.stock !== null && item.stock < qty) return json({ error: item.stock > 0 ? `재고가 ${item.stock}개 남았어요` : "품절이에요" }, 409);
   // 한 주 상한 (사나운 멧돼지 인형 30개)
   const key = capKey(item.name);
   const caps = await readCaps(env);
@@ -34,6 +36,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const [w] = await wallets(env, await readCurve(env), me.id);
   const cost = item.price * qty;
   if (!w || w.balance < cost) return json({ error: `성장코인이 모자라요 (가진 코인 ${w?.balance ?? 0}, 필요 ${cost})` }, 409);
+  // 재고 (김다혜 2026-11-15 '갯수는 재고'): 남은 만큼만 먼저 줄인다 (둘이 같이 사도 0 아래로 안 간다). 반려·취소하면 돌아온다 (orders/[id].ts)
+  if (item.stock !== null) {
+    const took = await env.DB.prepare("UPDATE gc_items SET stock = stock - ? WHERE id = ? AND stock >= ?").bind(qty, item.id, qty).run();
+    if (!took.meta.changes) return json({ error: "품절이에요" }, 409);
+  }
+  const giveBack = () =>
+    item.stock !== null ? env.DB.prepare("UPDATE gc_items SET stock = stock + ? WHERE id = ? AND stock IS NOT NULL").bind(qty, item.id).run() : null;
   const ins = await env.DB.prepare("INSERT INTO gc_orders (user_id, item_id, name, unit, price, qty, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)")
     .bind(me.id, item.id, item.name, item.unit, item.price, qty, Date.now())
     .run();
@@ -42,6 +51,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const over = cap !== undefined && ((await weekBought(env, me.id, caps))[key] ?? 0) > cap;
   if (!after || after.balance < 0 || over) {
     await env.DB.prepare("DELETE FROM gc_orders WHERE id = ?").bind(Number(ins.meta.last_row_id)).run();
+    await giveBack();
     return json({ error: over ? "이번주 구매한도를 넘었어요" : `성장코인이 모자라요 (가진 코인 ${w.balance}, 필요 ${cost})` }, 409);
   }
   const label = orderLabel(item.name, item.unit, qty);

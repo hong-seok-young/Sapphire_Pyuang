@@ -122,6 +122,8 @@ function TileCell({
         onContextMenu: (e: ReactMouseEvent) => e.preventDefault(),
       }
     : {};
+  if (t.split && !locked)
+    return <SplitTile t={t} className={className} inside={inside} handlers={handlers} editable={editable} />;
   return locked ? (
     <span className={className} aria-disabled="true" {...handlers}>
       {inside}
@@ -130,6 +132,115 @@ function TileCell({
     <a className={className} href={t.to} draggable={false} {...handlers}>
       {inside}
     </a>
+  );
+}
+
+/** 갈라질 때 튀는 불티 (각도, 거리) */
+const SPLIT_SPARKS = Array.from({ length: 14 }, (_, i) => ({
+  a: (i % 2 ? 1 : -1) * (15 + ((i * 37) % 70)),
+  d: 28 + ((i * 13) % 26),
+  y: ((i * 29) % 80) - 40,
+}));
+
+/**
+ * 누르면 좌우로 갈라지는 칸 (성장코인샵 1군 · 2군, 제작자 2026-11-15 '버튼을 누르면 좌우로 갈라지게 A안으로 위아래 높이 꽉차게', '애니메이션 지리게'):
+ * 평소에는 한 칸. 누르면 칸이 움찔하고 가운데로 번개처럼 금이 가며 불티가 튀고, 두 쪽이 문짝처럼 양옆으로 날아가며
+ * 칸 높이를 꽉 채운 금색 '1군' · 은색 '2군' 단추가 튀어나온다 (둘레를 빛이 돌고, 동전이 통통). 단추를 누르면 그 군의 상점으로,
+ * 칸 밖을 누르거나 폰 뒤로 가기면 다시 한 칸으로 닫힌다. 움직임은 transform·opacity 만, 움직임 줄이기면 바로 바뀐다 (styles.css .gs-*)
+ */
+function SplitTile({
+  t,
+  className,
+  inside,
+  handlers,
+  editable,
+}: {
+  t: LaunchItem;
+  className: string;
+  inside: JSX.Element;
+  handlers: Record<string, unknown>;
+  editable: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [boot, setBoot] = useState(0);
+  useBackClose(open, () => setOpen(false));
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      const el = e.target as Element | null;
+      if (!el?.closest?.(`[data-split="${t.key}"]`)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", away, true);
+    return () => document.removeEventListener("pointerdown", away, true);
+  }, [open, t.key]);
+  const onClick = (e: ReactMouseEvent<HTMLElement>) => {
+    if (editable && clickItem(e)) return;
+    if ((e.target as Element).closest?.(".gs-btn")) return;
+    e.preventDefault();
+    if (!open) {
+      navigator.vibrate?.([12, 30, 18]);
+      setBoot((n) => n + 1);
+      setOpen(true);
+    }
+  };
+  return (
+    <div
+      className={className + " gsplit" + (open ? " gsplit-open" : "")}
+      role="button"
+      tabIndex={0}
+      aria-expanded={open}
+      aria-label={`${t.title} · ${t.split!.map((s) => s.label).join(" · ")}`}
+      data-split={t.key}
+      {...handlers}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (!open && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          setBoot((n) => n + 1);
+          setOpen(true);
+        }
+      }}
+    >
+      <span className="gs-face gs-face-l" aria-hidden={open}>
+        {inside}
+      </span>
+      <span className="gs-face gs-face-r" aria-hidden="true">
+        {inside}
+      </span>
+      {/* 갈라지는 순간만: 번쩍, 금, 불티, 충격파 (열 때마다 다시 그린다) */}
+      {open && (
+        <span key={boot} className="gs-burst" aria-hidden="true">
+          <i className="gs-flash" />
+          <svg className="gs-crack" viewBox="0 0 10 100" preserveAspectRatio="none">
+            <polyline points="5,0 3,14 7,27 2,41 8,55 3,69 7,83 4,100" />
+          </svg>
+          <i className="gs-wave" />
+          {SPLIT_SPARKS.map((p, i) => (
+            <i
+              key={i}
+              className="gs-spark"
+              style={{ ["--sx" as string]: `${p.d * (p.a < 0 ? -1 : 1)}px`, ["--sy" as string]: `${p.y}px`, ["--sd" as string]: `${(i % 5) * 18}ms` }}
+            />
+          ))}
+        </span>
+      )}
+      {t.split!.map((s, i) => (
+        <a
+          key={s.to}
+          className={`gs-btn gs-btn-${i ? "r" : "l"} gs-${s.tone}`}
+          href={s.to}
+          tabIndex={open ? 0 : -1}
+          aria-hidden={!open}
+          draggable={false}
+        >
+          <i className="gs-glow" aria-hidden="true" />
+          <span className="gs-btn-in">
+            <TileIcon t={t} />
+            <b>{s.label}</b>
+          </span>
+        </a>
+      ))}
+    </div>
   );
 }
 

@@ -1,10 +1,10 @@
-// PUT /api/gcoin/round { from: "2026-11-11", to: "2026-11-17" } -> 주간 목표 판의 기간 정하기 (담당자, 제작자 2026-11-10 '며칠 00시부터 며칠 24시까지 이벤트 기간 설정').
+// PUT /api/gcoin/round { g?, from: "2026-11-11", to: "2026-11-17" } (g 1 = 1군 판) -> 주간 목표 판의 기간 정하기 (담당자, 제작자 2026-11-10 '며칠 00시부터 며칠 24시까지 이벤트 기간 설정').
 // 한국 시간 from 날 0시 ~ to 날 24시. 진행 중이거나 시작 전인 판(targetRound)을 고치고, 끝난 뒤 다음 판을 안 정했으면 새 판을 만든다.
 // 시작은 늘 그날 0시 (제작자 2026-11-10 '00시부터라니까'). 처음 정할 때 지금까지의 기본 판도 적어 둔다 (끝난 판 결과가 그대로 보이게)
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { canManageGcoin, canUseGcoin } from "../../../server/gcoin";
-import { currentRound, readRounds, targetRound } from "../../../server/gcrace";
+import { canManageGcoin, canUseGcoin, grpOf } from "../../../server/gcoin";
+import { currentRound, readRounds, roundId, targetRound } from "../../../server/gcrace";
 
 const DAY = 86_400_000;
 const KST = 9 * 3600_000;
@@ -20,7 +20,8 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!canUseGcoin(me) || !canManageGcoin(me)) return FORBIDDEN();
-  const b = await readJson<{ from: unknown; to: unknown }>(request);
+  const b = await readJson<{ g?: unknown; from: unknown; to: unknown }>(request);
+  const grp = grpOf(b.g);
   const from = dayMs(b.from);
   const to = dayMs(b.to);
   if (from === null || to === null) return json({ error: "기간이 맞지 않아요" }, 400);
@@ -31,18 +32,18 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env }) => {
   if (end - start > 62 * DAY) return json({ error: "기간은 두 달까지예요" }, 400);
   if (end <= now) return json({ error: "이미 지난 기간이에요" }, 400);
 
-  const rounds = await readRounds(env);
+  const rounds = await readRounds(env, grp);
   const stmts: D1PreparedStatement[] = [];
   // 처음 정하면 지금(또는 마지막) 기본 판을 적어 둔다
-  const cur = await currentRound(env, now, rounds);
+  const cur = await currentRound(env, grp, now, rounds);
   const list = rounds ?? [cur];
   if (!rounds) stmts.push(env.DB.prepare("INSERT OR IGNORE INTO gc_rounds (id, start, end_at, set_at, set_by) VALUES (?, ?, ?, ?, NULL)").bind(cur.id, cur.start, cur.end, now));
-  const target = await targetRound(env, now, rounds);
+  const target = await targetRound(env, grp, now, rounds);
   // 고치는 판: 진행 중이거나 시작 전인 판. 기본 판의 다음 판(아직 표에 없음)이나 다음 판 미정이면 새 판
   const editing = target && list.some((r) => r.id === target.id) ? target : null;
   if (editing && editing.start <= now && start !== editing.start && start > now)
     return json({ error: "진행 중인 판은 시작하는 날을 오늘 뒤로 옮길 수 없어요" }, 400);
-  const id = editing?.id ?? start;
+  const id = editing?.id ?? roundId(start, grp);
   if (!editing && start < now - DAY) return json({ error: "다음 판은 오늘이나 그 뒤에 시작해 주세요" }, 400);
   // 다른 판과 겹치지 않게
   for (const r of list) if (r.id !== id && start < r.end && r.start < end) return json({ error: "다른 판 기간과 겹쳐요" }, 400);

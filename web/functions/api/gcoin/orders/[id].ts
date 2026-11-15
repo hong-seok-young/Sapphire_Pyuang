@@ -17,6 +17,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
   const o = await env.DB.prepare("SELECT * FROM gc_orders WHERE id = ?").bind(id).first<{
     id: number;
     user_id: string;
+    item_id: number | null;
     name: string;
     unit: string | null;
     price: number;
@@ -43,10 +44,14 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
     env.DB.prepare("UPDATE gc_orders SET status = ?, note = ?, done_at = ?, done_by = ? WHERE id = ? AND status = 'pending'")
       .bind(status, note, now, me.id, o.id)
       .run();
+  // 반려·취소하면 재고를 돌려놓는다 (재고를 정한 물건만, orders/index.ts 가 신청 때 줄였다)
+  const restock = () =>
+    o.item_id !== null ? env.DB.prepare("UPDATE gc_items SET stock = stock + ? WHERE id = ? AND stock IS NOT NULL").bind(o.qty, o.item_id).run() : null;
 
   if (b.action === "cancel") {
     if (o.user_id !== me.id) return FORBIDDEN();
     const r = await set("cancel", null);
+    if (r.meta.changes) await restock();
     if (r.meta.changes) await notifyStaff(env, `${me.id}님이 성장코인 구매 신청을 취소했어요 · ${label}`, me.id);
     return json({ ok: true });
   }
@@ -60,6 +65,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
     const note = text(b.note, MAX_NOTE);
     if (note === undefined) return json({ error: `의견은 ${MAX_NOTE}자까지예요` }, 400);
     const r = await set("reject", note);
+    if (r.meta.changes) await restock();
     if (r.meta.changes)
       await notify(env, [o.user_id], "gcoin", `성장코인샵 신청 반려 · ${label} · 코인 ${o.price * o.qty}개가 돌아왔어요${note ? ` · “${note}”` : ""}`, "#/gcoin?t=mine", me.id);
     return json({ ok: true });

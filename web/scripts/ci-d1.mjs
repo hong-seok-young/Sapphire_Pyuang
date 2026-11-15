@@ -123,6 +123,8 @@ const ADDED_COLUMNS = [
   ["push_subs", "last_status", "INTEGER"], ["push_subs", "last_at", "INTEGER"],
   // 성장코인샵 목표를 정할 때 경험치: 그 자리가 달성률 0% (제작자 2026-11-11)
   ["gc_targets", "from_exp", "INTEGER"],
+  // 1군 성장코인샵 목표 경험치, 상점 재고 (제작자·김다혜 2026-11-15)
+  ["gc_targets", "to_exp", "INTEGER"], ["gc_round_results", "to_exp", "INTEGER"], ["gc_items", "stock", "INTEGER"],
 ];
 for (const [table, column, type] of ADDED_COLUMNS) {
   const columns = parseJson(wrangler("d1", "execute", DB, "--remote", "--json", "--command", `PRAGMA table_info(${table})`))[0]?.results ?? [];

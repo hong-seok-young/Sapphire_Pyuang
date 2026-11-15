@@ -35,6 +35,8 @@ export interface LaunchItem {
   corner?: string[];
   /** 특정 사람만 들어가는 칸: 테두리에 빛이 돈다 (gold 1군 전용, blue 운영진, purple 개발자) */
   ring?: "gold" | "blue" | "purple" | "mint" | "silver";
+  /** 누르면 칸이 좌우로 갈라져 두 단추가 된다 (성장코인샵 1군 · 2군, 제작자 2026-11-15 '버튼을 누르면 좌우로 갈라지게', Home.tsx SplitTile) */
+  split?: { label: string; to: string; tone: "gold" | "silver" }[];
   /** 개발 중·검토 후 오픈: 홈에서는 열린 칸 아래 접힌 '개발 중' 묶음에 들어간다 (제작자 요청 2026-11-02, Home.tsx) */
   soon?: boolean;
   /** soon 일 때 오른쪽 위 표 (없으면 '준비 중') */
@@ -120,7 +122,7 @@ export const ITEMS: LaunchItem[] = [
   // 기부함(#/donate)은 따로 칸을 두지 않고 명예의 전당 안 '전체 · 이번 달' 오른쪽 단추로 (제작자 2026-11-12 '기부함을 명예의 전당 안에 넣기만', '이번 달 우측에 기부함 버튼 편입')
   { key: "hall", title: "명예의 전당", short: "명예의 전당", to: "#/hall", icon: "🏛️", iconPic: "/icons/hall.png", managers: !DONATE_OPEN, soon: !DONATE_OPEN, badge: "개발중", match: ["hall", "donate"] },
   // 담당자 유어아너 (제작자 2026-11-10 '장비대여 담당자처럼 버튼에 유어아너로')
-  { key: "gcoin", title: "성장코인샵", short: "코인샵", to: "#/gcoin", icon: "🪙", iconPic: "/icons/gcoin.png", ribbon: "2군 전용", ring: "silver", corner: ["담당자", "유어아너"], managers: !GCOIN_OPEN, soon: !GCOIN_OPEN, badge: "개발중", match: ["gcoin"] },
+  { key: "gcoin", title: "성장코인샵", short: "코인샵", to: "#/gcoin", icon: "🪙", iconPic: "/icons/gcoin.png", corner: ["담당자", "유어아너"], split: [{ label: "1군", to: "#/gcoin?g=1", tone: "gold" }, { label: "2군", to: "#/gcoin?g=2", tone: "silver" }], managers: !GCOIN_OPEN, soon: !GCOIN_OPEN, badge: "개발중", match: ["gcoin"] },
   { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
   // 도감 계산기 (개발중, 제작자 요청 2026-11-10: 게임 도감 항목을 웹에서 정리, 제작자 도감 영상에서 옮긴 자료). 개발 중 묶음 (미리 보는 사람만, pages/Dex.tsx)
   // 데미지 계산기 (개발중, 제작자 요청 2026-11-11 '데미지 계산기' + 카페 글 331187 기본 데미지 산출공식): 내 무기·강화와 상대 방어도로 방어도/5 를 뺀 기본 데미지 (pages/Damage.tsx)
@@ -455,7 +457,10 @@ export function pressItem(e: ReactPointerEvent<HTMLElement>, key: string, editab
 }
 
 /** 칸 클릭: 편집 중이거나 방금 꾹 눌러 편집을 켰으면 열지 않는다 */
-export function clickItem(e: { preventDefault: () => void }) {
-  if (state.editing || swallowClick) e.preventDefault();
+/** 칸 누름: 배치 편집 중이거나 꾹 누른 뒤면 열지 않는다 (true = 막았다) */
+export function clickItem(e: { preventDefault: () => void }): boolean {
+  const stop = state.editing || swallowClick;
+  if (stop) e.preventDefault();
   swallowClick = false;
+  return stop;
 }

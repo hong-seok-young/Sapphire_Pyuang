@@ -14,7 +14,7 @@ import {
 import { JobEmblem } from "../emblems";
 import { HeroHalo } from "../heroHalo";
 import { GrowthChart } from "./GrowthChart";
-import { useAsync } from "../data";
+import { bookPic, useAsync, useBook } from "../data";
 import { KakaoButton, Nick } from "../kakao";
 import { ago } from "../market";
 import { useEntryState } from "../router";
@@ -46,6 +46,7 @@ import {
 import type {
   GcCurve,
   GcData,
+  Grp,
   GcRace,
   GcRaceEntry,
   GcItem,
@@ -402,7 +403,11 @@ function ShopTab({
     return cap === undefined ? null : { cap, left: Math.max(0, cap - (data.weekBought?.[k] ?? 0)) };
   };
   const pickedCap = picked ? capOf(picked) : null;
-  const maxQty = picked && pickedCap ? Math.min(20, Math.floor(pickedCap.left / qtyOf(picked.unit))) : 20;
+  const stockOf = (it: GcItem) => (it.stock === null || it.stock === undefined ? null : it.stock);
+  const maxQty = Math.min(
+    picked && pickedCap ? Math.min(20, Math.floor(pickedCap.left / qtyOf(picked.unit))) : 20,
+    picked && stockOf(picked) !== null ? (stockOf(picked) as number) : 20,
+  );
   const groups = new Map<string, GcItem[]>();
   for (const it of data.items.filter((i) => i.active && i.price > 0))
     groups.set(it.name, [...(groups.get(it.name) ?? []), it]);
@@ -412,7 +417,7 @@ function ShopTab({
   async function buy() {
     if (!picked) return;
     if (!member) {
-      setError("2군 전용이에요");
+      setError("본캐만 신청할 수 있어요");
       return;
     }
     setBusy(true);
@@ -438,6 +443,7 @@ function ShopTab({
           {[...groups.values()].flat().map((it) => {
             const short = !!wallet && balance < it.price;
             const c = capOf(it);
+            const st = stockOf(it);
             const per = qtyOf(it.unit);
             return (
               <li key={it.id}>
@@ -445,7 +451,8 @@ function ShopTab({
                   className={
                     "gc-good" +
                     (picked?.id === it.id ? " gc-picked" : "") +
-                    (short ? " gc-short" : "")
+                    (short ? " gc-short" : "") +
+                    (st === 0 ? " gc-soldout" : "")
                   }
                   onClick={() => {
                     setPicked(picked?.id === it.id ? null : it);
@@ -457,6 +464,11 @@ function ShopTab({
                     <span className="gc-cap-tag">
                       주간 {wallet ? `${Math.ceil((c.cap - c.left) / per)}/` : ""}
                       {Math.floor(c.cap / per)}
+                    </span>
+                  )}
+                  {st !== null && (
+                    <span className={"gc-stock-tag" + (st === 0 ? " gc-stock-out" : "")}>
+                      {st === 0 ? "품절" : `재고 ${st}`}
                     </span>
                   )}
                   <Pic name={it.name} />
@@ -511,7 +523,7 @@ function ShopTab({
           >
             <Coin />
             <PopNum n={total} />
-            &nbsp;{busy ? "…" : wallet && maxQty < 1 ? "한도 끝" : wallet && total > balance ? "부족" : "신청"}
+            &nbsp;{busy ? "…" : stockOf(picked) === 0 ? "품절" : wallet && maxQty < 1 ? "한도 끝" : wallet && total > balance ? "부족" : "신청"}
           </button>
           {pickedCap && (
             <small className="gc-cap">
@@ -830,12 +842,22 @@ function OrdersTab({
   );
 }
 
-/** 현황 칸 (오피서 이상): 2군 본캐 모두의 코인, 눌러서 손으로 더하거나 빼기 */
+/** 1군 추가 코인 (유어아너 공지 2026-11-15: '기여도 1000 이상 + 길던 잘 가시는 분들은 2코인 추가', '이노워 4번 풀참 시 3코인 추가'): 현황에서 한 번에 적는 단추 */
+const BONUS1 = [
+  { coin: 2, note: "기여도 1000 이상 · 길던" },
+  { coin: 3, note: "이노워 4번 풀참" },
+];
+
+/** 현황 칸 (담당자): 그 군 사람(본캐와 그 판에 목표가 있는 사람)의 코인, 눌러서 손으로 더하거나 빼기. 1군은 추가 코인 단추 */
 function MembersTab({
+  grp,
   admin,
+  race,
   onChanged,
 }: {
+  grp: Grp;
   admin: NonNullable<GcData["admin"]>;
+  race: GcRace;
   onChanged: () => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
@@ -858,15 +880,31 @@ function MembersTab({
       setBusy(false);
     }
   }
-  const total = admin.members.reduce((s, m) => s + m.balance, 0);
+  // 그 군: 길드가 같은 사람과 이 판에 목표가 있는 사람
+  const guildOf = new Map((admin.people ?? []).map((p) => [p.id, p.guild]));
+  const inRace = new Set([...race.list.map((e) => e.id), ...(race.upcoming ?? []).map((e) => e.id)]);
+  const members = admin.members.filter((m) => inRace.has(m.id) || guildOf.get(m.id) === (grp === 1 ? "main" : "second"));
+  const total = members.reduce((s, m) => s + m.balance, 0);
+  async function bonus(id: string, coin: number, note: string) {
+    setBusy(true);
+    setError("");
+    try {
+      await adjustCoin(id, coin, note);
+      onChanged();
+    } catch (x) {
+      setError(errorText(x));
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <>
       <p className="gc-note">
-        2군 {admin.members.length}명 · 남은 코인 합{" "}
+        {grp}군 {members.length}명 · 남은 코인 합{" "}
         {total.toLocaleString("ko-KR")}
       </p>
       <ul className="gc-hist">
-        {admin.members.map((m) => (
+        {members.map((m) => (
           <li
             key={m.id}
             className={"gc-member" + (open === m.id ? " gc-member-open" : "")}
@@ -895,6 +933,15 @@ function MembersTab({
                   {m.bonus} · 조정 {m.adjust >= 0 ? `+${m.adjust}` : m.adjust} ·
                   사용 −{m.spent}
                 </p>
+                {grp === 1 && (
+                  <div className="gc-bonus1">
+                    {BONUS1.map((b) => (
+                      <button key={b.note} className="pill gc-mini" disabled={busy} onClick={() => bonus(m.id, b.coin, b.note)}>
+                        +{b.coin} {b.note}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div className="gc-adjust">
                   <span className="mk-unit">
                     <button
@@ -938,8 +985,8 @@ function MembersTab({
             )}
           </li>
         ))}
-        {!admin.members.length && (
-          <li className="gc-hist-empty">2군 길드원이 아직 없어요</li>
+        {!members.length && (
+          <li className="gc-hist-empty">{grp}군 길드원이 아직 없어요</li>
         )}
       </ul>
     </>
@@ -1052,7 +1099,7 @@ function CoinsTab({
       <div className="panel gc-set">
         <p className="gc-week-head">
           <b>
-            {data.levelCoins ? "주간 1~5위 보너스" : "주간 목표 달성 1~5위 상금"}
+            {data.levelCoins ? "주간 1~5위 보너스" : `${data.grp}군 주간 목표 달성 1~5위 상금`}
           </b>
         </p>
         {rank.map((v, i) => (
@@ -1079,7 +1126,7 @@ function CoinsTab({
             disabled={busy}
             onClick={() =>
               run(
-                () => saveGcSettings({ rank: rank.map(Number) }),
+                () => saveGcSettings({ g: data.grp, rank: rank.map(Number) }),
                 "저장했어요",
               )
             }
@@ -1096,7 +1143,10 @@ const digits = (v: string, max: number) => v.replace(/\D/g, "").slice(0, max);
 
 /** 물건 그림: 게임 거래소 칸 그림(개수 표가 한 통), 없으면 그림 글자 */
 function Pic({ name, small }: { name: string; small?: boolean }) {
-  const src = itemPic(name);
+  // 거래소 칸 그림이 없으면 게임 도감 그림 (1군 교환템 코스튬: 꿈의형태 · 펌프퀸 …)
+  const book = useBook();
+  const bp = bookPic(book, name);
+  const src = itemPic(name) ?? (bp ? `/${bp.src}` : null);
   const cls = "gc-pic" + (small ? " gc-pic-s" : "");
   return src ? (
     <img className={cls} src={src} alt="" loading="lazy" />
@@ -1360,7 +1410,11 @@ function Bundle({
   useEffect(() => setGold(gold0), [gold0]);
   useEffect(() => setQty(qty0), [qty0]);
   const [del, setDel] = useState(false);
-  const dirty = qty !== String(qtyOf(it.unit)) || gold !== gold0;
+  // 재고 (묶음 수, 비우면 한도 없음. 김다혜 2026-11-15 '갯수는 재고')
+  const stock0 = it.stock === null || it.stock === undefined ? "" : String(it.stock);
+  const [stock, setStock] = useState(stock0);
+  useEffect(() => setStock(stock0), [stock0]);
+  const dirty = qty !== String(qtyOf(it.unit)) || gold !== gold0 || stock !== stock0;
   return (
     <div
       className={
@@ -1386,6 +1440,15 @@ function Bundle({
         aria-label="골드"
       />
       <span>골드</span>
+      <span>재고</span>
+      <input
+        className="mk-input gc-bundle-stock"
+        inputMode="numeric"
+        value={stock}
+        onChange={(e) => setStock(digits(e.target.value, 5))}
+        placeholder="∞"
+        aria-label="재고 (묶음 수, 비우면 한도 없음)"
+      />
       <small className="gc-bundle-coin">
         {Number(gold) ? (
           <>
@@ -1406,6 +1469,7 @@ function Bundle({
                 editGcItem(it.id, {
                   unit: `${Number(qty)}개`,
                   gold: Number(gold),
+                  stock: stock === "" ? null : Number(stock),
                 }),
               "저장했어요",
             )
@@ -1451,6 +1515,60 @@ function Bundle({
 }
 
 /**
+ * 1군 이벤트 안내 (유어아너 공지 2026-11-15, 제작자 '안의 틀은 2군과 같되 아래 내용으로'): 성장 현황 맨 위 접힌 한 줄, 누르면 펼친다.
+ * 참여자는 담당자 > 목표에서 정한 사람이라 여기 적지 않는다. 보상(1~5위)은 담당자 > 보상 값 그대로
+ */
+function Guide1({ prizes }: { prizes: number[] }) {
+  const [open, setOpen] = useEntryState("gc.guide1", false);
+  return (
+    <div className={"gc-guide" + (open ? " gc-guide-open" : "")}>
+      <button className="gc-guide-head" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <b>1군 성장 이벤트 안내</b>
+        <i aria-hidden="true">{open ? "▴" : "▾"}</i>
+      </button>
+      {open && (
+        <div className="gc-guide-body">
+          <p>
+            <b>참여</b>본캐만 참여할 수 있어요. 사파이어 사이트를 써야 보상을 받을 수 있어요.
+          </p>
+          <p>
+            <b>방법</b>닉네임 옆에 정해 준 목표(레벨·경험치)까지 일주일 동안 올려 주세요. 달성하면 담당자 플톡으로 인증샷을 남겨 주세요.
+          </p>
+          <p>
+            <b>추가 코인</b>기여도 1000 이상 + 길던 잘 가시는 분 +2 · 이노워 4번 풀참 +3 (강요 아니고 불이익 없어요)
+          </p>
+          <p>
+            <b>보상</b>선착순 {prizes.map((c, i) => `${i + 1}등 ${c}`).join(" · ")}
+          </p>
+          <p>
+            <b>교환</b>교환템은 바뀌거나 늘거나 품절될 수 있어요. 코인을 모아 한 번에 사도 돼요. 교환은 사이트에서만, 지급은 1~2일 걸릴 수 있어요.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 1군 · 2군 판 바꾸기 (홈 칸을 반으로 가른 것과 같은 금·은) */
+function GrpSwitch({ grp, onPick }: { grp: Grp; onPick: (g: Grp) => void }) {
+  return (
+    <div className="gc-grp" role="tablist">
+      {([1, 2] as Grp[]).map((g) => (
+        <button
+          key={g}
+          role="tab"
+          aria-selected={grp === g}
+          className={`gc-grp-btn gc-grp-${g}` + (grp === g ? " gc-grp-on" : "")}
+          onClick={() => onPick(g)}
+        >
+          {g}군
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
  * 2군 성장코인샵 (개발중, 제작자 2026-11-09): 2군 본캐가 레벨업할 때마다 성장코인이 쌓이고(높은 레벨일수록 많이), 주간 2군 성장 1·2·3위는 보너스.
  * 코인으로 물건을 신청하면 오피서가 게임 안에서 주고 '지급 완료'를 누른다. 지금은 앱개발자만 본다
  */
@@ -1463,9 +1581,22 @@ export function GrowthShopPage({
 }) {
   const me = meInfo.id;
   const [reload, setReload] = useState(0);
+  // 1군 판 · 2군 판 (제작자 2026-11-15): 홈 칸의 왼쪽(1군)·오른쪽(2군)이 '#/gcoin?g=1|2' 로 연다. 없으면 내 길드
+  const [grp, setGrp] = useState<Grp>(() => {
+    const g = new URLSearchParams(location.hash.split("?")[1] ?? "").get("g");
+    return g === "1" ? 1 : g === "2" ? 2 : meInfo.guild === "main" ? 1 : 2;
+  });
+  const pickGrp = (g: Grp) => {
+    if (g === grp) return;
+    const q = new URLSearchParams(location.hash.split("?")[1] ?? "");
+    q.set("g", String(g));
+    window.history.replaceState(window.history.state, "", `#/gcoin?${q}`);
+    setCur(null);
+    setGrp(g);
+  };
   const { data, error } = useAsync(
-    useCallback(() => fetchGcoin(), [reload]),
-    "gcoin",
+    useCallback(() => fetchGcoin(grp), [reload, grp]),
+    `gcoin:${grp}`,
   );
   const [cur, setCur] = useState<GcData | null>(null);
   // 알림에서 '#/gcoin?t=orders' 로 오면 담당자 > 신청
@@ -1483,8 +1614,8 @@ export function GrowthShopPage({
   const [staff, setStaff] = useEntryState<Staff>("gc.staff", "orders");
   const [notice, setNotice] = useState("");
   useEffect(() => {
-    if (data) setCur(data);
-  }, [data]);
+    if (data && data.grp === grp) setCur(data);
+  }, [data, grp]);
   const refresh = useCallback(() => setReload((n) => n + 1), []);
 
   if (!cur) return <Loading error={error} />;
@@ -1539,6 +1670,7 @@ export function GrowthShopPage({
   return (
     <>
       <TopBar title="성장코인샵" />
+      <GrpSwitch grp={grp} onPick={pickGrp} />
       <div className="pill-row gc-tabs">
         {tabs.map((t) => (
           <button
@@ -1592,6 +1724,7 @@ export function GrowthShopPage({
           onDone={saved}
         />
       )}
+      {shown === "status" && grp === 1 && <Guide1 prizes={race.prizes} />}
       {shown === "status" &&
         (cur.levelCoins ? (
           <StatusTab data={cur} me={me} />
@@ -1612,6 +1745,8 @@ export function GrowthShopPage({
       )}
       {shown === "staff" && cur.admin && staff === "targets" && (
         <TargetsTab
+          key={grp}
+          grp={grp}
           people={cur.admin.people ?? []}
           hidden={cur.admin.hidden ?? []}
           race={cur.race}
@@ -1622,13 +1757,13 @@ export function GrowthShopPage({
         <ItemsTab key={reload} data={cur} onChanged={saved} />
       )}
       {shown === "staff" && cur.admin && staff === "members" && (
-        <MembersTab admin={cur.admin} onChanged={refresh} />
+        <MembersTab grp={grp} admin={cur.admin} race={cur.race} onChanged={refresh} />
       )}
       {shown === "staff" && cur.admin && staff === "records" && (
         <RecordsTab results={cur.admin.results ?? []} />
       )}
       {shown === "staff" && cur.manage && staff === "coins" && (
-        <CoinsTab key={reload} data={cur} onChanged={saved} />
+        <CoinsTab key={`${grp}-${reload}`} data={cur} onChanged={saved} />
       )}
     </>
   );

@@ -9,6 +9,7 @@
 import type { Env, User } from "./auth";
 import { notify } from "./alerts";
 import { canUseGcoin, gcoinOpen, readRank } from "./gcoin";
+import type { Grp } from "./gcoin";
 
 const DAY = 86_400_000;
 /** 진행하는 날 수와 한 바퀴(진행 + 휴식): 담당자가 기간을 정하기 전의 기본 판 */
@@ -16,6 +17,11 @@ export const RACE_DAYS = 7;
 export const RACE_CYCLE = 14;
 /** 첫 판 시작 = 2026-11-16(월) 0시 한국 시간 (판은 늘 그날 0시부터) */
 export const RACE_ANCHOR = Date.UTC(2026, 10, 15, 15);
+
+/** 판 번호로 어느 군인지 (1군은 홀수 = 시작 ms + 1, 2군은 짝수 = 시작 ms. 시작은 늘 한국 0시라 짝수다) */
+export const roundGrp = (id: number): Grp => (id % 2 === 1 ? 1 : 2);
+/** 그 군의 판 번호 (처음 정한 시작 때) */
+export const roundId = (start: number, grp: Grp) => start + (grp === 1 ? 1 : 0);
 
 /** 판 하나. id 는 처음 정한 시작 때로, 목표(gc_targets.round)와 상금 장부(ref 'race:<id>')가 이것으로 잇는다 (기간을 고쳐도 그대로) */
 export interface Round {
@@ -29,38 +35,38 @@ function defaultStart(now: number): number {
   const n = Math.max(0, Math.floor((now - RACE_ANCHOR) / (RACE_CYCLE * DAY)));
   return RACE_ANCHOR + n * RACE_CYCLE * DAY;
 }
-const defaultRound = (start: number): Round => ({ id: start, start, end: start + RACE_DAYS * DAY });
+const defaultRound = (start: number, grp: Grp): Round => ({ id: roundId(start, grp), start, end: start + RACE_DAYS * DAY });
 
 /**
  * 담당자가 정한 판들 (제작자 2026-11-10 '담당자 페이지에서 며칠 00시부터 며칠 24시까지 이벤트 기간 설정'). D1 gc_rounds, 시작 순.
  * 하나도 없으면 null (기본 판을 쓴다). 하나라도 정하면 정한 판만 쓴다 (마지막 판이 끝나고 다음 판을 안 정했으면 '다음 판 미정')
  */
-export async function readRounds(env: Env): Promise<Round[] | null> {
-  const { results } = await env.DB.prepare("SELECT id, start, end_at AS end FROM gc_rounds ORDER BY start").all<Round>();
+export async function readRounds(env: Env, grp: Grp = 2): Promise<Round[] | null> {
+  const { results } = await env.DB.prepare("SELECT id, start, end_at AS end FROM gc_rounds WHERE id % 2 = ? ORDER BY start").bind(grp === 1 ? 1 : 0).all<Round>();
   return results.length ? results : null;
 }
 
 /** 지금(또는 마지막) 판. 첫 판 전이면 첫 판 */
-export async function currentRound(env: Env, now = Date.now(), rounds?: Round[] | null): Promise<Round> {
-  const rs = rounds === undefined ? await readRounds(env) : rounds;
-  if (!rs) return defaultRound(defaultStart(now));
+export async function currentRound(env: Env, grp: Grp, now = Date.now(), rounds?: Round[] | null): Promise<Round> {
+  const rs = rounds === undefined ? await readRounds(env, grp) : rounds;
+  if (!rs) return defaultRound(defaultStart(now), grp);
   let cur = rs[0];
   for (const r of rs) if (r.start <= now) cur = r;
   return cur;
 }
 /** 지금 판이 끝난 뒤 다음 판 (안 정했으면 null) */
-export async function nextRound(env: Env, now = Date.now(), rounds?: Round[] | null): Promise<Round | null> {
-  const rs = rounds === undefined ? await readRounds(env) : rounds;
-  const cur = await currentRound(env, now, rs);
+export async function nextRound(env: Env, grp: Grp, now = Date.now(), rounds?: Round[] | null): Promise<Round | null> {
+  const rs = rounds === undefined ? await readRounds(env, grp) : rounds;
+  const cur = await currentRound(env, grp, now, rs);
   if (now < cur.end) return null;
-  if (!rs) return defaultRound(cur.start + RACE_CYCLE * DAY);
+  if (!rs) return defaultRound(cur.start + RACE_CYCLE * DAY, grp);
   return rs.find((r) => r.start > now) ?? null;
 }
 /** 담당자가 목표를 정하는 판: 진행 중이거나 첫 판 전이면 그 판, 끝났으면 다음 판 (안 정했으면 null) */
-export async function targetRound(env: Env, now = Date.now(), rounds?: Round[] | null): Promise<Round | null> {
-  const rs = rounds === undefined ? await readRounds(env) : rounds;
-  const cur = await currentRound(env, now, rs);
-  return now < cur.end ? cur : nextRound(env, now, rs);
+export async function targetRound(env: Env, grp: Grp, now = Date.now(), rounds?: Round[] | null): Promise<Round | null> {
+  const rs = rounds === undefined ? await readRounds(env, grp) : rounds;
+  const cur = await currentRound(env, grp, now, rs);
+  return now < cur.end ? cur : nextRound(env, grp, now, rs);
 }
 
 export interface RaceEntry {
@@ -70,6 +76,8 @@ export interface RaceEntry {
   /** 목표를 정할 때 경험치(% x 1000): 그 자리가 달성률 0% (제작자 2026-11-11 '목표 설정하면 기존 겸치가 어떻든 0% 로 시작') */
   fromExp: number;
   target: number;
+  /** 목표 경험치(% x 1000, 0 이면 그 레벨 0%): 1군은 레벨이 높아 레벨업 없이 경험치까지 정한다 (제작자 2026-11-15 '1군은 목표 경험치까지 설정, 렙업 안 하더라도') */
+  toExp: number;
   /** 지금 레벨·경험치(% x 1000) */
   level: number;
   exp: number | null;
@@ -87,11 +95,14 @@ export interface RaceEntry {
 }
 
 const pos = (level: number, exp: number | null) => level + (exp ?? 0) / 100_000;
-/** 달성률: 목표를 정한 자리(레벨 + 경험치)가 0%, 목표 레벨 0% 가 100% */
-export function progress(fromLevel: number, fromExp: number, target: number, level: number, exp: number | null): number {
+/** 목표: 'Lv.52' 또는 'Lv.52 40%' (1군 목표 경험치) */
+export const goalText = (target: number, toExp: number) => `Lv.${target}${toExp ? ` ${Math.round(toExp / 10) / 100}%` : ""}`;
+/** 달성률: 목표를 정한 자리(레벨 + 경험치)가 0%, 목표 레벨(과 목표 경험치)이 100% */
+export function progress(fromLevel: number, fromExp: number, target: number, level: number, exp: number | null, toExp = 0): number {
   const from = pos(fromLevel, fromExp);
-  if (target <= from) return 100;
-  const p = ((pos(level, exp) - from) / (target - from)) * 100;
+  const goal = pos(target, toExp);
+  if (goal <= from) return 100;
+  const p = ((pos(level, exp) - from) / (goal - from)) * 100;
   return Math.max(0, Math.min(100, Math.floor(p * 10 + 1e-6) / 10));
 }
 
@@ -104,26 +115,27 @@ export async function raceState(env: Env, round: Round, prizes: number[], now = 
       ? `COALESCE((SELECT l.${col} FROM level_log l WHERE l.user_id = t.user_id AND l.at < ${end} ORDER BY l.at DESC LIMIT 1), p.${col})`
       : `p.${col}`;
   const { results } = await env.DB.prepare(
-    `SELECT t.user_id AS id, t.from_level AS fromLevel, COALESCE(t.from_exp, 0) AS fromExp, t.target AS target, ${at("level")} AS level, ${at("exp")} AS exp, p.job AS job, ` +
+    `SELECT t.user_id AS id, t.from_level AS fromLevel, COALESCE(t.from_exp, 0) AS fromExp, t.target AS target, COALESCE(t.to_exp, 0) AS toExp, ${at("level")} AS level, ${at("exp")} AS exp, p.job AS job, ` +
       "a.updated_at AS avatar, u.high_spec AS high, " +
-      "(SELECT MIN(l.at) FROM level_log l WHERE l.user_id = t.user_id AND l.level >= t.target AND l.at >= ? AND l.at < ?) AS doneAt " +
+      "(SELECT MIN(l.at) FROM level_log l WHERE l.user_id = t.user_id AND (l.level > t.target OR (l.level = t.target AND COALESCE(l.exp, 0) >= COALESCE(t.to_exp, 0))) AND l.at >= ? AND l.at < ?) AS doneAt " +
       "FROM gc_targets t JOIN profiles p ON p.user_id = t.user_id JOIN users u ON u.id = t.user_id " +
       "LEFT JOIN avatars a ON a.user_id = t.user_id WHERE t.round = ?",
   )
     .bind(start, end, round.id)
-    .all<{ id: string; fromLevel: number; fromExp: number; target: number; level: number; exp: number | null; job: string; avatar: number | null; high: number | null; doneAt: number | null }>();
+    .all<{ id: string; fromLevel: number; fromExp: number; target: number; toExp: number; level: number; exp: number | null; job: string; avatar: number | null; high: number | null; doneAt: number | null }>();
   const list = results.map((r) => ({
     id: r.id,
     fromLevel: r.fromLevel,
     fromExp: r.fromExp,
     target: r.target,
+    toExp: r.toExp,
     level: r.level,
     exp: r.exp,
     job: r.job,
     avatar: r.avatar,
     highSpec: r.high === 1,
     doneAt: r.doneAt,
-    pct: r.doneAt !== null ? 100 : progress(r.fromLevel, r.fromExp, r.target, r.level, r.exp),
+    pct: r.doneAt !== null ? 100 : progress(r.fromLevel, r.fromExp, r.target, r.level, r.exp, r.toExp),
     rank: 0,
     coins: 0,
   }));
@@ -150,13 +162,13 @@ export async function awardRace(env: Env, round: Round, list: RaceEntry[]): Prom
     win.map((e) =>
       env.DB.prepare(
         "INSERT OR IGNORE INTO gc_ledger (user_id, delta, kind, ref, note, by_user, created_at) VALUES (?, ?, 'race', ?, ?, NULL, ?)",
-      ).bind(e.id, e.coins, `race:${round.id}`, `주간 목표 Lv.${e.target} ${e.rank}위 달성`, e.doneAt),
+      ).bind(e.id, e.coins, `race:${round.id}`, `${roundGrp(round.id)}군 주간 목표 ${goalText(e.target, e.toExp)} ${e.rank}위 달성`, e.doneAt),
     ),
   );
   const fresh = win.filter((_, i) => (res[i]?.meta?.changes ?? 0) > 0);
   if (gcoinOpen())
     for (const e of fresh)
-      await notify(env, [e.id], "gcoin", `🏁 주간 목표 Lv.${e.target} ${e.rank}위 달성 · 성장코인 +${e.coins}`, "#/gcoin", "system");
+      await notify(env, [e.id], "gcoin", `🏁 주간 목표 ${goalText(e.target, e.toExp)} ${e.rank}위 달성 · 성장코인 +${e.coins}`, `#/gcoin?g=${roundGrp(round.id)}`, "system");
   return fresh;
 }
 
@@ -187,7 +199,7 @@ async function raceSeries(env: Env, round: Round, list: RaceEntry[]): Promise<Re
   const add = (id: string, at: number, level: number, exp: number | null) => {
     const e = by.get(id);
     if (!e) return;
-    const p = level >= e.target ? 100 : progress(e.fromLevel, e.fromExp, e.target, level, exp);
+    const p = pos(level, exp) >= pos(e.target, e.toExp) ? 100 : progress(e.fromLevel, e.fromExp, e.target, level, exp, e.toExp);
     const b = Math.max(best.get(id) ?? 0, p);
     const pts = (out[id] ??= []);
     if (pts.length && pts[pts.length - 1][1] === b) return;
@@ -201,23 +213,24 @@ async function raceSeries(env: Env, round: Round, list: RaceEntry[]): Promise<Re
 }
 
 /** 화면에 주는 판 자료. 끝났으면 next(다음 판, 안 정했으면 null)와 그 판에 정해 둔 목표(upcoming)도. target = 담당자가 목표·기간을 정하는 판 */
-export async function raceData(env: Env, now = Date.now(), pre?: { rounds: Round[] | null; prizes: number[] }) {
+export async function raceData(env: Env, grp: Grp, now = Date.now(), pre?: { rounds: Round[] | null; prizes: number[] }) {
   // DB 를 다녀오는 횟수를 줄인다 (제작자 2026-11-10 '전반적으로 렉'): 판·상금은 미리 읽은 것을, 차트·상금 넣기·다음 판 목표는 한꺼번에
-  const [rounds, prizes] = pre ? [pre.rounds, pre.prizes] : await Promise.all([readRounds(env), readRank(env)]);
-  const round = await currentRound(env, now, rounds);
-  const nx = await nextRound(env, now, rounds);
+  const [rounds, prizes] = pre ? [pre.rounds, pre.prizes] : await Promise.all([readRounds(env, grp), readRank(env, grp)]);
+  const round = await currentRound(env, grp, now, rounds);
+  const nx = await nextRound(env, grp, now, rounds);
   const list = await raceState(env, round, prizes, now);
   const [series, , up] = await Promise.all([
     raceSeries(env, round, list),
     awardRace(env, round, list),
     nx
-      ? env.DB.prepare("SELECT user_id AS id, from_level AS fromLevel, target FROM gc_targets WHERE round = ?")
+      ? env.DB.prepare("SELECT user_id AS id, from_level AS fromLevel, target, COALESCE(to_exp, 0) AS toExp FROM gc_targets WHERE round = ?")
           .bind(nx.id)
-          .all<{ id: string; fromLevel: number; target: number }>()
+          .all<{ id: string; fromLevel: number; target: number; toExp: number }>()
       : null,
   ]);
   const upcoming = up ? up.results : null;
   return {
+    grp,
     id: round.id,
     start: round.start,
     end: round.end,
@@ -232,7 +245,9 @@ export async function raceData(env: Env, now = Date.now(), pre?: { rounds: Round
 }
 
 export interface RaceGain {
+  grp: Grp;
   target: number;
+  toExp: number;
   fromLevel: number;
   fromExp: number;
   /** 저장 전·후 달성률 */
@@ -244,16 +259,20 @@ export interface RaceGain {
   coins: number;
 }
 
-/** 레벨을 저장하기 전 내 목표 (목표가 없거나 2군 본캐가 아니면 null) */
+/** 레벨을 저장하기 전 내 목표 (진행 중인 1군·2군 판 어디에도 목표가 없으면 null) */
 export async function raceBefore(env: Env, me: User) {
   // 대상은 담당자가 고른 누구나 (1군·2군 상관없이): 이번 판에 내 목표가 있을 때만
   if (!canUseGcoin(me)) return null;
-  const round = await currentRound(env);
-  if (Date.now() < round.start || Date.now() >= round.end) return null;
-  if (!(await env.DB.prepare("SELECT 1 AS x FROM gc_targets WHERE round = ? AND user_id = ?").bind(round.id, me.id).first())) return null;
-  const prizes = await readRank(env);
-  const mine = (await raceState(env, round, prizes)).find((e) => e.id === me.id);
-  return mine ? { round, prizes, mine } : null;
+  const now = Date.now();
+  for (const grp of [1, 2] as Grp[]) {
+    const round = await currentRound(env, grp, now);
+    if (now < round.start || now >= round.end) continue;
+    if (!(await env.DB.prepare("SELECT 1 AS x FROM gc_targets WHERE round = ? AND user_id = ?").bind(round.id, me.id).first())) continue;
+    const prizes = await readRank(env, grp);
+    const mine = (await raceState(env, round, prizes)).find((e) => e.id === me.id);
+    if (mine) return { round, prizes, mine };
+  }
+  return null;
 }
 
 /** 저장한 뒤: 달성률이 얼마나 올랐는지, 이번에 목표를 찍었으면 순위와 상금 (화면이 팝업을 띄운다) */
@@ -265,7 +284,9 @@ export async function raceAfter(env: Env, me: User, before: { round: Round; priz
   const justDone = before.mine.doneAt === null && mine.doneAt !== null;
   if (mine.pct === before.mine.pct && !justDone) return null;
   return {
+    grp: roundGrp(before.round.id),
     target: mine.target,
+    toExp: mine.toExp,
     fromLevel: mine.fromLevel,
     fromExp: mine.fromExp,
     prevPct: before.mine.pct,
@@ -285,6 +306,7 @@ export interface RoundResult {
   userId: string;
   fromLevel: number;
   target: number;
+  toExp: number;
   level: number;
   exp: number | null;
   doneAt: number | null;
@@ -294,20 +316,23 @@ export interface RoundResult {
 
 /** id 로 판 찾기 (담당자가 정한 판, 없으면 기본 판) */
 function roundOf(id: number, rounds: Round[] | null): Round {
-  return rounds?.find((r) => r.id === id) ?? defaultRound(id);
+  return rounds?.find((r) => r.id === id) ?? defaultRound(id - (id % 2), roundGrp(id));
 }
 
 /**
  * 끝났는데 아직 결과를 안 남긴 판(목표가 있는 판)을 끝날 때 레벨로 셈해 gc_round_results 에 남긴다. 판마다 한 번 (round, user_id 키).
  * 상금은 실제로 넣은 장부(gc_ledger ref 'race:<id>')로. 계정을 지워도 결과 줄은 남는다 (기록은 평생)
  */
-export async function snapshotEnded(env: Env, now = Date.now(), pre?: { rounds: Round[] | null; prizes: number[] }): Promise<void> {
+export async function snapshotEnded(env: Env, now = Date.now()): Promise<void> {
   const { results } = await env.DB.prepare(
     "SELECT DISTINCT round FROM gc_targets WHERE round NOT IN (SELECT round FROM gc_round_results)",
   ).all<{ round: number }>();
   if (!results.length) return;
-  const [rounds, prizes] = pre ? [pre.rounds, pre.prizes] : await Promise.all([readRounds(env), readRank(env)]);
+  const cache = new Map<Grp, [Round[] | null, number[]]>();
   for (const { round: id } of results) {
+    const grp = roundGrp(id);
+    if (!cache.has(grp)) cache.set(grp, await Promise.all([readRounds(env, grp), readRank(env, grp)]));
+    const [rounds, prizes] = cache.get(grp)!;
     const r = roundOf(id, rounds);
     if (now < r.end) continue;
     const list = await raceState(env, r, prizes, now);
@@ -320,19 +345,21 @@ export async function snapshotEnded(env: Env, now = Date.now(), pre?: { rounds: 
     await env.DB.batch(
       list.map((e) =>
         env.DB.prepare(
-          "INSERT OR IGNORE INTO gc_round_results (round, start, end_at, rank, user_id, from_level, target, level, exp, done_at, pct, coins, saved_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        ).bind(r.id, r.start, r.end, e.rank, e.id, e.fromLevel, e.target, e.level, e.exp, e.doneAt, e.pct, coin.get(e.id) ?? 0, now),
+          "INSERT OR IGNORE INTO gc_round_results (round, start, end_at, rank, user_id, from_level, target, to_exp, level, exp, done_at, pct, coins, saved_at) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ).bind(r.id, r.start, r.end, e.rank, e.id, e.fromLevel, e.target, e.toExp, e.level, e.exp, e.doneAt, e.pct, coin.get(e.id) ?? 0, now),
       ),
     );
   }
 }
 
-/** 남긴 결과들 (최근 판부터 20판) */
-export async function roundResults(env: Env): Promise<RoundResult[]> {
+/** 그 군의 남긴 결과들 (최근 판부터 20판) */
+export async function roundResults(env: Env, grp: Grp): Promise<RoundResult[]> {
   const { results } = await env.DB.prepare(
-    "SELECT round, start, end_at AS end, rank, user_id AS userId, from_level AS fromLevel, target, level, exp, done_at AS doneAt, pct, coins " +
-      "FROM gc_round_results WHERE round IN (SELECT DISTINCT round FROM gc_round_results ORDER BY start DESC LIMIT 20) ORDER BY start DESC, rank",
-  ).all<RoundResult>();
+    "SELECT round, start, end_at AS end, rank, user_id AS userId, from_level AS fromLevel, target, COALESCE(to_exp, 0) AS toExp, level, exp, done_at AS doneAt, pct, coins " +
+      "FROM gc_round_results WHERE round IN (SELECT DISTINCT round FROM gc_round_results WHERE round % 2 = ? ORDER BY start DESC LIMIT 20) ORDER BY start DESC, rank",
+  )
+    .bind(grp === 1 ? 1 : 0)
+    .all<RoundResult>();
   return results;
 }
