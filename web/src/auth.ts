@@ -68,6 +68,8 @@ export interface Me {
   pendingCharacters?: string[];
   /** 플래티넘 할인 상점을 열었는지 (설정의 '오픈'). 열기 전에는 홈 칸이 운영진에게만 보인다 */
   shopOpen?: boolean;
+  /** 1군 성장코인샵 오픈 (담당자가 켠다) */
+  gcoin1Open?: boolean;
 }
 
 /** 같은 사람의 캐릭터 하나 (부캐 묶기, 제작자 요청 2026-11-01) */

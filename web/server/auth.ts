@@ -264,7 +264,7 @@ export function readProfile(body: { job?: unknown; level?: unknown; exp?: unknow
 /** 로그인한 사람의 정보 (/api/me, /api/login 이 같은 모양으로 준다). exp, avatar 는 본인 것이라 여기서만 준다 */
 export async function meInfo(env: Env, user: User) {
   const owner = "(SELECT COALESCE(main_id, id) FROM users WHERE id = ?1)";
-  const [one, group, pending, shop] = await env.DB.batch([
+  const [one, group, pending, shop, g1] = await env.DB.batch([
     env.DB.prepare(
       "SELECT p.job AS job, p.level AS level, p.exp AS exp, p.guild AS guild, a.updated_at AS avatar, u.created_at AS created_at FROM users u " +
         "LEFT JOIN profiles p ON p.user_id = u.id LEFT JOIN avatars a ON a.user_id = u.id WHERE u.id = ?1",
@@ -277,6 +277,8 @@ export async function meInfo(env: Env, user: User) {
     env.DB.prepare(`SELECT id FROM signup_requests WHERE owner = ${owner} ORDER BY created_at`).bind(user.id),
     // 플래티넘 할인 상점을 열었는지 (설정의 '오픈'): 열기 전에는 홈 칸도 운영진만 본다 (제작자 2026-11-10, src/launcher.ts shopGate)
     env.DB.prepare("SELECT open FROM plat_settings WHERE id = 1"),
+    // 1군 성장코인샵을 열었는지 (담당자 '오픈'): 열기 전에는 홈 칸이 갈라지지 않고 2군으로만 간다 (src/launcher.ts canGcoin1)
+    env.DB.prepare("SELECT value FROM gc_settings WHERE key = 'g1open'"),
   ]);
   const p = one.results[0] as
     | { job: Job | null; level: number | null; exp: number | null; guild: Guild | null; avatar: number | null; created_at: number | null }
@@ -293,6 +295,7 @@ export async function meInfo(env: Env, user: User) {
     // 계정을 만든 때: 홈 화면 아이콘이 바뀌기 전부터 있던 계정인지 (아이콘 다시 설치 안내, src/App.tsx)
     createdAt: p?.created_at ?? null,
     shopOpen: (shop.results[0] as { open?: number } | undefined)?.open === 1,
+    gcoin1Open: (g1.results[0] as { value?: number } | undefined)?.value === 1,
   };
 }
 

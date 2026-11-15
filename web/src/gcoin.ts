@@ -127,6 +127,8 @@ export type Grp = 1 | 2;
 export interface GcData {
   open: boolean;
   grp: Grp;
+  /** 1군 오픈 (담당자가 켠다) */
+  g1open?: boolean;
   /** 한 주 상한 (낱개, 띄어쓰기 없는 이름: 사나운멧돼지인형 30)과 이번 주 내가 신청한 수 */
   caps?: Record<string, number>;
   weekBought?: Record<string, number>;
@@ -185,7 +187,7 @@ export interface GcRoundResult {
 /** 목표: 'Lv.52' 또는 'Lv.52 40%' (1군 목표 경험치, 서버 server/gcrace.ts goalText) */
 export const goalText = (target: number, toExp?: number) => `Lv.${target}${toExp ? ` ${Math.round(toExp / 10) / 100}%` : ""}`;
 
-export const fetchGcoin = (g: Grp = 2) => api<GcData>(`/api/gcoin?g=${g}`);
+export const fetchGcoin = (g: Grp = 2) => api<GcData>(g === 1 ? "/api/gcoin?g=1" : "/api/gcoin");
 /** 담당자: 이번 2주 목표 레벨 (null 이면 뺀다) */
 /** 판 기간 정하기: 한국 시간 from 날 0시 ~ to 날 24시 ('2026-11-11') */
 export const setRound = (g: Grp, from: string, to: string) =>
@@ -194,8 +196,9 @@ export const setTarget = (g: Grp, userId: string, target: number | null, toExp?:
   api<{ ok: boolean }>("/api/gcoin/targets", "PUT", { g, userId, target, toExp });
 /** 담당자: 목표 목록에서 빼기 (그 군의 본캐가 저절로 다시 들어오지 않게) */
 export const hideTarget = (g: Grp, userId: string) => api<{ ok: boolean }>("/api/gcoin/targets", "PUT", { g, userId, hide: true });
-export const buyItem = (itemId: number, qty: number) =>
+export const buyItem = (g: Grp, itemId: number, qty: number) =>
   api<{ ok: boolean; balance: number }>("/api/gcoin/orders", "POST", {
+    ...(g === 1 ? { g } : {}),
     itemId,
     qty,
   });
@@ -209,8 +212,11 @@ export const saveGcSettings = (input: {
   levels?: GcCurve[];
   rank?: number[];
   cap?: { name: string; n: number };
+  /** 1군 오픈 (담당자) */
+  open?: boolean;
 }) => api<{ ok: boolean }>("/api/gcoin/settings", "PUT", input);
 export const addGcItem = (input: {
+  g?: Grp;
   name: string;
   unit: string | null;
   gold: number;
@@ -228,8 +234,8 @@ export const editGcItem = (
 ) => api<{ ok: boolean }>(`/api/gcoin/items/${id}`, "PATCH", input);
 export const deleteGcItem = (id: number) =>
   api<{ ok: boolean }>(`/api/gcoin/items/${id}`, "DELETE");
-export const adjustCoin = (userId: string, delta: number, note: string) =>
-  api<{ ok: boolean }>("/api/gcoin/adjust", "POST", { userId, delta, note });
+export const adjustCoin = (g: Grp, userId: string, delta: number, note: string) =>
+  api<{ ok: boolean }>("/api/gcoin/adjust", "POST", { ...(g === 1 ? { g } : {}), userId, delta, note });
 
 /** 레벨 L 에 올라서는 데 주는 코인 (서버 server/gcoin.ts coinFor 와 같다) */
 export function coinFor(level: number, curve: GcCurve[]): number {

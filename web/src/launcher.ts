@@ -68,6 +68,12 @@ export const GCOIN_OPEN_AT = Date.UTC(2026, 10, 11, 2);
 export const GCOIN_OPEN = Date.now() >= GCOIN_OPEN_AT;
 /** 2군 성장코인샵에 들어가는 사람: 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (제작자 2026-11-09 '오피서랑 길마 보게 열어 줘, 개발 중으로 두고') */
 export const canGcoin = (me: Me) => GCOIN_OPEN || RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
+/** 성장코인샵 담당자 (서버 server/gcoin.ts GCOIN_STAFF·canManageGcoin 과 같다): 담당자·길드마스터·앱개발자 */
+const GCOIN_STAFF = ["유어아너"];
+export const canManageGcoin = (me: Me) =>
+  me.role === "developer" || me.role === "master" || [me.id, ...(me.characters ?? []).map((c) => c.id)].some((c) => GCOIN_STAFF.includes(c));
+/** 1군 성장코인샵 (#/gcoin1): 담당자가 '오픈'을 켜기 전에는 담당자·길드마스터·앱개발자(와 테스트 계정)만 (제작자 2026-11-15). 열기 전 길드원에게는 홈 칸이 갈라지지 않고 2군으로만 간다 */
+export const canGcoin1 = (me: Me) => me.gcoin1Open === true || canManageGcoin(me) || TEST_IDS.includes(me.id);
 
 /** 명예의 전당(안에 기부함)을 모두에게 열었는지 (서버 server/donate.ts DONATE_OPEN 과 같이 바꾼다). 2026-11-12 열었다 (제작자 '명예의전당 오픈') */
 export const DONATE_OPEN = true;
@@ -122,7 +128,7 @@ export const ITEMS: LaunchItem[] = [
   // 기부함(#/donate)은 따로 칸을 두지 않고 명예의 전당 안 '전체 · 이번 달' 오른쪽 단추로 (제작자 2026-11-12 '기부함을 명예의 전당 안에 넣기만', '이번 달 우측에 기부함 버튼 편입')
   { key: "hall", title: "명예의 전당", short: "명예의 전당", to: "#/hall", icon: "🏛️", iconPic: "/icons/hall.png", managers: !DONATE_OPEN, soon: !DONATE_OPEN, badge: "개발중", match: ["hall", "donate"] },
   // 담당자 유어아너 (제작자 2026-11-10 '장비대여 담당자처럼 버튼에 유어아너로')
-  { key: "gcoin", title: "성장코인샵", short: "코인샵", to: "#/gcoin", icon: "🪙", iconPic: "/icons/gcoin.png", corner: ["담당자", "유어아너"], split: [{ label: "1군", to: "#/gcoin?g=1", tone: "gold" }, { label: "2군", to: "#/gcoin?g=2", tone: "silver" }], managers: !GCOIN_OPEN, soon: !GCOIN_OPEN, badge: "개발중", match: ["gcoin"] },
+  { key: "gcoin", title: "성장코인샵", short: "코인샵", to: "#/gcoin", icon: "🪙", iconPic: "/icons/gcoin.png", corner: ["담당자", "유어아너"], split: [{ label: "1군", to: "#/gcoin1", tone: "gold" }, { label: "2군", to: "#/gcoin", tone: "silver" }], managers: !GCOIN_OPEN, soon: !GCOIN_OPEN, badge: "개발중", match: ["gcoin", "gcoin1"] },
   { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
   // 도감 계산기 (개발중, 제작자 요청 2026-11-10: 게임 도감 항목을 웹에서 정리, 제작자 도감 영상에서 옮긴 자료). 개발 중 묶음 (미리 보는 사람만, pages/Dex.tsx)
   // 데미지 계산기 (개발중, 제작자 요청 2026-11-11 '데미지 계산기' + 카페 글 331187 기본 데미지 산출공식): 내 무기·강화와 상대 방어도로 방어도/5 를 뺀 기본 데미지 (pages/Damage.tsx)

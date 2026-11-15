@@ -530,6 +530,8 @@ function Wiki({
     body = canSmack(me) ? <SmackPage me={me} arg={arg} /> : <DevSoon title="운영진 때리기" />;
   // 2군 성장코인샵 (개발중, 제작자 2026-11-09 '오피서랑 길마 보게 열어 줘'): 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (launcher.ts canGcoin, 서버 server/gcoin.ts)
   else if (page === "gcoin") body = canGcoin(me) ? <GrowthShopPage me={me} onMe={onMe} /> : <DevSoon title="성장코인샵" />;
+  // 1군 성장코인샵 (제작자 2026-11-15 '1군 2군 누르면 각각 경로로 아예 각개 메뉴'): 홈 칸 왼쪽 반. 담당자가 오픈하기 전에는 담당자·길드마스터·앱개발자만 (서버도 403)
+  else if (page === "gcoin1") body = <GrowthShopPage key="g1" me={me} onMe={onMe} grp={1} />;
   // 기부함 (개발중, 제작자 2026-11-10): 모든 템 기부를 골드 가치로 매겨 장비대여와 같은 마일리지로, 명예의 전당. 위키를 기다리지 않는다 (아이템 그림·이름 찾기는 위키가 오면 붙는다)
   // 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (launcher.ts canDonate, 서버 server/donate.ts)
   else if (page === "donate") body = canDonate(me) ? <DonatePage wiki={wiki ?? null} me={me} /> : <DevSoon title="기부함" />;

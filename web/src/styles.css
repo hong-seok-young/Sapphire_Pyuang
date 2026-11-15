@@ -5790,14 +5790,9 @@ a.cf-at { color: #9fb4ff; }
   .gsplit-open .gs-btn { opacity: 1; transform: none; }
 }
 
-/* 성장코인샵 안: 1군 · 2군 판 바꾸기, 재고, 1군 안내, 1군 추가 코인, 목표 경험치 */
-.gc-grp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0 0 8px; }
-.gc-grp-btn {
-  padding: 4px 0; font: inherit; font-size: 13px; color: var(--muted); background: var(--panel); border: 2px solid var(--edge); cursor: pointer;
-}
-.gc-grp-1.gc-grp-on { color: var(--edge); background: #ffd34d; box-shadow: inset 2px 2px 0 #fff3b0; }
-.gc-grp-2.gc-grp-on { color: var(--edge); background: #c9d3e6; box-shadow: inset 2px 2px 0 #fff; }
-.gc-grp-btn:active { transform: translate(1px, 1px); }
+/* 1군 성장코인샵: 오픈, 재고, 이벤트 안내, 추가 코인, 목표 경험치 */
+.gc-openbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin: 0 0 8px; padding: 6px 10px; font-size: 12px; color: var(--muted); background: var(--panel); border: 2px dashed #ffd34d; }
+.gc-openbar-on { border-style: solid; border-color: #3fe0a0; color: var(--text); }
 .gc-stock-tag { position: absolute; z-index: 2; top: 3px; right: 3px; padding: 0 3px; font-size: 9px; line-height: 13px; color: var(--edge); background: #8fe3ff; border: 1px solid var(--edge); }
 .gc-stock-out { background: #ff7a7a; }
 .gc-soldout { opacity: 0.55; }

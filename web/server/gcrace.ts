@@ -8,7 +8,7 @@
 // 달성한 사람은 그때 순서대로 1위 2위 … (확정), 아직인 사람은 달성률 순. 1~5위는 달성하는 순간 상금(gc_settings rank1~5)이 지갑에 들어간다 (gc_ledger kind race).
 import type { Env, User } from "./auth";
 import { notify } from "./alerts";
-import { canUseGcoin, gcoinOpen, readRank } from "./gcoin";
+import { canUseGcoin, gcoinOpen, gcoinPath, readRank } from "./gcoin";
 import type { Grp } from "./gcoin";
 
 const DAY = 86_400_000;
@@ -161,14 +161,14 @@ export async function awardRace(env: Env, round: Round, list: RaceEntry[]): Prom
   const res = await env.DB.batch(
     win.map((e) =>
       env.DB.prepare(
-        "INSERT OR IGNORE INTO gc_ledger (user_id, delta, kind, ref, note, by_user, created_at) VALUES (?, ?, 'race', ?, ?, NULL, ?)",
-      ).bind(e.id, e.coins, `race:${round.id}`, `${roundGrp(round.id)}군 주간 목표 ${goalText(e.target, e.toExp)} ${e.rank}위 달성`, e.doneAt),
+        "INSERT OR IGNORE INTO gc_ledger (user_id, delta, kind, ref, note, by_user, created_at, grp) VALUES (?, ?, 'race', ?, ?, NULL, ?, ?)",
+      ).bind(e.id, e.coins, `race:${round.id}`, `주간 목표 ${goalText(e.target, e.toExp)} ${e.rank}위 달성`, e.doneAt, roundGrp(round.id)),
     ),
   );
   const fresh = win.filter((_, i) => (res[i]?.meta?.changes ?? 0) > 0);
   if (gcoinOpen())
     for (const e of fresh)
-      await notify(env, [e.id], "gcoin", `🏁 주간 목표 ${goalText(e.target, e.toExp)} ${e.rank}위 달성 · 성장코인 +${e.coins}`, `#/gcoin?g=${roundGrp(round.id)}`, "system");
+      await notify(env, [e.id], "gcoin", `🏁 주간 목표 ${goalText(e.target, e.toExp)} ${e.rank}위 달성 · 성장코인 +${e.coins}`, gcoinPath(roundGrp(round.id)), "system");
   return fresh;
 }
 

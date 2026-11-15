@@ -75,7 +75,7 @@ export function CoinToast() {
       className={"ct" + (king ? " ct-king" : "")}
       onClick={() => {
         setGain(null);
-        go("#/gcoin?g=2");
+        go("#/gcoin");
       }}
       aria-live="polite"
     >
@@ -235,7 +235,7 @@ export function RaceToast() {
       className={"ct ct-race" + (king ? " ct-king" : "")}
       onClick={() => {
         setG(null);
-        go(`#/gcoin?g=${g.grp ?? 2}`);
+        go(g.grp === 1 ? "#/gcoin1" : "#/gcoin");
       }}
       aria-live="polite"
     >

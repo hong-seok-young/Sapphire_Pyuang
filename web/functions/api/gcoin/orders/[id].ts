@@ -6,7 +6,7 @@
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, paramId, readJson } from "../../../../server/auth";
 import { notify } from "../../../../server/alerts";
 import type { Env } from "../../../../server/auth";
-import { MAX_NOTE, canManageGcoin, canUseGcoin, notifyStaff, text, orderLabel } from "../../../../server/gcoin";
+import { MAX_NOTE, canManageGcoin, canUseGcoin, gcoinPath, grpOf, notifyStaff, text, orderLabel } from "../../../../server/gcoin";
 
 export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params }) => {
   const me = await currentUser(env, request);
@@ -18,6 +18,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
     id: number;
     user_id: string;
     item_id: number | null;
+    grp: number | null;
     name: string;
     unit: string | null;
     price: number;
@@ -27,13 +28,16 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
   }>();
   if (!o) return json({ error: "없는 신청이에요" }, 404);
   const b = await readJson<{ action: string; note: unknown }>(request);
+  // 1군 신청이면 1군 메뉴로 (제작자 2026-11-15 '1군 2군 각기 모듈러')
+  const grp = grpOf(o.grp ?? 2);
+  const mine = `${gcoinPath(grp)}?t=mine`;
   if (b.action === "reopen") {
     if (!canManageGcoin(me)) return FORBIDDEN();
     if (o.status !== "done") return json({ error: "지급 완료한 신청만 되돌려요" }, 409);
     if (Date.now() - (o.done_at ?? 0) > 86_400_000) return json({ error: "하루가 지나 되돌릴 수 없어요" }, 409);
     const r = await env.DB.prepare("UPDATE gc_orders SET status = 'pending', note = NULL, done_at = NULL, done_by = NULL WHERE id = ? AND status = 'done'").bind(o.id).run();
     if (r.meta.changes)
-      await notify(env, [o.user_id], "gcoin", `성장코인샵 지급 완료 취소 · ${orderLabel(o.name, o.unit, o.qty)} · 아직 기다리는 중이에요`, "#/gcoin?t=mine", me.id);
+      await notify(env, [o.user_id], "gcoin", `성장코인샵 지급 완료 취소 · ${orderLabel(o.name, o.unit, o.qty)} · 아직 기다리는 중이에요`, mine, me.id);
     return json({ ok: true });
   }
   if (o.status !== "pending") return json({ error: "이미 처리됐어요" }, 409);
@@ -52,13 +56,13 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
     if (o.user_id !== me.id) return FORBIDDEN();
     const r = await set("cancel", null);
     if (r.meta.changes) await restock();
-    if (r.meta.changes) await notifyStaff(env, `${me.id}님이 성장코인 구매 신청을 취소했어요 · ${label}`, me.id);
+    if (r.meta.changes) await notifyStaff(env, `${me.id}님이 성장코인 구매 신청을 취소했어요 · ${label}`, me.id, grp);
     return json({ ok: true });
   }
   if (!canManageGcoin(me)) return FORBIDDEN();
   if (b.action === "done") {
     const r = await set("done", null);
-    if (r.meta.changes) await notify(env, [o.user_id], "gcoin", `성장코인샵 지급 완료 · ${label}`, "#/gcoin?t=mine", me.id);
+    if (r.meta.changes) await notify(env, [o.user_id], "gcoin", `성장코인샵 지급 완료 · ${label}`, mine, me.id);
     return json({ ok: true });
   }
   if (b.action === "reject") {
@@ -67,7 +71,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
     const r = await set("reject", note);
     if (r.meta.changes) await restock();
     if (r.meta.changes)
-      await notify(env, [o.user_id], "gcoin", `성장코인샵 신청 반려 · ${label} · 코인 ${o.price * o.qty}개가 돌아왔어요${note ? ` · “${note}”` : ""}`, "#/gcoin?t=mine", me.id);
+      await notify(env, [o.user_id], "gcoin", `성장코인샵 신청 반려 · ${label} · 코인 ${o.price * o.qty}개가 돌아왔어요${note ? ` · “${note}”` : ""}`, mine, me.id);
     return json({ ok: true });
   }
   return json({ error: "할 일이 맞지 않아요" }, 400);

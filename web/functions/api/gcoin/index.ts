@@ -4,7 +4,7 @@
 import { FORBIDDEN, NEED_LOGIN, TEST_IDS, currentUser, json } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { raceData, readRounds, roundResults, snapshotEnded } from "../../../server/gcrace";
-import { grpOf, hidePrefix, LEVEL_COINS, readCaps, weekBought, gcoinOpen, openCleanup, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
+import { canEnterGrp, g1Open, grpSql, grpOf, hidePrefix, LEVEL_COINS, readCaps, weekBought, gcoinOpen, openCleanup, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
 import { weekStart } from "../../../server/week";
 
 interface OrderRow {
@@ -42,6 +42,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (!canUseGcoin(me)) return FORBIDDEN();
   const manage = canManageGcoin(me);
   const grp = grpOf(new URL(request.url).searchParams.get("g"));
+  // 1군은 담당자가 '오픈'을 켜기 전에는 담당자·길드마스터·앱개발자만 (제작자 2026-11-15)
+  if (!(await canEnterGrp(env, me, grp))) return json({ error: "1군 성장코인샵은 준비 중이에요", closed: true }, 403);
   // DB 를 다녀오는 횟수를 줄인다 (제작자 2026-11-10 '전반적으로 렉이 좀 있어, 반응이 늦어'): 서로 기다릴 필요 없는 것은 한꺼번에.
   // 1) 설정들 2) 판 순위(상금 넣기) 3) 지갑·신청·장부 (상금을 넣은 뒤에 세야 지갑이 맞다)
   const [, curve, rounds, rank, caps, start, member] = await Promise.all([
@@ -49,9 +51,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     readCurve(env),
     readRounds(env, grp),
     readRank(env, grp),
-    readCaps(env),
+    readCaps(env, grp),
     startAt(env),
-    isMember(env, me.id),
+    isMember(env, me.id, grp),
   ]);
   // 끝난 주의 순위 보너스 (아직이면 지금 한 번)
   await settleWeeks(env, curve);
@@ -62,8 +64,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const now = Date.now();
   const ws = Math.max(weekStart(now), start);
   const [mine, items, top, myOrders, myLedger, winners, bought, adminRows] = await Promise.all([
-    member ? wallets(env, curve, me.id, start) : Promise.resolve([]),
-    env.DB.prepare(`SELECT id, name, unit, price, gold, active, stock FROM gc_items ${manage ? "" : "WHERE active = 1 AND price > 0 "}ORDER BY sort, id`).all<{
+    member ? wallets(env, curve, me.id, start, grp) : Promise.resolve([]),
+    env.DB.prepare(`SELECT id, name, unit, price, gold, active, stock FROM gc_items WHERE ${grpSql(grp)} ${manage ? "" : "AND active = 1 AND price > 0 "}ORDER BY sort, id`).all<{
       id: number;
       name: string;
       unit: string | null;
@@ -72,18 +74,18 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       active: number;
       stock: number | null;
     }>(),
-    LEVEL_COINS ? weekRanking(env, ws, null, curve) : Promise.resolve([]),
-    env.DB.prepare("SELECT * FROM gc_orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 60").bind(me.id).all<OrderRow>(),
-    env.DB.prepare("SELECT delta, kind, note, created_at AS at FROM gc_ledger WHERE user_id = ? ORDER BY created_at DESC LIMIT 60").bind(me.id).all(),
+    LEVEL_COINS && grp === 2 ? weekRanking(env, ws, null, curve) : Promise.resolve([]),
+    env.DB.prepare(`SELECT * FROM gc_orders WHERE user_id = ? AND ${grpSql(grp)} ORDER BY created_at DESC LIMIT 60`).bind(me.id).all<OrderRow>(),
+    env.DB.prepare(`SELECT delta, kind, note, created_at AS at FROM gc_ledger WHERE user_id = ? AND ${grpSql(grp)} ORDER BY created_at DESC LIMIT 60`).bind(me.id).all(),
     env.DB.prepare(
       "SELECT user_id AS id, delta, note, created_at AS at FROM gc_ledger WHERE kind = 'rank' AND ref = (SELECT ref FROM gc_ledger WHERE kind = 'rank' ORDER BY created_at DESC LIMIT 1) ORDER BY delta DESC",
     ).all(),
-    member ? weekBought(env, me.id, caps) : Promise.resolve({}),
+    member ? weekBought(env, me.id, caps, Date.now(), grp) : Promise.resolve({}),
     manage
       ? Promise.all([
-          env.DB.prepare("SELECT * FROM gc_orders WHERE status = 'pending' ORDER BY created_at ASC").all<OrderRow>(),
-          env.DB.prepare("SELECT * FROM gc_orders WHERE status != 'pending' ORDER BY COALESCE(done_at, created_at) DESC LIMIT 60").all<OrderRow>(),
-          wallets(env, curve, undefined, start),
+          env.DB.prepare(`SELECT * FROM gc_orders WHERE status = 'pending' AND ${grpSql(grp)} ORDER BY created_at ASC`).all<OrderRow>(),
+          env.DB.prepare(`SELECT * FROM gc_orders WHERE status != 'pending' AND ${grpSql(grp)} ORDER BY COALESCE(done_at, created_at) DESC LIMIT 60`).all<OrderRow>(),
+          wallets(env, curve, undefined, start, grp),
           roundResults(env, grp),
           // 주간 목표 대상으로 고를 수 있는 사람 (담당자 재량, 1군·2군 상관없이): 레벨을 적은 계정 모두
           env.DB.prepare("SELECT p.user_id AS id, p.level AS level, p.guild AS guild, u.main_id AS main FROM profiles p JOIN users u ON u.id = p.user_id WHERE p.level IS NOT NULL")
@@ -140,6 +142,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   return json({
     open: gcoinOpen(),
     grp,
+    // 1군 오픈 (담당자가 켠다, 그 전에는 길드원이 못 들어온다)
+    ...(grp === 1 ? { g1open: await g1Open(env) } : {}),
     // 한 주 상한 (낱개, 띄어쓰기 없는 이름마다)과 이번 주 내가 신청한 수
     caps,
     weekBought: wallet ? bought : {},

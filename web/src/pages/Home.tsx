@@ -21,6 +21,7 @@ import {
   COLS,
   INFO_TILES,
   MAX_SLOTS,
+  canGcoin1,
   canPreview,
   canSee,
   clickItem,
@@ -57,7 +58,7 @@ export function TileIcon({ t }: { t: LaunchItem }) {
  */
 function TileCell({
   me,
-  t,
+  t: item,
   editable = false,
   dragKey,
   index,
@@ -68,6 +69,8 @@ function TileCell({
   dragKey?: string;
   index?: number;
 }) {
+  // 성장코인샵: 1군을 열기 전(길드원)에는 예전 2군 칸 그대로 ('2군 전용' 띠와 은빛, 갈라지지 않음. 제작자 2026-11-15 '2군 안의 내용은 그대로')
+  const t = item.key === "gcoin" && !canGcoin1(me) ? { ...item, ribbon: "2군 전용", ring: "silver" as const, split: undefined } : item;
   const news = useNews();
   // 고친 메뉴: 다른 색 테두리와 'UPDATE' (그 메뉴에 처음 들어가면 사라진다, updates.ts). '정보'는 안의 메뉴가 고쳐졌을 때도
   const updated = isUpdated(me.id, t);

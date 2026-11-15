@@ -87,16 +87,32 @@ export const DEFAULT_RANK = [6, 4, 3, 2, 2];
 export const DEFAULT_RANK1 = [10, 8, 6, 4, 4];
 
 /**
- * 성장코인샵은 1군·2군 두 판 (제작자 2026-11-15 '성장코인샵 버튼을 반으로, 왼쪽 1군 오른쪽 2군', 유어아너 1군 공지):
- * 주간 목표 판(기간·목표·상금·기록)만 따로이고 상점·지갑·신청은 하나다. 화면·API 는 ?g=1 이 1군, 없거나 2 면 2군.
- * 1군 판 번호(gc_rounds.id, gc_targets.round)는 홀수(시작 ms + 1), 2군은 짝수(시작 ms): 판 번호만 보고 어느 군인지 안다 (server/gcrace.ts)
+ * 성장코인샵은 1군·2군 두 메뉴 (제작자 2026-11-15 '성장코인샵 버튼을 반으로, 왼쪽 1군 오른쪽 2군', '1군 2군 누르면 각각 경로로 아예 각개 메뉴, 상점부터 모든 게 각기 모듈러',
+ * '2군 안의 내용은 그대로 냅두고 건들지 않는 거'). 화면은 #/gcoin(2군 그대로) · #/gcoin1(1군), API 는 ?g=1 이나 본문 g: 1 이 1군, 없으면 2군.
+ * 1군 것은 모두 따로: 물건(gc_items.grp)·신청(gc_orders.grp)·장부(gc_ledger.grp)·지갑·설정 키('g1…')·주간 목표 판(판 번호 홀수 = 시작 ms + 1, server/gcrace.ts).
+ * grp 칸이 비어 있는 예전 줄은 모두 2군이다
  */
 export type Grp = 1 | 2;
 export const grpOf = (v: unknown): Grp => (v === 1 || v === "1" ? 1 : 2);
+/** 이 줄이 그 군 것인지 (grp 칸, 비면 2군) */
+export const grpSql = (grp: Grp, col = "grp") => `COALESCE(${col}, 2) = ${grp}`;
 /** 상금 설정 키 ('rank1' 은 2군 그대로, 1군은 'g1rank1') */
 export const rankKey = (grp: Grp, i: number) => (grp === 1 ? `g1rank${i}` : `rank${i}`);
 /** 담당자가 목표 목록에서 뺀 사람 (그 군의 본캐가 저절로 다시 안 들어오게) */
 export const hidePrefix = (grp: Grp) => (grp === 1 ? "hide1:" : "hide:");
+/** 주간 구매 상한 키 (2군 'cap:<이름>' 그대로, 1군 'g1cap:<이름>') */
+export const capPrefix = (grp: Grp) => (grp === 1 ? "g1cap:" : "cap:");
+/** 화면 주소 (알림이 그 메뉴로) */
+export const gcoinPath = (grp: Grp) => (grp === 1 ? "#/gcoin1" : "#/gcoin");
+/** 1군 성장코인샵 오픈 (담당자가 켠다, gc_settings 'g1open' = 1). 열기 전에는 담당자·길드마스터·앱개발자(와 테스트 계정)만 들어온다 (제작자 2026-11-15 '담당자가 오픈 설정하기 전엔 진입 못 하게') */
+export async function g1Open(env: Env): Promise<boolean> {
+  const r = await env.DB.prepare("SELECT value FROM gc_settings WHERE key = 'g1open'").first<{ value: number }>();
+  return r?.value === 1;
+}
+export async function canEnterGrp(env: Env, me: User, grp: Grp): Promise<boolean> {
+  if (grp === 2) return true;
+  return canManageGcoin(me) || TEST_IDS.includes(me.id) || (await g1Open(env));
+}
 /** 처음 물건 (코인 1개 = 1,000골드쯤) */
 // 자몽주스·자몽케이크는 50개, 나머지는 20개씩 판다 (제작자 2026-11-09). price 는 관리자가 적은 골드 가치(천 골드) = 성장코인.
 // 제작자가 처음 준 값(사나운 멧돼지 인형·망고워터·자몽주스·자몽케이크) 말고는 0 = 값을 정하기 전 (제작자 '스샷 골드 가격 무시해, 골드 값어치는 관리자가 쓸 거야').
@@ -137,11 +153,12 @@ export const MAX_QTY = 20;
  * 기다리는 중·지급 완료한 신청을 센다 (반려·취소는 빼서 다시 살 수 있다). 화면은 /api/gcoin 의 caps 를 그대로 쓴다 */
 export const DEFAULT_CAP: Record<string, number> = { 사나운멧돼지인형: 30 };
 export const MAX_CAP = 100_000;
-export async function readCaps(env: Env): Promise<Record<string, number>> {
-  const out: Record<string, number> = { ...DEFAULT_CAP };
-  const { results } = await env.DB.prepare("SELECT key, value FROM gc_settings WHERE key LIKE 'cap:%'").all<{ key: string; value: number }>();
+export async function readCaps(env: Env, grp: Grp = 2): Promise<Record<string, number>> {
+  const out: Record<string, number> = grp === 2 ? { ...DEFAULT_CAP } : {};
+  const pre = capPrefix(grp);
+  const { results } = await env.DB.prepare("SELECT key, value FROM gc_settings WHERE key LIKE ?").bind(`${pre}%`).all<{ key: string; value: number }>();
   for (const r of results) {
-    const k = r.key.slice(4);
+    const k = r.key.slice(pre.length);
     if (r.value > 0) out[k] = r.value;
     else delete out[k];
   }
@@ -150,9 +167,9 @@ export async function readCaps(env: Env): Promise<Record<string, number>> {
 export const capKey = (name: string) => name.replace(/\s/g, "");
 export const unitCount = (unit: string | null) => Number(/(\d+)\s*개/.exec(unit ?? "")?.[1] ?? 1) || 1;
 /** 이번 주에 신청한 낱개 수 (상한이 있는 물건만, 띄어쓰기 없는 이름마다) */
-export async function weekBought(env: Env, userId: string, caps: Record<string, number>, now = Date.now()): Promise<Record<string, number>> {
+export async function weekBought(env: Env, userId: string, caps: Record<string, number>, now = Date.now(), grp: Grp = 2): Promise<Record<string, number>> {
   const { results } = await env.DB.prepare(
-    "SELECT name, unit, qty FROM gc_orders WHERE user_id = ? AND status IN ('pending', 'done') AND created_at >= ?",
+    `SELECT name, unit, qty FROM gc_orders WHERE user_id = ? AND status IN ('pending', 'done') AND created_at >= ? AND ${grpSql(grp)}`,
   )
     .bind(userId, growthWeekStart(now))
     .all<{ name: string; unit: string | null; qty: number }>();
@@ -220,9 +237,12 @@ export async function startAt(env: Env): Promise<number> {
  * 대상: 2군 본캐 (부캐 빼고, 테스트 계정 빼고). 제작자 '2군 전원', 공지 '본캐이신 분들만'.
  * 그리고 담당자가 주간 목표를 정해 준 사람은 1군·부캐여도 (제작자 2026-11-10 '목표가 정해진 사람들은 다 출입 가능하게'): 어느 판이든 목표가 남아 있으면 지갑·신청을 쓴다 (받은 상금을 판이 끝난 뒤에도 쓰게, 담당자가 '빼기'하면 끝)
  */
-// 1군 본캐도 (제작자 2026-11-15 1군 성장코인샵, 유어아너 공지 '본캘만 참여가능'): 목표·추가 코인(기여도·길던, 이노워)을 받고 신청한다
-const MEMBERS_SQL =
-  "SELECT p.user_id FROM profiles p JOIN users u ON u.id = p.user_id WHERE ((p.guild IN ('main', 'second') AND u.main_id IS NULL) OR p.user_id IN (SELECT user_id FROM gc_targets)) AND u.id NOT IN ('테스트1', '테스트2')";
+// 1군 성장코인샵은 따로 (제작자 2026-11-15, 유어아너 공지 '본캘만 참여가능'): 1군 본캐와 1군 판(홀수)에 목표가 있는 사람. 2군은 예전 그대로 (2군 판은 짝수)
+const membersSql = (grp: Grp) =>
+  grp === 1
+    ? "SELECT p.user_id FROM profiles p JOIN users u ON u.id = p.user_id WHERE ((p.guild = 'main' AND u.main_id IS NULL) OR p.user_id IN (SELECT user_id FROM gc_targets WHERE round % 2 = 1)) AND u.id NOT IN ('테스트1', '테스트2')"
+    : "SELECT p.user_id FROM profiles p JOIN users u ON u.id = p.user_id WHERE ((p.guild = 'second' AND u.main_id IS NULL) OR p.user_id IN (SELECT user_id FROM gc_targets WHERE round % 2 = 0)) AND u.id NOT IN ('테스트1', '테스트2')";
+const MEMBERS_SQL = membersSql(2);
 
 interface Point {
   user_id: string;
@@ -351,9 +371,10 @@ export async function wallets(
   one?: string,
   /** 미리 읽은 시작 때 (한 번 덜 다녀오게) */
   started?: number,
+  grp: Grp = 2,
 ): Promise<Wallet[]> {
   const start = started ?? (await startAt(env));
-  const where = one === undefined ? `IN (${MEMBERS_SQL})` : "= ?";
+  const where = one === undefined ? `IN (${membersSql(grp)})` : "= ?";
   const bind = one === undefined ? [] : [one];
   const [base, now, logs, ledger, spent] = await Promise.all([
     pointsAt(env, start, one ?? null),
@@ -368,12 +389,12 @@ export async function wallets(
       .bind(start, ...bind)
       .all<{ id: string; level: number; exp: number | null }>(),
     env.DB.prepare(
-      `SELECT user_id AS id, kind, SUM(delta) AS n FROM gc_ledger WHERE user_id ${where} GROUP BY user_id, kind`,
+      `SELECT user_id AS id, kind, SUM(delta) AS n FROM gc_ledger WHERE user_id ${where} AND ${grpSql(grp)} GROUP BY user_id, kind`,
     )
       .bind(...bind)
       .all<{ id: string; kind: string; n: number }>(),
     env.DB.prepare(
-      `SELECT user_id AS id, SUM(price * qty) AS n FROM gc_orders WHERE status IN ('pending', 'done') AND user_id ${where} GROUP BY user_id`,
+      `SELECT user_id AS id, SUM(price * qty) AS n FROM gc_orders WHERE status IN ('pending', 'done') AND user_id ${where} AND ${grpSql(grp)} GROUP BY user_id`,
     )
       .bind(...bind)
       .all<{ id: string; n: number }>(),
@@ -395,8 +416,8 @@ export async function wallets(
   return now.results.map((r) => {
     const b = base.get(r.id) ?? r;
     const t = top.get(r.id) ?? r;
-    const earned = LEVEL_COINS ? Math.floor(coinsBetween(posOf(b), posOf(t), curve)) : 0;
-    const milestone = LEVEL_COINS
+    const earned = LEVEL_COINS && grp === 2 ? Math.floor(coinsBetween(posOf(b), posOf(t), curve)) : 0;
+    const milestone = LEVEL_COINS && grp === 2
       ? milestonesBetween(b.level, t.level).reduce((n, m) => n + m.coin, 0)
       : 0;
     const l = led.get(r.id) ?? { bonus: 0, adjust: 0 };
@@ -419,9 +440,11 @@ export async function wallets(
 }
 
 /** 코인을 쌓고 쓰는 사람인지: 2군 본캐, 또는 담당자가 주간 목표를 정해 준 적 있는 사람 (1군·부캐여도. 테스트 계정도: 앱개발자가 2군 쪽 화면을 시험하려고. 순위·현황에서는 빠진다) */
-export async function isMember(env: Env, id: string): Promise<boolean> {
+export async function isMember(env: Env, id: string, grp: Grp = 2): Promise<boolean> {
   return !!(await env.DB.prepare(
-    "SELECT 1 AS x FROM profiles p JOIN users u ON u.id = p.user_id WHERE p.user_id = ? AND ((p.guild IN ('main', 'second') AND u.main_id IS NULL) OR EXISTS (SELECT 1 FROM gc_targets t WHERE t.user_id = p.user_id))",
+    grp === 1
+      ? "SELECT 1 AS x FROM profiles p JOIN users u ON u.id = p.user_id WHERE p.user_id = ? AND ((p.guild = 'main' AND u.main_id IS NULL) OR EXISTS (SELECT 1 FROM gc_targets t WHERE t.user_id = p.user_id AND t.round % 2 = 1))"
+      : "SELECT 1 AS x FROM profiles p JOIN users u ON u.id = p.user_id WHERE p.user_id = ? AND ((p.guild = 'second' AND u.main_id IS NULL) OR EXISTS (SELECT 1 FROM gc_targets t WHERE t.user_id = p.user_id AND t.round % 2 = 0))",
   )
     .bind(id)
     .first());
@@ -588,6 +611,7 @@ export async function notifyStaff(
   env: Env,
   msg: string,
   from: string,
+  grp: Grp = 2,
 ): Promise<void> {
   const { results } = await env.DB.prepare(
     "SELECT DISTINCT COALESCE(main_id, id) AS id FROM users WHERE role IN ('developer', 'master') OR COALESCE(main_id, id) IN (SELECT COALESCE(main_id, id) FROM users WHERE id IN (" +
@@ -598,8 +622,8 @@ export async function notifyStaff(
     env,
     results.map((r) => r.id),
     "gcoin",
-    msg,
-    "#/gcoin?t=orders",
+    grp === 1 ? `[1군] ${msg}` : msg,
+    `${gcoinPath(grp)}?t=orders`,
     from,
   );
 }

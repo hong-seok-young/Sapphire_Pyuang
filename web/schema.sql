@@ -981,6 +981,7 @@ CREATE TABLE IF NOT EXISTS gc_items (
   info TEXT,                              -- 안 씀 (옵션은 고정이라 화면 src/gcoin.ts ITEM_INFO)
   active INTEGER NOT NULL DEFAULT 1,      -- 0 이면 판매 중지 (상점에 안 보인다)
   sort INTEGER NOT NULL DEFAULT 0,
+  grp INTEGER,                            -- 1 이면 1군 성장코인샵 물건, 비면 2군 (제작자 2026-11-15 '1군 2군 각기 모듈러')
   stock INTEGER                           -- 남은 재고 (묶음 수, NULL 이면 한도 없음). 신청하면 줄고 반려·취소면 돌아온다 (김다혜 2026-11-15 '갯수는 재고')
 );
 -- 구매 신청: 이름·단위·값은 신청 때 그대로 남긴다. 코인은 pending·done 인 동안 빠진다 (cancel·reject 면 돌아온다)
@@ -996,7 +997,8 @@ CREATE TABLE IF NOT EXISTS gc_orders (
   note TEXT,                              -- 반려 의견
   created_at INTEGER NOT NULL,
   done_at INTEGER,
-  done_by TEXT
+  done_by TEXT,
+  grp INTEGER                             -- 1 이면 1군 성장코인샵, 비면 2군
 );
 CREATE INDEX IF NOT EXISTS gc_orders_user ON gc_orders (user_id, status);
 CREATE INDEX IF NOT EXISTS gc_orders_status ON gc_orders (status, created_at);
@@ -1009,7 +1011,8 @@ CREATE TABLE IF NOT EXISTS gc_ledger (
   ref TEXT NOT NULL,
   note TEXT,
   by_user TEXT,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  grp INTEGER                             -- 1 이면 1군 성장코인샵 지갑, 비면 2군
 );
 CREATE UNIQUE INDEX IF NOT EXISTS gc_ledger_once ON gc_ledger (user_id, kind, ref);
 -- 2주 목표 선착순 (시범운영, server/gcrace.ts): 판(시작 ms)마다 사람마다 목표 레벨. from_level 은 정할 때 레벨 (달성률 0%). 달성은 level_log 로 센다

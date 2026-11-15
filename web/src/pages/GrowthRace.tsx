@@ -434,7 +434,9 @@ export function RaceBoard({
   me,
   sample,
   now,
+  grp = 2,
 }: {
+  grp?: Grp;
   race: GcRace;
   me: string;
   sample: boolean;
@@ -528,7 +530,7 @@ export function RaceBoard({
         })}
       </ol>
       {done(race.list) === 0 && race.list.length > 0 && (
-        <p className="gr-foot">목표를 먼저 찍으면 1위 확정</p>
+        <p className="gr-foot">{grp === 1 ? "목표를 먼저 찍으면 1위 확정" : "목표 레벨을 먼저 찍으면 1위 확정"}</p>
       )}
     </div>
   );

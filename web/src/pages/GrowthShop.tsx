@@ -417,13 +417,13 @@ function ShopTab({
   async function buy() {
     if (!picked) return;
     if (!member) {
-      setError("본캐만 신청할 수 있어요");
+      setError(data.grp === 1 ? "1군 본캐만 신청할 수 있어요" : "2군 전용이에요");
       return;
     }
     setBusy(true);
     setError("");
     try {
-      await buyItem(picked.id, qty);
+      await buyItem(data.grp, picked.id, qty);
       setPicked(null);
       setQty(1);
       onDone(`${itemLabel({ ...picked, qty })} 신청했어요`);
@@ -852,12 +852,10 @@ const BONUS1 = [
 function MembersTab({
   grp,
   admin,
-  race,
   onChanged,
 }: {
   grp: Grp;
   admin: NonNullable<GcData["admin"]>;
-  race: GcRace;
   onChanged: () => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
@@ -870,7 +868,7 @@ function MembersTab({
     setBusy(true);
     setError("");
     try {
-      await adjustCoin(id, sign * (Number(delta) || 0), note.trim());
+      await adjustCoin(grp, id, sign * (Number(delta) || 0), note.trim());
       setDelta("");
       setNote("");
       onChanged();
@@ -880,16 +878,14 @@ function MembersTab({
       setBusy(false);
     }
   }
-  // 그 군: 길드가 같은 사람과 이 판에 목표가 있는 사람
-  const guildOf = new Map((admin.people ?? []).map((p) => [p.id, p.guild]));
-  const inRace = new Set([...race.list.map((e) => e.id), ...(race.upcoming ?? []).map((e) => e.id)]);
-  const members = admin.members.filter((m) => inRace.has(m.id) || guildOf.get(m.id) === (grp === 1 ? "main" : "second"));
+  // 그 군 사람만 (서버가 군마다 따로 준다)
+  const members = admin.members;
   const total = members.reduce((s, m) => s + m.balance, 0);
   async function bonus(id: string, coin: number, note: string) {
     setBusy(true);
     setError("");
     try {
-      await adjustCoin(id, coin, note);
+      await adjustCoin(grp, id, coin, note);
       onChanged();
     } catch (x) {
       setError(errorText(x));
@@ -1099,7 +1095,7 @@ function CoinsTab({
       <div className="panel gc-set">
         <p className="gc-week-head">
           <b>
-            {data.levelCoins ? "주간 1~5위 보너스" : `${data.grp}군 주간 목표 달성 1~5위 상금`}
+            {data.levelCoins ? "주간 1~5위 보너스" : "주간 목표 달성 1~5위 상금"}
           </b>
         </p>
         {rank.map((v, i) => (
@@ -1221,6 +1217,7 @@ function ItemsTab({
           name={name}
           list={list}
           cap={data.caps?.[name.replace(/\s/g, "")] ?? 0}
+          grp={data.grp}
           busy={busy}
           run={run}
         />
@@ -1257,6 +1254,7 @@ function ItemsTab({
             onClick={() =>
               run(async () => {
                 await addGcItem({
+                ...(data.grp === 1 ? { g: 1 as Grp } : {}),
                   name: nName.trim(),
                   unit: `${Number(nQty)}개`,
                   gold: Number(nGold),
@@ -1280,11 +1278,13 @@ function ItemGroup({
   name,
   list,
   cap,
+  grp,
   busy,
   run,
 }: {
   name: string;
   list: GcItem[];
+  grp: Grp;
   /** 주간 한도 (낱개, 0 = 없음) */
   cap: number;
   busy: boolean;
@@ -1327,7 +1327,7 @@ function ItemGroup({
         )}
       </div>
       {list.map((it) => (
-        <Bundle key={it.id} it={it} busy={busy} run={run} />
+        <Bundle key={it.id} it={it} grp={grp} busy={busy} run={run} />
       ))}
       <div className="gc-bundle gc-cap-row">
         <span>주간 한도</span>
@@ -1346,7 +1346,7 @@ function ItemGroup({
             disabled={busy}
             onClick={() =>
               run(
-                () => saveGcSettings({ cap: { name, n: Number(capIn) || 0 } }),
+                () => saveGcSettings({ ...(grp === 1 ? { g: grp } : {}), cap: { name, n: Number(capIn) || 0 } }),
                 Number(capIn) ? `주간 한도 ${Number(capIn)}개` : "주간 한도 없음",
               )
             }
@@ -1377,6 +1377,7 @@ function ItemGroup({
           onClick={() =>
             run(async () => {
               await addGcItem({
+                ...(grp === 1 ? { g: 1 as Grp } : {}),
                 name,
                 unit: `${Number(qty)}개`,
                 gold: Number(gold),
@@ -1396,10 +1397,13 @@ function ItemGroup({
 /** 묶음 한 줄: [20]개 [35000] 골드 (= 35코인), 판매 중지, 삭제 */
 function Bundle({
   it,
+  grp,
   busy,
   run,
 }: {
   it: GcItem;
+  /** 재고 칸은 1군만 (2군은 그대로, 제작자 2026-11-15 '2군 안의 내용은 그대로') */
+  grp: Grp;
   busy: boolean;
   run: (fn: () => Promise<unknown>, done: string) => void;
 }) {
@@ -1440,15 +1444,15 @@ function Bundle({
         aria-label="골드"
       />
       <span>골드</span>
-      <span>재고</span>
-      <input
+      {grp === 1 && <span>재고</span>}
+      {grp === 1 && <input
         className="mk-input gc-bundle-stock"
         inputMode="numeric"
         value={stock}
         onChange={(e) => setStock(digits(e.target.value, 5))}
         placeholder="∞"
         aria-label="재고 (묶음 수, 비우면 한도 없음)"
-      />
+      />}
       <small className="gc-bundle-coin">
         {Number(gold) ? (
           <>
@@ -1469,7 +1473,7 @@ function Bundle({
                 editGcItem(it.id, {
                   unit: `${Number(qty)}개`,
                   gold: Number(gold),
-                  stock: stock === "" ? null : Number(stock),
+                  ...(grp === 1 ? { stock: stock === "" ? null : Number(stock) } : {}),
                 }),
               "저장했어요",
             )
@@ -1549,21 +1553,35 @@ function Guide1({ prizes }: { prizes: number[] }) {
   );
 }
 
-/** 1군 · 2군 판 바꾸기 (홈 칸을 반으로 가른 것과 같은 금·은) */
-function GrpSwitch({ grp, onPick }: { grp: Grp; onPick: (g: Grp) => void }) {
+/**
+ * 1군 오픈 (담당자, 제작자 2026-11-15 '담당자가 오픈 설정하기 전엔 진입 못 하게 일반 길드원은'): 담당자 메뉴 맨 위 한 줄.
+ * 열기 전에는 담당자·길드마스터·앱개발자만 들어오고 홈 칸도 갈라지지 않고 2군으로만 간다
+ */
+function OpenBar({ open, onChanged }: { open: boolean; onChanged: (msg: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [sure, setSure] = useState(false);
+  async function flip() {
+    if (!sure) return setSure(true);
+    setBusy(true);
+    setError("");
+    try {
+      await saveGcSettings({ g: 1, open: !open });
+      setSure(false);
+      onChanged(open ? "1군 성장코인샵을 닫았어요" : "1군 성장코인샵을 열었어요");
+    } catch (x) {
+      setError(errorText(x));
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <div className="gc-grp" role="tablist">
-      {([1, 2] as Grp[]).map((g) => (
-        <button
-          key={g}
-          role="tab"
-          aria-selected={grp === g}
-          className={`gc-grp-btn gc-grp-${g}` + (grp === g ? " gc-grp-on" : "")}
-          onClick={() => onPick(g)}
-        >
-          {g}군
-        </button>
-      ))}
+    <div className={"gc-openbar" + (open ? " gc-openbar-on" : "")}>
+      <span>{open ? "오픈 · 길드원이 들어와요" : "오픈 전 · 담당자만 들어와요"}</span>
+      <button className={"pill gc-mini" + (open ? "" : " gc-done-btn")} disabled={busy} onClick={flip}>
+        {sure ? (open ? "닫기 확인" : "오픈 확인") : open ? "닫기" : "오픈"}
+      </button>
+      {error && <small className="form-error">{error}</small>}
     </div>
   );
 }
@@ -1575,28 +1593,18 @@ function GrpSwitch({ grp, onPick }: { grp: Grp; onPick: (g: Grp) => void }) {
 export function GrowthShopPage({
   me: meInfo,
   onMe,
+  grp = 2,
 }: {
   me: Me;
   onMe?: (p: Partial<Me>) => void;
+  /** 1 = 1군 성장코인샵 (#/gcoin1, 따로 노는 메뉴), 2 = 2군 (#/gcoin, 예전 그대로) */
+  grp?: Grp;
 }) {
   const me = meInfo.id;
   const [reload, setReload] = useState(0);
-  // 1군 판 · 2군 판 (제작자 2026-11-15): 홈 칸의 왼쪽(1군)·오른쪽(2군)이 '#/gcoin?g=1|2' 로 연다. 없으면 내 길드
-  const [grp, setGrp] = useState<Grp>(() => {
-    const g = new URLSearchParams(location.hash.split("?")[1] ?? "").get("g");
-    return g === "1" ? 1 : g === "2" ? 2 : meInfo.guild === "main" ? 1 : 2;
-  });
-  const pickGrp = (g: Grp) => {
-    if (g === grp) return;
-    const q = new URLSearchParams(location.hash.split("?")[1] ?? "");
-    q.set("g", String(g));
-    window.history.replaceState(window.history.state, "", `#/gcoin?${q}`);
-    setCur(null);
-    setGrp(g);
-  };
   const { data, error } = useAsync(
     useCallback(() => fetchGcoin(grp), [reload, grp]),
-    `gcoin:${grp}`,
+    grp === 1 ? "gcoin1" : "gcoin",
   );
   const [cur, setCur] = useState<GcData | null>(null);
   // 알림에서 '#/gcoin?t=orders' 로 오면 담당자 > 신청
@@ -1618,6 +1626,14 @@ export function GrowthShopPage({
   }, [data, grp]);
   const refresh = useCallback(() => setReload((n) => n + 1), []);
 
+  // 1군은 담당자가 열기 전에는 길드원이 못 들어온다 (서버 403 closed)
+  if (!cur && grp === 1 && error && /준비 중/.test(errorText(error)))
+    return (
+      <>
+        <TopBar title="1군 성장코인샵" />
+        <div className="empty">1군 성장코인샵은 준비 중이에요</div>
+      </>
+    );
   if (!cur) return <Loading error={error} />;
   // 메뉴는 모두가 보고 신청은 2군 본캐만 (제작자 2026-11-09 '이 메뉴는 모두가 봐야 하지만 2군만 상점 등 구매 버튼이 활성화, 1군이 누르면 2군 전용이라고 안내').
   // 2군이 아닌 운영진은 화면을 보려고 예시 지갑을, 그 밖의 사람은 지갑과 내 코인 칸 없이 성장 현황·상점만
@@ -1669,8 +1685,7 @@ export function GrowthShopPage({
 
   return (
     <>
-      <TopBar title="성장코인샵" />
-      <GrpSwitch grp={grp} onPick={pickGrp} />
+      <TopBar title={grp === 1 ? "1군 성장코인샵" : "성장코인샵"} />
       <div className="pill-row gc-tabs">
         {tabs.map((t) => (
           <button
@@ -1703,6 +1718,7 @@ export function GrowthShopPage({
           ))}
         </nav>
       )}
+      {grp === 1 && shown === "staff" && <OpenBar open={!!cur.g1open} onChanged={saved} />}
       {notice && <p className="form-note gc-notice">{notice}</p>}
 
       {(shown === "shop" || shown === "mine") && wallet && (
@@ -1729,7 +1745,7 @@ export function GrowthShopPage({
         (cur.levelCoins ? (
           <StatusTab data={cur} me={me} />
         ) : (
-          <RaceBoard race={race} me={me} sample={raceSample} now={raceNow} />
+          <RaceBoard race={race} me={me} sample={raceSample} now={raceNow} grp={grp} />
         ))}
       {shown === "mine" && (
         <MineTab
@@ -1757,7 +1773,7 @@ export function GrowthShopPage({
         <ItemsTab key={reload} data={cur} onChanged={saved} />
       )}
       {shown === "staff" && cur.admin && staff === "members" && (
-        <MembersTab grp={grp} admin={cur.admin} race={cur.race} onChanged={refresh} />
+        <MembersTab grp={grp} admin={cur.admin} onChanged={refresh} />
       )}
       {shown === "staff" && cur.admin && staff === "records" && (
         <RecordsTab results={cur.admin.results ?? []} />
