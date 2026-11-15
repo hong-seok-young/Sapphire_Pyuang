@@ -806,7 +806,7 @@ function ItemInfo({ it }: { it: TrendItem }) {
               <small key={i}>{l}</small>
             ))}
           </div>
-          <small className="muted trend-info-src">{it.info.part ? `${it.info.part} 정보 · ` : ""}{it.info.src}</small>
+          {it.info.part && <small className="muted trend-info-src">{it.info.part} 정보</small>}
         </>
       )}
     </div>

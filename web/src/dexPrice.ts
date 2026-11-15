@@ -125,10 +125,10 @@ export function wayText(w: GoldWay, scroll: string | null, gear = true, craft = 
 export interface SlotCost { gold: number | null; way: GoldWay | null; missing: string | null; scroll: string | null; stamp: Record<Mode, number | null>; date?: string;
   /** 거래소 값이 없어 같은 등급의 어림 시세로 셈 (제작자 2026-11-12 '레어도에 따라 가격이 정해짐') */
   grade?: { name: string; med: number; lo: number; hi: number; n: number } }
-/** '2026-11-12' -> '11월 12일 암거 기준' (제작자 2026-11-12: 도감 계산기의 골드 값은 그날 암거래중개인을 한 번 찍은 값이라 날짜를 이렇게 적는다) */
+/** '2026-11-12' -> '11월 12일' (도감 계산기의 골드 값은 그날 찍은 값이라 날짜만 적는다. 제작자 2026-11-15 '녹화본이다 이런 문구 다 없애, 날짜만 남겨') */
 export const amgeoText = (dates: (string | undefined)[]): string => {
   const days = [...new Set(dates.filter((d): d is string => !!d))].sort().map((d) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8, 10))}일`);
-  return days.length ? days.join(" · ") + " 암거 기준" : "암거 기준";
+  return days.join(" · ");
 };
 export function slotCost(it: DexItem, price: DexPrice, set: PriceSet): SlotCost {
   const stamp = { normal: stampGold(it, price, set, "normal"), event: stampGold(it, price, set, "event") };

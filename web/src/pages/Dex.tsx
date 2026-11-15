@@ -1004,7 +1004,7 @@ function SlotPrice({ it, price, pset }: { it: DexItem; price: DexPrice; pset: Pr
         ) : it.nt ? (
           "거래불가"
         ) : (
-          "암거 시세 없음"
+          "시세 없음"
         )}
       </small>
       <small>

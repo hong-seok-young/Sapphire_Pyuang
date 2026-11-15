@@ -179,10 +179,17 @@ function BookPanel({ v, has, book }: { v: BookVariant; has: (n: string) => boole
           ))}
         </div>
       )}
-      {v.src && <div className="bk-src">{v.src === "도감 정보" ? book.src.book : v.src}</div>}
+      {/* 출처 글('게임 거래소 정보창', '녹화')은 쓰지 않고 찍은 날짜만 (제작자 2026-11-15) */}
+      {v.src === "도감 정보" && bookDay(book.src.book) && <div className="bk-src">{bookDay(book.src.book)}</div>}
     </Panel>
   );
 }
+
+/** '… (2026-11-11 …)' -> '11월 11일' */
+const bookDay = (s?: string): string => {
+  const m = s?.match(/(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${Number(m[2])}월 ${Number(m[3])}일` : "";
+};
 
 export function ItemPage({ wiki, name, job = null }: { wiki: Wiki; name: string; job?: string | null }) {
   // 띄어쓰기만 다른 옛 이름(합치기 전 링크·즐겨찾기, 예 '스카우트띠')도 같은 아이템으로 (build_data.py 의 aka)
