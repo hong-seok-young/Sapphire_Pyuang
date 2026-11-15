@@ -1,0 +1,15 @@
+# 바깥 서비스가 되는지 손으로 확인 (날씨 Open-Meteo 등). 실행 기록에는 상태 코드와 걸린 시간만.
+name: Net check
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - run: |
+          for u in "https://api.open-meteo.com/v1/forecast?latitude=37.57&longitude=126.98&current=weather_code,temperature_2m,is_day&timezone=Asia%2FSeoul" \
+                   "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=37.57&lon=126.98"; do
+            curl -sS -m 20 -A "sapphire-guild-check" -o /tmp/out -w "%{http_code} %{time_total}s " "$u" || true
+            head -c 200 /tmp/out; echo
+          done
