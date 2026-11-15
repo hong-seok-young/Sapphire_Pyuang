@@ -355,8 +355,16 @@ export async function createSession(env: Env, userId: string): Promise<string> {
 }
 
 export async function deleteSession(env: Env, request: Request): Promise<void> {
-  const token = readCookie(request, COOKIE);
+  const token = sessionToken(request);
   if (token) await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256(token)).run();
+}
+
+/**
+ * 로그인 토큰: 쿠키, 없으면 x-sapphire-session 머리글 (2026-11-15 아이폰 Safari '모든 쿠키 차단'이면 쿠키가 오지 않아 '로그인해 주세요'만 떴다.
+ * 그런 브라우저는 로그인 응답의 token 을 화면이 메모리에 두고 요청마다 머리글로 보낸다, src/auth.ts)
+ */
+export function sessionToken(request: Request): string | null {
+  return readCookie(request, COOKIE) ?? (request.headers.get("x-sapphire-session") || null);
 }
 
 export function readCookie(request: Request, name: string): string | null {
@@ -375,7 +383,7 @@ const userOf = new WeakMap<Request, Promise<User | null>>();
 export async function currentUser(env: Env, request: Request): Promise<User | null> {
   const had = userOf.get(request);
   if (had) return had;
-  const token = readCookie(request, COOKIE);
+  const token = sessionToken(request);
   const found = token ? userOfToken(env, token) : Promise.resolve(null);
   userOf.set(request, found);
   found.catch(() => userOf.delete(request));
@@ -424,7 +432,7 @@ export async function canManageUser(env: Env, actor: Role, targetId: string, fal
 
 /** 지금 로그인을 같은 사람의 다른 캐릭터로 바꾼다 (부캐 묶기). 바꿨으면 true */
 export async function switchCharacter(env: Env, request: Request, me: User, to: string): Promise<boolean> {
-  const token = readCookie(request, COOKIE);
+  const token = sessionToken(request);
   if (!token) return false;
   const owner = me.owner ?? me.id;
   const res = await env.DB.prepare(
@@ -440,7 +448,7 @@ export async function switchCharacter(env: Env, request: Request, me: User, to: 
  * 늘렸으면 새 Set-Cookie 값, 아니면 null.
  */
 export async function renewSession(env: Env, request: Request): Promise<string | null> {
-  const token = readCookie(request, COOKIE);
+  const token = sessionToken(request);
   if (!token) return null;
   const expires = Date.now() + SESSION_DAYS * 86_400_000;
   const res = await env.DB.prepare("UPDATE sessions SET expires_at = ? WHERE token_hash = ? AND expires_at < ?")

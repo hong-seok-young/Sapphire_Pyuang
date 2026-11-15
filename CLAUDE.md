@@ -186,7 +186,10 @@
   나머지는 '길드원 관리'에서 만든다. 직접 배포할 때 시작 계정은 `web/scripts/make-accounts.mjs` 로 만들고, 만든 SQL은 공개 저장소에 올리지 않는다.
   저장소 비밀값 `FIRST_PASSWORD` 가 있으면 자동 배포가 시작 계정(길드마스터, 오피서)을 그 비밀번호로 한 번만 만든다 (D1 `setup` 에 기록).
 - 쿠키가 막힌 브라우저 (2026-11-15 새 계정 둘이 아이폰 Safari 에서 로그인은 9·12번 됐는데 '정하고 들어가기'가 '로그인해 주세요': 서버 세션은 생겼는데 쿠키가 한 번도 오지 않았다,
-  '모든 쿠키 차단'): 로그인 화면이 로그인 뒤 바로 `/api/me` 로 쿠키가 따라오는지 보고, 401 이거나 `navigator.cookieEnabled` 가 false 면 들어가지 않고 쿠키 허용하는 법을 알린다 (`Login.tsx` `cookieKept`·`COOKIE_BLOCKED`).
+  '모든 쿠키 차단'): 로그인 화면이 로그인 뒤 바로 `/api/me` 로 쿠키가 따라오는지 보고(`Login.tsx` `cookieKept`), 안 따라오면(401 이거나 `navigator.cookieEnabled` false)
+  로그인 응답의 `token` 을 화면 메모리(되면 브라우저 저장소 `sapphire.session`)에 두고 이 사이트로 가는 fetch 마다 머리글 `x-sapphire-session` 으로 보낸다 (`src/auth.ts` `setHeaderToken`·fetch 감싸기,
+  서버 `server/auth.ts` `sessionToken` = 쿠키, 없으면 그 머리글). 그래도 안 되면 쿠키 허용하는 법(`COOKIE_BLOCKED`)을 알린다. 로그아웃하면 지운다.
+  머리글을 못 붙이는 `<img>` 의 로그인 전용 그림(/data 아래)은 그런 브라우저에서 안 보일 수 있다.
   DB peek 의 new_accounts 가 최근 로그인한 계정의 세션 수·직업 정했는지를 찍는다.
 - 임시 비밀번호로 들어와 비밀번호 바꾸기 화면만 보일 때, '◀ 다른 아이디로 로그인'이나 폰의 뒤로 가기는 로그아웃하고 로그인 화면으로 돌아간다.
 - 비밀번호 초기화도 123123 으로 한다 (제작자 요청, 다음 로그인 때 바꾼다).

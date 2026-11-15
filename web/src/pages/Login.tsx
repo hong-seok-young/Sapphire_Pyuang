@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { ApiError, changePassword, errorText, fetchMe, login, logout, requestSignup } from "../auth";
+import { ApiError, changePassword, errorText, fetchMe, login, logout, requestSignup, setHeaderToken } from "../auth";
 import type { Me } from "../auth";
 import { HeroTitle, TopBar } from "../ui";
 import { appMenu } from "../platform";
@@ -8,9 +8,9 @@ import { appMenu } from "../platform";
 export const COOKIE_BLOCKED =
   "로그인은 됐는데 이 브라우저가 로그인 정보(쿠키)를 막고 있어요. 아이폰은 설정 > (앱 >) Safari > '모든 쿠키 차단'을 끄고, 안드로이드 크롬은 설정 > 사이트 설정 > 쿠키를 허용한 뒤 다시 로그인해 주세요";
 
-/** 방금 받은 로그인 쿠키가 다음 요청에 따라오는지 (인터넷 문제로 못 물으면 된 것으로 본다) */
-async function cookieKept(): Promise<boolean> {
-  if (typeof navigator !== "undefined" && navigator.cookieEnabled === false) return false;
+/** 방금 받은 로그인(쿠키, header 면 머리글 토큰)이 다음 요청에 따라오는지 (인터넷 문제로 못 물으면 된 것으로 본다) */
+async function cookieKept(header = false): Promise<boolean> {
+  if (!header && typeof navigator !== "undefined" && navigator.cookieEnabled === false) return false;
   try {
     await fetchMe();
     return true;
@@ -32,12 +32,18 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
     setBusy(true);
     setError("");
     try {
-      const me = await login(id.trim(), password);
+      setHeaderToken(null);
+      const { token, ...me } = await login(id.trim(), password);
       // 로그인은 됐는데 브라우저가 로그인 쿠키를 저장하지 않으면 다음 요청부터 모두 '로그인해 주세요'가 된다
-      // (2026-11-15 아이폰 Safari '모든 쿠키 차단': 로그인 9번·12번이 다 됐는데 쿠키가 한 번도 오지 않았다). 바로 확인해서 고치는 법을 알린다
+      // (2026-11-15 아이폰 Safari '모든 쿠키 차단': 로그인 9번·12번이 다 됐는데 쿠키가 한 번도 오지 않았다).
+      // 그러면 쿠키 대신 토큰을 요청마다 머리글로 보내서 들어간다 (src/auth.ts setHeaderToken). 그래도 안 되면 고치는 법을 알린다
       if (!(await cookieKept())) {
-        setError(COOKIE_BLOCKED);
-        return;
+        if (token) setHeaderToken(token);
+        if (!token || !(await cookieKept(true))) {
+          setHeaderToken(null);
+          setError(COOKIE_BLOCKED);
+          return;
+        }
       }
       onLogin(me);
     } catch (x) {

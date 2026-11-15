@@ -28,7 +28,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   await env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(Date.now()).run(); // 끝난 세션 정리
   const token = await createSession(env, row.id);
-  return json(await meInfo(env, { ...row, must_change: login.must_change }), 200, {
+  // token: 쿠키를 막은 브라우저가 머리글로 보낼 때 쓴다 (server/auth.ts sessionToken)
+  return json({ ...(await meInfo(env, { ...row, must_change: login.must_change })), token }, 200, {
     "set-cookie": sessionCookie(token),
   });
 };

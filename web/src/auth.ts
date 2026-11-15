@@ -150,6 +150,51 @@ export function deviceId(): string {
   }
   return devId;
 }
+/**
+ * 쿠키를 막은 브라우저용 로그인 토큰 (2026-11-15 아이폰 Safari '모든 쿠키 차단': 로그인은 되는데 다음 요청부터 '로그인해 주세요').
+ * 로그인 뒤 쿠키가 따라오지 않으면(`Login.tsx` cookieKept) 로그인 응답의 token 을 여기 두고, 이 사이트로 가는 요청마다 x-sapphire-session 머리글로 보낸다
+ * (server/auth.ts sessionToken). 브라우저 저장소가 되면 거기에도 두어 다시 열어도 이어지고, 안 되면 이번에 연 동안만.
+ * 머리글을 못 붙이는 그림(<img>)의 로그인 전용 그림은 그런 브라우저에서 안 보일 수 있다.
+ */
+const TOKEN_KEY = "sapphire.session";
+let memToken = (() => {
+  try {
+    return localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY) ?? "";
+  } catch {
+    return "";
+  }
+})();
+export function setHeaderToken(token: string | null): void {
+  memToken = token ?? "";
+  for (const s of ["localStorage", "sessionStorage"] as const) {
+    try {
+      if (memToken) window[s].setItem(TOKEN_KEY, memToken);
+      else window[s].removeItem(TOKEN_KEY);
+    } catch {
+      /* 저장소도 막혔으면 이번에 연 동안만 */
+    }
+  }
+}
+if (typeof window !== "undefined" && !(window.fetch as { sapphire?: boolean }).sapphire) {
+  const base = window.fetch.bind(window);
+  const wrapped = ((input: RequestInfo | URL, init?: RequestInit) => {
+    if (!memToken) return base(input, init);
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    let same = false;
+    try {
+      same = new URL(url, location.href).origin === location.origin;
+    } catch {
+      same = false;
+    }
+    if (!same) return base(input, init);
+    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+    if (!headers.has("x-sapphire-session")) headers.set("x-sapphire-session", memToken);
+    return base(input, { ...init, headers });
+  }) as typeof fetch & { sapphire?: boolean };
+  wrapped.sapphire = true;
+  window.fetch = wrapped;
+}
+
 /** API 요청 헤더 (JSON 이면 content-type, 그리고 기기 표) */
 export function apiHeaders(json: boolean): Record<string, string> {
   const h: Record<string, string> = json ? { "content-type": "application/json" } : {};
@@ -184,10 +229,14 @@ export async function api<T>(path: string, method = "GET", body?: unknown): Prom
 }
 
 export const fetchMe = () => api<Me>("/api/me");
-export const login = (id: string, password: string) => api<Me>("/api/login", "POST", { id, password });
-export const logout = () => {
+export const login = (id: string, password: string) => api<Me & { token?: string }>("/api/login", "POST", { id, password });
+export const logout = async () => {
   clearMemo();
-  return api<{ ok: boolean }>("/api/logout", "POST");
+  try {
+    return await api<{ ok: boolean }>("/api/logout", "POST");
+  } finally {
+    setHeaderToken(null);
+  }
 };
 export const changePassword = (current: string, next: string) =>
   api<{ ok: boolean }>("/api/password", "POST", { current, next });
