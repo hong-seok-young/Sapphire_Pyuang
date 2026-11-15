@@ -10,6 +10,8 @@
 - 거래 톡방 시세 (build_trend.py 가 만든 data/trend.json): 팝니다 중간값
 - 게임 상점 `자료/상점/상품.json`·`상자.json`·`가챠.json` (플래티넘 값, 구매 제한, 구성품)
 - 줄임말 (build_trend.py 가 만든 data/chatmarket.json 의 slang): '고봉' -> 고대의봉
+- 조합·NPC 제작·교환 (제작자 2026-11-15 '검색하면 이걸로 대체 뭐 하는 건지 어따 쓰는 건지도'): 조합책 리메이크 표(`자료/시세/조합_레시피.json` 의 조합책 줄)와
+  드랍표 사냥터 글의 NPC 줄('재료(*n), …, 50만 → 결과( ), 결과( ) (중 1개 제작가능)')을 모두 읽어 craft 목록, 재료마다 쓰는 곳(use), 결과마다 만드는 법(make)
 
 -> public/data/book.json (검색 `src/search.ts`, 아이템 화면 `src/pages/Detail.tsx` 가 필요할 때 받는다), 그림 public/data/icon/
 (영상에서 아이템만 오린 아이콘 `자료/이미지/도감아이콘`. 위키 아이템·장비 표 아이콘도 이것으로 바꾼다: build_data.py 가 `wiki_icon` 을 부른다.
@@ -159,6 +161,95 @@ def copy_icons() -> int:
     for v in c.values():
         shutil.copy2(v["f"], ICONS / v["url"])
     return len(c)
+
+
+_ING = re.compile(r"([가-힣A-Za-z0-9:\-\[\]\s]+?)\s*\(\s*\*\s*(\d+)\s*(?:,[^()]*)?\)")
+_OUT = re.compile(r"([^,()/→*]+?)\s*\(([^()]*)\)(?:\s*\([^()]*\))*")
+# '→' 바로 뒤 결과 묶음: 'A( ), B( ), / C( ) / (중 1개 제작가능)' (쉼표 뒤 줄바꿈 '/' 는 이어지고, 쉼표 없는 '/' 에서 끝)
+_ITEM = r"[^,()/→*]+?\s*\([^()]*\)(?:\s*\([^()]*\))*"
+_RUN = re.compile(r"\s*" + _ITEM + r"(?:\s*,\s*(?:/\s*)?" + _ITEM + r")*(?:\s*/\s*\(\s*중[^()]*\))?")
+
+
+def _craft_name(s: str) -> str:
+    return nk(s.split(",")[-1].split("*")[-1].strip(" /·"))
+
+
+def craft_book(wiki_key: dict, items: dict):
+    """조합·NPC 제작·교환. 이름은 위키·책 이름으로, 수량은 '0~10' 처럼 범위일 수 있다"""
+    book_key = {}
+    for k in items:
+        book_key.setdefault(nk(k), k)
+    show = lambda n: wiki_key.get(n) or book_key.get(n) or n
+    rows: list[dict] = []
+    seen = set()
+
+    def add(r: dict) -> None:
+        sig = (tuple(map(tuple, r["to"])), tuple(map(tuple, r["ins"])), r.get("at"))
+        if sig not in seen:
+            seen.add(sig)
+            rows.append(r)
+
+    rp = DATA / "시세" / "조합_레시피.json"
+    if rp.exists():
+        for x in json.loads(rp.read_text(encoding="utf-8")).get("레시피", []):
+            if not x.get("src", "").startswith("조합책") or re.search(r"[/(*,]|\d{3}", x["out"]):
+                continue  # NPC 줄은 아래에서 결과를 모두 ('중 1개' 도) 다시 읽는다
+            r = {"to": [[show(x["out"]), x.get("q") or 1]], "ins": [[show(a), n] for a, n in x["ins"]],
+                 "at": re.sub(r"^조합책\s+", "", x["src"]).replace("조합북", "조합책")}
+            if x.get("gold"):
+                r["gold"] = x["gold"]
+            add(r)
+    for f in sorted(DATA.glob("드랍표_추출/글*/*.txt")):
+        t = f.read_text(encoding="utf-8")
+        title = re.sub(r"\s*_ReMAKE.*|\(.*?\)", "", t.split("\n", 1)[0].strip("# ")).strip().replace("_", " ")
+        t = t.replace("|", " / ")
+        for blk in re.split(r"[①-⑳]|(?:^|\s/\s)\s*\d{1,2}\.\s", t):  # NPC 마다 (① 도른(…) / … 또는 1. 우드 / …)
+            m = re.match(r"\s*([가-힣A-Za-z][가-힣A-Za-z ]*?)\s*(?:\(|/|$)", blk)
+            npc = m.group(1).strip() if m else ""
+            for p in re.split(r"(?:^|\s/\s)\s*(?=\*\s)", blk):
+                parts = p.split("→")
+                carry = parts[0]
+                for rhs in parts[1:]:
+                    m = _RUN.match(rhs)
+                    if m:
+                        out_txt, rest = m.group(0), rhs[m.end():]
+                    else:  # '→ 매드가의버클 / 제작 …' 괄호 없는 결과 하나
+                        m = re.match(r"\s*([^/]+?)\s*(?:/|$)", rhs)
+                        out_txt, rest = (m.group(1) + "( )", rhs[m.end():]) if m else ("", rhs)
+                    lhs = carry.split("】")[-1]
+                    carry = rest
+                    ins = [[show(_craft_name(a)), int(n)] for a, n in _ING.findall(lhs) if _craft_name(a)]
+                    outs: list = []
+                    for a, inner in _OUT.findall(out_txt):
+                        a = _craft_name(a)
+                        if (not a or re.match(r"중\d", a) or re.fullmatch(r"[\d:]+", a) or a in [o[0] for o in outs]
+                                or len(a) > 16 or re.search(r"[^가-힣A-Za-z0-9:\-\[\]]", a)
+                                or re.search(r"^\d+분$|랜덤|이동$|레벨$|하지않|해변$|있는섬$", a)):
+                            continue
+                        q = re.match(r"\s*\*\s*(\d+)\s*(?:[~\-]\s*(\d+))?", inner)
+                        outs.append([show(a), (f"{q.group(1)}~{q.group(2)}" if q.group(2) else int(q.group(1))) if q else 1])
+                    if not ins or not outs:
+                        continue
+                    r = {"to": outs, "ins": ins, "at": (npc + " · " if npc else "") + title, "post": f.stem}
+                    gold = sum(float(g) * (10000 if u == "만" else 1000) for g, u in re.findall(r"(\d+(?:\.\d+)?)\s*(만|천)(?![가-힣])", lhs))
+                    if gold:
+                        r["gold"] = int(gold)
+                    tail = out_txt + rest[:30]
+                    if "랜덤" in out_txt or "확률" in out_txt:
+                        r["rnd"] = 1
+                    if re.search(r"중\s*1\s*개", tail):
+                        r["pick"] = 1
+                    add(r)
+    use: dict[str, list] = {}
+    make: dict[str, list] = {}
+    for i, r in enumerate(rows):
+        for n, _ in r["ins"]:
+            if i not in use.setdefault(nk(n), []):
+                use[nk(n)].append(i)
+        for n, _ in r["to"]:
+            if i not in make.setdefault(nk(n), []):
+                make[nk(n)].append(i)
+    return rows, use, make
 
 
 def _read(name: str):
@@ -404,6 +495,8 @@ def main() -> None:
             if hit and nk(a) != nk(hit[0]):
                 abbr.setdefault(a, hit)
 
+    craft, use, make = craft_book(wiki_key, items)
+
     # 빈 변형(이름만 있는 것)은 뺀다
     keep = {}
     for key, vs in items.items():
@@ -412,13 +505,13 @@ def main() -> None:
             keep[key] = vs
     out = {"built": date.today().isoformat(),
            "src": {"book": "게임 도감 정보 (2026-11-11 녹화)"},
-           "items": keep, "abbr": abbr, "slang": slang}
+           "items": keep, "abbr": abbr, "slang": slang, "craft": craft, "use": use, "make": make}
     (OUT / "book.json").write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     count = lambda f: sum(1 for vs in keep.values() if any(f(v) for v in vs))
     print("아이템 책", {"이름": len(keep), "위키에 없는 이름": sum(1 for k in keep if k not in wiki), "그림": count(lambda v: v.get("pic")),
                     "게임 정보": count(lambda v: v.get("g") or v.get("lv") or v.get("st") or v.get("desc") or v.get("lines")),
                     "도감": count(lambda v: v.get("dex")), "톡방 시세": count(lambda v: v.get("tk")), "상점": count(lambda v: v["t"] in ("상점", "상자", "가챠")),
-                    "줄임말": len(abbr), "아이콘 파일": n_icons + shop_pics, "kb": (OUT / "book.json").stat().st_size // 1024})
+                    "줄임말": len(abbr), "제작": len(craft), "쓰는 곳 있는 재료": len(use), "아이콘 파일": n_icons + shop_pics, "kb": (OUT / "book.json").stat().st_size // 1024})
 
 
 if __name__ == "__main__":

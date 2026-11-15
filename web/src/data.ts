@@ -167,8 +167,15 @@ export interface BookVariant {
   tk?: { med: number; n: number; to?: string };
   plat?: number; cnt?: number; limit?: string; parts?: [string, number][];
 }
-/** abbr = 줄임말 -> 아이템 이름들 ('고봉' -> 고대의봉), slang = 줄임말 풀이 글 (아이템이 아닌 말도: '월거' = 월드거래) */
-export interface Book { built: string; src: { book: string }; items: Record<string, BookVariant[]>; abbr: Record<string, string[]>; slang: Record<string, string> }
+/** 조합·NPC 제작·교환 하나 (build_book.py craft_book): to = 결과 [이름, 개수('0~10' 범위도)], ins = 재료, at = 'NPC · 사냥터' 또는 조합책 이름,
+ *  post = 그 NPC 가 나오는 드랍표 글(사냥터), gold = 드는 골드, pick = 결과 중 하나를 고름, rnd = 랜덤 */
+export interface Craft { to: [string, number | string][]; ins: [string, number][]; at: string; post?: string; gold?: number; pick?: 1; rnd?: 1 }
+/** abbr = 줄임말 -> 아이템 이름들 ('고봉' -> 고대의봉), slang = 줄임말 풀이 글 (아이템이 아닌 말도: '월거' = 월드거래),
+ *  craft = 제작·교환 목록, use = 재료(띄어쓰기 뺀 이름) -> 그 재료가 들어가는 craft 번호, make = 결과 -> 만드는 craft 번호 */
+export interface Book {
+  built: string; src: { book: string }; items: Record<string, BookVariant[]>; abbr: Record<string, string[]>; slang: Record<string, string>;
+  craft?: Craft[]; use?: Record<string, number[]>; make?: Record<string, number[]>;
+}
 let bookPromise: Promise<Book> | null = null;
 /** 한 번 받으면 이번에 연 동안 그대로. 못 받으면 다음에 다시 */
 export function loadBook(): Promise<Book> {

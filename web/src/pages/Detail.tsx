@@ -6,8 +6,8 @@ import { ImageText } from "./ImageText";
 import { FavStar, PicImg, TopBar, NotFound, Panel } from "../ui";
 import { MonsterCard } from "../wiki-ui";
 import { ControlMonsterBox } from "./Control";
-import { bookOf, loadBook, monstersByName, useAsync } from "../data";
-import type { Book, BookVariant } from "../data";
+import { bookOf, itemPic, loadBook, monstersByName, useAsync } from "../data";
+import type { Book, BookVariant, Craft } from "../data";
 
 export function MonsterPage({ wiki, name }: { wiki: Wiki; name: string }) {
   const list = useMemo(() => monstersByName(wiki).get(name) ?? [], [wiki, name]);
@@ -82,6 +82,84 @@ const variantTitle = (v: BookVariant) =>
  * 게임 상점의 플래티넘 값·구매 제한·구성품, 톡방 시세, 들어가는 도감 항목. '??' 는 게임이 가린 값 그대로.
  * 게임 거래소 녹화 최저가는 보이지 않는다 (제작자 2026-11-12: 항상 새로 찍어 줄 수 없는 값이라 러프한 도감 계산기에만)
  */
+/** 칸에 보일 것이 있는 변형인지 (그림·고르기 이름만 있으면 빈 칸이 떠서 그리지 않는다) */
+const bookHasBody = (v: BookVariant) =>
+  !!(v.g || v.lv || v.jobs || v.sex || v.cd || v.cash || v.nt || v.plat != null || v.st?.length || v.set?.length || v.desc || v.lines?.length || v.parts?.length || v.more?.length || v.tk || v.dex?.length);
+
+const goldText = (g: number) => (g >= 10000 ? `${+(g / 10000).toFixed(1)}만` : g >= 1000 ? `${+(g / 1000).toFixed(1)}천` : g.toLocaleString("ko-KR")) + " 골드";
+const nkey = (s: string) => s.replace(/\s+/g, "");
+
+/** 제작·교환 한 줄: 결과(그림·이름·개수), 재료 칩(지금 아이템은 금색), 골드, 어디서(누르면 그 사냥터) */
+function CraftRow({ r, wiki, book, me, has }: { r: Craft; wiki: Wiki; book: Book; me: string; has: (n: string) => boolean }) {
+  const item = (n: string, c: number | string, cls: string) => {
+    const pic = itemPic(wiki, book, n);
+    // 결과가 장비면 부위·직업·요구 레벨을 작게 ('목걸이 · 전사 Lv.40'): 무엇에 쓰는지 한눈에
+    const eq = cls === "cf-out" ? wiki.items[n]?.equip?.[0] : undefined;
+    const eqText = eq ? [eq.slot, eq.info["직업"], eq.info["레벨제한"] ? "Lv." + eq.info["레벨제한"] : ""].filter((x) => x && x !== "-").join(" ") : "";
+    const body = (
+      <>
+        {pic && <PicImg pic={pic} fit={20} />}
+        <span>{n}</span>
+        {c !== 1 && <small>×{c}</small>}
+        {eqText && <small className="cf-eq">{eqText}</small>}
+      </>
+    );
+    return has(n) && nkey(n) !== nkey(me) ? (
+      <a key={n} className={cls} href={"#/item/" + encodeURIComponent(n)}>
+        {body}
+      </a>
+    ) : (
+      <span key={n} className={cls + (nkey(n) === nkey(me) ? " cf-me" : "")}>
+        {body}
+      </span>
+    );
+  };
+  const place = r.post && wiki.places[r.post] ? "#/place/" + r.post : r.post ? "#/post/" + r.post : "";
+  return (
+    <div className="cf">
+      <div className="cf-to">
+        {r.to.map(([n, c]) => item(n, c, "cf-out"))}
+        {(r.pick || r.rnd) && <em className="cf-tag">{r.pick ? "중 1개 고름" : "랜덤"}</em>}
+      </div>
+      <div className="cf-ins">
+        <span className="cf-lab">재료</span>
+        {r.ins.map(([n, c]) => item(n, c, "cf-in"))}
+        {!!r.gold && <span className="cf-gold">{goldText(r.gold)}</span>}
+      </div>
+      {place ? (
+        <a className="cf-at" href={place}>
+          📍 {r.at} ›
+        </a>
+      ) : (
+        <div className="cf-at">📖 {r.at}</div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 쓰는 곳 · 만드는 법 (제작자 2026-11-15 '검색하면 이걸로 대체 뭐 하는 건지 어따 쓰는 건지도 알려 줄 수 있나', 오색가죽·망가진목걸이 스샷):
+ * 조합책과 드랍표 사냥터 글의 NPC 제작·교환에서 이 아이템이 재료로 들어가는 것과 이 아이템을 만드는 것 (book.json craft, build_book.py craft_book)
+ */
+function CraftPanel({ kind, name, wiki, book, has }: { kind: "use" | "make"; name: string; wiki: Wiki; book: Book; has: (n: string) => boolean }) {
+  const [all, setAll] = useState(false);
+  const rows = (book[kind]?.[nkey(name)] ?? []).map((i) => book.craft?.[i]).filter((r): r is Craft => !!r);
+  if (!rows.length) return null;
+  const shown = all ? rows : rows.slice(0, 6);
+  return (
+    <Panel title={(kind === "use" ? "쓰는 곳" : "만드는 법") + ` (${rows.length})`} className="cf-panel">
+      {shown.map((r, i) => (
+        <CraftRow key={i} r={r} wiki={wiki} book={book} me={name} has={has} />
+      ))}
+      {rows.length > shown.length && (
+        <button className="pill cf-more" onClick={() => setAll(true)}>
+          {rows.length - shown.length}개 더 보기
+        </button>
+      )}
+    </Panel>
+  );
+}
+
 function BookPanel({ v, has, book }: { v: BookVariant; has: (n: string) => boolean; book: Book }) {
   const chips = [
     v.lv ? `요구 레벨 ${v.lv}` : "",
@@ -232,7 +310,10 @@ export function ItemPage({ wiki, name, job = null }: { wiki: Wiki; name: string;
         </Panel>
       ))}
 
-      {book && variants.map((v, i) => <BookPanel key={i} v={v} has={has} book={book} />)}
+      {book && <CraftPanel kind="use" name={it?.name ?? name} wiki={wiki} book={book} has={has} />}
+      {book && <CraftPanel kind="make" name={it?.name ?? name} wiki={wiki} book={book} has={has} />}
+
+      {book && variants.filter(bookHasBody).map((v, i) => <BookPanel key={i} v={v} has={has} book={book} />)}
 
       {it && (
       <Panel title={droppers.length ? `떨구는 몬스터 (${droppers.length})` : "떨구는 몬스터"}>
