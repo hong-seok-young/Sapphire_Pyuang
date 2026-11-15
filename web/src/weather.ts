@@ -147,7 +147,7 @@ async function position(): Promise<Pos> {
 async function fetchOnce(lat: number, lon: number): Promise<Weather> {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code,temperature_2m,is_day&timezone=Asia%2FSeoul`;
   const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), 12_000);
+  const t = setTimeout(() => ctl.abort(), 6_000);
   try {
     const res = await fetch(url, { signal: ctl.signal });
     if (!res.ok) throw new WxError("net", `날씨 서버 ${res.status}`);
@@ -162,13 +162,34 @@ async function fetchOnce(lat: number, lon: number): Promise<Weather> {
   }
 }
 
-/** 날씨 받기 (인터넷이 잠깐 끊긴 것이면 한 번 더) */
+/** Open-Meteo 가 안 되면 우리 서버가 노르웨이 기상청(met.no)에 묻는다 (functions/api/weather.ts, 2026-11-15 Open-Meteo 가 답하지 않았다) */
+async function fetchBackup(lat: number, lon: number): Promise<Weather> {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 15_000);
+  try {
+    const res = await fetch(`/api/weather?lat=${lat}&lon=${lon}`, { signal: ctl.signal, credentials: "same-origin" });
+    if (!res.ok) throw new WxError("net", `날씨 서버 ${res.status}`);
+    const j = (await res.json()) as { sky?: Sky; temp?: number | null; day?: boolean };
+    if (!j.sky || !(j.sky in SKY_NAME)) throw new WxError("net", "날씨 자료가 비었음");
+    return { sky: j.sky, temp: typeof j.temp === "number" ? j.temp : null, day: j.day !== false, at: Date.now() };
+  } catch (e) {
+    throw e instanceof WxError ? e : new WxError("net", "날씨 서버 연결 안 됨");
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/** 날씨 받기: Open-Meteo, 안 되면 대신 길(met.no), 그래도 안 되면 잠깐 뒤 대신 길 한 번 더 */
 async function fetchWeather(lat: number, lon: number): Promise<Weather> {
   try {
     return await fetchOnce(lat, lon);
   } catch {
-    await new Promise((r) => setTimeout(r, 1500));
-    return fetchOnce(lat, lon);
+    try {
+      return await fetchBackup(lat, lon);
+    } catch {
+      await new Promise((r) => setTimeout(r, 1500));
+      return fetchBackup(lat, lon);
+    }
   }
 }
 
