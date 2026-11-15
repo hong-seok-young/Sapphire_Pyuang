@@ -166,6 +166,7 @@ function SplitTile({
 }) {
   const [open, setOpen] = useState(false);
   const [boot, setBoot] = useState(0);
+  const news = useNews();
   useBackClose(open, () => setOpen(false));
   useEffect(() => {
     if (!open) return;
@@ -204,6 +205,10 @@ function SplitTile({
         }
       }}
     >
+      {/* 새 것 수는 갈라지는 두 쪽(잘림) 밖에 하나만 (닫혀 있을 때) */}
+      {!open && newsFor(news, t.key) > 0 && (
+        <span className="news-badge tile-news gs-tile-news">{newsFor(news, t.key) > 99 ? "99+" : newsFor(news, t.key)}</span>
+      )}
       <span className="gs-face gs-face-l" aria-hidden={open}>
         {inside}
       </span>
@@ -241,6 +246,8 @@ function SplitTile({
             <TileIcon t={t} />
             <b>{s.label}</b>
           </span>
+          {/* 1군: 담당자가 더 준 코인 (아직 팝업으로 안 본 것) */}
+          {s.to === "#/gcoin1" && news["gcoin.gift"] > 0 && <span className="news-badge gs-news">{news["gcoin.gift"]}</span>}
         </a>
       ))}
     </div>

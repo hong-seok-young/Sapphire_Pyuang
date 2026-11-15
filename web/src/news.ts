@@ -28,6 +28,8 @@ export const KEYS = [
   "rent.staff",
   // 성장코인샵 담당자: 기다리는 구매 신청 수 (처리하면 줄어든다, 서버가 본 때와 상관없이 센다)
   "gcoin.staff",
+  // 1군 성장코인샵: 담당자가 더 준 코인 중 아직 팝업으로 안 본 것 (서버가 센다, 들어가서 팝업을 닫으면 0)
+  "gcoin.gift",
 ] as const;
 export type NewsKey = (typeof KEYS)[number];
 /** 홈 칸(launcher.ts 의 key)마다 더하는 단추들 */

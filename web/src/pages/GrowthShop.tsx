@@ -37,6 +37,7 @@ import {
   itemLabel,
   coinOfGold,
   itemInfo,
+  giftSeen,
   isSpecial,
   itemPic,
   packOf,
@@ -57,6 +58,7 @@ import type {
 } from "../gcoin";
 import { FitLine, Loading, TopBar } from "../ui";
 import { useBackClose } from "../backClose";
+import { refreshNews } from "../news";
 
 type Tab = "status" | "shop" | "mine" | "staff";
 /** 담당자 메뉴 안의 칸 */
@@ -903,13 +905,7 @@ function OrdersTab({
   );
 }
 
-/** 1군 추가 코인 (유어아너 공지 2026-11-15: '기여도 1000 이상 + 길던 잘 가시는 분들은 2코인 추가', '이노워 4번 풀참 시 3코인 추가'): 현황에서 한 번에 적는 단추 */
-const BONUS1 = [
-  { coin: 2, note: "기여도 1000 이상 · 길던" },
-  { coin: 3, note: "이노워 4번 풀참" },
-];
-
-/** 현황 칸 (담당자): 그 군 사람(본캐와 그 판에 목표가 있는 사람)의 코인, 눌러서 손으로 더하거나 빼기. 1군은 추가 코인 단추 */
+/** 현황 칸 (담당자): 그 군 사람(본캐와 그 판에 목표가 있는 사람)의 코인, 눌러서 손으로 더하거나 빼기 (1군은 사유를 적으면 받은 사람에게 알림·배지·팝업) */
 function MembersTab({
   grp,
   admin,
@@ -942,18 +938,6 @@ function MembersTab({
   // 그 군 사람만 (서버가 군마다 따로 준다)
   const members = admin.members;
   const total = members.reduce((s, m) => s + m.balance, 0);
-  async function bonus(id: string, coin: number, note: string) {
-    setBusy(true);
-    setError("");
-    try {
-      await adjustCoin(grp, id, coin, note);
-      onChanged();
-    } catch (x) {
-      setError(errorText(x));
-    } finally {
-      setBusy(false);
-    }
-  }
   return (
     <>
       <p className="gc-note">
@@ -990,15 +974,6 @@ function MembersTab({
                   {m.bonus} · 조정 {m.adjust >= 0 ? `+${m.adjust}` : m.adjust} ·
                   사용 −{m.spent}
                 </p>
-                {grp === 1 && (
-                  <div className="gc-bonus1">
-                    {BONUS1.map((b) => (
-                      <button key={b.note} className="pill gc-mini" disabled={busy} onClick={() => bonus(m.id, b.coin, b.note)}>
-                        +{b.coin} {b.note}
-                      </button>
-                    ))}
-                  </div>
-                )}
                 <div className="gc-adjust">
                   <span className="mk-unit">
                     <button
@@ -1027,7 +1002,7 @@ function MembersTab({
                     className="mk-input"
                     value={note}
                     onChange={(e) => setNote(e.target.value.slice(0, 60))}
-                    placeholder="메모"
+                    placeholder={grp === 1 ? "사유" : "메모"}
                   />
                   <button
                     className="pill gc-mini"
@@ -1649,6 +1624,44 @@ function OpenBar({ open, onChanged }: { open: boolean; onChanged: (msg: string) 
 }
 
 /**
+ * 1군: 담당자가 더 준 코인 팝업 (제작자 2026-11-15 '담당자가 코인 더 주면 받은 사람은 알림과 성장코인샵 뱃지와 들어왔을 때 한 번 팝업, 어떤 이유로 받았다고').
+ * 들어올 때 한 번, 닫으면 본 것으로 (서버 gift1_seen, 다른 폰에서도 다시 안 뜬다)
+ */
+function GiftPopup({ gifts, onClose }: { gifts: NonNullable<GcData["gifts"]>; onClose: () => void }) {
+  useBackClose(true, onClose);
+  const total = gifts.reduce((s, g) => s + g.delta, 0);
+  const day = (t: number) => {
+    const d = new Date(t + 9 * 3_600_000);
+    return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+  };
+  return createPortal(
+    <div className="gc-sheet-back gc-gift-back" onClick={onClose}>
+      <div className="gc-sheet gc-gift" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="성장코인을 받았어요">
+        <span className="gc-gift-rays" aria-hidden="true" />
+        <span className="gc-gift-coin" aria-hidden="true">
+          <Coin />
+        </span>
+        <b className="gc-gift-title">성장코인을 받았어요</b>
+        <b className="gc-gift-total">+{total}</b>
+        <ul className="gc-gift-list">
+          {gifts.map((g) => (
+            <li key={g.at}>
+              <span className="gc-gift-delta">+{g.delta}</span>
+              <span className="gc-gift-note">{g.note}</span>
+              <small>{day(g.at)}</small>
+            </li>
+          ))}
+        </ul>
+        <button className="pill gc-gift-ok" onClick={onClose}>
+          확인
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
  * 2군 성장코인샵 (개발중, 제작자 2026-11-09): 2군 본캐가 레벨업할 때마다 성장코인이 쌓이고(높은 레벨일수록 많이), 주간 2군 성장 1·2·3위는 보너스.
  * 코인으로 물건을 신청하면 오피서가 게임 안에서 주고 '지급 완료'를 누른다. 지금은 앱개발자만 본다
  */
@@ -1687,6 +1700,15 @@ export function GrowthShopPage({
     if (data && data.grp === grp) setCur(data);
   }, [data, grp]);
   const refresh = useCallback(() => setReload((n) => n + 1), []);
+  // 1군: 담당자가 더 준 코인 팝업 (들어올 때 한 번)
+  const [giftDone, setGiftDone] = useState(false);
+  const gifts = grp === 1 && !giftDone ? (cur?.gifts ?? []) : [];
+  const closeGift = useCallback(() => {
+    setGiftDone(true);
+    void giftSeen()
+      .catch(() => null)
+      .then(() => refreshNews());
+  }, []);
 
   // 1군은 담당자가 열기 전에는 길드원이 못 들어온다 (서버 403 closed)
   if (!cur && grp === 1 && error && /준비 중/.test(errorText(error)))
@@ -1748,6 +1770,7 @@ export function GrowthShopPage({
   return (
     <>
       <TopBar title={grp === 1 ? "1군 성장코인샵" : "성장코인샵"} />
+      {gifts.length > 0 && <GiftPopup gifts={gifts} onClose={closeGift} />}
       <div className="pill-row gc-tabs">
         {tabs.map((t) => (
           <button

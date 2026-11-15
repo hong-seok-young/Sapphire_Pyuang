@@ -2,7 +2,7 @@
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import { notify } from "../../../server/alerts";
 import type { Env } from "../../../server/auth";
-import { MAX_NOTE, canManageGcoin, canUseGcoin, gcoinOpen, gcoinPath, grpOf, int, isMember, text } from "../../../server/gcoin";
+import { MAX_NOTE, canManageGcoin, canUseGcoin, g1Open, gcoinOpen, gcoinPath, grpOf, int, isMember, text } from "../../../server/gcoin";
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
@@ -20,6 +20,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   await env.DB.prepare("INSERT INTO gc_ledger (user_id, delta, kind, ref, note, by_user, created_at, grp) VALUES (?, ?, 'adjust', ?, ?, ?, ?, ?)")
     .bind(userId, delta, `a${now}-${Math.random().toString(36).slice(2, 8)}`, note, me.id, now, grp === 1 ? 1 : null)
     .run();
-  if (gcoinOpen()) await notify(env, [userId], "gcoin", `성장코인 ${delta > 0 ? "+" : ""}${delta} · ${note}`, `${gcoinPath(grp)}?t=mine`, me.id);
+  // 1군 (제작자 2026-11-15 '담당자가 코인 더 주면 받은 사람은 알림과 성장코인샵 뱃지와 들어왔을 때 한 번 팝업, 어떤 이유로 받았다고'):
+  // 알림은 오픈 뒤에만 (그 전에는 들어올 수 없다). 배지·팝업은 열린 뒤 처음 들어올 때 (gift1_seen)
+  if (grp === 1) {
+    if (await g1Open(env))
+      await notify(env, [userId], "gcoin", delta > 0 ? `[1군 성장코인] +${delta} 받았어요 · 사유: ${note}` : `[1군 성장코인] ${delta} · 사유: ${note}`, `${gcoinPath(grp)}?t=mine`, me.id);
+  } else if (gcoinOpen()) await notify(env, [userId], "gcoin", `성장코인 ${delta > 0 ? "+" : ""}${delta} · ${note}`, `${gcoinPath(grp)}?t=mine`, me.id);
   return json({ ok: true });
 };

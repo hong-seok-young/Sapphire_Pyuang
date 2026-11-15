@@ -4,7 +4,7 @@
 import { FORBIDDEN, NEED_LOGIN, TEST_IDS, currentUser, json } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
 import { raceData, readRounds, roundResults, snapshotEnded } from "../../../server/gcrace";
-import { canEnterGrp, g1Open, grpSql, grpOf, hidePrefix, LEVEL_COINS, readCaps, weekBought, gcoinOpen, openCleanup, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
+import { GIFT_SEEN, canEnterGrp, g1Open, grpSql, grpOf, hidePrefix, LEVEL_COINS, readCaps, weekBought, gcoinOpen, openCleanup, MILESTONES, canManageGcoin, canUseGcoin, earnedRows, isMember, milestonesBetween, myStreak, streakBonus, readCurve, readRank, settleWeeks, startAt, wallets, weekRanking } from "../../../server/gcoin";
 import { weekStart } from "../../../server/week";
 
 interface OrderRow {
@@ -36,6 +36,11 @@ const orderOut = (o: OrderRow) => ({
   doneBy: o.done_by,
 });
 
+/** 1군 담당자가 더 준 코인 중 아직 안 본 것 (gc_settings 'gift1_seen:<아이디>' 뒤) */
+const GIFTS_SQL =
+  "SELECT delta, note, by_user AS by, created_at AS at FROM gc_ledger WHERE user_id = ?1 AND kind = 'adjust' AND delta > 0 AND grp = 1 " +
+  "AND created_at > COALESCE((SELECT value FROM gc_settings WHERE key = ?2), 0) ORDER BY created_at";
+
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
@@ -63,7 +68,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
   const now = Date.now();
   const ws = Math.max(weekStart(now), start);
-  const [mine, items, top, myOrders, myLedger, winners, bought, adminRows] = await Promise.all([
+  const [mine, items, top, myOrders, myLedger, winners, bought, adminRows, gifts] = await Promise.all([
     member ? wallets(env, curve, me.id, start, grp) : Promise.resolve([]),
     env.DB.prepare(`SELECT id, name, unit, price, gold, active, stock FROM gc_items WHERE ${grpSql(grp)} ${manage ? "" : "AND active = 1 AND price > 0 "}ORDER BY sort, id`).all<{
       id: number;
@@ -93,6 +98,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
           // 담당자가 목표 목록에서 뺀 사람 (2군 본캐가 저절로 다시 들어오지 않게)
           env.DB.prepare("SELECT substr(key, ?) AS id FROM gc_settings WHERE key LIKE ?").bind(hidePrefix(grp).length + 1, `${hidePrefix(grp)}%`).all<{ id: string }>(),
         ])
+      : null,
+    // 1군: 담당자가 더 준 코인 중 아직 팝업으로 안 본 것 (제작자 2026-11-15 '들어왔을 때 한 번 팝업, 어떤 이유로 받았다고'. gift-seen 으로 본 것으로)
+    grp === 1 && member
+      ? env.DB.prepare(GIFTS_SQL).bind(me.id, `${GIFT_SEEN}${me.id}`).all<{ delta: number; note: string; by: string | null; at: number }>()
       : null,
   ]);
   // 2군 본캐(와 목표가 있는 사람)만 지갑이 있다
@@ -162,5 +171,6 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     week: { start: ws, top: weekTop },
     lastWinners: winners.results,
     admin,
+    gifts: gifts?.results ?? [],
   });
 };

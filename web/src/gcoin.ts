@@ -153,6 +153,8 @@ export interface GcData {
   rank: number[];
   week: { start: number; top: GcRankEntry[] };
   lastWinners: { id: string; delta: number; note: string | null; at: number }[];
+  /** 1군: 담당자가 더 준 코인 중 아직 팝업으로 안 본 것 (사유, 준 사람, 때) */
+  gifts?: { delta: number; note: string; by: string | null; at: number }[];
   /** 다음에 처음 넘으면 받을 레벨 보너스 */
   nextMilestone: GcMilestone | null;
   /** 연속 성장: 지난주까지 이어진 주 수, 이번 주도 벌면 받을 보너스 */
@@ -234,6 +236,8 @@ export const editGcItem = (
 ) => api<{ ok: boolean }>(`/api/gcoin/items/${id}`, "PATCH", input);
 export const deleteGcItem = (id: number) =>
   api<{ ok: boolean }>(`/api/gcoin/items/${id}`, "DELETE");
+/** 1군 코인 받은 팝업을 봤다고 (그 뒤 받은 것만 다음에 다시 뜬다) */
+export const giftSeen = () => api<{ ok: boolean }>("/api/gcoin/gift-seen", "POST", {});
 export const adjustCoin = (g: Grp, userId: string, delta: number, note: string) =>
   api<{ ok: boolean }>("/api/gcoin/adjust", "POST", { ...(g === 1 ? { g } : {}), userId, delta, note });
 

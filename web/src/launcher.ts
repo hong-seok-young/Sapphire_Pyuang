@@ -69,7 +69,7 @@ export const GCOIN_OPEN = Date.now() >= GCOIN_OPEN_AT;
 /** 2군 성장코인샵에 들어가는 사람: 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (제작자 2026-11-09 '오피서랑 길마 보게 열어 줘, 개발 중으로 두고') */
 export const canGcoin = (me: Me) => GCOIN_OPEN || RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
 /** 성장코인샵 담당자 (서버 server/gcoin.ts GCOIN_STAFF·canManageGcoin 과 같다): 담당자·길드마스터·앱개발자 */
-const GCOIN_STAFF = ["유어아너"];
+const GCOIN_STAFF = ["유어아너", "마을모금함"];
 export const canManageGcoin = (me: Me) =>
   me.role === "developer" || me.role === "master" || [me.id, ...(me.characters ?? []).map((c) => c.id)].some((c) => GCOIN_STAFF.includes(c));
 /** 1군 성장코인샵 (#/gcoin1): 담당자가 '오픈'을 켜기 전에는 담당자·길드마스터·앱개발자(와 테스트 계정)만 (제작자 2026-11-15). 열기 전 길드원에게는 홈 칸이 갈라지지 않고 2군으로만 간다 */

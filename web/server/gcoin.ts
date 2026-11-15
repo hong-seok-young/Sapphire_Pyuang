@@ -44,7 +44,10 @@ export const canUseGcoin = (me: User) =>
   gcoinOpen() || RANK[me.role] >= 1 || TEST_IDS.includes(me.id);
 /** 담당자 (제작자 2026-11-10 '담당자는 유어아너', '유어아너만 조정 가능하게 해 줘 담당자 메뉴는', '길마도 할 수 있게'). 사람(묶은 캐릭터 모두)으로 정한다:
  * 담당이 바뀌거나 닉네임을 바꾸면 여기와 화면 launcher.ts gcoin 칸의 corner 를 고친다 */
-export const GCOIN_STAFF = ["유어아너"];
+// 길마(마을모금함)도 담당자와 같이 모든 권한·모든 메뉴 (제작자 2026-11-15 '길마는 담당자와 같이 모든 권한 모든 메뉴'): 역할(master)로도 되지만 이름으로도 적어 둔다
+export const GCOIN_STAFF = ["유어아너", "마을모금함"];
+/** 1군 담당자가 더 준 코인을 팝업으로 본 때 (gc_settings 'gift1_seen:<아이디>') */
+export const GIFT_SEEN = "gift1_seen:";
 /** 신청 처리, 목표, 보상, 물건, 코인 조정: 담당자·길드마스터·앱개발자만 (다른 오피서는 아니다) */
 export const canManageGcoin = (me: User) =>
   me.role === "developer" || me.role === "master" || (me.chars ?? [me.id, me.owner ?? me.id]).some((c) => GCOIN_STAFF.includes(c));
