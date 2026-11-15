@@ -203,7 +203,7 @@ def craft_book(wiki_key: dict, items: dict):
         t = f.read_text(encoding="utf-8")
         title = re.sub(r"\s*_ReMAKE.*|\(.*?\)", "", t.split("\n", 1)[0].strip("# ")).strip().replace("_", " ")
         t = t.replace("|", " / ")
-        for blk in re.split(r"[①-⑳]|(?:^|\s/\s)\s*\d{1,2}\.\s", t):  # NPC 마다 (① 도른(…) / … 또는 1. 우드 / …)
+        for blk in re.split(r"[①-⑳]|✅️?|(?:^|\s/\s)\s*\d{1,2}\.\s", t):  # NPC 마다 (① 도른(…) / … 또는 1. 우드 / …, ✅ 지역)
             m = re.match(r"\s*([가-힣A-Za-z][가-힣A-Za-z ]*?)\s*(?:\(|/|$)", blk)
             npc = m.group(1).strip() if m else ""
             for p in re.split(r"(?:^|\s/\s)\s*(?=\*\s)", blk):
@@ -216,7 +216,8 @@ def craft_book(wiki_key: dict, items: dict):
                     else:  # '→ 매드가의버클 / 제작 …' 괄호 없는 결과 하나
                         m = re.match(r"\s*([^/]+?)\s*(?:/|$)", rhs)
                         out_txt, rest = (m.group(1) + "( )", rhs[m.end():]) if m else ("", rhs)
-                    lhs = carry.split("】")[-1]
+                    # '빛바랜비석(*2) §정원(꽃) 재료교환 : 마력줄기(*20)→ 빛바랜비석(*1)' 처럼 앞에 다른 줄이 붙은 것은 § · ' : ' 뒤만 재료
+                    lhs = re.split(r"\s:\s|§", carry.split("】")[-1])[-1]
                     carry = rest
                     ins = [[show(_craft_name(a)), int(n)] for a, n in _ING.findall(lhs) if _craft_name(a)]
                     outs: list = []
@@ -228,7 +229,7 @@ def craft_book(wiki_key: dict, items: dict):
                             continue
                         q = re.match(r"\s*\*\s*(\d+)\s*(?:[~\-]\s*(\d+))?", inner)
                         outs.append([show(a), (f"{q.group(1)}~{q.group(2)}" if q.group(2) else int(q.group(1))) if q else 1])
-                    if not ins or not outs:
+                    if not ins or not outs or len(ins) > 8:
                         continue
                     r = {"to": outs, "ins": ins, "at": (npc + " · " if npc else "") + title, "post": f.stem}
                     gold = sum(float(g) * (10000 if u == "만" else 1000) for g, u in re.findall(r"(\d+(?:\.\d+)?)\s*(만|천)(?![가-힣])", lhs))

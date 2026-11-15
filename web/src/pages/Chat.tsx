@@ -171,7 +171,8 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
   const [turns, setTurns] = useState<Shown[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
-  const [input, setInput] = useState("");
+  // 아이템 화면의 '챗봇에게 … 다 묻기' (#/chat?ask=…): 새 대화의 입력칸에 채워 둔다 (보내기는 사람이 누른다)
+  const [input, setInput] = useState(() => (!arg && query.get("ask")) || "");
   const [pending, setPending] = useState<{ image: ChatImage; preview: string }[]>([]);
   const [pendingFiles, setPendingFiles] = useState<ChatFile[]>([]);
   const [attachError, setAttachError] = useState("");

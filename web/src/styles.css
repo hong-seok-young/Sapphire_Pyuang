@@ -5693,3 +5693,23 @@ a.cf-at { color: #9fb4ff; }
 .cf-more { margin-top: 6px; }
 .cf-eq { margin-left: 2px; }
 .cf-lab { font-size: 11px; color: var(--muted); }
+
+/* 아이템 지식 (Detail.tsx Glance·Lore*, 제작자 2026-11-15 '그 템에 대한 모든 지식') */
+.glance { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 6px; margin: -4px 12px 10px; }
+.glance-kind { font-size: 12px; color: var(--gold); padding: 2px 8px; border: 1px solid var(--gold); background: rgba(255, 200, 80, 0.08); }
+.glance-chip { font: inherit; font-size: 12px; color: #cfd6ff; padding: 2px 8px; border: 1px solid var(--edge); background: rgba(255, 255, 255, 0.05); cursor: pointer; }
+.glance-chip:active { transform: translateY(1px); }
+.lore .lore-post + .lore-post { border-top: 1px dashed var(--edge); margin-top: 8px; padding-top: 8px; }
+.lore-src { display: block; font-size: 12px; color: #9fb4ff; margin-bottom: 3px; }
+.lore-line { font-size: 13px; line-height: 1.5; min-width: 0; }
+.lore-line.lore-head { color: var(--muted); font-size: 12px; }
+.lore-fw { font-size: 12.5px; }
+.lore-me { color: var(--gold); font-weight: normal; }
+.lore-note { margin-top: 8px; font-size: 11px; color: var(--muted); }
+.lore-odds { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; margin-top: 6px; }
+.lore-odd { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: inherit; padding: 3px 0; border-bottom: 1px dotted var(--edge); }
+.lore-odd span { min-width: 0; }
+.lore-odd b { color: var(--gold); font-weight: normal; white-space: nowrap; }
+.lore-ask { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 14px 12px 24px; }
+.lore-ask-bot { color: var(--gold); border-color: var(--gold); }
+#lore-use, #lore-make, #lore-book, #lore-box, #lore-posts, #lore-drop { scroll-margin-top: 64px; }

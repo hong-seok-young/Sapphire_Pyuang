@@ -1235,6 +1235,9 @@ def main():
     build_dex.main()
     # 아이템 책: 게임 사전·거래소 값·도감·상점·줄임말을 아이템 이름으로 묶은 것 -> data/book.json, 오린 아이콘 -> data/icon/ (검색·아이템 화면)
     build_book.main()
+    # 아이템 지식: 카페 글·길드 자료·해외 팬 사이트 번역·상자·공식 확률에서 아이템마다 모은 것 -> data/lore/NN.json (아이템 화면, 제작자 2026-11-15)
+    import build_lore
+    build_lore.main()
 
 
 def write_place_parts(posts: dict, places: dict) -> None:

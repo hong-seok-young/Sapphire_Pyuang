@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import type { Wiki } from "../types";
 import { TYPE_NAME, fetchItemEvents } from "../official";
 import type { ItemEvent } from "../official";
@@ -8,6 +9,8 @@ import { MonsterCard } from "../wiki-ui";
 import { ControlMonsterBox } from "./Control";
 import { bookOf, itemPic, loadBook, monstersByName, useAsync } from "../data";
 import type { Book, BookVariant, Craft } from "../data";
+import { loadLore, nkey } from "../lore";
+import type { Lore } from "../lore";
 
 export function MonsterPage({ wiki, name }: { wiki: Wiki; name: string }) {
   const list = useMemo(() => monstersByName(wiki).get(name) ?? [], [wiki, name]);
@@ -87,7 +90,6 @@ const bookHasBody = (v: BookVariant) =>
   !!(v.g || v.lv || v.jobs || v.sex || v.cd || v.cash || v.nt || v.plat != null || v.st?.length || v.set?.length || v.desc || v.lines?.length || v.parts?.length || v.more?.length || v.tk || v.dex?.length);
 
 const goldText = (g: number) => (g >= 10000 ? `${+(g / 10000).toFixed(1)}만` : g >= 1000 ? `${+(g / 1000).toFixed(1)}천` : g.toLocaleString("ko-KR")) + " 골드";
-const nkey = (s: string) => s.replace(/\s+/g, "");
 
 /** 제작·교환 한 줄: 결과(그림·이름·개수), 재료 칩(지금 아이템은 금색), 골드, 어디서(누르면 그 사냥터) */
 function CraftRow({ r, wiki, book, me, has }: { r: Craft; wiki: Wiki; book: Book; me: string; has: (n: string) => boolean }) {
@@ -269,6 +271,213 @@ const bookDay = (s?: string): string => {
   return m ? `${Number(m[2])}월 ${Number(m[3])}일` : "";
 };
 
+/** 줄 속의 그 아이템 이름을 금색으로 (띄어쓰기는 무시하지 않고 그대로 찾는다) */
+function Mark({ text, name }: { text: string; name: string }) {
+  const i = text.indexOf(name);
+  if (!name || i < 0) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, i)}
+      <b className="lore-me">{name}</b>
+      {text.slice(i + name.length)}
+    </>
+  );
+}
+
+const go = (id: string) => () => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+/**
+ * 한눈에 (제작자 2026-11-15 '이걸로 대체 뭐 하는 건지'): 이름 아래 칩 한 줄. 무엇인지(장비 부위·종류), 얻는 곳, 쓰는 곳 수. 누르면 그 칸으로
+ */
+function Glance({ it, variants, drops, book, name, lore }: {
+  it?: Wiki["items"][string]; variants: BookVariant[]; drops: number; book: Book | undefined; name: string; lore: Lore | null | undefined;
+}) {
+  const eq = it?.equip?.[0];
+  const v0 = variants.find((v) => v.t !== "상점" && v.t !== "상자" && v.t !== "가챠") ?? variants[0];
+  const kind = eq
+    ? [eq.slot, eq.info["직업"], eq.info["레벨제한"] ? "Lv." + eq.info["레벨제한"] : ""].filter((x) => x && x !== "-").join(" ")
+    : v0
+      ? (v0.t === "일반" ? (v0.s ?? "") : v0.t + (v0.s ? " " + v0.s : "")) + (v0.g ? " · " + v0.g : "")
+      : "";
+  const k = nkey(name);
+  const uses = book?.use?.[k]?.length ?? 0;
+  const makes = book?.make?.[k]?.length ?? 0;
+  const dex = variants.reduce((n, v) => n + (v.dex?.length ?? 0), 0);
+  const quest = lore?.posts?.some(([, t, ls]) => /퀘스트/.test(t) || ls.some((l) => /퀘스트|재료모음/.test(l)));
+  const chips: [string, string][] = [];
+  if (drops) chips.push([`몬스터 ${drops}마리가 떨굼`, "lore-drop"]);
+  if (makes) chips.push([`만드는 법 ${makes}`, "lore-make"]);
+  if (lore?.box?.length || lore?.odds?.length) chips.push(["상자·뽑기에서 나옴", "lore-box"]);
+  if (uses) chips.push([`제작 재료 ${uses}곳`, "lore-use"]);
+  if (quest) chips.push(["퀘스트·교환에 쓰임", "lore-posts"]);
+  if (dex) chips.push([`도감 ${dex}곳`, "lore-book"]);
+  if (!kind && !chips.length) return null;
+  return (
+    <div className="glance">
+      {kind && <span className="glance-kind">{kind}</span>}
+      {chips.map(([t, id]) => (
+        <button key={t} className="glance-chip" onClick={go(id)}>
+          {t}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** 접힌 긴 칸: 처음 n 개만, '더 보기' */
+function More<T>({ list, n, render }: { list: T[]; n: number; render: (x: T, i: number) => ReactNode }) {
+  const [all, setAll] = useState(false);
+  return (
+    <>
+      {(all ? list : list.slice(0, n)).map(render)}
+      {list.length > n && !all && (
+        <button className="pill cf-more" onClick={() => setAll(true)}>
+          {list.length - n}개 더 보기
+        </button>
+      )}
+    </>
+  );
+}
+
+/** 상자·뽑기: 게임 상점 상자 구성품, 공식 확률 표 */
+function LoreBox({ lore, has }: { lore: Lore; has: (n: string) => boolean }) {
+  if (!lore.box?.length && !lore.odds?.length) return null;
+  return (
+    <div id="lore-box">
+      <Panel title="상자·뽑기에서 나옴" className="lore">
+        {!!lore.box?.length && (
+          <div className="bk-parts">
+            {lore.box.map(([b, c]) =>
+              has(b) ? (
+                <a key={b} href={"#/item/" + encodeURIComponent(b)}>
+                  {b}
+                  {c > 1 ? ` x${c}` : ""}
+                </a>
+              ) : (
+                <span key={b}>
+                  {b}
+                  {c > 1 ? ` x${c}` : ""}
+                </span>
+              ),
+            )}
+          </div>
+        )}
+        {!!lore.odds?.length && (
+          <div className="lore-odds">
+            <More
+              list={lore.odds}
+              n={6}
+              render={([key, label, p], i) => (
+                <a key={i} className="lore-odd" href={"#/odds/" + key}>
+                  <span>{label}</span>
+                  <b>{p}</b>
+                </a>
+              )}
+            />
+          </div>
+        )}
+      </Panel>
+    </div>
+  );
+}
+
+/** 카페 글에서: 퀘스트 재료, NPC 교환, 공략 글의 그 아이템 줄 (그 칸의 머리와 함께), 누르면 그 글·사냥터 */
+function LorePosts({ lore, name, wiki }: { lore: Lore; name: string; wiki: Wiki }) {
+  if (!lore.posts?.length) return null;
+  return (
+    <div id="lore-posts">
+      <Panel title={`카페 글에서 (${lore.posts.length})`} className="lore">
+        <More
+          list={lore.posts}
+          n={5}
+          render={([id, title, lines]) => (
+            <div key={id} className="lore-post">
+              <a className="lore-src" href={wiki.places[id] ? "#/place/" + id : "#/post/" + id}>
+                {title} ›
+              </a>
+              {lines.map((l, i) => (
+                <div key={i} className={"lore-line" + (/^\s*(?:[①-⑳]|✅|《|【|<|\d{1,2}\.\s)/.test(l) ? " lore-head" : "")}>
+                  <Mark text={l} name={name} />
+                </div>
+              ))}
+            </div>
+          )}
+        />
+      </Panel>
+    </div>
+  );
+}
+
+/** 길드 자료 (제작자·길드원이 알려 준 것, 톡방 정리, 카페·블로그 글) */
+function LoreGuild({ lore, name }: { lore: Lore; name: string }) {
+  if (!lore.guild?.length) return null;
+  return (
+    <Panel title="길드 자료" className="lore">
+      <More
+        list={lore.guild}
+        n={4}
+        render={([src, lines]) => (
+          <div key={src} className="lore-post">
+            <div className="lore-src">{src}</div>
+            {lines.map((l, i) => (
+              <div key={i} className="lore-line">
+                <Mark text={l} name={name} />
+              </div>
+            ))}
+          </div>
+        )}
+      />
+    </Panel>
+  );
+}
+
+/** 해외(글로벌 서버) 팬 사이트 문서 번역: 처음 몇 줄, 펼치면 전부 */
+function LoreForeign({ lore, name }: { lore: Lore; name: string }) {
+  const [open, setOpen] = useState(false);
+  if (!lore.fw?.length) return null;
+  return (
+    <Panel title="글로벌 서버 자료 (번역)" className="lore">
+      {lore.fw.map((d) => {
+        const body = open ? d.body : d.body.slice(0, 8);
+        return (
+          <div key={d.url || d.t} className="lore-post">
+            <a className="lore-src" href={d.url} target="_blank" rel="noreferrer">
+              {d.t} ↗
+            </a>
+            {body.map((l, i) => (
+              <div key={i} className="lore-line lore-fw">
+                <Mark text={l.replace(/^\s*-\s*/, "· ")} name={name} />
+              </div>
+            ))}
+          </div>
+        );
+      })}
+      {!open && lore.fw.some((d) => d.body.length > 8) && (
+        <button className="pill cf-more" onClick={() => setOpen(true)}>
+          전부 보기
+        </button>
+      )}
+      <div className="lore-note">해외 서버 기준이라 한국 서버와 이름·수치가 다를 수 있어요</div>
+    </Panel>
+  );
+}
+
+/** 챗봇에게 이 아이템을 묻기 (질문을 채워 둔 새 대화) */
+function AskBot({ name, enh }: { name: string; enh?: boolean }) {
+  return (
+    <div className="lore-ask">
+      {enh && (
+        <a className="pill" href={"#/enhance?a=" + encodeURIComponent("7" + name)}>
+          강화 비교
+        </a>
+      )}
+      <a className="pill lore-ask-bot" href={"#/chat?ask=" + encodeURIComponent(`${name} 어디서 얻고 어디에 쓰는지, 시세랑 알아 둘 것까지 다 알려줘`)}>
+        챗봇에게 {name} 다 묻기
+      </a>
+    </div>
+  );
+}
+
 export function ItemPage({ wiki, name, job = null }: { wiki: Wiki; name: string; job?: string | null }) {
   // 띄어쓰기만 다른 옛 이름(합치기 전 링크·즐겨찾기, 예 '스카우트띠')도 같은 아이템으로 (build_data.py 의 aka)
   const it = wiki.items[name] ?? Object.values(wiki.items).find((x) => x.name.replace(/\s+/g, "") === name.replace(/\s+/g, "") || x.aka?.includes(name));
@@ -279,6 +488,7 @@ export function ItemPage({ wiki, name, job = null }: { wiki: Wiki; name: string;
   // 아이템 책: 위키 드랍표에 없는 게임 아이템(코스튬·펫·소모품·상점 상품)도 이 화면으로 연다. 위키 아이템에는 게임 정보·거래소 값·도감 칸을 더한다
   const { data: book, error: bookError } = useAsync(useCallback(() => loadBook(), []), "book");
   const variants = bookOf(book, it?.name ?? name);
+  const { data: lore } = useAsync(useCallback(() => loadLore(it?.name ?? name), [it?.name, name]), "lore:" + (it?.name ?? name));
   if (!it && !variants.length) {
     if (!book && !bookError) return <TopBar title={name} />; // 책을 받는 중
     return <NotFound what="아이템" />;
@@ -291,6 +501,7 @@ export function ItemPage({ wiki, name, job = null }: { wiki: Wiki; name: string;
         <PicImg pic={it?.icon ?? variants.find((v) => v.pic)?.pic} fit={80} alt={name} />
         <div className="detail-name">{name}</div>
       </div>
+      <Glance it={it} variants={variants} drops={droppers.length} book={book} name={it?.name ?? name} lore={lore} />
 
       {(it?.equip ?? []).map((e, i) => (
         <Panel key={i} title={"장비 · " + e.slot}>
@@ -310,11 +521,13 @@ export function ItemPage({ wiki, name, job = null }: { wiki: Wiki; name: string;
         </Panel>
       ))}
 
-      {book && <CraftPanel kind="use" name={it?.name ?? name} wiki={wiki} book={book} has={has} />}
-      {book && <CraftPanel kind="make" name={it?.name ?? name} wiki={wiki} book={book} has={has} />}
+      <div id="lore-use">{book && <CraftPanel kind="use" name={it?.name ?? name} wiki={wiki} book={book} has={has} />}</div>
+      <div id="lore-make">{book && <CraftPanel kind="make" name={it?.name ?? name} wiki={wiki} book={book} has={has} />}</div>
+      {lore && <LoreBox lore={lore} has={has} />}
 
-      {book && variants.filter(bookHasBody).map((v, i) => <BookPanel key={i} v={v} has={has} book={book} />)}
+      <div id="lore-book">{book && variants.filter(bookHasBody).map((v, i) => <BookPanel key={i} v={v} has={has} book={book} />)}</div>
 
+      <div id="lore-drop" />
       {it && (
       <Panel title={droppers.length ? `떨구는 몬스터 (${droppers.length})` : "떨구는 몬스터"}>
         {!droppers.length && <div className="muted">드랍표에 나오는 몬스터가 없어요. 퀘스트, 제작, 상점으로 얻는 아이템일 수 있어요.</div>}
@@ -338,6 +551,10 @@ export function ItemPage({ wiki, name, job = null }: { wiki: Wiki; name: string;
       </Panel>
       )}
       <ItemEvents name={name} job={job} />
+      {lore && <LorePosts lore={lore} name={it?.name ?? name} wiki={wiki} />}
+      {lore && <LoreGuild lore={lore} name={it?.name ?? name} />}
+      {lore && <LoreForeign lore={lore} name={it?.name ?? name} />}
+      <AskBot name={it?.name ?? name} enh={!!lore?.enh} />
     </>
   );
 }
