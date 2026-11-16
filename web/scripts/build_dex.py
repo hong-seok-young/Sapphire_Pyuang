@@ -177,6 +177,17 @@ def price_data(key, wanted: set, infos: dict) -> dict | None:
                 continue
             gear[k] = {"k": kind, "lv": lv, "p": p, "d": date_}
     craft(gear, allp, wanted, wiki_lv)
+    # 장비마다 정한 강화 골드 값 (제작자 2026-11-16 '일괄 적용하기보다는 각기 개별 적용하자', 자료 시세/강화_정한_값.json):
+    # fix[강화] = {v: 골드 또는 None(스탬프로), w: 근거}. 계산기는 그 강화에서 이 값을 쓰고 더 위는 이 값부터 셈한다.
+    fixed = DATA / "시세" / "강화_정한_값.json"
+    if fixed.exists():
+        for r in json.loads(fixed.read_text(encoding="utf-8")).get("값", []):
+            k = key(r["장비"])
+            g = gear.get(k)
+            if g is None:
+                print(f"  강화_정한_값: 시세에 없는 장비 {r['장비']}")
+                continue
+            g.setdefault("fix", {})[str(r["강화"])] = {"v": r.get("골드"), "w": r.get("근거") or ""}
     s = {"날짜": max(g["d"] for g in gear.values() if g.get("d")) if gear else days[-1].parent.name}
     out = {"date": s.get("날짜"), "dates": sorted({g["d"] for g in gear.values() if g.get("d")}), "src": "암거래중개인(게임 거래소) 녹화", "gear": gear}
     if STAMP.exists():

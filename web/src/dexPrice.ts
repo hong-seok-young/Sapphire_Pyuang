@@ -4,6 +4,7 @@
 // - 갑옷류(갑옷·투구·장갑·신발·보조 장비)는 +4, 무기는 +6 까지 100% 성공 (공식 확률 120101·120102): 그 안에서는 한 단계 = 마법서 1장.
 // - 안전 단계 다음(갑옷 +5, 무기 +7) = (장비 + 마법서 N장) × 2, 그다음(갑옷 +6, 무기 +8) = 그 값 × 2.5. 더 위는 규칙이 없어 완성품 매물만.
 // - 단계마다 그 강화 완성품 매물이 계산값보다 싸면 매물 값 (제작자 확인 2026-11-11 '이게 맞지'). 그래서 +3 매물에 마법서를 더하는 길도 저절로 견준다.
+// - 장비마다 정한 강화 값(자료 시세/강화_정한_값.json, 제작자 2026-11-16 '각기 개별 적용')이 있으면 그 강화는 그 값, 더 위는 그 값부터 셈한다. null = 스탬프로.
 // - 마법서 등급은 장비 요구 레벨로: D 10 미만 · C 20 · B 30 · A 40 · S 50 미만 · 그 위 SS (해외 위키 마법서 표).
 // - 스탬프 = 칸의 대체 스탬프 장수 × 1장 값. 아바돈 스탬프 1장 = 일반 50장 (제작자, 평소에는 자판기에서 일반 50장으로 바꾼다).
 import { useEffect, useState } from "react";
@@ -88,12 +89,21 @@ export function stampPlat(price: DexPrice, set: PriceSet, mode: Mode, grade: str
 export const platGold = (price: DexPrice, set: PriceSet) => set.plat ?? price.stamp?.platGold ?? 700;
 
 /** 강화 한 칸을 골드로 채우는 가장 싼 길 (장비 1개): base = 산 매물의 강화, scrolls = 더한 마법서, mult = ×2 · ×2.5 */
-export interface GoldWay { v: number; base: number; baseV: number; scrolls: number; mult: string[] }
+export interface GoldWay { v: number; base: number; baseV: number; scrolls: number; mult: string[];
+  /** base 강화의 값이 장비마다 정한 값 (자료 시세/강화_정한_값.json, 제작자 2026-11-16 '각기 개별 적용') */
+  fixed?: string }
 export function goldWay(g: DexGearPrice, plus: number, scroll: number | null): GoldWay | null {
   const kind = kindOf(g.k);
   const safe = kind ? SAFE[kind] : null;
   let prev: GoldWay | null = null;
   for (let t = 0; t <= plus; t++) {
+    // 정한 값: 그 강화는 이 값 (null = 골드로는 셈하지 않고 스탬프로, 그 위 강화도)
+    const fx = g.fix?.[String(t)];
+    if (fx) {
+      if (fx.v == null) return null;
+      prev = { v: fx.v, base: t, baseV: fx.v, scrolls: 0, mult: [], fixed: fx.w };
+      continue;
+    }
     const l = g.p[String(t)];
     let best: GoldWay | null = l != null ? { v: l, base: t, baseV: l, scrolls: 0, mult: [] } : null;
     let calc: GoldWay | null = null;
@@ -116,7 +126,8 @@ export function fmtGold(v: number): string {
 }
 export function wayText(w: GoldWay, scroll: string | null, gear = true, craft = false): string {
   // 노강 값이 조합·NPC 제작 값이면 '조합' (제작자 2026-11-12 '조합 더 싼 거 있으면 도감계산기에 반영')
-  const base = !w.base && craft ? `조합 ${fmtGold(w.baseV)}` : `${w.base ? "+" + w.base + " " : gear ? "노강 " : ""}매물 ${fmtGold(w.baseV)}`;
+  const base = w.fixed != null ? `${w.base ? "+" + w.base + " " : ""}정한 값 ${fmtGold(w.baseV)}${w.fixed ? ` · ${w.fixed}` : ""}`
+    : !w.base && craft ? `조합 ${fmtGold(w.baseV)}` : `${w.base ? "+" + w.base + " " : gear ? "노강 " : ""}매물 ${fmtGold(w.baseV)}`;
   const core = w.scrolls ? `${base} + ${scroll ? scrollLabel(scroll) : "마법서"} ${w.scrolls}장` : base;
   return w.mult.length ? (w.scrolls ? `(${core}) ${w.mult.join(" ")}` : `${core} ${w.mult.join(" ")}`) : core;
 }
