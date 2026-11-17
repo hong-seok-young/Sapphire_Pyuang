@@ -101,11 +101,11 @@ export function Blocks({ blocks, link, postId }: { blocks: Block[]; link: PostLi
         const big = !!postId && hasBigPicture(b);
         if (big && onlyPictureNote(b)) return null; // 그림뿐인 칸은 통째로 뺀다
         return b.k === "p" ? (
-          <p className="paper-p" key={i}>
+          <p className="paper-p" key={i} data-b={i}>
             <Runs runs={b.r} link={link} hideBig={big} />
           </p>
         ) : (
-          <div className="paper-table-wrap" key={i}>
+          <div className="paper-table-wrap" key={i} data-b={i}>
             <table className="paper-table">
               <tbody>
                 {b.rows.map((row, r) => (

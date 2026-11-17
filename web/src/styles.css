@@ -5887,3 +5887,11 @@ a.cf-at { color: #9fb4ff; }
 .sim-gem-dot-1 { background: linear-gradient(160deg, #d6d0f0 0 20%, #6a6188 35% 70%, #3c3550 100%); }
 .sim-gem-dot-2 { background: linear-gradient(160deg, #f0d8ff 0 20%, #a877ff 35% 70%, #5e3a9e 100%); }
 .sim-gem-dot-3 { background: linear-gradient(160deg, #d8e4ff 0 20%, #4f7dff 35% 70%, #26409a 100%); }
+
+/* 검색의 스킬 줄로 들어온 글: 그 칸을 잠깐 금빛으로 (제작자 2026-11-17 '에피파니 왜 안 떠') */
+.paper-hit { animation: paper-hit 2.4s ease-out; border-radius: 4px; }
+@keyframes paper-hit { 0%, 40% { box-shadow: 0 0 0 2px var(--gold, #f5c84b); } 100% { box-shadow: 0 0 0 2px transparent; } }
+@media (prefers-reduced-motion: reduce) { .paper-hit { animation: none; outline: 2px solid var(--gold, #f5c84b); } }
+.search-skill .row { align-items: center; }
+.search-skill .skill-ic { width: 30px; height: 30px; flex: none; image-rendering: pixelated; margin-right: 8px; }
+.search-skill .row-sub { white-space: normal; }

@@ -1214,6 +1214,9 @@ def main():
     control = control_list(places, monsters)
     if control:
         meta["control"] = control
+    skills = skill_list(posts, menu)
+    if skills:
+        meta["skills"] = skills
     data = {"posts": posts, "menu": menu, "regions": regions, "places": places, "monsters": monsters,
             "items": items, "equipment": equipment, "meta": meta}
     for name, value in data.items():
@@ -1299,6 +1302,39 @@ def build_odds():
     odds = {"fetched": fetched, "page": f"https://lim.com2us.com/{ODDS_GAME}/{{key}}?lang=ko", "note": note, "tables": tables}
     (OUT / "data" / "odds.json").write_text(json.dumps(odds, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print("공식 확률 표", len(tables), "행", sum(len(s["r"]) for t in tables for s in t["sections"]))
+
+
+def skill_list(posts: dict, menu: list) -> list:
+    """'직업별 스킬' 글의 스킬 표(표 하나 = 스킬 하나) -> 검색에 쓰는 스킬 목록 (제작자 2026-11-17 '에피파니가 뭔지 몰라? 왜 안 떠':
+    검색이 아이템·몬스터·사냥터·글 제목만 찾아서 스킬 이름은 안 나왔다). 첫 칸 = 'Lv.45', 아이콘, 굵은 이름 / 둘째 칸 = '<패시브>', 'N단 - …' 줄"""
+    jobs = {"전사": "전사", "레인저": "레인저", "마법사": "마법사", "무도가": "무도가"}
+    out = []
+    for sec in menu:
+        if sec.get("title") != "직업별 스킬":
+            continue
+        for p in sec.get("posts", []):
+            post = posts.get(p["id"])
+            if not post:
+                continue
+            job = next((j for j in jobs if post["title"].startswith(j)), "")
+            for bi, b in enumerate(post.get("blocks", [])):
+                if b.get("k") != "table" or not b.get("rows") or len(b["rows"][0]) < 2:
+                    continue
+                head, desc = b["rows"][0][0].get("l", []), b["rows"][0][1].get("l", [])
+                runs = [r for line in head for r in line]
+                icon = next((r["src"] for r in runs if "src" in r), None)
+                name = next((r["t"].strip() for r in runs if r.get("b") and r.get("t", "").strip()
+                             and not r["t"].strip().startswith("(")), None)
+                lv = next((int(m.group(1)) for r in runs for m in [re.search(r"Lv\.?\s*(\d+)", r.get("t", ""))] if m), None)
+                texts = [("".join(r.get("t", "") for r in line)).strip() for line in desc]
+                stages = [t for t in texts if re.match(r"\d단", t)]
+                if not icon or not name or not stages:
+                    continue
+                kind = next((t.strip("<> ") for t in texts if t.startswith("<")), "")
+                rest = [("".join(r.get("t", "") for r in line)).strip() for row in b["rows"][2:] for c in row for line in c.get("l", [])]
+                out.append({"name": name, "job": job, "lv": lv, "kind": kind, "stages": stages,
+                            "desc": [t for t in rest if t][:4], "icon": "/" + icon, "post": p["id"], "b": bi})
+    return out
 
 
 def control_list(places: dict, monsters: dict):

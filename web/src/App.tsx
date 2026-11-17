@@ -555,7 +555,7 @@ function Wiki({
       <EquipSlots wiki={wiki} />
     );
   else if (page === "menu") body = <MenuPage wiki={wiki} title={arg} me={me} />;
-  else if (page === "post") body = <PostPage wiki={wiki} id={arg} />;
+  else if (page === "post") body = <PostPage wiki={wiki} id={arg} block={Number(route.query.get("b") ?? "") || undefined} />;
   else if (page === "chat")
     body = <ChatPage wiki={wiki} arg={arg} query={route.query} me={me} />;
   else if (page === "market") body = <MarketPage wiki={wiki} me={me} />;

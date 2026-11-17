@@ -1,4 +1,4 @@
-import type { Wiki } from "./types";
+import type { SkillInfo, Wiki } from "./types";
 import type { Book } from "./data";
 
 const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
@@ -229,6 +229,30 @@ export function searchPosts(wiki: Wiki, query: string, limit = 8): { id: string;
     }
   }
   return out.sort((a, b) => b.score - a.score || a.title.length - b.title.length).slice(0, limit);
+}
+
+/**
+ * 스킬 이름 찾기 (제작자 2026-11-17 '에피파니가 뭔지 몰라? 왜 안 떠': 검색이 스킬은 안 찾았다). 이름·처음 글자·초성, 적으면 오타.
+ * 단계 글('1단 - 수호의기원 강화')에 든 스킬 이름으로도 걸린다 (그 스킬을 강화하는 스킬)
+ */
+export function searchSkills(wiki: Wiki, query: string, limit = 8): SkillInfo[] {
+  const skills = wiki.meta.skills ?? [];
+  const q = norm(query);
+  if (!skills.length || [...q].length < 2) return [];
+  const out: { s: SkillInfo; score: number }[] = [];
+  for (const sk of skills) {
+    let sc = score(sk.name, q);
+    if (!sc && [...q].length >= 3 && sk.stages.some((t) => norm(t).includes(q))) sc = 1;
+    if (sc) out.push({ s: sk, score: sc });
+  }
+  if (!out.length && !onlyCho(q) && [...q].length >= 3) {
+    const qj = jamo(q);
+    for (const sk of skills) {
+      const f = fuzzy(sk.name, q, qj);
+      if (f) out.push({ s: sk, score: f });
+    }
+  }
+  return out.sort((a, b) => b.score - a.score || a.s.name.length - b.s.name.length).slice(0, limit).map((o) => o.s);
 }
 
 // ---------- 이름 고르기 칸 (제작자 2026-11-12 '왜 템 검색이 안 돼, 템 검색하는 모든 곳에서 템 검색이 모두 잘 되게') ----------

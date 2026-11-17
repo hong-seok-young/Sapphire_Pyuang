@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Wiki } from "../types";
-import { search, searchPosts } from "../search";
+import { search, searchPosts, searchSkills } from "../search";
 import { go } from "../router";
 import { FavStar, PicImg, TopBar } from "../ui";
 import { bookOf, loadBook, monstersByName, useAsync } from "../data";
@@ -112,6 +112,7 @@ export function Search({ wiki, q }: { wiki: Wiki; q: string }) {
   const { data: book } = useAsync(useCallback(() => loadBook(), []), "book");
   const hits = useMemo(() => search(wiki, q, 60, book), [wiki, q, book]);
   const posts = useMemo(() => searchPosts(wiki, q), [wiki, q]);
+  const skills = useMemo(() => searchSkills(wiki, q), [wiki, q]);
   // 줄임말 풀이 ('월거' = 월드거래 …): 친 말이 줄임말 표에 그대로 있으면 맨 위에 한 줄
   const slang = useMemo(() => {
     if (!book || !q.trim()) return [];
@@ -205,7 +206,7 @@ export function Search({ wiki, q }: { wiki: Wiki; q: string }) {
           <div className="scam-foot">{scamSource(scam.list)}</div>
         </section>
       )}
-      {q && !hits.length && !posts.length && !slang.length && !scam && official && !official.length && <div className="empty">"{q}" 검색 결과가 없어요.</div>}
+      {q && !hits.length && !skills.length && !posts.length && !slang.length && !scam && official && !official.length && <div className="empty">"{q}" 검색 결과가 없어요.</div>}
       {slang.length > 0 && (
         <div className="search-slang">
           {slang.map(([a, full]) => (
@@ -221,6 +222,28 @@ export function Search({ wiki, q }: { wiki: Wiki; q: string }) {
           return <HitRow key={h.kind + h.name} wiki={wiki} book={book} byName={byName} kind={h.kind} name={h.name} fkey={key} to={h.to} via={h.via} onOpen={remember} />;
         })}
       </ul>
+      {skills.length > 0 && (
+        <section className="search-off search-skill">
+          <h2 className="panel-title">스킬 {skills.length}</h2>
+          <ul className="list">
+            {skills.map((s) => (
+              <li key={s.post + s.name} className="hit">
+                <a className="row" href={`#/post/${s.post}?b=${s.b}`} onClick={remember}>
+                  <img className="skill-ic" src={s.icon} alt="" loading="lazy" />
+                  <span className="row-main">
+                    <span className="row-title">{s.name}</span>
+                    <span className="row-sub">
+                      {[s.job, s.lv ? `Lv.${s.lv}` : "", s.kind].filter(Boolean).join(" · ")}
+                      {s.stages.length ? ` · ${s.stages.map((t) => t.replace(/^(\d단)\s*-\s*/, "$1 ")).join(" / ")}` : ""}
+                    </span>
+                  </span>
+                  <span className="kind kind-post">스킬</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {posts.length > 0 && (
         <section className="search-off">
           <h2 className="panel-title">정보 글 {posts.length}</h2>

@@ -115,6 +115,21 @@ export interface Meta {
   counts: Record<string, number>;
   /** 길드 통제 리스트 (중립 길드라 잡지 않는 몹, 비공개 자료 길드/통제_리스트.json) */
   control?: ControlList;
+  /** 직업별 스킬 (build_data.py skill_list): 검색에서 스킬 이름으로 찾는다 */
+  skills?: SkillInfo[];
+}
+
+/** 직업별 스킬 글의 스킬 표 하나. post·b = 그 글과 표 자리 (#/post/글?b=표) */
+export interface SkillInfo {
+  name: string;
+  job: string;
+  lv: number | null;
+  kind: string;
+  stages: string[];
+  desc: string[];
+  icon: string;
+  post: string;
+  b: number;
 }
 
 /** 길드 통제 리스트 (meta.json control, build_data.py control_list): 중립 길드라 잡지 않는 몹 */
