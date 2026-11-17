@@ -221,3 +221,9 @@ button.fit-entry-name b { text-decoration: underline dotted var(--hi); text-unde
   .fit-rest-soon .fit-rest-main b, .fit-rest-done .fit-rest-main b { animation: none; }
   .fit-rest-bar { transition: none; }
 }
+
+/* 종목 애니메이션 (pages/FitAnim.tsx, 제작자 2026-11-17 '도트그래픽 남성이 해당 운동 반복'): 도트 그대로 키우고 어두운 칸에 */
+.fit-anim { flex: none; display: block; image-rendering: pixelated; background: rgba(11, 10, 26, 0.55); border: var(--px) solid var(--lo); }
+.fit-anim-entry { margin-right: 2px; }
+.fit-detail-top { display: flex; align-items: center; gap: 10px; margin: 2px 0 4px; }
+.fit-detail-top .fit-detail-sub { margin: 0; }
