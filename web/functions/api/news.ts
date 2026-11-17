@@ -137,7 +137,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
           ),
         ]
       : []),
-    ...(gcoinStaff ? [q("SELECT COUNT(*) AS n FROM gc_orders WHERE status = 'pending'")] : []),
+    // 담당자: 기다리는 구매 신청을 군마다 (1군 성장코인샵·2군 성장코인샵 단추에 따로, 제작자 2026-11-17 '1군인지 2군인지 모르겠다')
+    ...(gcoinStaff
+      ? [
+          q(
+            "SELECT SUM(CASE WHEN grp = 1 THEN 1 ELSE 0 END) AS g1, SUM(CASE WHEN grp = 1 THEN 0 ELSE 1 END) AS g2 FROM gc_orders WHERE status = 'pending'",
+          ),
+        ]
+      : []),
     // 1군 담당자가 더 준 코인 중 아직 팝업으로 안 본 것 (1군 성장코인샵이 열린 뒤에만, 지금 캐릭터). 성장코인샵 칸과 1군 단추에 배지
     env.DB.prepare(
       "SELECT COUNT(*) AS n FROM gc_ledger WHERE user_id = ?1 AND kind = 'adjust' AND delta > 0 AND grp = 1 AND created_at > ?2 " +
@@ -172,7 +179,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
     counts["rent.apps"] = n(results[i++]);
   }
   if (manager) counts["rent.staff"] = n(results[i++]);
-  if (gcoinStaff) counts["gcoin.staff"] = n(results[i++]);
+  if (gcoinStaff) {
+    const g = (results[i++].results[0] ?? {}) as { g1: number | null; g2: number | null };
+    counts["gcoin.staff"] = Number(g.g2 ?? 0);
+    counts["gcoin.staff1"] = Number(g.g1 ?? 0);
+  }
   counts["gcoin.gift"] = n(results[i++]);
   const maint = results[i++];
   const checked = results[i++];

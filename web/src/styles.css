@@ -5919,3 +5919,6 @@ a.cf-at { color: #9fb4ff; }
 @media (prefers-reduced-motion: reduce) { .gc-gift-rays, .gc-gift-coin, .gc-gift-total { animation: none; } }
 .gsplit .gs-face .tile-news { display: none; }
 .gsplit > .gs-tile-news { z-index: 4; }
+/* 성장코인샵 위 단추의 배지는 단추 모서리 밖으로 (글자 '담당자'를 가리지 않게) */
+.gc-tabs .pill .in-news { top: -8px; right: -6px; }
+.gc-tabs { overflow: visible; padding-top: 4px; }

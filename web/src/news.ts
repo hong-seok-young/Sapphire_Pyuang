@@ -28,6 +28,8 @@ export const KEYS = [
   "rent.staff",
   // 성장코인샵 담당자: 기다리는 구매 신청 수 (처리하면 줄어든다, 서버가 본 때와 상관없이 센다)
   "gcoin.staff",
+  // 같은 수의 1군 성장코인샵 것 (gcoin.staff 는 2군)
+  "gcoin.staff1",
   // 1군 성장코인샵: 담당자가 더 준 코인 중 아직 팝업으로 안 본 것 (서버가 센다, 들어가서 팝업을 닫으면 0)
   "gcoin.gift",
 ] as const;
