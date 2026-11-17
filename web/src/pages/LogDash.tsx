@@ -263,6 +263,18 @@ const METRICS: { key: MetricKey; name: string; fmt: (n: number) => string }[] = 
   { key: "tok", name: "AI 토큰", fmt: tokText },
 ];
 
+/** 지난 기간 대비 (▲50% · ▼12% · 그대로 · 새로) */
+function Delta({ now, before }: { now: number; before: number }) {
+  if (!before) return now ? <em className="ld-up">새로</em> : <em className="ld-same">–</em>;
+  const d = Math.round(((now - before) / before) * 100);
+  if (!d) return <em className="ld-same">그대로</em>;
+  return <em className={d > 0 ? "ld-up" : "ld-down"}>{d > 0 ? `▲${d}%` : `▼${-d}%`}</em>;
+}
+
+/**
+ * 핵심 숫자 (제작자 2026-11-17 '버튼 차지가 너무 커, 가시적으로 직관적으로 팍 눈에 띄게'):
+ * 맨 위 들어온 사람을 크게(14일 막대와), 그 아래 여섯 칸은 작게 · 값은 그 색 · 지금(색)과 지난 기간(회색) 막대 두 줄로 바로 견준다
+ */
 export function KpiGrid({ dash }: { dash: Dash }) {
   const { daily, period, people } = dash;
   const cur = daily.slice(-period);
@@ -270,34 +282,48 @@ export function KpiGrid({ dash }: { dash: Dash }) {
   const sum = (rows: typeof daily, k: MetricKey) => rows.reduce((t, r) => t + r[k], 0);
   const users = people.filter((p) => p.days > 0).length;
   const prevUsers = people.filter((p) => p.prev.days > 0).length;
+  const was = period === 1 ? "어제" : `전 ${period}일`;
+  const hero = METRICS[0];
   return (
-    <div className="ld-kpis">
-      {METRICS.map((m) => {
-        const value = m.key === "users" ? users : sum(cur, m.key);
-        const before = m.key === "users" ? prevUsers : sum(prev, m.key);
-        const spark = daily.slice(-14).map((r) => r[m.key]);
-        const diff = before ? Math.round(((value - before) / before) * 100) : null;
-        return (
-          <div key={m.key} className={"ld-kpi ld-kpi-" + m.key}>
-            <span className="ld-kpi-name">{m.name}</span>
-            <b className="ld-kpi-val">
-              <Pop v={`${period}:${value}`}>{m.fmt(value)}</Pop>
-            </b>
-            <small className="ld-kpi-cmp">
-              {period === 1 ? (
-                `어제 ${m.fmt(before)}`
-              ) : diff === null ? (
-                "지난 기간 없음"
-              ) : (
-                <>
-                  <em className={diff > 0 ? "ld-up" : diff < 0 ? "ld-down" : ""}>{diff > 0 ? `▲${diff}%` : diff < 0 ? `▼${-diff}%` : "그대로"}</em> 지난 {period}일
-                </>
-              )}
-            </small>
-            <MiniBars values={spark} />
-          </div>
-        );
-      })}
+    <div className="ld-board">
+      <div className="ld-hero">
+        <div className="ld-hero-main">
+          <span className="ld-hero-name">{hero.name}</span>
+          <b className="ld-hero-val">
+            <Pop v={`${period}:${users}`}>{users}</Pop>
+            <small>명</small>
+          </b>
+          <span className="ld-hero-cmp">
+            <Delta now={users} before={prevUsers} /> {was} {prevUsers}명
+          </span>
+        </div>
+        <MiniBars values={daily.slice(-14).map((r) => r.users)} className="ld-hero-bars" />
+      </div>
+      <div className="ld-scs">
+        {METRICS.slice(1).map((m) => {
+          const value = sum(cur, m.key);
+          const before = sum(prev, m.key);
+          const top = Math.max(1, value, before);
+          return (
+            <div key={m.key} className={"ld-sc ld-kpi-" + m.key}>
+              <span className="ld-sc-head">
+                <span className="ld-sc-name">{m.name}</span>
+                <Delta now={value} before={before} />
+              </span>
+              <b className="ld-sc-val">
+                <Pop v={`${period}:${value}`}>{m.fmt(value)}</Pop>
+              </b>
+              <span className="ld-cmp" aria-hidden>
+                <i style={{ width: `${(value / top) * 100}%` }} />
+                <i className="ld-cmp-was" style={{ width: `${(before / top) * 100}%` }} />
+              </span>
+              <small className="ld-sc-was">
+                {was} {m.fmt(before)}
+              </small>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -473,10 +499,13 @@ export function ScoreRing({ score, size = 34, tier }: { score: number; size?: nu
   );
 }
 
-const SHOWN_TIER = 8;
+const SHOWN_TIER = 6;
 
+/**
+ * 잘 쓰는 사람 · 안 쓰는 사람 (제작자 2026-11-17 '여기도 좀 간단하게'): 등급 칩 넷(색, 사람 수) 중 하나를 고르면 그 사람들만 한 줄씩.
+ * 점수 기준 글은 칩 줄의 '?' 를 누를 때만
+ */
 export function TierPanel({ dash, onPick }: { dash: Dash; onPick: (id: string) => void }) {
-  const [open, setOpen] = useState<Tier | null>(null);
   const groups = useMemo(() => {
     const g: Record<Tier, DashPerson[]> = { core: [], active: [], light: [], idle: [] };
     for (const p of dash.people) g[tierOf(p.score)].push(p);
@@ -484,71 +513,77 @@ export function TierPanel({ dash, onPick }: { dash: Dash; onPick: (id: string) =
     g.idle.sort((a, b) => (b.last ?? -1) - (a.last ?? -1));
     return g;
   }, [dash]);
+  const first = TIERS.find((t) => groups[t.key].length)?.key ?? "core";
+  const [pick, setPick] = useEntryState<Tier | "">("log.tier", "");
+  const [all, setAll] = useState(false);
+  const [why, setWhy] = useState(false);
+  const cur = pick && groups[pick] ? pick : first;
+  const list = groups[cur];
   const total = dash.people.length || 1;
   return (
     <section className="panel ld-tier">
-      <h2 className="panel-title">잘 쓰는 사람 · 안 쓰는 사람</h2>
-      <div className="ld-tier-bar" role="img" aria-label={TIERS.map((t) => `${t.name} ${groups[t.key].length}명`).join(", ")}>
-        {TIERS.map((t) =>
-          groups[t.key].length ? (
-            <span key={t.key} className={"ld-t-" + t.key} style={{ flexGrow: groups[t.key].length }}>
-              {(groups[t.key].length / total) * 100 >= 9 ? groups[t.key].length : ""}
-            </span>
-          ) : null,
-        )}
+      <h2 className="panel-title">
+        잘 쓰는 사람 · 안 쓰는 사람
+        <button type="button" className="ld-why" onClick={() => setWhy(!why)} aria-label="점수 기준">
+          ?
+        </button>
+      </h2>
+      {why && <p className="ld-score-why">점수 = 들어온 날 40 · 사용 시간 25 · 로그인 15 · 한 일 10 · 챗봇 10 · 핵심 60 · 활발 30 · 가끔 8점 이상</p>}
+      <div className="ld-tchips" role="tablist">
+        {TIERS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={cur === t.key}
+            className={"ld-tchip ld-t-" + t.key + (cur === t.key ? " ld-tchip-on" : "")}
+            onClick={() => {
+              setPick(t.key);
+              setAll(false);
+            }}
+          >
+            <span>{t.name}</span>
+            <b>{groups[t.key].length}</b>
+            <i style={{ width: `${(groups[t.key].length / total) * 100}%` }} />
+          </button>
+        ))}
       </div>
-      <p className="ld-score-why">
-        점수 = 들어온 날 40 · 사용 시간 25 · 로그인 15 · 한 일 10 · 챗봇 10 ({dash.period === 1 ? "오늘" : `${dash.period}일`} 기준)
-      </p>
-      <div className="ld-tiers">
-        {TIERS.map((t) => {
-          const list = groups[t.key];
-          const all = open === t.key;
-          return (
-            <div key={t.key} className={"ld-tcol ld-t-" + t.key}>
-              <h3>
-                <i className="ld-tdot" />
-                {t.name}
-                <b>{list.length}명</b>
-                <small>{t.key === "idle" ? `${t.min + 8}점 아래` : `${t.min}점 이상`}</small>
-              </h3>
-              <ul>
-                {(all ? list : list.slice(0, SHOWN_TIER)).map((p) => {
-                  const pt = tierOf(p.prevScore);
-                  const move = TIERS.findIndex((x) => x.key === pt) - TIERS.findIndex((x) => x.key === t.key);
-                  return (
-                    <li key={p.id}>
-                      <button type="button" onClick={() => onPick(p.id)}>
-                        <span className="ld-tname">
-                          <Nick name={p.id} />
-                          {dash.period > 1 && move > 0 && <em className="ld-up">▲</em>}
-                          {dash.period > 1 && move < 0 && <em className="ld-down">▼</em>}
-                        </span>
-                        {t.key === "idle" ? (
-                          <small className={p.last === null || dash.today - p.last >= 7 ? "ld-cold" : ""}>{lastText(p.last, dash.today)}</small>
-                        ) : (
-                          <small>
-                            {p.days}일 · 로그인 {p.v} · {minShort(p.m)}
-                          </small>
-                        )}
-                        <span className="ld-tscore" style={{ "--s": `${p.score}%` } as React.CSSProperties}>
-                          <i />
-                          <b>{p.score}</b>
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-              {list.length > SHOWN_TIER && (
-                <button type="button" className="ld-more" onClick={() => setOpen(all ? null : t.key)}>
-                  {all ? "접기" : `${list.length - SHOWN_TIER}명 더`}
+      {list.length === 0 ? (
+        <p className="ld-quiet">없어요</p>
+      ) : (
+        <ul className={"ld-tlist ld-t-" + cur}>
+          {(all ? list : list.slice(0, SHOWN_TIER)).map((p) => {
+            const move = TIERS.findIndex((x) => x.key === tierOf(p.prevScore)) - TIERS.findIndex((x) => x.key === cur);
+            return (
+              <li key={p.id}>
+                <button type="button" onClick={() => onPick(p.id)}>
+                  <span className="ld-tname">
+                    <Nick name={p.id} />
+                    {dash.period > 1 && move > 0 && <em className="ld-up">▲</em>}
+                    {dash.period > 1 && move < 0 && <em className="ld-down">▼</em>}
+                  </span>
+                  {cur === "idle" ? (
+                    <small className={p.last === null || dash.today - p.last >= 7 ? "ld-cold" : ""}>{lastText(p.last, dash.today)}</small>
+                  ) : (
+                    <small>
+                      {p.days}일 · {minShort(p.m)}
+                    </small>
+                  )}
+                  <span className="ld-tscore" style={{ "--s": `${p.score}%` } as React.CSSProperties}>
+                    <i />
+                    <b>{p.score}</b>
+                  </span>
                 </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {list.length > SHOWN_TIER && (
+        <button type="button" className="ld-more" onClick={() => setAll(!all)}>
+          {all ? "접기" : `${list.length - SHOWN_TIER}명 더`}
+        </button>
+      )}
     </section>
   );
 }

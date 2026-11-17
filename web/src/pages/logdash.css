@@ -91,21 +91,39 @@
 @keyframes ld-dotring { 0% { transform: scale(1); opacity: 0.7; } 100% { transform: scale(2.8); opacity: 0; } }
 
 /* ---------- 핵심 숫자 ---------- */
-.ld-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-bottom: 12px; }
-.ld-kpi-tok { grid-column: span 2; }
-@media (min-width: 400px) { .ld-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .ld-kpi-tok { grid-column: span 3; } }
-.ld-kpi { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; padding: 8px 8px 22px; overflow: hidden; background: var(--panel); border: 2px solid var(--edge); box-shadow: inset 2px 2px 0 var(--hi), inset -2px -2px 0 var(--lo); }
-.ld-kpi-name { font-size: 11px; color: var(--muted); }
-.ld-kpi-val { font-size: 19px; line-height: 1.25; font-weight: 400; color: var(--text); white-space: nowrap; }
-.ld-kpi-cmp { font-size: 10px; color: var(--muted); }
-.ld-kpi .ld-mini { position: absolute; left: 8px; right: 8px; bottom: 5px; height: 14px; }
-.ld-kpi-users .ld-mini i { background: var(--ld-live); }
-.ld-kpi-v .ld-mini i { background: var(--ld-3); }
-.ld-kpi-w .ld-mini i { background: var(--ld-1); }
-.ld-kpi-a .ld-mini i { background: var(--ld-2); }
-.ld-kpi-m .ld-mini i { background: #7f97ff; }
-.ld-kpi-q .ld-mini i { background: var(--ld-4); }
-.ld-kpi-tok .ld-mini i { background: var(--ld-5); }
+/* 핵심 숫자: 위 큰 칸 하나 + 아래 작은 여섯 칸 (제작자 2026-11-17 '버튼 차지가 너무 커') */
+.ld-board { margin-bottom: 12px; background: var(--panel); border: 2px solid var(--edge); box-shadow: inset 2px 2px 0 var(--hi), inset -2px -2px 0 var(--lo); }
+.ld-hero { position: relative; display: flex; align-items: flex-end; gap: 10px; padding: 8px 10px 7px; overflow: hidden; border-bottom: 2px solid var(--edge);
+  background: linear-gradient(90deg, rgba(75, 227, 143, 0.14), transparent 70%); }
+.ld-hero::after { content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  transform: skewX(-20deg); animation: ld-sweep 5s ease-in-out infinite; pointer-events: none; }
+@keyframes ld-sweep { 0%, 60% { transform: translateX(0) skewX(-20deg); } 100% { transform: translateX(560%) skewX(-20deg); } }
+.ld-hero-main { display: grid; min-width: 0; }
+.ld-hero-name { font-size: 11px; color: var(--muted); }
+.ld-hero-val { font-size: 30px; line-height: 1.05; font-weight: 400; color: var(--ld-live); text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.45); white-space: nowrap; }
+.ld-hero-val small { margin-left: 2px; font-size: 13px; color: var(--muted); text-shadow: none; }
+.ld-hero-cmp { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.ld-hero .ld-hero-bars { flex: 1; min-width: 0; height: 34px; }
+.ld-hero-bars i { background: var(--ld-live); }
+.ld-scs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ld-sc { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; padding: 5px 7px 6px; min-width: 0; --c: var(--ld-1); }
+.ld-sc:not(:nth-child(3n + 1)) { border-left: 1px solid rgba(255, 255, 255, 0.08); }
+.ld-sc:nth-child(n + 4) { border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.ld-sc-head { display: flex; justify-content: space-between; gap: 3px; font-size: 10px; white-space: nowrap; }
+.ld-sc-name { color: var(--muted); overflow: hidden; }
+.ld-sc-head em { font-size: 9px; }
+.ld-sc-val { font-size: 17px; line-height: 1.15; font-weight: 400; color: var(--c); white-space: nowrap; }
+.ld-cmp { display: grid; gap: 2px; margin-top: 1px; }
+.ld-cmp i { display: block; height: 3px; min-width: 2px; background: var(--c); transition: width 0.4s ease; }
+.ld-cmp i.ld-cmp-was { background: rgba(255, 255, 255, 0.22); }
+.ld-sc-was { font-size: 9px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+.ld-kpi-v { --c: #f0b030; }
+.ld-kpi-w { --c: #7f9dff; }
+.ld-kpi-a { --c: #3fd39b; }
+.ld-kpi-m { --c: #a9b8ff; }
+.ld-kpi-q { --c: #ff86b4; }
+.ld-kpi-tok { --c: #b3a8ff; }
+@media (prefers-reduced-motion: reduce) { .ld-hero::after { animation: none; display: none; } .ld-cmp i { transition: none; } }
 .ld-mini { display: flex; align-items: flex-end; gap: 2px; }
 .ld-mini i { flex: 1; min-width: 0; background: var(--ld-1); opacity: 0.55; border-radius: 1px 1px 0 0; }
 .ld-mini i.ld-mini-last { opacity: 1; transform-origin: bottom; animation: ld-breathe 2.4s ease-in-out infinite; }
@@ -129,25 +147,28 @@
 .ld-now .ld-ping { color: var(--gold); }
 
 /* ---------- 잘 쓰는 사람 · 안 쓰는 사람 ---------- */
-.ld-tier-bar { display: flex; gap: 2px; height: 22px; margin: 2px 0 2px; overflow: hidden; }
-.ld-tier-bar span { display: flex; align-items: center; justify-content: center; min-width: 4px; font-size: 11px; color: var(--edge); background: var(--t); transition: flex-grow 0.45s ease; }
-.ld-tier-bar .ld-t-idle, .ld-tier-bar .ld-t-light { color: var(--text); }
-.ld-tiers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.ld-tcol { min-width: 0; padding: 6px; background: rgba(11, 10, 26, 0.35); border-top: 3px solid var(--t); }
-.ld-tcol h3 { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 6px; margin: 0 0 4px; font-size: 13px; font-weight: 400; color: var(--text); }
-.ld-tcol h3 b { font-weight: 400; color: var(--gold); }
-.ld-tcol h3 small { flex-basis: 100%; font-size: 9px; color: var(--muted); }
-.ld-tdot { display: inline-block; width: 8px; height: 8px; background: var(--t); }
-.ld-t-core .ld-tdot { animation: ld-breathe 1.8s ease-in-out infinite; }
-.ld-tcol ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
-.ld-tcol li button { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 30px; grid-template-rows: auto auto; column-gap: 4px; padding: 3px 4px; font: inherit; text-align: left;
+/* 잘 쓰는 사람: 등급 칩 넷 + 고른 등급의 한 줄 목록 (제작자 2026-11-17 '간단하게') */
+.ld-why { margin-left: 6px; width: 18px; height: 18px; padding: 0; font: inherit; font-size: 11px; line-height: 16px; color: var(--muted); background: none; border: 1px solid var(--muted); border-radius: 50%; box-shadow: none; cursor: pointer; vertical-align: 2px; }
+.ld-tchips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin-bottom: 6px; }
+.ld-tchip { position: relative; display: grid; justify-items: center; gap: 0; padding: 4px 2px 6px; overflow: hidden; font: inherit; color: var(--muted);
+  background: rgba(11, 10, 26, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: none; cursor: pointer; }
+.ld-tchip span { font-size: 11px; white-space: nowrap; }
+.ld-tchip b { font-size: 18px; line-height: 1.1; font-weight: 400; color: var(--t); }
+.ld-tchip i { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--t); transition: width 0.4s ease; }
+.ld-tchip-on { color: var(--text); background: rgba(255, 255, 255, 0.07); border-color: var(--t); box-shadow: inset 0 0 0 1px var(--t); }
+.ld-tchip:active { transform: translateY(1px); }
+.ld-tlist { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); border-left: 3px solid var(--t); }
+.ld-tlist li + li { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.ld-tlist li button { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto 34px; align-items: center; column-gap: 8px; padding: 5px 6px; font: inherit; text-align: left;
   color: var(--text); background: none; border: 0; box-shadow: none; cursor: pointer; }
-.ld-tcol li button:active { background: rgba(255, 255, 255, 0.06); }
+.ld-tlist li button:active { background: rgba(255, 255, 255, 0.06); }
 .ld-tname { min-width: 0; font-size: 12px; overflow-wrap: anywhere; }
 .ld-tname em { margin-left: 3px; font-size: 9px; }
-.ld-tcol li small { grid-column: 1; font-size: 9px; color: var(--muted); }
-.ld-tcol li small.ld-cold { color: #ff9a9a; }
-.ld-tscore { grid-column: 2; grid-row: 1 / 3; position: relative; align-self: center; height: 14px; background: rgba(255, 255, 255, 0.06); }
+.ld-tlist li small { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.ld-tlist li small.ld-cold { color: #ff9a9a; }
+.ld-t-core .ld-tdot { animation: ld-breathe 1.8s ease-in-out infinite; }
+.ld-tdot { display: inline-block; width: 8px; height: 8px; background: var(--t); }
+.ld-tscore { position: relative; align-self: center; height: 14px; background: rgba(255, 255, 255, 0.06); }
 .ld-tscore i { position: absolute; left: 0; top: 0; bottom: 0; width: var(--s); background: var(--t); opacity: 0.6; transition: width 0.4s ease; }
 .ld-tscore b { position: relative; display: block; font-size: 10px; font-weight: 400; line-height: 14px; text-align: center; color: var(--text); text-shadow: 1px 1px 0 var(--edge); }
 
@@ -282,7 +303,7 @@
   .ld-radar-on > i, .ld-radar > b, .ld-ping, .ld-dot::after, .ld-mini i.ld-mini-last, .ld-t-core .ld-tdot, .ld-ring.ld-t-core::after, .ld-crown,
   .ld-row-1 > button::after, .ld-cell-now::after, .ld-cell-peak::before, .ld-db .log-ring-cur i, .ld-pop { animation: none; }
   .ld-ping { display: none; }
-  .ld-bar-fill, .ld-bar-stack, .ld-row-bar i, .ld-tscore i, .ld-ring-fg, .ld-tier-bar span, .ld-via-bar span, .ld-gauge-fg { transition: none; }
+  .ld-bar-fill, .ld-bar-stack, .ld-row-bar i, .ld-tscore i, .ld-ring-fg, .ld-tchip i, .ld-via-bar span, .ld-gauge-fg { transition: none; }
 }
 
 /* 화면 폭 대원칙 */
