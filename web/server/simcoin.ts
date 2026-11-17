@@ -28,25 +28,41 @@ export interface EarnRule {
   cap: number;
   method?: string;
   re?: RegExp;
+  /** 그 일을 하는 화면 (버는 법 표에서 누르면 간다) */
+  to?: string;
 }
 export const EARN: EarnRule[] = [
   { key: "visit", label: "하루 첫 접속", coin: 20, cap: 1 },
-  { key: "board", label: "게시판 글쓰기", coin: 30, cap: 3, method: "POST", re: /^\/api\/board$/ },
-  { key: "comment", label: "게시판 댓글", coin: 5, cap: 10, method: "POST", re: /^\/api\/(board|official)\/\d+\/comments$/ },
-  { key: "like", label: "게시판 좋아요", coin: 1, cap: 10, method: "PUT", re: /^\/api\/board\/\d+\/like$/ },
-  { key: "gd", label: "길드 던전 시간표 확정", coin: 20, cap: 1, method: "POST", re: /^\/api\/gd\/confirm$/ },
-  { key: "gdpaint", label: "길드 던전 시간표 칠하기", coin: 2, cap: 5, method: "PUT", re: /^\/api\/gd\/avail$/ },
-  { key: "chat", label: "챗봇 질문", coin: 3, cap: 20, method: "POST", re: /^\/api\/chat$/ },
-  { key: "market", label: "중개인 물건 올리기", coin: 10, cap: 3, method: "POST", re: /^\/api\/market$/ },
-  { key: "want", label: "중개인 살래요 · 팔래요", coin: 3, cap: 5, method: "PUT", re: /^\/api\/market\/\d+\/want$/ },
-  { key: "talk", label: "중개인 토론방", coin: 2, cap: 10, method: "POST", re: /^\/api\/market\/\d+\/talk$/ },
-  { key: "gold", label: "골드 글", coin: 10, cap: 2, method: "POST", re: /^\/api\/gold$/ },
-  { key: "request", label: "의뢰 올리기", coin: 10, cap: 3, method: "POST", re: /^\/api\/requests$/ },
-  { key: "accept", label: "의뢰 수락 · 완료", coin: 5, cap: 5, method: "PATCH", re: /^\/api\/requests\/\d+$/ },
-  { key: "profile", label: "레벨 · 경험치 기록", coin: 5, cap: 2, method: "PUT", re: /^\/api\/profile$/ },
-  { key: "todo", label: "To do 체크", coin: 1, cap: 15, method: "PUT", re: /^\/api\/todo$/ },
-  { key: "rent", label: "장비대여 신청", coin: 5, cap: 2, method: "POST", re: /^\/api\/rent\/apply$/ },
+  { key: "board", label: "게시판 글쓰기", coin: 30, cap: 3, method: "POST", re: /^\/api\/board$/, to: "#/board" },
+  { key: "comment", label: "게시판 댓글", coin: 5, cap: 10, method: "POST", re: /^\/api\/(board|official)\/\d+\/comments$/, to: "#/board" },
+  { key: "like", label: "게시판 좋아요", coin: 1, cap: 10, method: "PUT", re: /^\/api\/(board|official)\/\d+\/like$/, to: "#/board" },
+  { key: "gd", label: "길드 던전 시간표 확정", coin: 20, cap: 1, method: "POST", re: /^\/api\/gd\/confirm$/, to: "#/match" },
+  { key: "gdpaint", label: "길드 던전 시간표 칠하기", coin: 2, cap: 5, method: "PUT", re: /^\/api\/gd\/avail$/, to: "#/match" },
+  { key: "gdanswer", label: "길드 던전 후보 확정 · 불참", coin: 5, cap: 3, method: "POST", re: /^\/api\/gd\/answer$/, to: "#/match" },
+  { key: "chat", label: "챗봇 질문", coin: 3, cap: 20, method: "POST", re: /^\/api\/chat$/, to: "#/chat" },
+  { key: "market", label: "중개인 물건 올리기", coin: 10, cap: 3, method: "POST", re: /^\/api\/market$/, to: "#/market" },
+  { key: "want", label: "중개인 살래요 · 팔래요", coin: 3, cap: 5, method: "PUT", re: /^\/api\/market\/\d+\/want$/, to: "#/market" },
+  { key: "bid", label: "중개인 경매 입찰", coin: 3, cap: 5, method: "POST", re: /^\/api\/market\/\d+\/bids$/, to: "#/market" },
+  { key: "talk", label: "중개인 토론방", coin: 2, cap: 10, method: "POST", re: /^\/api\/market\/\d+\/talk$/, to: "#/market" },
+  { key: "gold", label: "골드 글", coin: 10, cap: 2, method: "POST", re: /^\/api\/gold$/, to: "#/market" },
+  { key: "request", label: "의뢰 올리기", coin: 10, cap: 3, method: "POST", re: /^\/api\/requests$/, to: "#/requests" },
+  { key: "accept", label: "의뢰 수락 · 완료", coin: 5, cap: 5, method: "PATCH", re: /^\/api\/requests\/\d+$/, to: "#/requests" },
+  { key: "profile", label: "레벨 · 경험치 기록", coin: 5, cap: 2, method: "PUT", re: /^\/api\/profile$/, to: "#/ranking" },
+  { key: "avatar", label: "캐릭터 사진 등록", coin: 10, cap: 1, method: "PUT", re: /^\/api\/avatar$/, to: "#/me" },
+  { key: "todo", label: "To do 체크", coin: 1, cap: 15, method: "PUT", re: /^\/api\/todo$/, to: "#/todo" },
+  { key: "rent", label: "장비대여 신청", coin: 5, cap: 2, method: "POST", re: /^\/api\/rent\/apply$/, to: "#/rent" },
+  { key: "donate", label: "기부함 기부 신청", coin: 15, cap: 2, method: "POST", re: /^\/api\/donate$/, to: "#/donate" },
+  { key: "gcoin", label: "성장코인샵 신청", coin: 5, cap: 2, method: "POST", re: /^\/api\/gcoin\/orders$/, to: "#/gcoin" },
+  { key: "devreq", label: "개발 요청", coin: 10, cap: 2, method: "POST", re: /^\/api\/devreq$/, to: "#/devreq" },
 ];
+
+/** 연속 접속 보너스 (2026-11-17 고도화): 어제도 들어왔으면 하루 첫 접속에 더 준다. 2일째 +5 … 7일째부터 +30 (STREAK_STEP x (이어진 날 - 1), STREAK_MAX 까지). sim_earn 의 key 'streak' 에 그날 이어진 날 수 */
+export const STREAK_STEP = 5;
+export const STREAK_MAX = 30;
+export const streakBonus = (days: number) => Math.min(STREAK_MAX, Math.max(0, days - 1) * STREAK_STEP);
+/** 장비 팔기 (2026-11-17 고도화): 강화한 장비를 코인으로 판다. 값은 화면이 공식 확률로 셈한다 (만드는 데 드는 평균 코인의 반쯤, 재미로만. 서버는 범위와 하루 횟수만 본다) */
+export const SELL_CAP = 40;
+export const SELL_MAX = 300_000;
 
 /** 지갑이 없으면 처음 코인으로 만든다 */
 export const ensureWallet = (env: Env, userId: string, space: Space = "live") =>
@@ -73,11 +89,39 @@ export async function earn(env: Env, userId: string, key: string, space: Space =
     )
       .bind(userId, rule.coin, now, WELCOME)
       .run();
+    if (key === "visit") await streakEarn(env, userId, space, now).catch((e) => console.error("sim streak", e instanceof Error ? e.message : e));
     return true;
   } catch (e) {
     console.error("sim coin", e instanceof Error ? e.message : e);
     return false;
   }
+}
+
+/** 하루 첫 접속 뒤: 어제까지 이어 들어온 날 수로 연속 접속 보너스를 준다 (오늘 포함 days, 'streak' 줄에 days 를 적어 두 번 주지 않는다) */
+async function streakEarn(env: Env, userId: string, space: Space, now: number): Promise<void> {
+  const T = tbl(space);
+  const today = kstDate(now);
+  const days = new Set(
+    ((await env.DB.prepare(`SELECT day FROM ${T}earn WHERE user_id = ? AND key = 'visit' AND day >= ? AND day < ?`).bind(userId, kstDate(now - 40 * 86_400_000), today).all<{ day: string }>()).results ?? []).map((r) => r.day),
+  );
+  let streak = 1;
+  for (let d = 1; d <= 40 && days.has(kstDate(now - d * 86_400_000)); d++) streak++;
+  const r = await env.DB.prepare(`INSERT INTO ${T}earn (user_id, day, key, n) VALUES (?1, ?2, 'streak', ?3) ON CONFLICT(user_id, day, key) DO NOTHING`).bind(userId, today, streak).run();
+  const bonus = streakBonus(streak);
+  if (!r.meta.changes || !bonus) return;
+  await env.DB.prepare(`UPDATE ${T}wallet SET coins = coins + ?2, earned = earned + ?2, updated_at = ?3 WHERE user_id = ?1`).bind(userId, bonus, now).run();
+}
+
+/** 장비를 팔아 코인을 받는다 (하루 SELL_CAP 번, 한 번에 SELL_MAX 까지). 됐으면 true */
+export async function sellGear(env: Env, userId: string, gain: number, space: Space): Promise<boolean> {
+  if (!(gain >= 1 && gain <= SELL_MAX)) return false;
+  const now = Date.now();
+  const r = await env.DB.prepare(`INSERT INTO ${tbl(space)}earn (user_id, day, key, n) VALUES (?1, ?2, 'sell', 1) ON CONFLICT(user_id, day, key) DO UPDATE SET n = n + 1 WHERE n < ?3`)
+    .bind(userId, kstDate(now), SELL_CAP)
+    .run();
+  if (!r.meta.changes) return false;
+  await env.DB.prepare(`UPDATE ${tbl(space)}wallet SET coins = coins + ?2, earned = earned + ?2, updated_at = ?3 WHERE user_id = ?1`).bind(userId, Math.round(gain), now).run();
+  return true;
 }
 
 /** 미들웨어: 성공한 요청이 버는 일이면 */

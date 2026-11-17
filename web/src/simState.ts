@@ -21,8 +21,12 @@ export interface SimSave {
   // 껐다 켜도 남는 기록 (제작자 2026-11-06 '껐다가 다시 오면 기록이 사라지네': 화면에만 있어서 다시 열면 0 이었다)
   /** 강화: 시도·부서진 장비·가장 높은 강화도·쓴 코인, 최근 결과 점 40개 */
   enh?: { n?: { tries: number; broke: number; best: number; coins: number }; log?: { to: number; ok: boolean; broke?: boolean; plus?: number }[] };
-  /** 성장: 표마다 지금 단계·펫 옵션·처음부터 센 시도(순위용), 그리고 모든 표의 시도·성공·+2 성공 */
-  stat?: Record<string, { stage: number; type: string | null; since: number }>;
+  /** 성장: 표마다 지금 단계·펫 옵션·처음부터 센 시도(순위용)·고른 장신구나 펫 이름(2026-11-17), 그리고 모든 표의 시도·성공·+2 성공 */
+  stat?: Record<string, { stage: number; type: string | null; since: number; item?: string }>;
+  /** 강화 도감 (2026-11-17 고도화): 장비마다 닿은 가장 높은 강화도 (어느 마법서로든, 팔거나 부서져도 남는다) */
+  best?: Record<string, number>;
+  /** 판 장비 수와 받은 코인 (2026-11-17) */
+  sold?: { n: number; coins: number };
   statN?: { tries: number; ok: number; big: number };
   /** 보석 합성: 가진 보석, 합성 수, 처음 1단계 개수, 닿은 가장 높은 단계 */
   gem?: { inv: number[]; runs: number; start: number; best: number };

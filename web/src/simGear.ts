@@ -5,7 +5,8 @@
 // 값: 레벨이 높을수록 비싸다 (강한 장비일수록 부서지면 아프다). 장비 값은 행운 코인으로 낸다.
 import type { Odds } from "./odds";
 import type { Wiki, Pic } from "./types";
-import type { Part } from "./sim";
+import type { Part, Scroll } from "./sim";
+import { expectedTo } from "./sim";
 
 export type GearJob = "전사" | "레인저" | "마법사" | "무도가";
 export const GEAR_JOBS: GearJob[] = ["전사", "레인저", "마법사", "무도가"];
@@ -82,6 +83,26 @@ export function gearOf(wiki: Wiki, odds: Odds): Gear[] {
     }
   }
   return out.sort((a, b) => a.lv - b.lv || a.name.localeCompare(b.name, "ko"));
+}
+
+/** 장비 시세 (2026-11-17 고도화, 제작자 '너무 허접해' -> 강화한 장비를 코인으로 팔아 다음 장비 값으로): +0 은 산 값의 반,
+ *  강화한 장비는 '+0 노작을 그 강화도까지 만드는 데 드는 평균 코인'(장비 값 + 평균 마법서 + 부서지는 장비 x 장비 값)을 그 부위의 모든 마법서(이벤트 확률까지) 중
+ *  가장 싼 길로 셈해 그 VALUE_RATE. 만드는 평균보다 늘 싸서 코인은 전체로 줄어들지만, +7 에서 +8 에 도전할지 지금 팔지 같은 고민이 생긴다 */
+export const VALUE_RATE = 0.55;
+export const VALUE_MAX = 300_000;
+export function gearValue(g: Gear, lv: number, scrolls: Scroll[]): number {
+  if (lv <= 0) return Math.max(1, Math.floor(g.price / 2));
+  let cost = Infinity;
+  for (const s of scrolls) {
+    if (s.part !== g.part) continue;
+    for (const rates of [s.rates, s.event]) {
+      if (!rates) continue;
+      const e = expectedTo((k) => rates[k] ?? 0, s.keep, 0, lv);
+      if (e) cost = Math.min(cost, g.price + e.tries + e.broken * g.price);
+    }
+  }
+  if (!Number.isFinite(cost)) return Math.max(1, Math.floor(g.price / 2));
+  return Math.min(VALUE_MAX, Math.max(Math.floor(g.price / 2), Math.floor(cost * VALUE_RATE)));
 }
 
 /** 장비마다 해금 값 (제작자 2026-11-04 '자동 강화도 무기별로 각각 다 해금하게, 해금 비용은 코인으로'): 자동 강화는 장비 값의 5배, 자동 구매는 10배 */

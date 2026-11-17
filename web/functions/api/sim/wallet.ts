@@ -4,11 +4,12 @@
 // POST /api/sim/wallet { quest: 0|1|2 } -> 오늘의 도전을 깼다 (하루 한 번씩 QUEST_COIN) -> { coins, got }
 // POST /api/sim/wallet { unlock: 'auto:장비' | 'buy:장비', cost, spend? } -> 장비마다 자동 강화·자동 구매 해금 (제작자 2026-11-04 '자동 강화도 무기별로 각각 해금, 해금 비용은 코인').
 //      값은 화면이 장비 값으로 셈한다 (재미로만, 범위만 본다). 코인이 모자라면 409, 이미 해금했으면 그대로 -> { coins, unlocks }
+// POST /api/sim/wallet { sell: 코인, label } -> 강화한 장비를 판다 (2026-11-17 고도화: 값은 화면이 공식 확률로 셈한 것, 서버는 범위와 하루 횟수 SELL_CAP 만 본다) -> { coins, sold }
 // POST /api/sim/wallet { state } -> 진행 상황(들고 있는 장비, 보관함, 직접 겪은 것) JSON 을 그대로 둔다 (제작자 2026-11-04 '8강 참나무지팡이가 장비 바꾸기 누르니까 없어졌네':
 //      폰에만 두다 덮였다. 이제 서버에, 다른 폰에서도 그대로) -> { ok }
 import { FORBIDDEN, NEED_LOGIN, TEST_IDS, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { DEV_FLOOR, DEV_REFILL, EARN, QUEST_COIN, QUEST_KEYS, earn, ensureWallet, kstDate, refillSql, refillable, spaceOf, tbl } from "../../../server/simcoin";
+import { DEV_FLOOR, DEV_REFILL, EARN, QUEST_COIN, QUEST_KEYS, SELL_CAP, SELL_MAX, earn, ensureWallet, kstDate, refillSql, refillable, sellGear, spaceOf, streakBonus, tbl } from "../../../server/simcoin";
 
 const unlocksOf = async (env: Env, id: string, T: string) =>
   ((await env.DB.prepare(`SELECT key FROM ${T}unlocks WHERE user_id = ?`).bind(id).all<{ key: string }>()).results ?? []).map((r) => r.key);
@@ -44,7 +45,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   return json(
     {
       ...(w.results[0] as object),
-      rules: EARN.map((r) => ({ key: r.key, label: r.label, coin: r.coin, cap: r.cap, n: n.get(r.key) ?? 0 })),
+      rules: EARN.map((r) => ({ key: r.key, label: r.label, coin: r.coin, cap: r.cap, n: n.get(r.key) ?? 0, to: r.to })),
+      // 연속 접속 (server/simcoin.ts streakEarn): 오늘까지 이어진 날 수와 오늘 받은 보너스, 장비 판 횟수
+      streak: { days: n.get("streak") ?? 0, bonus: streakBonus(n.get("streak") ?? 0), step: 5, max: 30 },
+      sold: { n: n.get("sell") ?? 0, cap: SELL_CAP, max: SELL_MAX },
       quests: QUEST_KEYS.map((k) => (n.get(k) ?? 0) > 0),
       questCoin: QUEST_COIN,
       feed: feed.results,
@@ -65,8 +69,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const space = spaceOf(request, me);
   if (!space) return FORBIDDEN();
   const T = tbl(space);
-  const body = await readJson<{ spend: unknown; quest: unknown; unlock: unknown; cost: unknown; state: unknown }>(request);
+  const body = await readJson<{ spend: unknown; quest: unknown; unlock: unknown; cost: unknown; state: unknown; sell: unknown }>(request);
   await ensureWallet(env, me.id, space);
+  if (body.sell !== undefined) {
+    const gain = Math.round(Number(body.sell));
+    if (!(gain >= 1 && gain <= SELL_MAX)) return json({ error: "판 값이 맞지 않아요" }, 400);
+    const sold = await sellGear(env, me.id, gain, space);
+    const w = await env.DB.prepare(`SELECT coins FROM ${T}wallet WHERE user_id = ?`).bind(me.id).first<{ coins: number }>();
+    return json(sold ? { coins: w?.coins ?? 0, sold: true } : { error: "오늘은 더 못 팔아요", coins: w?.coins ?? 0, sold: false }, sold ? 200 : 409);
+  }
   if (body.state !== undefined) {
     const data = JSON.stringify(body.state ?? null);
     if (data.length > 200_000) return json({ error: "진행 상황이 너무 커요" }, 400);

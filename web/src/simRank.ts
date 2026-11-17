@@ -22,7 +22,11 @@ export interface Wallet {
   coins: number;
   earned: number;
   spent: number;
-  rules: { key: string; label: string; coin: number; cap: number; n: number }[];
+  rules: { key: string; label: string; coin: number; cap: number; n: number; to?: string }[];
+  /** 연속 접속 (2026-11-17): 오늘까지 이어진 날 수와 오늘 받은 보너스 */
+  streak?: { days: number; bonus: number; step: number; max: number };
+  /** 오늘 장비를 판 횟수와 한도 */
+  sold?: { n: number; cap: number; max: number };
   /** 오늘의 도전 셋을 깼는지 */
   quests: boolean[];
   questCoin: number;
@@ -112,8 +116,10 @@ export interface Coins {
   unlocks: Set<string>;
   /** cost 코인으로 해금 (서버에 바로, 모아 둔 시도도 같이 보낸다). 됐으면 true */
   unlock: (key: string, cost: number) => Promise<boolean>;
+  /** 장비를 팔아 gain 코인을 받는다 (서버에 바로). 됐으면 true (하루 한도가 끝나면 false) */
+  sell: (gain: number) => Promise<boolean>;
 }
-export const CoinCtx = createContext<Coins>({ coins: null, take: () => 0, has: () => false, unlocks: new Set(), unlock: async () => false });
+export const CoinCtx = createContext<Coins>({ coins: null, take: () => 0, has: () => false, unlocks: new Set(), unlock: async () => false, sell: async () => false });
 export const useCoins = () => useContext(CoinCtx);
 
 export function useCoinState(space: Space): Coins & { wallet: (Wallet & { state?: unknown }) | null; reload: () => void } {
@@ -192,7 +198,30 @@ export function useCoinState(space: Space): Coins & { wallet: (Wallet & { state?
     },
     [space],
   );
-  return { coins, take, has, unlocks, unlock, wallet, reload };
+  const sell = useCallback(
+    async (gain: number) => {
+      if (left.current === null || !(gain >= 1)) return false;
+      window.clearTimeout(timer.current);
+      timer.current = 0;
+      const spend = pending.current;
+      pending.current = 0;
+      try {
+        if (spend) await fetch(simUrl("/api/sim/wallet", space), { method: "POST", credentials: "same-origin", headers: apiHeaders(true), body: JSON.stringify({ spend }), keepalive: true });
+        const r = await fetch(simUrl("/api/sim/wallet", space), { method: "POST", credentials: "same-origin", headers: apiHeaders(true), body: JSON.stringify({ sell: Math.round(gain) }) });
+        const j = (await r.json()) as { coins?: number; sold?: boolean };
+        if (typeof j.coins === "number") {
+          left.current = j.coins - pending.current;
+          setCoins(left.current);
+        }
+        if (j.sold) setWallet((w) => (w && w.sold ? { ...w, sold: { ...w.sold, n: w.sold.n + 1 } } : w));
+        return !!j.sold;
+      } catch {
+        return false;
+      }
+    },
+    [space],
+  );
+  return { coins, take, has, unlocks, unlock, sell, wallet, reload };
 }
 
 // ---------------------------------------------------------------- 순위

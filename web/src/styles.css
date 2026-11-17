@@ -5925,3 +5925,115 @@ a.cf-at { color: #9fb4ff; }
 .rent-ledger-btn { position: relative; }
 /* 의뢰소 칸 칩의 새 일 수 (모서리 밖) */
 .rq-chips .mk-chip, .mk-cats > .mk-chip { position: relative; }
+
+/* ---------------------------------------------------------------- 확률 시뮬레이터 고도화 (2026-11-17, 제작자 '너무 허접해'): 맨 위 한 판(HUD), 장비 시세·팔기, 불티, 강화 도감, 성장 칸 실제 물건, 뽑기 카드 NEW, 코인 버는 법 표 */
+.sim-hud { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 8px 10px; margin-bottom: 10px;
+  background: linear-gradient(180deg, rgba(255, 195, 92, 0.1), transparent 70%), var(--panel); }
+.sim-hud-coin { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; padding: 2px 0; color: var(--text); font: inherit; text-align: left; background: none; border: 0; }
+.sim-hud-n { display: grid; }
+.sim-hud-n small { font-size: 11px; color: var(--muted); }
+.sim-hud-n b { font-size: 24px; line-height: 1.1; color: var(--gold); text-shadow: 2px 2px 0 var(--edge); animation: sim-settle 0.3s ease-out; font-variant-numeric: tabular-nums; }
+.sim-hud-side { display: grid; justify-items: end; gap: 2px; text-align: right; }
+.sim-hud-side small { font-size: 11px; color: var(--muted); }
+.sim-hud-today { color: #7ee2a8 !important; }
+.sim-hud-streak { color: #ffb24a !important; }
+.sim-hud-how { color: var(--gold) !important; }
+.sim-hud-empty .sim-hud-n b { color: var(--red); }
+.sim-hud-empty { border-color: rgba(255, 107, 107, 0.5); }
+/* 도트 동전: 금빛 원, 어두운 테두리, 안쪽 고리, 반짝이는 빛 한 점 */
+.sim-coin-pic { position: relative; display: block; width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(circle at 38% 35%, #fff3c4 0 18%, #ffc35c 20% 60%, #d98b2a 62% 100%);
+  box-shadow: 0 0 0 2px var(--edge), inset 0 0 0 3px rgba(217, 139, 42, 0.9), inset 0 0 0 5px rgba(255, 243, 196, 0.35); image-rendering: pixelated; }
+.sim-coin-pic::after { content: ""; position: absolute; left: 50%; top: 50%; width: 10px; height: 14px; margin: -7px 0 0 -5px; background: #b86f1c; clip-path: polygon(0 0, 100% 0, 100% 20%, 60% 20%, 60% 80%, 100% 80%, 100% 100%, 0 100%, 0 80%, 40% 80%, 40% 20%, 0 20%); opacity: 0.8; }
+.sim-coin-pic i { position: absolute; left: 6px; top: 5px; width: 6px; height: 6px; background: #fff; opacity: 0.9; animation: sim-coin-shine 2.4s ease-in-out infinite; }
+@keyframes sim-coin-shine { 0%, 100% { opacity: 0.3; transform: scale(0.7); } 50% { opacity: 1; transform: scale(1); } }
+.sim-hud-coin:active .sim-coin-pic { transform: scale(0.92); }
+.sim-hud-quests { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding-top: 4px; border-top: 1px solid rgba(169, 162, 207, 0.18); font-size: 12px; }
+.sim-hud-quests > b { font-size: 11px; font-weight: 400; color: var(--muted); }
+.sim-hud-quests > span { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.sim-hud-quests > span small { margin-left: auto; color: var(--gold); flex: none; }
+.sim-hud-quests > span.sim-q-done { color: var(--muted); text-decoration: line-through; }
+.sim-hud-quests > span.sim-q-done small { color: #7ee2a8; text-decoration: none; }
+.sim-q-box { display: grid; place-items: center; flex: none; width: 14px; height: 14px; font-size: 10px; font-style: normal; color: #7ee2a8; border: var(--px) solid var(--hi); background: rgba(11, 10, 26, 0.5); }
+.sim-q-done .sim-q-box { border-color: #7ee2a8; }
+.sim-hud .sim-ticker { margin: 2px -10px -8px; }
+/* 불티: 모루 바닥에서 떠올라 사라진다 (늘 도는 움직임, transform·opacity 만) */
+.sim-embers { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+.sim-embers i { position: absolute; left: var(--x); bottom: 6px; width: var(--s); height: var(--s); background: #ffb24a; box-shadow: 0 0 4px #ff8a3c; opacity: 0;
+  animation: sim-ember var(--t) linear var(--d) infinite; }
+@keyframes sim-ember { 0% { transform: translate3d(0, 0, 0); opacity: 0; } 10% { opacity: 0.9; } 60% { opacity: 0.5; } 100% { transform: translate3d(calc(var(--s) * -3), -150px, 0); opacity: 0; } }
+.sim-anvil > * { position: relative; }
+.sim-anvil > .sim-vignette, .sim-anvil > .sim-embers { position: absolute; }
+/* 시세와 팔기 */
+.sim-value { color: var(--muted); font-size: 12px; animation: sim-settle 0.3s ease-out; }
+.sim-value b { color: var(--gold); }
+.sim-value em { font-style: normal; color: #7ee2a8; }
+.sim-sell { color: var(--gold); border-color: rgba(255, 195, 92, 0.45); }
+.sim-sell small { font-size: 10px; color: var(--gold); }
+.sim-sell-sure { color: var(--edge); background: var(--gold); border-color: var(--gold); animation: sim-sure 0.6s ease-in-out infinite alternate; }
+.sim-sell-sure small { color: var(--edge); }
+@keyframes sim-sure { from { opacity: 1; } to { opacity: 0.65; } }
+.sim-sold b { color: var(--gold); font-size: 18px; }
+.sim-sold span { color: var(--text); }
+.sim-bag-btns { display: grid; gap: 3px; flex: none; }
+.sim-bag-btns .sim-buy { min-width: 60px; padding: 3px 6px; font-size: 12px; }
+.sim-buy.sim-sell { background: none; border: var(--px) solid rgba(255, 195, 92, 0.45); color: var(--gold); }
+.sim-buy.sim-sell-sure { background: var(--gold); color: var(--edge); }
+.sim-shop-list > li.sim-bag-3 { box-shadow: inset 3px 0 0 var(--gold); }
+.sim-shop-list > li.sim-bag-2 { box-shadow: inset 3px 0 0 #b478ff; }
+.sim-shop-list > li.sim-bag-1 { box-shadow: inset 3px 0 0 #6f8fff; }
+.sim-shop-list > li.sim-bag-4 { box-shadow: inset 3px 0 0 #ff6b6b; }
+.sim-buy-on { background: var(--gold); color: var(--edge); }
+/* 성장 칸: 실제 장신구·펫 */
+.sim-anvil-grow .sim-item { margin-top: 2px; }
+.sim-pick-list { max-height: 360px; overflow-y: auto; scrollbar-width: thin; }
+/* 뽑기 카드: 그림 칸을 왼쪽에, NEW 표 */
+.sim-card { grid-template-columns: 38px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 7px; align-items: center; position: relative; }
+.sim-card-pic { grid-row: 1 / 3; display: grid; place-items: center; width: 38px; height: 38px; background: rgba(11, 10, 26, 0.5); border: var(--px) solid var(--hi); }
+.sim-card-nopic { width: 14px; height: 14px; background: rgba(169, 162, 207, 0.25); }
+.sim-card.sim-t-sr .sim-card-pic { border-color: var(--gold); box-shadow: 0 0 8px rgba(255, 195, 92, 0.45); }
+.sim-card.sim-t-r .sim-card-pic { border-color: #a877ff; }
+.sim-card.sim-t-u .sim-card-pic { border-color: var(--sapphire); }
+.sim-card-name { display: block; overflow-wrap: anywhere; }
+.sim-new { position: absolute; right: -1px; top: -1px; padding: 1px 4px; font-size: 9px; font-style: normal; font-weight: 700; letter-spacing: 0.5px; color: var(--edge); background: #ff7ab8;
+  animation: sim-new 1.2s ease-in-out infinite alternate; }
+@keyframes sim-new { from { transform: scale(1); } to { transform: scale(1.12); } }
+/* 보석 그림 */
+.sim-gem { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+.sim-gem-pic { grid-row: 1 / 3; display: grid; place-items: center; width: 34px; height: 34px; }
+.sim-gem-odds { grid-column: 2 / -1; }
+/* 강화 도감 */
+.sim-dex { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 8px 10px; }
+.sim-dex-strip { margin: 0; }
+.sim-dex-strip .mk-cats { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
+.sim-dex-strip .sub-tab small { margin-left: 3px; font-size: 10px; color: var(--muted); }
+.sim-dex-strip .sub-tab-on small { color: var(--edge); }
+.sim-dex-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 4px; }
+.sim-dex-grid li { position: relative; display: grid; justify-items: center; gap: 1px; padding: 4px 2px 3px; background: rgba(11, 10, 26, 0.45); border: var(--px) solid var(--edge); }
+.sim-dex-grid li b { font-size: 12px; color: var(--gold); }
+.sim-dex-grid li small { font-size: 9px; color: var(--muted); }
+.sim-dex-pic { display: grid; place-items: center; width: 32px; height: 32px; }
+.sim-dex-pic small { font-size: 10px; color: var(--muted); }
+.sim-dex-none .sim-dex-pic { opacity: 0.25; filter: grayscale(1); }
+.sim-dex-none b { color: var(--muted); }
+.sim-dex-got.sim-aura-1 { border-color: #6f8fff; }
+.sim-dex-got.sim-aura-2 { border-color: #b478ff; }
+.sim-dex-got.sim-aura-3 { border-color: var(--gold); box-shadow: 0 0 6px rgba(255, 195, 92, 0.35); }
+.sim-dex-got.sim-aura-4 { border-color: #ff6b6b; box-shadow: 0 0 8px rgba(255, 107, 107, 0.4); }
+/* 코인 버는 법: 누르면 그 화면, 진행 막대 */
+.sim-earn-row > span { display: grid; min-width: 0; gap: 2px; }
+.sim-earn-bar { display: block; height: 3px; background: rgba(169, 162, 207, 0.18); }
+.sim-earn-bar > i { display: block; height: 100%; background: #7ee2a8; transition: width 0.3s ease-out; }
+.sim-earn-done .sim-earn-bar > i { background: var(--muted); }
+.sim-earn-link { color: inherit; text-decoration: none; }
+.sim-earn-link:active { transform: translateY(1px); }
+.sim-earn-link .sim-earn-label { color: var(--text); }
+.sim-earn-note { display: block; font-size: 10px; color: var(--muted); text-align: left; }
+.sim-earn-streak b { color: #ffb24a; }
+.sim-earn-wait b { color: var(--muted); }
+@media (prefers-reduced-motion: reduce) {
+  .sim-embers i, .sim-coin-pic i, .sim-new, .sim-sell-sure { animation: none; }
+}
+.sim-gem-dot { display: block; width: 20px; height: 20px; clip-path: polygon(30% 0, 70% 0, 100% 35%, 50% 100%, 0 35%); background: linear-gradient(160deg, #e9ffff 0 20%, #5fe0e6 35% 70%, #2a8f9a 100%); }
+.sim-gem-dot-1 { background: linear-gradient(160deg, #d6d0f0 0 20%, #6a6188 35% 70%, #3c3550 100%); }
+.sim-gem-dot-2 { background: linear-gradient(160deg, #f0d8ff 0 20%, #a877ff 35% 70%, #5e3a9e 100%); }
+.sim-gem-dot-3 { background: linear-gradient(160deg, #d8e4ff 0 20%, #4f7dff 35% 70%, #26409a 100%); }

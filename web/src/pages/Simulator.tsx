@@ -9,7 +9,7 @@ import { useEntryState } from "../router";
 import { BOX_CATS, GEM_NAMES, atLeast, boxFor, boxOf, boxesOf, expectedTo, gemSynth, optionFor, optionSources, pick, repairItems, scrollsOf, stepsExpected, stepsOf, tierOf } from "../sim";
 import type { Box, Dist, OptItem, OptSource, Part, Scroll, Steps } from "../sim";
 import { Loading, PicImg, TopBar } from "../ui";
-import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, gearOf, gearPower, gearStat, unlockCost } from "../simGear";
+import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, gearOf, gearPower, gearStat, gearValue, unlockCost } from "../simGear";
 import type { ArmorSlot, Gear, GearJob, Held } from "../simGear";
 import type { Wiki } from "../types";
 import { JOB_NAME } from "../auth";
@@ -28,6 +28,7 @@ import { useBook } from "../data";
 import { filterByName } from "../search";
 import type { IconOf } from "../simIcons";
 import type { Pic } from "../types";
+import type { Book } from "../data";
 import { useBackClose } from "../backClose";
 
 type Tab = "enhance" | "grow" | "option" | "gem" | "box" | "rank";
@@ -119,7 +120,8 @@ export function SimulatorPage({ wiki, me, space }: { wiki: Wiki; me: Me; space: 
       () => saveState.set({ ...base, restored: true }),
     );
   }, [saveState, space, me.id]);
-  const today = (coin.wallet?.rules.reduce((t, r) => t + r.n * r.coin, 0) ?? 0) + (coin.wallet?.quests.filter(Boolean).length ?? 0) * (coin.wallet?.questCoin ?? 0);
+  const today =
+    (coin.wallet?.rules.reduce((t, r) => t + r.n * r.coin, 0) ?? 0) + (coin.wallet?.quests.filter(Boolean).length ?? 0) * (coin.wallet?.questCoin ?? 0) + (coin.wallet?.streak?.bonus ?? 0);
   // 오늘의 도전 (src/simQuest.ts): 결과마다 알리면 맞는 도전을 깨고 코인을 받는다.
   // 화면을 켜 둔 채 0시가 지나면 새 날의 도전으로 바꾼다 (예전에는 어제 도전을 깨면 오늘 같은 번호 도전의 코인이 들어갔다)
   const { reload } = coin;
@@ -189,24 +191,7 @@ export function SimulatorPage({ wiki, me, space }: { wiki: Wiki; me: Me; space: 
           </button>
         ))}
       </div>
-      {/* 행운 코인: 시도마다 하나 (웹에서 글쓰기·시간표 확정·챗봇 같은 일을 하면 쌓인다) */}
-      <button type="button" className={"sim-coins" + (coin.coins === 0 ? " sim-coins-empty" : "")} onClick={() => setTab("rank")}>
-        <span>행운 코인</span>
-        <b key={coin.coins ?? -1}>{coin.coins === null ? "…" : coin.coins.toLocaleString()}</b>
-        <em className="sim-title">{coin.wallet ? titleOf(coin.wallet.total) : ""}</em>
-        <small>{coin.coins === 0 ? "버는 법 ›" : today ? `오늘 +${today}` : "버는 법 ›"}</small>
-      </button>
-      {coin.wallet && coin.wallet.feed.length > 0 && <Ticker feed={coin.wallet.feed} />}
-      <div className="sim-quests" aria-label="오늘의 도전">
-        <b>오늘의 도전</b>
-        {quests.map((q, i) => (
-          <span key={q.id} className={done[i] ? "sim-q-done" : ""}>
-            {done[i] ? "✓ " : ""}
-            {q.text}
-            {!done[i] && <small> +{coin.wallet?.questCoin ?? 30}</small>}
-          </span>
-        ))}
-      </div>
+      <SimHud coin={coin} today={today} quests={quests} done={done} onRank={() => setTab("rank")} />
       {cheer && (
         <div key={cheer.n} className="sim-cheer" role="status">
           <b>도전 완료</b>
@@ -219,7 +204,7 @@ export function SimulatorPage({ wiki, me, space }: { wiki: Wiki; me: Me; space: 
       ) : tab === "enhance" ? (
         <EnhanceTab odds={odds} wiki={wiki} me={me} />
       ) : tab === "grow" ? (
-        <StatSim odds={odds} />
+        <StatSim odds={odds} wiki={wiki} />
       ) : tab === "option" ? (
         <OptionSim odds={odds} />
       ) : tab === "gem" ? (
@@ -227,13 +212,51 @@ export function SimulatorPage({ wiki, me, space }: { wiki: Wiki; me: Me; space: 
       ) : tab === "box" ? (
         <BoxSim odds={odds} />
       ) : (
-        <RankTab odds={odds} />
+        <RankTab odds={odds} wiki={wiki} me={me} />
       )}
       </IconCtx.Provider>
       </QuestCtx.Provider>
     </CoinCtx.Provider>
     </SaveCtx.Provider>
     </SpaceCtx.Provider>
+  );
+}
+
+/** 맨 위 한 판 (2026-11-17 고도화): 도트 동전과 코인 수, 칭호, 오늘 번 코인과 연속 접속, 오늘의 도전 셋, 전광판. 코인을 누르면 순위·버는 법 */
+function SimHud({ coin, today, quests, done, onRank }: { coin: ReturnType<typeof useCoinState>; today: number; quests: { id: string; text: string }[]; done: boolean[]; onRank: () => void }) {
+  const w = coin.wallet;
+  const streak = w?.streak?.days ?? 0;
+  const empty = coin.coins === 0;
+  return (
+    <section className={"panel sim-hud" + (empty ? " sim-hud-empty" : "")}>
+      <button type="button" className="sim-hud-coin" onClick={onRank}>
+        <span className="sim-coin-pic" aria-hidden>
+          <i />
+        </span>
+        <span className="sim-hud-n">
+          <small>행운 코인</small>
+          <b key={coin.coins ?? -1}>{coin.coins === null ? "…" : coin.coins.toLocaleString()}</b>
+        </span>
+        <span className="sim-hud-side">
+          <em className="sim-title">{w ? titleOf(w.total) : ""}</em>
+          <small className={today ? "sim-hud-today" : "sim-hud-how"}>{empty ? "버는 법 ›" : today ? `오늘 +${today}` : "버는 법 ›"}</small>
+          {streak >= 2 && <small className="sim-hud-streak">{streak}일 연속 접속</small>}
+        </span>
+      </button>
+      <div className="sim-hud-quests" aria-label="오늘의 도전">
+        <b>오늘의 도전</b>
+        {quests.map((q, i) => (
+          <span key={q.id} className={done[i] ? "sim-q-done" : ""}>
+            <i className="sim-q-box" aria-hidden>
+              {done[i] ? "✓" : ""}
+            </i>
+            {q.text}
+            <small>{done[i] ? "완료" : `+${w?.questCoin ?? 30}`}</small>
+          </span>
+        ))}
+      </div>
+      {w && w.feed.length > 0 && <Ticker feed={w.feed} />}
+    </section>
   );
 }
 
@@ -318,10 +341,11 @@ function gameNamer(odds: Odds) {
   };
 }
 
-/** 순위 칸: 도박의 신(묶음마다 가장 드문 기록의 운을 더한 것), 시뮬레이터마다 1위, 코인 버는 법 */
-function RankTab({ odds }: { odds: Odds }) {
+/** 순위 칸: 도박의 신(묶음마다 가장 드문 기록의 운을 더한 것), 시뮬레이터마다 1위, 강화 도감, 코인 버는 법 */
+function RankTab({ odds, wiki, me }: { odds: Odds; wiki: Wiki; me: Me }) {
   const coin = useCoins() as ReturnType<typeof useCoinState>;
   const space = useSpace();
+  const { save } = useSave();
   const [data, setData] = useState<{ king: King[]; firsts: SimRec[]; mine: SimRec[] } | null>(null);
   const [err, setErr] = useState("");
   useEffect(() => {
@@ -330,6 +354,8 @@ function RankTab({ odds }: { odds: Odds }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const name = useMemo(() => gameNamer(odds), [odds]);
+  const w = coin.wallet;
+  const streak = w?.streak;
   if (!data) return <Loading error={err} />;
   const parts = (s: string) =>
     s
@@ -380,24 +406,112 @@ function RankTab({ odds }: { odds: Odds }) {
           ))}
         </section>
       )}
-      {coin.wallet && (
+      <GearDex odds={odds} wiki={wiki} me={me} best={save.best ?? {}} />
+      {w && (
         <section className="panel sim-earn">
           <div className="sim-rank-head">
             <b>행운 코인 버는 법</b>
-            <small>하루마다 새로</small>
+            <small>하루마다 새로 · 누르면 그 화면으로</small>
           </div>
-          {coin.wallet.rules.map((r) => (
-            <div key={r.key} className={"sim-earn-row" + (r.n >= r.cap ? " sim-earn-done" : "")}>
-              <span>{r.label}</span>
-              <b>+{r.coin}</b>
+          {streak && (
+            <div className={"sim-earn-row sim-earn-streak" + (streak.days >= 2 ? "" : " sim-earn-wait")}>
+              <span>
+                연속 접속 보너스
+                <small className="sim-earn-note">{streak.days >= 2 ? `${streak.days}일째 · 2일째 +${streak.step} 부터 날마다 +${streak.step}, 최대 +${streak.max}` : `내일도 들어오면 +${streak.step} 부터, 최대 +${streak.max}`}</small>
+              </span>
+              <b>{streak.bonus ? `+${streak.bonus}` : "-"}</b>
+              <small>{streak.days ? `${streak.days}일` : ""}</small>
+            </div>
+          )}
+          {w.rules.map((r) => {
+            const body = (
+              <>
+                <span>
+                  <span className="sim-earn-label">{r.to && r.n < r.cap ? `${r.label} ›` : r.label}</span>
+                  <i className="sim-earn-bar" aria-hidden>
+                    <i style={{ width: `${Math.min(100, (r.n / r.cap) * 100)}%` }} />
+                  </i>
+                </span>
+                <b>+{r.coin}</b>
+                <small>
+                  {r.n}/{r.cap}
+                </small>
+              </>
+            );
+            const cls = "sim-earn-row" + (r.n >= r.cap ? " sim-earn-done" : "");
+            return r.to && r.n < r.cap ? (
+              <a key={r.key} className={cls + " sim-earn-link"} href={r.to}>
+                {body}
+              </a>
+            ) : (
+              <div key={r.key} className={cls}>
+                {body}
+              </div>
+            );
+          })}
+          {w.sold && (
+            <div className={"sim-earn-row" + (w.sold.n >= w.sold.cap ? " sim-earn-done" : "")}>
+              <span>
+                장비 팔기
+                <small className="sim-earn-note">강화 칸에서 들고 있거나 보관한 장비를 시세로</small>
+              </span>
+              <b>시세</b>
               <small>
-                {r.n}/{r.cap}
+                {w.sold.n}/{w.sold.cap}
               </small>
             </div>
-          ))}
+          )}
         </section>
       )}
     </div>
+  );
+}
+
+/** 강화 도감 (2026-11-17 고도화): 장비마다 닿은 가장 높은 강화도 (팔거나 부서져도 남는다). 무기는 직업마다, 방어구는 부위마다 한 칸 */
+const DEX_SECTIONS: { key: string; label: string; part: Part; kind: string }[] = [
+  ...GEAR_JOBS.map((j) => ({ key: j, label: `${j} 무기`, part: "무기" as Part, kind: j })),
+  ...ARMOR_SLOTS.map((a) => ({ key: a, label: a, part: "갑옷" as Part, kind: a })),
+];
+function GearDex({ odds, wiki, me, best }: { odds: Odds; wiki: Wiki; me: Me; best: Record<string, number> }) {
+  const gears = useMemo(() => gearOf(wiki, odds), [wiki, odds]);
+  const myJob = (me.job ? JOB_NAME[me.job] : "전사") as GearJob;
+  const [sec, setSec] = useEntryState("sim.dex", myJob as string);
+  const cur = DEX_SECTIONS.find((x) => x.key === sec) ?? DEX_SECTIONS[0];
+  const list = gears.filter((g) => g.part === cur.part && g.kind === cur.kind);
+  const got = gears.filter((g) => (best[g.name] ?? 0) > 0);
+  const top = got.reduce((m, g) => Math.max(m, best[g.name] ?? 0), 0);
+  const count = (x: (typeof DEX_SECTIONS)[number]) => gears.filter((g) => g.part === x.part && g.kind === x.kind && (best[g.name] ?? 0) > 0).length;
+  return (
+    <section className="panel sim-dex">
+      <div className="sim-rank-head">
+        <b>강화 도감</b>
+        <small>
+          {got.length}/{gears.length} 장비{top ? ` · 최고 +${top}` : ""}
+        </small>
+      </div>
+      <div className="mk-sub sim-dex-strip">
+        <div className="mk-cats" role="tablist">
+          {DEX_SECTIONS.map((x) => (
+            <button key={x.key} type="button" role="tab" aria-selected={x.key === cur.key} className={"sub-tab" + (x.key === cur.key ? " sub-tab-on" : "")} onClick={() => setSec(x.key)}>
+              {x.key}
+              <small>{count(x)}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+      <ul className="sim-dex-grid" aria-label={cur.label}>
+        {list.map((g) => {
+          const lv = best[g.name] ?? 0;
+          return (
+            <li key={g.name} className={lv ? `sim-dex-got sim-aura-${auraOf(lv)}` : "sim-dex-none"} title={`${g.name} Lv.${g.lv}`}>
+              <span className="sim-dex-pic">{g.icon ? <PicImg pic={g.icon} fit={30} className="sim-pic" /> : <small>{g.name.slice(0, 3)}</small>}</span>
+              <b>{lv ? `+${lv}` : "?"}</b>
+              <small>Lv.{g.lv}</small>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -466,6 +580,10 @@ const josa = (w: string, a: string, b: string) => {
   const c = w.charCodeAt(w.length - 1) - 0xac00;
   return c >= 0 && c < 11172 && c % 28 ? a : b;
 };
+/** 모루 둘레에 떠오르는 불티 (가로 자리 %, 늦게 시작 s, 한 번 도는 때 s, 크기 px). 늘 도는 움직임이라 transform·opacity 만 */
+const EMBERS: [number, number, number, number][] = [
+  [8, 0, 5.2, 3], [18, 1.6, 6.1, 2], [31, 0.4, 4.6, 3], [44, 2.2, 5.8, 2], [57, 1.1, 5.1, 3], [69, 2.9, 6.4, 2], [82, 0.8, 4.9, 3], [93, 2.4, 5.5, 2], [25, 3.3, 7, 2], [75, 3.8, 6.8, 2],
+];
 /** 강화도마다 빛 단계: +4 파랑, +7 보라, +9 금빛, +11 무지개 */
 const auraOf = (lv: number) => (lv >= 11 ? 4 : lv >= 9 ? 3 : lv >= 7 ? 2 : lv >= 4 ? 1 : 0);
 
@@ -511,11 +629,14 @@ function Gauge({ c, keep, onDone }: { c: Charge; keep: boolean; onDone: () => vo
 }
 
 /** 장비 상점: 실제 장비를 +0(노작)으로 산다. 레벨이 높을수록 비싸다 (src/simGear.ts) */
-function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClose, cleared, bag, onTake }: {
+function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClose, cleared, bag, onTake, valueOf, onSell }: {
   gears: Gear[];
   /** 내 장비 (보관함): 다른 장비를 사거나 꺼내도 남는다 (src/simState.ts) */
   bag: Held[];
   onTake: (i: number) => void;
+  /** 장비 시세 (simGear.ts gearValue)와 보관함 장비 팔기 (2026-11-17) */
+  valueOf: (g: Gear, lv: number) => number;
+  onSell: (i: number, value: number) => void;
   cleared: Set<string>;
   part: Part;
   job: GearJob;
@@ -527,6 +648,13 @@ function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClo
   onClose?: () => void;
 }) {
   const list = gears.filter((g) => g.part === part && g.jobs.includes(job) && (part === "무기" || g.kind === slot));
+  // 보관함 장비 팔기는 두 번 눌러야 한다 (한 번 누르면 3초 동안 '정말 팔기')
+  const [sellIdx, setSellIdx] = useState(-1);
+  useEffect(() => {
+    if (sellIdx < 0) return;
+    const t = window.setTimeout(() => setSellIdx(-1), 3000);
+    return () => window.clearTimeout(t);
+  }, [sellIdx]);
   return (
     <section className="panel sim-shop">
       <div className="sim-shop-head">
@@ -565,18 +693,29 @@ function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClo
           <ul className="sim-shop-list sim-bag">
             {bag.map((h, i) => {
               const g = gears.find((x) => x.part === part && x.name === h.name);
+              const v = g ? valueOf(g, h.lv) : 0;
               return (
-                <li key={`${h.name}-${i}`}>
+                <li key={`${h.name}-${i}`} className={`sim-bag-${auraOf(h.lv)}`}>
                   <span className="sim-shop-pic">{g?.icon ? <PicImg pic={g.icon} fit={28} /> : null}</span>
                   <span className="sim-shop-name">
                     <b>
                       +{h.lv} {h.name}
                     </b>
-                    <small>{g ? (part === "무기" ? `공격 ${gearStat(g, h.lv)}` : gearStat(g, h.lv)) : ""}</small>
+                    <small>
+                      {g ? (part === "무기" ? `공격 ${gearStat(g, h.lv)}` : gearStat(g, h.lv)) : ""}
+                      {v ? ` · 시세 ${v.toLocaleString()}` : ""}
+                    </small>
                   </span>
-                  <button type="button" className="btn btn-ghost sim-buy" onClick={() => onTake(i)}>
-                    꺼내기
-                  </button>
+                  <span className="sim-bag-btns">
+                    <button type="button" className="btn btn-ghost sim-buy" onClick={() => onTake(i)}>
+                      꺼내기
+                    </button>
+                    {v > 0 && (
+                      <button type="button" className={"btn btn-ghost sim-buy sim-sell" + (sellIdx === i ? " sim-sell-sure" : "")} onClick={() => (sellIdx === i ? (setSellIdx(-1), onSell(i, v)) : setSellIdx(i))}>
+                        {sellIdx === i ? "정말 팔기" : "팔기"}
+                      </button>
+                    )}
+                  </span>
                 </li>
               );
             })}
@@ -650,6 +789,48 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
   const [shop, setShop] = useState(false);
   const lv = held?.lv ?? 0;
   const broken = held?.broken ?? false;
+  // 장비 시세 (2026-11-17 고도화, simGear.ts gearValue): 지금 팔면, 다음 강화가 되면
+  const valueOf = useCallback((g: Gear, k: number) => gearValue(g, k, all), [all]);
+  const value = gear && !broken ? valueOf(gear, lv) : 0;
+  const [selling, setSelling] = useState(false);
+  useEffect(() => {
+    if (!selling) return;
+    const t = window.setTimeout(() => setSelling(false), 3000);
+    return () => window.clearTimeout(t);
+  }, [selling]);
+  const [sold, setSold] = useState<{ name: string; lv: number; value: number; n: number } | null>(null);
+  useEffect(() => {
+    if (!sold) return;
+    const t = window.setTimeout(() => setSold(null), 2600);
+    return () => window.clearTimeout(t);
+  }, [sold]);
+  const afterSell = (h: Held, v: number) => {
+    setSold((x) => ({ name: h.name, lv: h.lv, value: v, n: (x?.n ?? 0) + 1 }));
+    update((s) => ({ ...s, sold: { n: (s.sold?.n ?? 0) + 1, coins: (s.sold?.coins ?? 0) + v } }));
+  };
+  // 들고 있는 장비 팔기 (두 번 눌러): 팔리면 빈손이 되어 상점이 열린다
+  const sellHeld = async () => {
+    const h = heldRef.current;
+    if (!h || h.broken || !value) return;
+    if (!selling) {
+      setSelling(true);
+      return;
+    }
+    setSelling(false);
+    if (!(await coins.sell(value))) return;
+    clearFx();
+    heldRef.current = null;
+    setHeldState(null);
+    update((s) => ({ ...s, held: { ...(s.held ?? {}), [part]: null } }));
+    afterSell(h, value);
+  };
+  const sellBag = async (i: number, v: number) => {
+    const list = save.bag?.[part] ?? [];
+    const h = list[i];
+    if (!h || !(await coins.sell(v))) return;
+    update((s) => ({ ...s, bag: { ...(s.bag ?? {}), [part]: (s.bag?.[part] ?? []).filter((_, j) => j !== i) } }));
+    afterSell(h, v);
+  };
   const [fx, setFx] = useState<Fx | null>(null);
   const [gain, setGain] = useState<{ from: string; to: string; pct: number; n: number } | null>(null);
   // 시도·부서진 장비·쓴 코인과 결과 점은 진행 상황에 (제작자 2026-11-06 '껐다가 다시 오면 기록이 사라지네')
@@ -690,6 +871,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
   const clearFx = () => {
     setFx(null);
     setGain(null);
+    setSelling(false);
     setAuto(false);
     comboRef.current = 0;
     setCombo(0);
@@ -768,7 +950,13 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
       if (ok && !h.tainted) emit({ kind: "enh", part: scroll.part, scroll: scroll.name, level: cur + 1, combo: comboRef.current });
       setStats((s) => ({ ...s, tries: s.tries + 1, coins: s.coins + 1, broke: s.broke + (!ok && !scroll.keep && p < 1 ? 1 : 0), best: Math.max(s.best, ok ? cur + 1 : cur) }));
       setLog((l) => [...l.slice(-39), { to: cur + 1, ok, broke: !ok && !scroll.keep }]);
-      if (ok && cur + 1 >= CLEAR_LV[scroll.part]) update((s) => ((s.cleared ?? []).includes(g.name) ? s : { ...s, cleared: [...(s.cleared ?? []), g.name] }));
+      // 강화 도감(best)에 닿은 강화도를 적고, 앞 장비 기준(+8·+6)에 닿으면 다음 장비를 연다
+      if (ok)
+        update((s) => {
+          const b = s.best?.[g.name] ?? 0;
+          const next = b >= cur + 1 ? s : { ...s, best: { ...(s.best ?? {}), [g.name]: cur + 1 } };
+          return cur + 1 >= CLEAR_LV[scroll.part] && !(next.cleared ?? []).includes(g.name) ? { ...next, cleared: [...(next.cleared ?? []), g.name] } : next;
+        });
       // 직접 눌러 닿은 강화도: 자동은 여기까지
       if (ok && manual) update((s) => raiseExp(s, `enh:${g.name}`, cur + 1));
       if (ok) {
@@ -908,6 +1096,8 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
           cleared={cleared}
           bag={bag}
           onTake={takeOut}
+          valueOf={valueOf}
+          onSell={sellBag}
         />
       ) : (
         <>
@@ -925,10 +1115,20 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
                   {combo}연속
                 </span>
               )}
+              {value > 0 && (
+                <button type="button" className={"sim-change sim-sell" + (selling ? " sim-sell-sure" : "")} onClick={sellHeld} disabled={!!charge || auto}>
+                  {selling ? "정말 팔기" : "팔기"} <small>{value.toLocaleString()}</small>
+                </button>
+              )}
               <button type="button" className="sim-change" onClick={() => setShop(true)} disabled={!!charge || auto}>
                 장비 바꾸기
               </button>
             </div>
+            <span className="sim-embers" aria-hidden>
+              {EMBERS.map((e, i) => (
+                <i key={i} style={{ ["--x" as string]: `${e[0]}%`, ["--d" as string]: `${e[1]}s`, ["--t" as string]: `${e[2]}s`, ["--s" as string]: `${e[3]}px` }} />
+              ))}
+            </span>
             {fx?.kind === "ok" && fx.big && (
               <span key={`b${fx.n}`} className="sim-burst" aria-hidden>
                 <i />
@@ -998,6 +1198,17 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
                       {gearStat(gear!, lv)}
                     </small>
                   ))}
+                {!broken && value > 0 && (
+                  <small key={`v${lv}`} className="sim-value">
+                    시세 <b>{value.toLocaleString()}</b>
+                    {p > 0 && p < 1 && (
+                      <>
+                        {" "}
+                        · +{next} 되면 <em>{valueOf(gear!, next).toLocaleString()}</em>
+                      </>
+                    )}
+                  </small>
+                )}
               </div>
             )}
           </section>
@@ -1061,6 +1272,14 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
         </>
       )}
 
+      {sold && (
+        <div key={sold.n} className="sim-cheer sim-sold" role="status">
+          <b>+{sold.value.toLocaleString()} 코인</b>
+          <span>
+            +{sold.lv} {sold.name} 팔았어요
+          </span>
+        </div>
+      )}
       <div className="sim-stats">
         <span>
           <small>시도</small>
@@ -1210,8 +1429,45 @@ const STATS = [
   { k: "마나", per: 10 },
 ];
 
-function StatSim({ odds }: { odds: Odds }) {
+/** 성장 칸의 실제 물건 (2026-11-17 고도화, 제작자 '너무 허접해': 글자 상자 '장신구'·'펫' 대신 위키 장신구(벨트·망토·목걸이·반지)와 아이템 책의 펫 그림) */
+interface StatPick {
+  name: string;
+  icon: Pic;
+  sub: string;
+  lv: number;
+}
+const ACC_SLOTS = ["벨트", "망토", "목걸이", "반지"];
+function accessoriesOf(wiki: Wiki): StatPick[] {
+  const out: StatPick[] = [];
+  const seen = new Set<string>();
+  for (const t of wiki.equipment) {
+    if (!ACC_SLOTS.includes(t.slot)) continue;
+    for (const row of t.rows) {
+      const name = row.name.trim();
+      if (!name || !row.icon || seen.has(name) || /^\+|\[/.test(name)) continue;
+      seen.add(name);
+      const h = row.h ?? t.headers;
+      const lv = Number(String(row.cells[h.indexOf("레벨제한")] ?? "").replace(/\D/g, "")) || 0;
+      out.push({ name, icon: row.icon, sub: `${t.slot} · Lv.${lv}`, lv });
+    }
+  }
+  return out.sort((a, b) => a.lv - b.lv || a.name.localeCompare(b.name, "ko"));
+}
+function petsOf(book: Book | null): StatPick[] {
+  if (!book) return [];
+  const out: StatPick[] = [];
+  for (const [name, vs] of Object.entries(book.items)) {
+    const v = vs.find((x) => x.t === "펫" && x.pic);
+    if (v?.pic) out.push({ name, icon: v.pic, sub: `펫${v.g ? ` · ${v.g}` : ""}`, lv: v.lv ?? 0 });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+}
+
+function StatSim({ odds, wiki }: { odds: Odds; wiki: Wiki }) {
   const all = useMemo(() => stepsOf(odds), [odds]);
+  const book = useBook();
+  const accs = useMemo(() => accessoriesOf(wiki), [wiki]);
+  const pets = useMemo(() => petsOf(book), [book]);
   const [key, setKey] = useEntryState("sim.steps", all[0]?.key ?? "");
   const st = all.find((s) => s.key === key) ?? all[0];
   const [stat, setStat] = useEntryState("sim.stat", "지능");
@@ -1225,7 +1481,27 @@ function StatSim({ odds }: { odds: Odds }) {
   const stageRef = useRef(stage);
   stageRef.current = stage;
   if (!st) return <div className="empty">스탯 부여 자료가 없어요</div>;
-  return <StatInner st={st} all={all} setKey={setKey} stat={stat} setStat={setStat} stage={stage} setStage={setStage} stageRef={stageRef} type={type} setType={setType} fx={fx} setFx={setFx} stats={stats} setStats={setStats} auto={auto} setAuto={setAuto} />;
+  return (
+    <StatInner
+      st={st}
+      all={all}
+      setKey={setKey}
+      stat={stat}
+      setStat={setStat}
+      stage={stage}
+      setStage={setStage}
+      stageRef={stageRef}
+      type={type}
+      setType={setType}
+      fx={fx}
+      setFx={setFx}
+      stats={stats}
+      setStats={setStats}
+      auto={auto}
+      setAuto={setAuto}
+      picks={st.types ? pets : accs}
+    />
+  );
 }
 
 function StatInner(p: {
@@ -1245,8 +1521,10 @@ function StatInner(p: {
   setStats: (f: (s: { tries: number; ok: number; big: number }) => { tries: number; ok: number; big: number }) => void;
   auto: boolean;
   setAuto: (v: boolean) => void;
+  /** 고를 수 있는 실제 물건 (장신구나 펫) */
+  picks: StatPick[];
 }) {
-  const { st, stage, stageRef, setStage, setFx, setStats, setType, auto, setAuto } = p;
+  const { st, stage, stageRef, setStage, setFx, setStats, setType, auto, setAuto, picks } = p;
   const pet = !!st.types;
   const step = st.steps[stage];
   const coins = useCoins();
@@ -1259,7 +1537,15 @@ function StatInner(p: {
   const emit = useQuest();
   const expStage = expOf(save, `stat:${st.key}`);
   const cap = Math.min(st.max, expStage);
-  const keep = (key: string, v: { stage: number; type: string | null; since: number }) => update((s) => ({ ...s, stat: { ...s.stat, [key]: v } }));
+  // 고른 물건 (진행 상황에, 표마다): 없으면 처음 것
+  const [itemName, setItemName] = useState<string>(() => save.stat?.[st.key]?.item ?? "");
+  const [picking, setPicking] = useState(false);
+  const [pq, setPq] = useState("");
+  // 아직 안 골랐으면 Lv.40~46 반지(제일 많이 강화하는 것), 없으면 처음 것
+  const item = picks.find((x) => x.name === itemName) ?? picks.filter((x) => x.sub.startsWith("반지") && x.lv >= 40 && x.lv <= 46).pop() ?? picks[0] ?? null;
+  const found = pq.trim() ? filterByName(picks, pq, (x) => [x.name]) : picks;
+  useBackClose(picking, () => setPicking(false));
+  const keep = (key: string, v: { stage: number; type: string | null; since: number; item?: string }) => update((s) => ({ ...s, stat: { ...s.stat, [key]: v } }));
   // 단계·펫 옵션이 바뀌거나 한 번 시도할 때마다 적는다 (처음 그릴 때는 그대로)
   const firstKeep = useRef(true);
   useEffect(() => {
@@ -1267,9 +1553,9 @@ function StatInner(p: {
       firstKeep.current = false;
       return;
     }
-    keep(st.key, { stage, type: p.type, since: since.current });
+    keep(st.key, { stage, type: p.type, since: since.current, item: itemName || undefined });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [st.key, stage, p.type, p.stats.tries]);
+  }, [st.key, stage, p.type, p.stats.tries, itemName]);
   const reset = () => {
     setStage(0);
     stageRef.current = 0;
@@ -1277,7 +1563,7 @@ function StatInner(p: {
     setFx(() => null);
     setAuto(false);
     since.current = 0;
-    keep(st.key, { stage: 0, type: null, since: 0 });
+    keep(st.key, { stage: 0, type: null, since: 0, item: itemName || undefined });
   };
   // 다른 표로 바꾸면 그 표에서 하던 단계로 (예전에는 늘 0 부터)
   const load = (key: string) => {
@@ -1288,6 +1574,8 @@ function StatInner(p: {
     setFx(() => null);
     setAuto(false);
     since.current = k?.since ?? 0;
+    setItemName(k?.item ?? "");
+    setPicking(false);
   };
   const tryOnce = useCallback((manual = false) => {
     const cur = stageRef.current;
@@ -1369,14 +1657,63 @@ function StatInner(p: {
         )}
       </div>
 
-      <section className="panel sim-anvil">
+      {picking ? (
+        <section className="panel sim-shop">
+          <div className="sim-shop-head">
+            <b>{pet ? "펫 고르기" : "장신구 고르기"}</b>
+            <small>{picks.length}개</small>
+            <button type="button" className="sim-shop-x" onClick={() => setPicking(false)}>
+              닫기
+            </button>
+          </div>
+          <input className="sim-search" value={pq} onChange={(e) => setPq(e.target.value)} placeholder="이름" aria-label={pet ? "펫 찾기" : "장신구 찾기"} />
+          <ul className="sim-shop-list sim-pick-list">
+            {found.slice(0, 80).map((x) => (
+              <li key={x.name}>
+                <span className="sim-shop-pic">
+                  <PicImg pic={x.icon} fit={28} className="sim-pic" />
+                </span>
+                <span className="sim-shop-name">
+                  <b>{x.name}</b>
+                  <small>{x.sub}</small>
+                </span>
+                <button
+                  type="button"
+                  className={"btn sim-buy" + (item?.name === x.name ? " sim-buy-on" : " btn-ghost")}
+                  onClick={() => {
+                    setItemName(x.name);
+                    setPicking(false);
+                  }}
+                >
+                  {item?.name === x.name ? "고름" : "고르기"}
+                </button>
+              </li>
+            ))}
+            {!found.length && <li className="sim-muted">찾는 것이 없어요</li>}
+          </ul>
+        </section>
+      ) : (
+      <section className="panel sim-anvil sim-anvil-grow">
+        <span className="sim-vignette" aria-hidden />
+        <div className="sim-gearline">
+          <span>{item ? item.sub : pet ? "펫" : "장신구"}</span>
+          {picks.length > 0 && (
+            <button type="button" className="sim-change" onClick={() => setPicking(true)} disabled={auto}>
+              {pet ? "펫 바꾸기" : "장신구 바꾸기"}
+            </button>
+          )}
+        </div>
         <div key={p.fx?.n ?? 0} className={`sim-item${p.fx ? ` sim-fx-${p.fx.kind}` : ""}`}>
           {p.fx && p.fx.kind !== "keep" && <Sparks kind={p.fx.kind} n={p.fx.kind === "plus2" ? 16 : 10} />}
           <span className="sim-ring" aria-hidden />
-          <span className={`sim-icon sim-glow-${Math.min(4, stage + (stage >= st.max ? 1 : 0))}`} aria-hidden>
-            <span className="sim-half sim-half-a">{pet ? "펫" : "장신구"}</span>
+          <span className={`sim-frame sim-aura-${Math.min(4, stage + (stage >= st.max ? 1 : 0))}`}>
+            <i className="sim-aura" aria-hidden />
+            <span className={`sim-icon${item ? " sim-icon-pic" : ""}`} aria-hidden>
+              <span className="sim-half sim-half-a">{item ? <PicImg pic={item.icon} fit={64} className="sim-pic" /> : pet ? "펫" : "장신구"}</span>
+            </span>
           </span>
-          <b className="sim-lv sim-lv-sm">{shown}</b>
+          {item && <span className="sim-name">{item.name}</span>}
+          <b key={`s${stage}${p.type ?? ""}`} className="sim-lv sim-lv-sm">{shown}</b>
         </div>
         <div className="sim-steps" aria-label="단계">
           {Array.from({ length: st.max }, (_, i) => (
@@ -1402,6 +1739,7 @@ function StatInner(p: {
           )}
         </div>
       </section>
+      )}
 
       <div className="sim-actions">
         <button type="button" className="btn sim-go" disabled={stage >= st.max || auto || coins.coins === 0} onClick={() => tryOnce(true)}>
@@ -1779,6 +2117,8 @@ function BoxOpener({
   const sec = box.sections[Math.min(si, box.sections.length - 1)];
   const total = sec.items.reduce((s, x) => s + x.p, 0) || 1;
   const [pulls, setPulls] = useState<Pull[]>([]);
+  // 이번에 처음 나온 것 (2026-11-17: 카드에 NEW)
+  const [fresh, setFresh] = useState<Set<string>>(() => new Set());
   // 상자·묶음마다 연 수와 나온 것은 진행 상황에 (제작자 2026-11-06 '껐다가 다시 오면 기록이 사라지네')
   const keptBox = useSave().save.box;
   const keptOf = (i: number) => keptBox?.[`${box.key}:${i}`];
@@ -1832,6 +2172,7 @@ function BoxOpener({
       const x = pick(sec.items);
       got.push({ name: x.name, p: x.p / total, id: seq.current++ });
     }
+    setFresh(new Set(got.filter((x) => !expOf(save, gotKey(x.name))).map((x) => x.name)));
     update((s) => got.reduce((acc, x) => raiseExp(acc, gotKey(x.name), 1), s));
     // 많이 열면 드문 것부터 10개만 카드로
     setPulls(k > 10 ? [...got].sort((a, b) => a.p - b.p).slice(0, 10) : got);
@@ -1853,6 +2194,8 @@ function BoxOpener({
       if (hit || tries >= can) break;
     }
     coins.take(tries);
+    setFresh(new Set(got.filter((x) => !expOf(save, gotKey(x.name))).map((x) => x.name)));
+    update((s) => got.reduce((acc, x) => raiseExp(acc, gotKey(x.name), 1), s));
     setPulls([...got].sort((a, b) => a.p - b.p).slice(0, 10));
     setHunt({ name: goal.name, tries, expect: total / goal.p, k: (hunt?.k ?? 0) + 1, short: !hit });
     record(got, tries);
@@ -1946,14 +2289,13 @@ function BoxOpener({
               const xp = iconOf(x.name);
               const body = (
                 <>
-                  <span className="sim-card-name">
-                    {xp && <PicImg pic={xp} fit={22} className="sim-pic" />}
-                    {x.name}
-                  </span>
+                  <span className="sim-card-pic">{xp ? <PicImg pic={xp} fit={34} className="sim-pic" /> : <i className="sim-card-nopic" />}</span>
+                  <span className="sim-card-name">{x.name}</span>
                   <small>
                     {pctText(x.p)}
                     {next ? " · 열기 ›" : opt ? " · 옵션 ›" : ""}
                   </small>
+                  {fresh.has(x.name) && <em className="sim-new">NEW</em>}
                 </>
               );
               const cls = `sim-card sim-t-${tierOf(x.p)}${optItem && opt === optItem ? " sim-card-on" : ""}`;
@@ -2039,6 +2381,8 @@ function GemTab({ odds }: { odds: Odds }) {
 }
 
 const GEM_STARTS = [30, 90, 300, 1000];
+/** 단계마다 보일 보석 그림 (아이템 책의 도감 아이콘, 세레인의 보석 1~4단계) */
+const GEM_PIC = ["", "세레인의흑요석", "세레인의자수정", "세레인의사파이어", "세레인의아쿠아마린"];
 /** 1단계 보석 N개로 시작해 같은 단계 3개씩 합성한다 (실패하면 3개가 같은 단계 1개로) */
 function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
   const rules = useMemo(() => gemSynth(odds), [odds]);
@@ -2050,6 +2394,8 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
   const [fx, setFx] = useState<{ from: number; to: number; n: number } | null>(null);
   const [avg, setAvg] = useState<number[] | null>(null);
   const coins = useCoins();
+  // 보석 그림이 없는 단계(아쿠아마린은 자료에 그림이 없다)는 그 색의 도트 보석
+  const iconOf = useIcon();
   // 순위: 1단계 몇 개로 몇 단계까지 (같은 단계면 적은 보석으로, 그다음 적은 합성으로)
   const rec = useRecord("gem:synth");
   const best = useRef(kept?.best ?? 1);
@@ -2144,6 +2490,9 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
       <section className="panel sim-gems">
         {[1, 2, 3, 4].map((st) => (
           <div key={st} className={`sim-gem sim-gem-${st}` + (fx && fx.to === st ? " sim-gem-hit" : "")}>
+            <span className="sim-gem-pic" aria-hidden>
+              {iconOf(GEM_PIC[st]) ? <NameIcon name={GEM_PIC[st]} size={30} /> : <i className={`sim-gem-dot sim-gem-dot-${st}`} />}
+            </span>
             <b>
               {st}단계 <span>{GEM_NAMES[st]}</span>
             </b>
