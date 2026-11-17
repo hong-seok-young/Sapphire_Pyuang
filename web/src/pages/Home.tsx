@@ -246,8 +246,12 @@ function SplitTile({
             <TileIcon t={t} />
             <b>{s.label}</b>
           </span>
-          {/* 1군: 담당자가 더 준 코인 (아직 팝업으로 안 본 것) */}
-          {s.to === "#/gcoin1" && news["gcoin.gift"] > 0 && <span className="news-badge gs-news">{news["gcoin.gift"]}</span>}
+          {/* 배지는 군마다 따로 (제작자 2026-11-17 '1군인지 2군인지 모르겠다', '과정마다 다 달아야'):
+              1군 = 기다리는 1군 신청(담당자) + 담당자가 더 준 코인(아직 팝업으로 안 본 것), 2군 = 기다리는 2군 신청(담당자) */}
+          {(() => {
+            const c = s.to === "#/gcoin1" ? (news["gcoin.staff1"] ?? 0) + (news["gcoin.gift"] ?? 0) : (news["gcoin.staff"] ?? 0);
+            return c > 0 ? <span className="news-badge gs-news">{c > 99 ? "99+" : c}</span> : null;
+          })()}
         </a>
       ))}
     </div>

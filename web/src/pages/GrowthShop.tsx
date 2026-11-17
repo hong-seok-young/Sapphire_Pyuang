@@ -56,7 +56,7 @@ import type {
   GcRankEntry,
   GcWallet,
 } from "../gcoin";
-import { FitLine, Loading, TopBar } from "../ui";
+import { FitLine, Loading, NewTag, NewsDot, TopBar } from "../ui";
 import { useBackClose } from "../backClose";
 import { refreshNews } from "../news";
 
@@ -804,6 +804,8 @@ function OrdersTab({
               <Pic name={o.name} small />
               <span className="gc-hist-main">
                 <span>
+                  {/* 기다리는 신청마다 'N' (배지가 줄까지 따라간다, 처리하면 사라진다) */}
+                  <NewTag on />
                   <Nick name={o.user} /> <KakaoButton name={o.user} /> · {itemLabel(o)}
                 </span>
                 <small>
@@ -1740,7 +1742,7 @@ export function GrowthShopPage({
           race.list.find((e) => e.id === me) ??
           (raceSample && sample ? race.list[1] : null),
       };
-  const tabs: { key: Tab; label: string }[] = [
+  const tabs: { key: Tab; label: string; dot?: number }[] = [
     { key: "status", label: "성장 현황" },
     { key: "shop", label: "상점" },
     ...(cur.member || sample ? [{ key: "mine" as Tab, label: "내 코인" }] : []),
@@ -1748,14 +1750,15 @@ export function GrowthShopPage({
       ? [
           {
             key: "staff" as Tab,
-            label: `담당자${pending ? ` ${pending}` : ""}`,
+            label: "담당자",
+            dot: pending,
           },
         ]
       : []),
   ];
   const shown = tabs.some((t) => t.key === tab) ? tab : "status";
-  const staffTabs: { key: Staff; label: string }[] = [
-    { key: "orders", label: `신청${pending ? ` ${pending}` : ""}` },
+  const staffTabs: { key: Staff; label: string; dot?: number }[] = [
+    { key: "orders", label: "신청", dot: pending },
     { key: "items", label: "물건" },
     ...(cur.levelCoins ? [] : [{ key: "targets" as Staff, label: "목표" }]),
     { key: "members", label: "현황" },
@@ -1783,6 +1786,7 @@ export function GrowthShopPage({
             }}
           >
             {t.label}
+            <NewsDot n={t.dot ?? 0} />
           </button>
         ))}
       </div>
@@ -1799,6 +1803,7 @@ export function GrowthShopPage({
               }}
             >
               {t.label}
+              <NewsDot n={t.dot ?? 0} />
             </button>
           ))}
         </nav>
