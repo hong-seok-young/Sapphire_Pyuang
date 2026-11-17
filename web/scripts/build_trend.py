@@ -305,8 +305,10 @@ ROOM = re.compile(r"^﻿?(.+?) \d* ?님과 카카오톡 대화")
 # '75비율' = 75:1 (제작자 2026-11-12 '이건 골드네': '제국 75비율 13장 일괄 팝니당'이 물건 '비율'로 셌다)
 RATE = re.compile(r"(?<![\d.])(\d{2,3})(?:\s*[:：대]\s*1(?![\d])|\s*비율)")
 AMOUNT = re.compile(r"(\d+(?:\.\d+)?)\s*(장|콩)")
-SELL = re.compile(r"팝니다|팔아요|팔아유|팔|판매|ㅍ(?![a-z가-힣])|떨이|텁니다|털어요")
-BUY = re.compile(r"삽니다|삽니당|구매|구합|산다|사요|매입|ㅅ(?![a-z가-힣])")
+# '팔' 한 글자는 한글 강화 숫자('팔윙', '팔심연' = +8)이기도 해서 파는 말 꼴만 (2026-11-17: 삽니다 글의 '팔윙' 줄이 팝니다로 셌다). 팝니아 = 팝니다 오타
+SELL = re.compile(r"팝니|팔아|팔게|팔께|팔겠|팔려|팔래|팔까|팔거|팔건|팔고(?![가-힣])|팔(?![가-힣])|팜(?![가-힣])|판매|ㅍ(?![a-z가-힣])|떨이|텁니다|털어요")
+# 줄서봅니다 = 사려고 줄 선다 ('광부 15장 줄서봅니다')
+BUY = re.compile(r"삽니다|삽니당|구매|구합|산다|사요|매입|줄\s?서|ㅅ(?![a-z가-힣])")
 # 냥 = 장 = 현금 만 원 ('코튬코인 312개 6냥', '334팔윙 27냥', 제작자 2026-11-12 '현금가치임'), '4천골' = 0.4만 골드, '4000골' = 4천 골드
 PRICE = re.compile(r"(?<![\d.])(\d+(?:[.,]\d+)?)\s*(장|콩|냥|만\s?골드|만\s?골|만원|만|천\s?골드|천\s?골|골드|골)(?![가-힣\d])")
 # 한 개 값 ('수주 개당 4천골 250개 100만골드', '거가 스무 장당 120만골'): 묶음 값보다 이것을 쓴다
@@ -484,7 +486,7 @@ ENHANCE_RE = re.compile(r"^\+?(\d{1,2}|[오육칠팔구십])(?=[가-힣])")
 # 줄에서 물건이 아닌 말
 SKIP_WORDS = {"제국", "왕국", "중립", "팝니다", "삽니다", "팔아요", "판매", "구매", "구합니다", "급처", "흥정", "일괄", "가능", "플톡", "주세요", "문의", "떨이",
               "개당", "통당", "장당", "통", "노작", "노강", "싸게", "급매", "빠르게", "각개", "통매입", "매입", "노옵", "투옵", "쓰리옵", "이상", "이하", "판완", "완료", "예약", "골드", "현금", "보유", "각", "개", "한통", "한묶음", "대량"}
-NOT_ITEM_WORDS = {"베리밤", "아여", "땡구", "기본전", "플티", "제이상", "사진", "Pvp", "보스뎀", "늘까지만", "장에", "장에어쩌고비율", "년차2년차", "중고니까", "투력", "서봅니다", "대기중", "먹튀해서뭐해요", "쿠폰받은거", "EDD", "빛의둘레길", "왕국골드", "길원가", "퀭님실제키", "사기임", "어떠십니꼬", "구속된크앙의", "쟁법사리키", "법사레벨", "전사레벨", "레인저레벨", "무도가레벨", "번개저", "렌저거불보유렌저길포", "로저뚝가능한지좀물어봐줭", "아이언피스트두개합쳐서", "코스튬패키지", "제이상방어구",  # 2026-11-10 톡방 말·닉네임 (물건 아님)
+NOT_ITEM_WORDS = {"렌템", "전템", "법템", "무템", "코튬패키지", "코튬팩", "무기코튬세트", "베리밤", "아여", "땡구", "기본전", "플티", "제이상", "사진", "Pvp", "보스뎀", "늘까지만", "장에", "장에어쩌고비율", "년차2년차", "중고니까", "투력", "서봅니다", "대기중", "먹튀해서뭐해요", "쿠폰받은거", "EDD", "빛의둘레길", "왕국골드", "길원가", "퀭님실제키", "사기임", "어떠십니꼬", "구속된크앙의", "쟁법사리키", "법사레벨", "전사레벨", "레인저레벨", "무도가레벨", "번개저", "렌저거불보유렌저길포", "로저뚝가능한지좀물어봐줭", "아이언피스트두개합쳐서", "코스튬패키지", "제이상방어구",  # 2026-11-10 톡방 말·닉네임 (물건 아님)
      # 플티 = 플래티넘, '40제이상' = 40제 이상  # 제작자 2026-11-10: 오타·무시
                   "보석", "코튬", "코스튬", "아이템", "장비", "무기", "방어구", "캐릭터", "계정", "통판매", "대리판매", "도감", "도감용",
                   "전사", "렌저", "레인저", "법사", "마법사", "무도가", "신발", "투구", "갑옷", "장갑", "모자", "반지", "벨트", "망토", "목걸이", "이상", "이하",
@@ -494,7 +496,7 @@ NOT_ITEM_WORDS = {"베리밤", "아여", "땡구", "기본전", "플티", "제�
                   "플티포함", "일괄시", "일광시", "적정가", "보스데미지", "대량", "각각", "세트로", "맥스80", "파글합니다", "애정이듬뿍담긴계정", "대량시할인수율",
                   "첫번째보석", "맥주도핑다수", "패키지코튬하나만", "장갑신발코튬각각", "전사무기코튬아무거나", "스무스갑합쳐서", "열매3개합", "각개x", "계정구해요", "코튬각각", "통판", "급처", "구해요", "팝니당", "삽니당"}  # 아드골드 = 도감의 아이템·골드 드랍율 (제작자)
 # 캐릭터 글의 말(올마, 도감, 46전사)과 닉네임 표시(닉넴 …)는 물건이 아니다
-CHAR_TOKEN = re.compile(r"올마|노도감|도감|^닉넴|^\d{2}(전사|렌저|레인저|법사|마법사|무도가|전|렌|법|무)$|^(투쉴|덥마|와마|프마|쉴마)")
+CHAR_TOKEN = re.compile(r"올마|노도감|도감|쟁캐|캐릭|^닉넴|^\d{2}(전사|렌저|레인저|법사|마법사|무도가|전|렌|법|무)$|^(투쉴|덥마|와마|프마|쉴마)")
 # 줄임말 한 글자가 두 글자를 줄인 것
 SQUEEZE = {"닼": "다크", "롭": "로브", "렌": "레인"}
 # 자동으로 풀기 어려운 줄임말 (제작자 확인). 값이 None 이면 위키에 없는 물건이라 줄임말 그대로 둔다
@@ -529,7 +531,11 @@ ALIASES: dict[str, str | None] = {
     "레이븐": "레이븐목걸이", "맹독신": "맹독의장화", "오트윌갑": "오트윌의경갑", "철실": "철갑쉴드", "닼실": "다크스틸쉴드",
     # 제작자 2026-11-10 확인: 닥소 = 닼소, 오트갑 = 오트윌갑, 데조 = 데조르바의보우 (칠데조 = +7 데조)
     "닥소": "다크스틸소드", "오트갑": "오트윌의경갑", "데조": "데조르바의보우",
-    "황솟": "황혼의송곳니", "신벨": "신념의벨트", "파글": "파워글러브",  # 제작자 2026-11-10
+    "황솟": "황혼의 송곳니",
+    # 2026-11-17 톡방 문맥으로 정함: 그보 = 그레이트보우('C무기 9강 18 삽니다 / 9그보 20 삽니다'), 맹독 = 맹독의장화(렌 캐릭터 장비 목록 '민2속8 4맹독-1': 민첩·이동속도, 맹독신과 같은 것)
+    "그보": "그레이트보우", "맹독": "맹독의장화",
+    "신벨": "신념의벨트", "파글": "파워글러브",
+    "번지": "번개맞은나무",  # 짐작, 확인 전: 마법사 무기 ('지12 7번지 43', '팔파홀 or 팔번지', '8번지 100'). 강화 표의 마법사 무기 가운데 '번'으로 시작하는 것은 번개맞은나무뿐
     "오트윌": "오트윌의경갑", "약반": "약속의반지", "방랑자의화실집": "방랑자의 화살집", "써지": "써지싸이클", "써지사이클": "써지싸이클",  # 위키 이름 (화실집은 오타)
     "워투": "워로드투구",  # 문맥으로 정함 (제작자 2026-11-10 '앞뒤 문맥 필요'): 닥갑·닥쉴·백레와 같이 파는 전사 장비, '힘8 속8 6워투' = 워로드투구의 속성저항·힘
     "레인저껍갑": "세계수가지갑옷",  # 제작자 2026-11-10 '세계수 가지갑일걸' (껍갑은 전사 것인데 레인저라고 적음)
@@ -550,9 +556,9 @@ ALIASES: dict[str, str | None] = {
 GEMSET = re.compile(r"^(\d{1,3})번?보석셋$")
 # 펫 (제작자 2026-11-03): 레어펫, 수룡펫, 베스페라, 모스가디는 펫. 값은 속성강화와 펫 종류로 정해지는데 매물이 적어 '펫' 하나로 묶고
 # 묶음·원글에 무슨 펫인지 적는다
-PET_WORDS = {"베루아": "베루아", "레어펫": "레어펫", "수룡펫": "수룡펫", "수룡": "수룡펫", "베스페라": "베스페라", "모스가디": "모스가디", "젤피": "젤피", "나이녹스": "나이녹스", "올리브": "올리브", "펫": "펫",
+PET_WORDS = {"베루아": "베루아", "레어펫": "레어펫", "수룡펫": "수룡펫", "수룡": "수룡펫", "베스페라": "베스페라", "모스가디": "모스가디", "젤피": "젤피", "나이녹스": "나이녹스", "올리브": "올리브", "펫": "펫", "작은거미": "작은거미",
              "에스페라": "베스페라"}  # 에스페라 = 짐작, 확인 전 ('힘삼펫 에스페라. 2': 게임에 에스페라는 없고 펫 베스페라)
-PET_RE = re.compile(r"^(?:펫)?(베루아|레어펫|수룡펫|수룡|베스페라|에스페라|모스가디|젤피|나이녹스|올리브|[가-힣]{1,4}펫)$")  # 젤피 = 펫 (유어 2026-11-04), 나이녹스 = 펫 (제작자 2026-11-04)  # 베루아 = 펫 (제작자 2026-11-10)  # 올리브 = 펫, '힘3 올리브' = 힘3 속성부여 (제작자 2026-11-10, 펫 속성부여는 3까지)
+PET_RE = re.compile(r"^(?:펫)?(베루아|레어펫|수룡펫|수룡|베스페라|에스페라|모스가디|작은거미|젤피|나이녹스|올리브|[가-힣]{1,4}펫)$")  # 젤피 = 펫 (유어 2026-11-04), 나이녹스 = 펫 (제작자 2026-11-04)  # 베루아 = 펫 (제작자 2026-11-10)  # 올리브 = 펫, '힘3 올리브' = 힘3 속성부여 (제작자 2026-11-10, 펫 속성부여는 3까지)
 SKILL_BOOK = {"포아": "포레스트아이", "화폭": "화염폭풍", "치격": "치명적일격", "소드": "소울드레인샷", "쉴드": "쉴드", "휩": "휩쓸기", "덥": "더블샷", "충": "충격샷",
               "아프": "아이스프리즌", "수기": "수호의기원", "강인함": "강인함",  # 유어 2026-11-04: 아프 = 법사 스킬 아이스프리즌, 수기 = 수호의기원
               "와": "와일드스윙", "프": "프레임쇼크"}
@@ -658,11 +664,12 @@ NON_WIKI = {"아드셋": "아드레날린 보석 세트", "활발한강아지": 
             "참회의인도": "참회의 인도 (코스튬)", "참회의인도자": "참회의 인도 (코스튬)",  # 게임 이름 '참회의 인도' (해외 위키 번역 '인도자'는 틀림, 2026-11-12)
             "흰고양귀꼬리코튬셋": "흰고양이 귀·꼬리 (코스튬)", "흰고양이귀꼬리": "흰고양이 귀·꼬리 (코스튬)", "이네스날개": "이네스의 날개 (코스튬)",  # 흰고양이 = 게임 이름 흰고양이귀·흰고양이꼬리 (2026-11-12 제작자 '이미지 왜 없어')
             "거불최고급헌터증서": "최고급헌터증서 (거래불가)",
-            "꿈형태": "꿈의 형상 (코스튬)",  # 짐작, 확인 전: 해외 위키 '꿈의 형상' 코스튬 장신구
+            "블루베리젤리": "블루베리 젤리 (코스튬)", "꿈형태": "꿈의 형상 (코스튬)",  # 짐작, 확인 전: 해외 위키 '꿈의 형상' 코스튬 장신구
             **{n: n for n in ("데블랑사탕", "동그리사탕", "딸기빙수", "정제된마나", "세레인사파이어", "시프넬의자수정보석", "시프넬보석", "윙프릴의흑요석보석", "윙프릴사파이어",
                               "코스튬코인", "길드주화", "최고급헌터증서", "최고급헌터카드", "가네샤파편")},
             # 2026-11-12 게임 속 이름으로 (도감 정보 사전·오린 아이콘 목록): 그림·정보가 붙는다
-            "코튬코인": "코스튬코인", "아쥬가르파편": "아쥬가르의 영혼 파편", "쿠라다가방": "쿠라다 (가방)",
+            "코튬코인": "코스튬코인", "아쥬가르파편": "아쥬가르의 영혼 파편", "아쥬파편": "아쥬가르의 영혼 파편", "데블사탕": "데블랑사탕",
+            "C무기": "C등급 무기",  # 'C무기 9강 18 삽니다': 도감용으로 +9 C등급 무기 아무거나 "쿠라다가방": "쿠라다 (가방)",
             "시프넬의자수정보석": "시프넬의자수정 (2단계)", "윙프릴의흑요석보석": "윙프릴의흑요석 (1단계)",
             "청빙조": "청빙조 (코스튬)", "아이언파운더": "아이언 파운더 (코스튬)",
             "아이스파운더": "아이언 파운더 (코스튬)",  # 짐작, 확인 전: 게임에 '아이스 파운더'는 없고 무도가 코스튬 무기 '아이언 파운더'('청빙조 or 아이스 파운더 2', 둘 다 무도가 코스튬 무기)
@@ -682,7 +689,8 @@ NON_WIKI = {"아드셋": "아드레날린 보석 세트", "활발한강아지": 
             # 톡방의 코스튬 목록 '천날(15), 요정날개(8), 분노(8), 신속(8), 공포(6), 해적왕(8), 스나이퍼(8), 강탈(8), 집중(7), 화염마법사(5), 꿈의형태(3.5)'와
             # '흑마법사 요정의날개 등 레어코튬 다수', '펌프킹(3.5장)' (펌프퀸과 짝). 악마소환사는 흑마법사·화염마법사와 같은 이름 꼴이라 코스튬으로 본다
             **{k: f"{k} (코스튬)" for k in ("공포", "신속", "강탈", "해적왕", "집중", "흑마법사", "화염마법사", "악마소환사", "꿈의형태", "펌프킹", "악마날개")},
-            "요정날개": "요정의날개 (코스튬)", "요정의날개": "요정의날개 (코스튬)"}
+            "요정날개": "요정의날개 (코스튬)", "요정의날개": "요정의날개 (코스튬)", "악마날개": "악마의날개 (코스튬)", "악마의날개": "악마의날개 (코스튬)",
+            "천사의날개": "천사의날개 (코스튬)", "광휘의날개": "광휘의 날개 (코스튬)"}
 
 
 def _norm_name(name: str) -> str:
@@ -846,6 +854,46 @@ def game_names() -> dict[str, str]:
     return _GAME
 
 
+_SET_PARTS: dict[tuple[str, str], str] | None = None
+# 톡방의 부위 말 -> 도감 코스튬 탭
+PART_TAB = {"모자": "모자", "투구": "모자", "뚝": "모자", "후드": "모자", "갑옷": "갑옷", "로브": "갑옷", "롭": "갑옷", "갑": "갑옷", "옷": "갑옷",
+            "장갑": "장갑", "장": "장갑", "신발": "신발", "신": "신발", "장화": "신발", "부츠": "신발"}
+
+
+def costume_set_part(c: str) -> str | None:
+    """'이네스모자' -> '이네스의후드 (코스튬)': 세트 앞말 + 부위 말을 도감 사전의 그 세트 그 부위 코스튬으로 (세트 이름이 '<앞말>의…' 꼴인 것만)"""
+    global _SET_PARTS
+    if _SET_PARTS is None:
+        _SET_PARTS = {}
+        bp = DATA / "도감" / "아이템" / "아이템.json"
+        if bp.exists():
+            for b in json.loads(bp.read_text(encoding="utf-8")).get("아이템", []):
+                nm, tab = (b.get("이름") or "").strip(), b.get("고르기") or ""
+                m = re.match(r"([가-힣]{2,6})의\s?[가-힣]", nm)
+                if b.get("큰탭") == "코스튬" and m and tab.startswith("코스튬"):
+                    _SET_PARTS.setdefault((m.group(1), tab[3:]), nm)
+    for part in sorted(PART_TAB, key=len, reverse=True):
+        if c.endswith(part) and len(c) > len(part) + 1:
+            base = re.sub(r"의$", "", c[: -len(part)])
+            hit = _SET_PARTS.get((base, PART_TAB[part]))
+            if hit:
+                return hit + " (코스튬)"
+    return None
+
+
+_LOOSE_GAME: dict[str, str] | None = None
+
+
+def loose_game_names() -> dict[str, str]:
+    """게임 속 이름을 '의'·띄어쓰기 없이 ('자미로 장갑' = 자미로의 장갑, '천사의 날개' = 천사의날개)"""
+    global _LOOSE_GAME
+    if _LOOSE_GAME is None:
+        _LOOSE_GAME = {}
+        for k, v in game_names().items():
+            _LOOSE_GAME.setdefault(_loose(k), v)
+    return _LOOSE_GAME
+
+
 def known_name(c: str, names: list[str]) -> tuple[str, str] | None:
     """줄임말 없이 적은 이름: 붙인 이름, 낱말 하나, 이웃한 두 낱말 차례로 NON_WIKI 나 게임 속 이름이면 (화면 이름, 적힌 말)"""
     words = [re.sub(r"[^가-힣a-zA-Z0-9]", "", w) for w in names]
@@ -855,7 +903,7 @@ def known_name(c: str, names: list[str]) -> tuple[str, str] | None:
             continue
         if w in NON_WIKI:
             return NON_WIKI[w], w
-        g = game_names().get(_nk(w))
+        g = game_names().get(_nk(w)) or loose_game_names().get(_loose(w))
         if g:
             return g, w
     return None
@@ -908,6 +956,12 @@ def _parse_line(line: str, rs: Resolver) -> dict | None:
     words = s.split()
     if not words:
         return None
+    while len(words) > 2 and (SELL.fullmatch(words[-1]) or BUY.fullmatch(words[-1]) or re.fullmatch(r"[ㅍㅅ]+|팝니다!*|삽니다!*", words[-1])):
+        words.pop()  # '9그보 20 삽니다': 끝의 사고파는 말 앞 숫자가 값
+    gl = re.fullmatch(r"(\+?(?:\d{1,2}|[오육칠팔구십])?)([가-힣]{2,})(\d+(?:\.\d+)?)", words[-1])
+    if gl and not any(PRICE.fullmatch(w) for w in words) and not norm_opt(words[-1]) and (
+            gl.group(2) in ALIASES or gl.group(2) in NON_WIKI or gl.group(2) in rs.names or _nk(gl.group(2)) in game_names()):
+        words[-1:] = [gl.group(1) + gl.group(2), gl.group(3)]
     if sum(1 for c in re.sub(r"\(.*?\)|\[.*?\]", " ", line).split(",") if item_chunk(c)) >= 2:
         return None  # 여러 물건에 값 하나 ('334팔윙,명4스카띠,민1닼스 30냥', '6블주투,6블스갑 6냥'): 한 물건 값이 아니다
     # 가격: 단위 붙은 것 중 현금(장, 콩) 우선, 없으면 만 골드, 없으면 맨 뒤 단위 없는 숫자
@@ -999,7 +1053,9 @@ def _parse_line(line: str, rs: Resolver) -> dict | None:
             if re.fullmatch(r"\+?(?:\d{1,2}|[오육칠팔구십])?닼", w):  # '8닼', '팔닼' = +8 다크스틸소드 (제작자 2026-11-04)
                 names.append(w)
                 continue
-            if w not in NON_WIKI and w not in ALIASES and not w.endswith("의") and len(re.sub(r"[^가-힣a-zA-Z]", "", STAT_RE.sub("", w))) < 2:
+            bare_w = ENHANCE_RE.sub("", w)  # '8고지' -> '고지': 숫자 강화를 뗀 말이 아는 줄임말이면 스펙 말이 아니다 (2026-11-17: '지9 8고지 30', '8윙 334 25장' 이 통째로 빠졌다)
+            if w not in NON_WIKI and w not in ALIASES and bare_w not in ALIASES and bare_w not in NON_WIKI and bare_w not in ("닼", "윙", "샤") \
+                    and not w.endswith("의") and len(re.sub(r"[^가-힣a-zA-Z]", "", STAT_RE.sub("", w))) < 2:
                 continue  # 스펙 말만 남음 ('마나의 열매'의 '마나의'는 이름이라 남긴다)
             if w:
                 names.append(w)
@@ -1052,6 +1108,8 @@ def _parse_line(line: str, rs: Resolver) -> dict | None:
             c = re.sub(r"[^가-힣a-zA-Z0-9]", "", c)
             if (len(c) < 2 and c not in ("닼", "윙", "샤")) or c in NOT_ITEM_WORDS:
                 continue
+            if c in NON_WIKI and c not in ALIASES and "(코스튬)" in NON_WIKI[c]:
+                continue  # '집중(7)', '공포 체8' = 코스튬 (스킬북 집중3 으로 풀지 않는다)
             found = rs.resolve(c)
             if found:
                 return found, c, (_enh_value(em) if em else 0)
@@ -1068,6 +1126,8 @@ def _parse_line(line: str, rs: Resolver) -> dict | None:
         return {"name": name, "wiki": False, "enh": 0, "opts": opts, "price": _r(price), "abbr": joined}
     for w in [joined] + (names if len(names) > 1 else []):
         sb = skill_book(w, rs)
+        if sb and (CHAR_HINT.search(line) or re.search(r"\d{2}\s?(이상|렙)", line)):
+            return None
         if sb:
             return {"name": sb[0], "wiki": sb[1], "enh": 0, "opts": opts, "price": _r(price), "bare": bare, "abbr": w}
     for w in [joined] + (names if len(names) > 1 else []):
@@ -1081,12 +1141,25 @@ def _parse_line(line: str, rs: Resolver) -> dict | None:
                 opts = num_opts(name, lead_digits, num_words)
             return {"name": name, "wiki": wiki, "enh": enh if enh <= 20 else 0, "opts": opts, "price": _r(price), "bare": bare, "abbr": abbr}
     hit = try_word(joined)
-    if not hit and len(names) > 1:
+    # '천사의 날개 20', '요정의 날개 9': 붙인 이름이 아는 코스튬·게임 이름이면 낱말 하나('날개' = Lv.1 투구, '요정의' = 숲요정의장갑)로 풀지 않는다 (2026-11-17)
+    whole = re.sub(r"[^가-힣a-zA-Z0-9]", "", joined)
+    whole_known = len(names) > 1 and (whole in NON_WIKI or _nk(whole) in game_names() or _loose(whole) in loose_game_names())
+    if not hit and len(names) > 1 and not whole_known:
         for w in names:  # 물건이 둘이거나 설명 말이 섞였을 때: 낱말 하나씩
             hit = try_word(w)
             if hit:
                 break
     unknown = False
+    if hit and hit[1] == "광전사" and not hit[2] and not enh_word and not lead_digits and not num_words and all(o.startswith("체력") for o in opts):
+        # 강화·신발 옵션 없이 적은 '광전사'('체9 광전사', '분노,광전사 18')는 영웅 코스튬 광전사. '5광전사 불8 힘2 이속10' 은 광전사의부츠 (2026-11-17 톡방 문맥)
+        return {"name": "광전사 (코스튬)", "wiki": False, "unknown": False, "enh": 0, "opts": opts, "price": _r(price), "bare": bare, "abbr": "광전사"}
+    dual = re.fullmatch(r"(\+?(?:\d{1,2}|[오육칠팔구십]))?(심연|광기)", whole)
+    if not hit and dual and (dual.group(1) or enh_word or lead_digits or num_words or any(not o.startswith("체력") for o in opts)):
+        # 강화나 무기 옵션이 붙은 '심연'·'광기'는 코스튬이 아니라 무기 (2026-11-17 톡방 문맥): '8심연 명5크3힘10 165', '5310 팔심연' = Lv.48 무도가 무기 심연의 파편,
+        # '9광기 13' = 도감용 +9 광기의송곳니(Lv.9 전사 무기). 강화·옵션 없이 적은 것('광기 (전사 무기 코스튬) 4장', '체8 심연')은 코스튬 그대로
+        full = {"심연": "심연의 파편", "광기": "광기의송곳니"}[dual.group(2)]
+        em = ENHANCE_RE.match(whole)
+        hit = (rs.names.get(_norm_name(full), full), dual.group(2), _enh_value(em) if em else 0)
     if hit:
         name, abbr, enh = hit
         wiki = True
@@ -1106,7 +1179,10 @@ def _parse_line(line: str, rs: Resolver) -> dict | None:
         abbr = c
         name = NON_WIKI.get(c, c)
         wiki = False
-        if c not in NON_WIKI and costume:
+        set_part = costume_set_part(c)
+        if set_part and (c not in NON_WIKI or re.fullmatch(r"[가-힣]+ (모자|갑옷|장갑|신발) \(코스튬\)", NON_WIKI[c])):
+            name = set_part  # '이네스 모자(8)' = 이네스의후드, '드롤 갑옷(8)' = 드롤의중갑: 도감 사전의 그 세트 그 부위 이름 (2026-11-17)
+        elif c not in NON_WIKI and costume:
             if re.search(r"\d|각각|하나만|아무거나|제외|패키지|합쳐", c):
                 return None  # '장갑신발 코튬 각각', '패키지 코튬 하나만': 이름이 아닌 설명
             name = c + " (코스튬)"  # 이름을 그대로 적은 코스튬: 줄임말이 아니다
@@ -1115,6 +1191,8 @@ def _parse_line(line: str, rs: Resolver) -> dict | None:
         elif c not in NON_WIKI and known_name(c, names):
             name, abbr = known_name(c, names)  # 게임 속 이름 그대로 ('새싹머리장식'), 'A or B' 목록은 처음 아는 이름 ('청빙조 or 아이스 파운더')
         elif c not in NON_WIKI:
+            if len(names) >= 4:
+                return None  # '거불 에무 20 거가 에무 23': 여러 물건을 한 줄에 적은 것
             rs.unknown[c] += 1
             unknown = True
     enh = enh or enh_word
@@ -1186,7 +1264,32 @@ def range_opts(name: str) -> tuple[list[str], str]:
                             _RANGE_MIN[(nm, st)] = min(_RANGE_MIN.get((nm, st), lo_fix), lo_fix)
                     job = cells[hs.index("직업")] if "직업" in hs and hs.index("직업") < len(cells) else ""
                     _RANGE_OPTS.setdefault(re.sub(r"\s", "", row.get("name", "")), (stats, job))
-    return _RANGE_OPTS.get(re.sub(r"\s", "", name), ([], ""))
+    key = re.sub(r"\s", "", name)
+    if key not in _RANGE_OPTS:
+        for k in list(_RANGE_OPTS):
+            if _loose(k) == _loose(key):  # 장비 표 '사막용병장갑' = 아이템 '사막용병의장갑': 옵션 범위도 같은 열쇠로
+                _RANGE_OPTS[key] = _RANGE_OPTS[k]
+                for (nm, st), v in list(_RANGE_MAX.items()):
+                    if nm == k:
+                        _RANGE_MAX[(key, st)] = v
+                for (nm, st), v in list(_RANGE_MIN.items()):
+                    if nm == k:
+                        _RANGE_MIN[(key, st)] = v
+                break
+    return _RANGE_OPTS.get(key, ([], ""))
+
+
+def digits_are_options(name: str, bare: float | None) -> bool:
+    """단위 없는 끝 숫자를 한 자리씩 끊으면 그 장비의 옵션 수·범위에 맞는가 ('노강 샤보 371' = 크리3 민첩7 속저1)"""
+    if bare is None or not float(bare).is_integer() or bare < 10:
+        return False
+    digits = [int(ch) for ch in str(int(bare))]
+    stats, _ = range_opts(name)
+    key = re.sub(r"\s", "", name)
+    for cand in (stats, EFFECTIVE_OPTS.get(key)):
+        if cand and len(digits) == len(cand) and all(v <= _RANGE_MAX.get((key, st), 99) for v, st in zip(digits, cand)):
+            return True
+    return False
 
 
 def bare_is_option(name: str, words: list[str], bare: float | None) -> bool:
@@ -1372,22 +1475,35 @@ def group_label(kind: str, x: dict) -> str:
 
 
 def resolve_bare(kind: str, xs: list[dict]) -> None:
-    """단위 없는 숫자: 같은 묶음(없으면 같은 물건)에서 단위를 적은 글의 중간값에 가까운 쪽(만 원 / 만 골드)으로 다시 읽는다"""
-    # 기준: 같은 묶음의 모든 값 (단위 없는 값은 일단 BARE_GOLD_FROM 규칙으로 읽은 것). 단위 적은 글 하나가 잘못돼도 다수를 따른다
-    ref_group: dict[str, list[float]] = defaultdict(list)
+    """단위 없는 숫자: 같은 묶음(없으면 같은 물건)에서 단위를 적은 글의 중간값에 가까운 쪽(만 원 / 만 골드)으로 다시 읽는다.
+    단위를 적은 글이 없으면 그 묶음의 모든 값(단위 없는 값은 일단 BARE_GOLD_FROM 규칙으로 읽은 것)이 기준.
+    2026-11-17: 기준에 단위 없는 값까지 넣어서, 같은 사람이 '6회바셋 700'(만 골드)을 날마다 올리면 그 값이 다수가 되어 700만 원으로 남았다"""
+    def refs(same) -> list[float]:
+        return [x["price"] for x in xs if x.get("bare") is None and same(x)]
+
+    all_group: dict[str, list[float]] = defaultdict(list)
     for x in xs:
-        ref_group[group_label(kind, x)].append(x["price"])
+        all_group[group_label(kind, x)].append(x["price"])
     for x in xs:
         v = x.get("bare")
         if v is None:
             continue
-        ref = ref_group[group_label(kind, x)]
-        if len(ref) < 2:
-            continue
+        g = group_label(kind, x)
+        ref = refs(lambda y: group_label(kind, y) == g)
+        if not ref and kind not in ("enhance", "enchant"):
+            ref = refs(lambda y: True)  # 강화·속성부여 묶음은 값이 크게 달라 물건 전체로 넓히지 않는다
+        if not ref:
+            ref = all_group[g]
+            if len(ref) < 2:
+                continue
         mid = statistics.median(ref)
-        as_won, as_gold = v, v / USUAL_RATE
-        pick = as_won if abs(math.log(as_won / mid)) <= abs(math.log(as_gold / mid)) else as_gold
-        x["price"] = _r(max(pick, 0.001))
+        if mid <= 0:
+            continue
+        # 지금 읽은 쪽이 기준에서 3배 넘게 벗어나고 다른 쪽이 3배 안일 때만 바꾼다 (옵션이 좋아 10배 비싼 글을 골드로 바꾸지 않게: '크4민5 5사용장-5' 와 '34 5사용장 0.5장')
+        far = lambda p: abs(math.log(p / mid)) > math.log(3)
+        other = v / USUAL_RATE if abs(x["price"] - v) < 1e-9 else v
+        if far(x["price"]) and not far(other):
+            x["price"] = _r(max(other, 0.001))
 
 
 def group_sort_key(kind: str, g: dict) -> tuple:
@@ -1421,25 +1537,184 @@ def people(xs: list[dict], key: str = "price") -> list[dict]:
     return out
 
 
+# ---- 글 하나(여러 줄)를 물건 줄들로 (2026-11-17 제작자 '시세 이상하게 적히거나 그런 거 없는지 검토', '모르겠으면 톡방 문맥을 봐') ----
+# 글 머리에 단위를 밝힌 글 ('가격 (단위 만 골드)', '물품은 골드에만 판매합니다'): 그 글의 단위 없는 숫자는 모두 만 골드
+GOLD_UNIT_MSG = re.compile(r"단위\s*[:：]?\s*만\s?골|골드에만|골드로만|골드만\s?받")
+# 여러 물건을 묶은 값 ('세계수롭 건마밸 합쳐서 구매시35', '지1 노강 세계수롭 같이 35장' = 캐릭터와 같이): 한 물건 값이 아니다
+TOGETHER = re.compile(r"같이|합쳐|합\s?\d|->|→|[가-힣]\s*\+\s*(?:[가-힣]|\d+장)")  # '6세계롭+지3건마벨 80', '344 8윙 + 5장 -> 7샤'(바꾸자는 글)
+# '6강 세계롭 60+지능3 체재2 뿌벨 15 합 75' = 물건마다 값, '75만+34 5사용장 2만'·'1230만골+지3 작은거미 합쳐서 17장' = 골드와 물건을 묶은 값
+PLUS_SPLIT = re.compile(r"(?<=[\d만골장콩])\s*\+\s*(?=[가-힣])|(?<=[만골장콩])\s*\+\s*(?=\d)")
+# 값을 괄호에 적은 줄 ('49 팔샤 (90)', '죽망 지3 (55)', '이네스 모자(8) 장갑(4) 신발(4)', '천날(15), 요정날개(8)')
+# 사고파는 글이 아닌 말
+CHATTER = re.compile(r"하다가|씀\.|썼|날렸|날림|터졌")
+PAREN_PRICE = re.compile(r"([가-힣A-Za-z]*)\s?\((\d{1,3}(?:\.\d+)?)\)")
+
+
+def parse_lines(line: str, rs: Resolver) -> list[dict]:
+    """한 줄 -> 물건들. 보통 하나, 값을 괄호에 적은 줄과 '+' 로 이은 줄은 여럿, 묶음 값은 없음"""
+    segs = PLUS_SPLIT.split(line)
+    if len(segs) > 1:
+        if not re.search(r"[가-힣]{2}", re.sub(r"만\s?골드?|골드|만원|[만장콩골]", "", segs[0])):
+            return []  # 골드 + 물건 묶음
+        out = []
+        for seg in segs:
+            p = parse_line(re.sub(r"\s*합\s*\d.*$", "", seg), rs)
+            if p:
+                out.append(p)
+        return out
+    if TOGETHER.search(line) or line.lstrip().startswith("@") or CHATTER.search(line):
+        return []  # 묶음 값, 남을 부르는 답글('@엘프,흙사 / 27'), 잡담('전 6광부 하다가 300만 씀..')
+    marks = list(PAREN_PRICE.finditer(line))
+    unit_price = bool(PRICE.search(re.sub(r"\(.*?\)", " ", line)))
+    tail_only = len(marks) == 1 and not line[marks[0].end():].strip()
+    if marks and not unit_price and (tail_only or len(marks) > 1):
+        out = paren_items(line, rs)  # '5설원신 37 (3)': 괄호를 지우고 읽으면 앞의 옵션 숫자 37 이 값이 된다
+        if out:
+            return out
+    p = parse_line(line, rs)
+    if p:
+        return [p]
+    return paren_items(line, rs) if marks else []
+
+
+def paren_items(line: str, rs: Resolver) -> list[dict]:
+    """값을 괄호에 적은 줄: 쉼표마다, 괄호가 여럿이면 앞말 + 부위마다 한 물건"""
+    out = []
+    for c in (line.split(",") if "," in line else [line]):
+        cm = list(PAREN_PRICE.finditer(c))
+        if not cm:
+            continue
+        if len(cm) == 1:
+            m = cm[0]
+            if c[m.end():].strip() or not c[: m.start(2) - 1].strip():
+                continue  # 줄 끝의 괄호만 값 ('(3)상세 문의' 의 앞 번호, '8페일(584) 750' 의 옵션은 아니다)
+            virtual = [c[: m.start(2) - 1].strip() + " " + m.group(2)]
+        else:  # '이네스 모자(8) 장갑(4)': 앞말 + 부위마다
+            if not all(m.group(1) for m in cm):
+                continue
+            prefix = c[: cm[0].start()].strip()
+            virtual = [f"{prefix} {m.group(1)} {m.group(2)}" for m in cm]
+        for v in virtual:
+            head, num = v.rsplit(" ", 1)
+            game = None if _nk(head) in NON_WIKI else game_names().get(_nk(head)) or loose_game_names().get(_loose(head))
+            p = parse_line(f"{_nk(head)} {num}" if game else v, rs)
+            if p and game and not p["wiki"]:
+                p.update({"name": game, "unknown": False})  # '고립 (4)', '사과 속 꼬물이(4)': 게임 속 이름 그대로
+            if p:
+                out.append(p)
+    return out
+
+
+_ALL_LINES: dict[int, list[dict]] = {}
+
+
+def all_lines(msgs: list[dict], rs: Resolver) -> list[dict]:
+    """모든 글의 물건 줄 (팝니다·삽니다 같이, 한 번만 만든다). 글 단위로 문맥을 본다:
+    - 단위를 밝힌 글은 그 단위로 (GOLD_UNIT_MSG)
+    - 값 없이 스펙만 늘어놓은 문단(캐릭터 판매 글의 장비 목록 '8임페 361', 값 없는 팝니다 목록 '6강 사용장 3 5')에서
+      범위 옵션이 있는 장비의 단위 없는 끝 숫자는 값이 아니라 옵션
+    - 같은 사람이 같은 날 같은 물건(강화·옵션까지 같음)을 다른 글로 값을 바꿔 다시 올리면 마지막 글의 값 (고쳐 올린 값)"""
+    key = id(msgs)
+    if key in _ALL_LINES:
+        return _ALL_LINES[key]
+    out: list[dict] = []
+    for mi, m in enumerate(msgs):
+        t = m["text"]
+        msg_side = side_of(t.split("\n")[0]) or side_of(t)
+        gold_msg = bool(GOLD_UNIT_MSG.search(t))
+        cur = ""  # 앞 문단의 머리 줄에서 이어진 쪽
+        paras: list[tuple[int, int, list[dict]]] = []  # (숫자 든 줄 수, 값이 읽힌 줄 수, 물건들)
+        for para in re.split(r"\n\s*\n", t):
+            listed = hit = 0
+            got: list[dict] = []
+            marks = {side_of(l) for l in para.split("\n")} - {""}
+            para_side = next(iter(marks)) if len(marks) == 1 else ""  # 문단에 한쪽 말만 있으면 그쪽 ('A\nB\nC ㅅㅅ', 'A\nB\n팝니다.')
+            head = ""  # 이 문단에서 본 머리 줄
+            after_char = False  # 바로 앞줄이 캐릭터 파는 줄 ('제국 쟁 44 투쉴마 법사 32/35')
+            for line in para.split("\n"):
+                was_char, after_char = after_char, bool(LEVEL_JOB.search(line) and re.search(r"\d\s*(장|콩)?\s*[ㅍㅅ]*\s*$", line))
+                own = side_of(line)
+                if own and not re.search(r"\d", line) and len(re.findall(r"[가-힣]", line)) <= 10:
+                    head = cur = own  # 머리 줄: 아래 줄들이 이쪽
+                if RATE.search(line) or ("골드" in line and side_of(line) and len(line) < 20):
+                    continue  # 골드 시세 글은 위에서 셌다
+                if re.search(r"\d", line) and len(re.findall(r"[가-힣]", line)) >= 2:
+                    listed += 1
+                ps = parse_lines(line, rs)
+                if was_char:
+                    ps = [p for p in ps if not (p.get("bare") is not None and p["bare"] >= 10)]  # '지1 노강 세계수롭 30 ㅍ': 캐릭터에 그 템을 얹은 값
+                hit += bool(ps)
+                for p in ps:
+                    # 줄에 적힌 말 > 이 문단의 머리 줄 > 문단에 한쪽 말만 > 앞 문단의 머리 줄 > 글 전체
+                    # (2026-11-17: '왕국 삽니다 … 왕국 팝니다 …' 한 글의 둘째 묶음이 첫 줄 쪽으로 셌다)
+                    p.update({"date": m["date"], "side": own or head or para_side or cur or msg_side or "sell", "who": m["who"], "tel": m["tel"],
+                              "raw": re.sub(r"\s+", " ", line).strip()[:60], "mi": mi})
+                    got.append(p)
+            paras.append((listed, hit, got))
+        total = sum(a for a, _, _ in paras)
+        total_hit = sum(b for _, b, _ in paras)
+        any_unit = any(p.get("bare") is None for _, _, g in paras for p in g)
+        for listed, hit, got in paras:
+            ratio = hit / listed if listed else 1
+            spec_only = (listed >= 4 and ratio < 0.3) or (ratio < 0.6 and not any_unit and total >= 6 and total_hit / total < 0.2)
+            for p in got:
+                if p.get("bare") is not None:
+                    if spec_only and p["wiki"] and range_opts(p["name"])[0]:
+                        continue
+                    if gold_msg:
+                        p["price"], p["bare"] = _r(max(p["bare"] / USUAL_RATE, 0.001)), None
+                out.append(p)
+    # 같은 날 다른 글로 다시 올린 같은 물건은 마지막 글만
+    # 단위 없는 숫자를 만 골드로 적는 사람의 글 ('희미한원혼20 / 마나의열매25 / 정제된마나10 ㅅㅅ'): 같은 글의 다른 줄이 단위를 적은 글들과 견줘
+    # 만 골드가 분명하고 만 원이 분명한 줄은 없으면, 견줄 글이 없는 줄도 만 골드로 읽는다
+    united: dict[tuple, list[float]] = defaultdict(list)
+    for p in out:
+        if p.get("bare") is None:
+            united[(p["side"], p["name"])].append(p["price"])
+    by_msg: dict[int, list[dict]] = defaultdict(list)
+    for p in out:
+        if p.get("bare") is not None and p["bare"] < BARE_GOLD_FROM:
+            by_msg[p["mi"]].append(p)
+    for ps in by_msg.values():
+        gold = won = 0
+        for p in ps:
+            ref = united.get((p["side"], p["name"]))
+            if not ref:
+                continue
+            mid = statistics.median(ref)
+            far = lambda v: mid <= 0 or abs(math.log(v / mid)) > math.log(3)
+            if far(p["price"]) and not far(p["bare"] / USUAL_RATE):
+                gold += 1
+            elif not far(p["price"]):
+                won += 1
+        if gold and not won:
+            for p in ps:
+                if not united.get((p["side"], p["name"])):
+                    p["price"], p["bare"] = _r(max(p["bare"] / USUAL_RATE, 0.001)), None
+
+    def same(p: dict) -> tuple:
+        return (p["who"], p["date"], p["side"], p["name"], p["enh"], tuple(p["opts"]), p.get("pet"))
+
+    last: dict[tuple, int] = {}
+    for p in out:
+        last[same(p)] = max(last.get(same(p), -1), p["mi"])
+    final: dict[tuple, set] = defaultdict(set)
+    for p in out:
+        if p["mi"] == last[same(p)]:
+            final[same(p)].add(p["price"])
+    out = [p for p in out if p["mi"] == last[same(p)] or p["price"] in final[same(p)]]  # 값이 그대로면 앞 글도 센다 (글 수)
+    _ALL_LINES[key] = out
+    return out
+
+
 def item_prices(msgs: list[dict], last_week: str, rs: Resolver, side: str = "sell") -> list[dict]:
     """물건마다 묶음(groups: 속성부여 템은 주 스탯별, 강화 템은 강화 단계별)과 그 안의 강화·옵션 묶음(variants)별 (날짜, 만 원 가격) 모음.
     글 2개 이상인 물건만. 글 본문 한 줄과 닉네임을 보기로 남긴다"""
     kinds = load_kinds()
     items: dict[str, list[dict]] = defaultdict(list)
-    for m in msgs:
-        t = m["text"]
-        msg_side = side_of(t.split("\n")[0]) or side_of(t)
-        for line in t.split("\n"):
-            if RATE.search(line) or ("골드" in line and side_of(line) and len(line) < 20):
-                continue  # 골드 시세 글은 위에서 셌다
-            p = parse_line(line, rs)
-            if not p:
-                continue
-            p.update({"date": m["date"], "side": side_of(line) or msg_side or "sell", "who": m["who"], "tel": m["tel"],
-                      "raw": re.sub(r"\s+", " ", line).strip()[:60]})
-            if p["side"] != side:
-                continue  # 파는 사람이 부른 값과 사는 사람이 부른 값은 따로 센다 (제작자 지적 2026-11-03)
-            items[p["name"]].append(p)
+    for p in all_lines(msgs, rs):
+        if p["side"] == side:  # 파는 사람이 부른 값과 사는 사람이 부른 값은 따로 센다 (제작자 지적 2026-11-03)
+            items[p["name"]].append(dict(p))
 
     def summary(xs: list[dict]) -> dict:
         prices = [x["price"] for x in xs]
@@ -1483,6 +1758,18 @@ def item_prices(msgs: list[dict], last_week: str, rs: Resolver, side: str = "sel
             if len(xs) < (2 if side == "sell" else 1):
                 continue
         resolve_bare(kind, xs)
+        # 재료·기타의 단위 없는 큰 숫자는 골드 그대로 ('특마옷 15000' = 1만 5천 골드. 만 골드로 읽으면 재료 하나가 200만 원이 된다). 짐작, 확인 전 (2026-11-17)
+        if kind not in ("enhance", "enchant") and "(코스튬)" not in name and name != "펫":
+            for x in xs:
+                if x.get("bare") is not None and x["bare"] >= BARE_GOLD_FROM and x["price"] >= 50:
+                    x["price"] = _r(max(x["bare"] / 10_000 / USUAL_RATE, 0.001))
+        # 옵션 숫자를 값으로 읽은 줄: 한 자리씩 끊으면 옵션에 맞고, 같거나 더 높은 강화의 다른 글보다 3배 넘게 비쌀 때 ('노강 샤보 371', +8 이 70~90만 원)
+        odd = [x for x in xs if x.get("bare") is not None and x["wiki"] and digits_are_options(name, x["bare"])
+               and (lambda others: others and x["price"] >= 3 * max(others))([y["price"] for y in xs if y["raw"] != x["raw"] and y["enh"] >= x["enh"]])]
+        if odd:
+            xs = [x for x in xs if x not in odd]
+            if len(xs) < (2 if side == "sell" else 1):
+                continue
         by_group: dict[str, list[dict]] = defaultdict(list)
         for x in xs:
             by_group[group_label(kind, x)].append(x)
