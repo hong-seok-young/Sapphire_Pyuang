@@ -1,6 +1,7 @@
 // 운영진 때리기 (server/smack.ts, 화면 src/pages/Smack.tsx)
-// GET  /api/smack -> { targets, mine: { [운영진]: 기록 }, topTargets, topHitters, hitMe }
-//   topTargets 가장 많이 맞은 운영진, topHitters 가장 많이 때린 길드원 (데미지 합 순, 10명. 테스트 계정은 빠진다), hitMe 내가 운영진이면 나를 때린 합
+// GET  /api/smack -> { targets, mine: { [운영진]: 기록 }, totals: { [운영진]: 모두가 때린 합 }, topTargets, topHitters, hitMe }
+//   totals 는 목록 카드의 현상금(맞은 데미지 합)·K.O., topTargets 가장 많이 맞은 운영진, topHitters 가장 많이 때린 길드원 (데미지 합 순, 10명. 테스트 계정은 빠진다),
+//   hitMe 내가 운영진이면 나를 때린 합
 // POST /api/smack { items: [{ target, hits, damage, kos, crits, deadly, best }] } -> { ok }
 //   화면이 3초마다(와 화면을 떠날 때 sendBeacon) 그동안 때린 만큼을 더한다. 사용 기록에는 남기지 않는다 (_middleware.ts)
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
@@ -23,12 +24,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (!canSmack(me)) return FORBIDDEN();
   const chars = me.chars ?? [me.id];
   const mineQ = `(${chars.map(() => "?").join(", ")})`;
-  const [targets, mine, topTargets, topHitters, hitMe] = await Promise.all([
+  const [targets, mine, byTarget, topHitters, hitMe] = await Promise.all([
     smackTargets(env, me.owner ?? me.id),
     env.DB.prepare("SELECT target, hits, damage, kos, crits, deadly, best FROM smack_stats WHERE hitter = ?").bind(me.id).all<Row & { target: string }>(),
-    env.DB.prepare(
-      `SELECT target AS id, SUM(hits) AS hits, SUM(damage) AS damage, SUM(kos) AS kos FROM smack_stats WHERE ${NOT_TEST("hitter")} GROUP BY target ORDER BY damage DESC LIMIT ${TOP}`,
-    ).all<{ id: string; hits: number; damage: number; kos: number }>(),
+    // 운영진마다 맞은 합 (운영진은 몇 명이라 한 번에 다 읽고 순위는 여기서 자른다)
+    env.DB.prepare(`SELECT target AS id, SUM(hits) AS hits, SUM(damage) AS damage, SUM(kos) AS kos FROM smack_stats WHERE ${NOT_TEST("hitter")} GROUP BY target ORDER BY damage DESC`).all<{
+      id: string;
+      hits: number;
+      damage: number;
+      kos: number;
+    }>(),
     env.DB.prepare(
       `SELECT hitter AS id, SUM(hits) AS hits, SUM(damage) AS damage, SUM(kos) AS kos, MAX(best) AS best FROM smack_stats WHERE ${NOT_TEST("hitter")} GROUP BY hitter ORDER BY damage DESC LIMIT ${TOP}`,
     ).all<{ id: string; hits: number; damage: number; kos: number; best: number }>(),
@@ -38,10 +43,13 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   ]);
   const mineMap: Record<string, Row> = {};
   for (const r of mine.results) mineMap[r.target] = { hits: r.hits, damage: r.damage, kos: r.kos, crits: r.crits, deadly: r.deadly, best: r.best };
+  const totals: Record<string, { hits: number; damage: number; kos: number }> = {};
+  for (const r of byTarget.results) totals[r.id] = { hits: r.hits, damage: r.damage, kos: r.kos };
   return json({
     targets,
     mine: mineMap,
-    topTargets: topTargets.results,
+    totals,
+    topTargets: byTarget.results.slice(0, TOP),
     topHitters: topHitters.results,
     hitMe: hitMe?.hits ? { hits: hitMe.hits, damage: hitMe.damage ?? 0, kos: hitMe.kos ?? 0, people: hitMe.people } : null,
   });

@@ -26,7 +26,6 @@ import {
   GCOIN_OPEN,
   DONATE_OPEN,
   canDonate,
-  canSmack,
   canSuggest,
   canSee,
   canSeeLog,
@@ -113,7 +112,6 @@ const CHUNKS = {
   Rental: () => import("./pages/Rental"),
   GuildDungeon: () => import("./pages/GuildDungeon"),
   Fit: () => import("./pages/Fit"),
-  Smack: () => import("./pages/Smack"),
   GrowthShop: () => import("./pages/GrowthShop"),
   Donate: () => import("./pages/Donate"),
   Hall: () => import("./pages/Hall"),
@@ -146,7 +144,6 @@ const TodoPage = lazy(() => CHUNKS.Todo().then((m) => ({ default: m.TodoPage }))
 const RentalPage = lazy(() => CHUNKS.Rental().then((m) => ({ default: m.RentalPage })));
 const GuildDungeonPage = lazy(() => CHUNKS.GuildDungeon().then((m) => ({ default: m.GuildDungeonPage })));
 const FitPage = lazy(() => CHUNKS.Fit().then((m) => ({ default: m.FitPage })));
-const SmackPage = lazy(() => CHUNKS.Smack().then((m) => ({ default: m.SmackPage })));
 const GrowthShopPage = lazy(() => CHUNKS.GrowthShop().then((m) => ({ default: m.GrowthShopPage })));
 const DonatePage = lazy(() => CHUNKS.Donate().then((m) => ({ default: m.DonatePage })));
 const HallPage = lazy(() => CHUNKS.Hall().then((m) => ({ default: m.HallPage })));
@@ -528,9 +525,6 @@ function Wiki({
   // 헬스 루틴 (개발중, 길드원 완뻔치 님 개발 요청 #8, 2026-11-09 '일단 나만 보이게'): 실제 헬스장 운동 기록. 열기 전에는 앱개발자(와 테스트 계정)만
   // (launcher.ts canFit, 서버 server/fit.ts). 위키 자료를 쓰지 않아 기다리지 않는다
   else if (page === "fit") body = canFit(me) ? <FitPage me={me} /> : <DevSoon title="헬스 루틴" />;
-  // 운영진 때리기 (개발 요청 #10, 제작자 2026-11-09 '우선 나한테만 보이게'): 열기 전에는 앱개발자(와 테스트 계정)만 (launcher.ts canSmack, 서버 server/smack.ts)
-  else if (page === "smack")
-    body = canSmack(me) ? <SmackPage me={me} arg={arg} /> : <DevSoon title="운영진 때리기" />;
   // 2군 성장코인샵 (개발중, 제작자 2026-11-09 '오피서랑 길마 보게 열어 줘'): 열기 전에는 길드마스터·오피서·앱개발자(와 테스트 계정)만 (launcher.ts canGcoin, 서버 server/gcoin.ts)
   else if (page === "gcoin") body = canGcoin(me) ? <GrowthShopPage me={me} onMe={onMe} /> : <DevSoon title="성장코인샵" />;
   // 1군 성장코인샵 (제작자 2026-11-15 '1군 2군 누르면 각각 경로로 아예 각개 메뉴'): 홈 칸 왼쪽 반. 담당자가 오픈하기 전에는 담당자·길드마스터·앱개발자만 (서버도 403)

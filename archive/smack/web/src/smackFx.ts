@@ -374,3 +374,93 @@ export function restartAs(el: HTMLElement | null, prefix: string, cls: string | 
   if (had === cls) replayAnim(el);
   else el.classList.add(cls);
 }
+
+// ───────── 2026-11-17 2차 (제작자 '지금 너무 허접해'): 주먹·필살기·외침·말풍선 ─────────
+
+/** 도트 권투 글러브 (오른손, 16x13 칸). X 테두리, R 빨강, L 밝은 빨강, D 그림자, W 손목 흰색, H 손목 하이라이트 */
+const GLOVE_MAP = [
+  "....XXXXXXX.....",
+  "...XRLLRRRRX....",
+  "..XRLLRRRRRRX...",
+  "..XRLRRRRRRRRX..",
+  ".XRRRRRRRRRRRRX.",
+  ".XRRRRRRRRRRRRX.",
+  ".XRRRRRRRRRDDRX.",
+  ".XRRRRRRRRDDDRX.",
+  "..XRRDDDDDDDRX..",
+  "..XWWWWWWWWWX...",
+  "..XWHHWWWWWWX...",
+  "..XWWWWWWWWWX...",
+  "...XXXXXXXXX....",
+];
+const GLOVE_COLORS: Record<string, string> = { X: "#2a1030", R: "#e23b3b", L: "#ff8a8a", D: "#9c1c1c", W: "#f3f0ff", H: "#ffffff" };
+/** 금빛 글러브 (필살기): 같은 모양에 색만 */
+const GOLD_COLORS: Record<string, string> = { X: "#3a2600", R: "#ffc35c", L: "#fff1b8", D: "#c98a1a", W: "#fff8e0", H: "#ffffff" };
+let gloveUrl = "";
+let goldGloveUrl = "";
+function drawMap(map: string[], colors: Record<string, string>, scale: number): string {
+  if (typeof document === "undefined") return "";
+  const w = map[0].length;
+  const h = map.length;
+  const cv = document.createElement("canvas");
+  cv.width = w * scale;
+  cv.height = h * scale;
+  const ctx = cv.getContext("2d");
+  if (!ctx) return "";
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const c = colors[map[y][x]];
+      if (!c) continue;
+      ctx.fillStyle = c;
+      ctx.fillRect(x * scale, y * scale, scale, scale);
+    }
+  return cv.toDataURL("image/png");
+}
+/** 글러브 그림 주소 (한 번 그려 둔다. 16 칸 x 4 = 64px, 화면은 pixelated 로 키운다) */
+export function gloveArt(gold = false): string {
+  if (gold) return (goldGloveUrl ||= drawMap(GLOVE_MAP, GOLD_COLORS, 4));
+  return (gloveUrl ||= drawMap(GLOVE_MAP, GLOVE_COLORS, 4));
+}
+export const GLOVE_W = 16;
+export const GLOVE_H = 13;
+
+/** 필살기 게이지: 가득 차는 수와 타격마다 차는 양 */
+export const ULT_FULL = 30;
+export const ULT_GAIN: Record<HitKind, number> = { normal: 1, critical: 2, deadly: 3 };
+/** 필살기 데미지 = 일반 한 대 x 10 (서버 MAX_HIT_DAMAGE 5000 안: 160 x 10 x 1.5 = 2400) */
+export const ULT_MULT = 10;
+export function rollUlt(combo: number): number {
+  const [a, b] = BASE_DMG;
+  return Math.round((a + Math.random() * (b - a)) * ULT_MULT * comboBonus(combo));
+}
+
+/** 콤보 외침: 5콤보마다 한 단계 (생일 스티커와 같은 흐름, 더 짧게). 10단계 뒤로는 마지막 */
+export const SHOUTS = ["NICE", "GOOD", "GREAT", "COOL", "SUPER", "AWESOME", "AMAZING", "FEVER", "INSANE", "LEGEND", "GODLIKE"];
+export const shoutOf = (combo: number) => (combo < 5 ? "" : SHOUTS[Math.min(SHOUTS.length - 1, Math.floor(combo / 5) - 1)]);
+/** 이 콤보부터 피버 (무대 둘레 무지개, 콤보 숫자 무지개) */
+export const FEVER_AT = 30;
+
+/** 맞는 운영진의 말풍선 (누구를 비꼬는 말이 아니라 놀이 말투만) */
+export const TAUNTS = {
+  hit: ["아야!", "왜 때려!", "그만해!", "하나도 안 아픈데?", "흑흑", "길마한테 이를 거야", "오늘 왜 이래", "운영 열심히 할게", "한 대만 더…", "스트레스 풀려?"],
+  low: ["살려 줘…", "눈앞이 핑핑", "항복할까…", "아직 안 쓰러져", "여기까지인가"],
+  ko: ["졌다…", "다음엔 안 져", "으악", "잠깐 쉴게", "너무해"],
+  idle: ["쳐 봐", "겁나?", "어디 한번", "콤보 끊겼네", "기다리는 중"],
+};
+export const pickOne = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
+
+/** 필살기 때 캔버스 불꽃 (K.O. 보다 크게) */
+export function ultBurst(fx: Fx, x: number, y: number) {
+  fx.flash(x, y, "#ffffff", 90, 700);
+  fx.flash(x, y, "#ffe14a", 70, 520, 0.03);
+  fx.ring(x, y, "#ffd27a", 620, 0, 0.8);
+  fx.ring(x, y, "#ffffff", 460, 0.08, 0.6);
+  fx.ring(x, y, "#ff7aa8", 380, 0.16, 0.6);
+  sparks(fx, x, y, 40, [420, 760], ["#ffffff", "#fff27a", "#ffd23a", "#ff9a3c"], [0.3, 0.6], 2.8, 10, 120);
+  fx.explode(x, y - 10, "star", ["#ffc35c", "#fff27a"], 1.3, 0.05);
+  fx.explode(x, y, "pixel", ["#ffc35c", "#ff6b6b", "#6f8fff", "#ffffff"], 1.2, 0.1);
+}
+/** 피버 중 타격: 둘레에 무지개 불똥이 더 튄다 */
+export function feverSparks(fx: Fx, x: number, y: number) {
+  sparks(fx, x, y, 10, [220, 420], ["#ff6b6b", "#ffc35c", "#7bff9a", "#6f8fff", "#d08cff"], [0.25, 0.5], 2.2, 5);
+}
