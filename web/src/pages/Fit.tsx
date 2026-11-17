@@ -10,6 +10,7 @@ import type { Me } from "../auth";
 import { useBackClose } from "../backClose";
 import { useEntryState } from "../router";
 import { FitLine, Loading, TopBar } from "../ui";
+import { FitAnim } from "./FitAnim";
 import {
   KINDS,
   KIND_NAME,
@@ -575,6 +576,7 @@ function Session({
         return (
           <div key={i + e.key} className="fit-entry">
             <div className="fit-entry-head">
+              <FitAnim ex={e} scale={2} className="fit-anim-entry" />
               <button type="button" className="fit-entry-name" onClick={() => onDetail(e.key)}>
                 <b>{e.name}</b>
                 <small>{PART_NAME[e.part]}</small>
@@ -795,6 +797,7 @@ function RoutineEditor({
       {items.map((it, i) => (
         <div key={i + it.key} className="fit-entry">
           <div className="fit-entry-head">
+            <FitAnim ex={it} scale={1.5} className="fit-anim-entry" />
             <span className="fit-entry-name">
               <b>{it.name}</b>
               <small>{PART_NAME[it.part]}</small>
@@ -1053,6 +1056,7 @@ function ExTab({ exercises, history, onDetail, onAdded }: { exercises: Exercise[
             const h = history.get(x.key) ?? [];
             return (
               <button key={x.key} type="button" className="fit-exrow" onClick={() => onDetail(x.key)}>
+                <FitAnim ex={x} scale={1.5} />
                 <span className="fit-exrow-main">
                   <b>{x.name}</b>
                   <small>
@@ -1181,6 +1185,7 @@ function Picker({ exercises, history, onClose, onPick }: { exercises: Exercise[]
               <span className={"fit-tick" + (on ? " fit-tick-on" : "")} aria-hidden>
                 {on ? picked.indexOf(x.key) + 1 : ""}
               </span>
+              <FitAnim ex={x} scale={1.5} />
               <span className="fit-exrow-main">
                 <b>{x.name}</b>
                 <small>
@@ -1243,10 +1248,13 @@ function Detail({ ex, points, onClose, onDeleted }: { ex: Exercise; points: Poin
   stats.push(["기록", `${points.length}회`]);
   return (
     <Sheet title={ex.name} onClose={onClose}>
-      <p className="fit-detail-sub">
-        {PART_NAME[ex.part]} · {KIND_NAME[ex.kind]}
-        {ex.custom ? " · 내 종목" : ""}
-      </p>
+      <div className="fit-detail-top">
+        <FitAnim ex={ex} scale={3} className="fit-anim-big" />
+        <p className="fit-detail-sub">
+          {PART_NAME[ex.part]} · {KIND_NAME[ex.kind]}
+          {ex.custom ? " · 내 종목" : ""}
+        </p>
+      </div>
       {points.length === 0 ? (
         <p className="fit-empty">아직 기록이 없어요</p>
       ) : (
