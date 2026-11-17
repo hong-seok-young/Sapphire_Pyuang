@@ -88,12 +88,12 @@ export interface DonateInput {
   gold: number | null;
 }
 export const askDonate = (v: DonateInput) => api<{ id: number }>("/api/donate", "POST", v);
-export const addDonate = (who: string, v: DonateInput) =>
-  api<{ id: number; dia: number; mileage: number }>("/api/donate", "POST", { ...v, who, confirm: true });
+export const addDonate = (who: string, v: DonateInput, at?: number) =>
+  api<{ id: number; dia: number; mileage: number }>("/api/donate", "POST", { ...v, who, confirm: true, ...(at ? { at } : {}) });
 export const confirmDonate = (id: number, v: Partial<DonateInput>) =>
   api<{ dia: number; mileage: number }>(`/api/donate/${id}`, "PUT", { ...v, action: "confirm" });
-export const editDonate = (id: number, v: DonateInput) =>
-  api<{ dia?: number; mileage?: number }>(`/api/donate/${id}`, "PUT", { ...v, action: "edit" });
+export const editDonate = (id: number, v: DonateInput, at?: number) =>
+  api<{ dia?: number; mileage?: number }>(`/api/donate/${id}`, "PUT", { ...v, action: "edit", ...(at ? { at } : {}) });
 export const rejectDonate = (id: number) => api(`/api/donate/${id}`, "PUT", { action: "reject" });
 export const placeDonate = (id: number, place: "keep" | "used") => api(`/api/donate/${id}`, "PUT", { action: "place", place });
 /** 장비대여 운용: 장비대여 '물건 추가' 목록으로 넘긴다 (undo 면 보관으로 되돌림, 아직 안 올렸을 때만) */
@@ -127,6 +127,29 @@ export const STATUS_NAME: Record<DonateStatus, string> = { request: "확인 전"
 export const PLACE_NAME: Record<DonatePlace, string> = { keep: "보관", rent: "장비대여", used: "나눔·사용" };
 
 /** '11/10' */
+/**
+ * 기부 날짜 (제작자 2026-11-17 '기부일자도 적을 수 있게 해야 돼'): 운영진 직접 등록·가치 수정에서 적는 월·일. 해는 올해, 오늘보다 뒤면 지난해.
+ * 서버에는 그날 한국 시간 낮 12시로 보낸다 (오늘이면 보내지 않아 지금 때가 된다)
+ */
+export function giftDayMs(month: number, day: number, now = Date.now()): number | null {
+  if (!Number.isInteger(month) || !Number.isInteger(day) || month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const k = new Date(now + 9 * 3_600_000);
+  let y = k.getUTCFullYear();
+  const at = (yy: number) => Date.UTC(yy, month - 1, day, 3);
+  if (new Date(at(y) + 9 * 3_600_000).getUTCDate() !== day) return null;
+  if (at(y) > now + 12 * 3_600_000) y -= 1;
+  return at(y);
+}
+/** ms 가 한국 날짜로 오늘인지 */
+export const isTodayKst = (ms: number, now = Date.now()) => Math.floor((ms + 9 * 3_600_000) / 86_400_000) === Math.floor((now + 9 * 3_600_000) / 86_400_000);
+/** 한국 날짜의 월·일 */
+export const kstMonthDay = (ms: number) => {
+  const d = new Date(ms + 9 * 3_600_000);
+  return { m: d.getUTCMonth() + 1, d: d.getUTCDate() };
+};
+const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
+export const weekdayText = (ms: number) => WEEK[new Date(ms + 9 * 3_600_000).getUTCDay()];
+
 export function dayText(ms: number): string {
   const d = new Date(ms + 9 * 3_600_000);
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;

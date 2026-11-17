@@ -57,10 +57,6 @@ export interface LaunchItem {
   shopGate?: boolean;
 }
 
-/** 운영진 때리기를 모두에게 열었는지 (서버 server/smack.ts SMACK_OPEN 과 같이 바꾼다) */
-export const SMACK_OPEN = false;
-/** 운영진 때리기에 들어가는 사람: 열기 전에는 앱개발자(와 테스트 계정)만 */
-export const canSmack = (me: Me) => SMACK_OPEN || me.role === "developer" || TEST_IDS.includes(me.id);
 
 /** 2군 성장코인샵을 여는 때: 2026-11-11(수) 11:00 한국 시간 (제작자 2026-11-10 '11/11 오전 11시 오픈 예약', 서버 server/gcoin.ts GCOIN_OPEN_AT 과 같이 바꾼다).
  * 화면을 연 때 한 번 본다 (그 전에 열어 둔 화면은 다시 열거나 업데이트로 새로 뜨면) */
@@ -119,9 +115,7 @@ export const ITEMS: LaunchItem[] = [
   // 건의함 (개발중, 제작자 요청 2026-11-09 '건의사항은 게시판에서 빼고 별도 버튼, 익명 기능'): 게시판의 건의 사항을 따로, 익명 글·댓글.
   // 열면 src/board.ts SUGGEST_OPEN (그때 soon·badge 가 빠진다)
   { key: "suggest", title: "건의함", short: "건의", to: "#/suggest", icon: "💡", developer: !SUGGEST_OPEN, soon: !SUGGEST_OPEN, badge: "개발중", match: ["suggest"] },
-  // 운영진 때리기 (개발 요청 #10, 제작자 2026-11-09 '우선 나한테만 보이게'): 길마·오피서 캐릭터를 두드려 스트레스 풀기 (pages/Smack.tsx).
-  // 열 때는 developer·soon·badge 를 빼고 SMACK_OPEN (CLAUDE.md '운영진 때리기')
-  { key: "smack", title: "운영진 때리기", short: "때리기", to: "#/smack", icon: "🥊", developer: !SMACK_OPEN, soon: !SMACK_OPEN, badge: "개발중", match: ["smack"] },
+  // 운영진 때리기(개발 요청 #10)는 2026-11-17 제작자 '이건 그냥 접자'로 뺐다: 코드는 archive/smack/ (CLAUDE.md '운영진 때리기')
   // 2군 성장코인샵 (개발중, 제작자 2026-11-09 '1군전용처럼 2군전용 성장코인샵, 개발중, 나한테만'): 레벨업마다 쌓이는 성장코인으로 산다 (pages/GrowthShop.tsx).
   // 열 때는 managers·soon·badge 를 빼고 GCOIN_OPEN (CLAUDE.md '2군 성장코인샵')
   // 명예의 전당 (개발중, 제작자 2026-11-10 '명예의 전당은 별도 버튼으로'): 기부로 쌓인 마일리지 순위. 열 때는 managers·soon·badge 를 빼고 DONATE_OPEN.
@@ -230,7 +224,7 @@ function build(dock: string[], slots: string[], search: boolean): Layout {
  *  안 보이는 칸은 normalize 가 빼고 위부터 채운다. 개발 중 칸은 뒤에 두어 '개발 중' 묶음 순서) */
 export const DEFAULT_LAYOUT: Layout = {
   dock: ["home", "board", "info", "search", "chat"],
-  grid: ["ranking", "hall", "shop", "gcoin", "market", "match", "rent", "enhance", "todo", "requests", "suggest", "devreq", "admin", "gaps", "log", "trend", "dex", "damage", "sim", "simtest", "fit", "app", "smack"],
+  grid: ["ranking", "hall", "shop", "gcoin", "market", "match", "rent", "enhance", "todo", "requests", "suggest", "devreq", "admin", "gaps", "log", "trend", "dex", "damage", "sim", "simtest", "fit", "app"],
 };
 
 /**

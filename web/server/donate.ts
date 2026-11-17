@@ -260,3 +260,14 @@ export async function grantRentDonation(env: Env, me: User, now = Date.now()): P
     await notify(env, [r.id], "rent", `[장비대여] 기부하신 장비로 마일리지가 💎${give} 들어왔어요 · 대여 보증금으로 쓸 수 있어요`, "#/rent?v=apps&mile=1", "");
   }
 }
+
+/**
+ * 운영진이 적은 기부 날짜 (제작자 2026-11-17 '기부일자도 적을 수 있게'): 2020년부터 지금까지만. 한국 날짜로 오늘이면 지금 때.
+ * 없거나 맞지 않으면 null (그대로 둔다)
+ */
+export function giftAt(v: unknown, now = Date.now()): number | null {
+  const n = typeof v === "number" ? Math.round(v) : NaN;
+  if (!Number.isFinite(n) || n < Date.UTC(2020, 0, 1) || n > now + 12 * 3_600_000) return null;
+  const day = (t: number) => Math.floor((t + 9 * 3_600_000) / 86_400_000);
+  return day(n) === day(now) ? now : n;
+}

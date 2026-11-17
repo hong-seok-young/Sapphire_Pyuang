@@ -62,7 +62,7 @@ export class Fx {
   /** 지금 캔버스 배율 (느리면 1 로 낮춘다) */
   private lowRes = false;
 
-  /** cls: 캔버스 모양 (운영진 때리기는 smk-canvas, src/smackFx.ts) */
+  /** cls: 캔버스 모양 (접어 둔 운영진 때리기는 smk-canvas, archive/smack/) */
   mount(cls = "bday-canvas") {
     if (this.cv) return;
     const cv = document.createElement("canvas");
