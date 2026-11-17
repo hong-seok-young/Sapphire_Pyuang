@@ -2220,6 +2220,12 @@ def group_icon(it: dict, wiki_items: dict) -> None:
     for label, by_job in JOB_GROUPS.values():
         if it["name"] == label:
             cands = list(by_job.values())
+    # 보석 세트는 세트 그림이 따로 없어 보석 영상에서 오린 보석 그림 (제작자 2026-11-17 '그냥 그 이미지 가져다써 보석 영상', '1·2번 보석 세트 이것도 마찬가지'):
+    # 아드레날린은 로베르토 보석의 옵션(공식 확률 30201), 아드셋은 거의 2등급
+    if it["name"] == "아드레날린 보석 세트":
+        cands = ["로베르토의자수정 (2단계)", "로베르토의흑요석 (1단계)"]
+    if it["name"].endswith("번 보석 세트"):
+        cands = ["세레인의사파이어 (3단계)", "윙프릴의사파이어 (3단계)", "로베르토의자수정 (2단계)"]
     if it["name"] == "가네샤파편":  # 라이딩 가네샤를 만드는 영혼 파편 (자료 제공/도감_시세.md, 마을모금함): 파편 그림이 없어 가네샤 그림
         cands = ["가네샤"]
     for c in cands:
