@@ -11,7 +11,7 @@
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../server/auth";
 import type { Env } from "../../server/auth";
 import { canSeeLog, record, tapDetail, whereOf } from "../../server/activity";
-import { chatFeed, chatForRows } from "../../server/actChat";
+import { chatFeed, chatForRows, chatOne } from "../../server/actChat";
 import { dashboard, liveNow, personDash } from "../../server/actDash";
 import { canSim, earn } from "../../server/simcoin";
 import { anonView } from "../../server/board";
@@ -170,6 +170,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
   if (!canSeeLog(me)) return FORBIDDEN();
   const q = new URL(request.url).searchParams;
   if (q.get("usage")) return json(await usage(env));
+  // 질문 하나와 답 ('답 전체' 화면)
+  if (q.get("part") === "qa") {
+    const id = Number(q.get("id"));
+    const qa = Number.isInteger(id) && id > 0 ? await chatOne(env, id) : null;
+    return qa ? json({ qa }) : json({ error: "질문을 찾지 못했어요" }, 404);
+  }
   // 챗봇 질문과 답 (계정 DB 의 대화에서, 새것부터 30개씩)
   if (q.get("part") === "chat") {
     const who = q.get("user");

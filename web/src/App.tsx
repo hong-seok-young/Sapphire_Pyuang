@@ -132,6 +132,7 @@ const TrendPage = lazy(() => CHUNKS.Trend().then((m) => ({ default: m.TrendPage 
 const DexPage = lazy(() => CHUNKS.Dex().then((m) => ({ default: m.DexPage })));
 const DamagePage = lazy(() => CHUNKS.Damage().then((m) => ({ default: m.DamagePage })));
 const ActivityLogPage = lazy(() => CHUNKS.ActivityLog().then((m) => ({ default: m.ActivityLogPage })));
+const LogAnswerPage = lazy(() => CHUNKS.ActivityLog().then((m) => ({ default: m.LogAnswerPage })));
 const AlertsPage = lazy(() => CHUNKS.Alerts().then((m) => ({ default: m.AlertsPage })));
 const ChatGapsPage = lazy(() => CHUNKS.ChatGaps().then((m) => ({ default: m.ChatGapsPage })));
 const PlatShopPage = lazy(() => CHUNKS.PlatShop().then((m) => ({ default: m.PlatShopPage })));
@@ -583,7 +584,12 @@ function Wiki({
   else if (page === "log")
     body =
       canSeeLog(me) ? (
-        <ActivityLogPage wiki={wiki} me={me} />
+        // 챗봇 답 전체는 화면을 바꿔서 (#/log/qa/<질문 글 번호>, 뒤로 가기로 보던 자리)
+        arg === "qa" && /^\d+$/.test(route.parts[2] ?? "") ? (
+          <LogAnswerPage id={Number(route.parts[2])} wiki={wiki} />
+        ) : (
+          <ActivityLogPage wiki={wiki} me={me} />
+        )
       ) : (
         <NotFound what="페이지" />
       );

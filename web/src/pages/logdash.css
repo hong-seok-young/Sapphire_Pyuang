@@ -369,7 +369,8 @@
 .lg-a-none { cursor: default; background: none; }
 .lg-a-none > span { color: var(--muted); }
 .lg-a-full { min-width: 0; padding: 6px 8px; background: rgba(255, 255, 255, 0.04); border-radius: 6px; overflow-x: auto; }
-.lg-a-full > .lg-a-more { display: block; margin-top: 4px; }
+.lg-qa-page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.lg-qa-page .ans-asks { display: none; }
 .lg-qs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .lg-qs .lg-qa + .lg-qa { padding-top: 10px; border-top: 1px dashed rgba(169, 162, 207, 0.2); }
 .lg-blocks .lg-qa { padding: 6px 0 2px; }

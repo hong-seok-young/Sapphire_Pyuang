@@ -1521,7 +1521,8 @@
     전체는 **접속 한 번 = 카드 한 장** (같은 사람이 앱을 새로 열었거나 30분 넘게 쉬면 다음 카드, `buildSessions`): 접힌 카드는 닉네임 · 앱/웹 · 시작~끝 · 걸린 때, 들른 메뉴 차례(홈 칸 그림과 이름 ›), '누름 N · 한 일 N · 챗봇 N'.
     펼치면 화면마다 한 칸: 시각 · 메뉴 그림과 화면 이름, 그 안에서 한 것을 시간 순서로(잇단 단추는 칩 한 줄·같은 단추 잇달면 '×N', 한 일은 ✔, 챗봇은 질문과 답 카드), 맨 아래 'X 기록만 보기'.
     챗봇 자료 보내기·답 저장(`/api/chat/context`, `/api/chat/threads/N/msgs`)은 질문·답 카드와 겹쳐 그리지 않는다 (`NOISE`). 펼친 카드는 'log.open' 으로 기억.
-  - 챗봇 질문·답 (`pages/LogChat.tsx` `ChatCard`): Q 질문(첨부 이름), A 답을 보통 글 4줄(`plainAnswer`: [[아이템:…]] 같은 표시는 이름만), '답 전체'를 누르면 챗봇 화면과 같은 모양(`ChatAnswer`)으로. 끊긴 질문은 '답 없음'.
+  - 챗봇 질문·답 (`pages/LogChat.tsx` `ChatCard`): Q 질문(첨부 이름), A 답을 보통 글 4줄(`plainAnswer`: [[아이템:…]] 같은 표시는 이름만), '답 전체 ›'를 누르면 **화면을 바꿔** 챗봇 화면과 같은 모양(`ChatAnswer`, 추천 질문 단추는 숨김)으로 (`#/log/qa/<질문 글 번호>`, `LogAnswerPage`, 목록에서 본 것은 바로, 새로고침이면 `GET /api/activity?part=qa&id=` `chatOne`).
+    폰 뒤로 가기는 보던 자리로 (제작자 2026-11-17 '한 번 누르면 스크롤이 너무 많아지니 화면 전환으로, 뒤로 가기 누르면 원래 보던 스크롤 위치로': 펼친 카드는 'log.open', 목록은 이번에 연 동안 받은 것, 스크롤은 router 가 되돌린다. 로컬 시험 1125px -> 뒤로 1130px, 카드 펼친 채). 끊긴 질문은 '답 없음'.
     답은 사용 기록이 아니라 계정 DB 의 대화(chat_msgs)에서 읽는다 (`server/actChat.ts`: 기록의 질문 줄마다 그 사람 대화 중 앞 5분~뒤 1분의 가장 가까운 질문 글과 그다음 글 `chatForRows`, 챗봇 칸은 `chatFeed` 30쌍씩, `GET /api/activity?part=chat&user=&before=`).
     사람 칸의 그 사람 '챗봇 질문과 답'(최근 8개)도 같은 것 (`server/actDash.ts` personDash questions).
   - **누른 단추** (`src/activity.ts` `startTapLog`, App 이 로그인한 동안 켠다): 단추·링크·탭·체크 칸을 누르면 그 보이는 이름(없으면 aria-label·title·그림 설명, 40자)만 적고 입력 칸 글은 적지 않는다.

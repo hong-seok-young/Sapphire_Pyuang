@@ -32,6 +32,7 @@ import {
   usePerson,
 } from "./LogDash";
 import { ChatCard } from "./LogChat";
+export { LogAnswerPage } from "./LogChat";
 
 /** '오늘', '어제', '10월 29일 (목)' */
 function dayText(t: number): string {

@@ -139,6 +139,9 @@ export function fetchChatFeed(user: string | null, before = 0) {
   return api<{ list: ChatQA[]; more: boolean }>(`/api/activity?${p}`);
 }
 
+/** 질문 하나와 답 (사용 기록의 '답 전체' 화면) */
+export const fetchQA = (id: number) => api<{ qa: ChatQA }>(`/api/activity?part=qa&id=${id}`).then((r) => r.qa);
+
 /** 답 글을 미리 보기용 보통 글로: 화면 표시([[아이템:…]] 등)는 이름만, 추천 질문·모름 표시는 뺀다 */
 export function plainAnswer(t: string): string {
   return t

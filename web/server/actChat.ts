@@ -107,3 +107,11 @@ export async function chatForRows(env: Env, rows: { id: number; user: string; ki
   for (const r of results) if (r.k) out[r.k] = shape(r);
   return out;
 }
+
+/** 질문 하나와 그 답 (사용 기록의 '답 전체' 화면, 질문 글 번호로) */
+export async function chatOne(env: Env, id: number): Promise<ChatQA | null> {
+  const r = await env.DB.prepare(`SELECT ${COLS} FROM chat_msgs m JOIN chat_threads t ON t.id = m.thread_id ${NEXT} WHERE m.id = ? AND m.role = 'user'`)
+    .bind(id)
+    .first<Raw>();
+  return r ? shape(r) : null;
+}
