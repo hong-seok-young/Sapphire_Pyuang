@@ -1,13 +1,13 @@
 // PUT /api/donate/:id { action, ... } (server/donate.ts)
 //   confirm { gold, item?, qty?, enhance?, note? }  운영진: 신청을 그 골드 가치로 확정, 마일리지 지급
-//   edit    { item, qty, enhance, note, gold }      운영진: 확인 전·확정한 줄 고치기 (확정한 줄은 마일리지를 맞춘다). 신청한 사람: 확인 전 내 신청 고치기 (gold 는 내가 적는 가치)
+//   edit    { item, qty, enhance, note, gold, at? } 운영진(at = 기부 날짜): 확인 전·확정한 줄 고치기 (확정한 줄은 마일리지를 맞춘다). 신청한 사람: 확인 전 내 신청 고치기 (gold 는 내가 적는 가치)
 //   reject                                         운영진: 신청 거절
 //   place   { place: keep | used }                 운영진: 받은 템을 보관 / 나눔·사용
 //   rent    { undo? }                              운영진: 장비대여 운용 (장비대여 '물건 추가' 목록으로 넘긴다, undo 면 보관으로)
 // DELETE /api/donate/:id  운영진: 지우기 (확정한 줄이면 그만큼 마일리지를 뺀다). 신청한 사람: 확인 전 내 신청 취소
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { canManageDonate, canUseDonate, donateLabel, earnedDia, goldText, notifyDonor, readDonate, syncDia } from "../../../server/donate";
+import { canManageDonate, canUseDonate, donateLabel, earnedDia, giftAt, goldText, notifyDonor, readDonate, syncDia } from "../../../server/donate";
 import type { DonateRow } from "../../../server/donate";
 import { notifyManagers } from "../../../server/rental";
 
@@ -44,13 +44,15 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
       return json({ ok: true });
     }
     if (v.gold === null) return json({ error: "골드 가치를 적어 주세요" }, 400);
-    await env.DB.prepare("UPDATE donate_items SET item = ?, qty = ?, enhance = ?, note = ?, options = ?, enchant = ?, gold = ? WHERE id = ?")
-      .bind(v.item, v.qty, v.enhance, v.note, v.options, v.enchant, v.gold, id)
+    // 기부 날짜를 고치면 그날로 (제작자 2026-11-17 '기부일자도 적을 수 있게')
+    const at = giftAt(b.at, now);
+    await env.DB.prepare("UPDATE donate_items SET item = ?, qty = ?, enhance = ?, note = ?, options = ?, enchant = ?, gold = ?, done_at = COALESCE(?, done_at) WHERE id = ?")
+      .bind(v.item, v.qty, v.enhance, v.note, v.options, v.enchant, v.gold, at, id)
       .run();
     const s = await syncDia(env, row.who, id, donateLabel(v), me.id);
     if (s.error) {
-      await env.DB.prepare("UPDATE donate_items SET item = ?, qty = ?, enhance = ?, note = ?, options = ?, enchant = ?, gold = ? WHERE id = ?")
-        .bind(row.item, row.qty, row.enhance, row.note, row.options, row.enchant, row.gold, id)
+      await env.DB.prepare("UPDATE donate_items SET item = ?, qty = ?, enhance = ?, note = ?, options = ?, enchant = ?, gold = ?, done_at = ? WHERE id = ?")
+        .bind(row.item, row.qty, row.enhance, row.note, row.options, row.enchant, row.gold, row.done_at, id)
         .run();
       return json({ error: s.error }, 409);
     }

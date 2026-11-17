@@ -21,6 +21,10 @@ import {
   confirmDonate,
   dayText,
   diaText,
+  giftDayMs,
+  isTodayKst,
+  kstMonthDay,
+  weekdayText,
   mileText,
   donateExtra,
   donateLabel,
@@ -375,7 +379,7 @@ function Give({ data, wiki, me, done }: { data: DonateData; wiki: Wiki | null; m
                   </span>
                   {donateExtra(r) && <small className="dn-extra">{donateExtra(r)}</small>}
                   <small>
-                    {dayText(r.created_at)}
+                    {dayText(r.done_at ?? r.created_at)}
                     {r.who !== me.id && <> · {r.who}</>}
                   </small>
                 </span>
@@ -515,15 +519,51 @@ function Pending({ rows, wiki, done }: { rows: DonateRow[]; wiki: Wiki | null; d
   );
 }
 
+/**
+ * 기부 날짜 (제작자 2026-11-17 '기부일자도 적을 수 있게 해야 돼'): 월·일 두 칸과 '오늘'. 해는 올해(오늘보다 뒤면 지난해).
+ * 날짜 고르는 브라우저 창은 게임 위 위키 창에서 안 열려서 쓰지 않는다
+ */
+type DayInput = { m: string; d: string };
+const dayInputOf = (ms: number): DayInput => {
+  const k = kstMonthDay(ms);
+  return { m: String(k.m), d: String(k.d) };
+};
+/** 적은 날 (오늘이면 undefined, 맞지 않으면 null) */
+function dayMsOf(v: DayInput): number | null | undefined {
+  const at = giftDayMs(Number(v.m), Number(v.d));
+  if (at === null) return null;
+  return isTodayKst(at) ? undefined : at;
+}
+function GiftDay({ v, set }: { v: DayInput; set: (v: DayInput) => void }) {
+  const at = giftDayMs(Number(v.m), Number(v.d));
+  const today = at !== null && isTodayKst(at);
+  const num = (x: string) => x.replace(/[^0-9]/g, "").slice(0, 2);
+  return (
+    <div className="dn-day-row">
+      <span>기부 날짜</span>
+      <input inputMode="numeric" value={v.m} onChange={(e) => set({ ...v, m: num(e.target.value) })} aria-label="월" />
+      <span>월</span>
+      <input inputMode="numeric" value={v.d} onChange={(e) => set({ ...v, d: num(e.target.value) })} aria-label="일" />
+      <span>일</span>
+      <small className={at === null ? "dn-day-bad" : ""}>{at === null ? "날짜 확인" : `(${weekdayText(at)})${at && new Date(at + 9 * 3_600_000).getUTCFullYear() !== new Date(Date.now() + 9 * 3_600_000).getUTCFullYear() ? ` ${new Date(at + 9 * 3_600_000).getUTCFullYear()}년` : ""}`}</small>
+      <button type="button" className={"pill dn-day-today" + (today ? " pill-on" : "")} onClick={() => set(dayInputOf(Date.now()))}>
+        오늘
+      </button>
+    </div>
+  );
+}
+
 /** 운영 > 직접 등록: 누가 무엇을 얼마 가치로 */
 function AddByStaff({ wiki, done }: { wiki: Wiki | null; done: (msg: string) => void }) {
   const [who, setWho] = useState("");
   const [f, setF] = useState<FormState>(EMPTY);
+  const [day, setDay] = useState<DayInput>(() => dayInputOf(Date.now()));
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   return (
     <section className="panel dn-form">
       <input className="dn-who" value={who} maxLength={20} placeholder="기부한 사람 닉네임" onChange={(e) => setWho(e.target.value)} />
+      <GiftDay v={day} set={setDay} />
       <DonateFields wiki={wiki} f={f} set={setF} goldLabel="확정 골드 가치" />
       {err && <p className="form-error">{err}</p>}
       <button
@@ -534,12 +574,15 @@ function AddByStaff({ wiki, done }: { wiki: Wiki | null; done: (msg: string) => 
           if (typeof v === "string") return setErr(v);
           if (!who.trim()) return setErr("기부한 사람을 적어 주세요");
           if (v.gold === null) return setErr("골드 가치를 적어 주세요");
+          const at = dayMsOf(day);
+          if (at === null) return setErr("기부 날짜를 확인해 주세요");
           setBusy(true);
           setErr("");
           try {
-            const res = await addDonate(who.trim(), v);
+            const res = await addDonate(who.trim(), v, at);
             setF(EMPTY);
             setWho("");
+            setDay(dayInputOf(Date.now()));
             done(`등록했어요 · ${who.trim()} 💎+${res.dia} (지금 💎${res.mileage})`);
           } catch (e) {
             setErr(errorText(e));
@@ -560,6 +603,7 @@ function Store({ rows, wiki, done }: { rows: DonateRow[]; wiki: Wiki | null; don
   const [open, setOpen] = useState<number | null>(null);
   const [mode, setMode] = useState<"edit" | null>(null);
   const [f, setF] = useState<FormState>(EMPTY);
+  const [day, setDay] = useState<DayInput>(() => dayInputOf(Date.now()));
   const [err, setErr] = useState("");
   const [sure, setSure] = useState<number | null>(null);
   const shown = filter === "all" ? rows : rows.filter((r) => r.place === filter);
@@ -614,6 +658,7 @@ function Store({ rows, wiki, done }: { rows: DonateRow[]; wiki: Wiki | null; don
                       onClick={() => {
                         setMode(mode === "edit" ? null : "edit");
                         setF(fromRow(r, r.gold));
+                        setDay(dayInputOf(r.done_at ?? r.created_at));
                       }}
                     >
                       가치 수정
@@ -665,14 +710,21 @@ function Store({ rows, wiki, done }: { rows: DonateRow[]; wiki: Wiki | null; don
                   </div>
                   {mode === "edit" && (
                     <>
+                      <GiftDay v={day} set={setDay} />
                       <DonateFields wiki={wiki} f={f} set={setF} goldLabel="확정 골드 가치" />
                       <button
                         className="pill pill-on dn-send"
                         onClick={async () => {
                           const v = toInput(f, wiki);
                           if (typeof v === "string") return setErr(v);
+                          const picked = dayMsOf(day);
+                          if (picked === null) return setErr("기부 날짜를 확인해 주세요");
+                          // 날짜를 그대로 두면 보내지 않는다 (확정한 시각을 정오로 바꾸지 않게)
+                          const was = dayInputOf(r.done_at ?? r.created_at);
+                          const same = was.m === String(Number(day.m)) && was.d === String(Number(day.d));
+                          const at = same ? undefined : picked ?? Date.now();
                           try {
-                            const res = await editDonate(r.id, v);
+                            const res = await editDonate(r.id, v, at);
                             done(`고쳤어요${res.dia ? ` · ${r.who} 💎${res.dia > 0 ? "+" : ""}${res.dia}` : ""}`);
                           } catch (e) {
                             setErr(errorText(e));

@@ -4746,6 +4746,12 @@ button.sim-tally-row { width: 100%; padding: 6px 2px; color: var(--text); font: 
 .dn-row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .dn-row2 label, .dn-gold { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; color: var(--muted); }
 .dn-row2 input { flex: 1; min-width: 0; width: 100%; }
+.dn-day-row { display: flex; align-items: center; gap: 4px; min-width: 0; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.dn-day-row > span:first-child { margin-right: 4px; }
+.dn-day-row input { width: 3.2em; min-width: 0; text-align: center; }
+.dn-day-row small { color: var(--muted); }
+.dn-day-row .dn-day-bad { color: #ff7a7a; }
+.dn-day-today { margin-left: auto; padding: 3px 10px; font-size: 12px; }
 .dn-gold { flex-wrap: wrap; }
 .dn-gold-in { flex: 1; display: flex; align-items: center; gap: 4px; min-width: 140px; }
 .dn-gold-in input { flex: 1; min-width: 0; }

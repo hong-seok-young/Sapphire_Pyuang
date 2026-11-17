@@ -5,7 +5,7 @@
 //   길드원: 기부 신청 (gold 는 내가 적은 가치, 운영진이 고쳐서 확정). 운영진이 confirm 이면 who 의 기부로 바로 확정하고 마일리지를 준다
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { canManageDonate, canUseDonate, donateLabel, earnedDia, goldText, hallOfFame, notifyDonateStaff, notifyDonor, readDonate, syncDia } from "../../../server/donate";
+import { canManageDonate, canUseDonate, donateLabel, earnedDia, giftAt, goldText, hallOfFame, notifyDonateStaff, notifyDonor, readDonate, syncDia } from "../../../server/donate";
 import type { DonateRow } from "../../../server/donate";
 import { mileageOfName } from "../../../server/rental";
 
@@ -56,10 +56,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const who = typeof b.who === "string" ? b.who.trim() : "";
     if (!who || who.length > 20) return json({ error: "기부한 사람을 적어 주세요" }, 400);
     if (v.gold === null) return json({ error: "골드 가치를 적어 주세요" }, 400);
+    // 기부 날짜 (운영진이 적은 날, 없으면 지금): 기부 내역·명예의 전당 '이번 달'이 이 날로 센다
+    const at = giftAt(b.at, now) ?? now;
     const r = await env.DB.prepare(
       "INSERT INTO donate_items (who, item, qty, enhance, note, options, enchant, gold, status, created_at, created_by, done_at, done_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'done', ?, ?, ?, ?)",
     )
-      .bind(who, v.item, v.qty, v.enhance, v.note, v.options, v.enchant, v.gold, now, me.id, now, me.id)
+      .bind(who, v.item, v.qty, v.enhance, v.note, v.options, v.enchant, v.gold, at, me.id, at, me.id)
       .run();
     const id = Number(r.meta.last_row_id);
     const s = await syncDia(env, who, id, label, me.id);
