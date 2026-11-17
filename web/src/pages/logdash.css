@@ -387,3 +387,13 @@
 .lg-fold-body > .panel { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
 .lg-fold-body > .panel > .panel-title:first-child { display: none; }
 @media (prefers-reduced-motion: reduce) { .lg-card-head:active { transform: none; } }
+
+/* 통계 칸 고르기 (2026-11-17): 맨 위 칸 단추(테두리 단추) > 기간(어두운 띠) > 이것(밑줄 탭, 작은 글씨). 한 줄에 같은 폭, 줄을 넘지 않는다 */
+.lg-secs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); margin: -2px 0 10px; border-bottom: 1px solid var(--hi); }
+.lg-sec { position: relative; min-width: 0; padding: 7px 0 8px; font: inherit; font-size: 12px; line-height: 1; color: var(--muted); white-space: nowrap;
+  background: none; border: 0; box-shadow: none; cursor: pointer; }
+.lg-sec::after { content: ""; position: absolute; left: 18%; right: 18%; bottom: -1px; height: 2px; background: var(--gold); transform: scaleX(0); transition: transform 0.18s ease-out; }
+.lg-sec-on { color: var(--gold); }
+.lg-sec-on::after { transform: scaleX(1); }
+.lg-sec:active { transform: scale(0.95); }
+@media (prefers-reduced-motion: reduce) { .lg-sec::after { transition: none; } .lg-sec:active { transform: none; } }

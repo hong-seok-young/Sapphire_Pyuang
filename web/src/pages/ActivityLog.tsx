@@ -177,7 +177,12 @@ const PERIODS: { key: Period; name: string }[] = [
 export function ActivityLogPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const [rawTab, setTab] = useEntryState<string>("log.tab2", "rows");
   const tab: Tab = TABS.some((t) => t.key === rawTab) ? (rawTab as Tab) : "rows";
-  const [period, setPeriod] = useEntryState<Period>("log.period", 7);
+  // 기간은 칸마다 따로: 통계는 처음 오늘 (제작자 2026-11-17 '통계쪽도 기본을 오늘로'), 사람은 처음 7일
+  const [statPer, setStatPer] = useEntryState<Period>("log.statPer", 1);
+  const [peoplePer, setPeoplePer] = useEntryState<Period>("log.period", 7);
+  const period = tab === "stats" ? statPer : peoplePer;
+  const setPeriod = tab === "stats" ? setStatPer : setPeoplePer;
+  const [sec, setSec] = useEntryState<StatSec>("log.sec", "sum");
   const [user, setUser] = useEntryState<string | null>("log.user", null);
   const { dash, error } = useDash(period);
   const live = useLive();
@@ -231,31 +236,54 @@ export function ActivityLogPage({ wiki, me }: { wiki: Wiki; me: Me }) {
           <Loading error={error} />
         ) : (
           <div className="ld-dash">
-            <KpiGrid dash={dash} />
-            <TrendPanel dash={dash} />
-            <TierPanel dash={dash} onPick={pick} />
-            <LeadPanel dash={dash} onPick={pick} />
-            <Fold k="log.f.heat" title="언제 붐비나">
-              <HeatPanel heat={dash.heat} users={dash.heatUsers} days={dash.heatDays} now={dash.now} />
-            </Fold>
-            <Fold k="log.f.menu" title="많이 쓴 메뉴">
-              <MenuPanel secs={dash.secs} />
-            </Fold>
-            <Fold k="log.f.via" title="어디서 쓰나">
-              <ViaPanel vias={dash.vias} />
-            </Fold>
-            <Fold k="log.f.ai" title="챗봇 · AI 사용량">
-              <AiPanel dash={dash} />
-            </Fold>
-            <Fold k="log.f.db" title="저장소">
-              <StorageTab />
-            </Fold>
+            <nav className="lg-secs" role="tablist" aria-label="통계 칸">
+              {STAT_SECS.map((x) => (
+                <button key={x.key} type="button" role="tab" aria-selected={sec === x.key} className={"lg-sec" + (sec === x.key ? " lg-sec-on" : "")} onClick={() => setSec(x.key)}>
+                  {x.name}
+                </button>
+              ))}
+            </nav>
+            {sec === "sum" && (
+              <>
+                <KpiGrid dash={dash} />
+                <TrendPanel dash={dash} />
+              </>
+            )}
+            {sec === "rank" && (
+              <>
+                <TierPanel dash={dash} onPick={pick} />
+                <LeadPanel dash={dash} onPick={pick} />
+              </>
+            )}
+            {sec === "time" && <HeatPanel heat={dash.heat} users={dash.heatUsers} days={dash.heatDays} now={dash.now} />}
+            {sec === "menu" && (
+              <>
+                <MenuPanel secs={dash.secs} />
+                <ViaPanel vias={dash.vias} />
+              </>
+            )}
+            {sec === "ai" && <AiPanel dash={dash} />}
+            {sec === "db" && <StorageTab />}
             {dash.partial && <p className="ld-score-why">지난 기록을 정리하는 중…</p>}
           </div>
         ))}
     </>
   );
 }
+
+/**
+ * 통계 칸 (제작자 2026-11-17 '그 아래에 수많은 메뉴들을 각각의 버튼식으로 기간 아래쪽에, 상하위 구분 잘, 버튼들은 한 행을 넘지 않게 제목을 간결하게, 같은 거끼리 묶던'):
+ * 핵심 숫자·날마다 = 요약, 잘 쓰는 사람·누가 많이 쓰나 = 순위, 언제 붐비나 = 시간대, 많이 쓴 메뉴·어디서 = 메뉴, 챗봇·AI = AI, 저장소
+ */
+type StatSec = "sum" | "rank" | "time" | "menu" | "ai" | "db";
+const STAT_SECS: { key: StatSec; name: string }[] = [
+  { key: "sum", name: "요약" },
+  { key: "rank", name: "순위" },
+  { key: "time", name: "시간대" },
+  { key: "menu", name: "메뉴" },
+  { key: "ai", name: "AI" },
+  { key: "db", name: "저장소" },
+];
 
 type View = "all" | "chat";
 
