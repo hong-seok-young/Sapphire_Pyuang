@@ -1633,6 +1633,9 @@ def paren_items(line: str, rs: Resolver) -> list[dict]:
     return out
 
 
+# 시세 동향에 넣지 않는 것 (제작자 2026-11-17 '이런 거 그냥 빼자, 의미 없음'): 끝난 이벤트의 헌터 증서·카드, 무엇인지 모르는 이름, 짐작으로만 풀리는 이름
+DROP_NAMES = {"최고급헌터증서", "최고급헌터증서 (거래불가)", "최고급헌터카드", "환혼장갑"}
+DROP_ABBR = {"회색리본머리띠", "아이스파운더", "환혼장갑", "환혼"}
 _ALL_LINES: dict[int, list[dict]] = {}
 
 
@@ -1727,6 +1730,7 @@ def all_lines(msgs: list[dict], rs: Resolver) -> list[dict]:
                 if not united.get((p["side"], p["name"])):
                     p["price"], p["bare"] = _r(max(p["bare"] / USUAL_RATE, 0.001)), None
 
+    out = [p for p in out if p["name"] not in DROP_NAMES and p.get("abbr") not in DROP_ABBR]
     # 제작자가 원글을 보고 바로잡은 값 (자료 `시세/톡방_고침.json`: 누가·날짜·줄 -> 값(만 원), 값이 null 이면 뺀다. 오타로 적힌 글)
     fixes = line_fixes()
     if fixes:
