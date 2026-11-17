@@ -565,6 +565,7 @@ SKILL_BOOK = {"포아": "포레스트아이", "화폭": "화염폭풍", "치격"
 NON_WIKI = {"아드셋": "아드레날린 보석 세트", "활발한강아지": "활발한 강아지 (코스튬)",
             # 계정 글의 '레어 코스튬 도감: 천사의날개, 아이요셋, 스나이퍼, 보석의기사' (톡방 원글)
             "천날": "천사의날개 (코스튬)", "천사의날개": "천사의날개 (코스튬)", "스나이퍼": "스나이퍼 (코스튬)", "아드보석셋": "아드레날린 보석 세트", "아드보석세트": "아드레날린 보석 세트",
+            "보석셋": "아드레날린 보석 세트",  # 제작자 확인 2026-11-17: '지2보석셋 13 삽니다' = 지2 아드셋 (숫자가 앞에 붙은 '12번보석셋' 은 GEMSET)
             # 알려 준 이름의 다른 표기 (제작자 2026-11-04: 알려 준 건데 왜 아직 모르는 줄임말이냐)
             "해냐장": "해니아의손덮개 (코스튬)", "해니아장갑신발": "해니아 장갑·신발 (코스튬)", "헤니아장갑신발": "해니아 장갑·신발 (코스튬)",
             "게올뚝": "게올의모자 (코스튬)", "게올모자": "게올의모자 (코스튬)", "게올뚝갑": "게올 모자·갑옷 (코스튬)", "게올롭": "게올 갑옷 (코스튬)", "게올장갑": "게올 장갑 (코스튬)", "게올신발": "게올 신발 (코스튬)",
@@ -1608,6 +1609,13 @@ def paren_items(line: str, rs: Resolver) -> list[dict]:
 _ALL_LINES: dict[int, list[dict]] = {}
 
 
+def line_fixes() -> list[dict]:
+    f = DATA / "시세" / "톡방_고침.json"
+    if not f.exists():
+        return []
+    return [x for x in json.loads(f.read_text(encoding="utf-8")).get("고침", []) if x.get("누가") and x.get("줄")]
+
+
 def all_lines(msgs: list[dict], rs: Resolver) -> list[dict]:
     """모든 글의 물건 줄 (팝니다·삽니다 같이, 한 번만 만든다). 글 단위로 문맥을 본다:
     - 단위를 밝힌 글은 그 단위로 (GOLD_UNIT_MSG)
@@ -1691,6 +1699,19 @@ def all_lines(msgs: list[dict], rs: Resolver) -> list[dict]:
             for p in ps:
                 if not united.get((p["side"], p["name"])):
                     p["price"], p["bare"] = _r(max(p["bare"] / USUAL_RATE, 0.001)), None
+
+    # 제작자가 원글을 보고 바로잡은 값 (자료 `시세/톡방_고침.json`: 누가·날짜·줄 -> 값(만 원), 값이 null 이면 뺀다. 오타로 적힌 글)
+    fixes = line_fixes()
+    if fixes:
+        kept = []
+        for p in out:
+            f = next((f for f in fixes if f["누가"] == p["who"] and f["줄"] in p["raw"] and f.get("날짜", p["date"]) == p["date"]), None)
+            if f and f.get("값") is None:
+                continue
+            if f:
+                p["price"], p["bare"] = _r(float(f["값"])), None
+            kept.append(p)
+        out = kept
 
     def same(p: dict) -> tuple:
         return (p["who"], p["date"], p["side"], p["name"], p["enh"], tuple(p["opts"]), p.get("pet"))
