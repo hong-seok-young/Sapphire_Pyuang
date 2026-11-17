@@ -10,8 +10,8 @@ import { useSample } from "../tutorialState";
 import { MARKET_PIC, MAX_PRICE, ago, goldText, goldWords } from "../market";
 import { MAX_DETAIL, MAX_NOTE, MAX_REWARD_TEXT, MAX_TITLE, STATUS_NAME, actOnRequest, createRequest, deleteRequest, fetchRequests, liveOffers } from "../requests";
 import type { GuildRequest, RequestAction } from "../requests";
-import { Loading, NewTag, ThingDot, TopBar } from "../ui";
-import { markThingSeen, thingSince } from "../news";
+import { Loading, NewTag, NewsDot, ThingDot, TopBar } from "../ui";
+import { markThingSeen, thingNew, thingSince, useNews } from "../news";
 import { useBackClose } from "../backClose";
 
 type Filter = "open" | "done" | "mine";
@@ -248,6 +248,7 @@ export function RequestsPage({ me }: { me: Me }) {
   const { data, error } = useAsync(useCallback(() => fetchRequests(), [reload]), "requests");
   const [list, setList] = useState<GuildRequest[] | null>(null);
   const [filter, setFilter] = useEntryState<Filter>("filter", "open");
+  useNews();
   const [writing, setWriting] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
   // 폰 뒤로 가기로 펼친 정보창을 닫는다 (backClose.ts)
@@ -272,6 +273,8 @@ export function RequestsPage({ me }: { me: Me }) {
         {FILTERS.map((f) => (
           <button key={f.key} className={"pill mk-chip" + (filter === f.key ? " pill-on" : "")} onClick={() => setFilter(f.key)}>
             {f.label} <small>{count(f.key)}</small>
+            {/* 그 칸 안 의뢰들의 새 일 (새 의뢰, 내 의뢰에 들어온 수락) */}
+            <NewsDot n={all.filter((r) => fits(r, f.key)).reduce((n, r) => n + thingNew(`req:${r.id}`), 0)} />
           </button>
         ))}
         <button className={"pill mk-chip rq-write" + (writing ? " pill-on" : "")} onClick={() => setWriting((w) => !w)}>

@@ -48,7 +48,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   await env.DB.prepare("INSERT INTO rental_mileage (who, delta, reason, note, by_user, created_at) VALUES (?, ?, ?, ?, ?, ?)")
     .bind(who, delta, reason, note || null, me.id, Date.now())
     .run();
-  await notify(env, [who], "rent", `마일리지 💎${delta > 0 ? "+" : ""}${delta}${note ? ` (${note})` : ""} · 지금 💎${now + delta}`, "#/rent?v=apps", me.id);
+  await notify(env, [who], "rent", `마일리지 💎${delta > 0 ? "+" : ""}${delta}${note ? ` (${note})` : ""} · 지금 💎${now + delta}`, "#/rent?v=apps&mile=1", me.id);
   return json({ ok: true, mileage: now + delta });
 };
 

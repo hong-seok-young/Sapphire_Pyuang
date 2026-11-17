@@ -5922,3 +5922,6 @@ a.cf-at { color: #9fb4ff; }
 /* 성장코인샵 위 단추의 배지는 단추 모서리 밖으로 (글자 '담당자'를 가리지 않게) */
 .gc-tabs .pill .in-news { top: -8px; right: -6px; }
 .gc-tabs { overflow: visible; padding-top: 4px; }
+.rent-ledger-btn { position: relative; }
+/* 의뢰소 칸 칩의 새 일 수 (모서리 밖) */
+.rq-chips .mk-chip, .mk-cats > .mk-chip { position: relative; }

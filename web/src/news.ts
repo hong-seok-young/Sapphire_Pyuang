@@ -26,6 +26,8 @@ export const KEYS = [
   "rent.list",
   "rent.apps",
   "rent.staff",
+  // 장비대여 운영: 확인 전 신청 + 반납 신청 수 (처리하면 줄어든다, 서버가 본 때와 상관없이 센다)
+  "rent.wait",
   // 성장코인샵 담당자: 기다리는 구매 신청 수 (처리하면 줄어든다, 서버가 본 때와 상관없이 센다)
   "gcoin.staff",
   // 같은 수의 1군 성장코인샵 것 (gcoin.staff 는 2군)
@@ -64,6 +66,8 @@ export const THING_KEYS: NewsKey[] = [
   "market.gold",
   "requests",
   "rent.list",
+  "rent.apps",
+  "rent.staff",
 ];
 const isThingKey = (k: NewsKey) => THING_KEYS.includes(k);
 /** 글·물건 하나의 새 일: 단추, 때, 쪽(물건·골드의 sell|buy, 장비대여의 직업) */
@@ -175,6 +179,27 @@ export function thingSince(k: string): number {
   const list = acts.get(k);
   const base = seenAll();
   return Math.max(thingSeen[k] ?? 0, list?.length ? (base[list[0].c] ?? 0) : 0);
+}
+/** 한 단추 안에서 아직 안 본 새 일이 있는 글·물건 키들 (화면에 줄이 없는 것을 본 것으로 적을 때) */
+export function thingKeysOf(c: NewsKey): string[] {
+  const base = seenAll();
+  const out: string[] = [];
+  for (const [k, list] of acts) if (list.some((a) => a.c === c && a.t > seenUntil(k, a.c, base))) out.push(k);
+  return out;
+}
+/**
+ * 화면에 그 줄이 없는 새 일은 본 것으로 (예: 반납이 끝나 쓰는 무기 줄이 사라졌는데 그 알림 배지가 남는 것).
+ * 단추를 열어 그 칸을 볼 때 부른다. shown 은 지금 화면에 줄로 보이는 키들
+ */
+export function useOrphanSeen(c: NewsKey, shown: string[], on: boolean) {
+  const news = useNews();
+  const join = shown.join(",");
+  useEffect(() => {
+    if (!on) return;
+    const vis = new Set(join ? join.split(",") : []);
+    const gone = thingKeysOf(c).filter((k) => !vis.has(k));
+    if (gone.length) markThingSeen(...gone);
+  }, [on, join, news[c], c]);
 }
 /** 한 단추 안에서 쪽(팝니다·삽니다, 직업)마다의 수 */
 export function newsSide(c: NewsKey, side: (s: string | null) => boolean): number {

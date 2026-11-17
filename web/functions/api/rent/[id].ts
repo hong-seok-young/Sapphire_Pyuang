@@ -35,7 +35,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
   if (!r.meta.changes) return json({ error: "없는 물건이에요" }, 404);
   if (exists.renter && due !== exists.due_at) {
     const md = (t: number) => { const d = new Date(t + 9 * 3_600_000); return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`; };
-    await notify(env, [exists.renter], "rent", `${itemLabel({ ...exists, weapon: it.weapon, enhance: it.enhance })} 반납 기한이 ${due ? md(due) + "로" : "없게"} 바뀌었어요`, "#/rent?v=apps", me.id);
+    await notify(env, [exists.renter], "rent", `${itemLabel({ ...exists, weapon: it.weapon, enhance: it.enhance })} 반납 기한이 ${due ? md(due) + "로" : "없게"} 바뀌었어요`, `#/rent?v=apps&item=${id}`, me.id);
   }
   return json({ ok: true });
 };

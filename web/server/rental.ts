@@ -239,7 +239,7 @@ export async function setDonation(env: Env, item: { id: number; weapon: string; 
     ),
   );
   for (const c of changes) {
-    await notify(env, [c.who], "rent", `마일리지 💎${c.delta > 0 ? "+" : ""}${c.delta} (${label} 기부) · 지금 💎${left.get(c.who)}`, "#/rent?v=apps", by);
+    await notify(env, [c.who], "rent", `마일리지 💎${c.delta > 0 ? "+" : ""}${c.delta} (${label} 기부) · 지금 💎${left.get(c.who)}`, "#/rent?v=apps&mile=1", by);
   }
   return null;
 }

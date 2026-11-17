@@ -8,7 +8,7 @@
 // 예전 화면(?board=&market=&requests=)에는 board, market, requests 도 같이 준다.
 //   things: [키, 단추, 때, 쪽] 줄들 (제작자 2026-11-06 '버튼에만 배지 달게 아니라 끝까지 배지가 추적해서, 마지막까지 사용자가 들어가서 봐야 배지가 없어지게'):
 //   다른 사람이 그 단추 안에서 한 일 하나하나. 'post:<글>'(새 글·댓글), 'imo:<글>', 'item:<물건>'(새 물건), 'talk:<물건>'(토론방 글), 'gold:<글>', 'req:<의뢰>'(새 의뢰·내 의뢰 수락),
-//   'rent:<무기>'. 쪽은 물건·골드의 sell|buy, 장비대여의 직업. 화면(src/news.ts)이 글·물건마다 연 때와 견줘 새 것을 세고, 그 글·물건을 열어야 지운다. 최근 14일 것만
+//   'rent:<무기>', 장비대여 신청함 'mapp:<신청서>'·'mheld:<무기>'·'mmile'·'mrent', 운영 'rapp:<신청서>'·'rback:<무기>'. 쪽은 물건·골드의 sell|buy, 장비대여의 직업. 화면(src/news.ts)이 글·물건마다 연 때와 견줘 새 것을 세고, 그 글·물건을 열어야 지운다. 최근 14일 것만
 //   maint: 아이모 점검 (홈 점검 전광판, 제작자 요청 2026-11-01, server/maint.ts). 점검 글은 2분에 한 번 뒤에서 새로 받는다 (server/official.ts refreshMaint)
 import { NEED_LOGIN, currentUser, json } from "../../server/auth";
 import type { Env } from "../../server/auth";
@@ -98,7 +98,29 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
       floor("requests"),
     ),
     ...(rent
-      ? [q(`SELECT 'rent:' || id AS k, 'rent.list' AS c, created_at AS t, job AS s FROM rental_items WHERE created_at > ?1 AND status = 'open' AND COALESCE(updated_by, '') NOT IN ${MINE}`, floor("rent.list"))]
+      ? [
+          q(`SELECT 'rent:' || id AS k, 'rent.list' AS c, created_at AS t, job AS s FROM rental_items WHERE created_at > ?1 AND status = 'open' AND COALESCE(updated_by, '') NOT IN ${MINE}`, floor("rent.list")),
+          // 신청함: 나에게 온 장비대여 알림을 신청함 안의 자리마다 (제작자 2026-11-17 '뱃지는 끝까지 추적하듯이 과정마다'). 알림 주소의 &app=·&item=·&mile= 로
+          // 'mapp:<신청서>'(신청서 카드), 'mheld:<무기>'(쓰는 무기 줄), 'mmile'(마일리지·장부), 그 밖은 'mrent'(신청함을 열면 본 것)
+          q(
+            `SELECT CASE WHEN instr(link, '&app=') > 0 THEN 'mapp:' || substr(link, instr(link, '&app=') + 5) ` +
+              `WHEN instr(link, '&item=') > 0 THEN 'mheld:' || substr(link, instr(link, '&item=') + 6) ` +
+              `WHEN instr(link, '&mile=') > 0 THEN 'mmile' ELSE 'mrent' END AS k, 'rent.apps' AS c, created_at AS t, NULL AS s ` +
+              `FROM alerts WHERE user_id IN ${MINE} AND kind = 'rent' AND link LIKE '#/rent?v=apps%' AND created_at > ?1`,
+            floor("rent.apps"),
+          ),
+        ]
+      : []),
+    // 운영: 신청한 사람이 쓴 대화를 신청서 카드('rapp:<신청서>')나 장비반납 줄('rback:<무기>', 반납 대화창)마다. 기다리는 신청·반납 신청 수는 아래 rent.wait
+    ...(manager
+      ? [
+          q(
+            `SELECT CASE WHEN ri.id IS NOT NULL THEN 'rback:' || ri.id ELSE 'rapp:' || a.id END AS k, 'rent.staff' AS c, t.created_at AS t, CASE WHEN ri.id IS NOT NULL THEN 'back' ELSE 'apps' END AS s ` +
+              `FROM rental_talk t JOIN rental_apps a ON a.id = t.app_id LEFT JOIN rental_items ri ON ri.return_app_id = a.id AND ri.renter IS NOT NULL ` +
+              `WHERE t.created_at > ?1 AND t.user_id = a.user_id AND a.user_id NOT IN ${MINE}`,
+            floor("rent.staff"),
+          ),
+        ]
       : []),
   ];
   const results = await env.DB.batch([
@@ -124,16 +146,19 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
     ...(rent
       ? [
           q(`SELECT COUNT(*) AS n FROM rental_items WHERE created_at > ?1 AND status = 'open' AND COALESCE(updated_by, '') NOT IN ${MINE}`, since("rent.list")),
-          q(`SELECT COUNT(*) AS n FROM alerts WHERE user_id IN ${MINE} AND kind = 'rent' AND link = '#/rent?v=apps' AND created_at > ?1`, since("rent.apps")),
+          q(`SELECT COUNT(*) AS n FROM alerts WHERE user_id IN ${MINE} AND kind = 'rent' AND link LIKE '#/rent?v=apps%' AND created_at > ?1`, since("rent.apps")),
         ]
       : []),
     ...(manager
       ? [
           q(
-            `SELECT (SELECT COUNT(*) FROM rental_requests WHERE created_at > ?1 AND app_id IS NOT NULL AND user_id NOT IN ${MINE}) + ` +
-              `(SELECT COUNT(*) FROM rental_talk t JOIN rental_apps a ON a.id = t.app_id WHERE t.created_at > ?1 AND t.user_id = a.user_id AND a.user_id NOT IN ${MINE}) + ` +
-              `(SELECT COUNT(*) FROM rental_items WHERE return_req_at > ?1 AND renter NOT IN ${MINE}) AS n`,
+            `SELECT (SELECT COUNT(*) FROM rental_talk t JOIN rental_apps a ON a.id = t.app_id WHERE t.created_at > ?1 AND t.user_id = a.user_id AND a.user_id NOT IN ${MINE}) AS n`,
             since("rent.staff"),
+          ),
+          // 처리할 것 (본 때와 상관없이 남은 만큼, 처리하면 준다): 확인 전 신청 + 반납 신청
+          q(
+            `SELECT (SELECT COUNT(*) FROM rental_requests r JOIN rental_items i ON i.id = r.item_id WHERE r.status = 'wait' AND r.app_id IS NOT NULL AND i.status = 'open') + ` +
+              `(SELECT COUNT(*) FROM rental_items WHERE return_req_at IS NOT NULL AND renter IS NOT NULL AND status = 'open') AS n`,
           ),
         ]
       : []),
@@ -178,7 +203,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
     counts["rent.list"] = n(results[i++]);
     counts["rent.apps"] = n(results[i++]);
   }
-  if (manager) counts["rent.staff"] = n(results[i++]);
+  if (manager) {
+    counts["rent.staff"] = n(results[i++]);
+    counts["rent.wait"] = n(results[i++]);
+  }
   if (gcoinStaff) {
     const g = (results[i++].results[0] ?? {}) as { g1: number | null; g2: number | null };
     counts["gcoin.staff"] = Number(g.g2 ?? 0);

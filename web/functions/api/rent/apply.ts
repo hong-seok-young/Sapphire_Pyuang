@@ -60,7 +60,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const waiting = (queued.get(i.id) ?? 0) + 1;
     const due = i.rented_at && days ? i.rented_at + days * 86_400_000 : null;
     const when = due === null ? "기한 없는 무기라 다 쓰면 '반납 신청'을 눌러 주세요" : due > now ? `${md(due)}까지 반납해 주세요` : "기한이 지났어요. 지금 반납해 주세요";
-    await notify(env, [i.renter], "rent", `${itemLabel(i)} 대여 신청이 들어왔어요 (대기 ${waiting}명) · ${when}`, "#/rent?v=apps", me.id);
+    await notify(env, [i.renter], "rent", `${itemLabel(i)} 대여 신청이 들어왔어요 (대기 ${waiting}명) · ${when}`, `#/rent?v=apps&item=${i.id}`, me.id);
   }
   return json({ appId });
 };

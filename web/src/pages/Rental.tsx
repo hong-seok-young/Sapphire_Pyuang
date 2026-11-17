@@ -28,8 +28,8 @@ import { useSample } from "../tutorialState";
 import { JOBS, JOB_NAME, errorText } from "../auth";
 import type { Job, Me } from "../auth";
 import type { Wiki } from "../types";
-import { FitLine, Loading, NewsDot, PicImg, ThingDot, TopBar } from "../ui";
-import { markThingSeen, newsSide, useNews, useNewsSeen } from "../news";
+import { FitLine, Loading, NewTag, NewsDot, PicImg, ThingDot, TopBar } from "../ui";
+import { markThingSeen, newsSide, thingNew, useNews, useOrphanSeen } from "../news";
 import {
   STATUS_NAME,
   MAX_WEEKS,
@@ -127,7 +127,26 @@ export function RentalPage({
   // 새 것 수 (news.ts, 제작자 요청 2026-11-02: 장비대여에 숫자 -> 안에서 목록·신청함·운영 어디에 새로 생겼는지). 신청함·운영은 보고 있는 칸을 본 것으로,
   // 목록의 새 무기는 직업 단추 -> 무기 줄을 따라가 정보창을 열어야 지운다 (제작자 2026-11-06 '끝까지 배지가 추적해서')
   const news = useNews();
-  useNewsSeen(view === "apps" ? ["rent.apps"] : view === "staff" ? ["rent.staff"] : []);
+  // 2026-11-17 (제작자 '뱃지는 끝까지 추적하듯이 하나하나 과정마다'): 신청함·운영도 칸을 연다고 지우지 않고 그 카드·줄을 눌러야 지운다.
+  // 신청함은 신청서 카드 'mapp:', 쓰는 무기 줄 'mheld:', 장부 'mmile', 운영은 신청서 카드 'rapp:', 장비반납 줄 'rback:'. 화면에 줄이 없는 것은 칸을 열면 본 것으로
+  const mineSet = new Set(raw?.mine ?? []);
+  useOrphanSeen(
+    "rent.apps",
+    raw
+      ? [
+          ...raw.apps.filter((a) => a.mine && a.requests.some((r) => r.status === "wait" || r.status === "ok" || r.holding)).map((a) => `mapp:${a.id}`),
+          ...raw.items.filter((i) => i.renter && mineSet.has(i.renter)).map((i) => `mheld:${i.id}`),
+          "mmile",
+        ]
+      : [],
+    view === "apps" && !!raw,
+  );
+  useOrphanSeen(
+    "rent.staff",
+    raw?.manager
+      ? [...raw.apps.filter((a) => a.requests.some((r) => r.status === "wait" || r.status === "ok")).map((a) => `rapp:${a.id}`), ...raw.items.filter((i) => i.renter).map((i) => `rback:${i.id}`)] : [],
+    view === "staff" && !!raw?.manager,
+  );
   const [showLedger, setShowLedger] = useState(false);
   // 대여 신청을 보낸 뒤 '오픈채팅으로 이야기할까요?' 창 (제작자 2026-11-10, RentNotice.tsx)
   const [applied, setApplied] = useState(false);
@@ -181,6 +200,9 @@ export function RentalPage({
     (n, a) => n + a.requests.filter((r) => r.status === "wait").length,
     0,
   );
+  // 운영 안의 단추 배지: 장비대여 = 확인 전 신청 + 신청서 카드의 새 대화, 장비반납 = 반납 신청 + 반납 대화
+  const appsDot = waitCount + openApps.reduce((n, a) => n + thingNew(`rapp:${a.id}`), 0);
+  const backDot = backAsked + lent.reduce((n, i) => n + thingNew(`rback:${i.id}`), 0);
   // 공용이거나 여러 직업인 물건은 그 직업 칸마다 보인다
   const ofJob = data.items.filter((i) => jobsOf(i.job).includes(job));
   // 레벨별로 쭉 (같은 레벨 안에서는 무기, 강화, 기한 순서)
@@ -208,14 +230,14 @@ export function RentalPage({
       to: "#/rent?v=apps",
       badge: news["rent.apps"],
     },
-    // 운영: 확인 전 신청 수 (없으면 새 대화 같은 새 것 수)
+    // 운영: 확인 전 신청 + 반납 신청 + 신청한 사람의 새 대화 (안의 장비대여·장비반납 단추의 합)
     ...(data.manager
       ? [
           {
             key: "staff",
             name: "운영",
             to: "#/rent?v=staff",
-            badge: waitCount || news["rent.staff"],
+            badge: appsDot + backDot,
           },
         ]
       : []),
@@ -255,10 +277,11 @@ export function RentalPage({
             <span className="rent-dia">💎 {data.mileage.toLocaleString()}</span>
             <small>마일리지 · {diaGold(data.mileage, data.rate)} 골드</small>
             <button
-              className={"pill" + (showLedger ? " pill-on" : "")}
-              onClick={() => setShowLedger((v) => !v)}
+              className={"pill rent-ledger-btn" + (showLedger ? " pill-on" : "")}
+              onClick={() => (markThingSeen("mmile"), setShowLedger((v) => !v))}
             >
               장부
+              <NewsDot n={thingNew("mmile")} />
             </button>
           </div>
           <StaffKakao />
@@ -308,7 +331,8 @@ export function RentalPage({
                   : p === "add"
                     ? `물건 추가 ${data.donated?.length ?? 0}`
                     : "기부 현황"}
-              {p === "back" && <NewsDot n={backAsked} />}
+              {p === "apps" && <NewsDot n={appsDot} />}
+              {p === "back" && <NewsDot n={backDot} />}
             </button>
           ))}
         </nav>
@@ -859,10 +883,13 @@ function AppCard({
   const fresh =
     !!last &&
     (manage ? last.user === app.user : !data.mine.includes(last.user));
+  // 이 카드의 새 일 (운영은 신청한 사람의 대화, 신청함은 나에게 온 알림). 카드 안을 누르면 본 것으로
+  const key = `${manage ? "rapp" : "mapp"}:${app.id}`;
   return (
-    <div className="rent-app">
+    <div className="rent-app" onClick={() => markThingSeen(key)}>
       <div className="rent-app-head">
         <b>{manage ? <Nick name={app.user} /> : "내 신청"}</b>
+        <ThingDot k={key} />
         {manage && <KakaoButton name={app.user} />}
         <small>{when(app.createdAt)}</small>
         {manage && app.mileage !== undefined && (
@@ -955,6 +982,8 @@ function ReqLine({
       {/* 왼쪽: 무기와 상태 두 줄, 오른쪽: 단추 한 줄 */}
       <div className="rent-req-info">
         <span className="rent-req-name">
+          {/* 확인 전 신청은 'N' (운영 > 장비대여 단추 배지가 이 줄까지 따라온다, 수락·거절하면 사라진다) */}
+          {manage && r.status === "wait" && <NewTag on />}
           {r.weapon ?? "내려간 무기"}{" "}
           {r.enhance !== null ? `+${r.enhance}` : ""}
           <small>
@@ -1962,10 +1991,11 @@ function HeldLine({
     }
   };
   return (
-    <div className="rent-held">
+    <div className="rent-held" onClick={() => markThingSeen(`mheld:${i.id}`)}>
       <div className="rent-me-line">
         <span>
           {i.weapon} +{i.enhance} <small className="rent-muted">대여 중</small>
+          <ThingDot k={`mheld:${i.id}`} />
           {i.deposit && (i.deposit.dia > 0 || i.deposit.gold > 0) && (
             <small className="rent-muted">
               {" "}
@@ -2104,12 +2134,14 @@ function ReturnRow({
         (late ? " rent-back-late" : "") +
         (item.returnReqAt ? " rent-back-ask" : "")
       }
+      onClick={() => markThingSeen(`rback:${item.id}`)}
     >
       <div className="rent-back-top">
         <Slot wiki={wiki} item={item} />
         <span className="rent-nm">
           {item.weapon}
           <em>+{item.enhance}</em>
+          <ThingDot k={`rback:${item.id}`} />
         </span>
         {/* 빌린 사람과 단추는 한 묶음: 폰 폭에서 자리가 모자라면 묶음째 다음 줄 오른쪽으로 (제작자 2026-11-02: 화면 폭을 넘었다) */}
         <span className="rent-back-side">

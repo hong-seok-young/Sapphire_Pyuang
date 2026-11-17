@@ -52,6 +52,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
       : []),
   ]);
   const deposit = [useDia ? `마일리지 💎${useDia}` : "", gold ? `골드 ${manText(gold)}` : ""].filter(Boolean).join(" + ") || "없음";
-  await notify(env, [renter], "rent", `${itemLabel(item)} 대여 완료 · 보증금 ${deposit} (반납하면 돌려받아요)${due ? ` · 기한 ${day(due)} (다음 신청이 있으면 그날 담당자에게 돌려주세요)` : ""}`, "#/rent?v=apps", me.id);
+  await notify(env, [renter], "rent", `${itemLabel(item)} 대여 완료 · 보증금 ${deposit} (반납하면 돌려받아요)${due ? ` · 기한 ${day(due)} (다음 신청이 있으면 그날 담당자에게 돌려주세요)` : ""}`, `#/rent?v=apps&item=${item.id}`, me.id);
   return json({ ok: true, dueAt: due });
 };
