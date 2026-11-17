@@ -28,6 +28,8 @@ import { emojiPic } from "../emojiIcons";
 import { Nick } from "../kakao";
 import type { Wiki } from "../types";
 import { Loading } from "../ui";
+import { useEntryState } from "../router";
+import { ChatCard } from "./LogChat";
 import "./logdash.css";
 
 // ---------- 글자 ----------
@@ -710,7 +712,7 @@ export function HeatPanel({ heat, users, days, now, title = "언제 붐비나" }
 }
 
 // ---------- 메뉴 ----------
-function SecIcon({ icon, pic }: { icon: string; pic?: string }) {
+export function SecIcon({ icon, pic }: { icon: string; pic?: string }) {
   const src = pic ?? emojiPic(icon);
   return src ? <img className="ld-sec-pic" src={src} alt="" /> : <span className="ld-sec-emo">{icon}</span>;
 }
@@ -887,6 +889,7 @@ export function AiPanel({ dash }: { dash: Dash }) {
 
 // ---------- 한 사람 ----------
 export function PersonPanel({
+  wiki,
   person,
   data,
   error,
@@ -897,6 +900,7 @@ export function PersonPanel({
   onClose,
   children,
 }: {
+  wiki: Wiki;
   person: DashPerson | undefined;
   id: string;
   data?: PersonDash;
@@ -989,25 +993,24 @@ export function PersonPanel({
               </div>
             </>
           )}
-          <HeatPanel heat={data.heat} days={Math.max(7, data.period)} now={now} title="자주 쓰는 때" />
-          {data.secs.length > 0 && <MenuPanel secs={data.secs} title="자주 쓰는 메뉴" />}
           {data.questions.length > 0 && (
-            <section className="panel ld-qs">
-              <h2 className="panel-title">최근 챗봇 질문</h2>
-              <ul>
-                {data.questions.map((q, i) => (
-                  <li key={i}>
-                    <small>{ago(q.at, now)}</small>
-                    <span>
-                      {q.text || "(첨부만)"}
-                      {q.photos > 0 && <em> · 사진 {q.photos}</em>}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+            <section className="panel lg-qs">
+              <h2 className="panel-title">챗봇 질문과 답</h2>
+              {data.questions.map((q) => (
+                <ChatCard key={q.id} qa={q} wiki={wiki} when={ago(q.at, now)} />
+              ))}
             </section>
           )}
+          <Fold k="log.pf.heat" title="자주 쓰는 때">
+            <HeatPanel heat={data.heat} days={Math.max(7, data.period)} now={now} title="자주 쓰는 때" />
+          </Fold>
+          {data.secs.length > 0 && (
+            <Fold k="log.pf.menu" title="자주 쓰는 메뉴">
+              <MenuPanel secs={data.secs} title="자주 쓰는 메뉴" />
+            </Fold>
+          )}
           {data.ai.length > 0 && (
+            <Fold k="log.pf.ai" title="AI 사용">
             <section className="panel ld-ai">
               <h2 className="panel-title">AI 사용</h2>
               <ul className="ld-ai-kinds">
@@ -1021,6 +1024,7 @@ export function PersonPanel({
                 ))}
               </ul>
             </section>
+            </Fold>
           )}
           {children}
         </>
@@ -1029,5 +1033,23 @@ export function PersonPanel({
         이 사람 기록 보기 ›
       </button>
     </section>
+  );
+}
+
+/**
+ * 접어 둔 칸 (제작자 2026-11-17 '스크롤 양이 많고 불필요한 정보가 많다'): 제목 한 줄만 보이고 누르면 펼친다.
+ * 펼친 것은 useEntryState 로 기억 (새로고침·뒤로 가기에도 그대로). 안의 칸 제목은 겹쳐서 숨긴다 (.lg-fold-body)
+ */
+export function Fold({ k, title, note, children }: { k: string; title: string; note?: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useEntryState(k, false);
+  return (
+    <div className={"lg-fold" + (open ? " lg-fold-open" : "")}>
+      <button type="button" className="lg-fold-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <b>{title}</b>
+        {note && <small>{note}</small>}
+        <i className="log-chev" aria-hidden />
+      </button>
+      {open && <div className="lg-fold-body">{children}</div>}
+    </div>
   );
 }

@@ -20,7 +20,26 @@ const SECRET = /pass|^current$|^next$/i;
 const SKIP = new Set(["context"]);
 const MAX_TEXT = 1000;
 
-export type Kind = "visit" | "view" | "act";
+/** tap: 한 화면에서 누른 단추를 모은 한 줄 (제작자 2026-11-17 '어떤 메뉴 들어가서 어떤 버튼 눌렀는지도'). what 은 화면 주소, detail 은 누른 단추들 */
+export type Kind = "visit" | "view" | "act" | "tap";
+
+/** 누른 단추 한 줄의 모양: [기록 때부터 몇 ms 뒤, 단추 이름, 잇달아 누른 수] */
+export type Tap = [number, string, number];
+/** 한 줄에 단추 60개까지, 이름 40자까지 (화면이 모아 보낸 것을 한 번 더 고른다) */
+export function tapDetail(list: unknown): string | null {
+  if (!Array.isArray(list)) return null;
+  const out: Tap[] = [];
+  for (const t of list.slice(0, 60)) {
+    if (!Array.isArray(t)) continue;
+    const [ms, label, n] = t as unknown[];
+    if (typeof ms !== "number" || !Number.isFinite(ms) || ms < 0 || ms > 3_600_000) continue;
+    if (typeof label !== "string") continue;
+    const name = label.replace(/\s+/g, " ").trim().slice(0, 40);
+    if (!name) continue;
+    out.push([Math.round(ms), name, typeof n === "number" && n > 1 ? Math.min(999, Math.round(n)) : 1]);
+  }
+  return out.length ? JSON.stringify(out) : null;
+}
 /** 어디서: 안드로이드 앱, 게임 위 위키 창, 웹(아이폰, 안드로이드, PC) */
 export type Via = "app" | "float" | "ios" | "android" | "pc";
 
@@ -122,7 +141,7 @@ export function whereOf(request: Request): Where {
  * 기록 하나. 접속은 화면이 열릴 때 따로 보낸다 (POST /api/activity { open: true }).
  * 사용 기록 DB 2~10 중 지금 쓰는 곳에 쓴다 (server/logdb.ts). 번호는 DB 를 넘어가도 이어진다. 기록이 안 돼도 하던 일은 그대로 끝난다
  */
-export async function record(env: Env, userId: string, kind: Kind, what: string, detail: string | null, where: Where): Promise<void> {
+export async function record(env: Env, userId: string, kind: Kind, what: string, detail: string | null, where: Where, at = Date.now()): Promise<void> {
   const { via, ip, place, device, dev } = where;
   try {
     const cur = await currentLog(env);
@@ -131,7 +150,7 @@ export async function record(env: Env, userId: string, kind: Kind, what: string,
         "INSERT INTO activity (id, user_id, kind, what, detail, via, ip, place, device, dev, at) " +
           "VALUES (COALESCE((SELECT MAX(id) FROM activity), ?) + 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       )
-      .bind(cur.base, userId, kind, what.slice(0, 200), detail, via, ip, place, device, dev, Date.now())
+      .bind(cur.base, userId, kind, what.slice(0, 200), detail, via, ip, place, device, dev, at)
       .run();
     const size = (res.meta as { size_after?: number } | undefined)?.size_after;
     if (cur.n === 1) {

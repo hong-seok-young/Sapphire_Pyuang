@@ -10,7 +10,8 @@ import { slotText } from "./gdungeon";
 import { weekStart } from "./week";
 import type { Cat } from "./board";
 
-export type Kind = "visit" | "view" | "act";
+/** tap: 한 화면에서 누른 단추를 모은 한 줄 (detail 은 [[ms, 이름, 잇달아 누른 수], …]) */
+export type Kind = "visit" | "view" | "act" | "tap";
 export type Via = "app" | "float" | "ios" | "android" | "pc";
 
 export interface ActivityRow {
@@ -75,7 +76,7 @@ export const VIA_NAME: Record<Via, string> = {
   pc: "웹(PC)",
 };
 
-export const KIND_NAME: Record<Kind, string> = { visit: "접속", view: "화면", act: "한 일" };
+export const KIND_NAME: Record<Kind, string> = { visit: "접속", view: "화면", act: "한 일", tap: "누름" };
 
 /** DB 를 무엇이 얼마나 쓰는지 (사용 기록의 '자세히', 앱개발자만) */
 export const fetchUsage = () => api<{ total: number | null; limit: number; parts: { name: string; bytes: number }[] }>("/api/activity?usage=1");
@@ -97,6 +98,20 @@ export interface Storage {
   logFull?: number;
 }
 
+/** 챗봇 질문 하나와 그 답 (서버 server/actChat.ts, 계정 DB 의 대화에서) */
+export interface ChatQA {
+  id: number;
+  user: string;
+  thread: number;
+  q: string;
+  photos: number;
+  attach: string[];
+  at: number;
+  /** 답 (끊긴 질문은 null) */
+  a: string | null;
+  aAt: number | null;
+}
+
 /** part: 'rows' 는 기록만, 'summary' 는 사람별 요약·DB 크기·기기만 (둘을 동시에 받아 기록부터 그린다) */
 export function fetchActivity(q: { user?: string | null; kind?: Kind | null; before?: number; part?: "rows" | "summary" }) {
   const p = new URLSearchParams();
@@ -104,9 +119,143 @@ export function fetchActivity(q: { user?: string | null; kind?: Kind | null; bef
   if (q.user) p.set("user", q.user);
   if (q.kind) p.set("kind", q.kind);
   if (q.before) p.set("before", String(q.before));
-  return api<{ rows: ActivityRow[]; more: boolean; people?: Person[]; devices?: DeviceInfo[]; overlaps?: OverlapInfo[]; storage?: Storage }>(
-    `/api/activity?${p}`,
-  );
+  return api<{
+    rows: ActivityRow[];
+    more: boolean;
+    /** 기록 번호 -> 그 챗봇 질문과 답 */
+    chats?: Record<string, ChatQA>;
+    people?: Person[];
+    devices?: DeviceInfo[];
+    overlaps?: OverlapInfo[];
+    storage?: Storage;
+  }>(`/api/activity?${p}`);
+}
+
+/** 챗봇 질문과 답만 (새것부터 30개씩, before 는 질문 글 번호) */
+export function fetchChatFeed(user: string | null, before = 0) {
+  const p = new URLSearchParams({ part: "chat" });
+  if (user) p.set("user", user);
+  if (before) p.set("before", String(before));
+  return api<{ list: ChatQA[]; more: boolean }>(`/api/activity?${p}`);
+}
+
+/** 답 글을 미리 보기용 보통 글로: 화면 표시([[아이템:…]] 등)는 이름만, 추천 질문·모름 표시는 뺀다 */
+export function plainAnswer(t: string): string {
+  return t
+    .replace(/\[\[링크:[^\]|]*\|([^\]]+)\]\]/g, "$1")
+    .replace(/\[\[(?:아이템|몬스터|사냥터|메뉴|화면|공식글|그림|시세):([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_m, a: string, b?: string) => (b ? b : a))
+    .replace(/\[\[[^\]]*\]\]/g, "")
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/\*\*/g, "")
+    .replace(/^\|?[\s:|-]+\|?$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+// ---------- 누른 단추 (제작자 2026-11-17 '어떤 메뉴 들어가서 어떤 버튼 눌렀는지도 보이게') ----------
+// 누를 때마다 서버에 보내지 않고 한 화면에서 누른 것을 모아 한 줄로 보낸다 (무료 요금제 하루 쓰기 10만 줄을 아끼려고):
+// 다른 화면으로 갈 때, 다른 앱으로 갈 때, 60개가 모이거나 2분이 지나면. 단추·링크·탭의 보이는 이름만 적고 입력 칸의 글은 적지 않는다.
+// 튜토리얼이 대신 누르는 것과 사용 기록 화면 안은 적지 않는다.
+
+type TapBuf = { path: string; at: number; list: [number, string, number][]; last: number };
+let tapBuf: TapBuf | null = null;
+let tapTimer = 0;
+const TAP_MAX = 60;
+const TAP_WAIT = 120_000;
+const TAP_TARGET = "button, a, [role=button], [role=tab], [role=switch], [role=menuitem], summary, label, input[type=checkbox], input[type=radio]";
+const NO_TAP_PATH = /^#\/(log|password)(?:$|[/?])/;
+
+/** 단추의 이름: 보이는 글, 없으면 aria-label · title · 그림 설명 */
+function tapLabel(el: HTMLElement): string {
+  const own = el.getAttribute("aria-label") || el.getAttribute("title");
+  let text = (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim();
+  if (!text && el instanceof HTMLInputElement) text = (el.closest("label")?.innerText ?? "").replace(/\s+/g, " ").trim();
+  if (!text) text = own ?? el.querySelector("img")?.getAttribute("alt") ?? "";
+  else if (own && text.length <= 2) text = own;
+  return text.slice(0, 40) || "아이콘 단추";
+}
+
+/**
+ * 무료 한도 (docs/무료한도.md): 한 기기에서 하루에 보내는 단추 줄은 TAP_DAY 까지 (보통 하루 수십 줄).
+ * 넘으면 그날은 더 보내지 않는다 (화면 기록·한 일은 그대로 남는다)
+ */
+const TAP_DAY = 200;
+function underTapCap(): boolean {
+  const day = new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
+  try {
+    const raw = JSON.parse(localStorage.getItem("sapphire.tapcap") ?? "{}") as { d?: string; n?: number };
+    const n = raw.d === day ? (raw.n ?? 0) : 0;
+    if (n >= TAP_DAY) return false;
+    localStorage.setItem("sapphire.tapcap", JSON.stringify({ d: day, n: n + 1 }));
+  } catch {
+    // 못 적는 브라우저는 그대로 보낸다 (한 화면에 한 줄이라 많지 않다)
+  }
+  return true;
+}
+
+function flushTaps() {
+  window.clearTimeout(tapTimer);
+  const b = tapBuf;
+  tapBuf = null;
+  if (!b || !b.list.length || !underTapCap()) return;
+  fetch("/api/activity", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: apiHeaders(true),
+    body: JSON.stringify({ path: b.path, at: b.at, taps: b.list }),
+    keepalive: true,
+  }).catch(() => {});
+}
+
+function onTap(e: MouseEvent) {
+  const t = e.target;
+  if (!(t instanceof Element)) return;
+  const el = t.closest(TAP_TARGET);
+  if (!(el instanceof HTMLElement) || el.closest(".tut, [data-notap]") || !e.isTrusted) return;
+  const path = (location.hash.startsWith("#/") ? location.hash : "#/").slice(0, 200);
+  if (NO_TAP_PATH.test(path)) return;
+  const label = tapLabel(el);
+  const now = Date.now();
+  if (tapBuf && tapBuf.path !== path) flushTaps();
+  if (!tapBuf) {
+    tapBuf = { path, at: now, list: [], last: 0 };
+    tapTimer = window.setTimeout(flushTaps, TAP_WAIT);
+  }
+  const prev = tapBuf.list[tapBuf.list.length - 1];
+  // 같은 단추를 잇달아 누르면 한 칸에 '×N'
+  if (prev && prev[1] === label && now - tapBuf.last < 30_000) prev[2]++;
+  else tapBuf.list.push([now - tapBuf.at, label, 1]);
+  tapBuf.last = now;
+  if (tapBuf.list.length >= TAP_MAX) flushTaps();
+}
+
+/** 누른 단추 모으기 시작 (로그인한 동안, App 이 한 번 부른다) */
+export function startTapLog(): () => void {
+  const hide = () => document.visibilityState === "hidden" && flushTaps();
+  document.addEventListener("click", onTap, true);
+  document.addEventListener("visibilitychange", hide);
+  window.addEventListener("pagehide", flushTaps);
+  window.addEventListener("hashchange", flushTaps);
+  return () => {
+    flushTaps();
+    document.removeEventListener("click", onTap, true);
+    document.removeEventListener("visibilitychange", hide);
+    window.removeEventListener("pagehide", flushTaps);
+    window.removeEventListener("hashchange", flushTaps);
+  };
+}
+
+/** 기록 줄의 누른 단추들 (tap 줄의 detail) */
+export function tapsOf(r: ActivityRow): { at: number; label: string; n: number }[] {
+  try {
+    const v = JSON.parse(r.detail ?? "[]") as unknown;
+    if (!Array.isArray(v)) return [];
+    return v
+      .filter((x): x is [number, string, number] => Array.isArray(x) && typeof x[0] === "number" && typeof x[1] === "string")
+      .map(([ms, label, n]) => ({ at: r.at + ms, label, n: typeof n === "number" && n > 1 ? n : 1 }));
+  } catch {
+    return [];
+  }
 }
 
 let lastSent = "";
@@ -581,7 +730,7 @@ export interface PersonDash {
   daily: { d: number; v: number; w: number; a: number; m: number; q: number }[];
   heat: number[][];
   secs: { s: string; n: number }[];
-  questions: { at: number; text: string; photos: number }[];
+  questions: ChatQA[];
   ai: { kind: string; calls: number; input: number; output: number; web: number }[];
   devices: DeviceInfo[];
   overlaps: OverlapInfo[];

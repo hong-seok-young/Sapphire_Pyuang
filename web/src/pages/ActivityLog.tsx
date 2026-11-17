@@ -1,22 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { useEntryState } from "../router";
 import { errorText } from "../auth";
 import type { Me } from "../auth";
-import { KIND_NAME, TIER_NAME, VIA_NAME, actionText, fetchActivity, fetchUsage, pageName, sectionOf, tierOf } from "../activity";
-import type { ActivityRow, DashPerson, DeviceInfo, Kind, LogDbInfo, OverlapInfo, Period, Person, Storage } from "../activity";
+import { TIER_NAME, VIA_NAME, actionText, fetchActivity, fetchChatFeed, fetchUsage, pageName, secItem, tapsOf, tierOf } from "../activity";
+import type { ActivityRow, ChatQA, DashPerson, DeviceInfo, LiveNow, LogDbInfo, OverlapInfo, Period, Person, Storage } from "../activity";
+import { Nick } from "../kakao";
 import { ago } from "../market";
 import type { Wiki } from "../types";
 import { Loading, MasterNote, TopBar } from "../ui";
 import {
   AiPanel,
+  Fold,
   HeatPanel,
   KpiGrid,
   LeadPanel,
-  LivePanel,
   MenuPanel,
   MiniBars,
   PersonPanel,
   ScoreRing,
+  SecIcon,
   TierPanel,
   TrendPanel,
   ViaPanel,
@@ -28,8 +31,7 @@ import {
   useLive,
   usePerson,
 } from "./LogDash";
-
-const KINDS: (Kind | null)[] = [null, "visit", "view", "act"];
+import { ChatCard } from "./LogChat";
 
 /** '오늘', '어제', '10월 29일 (목)' */
 function dayText(t: number): string {
@@ -53,43 +55,109 @@ const squash = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 /** 무료 요금제의 DB 하나 크기 한도 (Cloudflare D1 Free 500MB, Workers Paid 10GB) */
 const DB_LIMIT = 500 * 1024 * 1024;
 const mbText = (b: number) => (b < 1024 * 1024 ? `${Math.round(b / 1024)}KB` : `${(b / 1024 / 1024).toFixed(b < 10 * 1024 * 1024 ? 1 : 0)}MB`);
+const spanText = (ms: number) => (ms < 60_000 ? "잠깐" : ms < 3_600_000 ? `${Math.round(ms / 60_000)}분` : `${Math.floor(ms / 3_600_000)}시간 ${Math.round((ms % 3_600_000) / 60_000)}분`);
+
+// ---------- 접속 한 번 = 카드 한 장 (제작자 2026-11-17 '스크롤 양이 많고 불필요한 정보가 많고', '어떤 메뉴 들어가서 어떤 버튼 눌렀는지도', '챗봇 질문과 답변도') ----------
+
+/** 기록에 보이지 않는 한 일: 챗봇 자료 보내기·답 저장 (질문과 답 카드에 이미 있다) */
+const NOISE = [/^POST \/api\/chat\/context$/, /^POST \/api\/chat\/threads\/\d+\/msgs$/];
+/** 같은 사람이 이만큼 쉬면 다른 접속으로 */
+const GAP = 30 * 60_000;
+
+/** 한 화면에서 한 것: 들어간 화면, 누른 단추, 한 일, 챗봇 질문과 답 */
+interface Block {
+  path: string;
+  name: string;
+  menu: { title: string; icon: string; pic?: string };
+  at: number;
+  /** 그 화면에서 한 것 (시간 순서로 그린다, 잇단 단추는 한 줄로) */
+  items: Item[];
+}
+type Item = { at: number; tap: string; n: number } | { at: number; act: string } | { at: number; chat: ChatQA | null; text: string };
+interface Session {
+  key: string;
+  user: string;
+  via: ActivityRow["via"];
+  start: number;
+  end: number;
+  blocks: Block[];
+  taps: number;
+  acts: number;
+  asks: number;
+}
+
+/** 화면 주소의 메뉴 (홈 칸 이름과 그림) */
+function menuOf(path: string): Block["menu"] {
+  const page = path.replace(/^#\/?/, "").split(/[/?]/)[0];
+  if (!page) return { title: "홈", icon: "🏠" };
+  const it = secItem(`view:${page}`);
+  return { title: it.title, icon: it.icon, pic: it.item?.iconPic };
+}
 
 /**
- * 같은 사람이 같은 메뉴(게시판, 중개인 …)에서 잇달아 한 기록은 한 묶음으로 (제작자 요청 2026-11-02: '게시판 안에서 뭐 했는지 기록을 묶어서').
- * 사람마다 따로 이어 붙여서, 여럿이 같은 때 쓴 기록이 섞여도 끊기지 않는다. 그 사람이 다른 메뉴로 가거나 접속이 새로 되거나,
- * 날짜가 바뀌거나 30분 넘게 비면 끊는다. 하나뿐이면 그냥 한 줄. 묶음은 그 안에서 가장 나중 기록 자리에 보인다
+ * 기록을 사람마다 접속 한 번씩으로 묶는다: 앱을 새로 열었거나(접속) 30분 넘게 쉬면 다음 접속.
+ * 그 안에서는 화면마다 한 칸 (누른 단추는 그 화면의 칸에, 한 일·챗봇 질문은 그때 보던 화면의 칸에)
  */
-type Item = { one: ActivityRow } | { group: ActivityRow[]; section: string };
-const GAP = 30 * 60_000;
-function groupRows(rows: ActivityRow[]): Item[] {
-  const slots: { rows: ActivityRow[]; section: string | null }[] = [];
-  const open = new Map<string, { rows: ActivityRow[]; section: string | null }>();
-  for (const r of rows) {
-    const section = sectionOf(r);
-    const cur = open.get(r.user);
-    const prev = cur?.rows[cur.rows.length - 1];
-    if (cur && section && cur.section === section && prev && dayText(prev.at) === dayText(r.at) && prev.at - r.at < GAP) {
-      cur.rows.push(r);
-      continue;
+function buildSessions(rows: ActivityRow[], chats: Record<string, ChatQA>, wiki: Wiki): Session[] {
+  const byUser = new Map<string, ActivityRow[]>();
+  for (const r of rows) (byUser.get(r.user) ?? (byUser.set(r.user, []), byUser.get(r.user)!)).push(r);
+  const out: Session[] = [];
+  for (const [user, list] of byUser) {
+    list.sort((a, b) => a.at - b.at || a.id - b.id);
+    let cur: Session | null = null;
+    const newBlock = (s: Session, path: string, at: number, detail?: string | null): Block => {
+      const b: Block = { path, name: pageName(path, wiki, detail), menu: menuOf(path), at, items: [] };
+      s.blocks.push(b);
+      return b;
+    };
+    for (const r of list) {
+      const end = r.kind === "tap" ? Math.max(r.at, ...tapsOf(r).map((t) => t.at)) : r.at;
+      if (!cur || r.kind === "visit" || r.at - cur.end > GAP) {
+        cur = { key: `${user}:${r.id}`, user, via: r.via, start: r.at, end, blocks: [], taps: 0, acts: 0, asks: 0 };
+        out.push(cur);
+      }
+      cur.end = Math.max(cur.end, end);
+      if (!cur.via && r.via) cur.via = r.via;
+      if (r.kind === "visit") continue;
+      if (r.kind === "view") {
+        const last = cur.blocks[cur.blocks.length - 1];
+        if (!last || last.path !== r.what || last.items.length) newBlock(cur, r.what, r.at, r.detail);
+        continue;
+      }
+      if (r.kind === "tap") {
+        // 그 화면의 가장 최근 칸 (화면 기록이 없으면 새 칸)
+        let b = [...cur.blocks].reverse().find((x) => x.path === r.what);
+        if (!b) b = newBlock(cur, r.what, r.at);
+        for (const t of tapsOf(r)) {
+          b.items.push({ at: t.at, tap: t.label, n: t.n });
+          cur.taps += t.n;
+        }
+        continue;
+      }
+      if (NOISE.some((re) => re.test(r.what))) continue;
+      const b = cur.blocks[cur.blocks.length - 1] ?? newBlock(cur, "#/", r.at);
+      if (r.what === "POST /api/chat") {
+        b.items.push({ at: r.at, chat: chats[String(r.id)] ?? null, text: actionText(r.what, r.detail, r.at) });
+        cur.asks++;
+      } else {
+        b.items.push({ at: r.at, act: actionText(r.what, r.detail, r.at) });
+        cur.acts++;
+      }
     }
-    const slot = { rows: [r], section };
-    slots.push(slot);
-    if (section) open.set(r.user, slot);
-    else open.delete(r.user);
   }
-  return slots.map((g) => (g.rows.length > 1 && g.section ? { group: g.rows, section: g.section } : { one: g.rows[0] }));
+  return out.sort((a, b) => b.end - a.end);
 }
 
 /** 이번에 연 동안 받은 것: 다시 들어오면 받는 동안 바로 보인다 */
-const rowsCache = new Map<string, { rows: ActivityRow[]; more: boolean }>();
+const rowsCache = new Map<string, { rows: ActivityRow[]; more: boolean; chats: Record<string, ChatQA> }>();
+const chatCache = new Map<string, { list: ChatQA[]; more: boolean }>();
 const summaryCache = new Map<string, Awaited<ReturnType<typeof fetchActivity>>>();
 
-type Tab = "dash" | "people" | "rows" | "db";
+type Tab = "rows" | "people" | "stats";
 const TABS: { key: Tab; name: string }[] = [
-  { key: "dash", name: "대시보드" },
-  { key: "people", name: "사람" },
   { key: "rows", name: "기록" },
-  { key: "db", name: "저장소" },
+  { key: "people", name: "사람" },
+  { key: "stats", name: "통계" },
 ];
 const PERIODS: { key: Period; name: string }[] = [
   { key: 1, name: "오늘" },
@@ -98,16 +166,16 @@ const PERIODS: { key: Period; name: string }[] = [
 ];
 
 /**
- * 사용 기록 (길드마스터·앱개발자·유어아너, 제작자 2026-11-13 개편 '싹 개편, 유어아너도, 누가 웹과 챗봇 api 사용량이 많은가 대시보드, 차트와 애니메이션',
- * '로그인 횟수 등등 종합해서 잘 쓰는 사람과 안 쓰는 사람'). 맨 위 같은 폭 단추 대시보드 · 사람 · 기록 · 저장소, 그 아래 어두운 띠에 기간 오늘 · 7일 · 30일.
- * - 대시보드: 지금 접속 중(20초마다), 핵심 숫자(지난 기간 대비), 날마다 그림, 잘 쓰는 사람 · 안 쓰는 사람(점수로 핵심·활발·가끔·잠수), 누가 많이 쓰나(순위),
- *   언제 붐비나(요일 x 시), 많이 쓴 메뉴, 어디서 쓰나, 챗봇 · AI 사용량 (pages/LogDash.tsx, 서버 server/actDash.ts)
- * - 사람: 점수·마지막 접속·14일 막대와 기기 표시(새 기기, 다른 도시 동시 접속). 누르면 그 사람만 (날마다, 자주 쓰는 때·메뉴, 최근 챗봇 질문, 기기)
- * - 기록: 누가 어디서 무엇을 했는지 (같은 메뉴에서 이어 한 것은 한 줄로 묶음). 기록은 지우지 않는다
- * - 저장소: DB 크기와 사용 기록 DB 2~10
+ * 사용 기록 (길드마스터·앱개발자·유어아너). 2026-11-17 다시 개편 (제작자 '싹 개편, 스크롤 양이 많고 불필요한 정보가 많고,
+ * 챗봇을 썼으면 질문과 답변도, 어떤 메뉴 들어가서 어떤 버튼 눌렀는지도'): 맨 위 같은 폭 단추 기록 · 사람 · 통계.
+ * - 기록(처음): 지금 접속 중 한 줄, 접속 한 번마다 카드 한 장(누가 · 언제 · 얼마나 · 들른 메뉴 · 누름·한 일·질문 수).
+ *   카드를 펼치면 화면마다 누른 단추, 한 일, 챗봇 질문과 답. '챗봇' 칸은 질문과 답만 모아서
+ * - 사람: 점수·마지막 접속, 누르면 그 사람 (질문과 답, 접어 둔 자주 쓰는 때·메뉴·AI·기기)
+ * - 통계: 핵심 숫자·날마다·잘 쓰는 사람·누가 많이 쓰나, 나머지(언제 붐비나·메뉴·어디서·AI·저장소)는 접어 둠
  */
 export function ActivityLogPage({ wiki, me }: { wiki: Wiki; me: Me }) {
-  const [tab, setTab] = useEntryState<Tab>("log.tab", "dash");
+  const [rawTab, setTab] = useEntryState<string>("log.tab2", "rows");
+  const tab: Tab = TABS.some((t) => t.key === rawTab) ? (rawTab as Tab) : "rows";
   const [period, setPeriod] = useEntryState<Period>("log.period", 7);
   const [user, setUser] = useEntryState<string | null>("log.user", null);
   const { dash, error } = useDash(period);
@@ -123,8 +191,7 @@ export function ActivityLogPage({ wiki, me }: { wiki: Wiki; me: Me }) {
     <>
       <TopBar title="사용 기록" />
       <MasterNote role={me.role === "developer" ? "developer" : "master"} who="길드마스터·유어아너와 개발자에게만 보이는 메뉴예요">
-        길드원이 언제 접속해서 어떤 화면을 보고 무엇을 했는지 남아요. 앱을 더 낫게 고치고, 오류나 사고가 났을 때 무슨 일이 있었는지 원인을 찾으려고
-        쓰는 메뉴예요. 길드원에게는 보이지 않아요.
+        누가 언제 들어와 어느 메뉴에서 무엇을 눌렀는지, 챗봇에 무엇을 묻고 어떤 답을 받았는지 남아요. 길드원에게는 보이지 않아요.
       </MasterNote>
       <nav className="pill-row ld-tabs">
         {TABS.map((t) => (
@@ -133,7 +200,7 @@ export function ActivityLogPage({ wiki, me }: { wiki: Wiki; me: Me }) {
           </button>
         ))}
       </nav>
-      {(tab === "dash" || tab === "people") && (
+      {tab !== "rows" && (
         <nav className="sub-tabs ld-period">
           {PERIODS.map((p) => (
             <button key={p.key} type="button" className={"sub-tab" + (period === p.key ? " sub-tab-on" : "")} onClick={() => setPeriod(p.key)}>
@@ -143,25 +210,10 @@ export function ActivityLogPage({ wiki, me }: { wiki: Wiki; me: Me }) {
         </nav>
       )}
 
-      {tab === "dash" &&
-        (!dash ? (
-          <Loading error={error} />
-        ) : (
-          <div className="ld-dash">
-            <LivePanel live={live} wiki={wiki} onPick={pick} />
-            <KpiGrid dash={dash} />
-            <TrendPanel dash={dash} />
-            <TierPanel dash={dash} onPick={pick} />
-            <LeadPanel dash={dash} onPick={pick} />
-            <HeatPanel heat={dash.heat} users={dash.heatUsers} days={dash.heatDays} now={dash.now} />
-            <MenuPanel secs={dash.secs} />
-            <ViaPanel vias={dash.vias} />
-            <AiPanel dash={dash} />
-            {dash.partial && <p className="ld-score-why">지난 기록을 정리하는 중…</p>}
-          </div>
-        ))}
+      {tab === "rows" && <RecordsTab wiki={wiki} user={user} setUser={setUser} live={live} />}
       {tab === "people" && (
         <PeopleTab
+          wiki={wiki}
           people={dash?.people}
           today={dash?.today ?? 0}
           now={dash?.now ?? Date.now()}
@@ -173,8 +225,332 @@ export function ActivityLogPage({ wiki, me }: { wiki: Wiki; me: Me }) {
           onRecords={() => setTab("rows")}
         />
       )}
-      {tab === "rows" && <RecordsTab wiki={wiki} user={user} setUser={setUser} />}
-      {tab === "db" && <StorageTab />}
+      {tab === "stats" &&
+        (!dash ? (
+          <Loading error={error} />
+        ) : (
+          <div className="ld-dash">
+            <KpiGrid dash={dash} />
+            <TrendPanel dash={dash} />
+            <TierPanel dash={dash} onPick={pick} />
+            <LeadPanel dash={dash} onPick={pick} />
+            <Fold k="log.f.heat" title="언제 붐비나">
+              <HeatPanel heat={dash.heat} users={dash.heatUsers} days={dash.heatDays} now={dash.now} />
+            </Fold>
+            <Fold k="log.f.menu" title="많이 쓴 메뉴">
+              <MenuPanel secs={dash.secs} />
+            </Fold>
+            <Fold k="log.f.via" title="어디서 쓰나">
+              <ViaPanel vias={dash.vias} />
+            </Fold>
+            <Fold k="log.f.ai" title="챗봇 · AI 사용량">
+              <AiPanel dash={dash} />
+            </Fold>
+            <Fold k="log.f.db" title="저장소">
+              <StorageTab />
+            </Fold>
+            {dash.partial && <p className="ld-score-why">지난 기록을 정리하는 중…</p>}
+          </div>
+        ))}
+    </>
+  );
+}
+
+type View = "all" | "chat";
+
+/** 기록: 지금 접속 중 한 줄, 전체(접속 카드) · 챗봇(질문과 답) */
+function RecordsTab({ wiki, user, setUser, live }: { wiki: Wiki; user: string | null; setUser: (u: string | null) => void; live?: LiveNow }) {
+  const [view, setView] = useEntryState<View>("log.view", "all");
+  const people = live?.people ?? [];
+  return (
+    <>
+      <div className="lg-live" aria-live="polite">
+        <i className={"ld-dot" + (people.length ? "" : " lg-dot-off")} aria-hidden />
+        <b>지금 {people.length}명</b>
+        <span className="lg-live-list">
+          {people.map((p) => (
+            <button key={p.id} type="button" className={"lg-live-chip" + (user === p.id ? " lg-live-on" : "")} onClick={() => setUser(user === p.id ? null : p.id)}>
+              <Nick name={p.id} />
+            </button>
+          ))}
+          {!people.length && <small>{live ? "조용해요" : "보는 중…"}</small>}
+        </span>
+      </div>
+      <nav className="sub-tabs ld-kinds">
+        <button type="button" className={"sub-tab" + (view === "all" ? " sub-tab-on" : "")} onClick={() => setView("all")}>
+          전체
+        </button>
+        <button type="button" className={"sub-tab" + (view === "chat" ? " sub-tab-on" : "")} onClick={() => setView("chat")}>
+          챗봇 질문·답
+        </button>
+        {user && (
+          <button type="button" className="sub-tab sub-tab-on lg-who" onClick={() => setUser(null)}>
+            {user} ✕
+          </button>
+        )}
+      </nav>
+      {view === "all" ? <Sessions wiki={wiki} user={user} setUser={setUser} /> : <ChatFeed wiki={wiki} user={user} />}
+    </>
+  );
+}
+
+/** 접속 카드 목록 (기록 150줄씩, '더 보기'로 앞의 것) */
+function Sessions({ wiki, user, setUser }: { wiki: Wiki; user: string | null; setUser: (u: string | null) => void }) {
+  const key = user ?? "";
+  const [data, setData] = useState(rowsCache.get(key) ?? null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [opened, setOpened] = useEntryState<string[]>("log.open", []);
+
+  useEffect(() => {
+    let alive = true;
+    setData(rowsCache.get(key) ?? null);
+    setError("");
+    fetchActivity({ user, part: "rows" }).then(
+      (r) => {
+        if (!alive) return;
+        const d = { rows: r.rows, more: r.more, chats: r.chats ?? {} };
+        rowsCache.set(key, d);
+        setData(d);
+      },
+      (x) => alive && setError(errorText(x)),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [key]);
+
+  const sessions = useMemo(() => (data ? buildSessions(data.rows, data.chats, wiki) : []), [data, wiki]);
+
+  async function loadMore() {
+    if (!data?.rows.length) return;
+    setBusy(true);
+    try {
+      const r = await fetchActivity({ user, before: Math.min(...data.rows.map((x) => x.id)) });
+      const d = { rows: [...data.rows, ...r.rows], more: r.more, chats: { ...data.chats, ...(r.chats ?? {}) } };
+      rowsCache.set(key, d);
+      setData(d);
+    } catch (x) {
+      setError(errorText(x));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!data) return <Loading error={error} />;
+  if (!sessions.length) return <div className="empty">아직 기록이 없어요.</div>;
+  let lastDay = "";
+  return (
+    <>
+      <ol className="lg-sessions">
+        {sessions.map((s) => {
+          const day = dayText(s.end);
+          const head = day !== lastDay;
+          lastDay = day;
+          const open = opened.includes(s.key);
+          const toggle = () => setOpened(open ? opened.filter((k) => k !== s.key) : [...opened, s.key].slice(-20));
+          return (
+            <li key={s.key}>
+              {head && <h3 className="log-day">{day}</h3>}
+              <SessionCard s={s} open={open} onToggle={toggle} wiki={wiki} onPerson={user ? undefined : () => setUser(s.user)} />
+            </li>
+          );
+        })}
+      </ol>
+      {error && <p className="form-error">{error}</p>}
+      {data.more && (
+        <div className="links">
+          <button className="btn btn-ghost" disabled={busy} onClick={loadMore}>
+            {busy ? "불러오는 중…" : "더 보기"}
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** 들른 메뉴 차례 (같은 메뉴가 잇달면 한 번) */
+function trailOf(s: Session) {
+  const out: Block["menu"][] = [];
+  for (const b of s.blocks) if (out[out.length - 1]?.title !== b.menu.title) out.push(b.menu);
+  return out;
+}
+
+function SessionCard({ s, open, onToggle, wiki, onPerson }: { s: Session; open: boolean; onToggle: () => void; wiki: Wiki; onPerson?: () => void }) {
+  const trail = trailOf(s);
+  const shown = trail.slice(0, 6);
+  return (
+    <div className={"lg-card" + (open ? " lg-card-open" : "")}>
+      <button type="button" className="lg-card-head" aria-expanded={open} onClick={onToggle}>
+        <span className="lg-card-top">
+          <b className="lg-card-who">
+            <Nick name={s.user} />
+          </b>
+          {s.via && <small>{VIA_NAME[s.via]}</small>}
+          <span className="lg-card-time">
+            {timeText(s.start)}
+            {s.end - s.start >= 60_000 && `~${timeText(s.end)}`} · {spanText(s.end - s.start)}
+          </span>
+        </span>
+        <span className="lg-trail">
+          {shown.map((m, i) => (
+            <span key={i} className="lg-trail-m">
+              <SecIcon icon={m.icon} pic={m.pic} />
+              {m.title}
+            </span>
+          ))}
+          {trail.length > shown.length && <small>외 {trail.length - shown.length}</small>}
+          {!trail.length && <small>앱만 열었어요</small>}
+        </span>
+        <span className="lg-counts">
+          {s.taps > 0 && <em className="lg-c-tap">누름 {s.taps}</em>}
+          {s.acts > 0 && <em className="lg-c-act">한 일 {s.acts}</em>}
+          {s.asks > 0 && <em className="lg-c-ask">챗봇 {s.asks}</em>}
+        </span>
+        <i className="log-chev" aria-hidden />
+      </button>
+      {open && (
+        <ol className="lg-blocks">
+          {s.blocks.map((b, i) => (
+            <li key={i} className="lg-block">
+              <time>{timeText(b.at)}</time>
+              <div className="lg-block-main">
+                <b className="lg-block-name">
+                  <SecIcon icon={b.menu.icon} pic={b.menu.pic} />
+                  {b.name}
+                </b>
+                <BlockItems items={b.items} wiki={wiki} />
+              </div>
+            </li>
+          ))}
+          {onPerson && (
+            <li className="lg-block-end">
+              <button type="button" className="ld-more" onClick={onPerson}>
+                {s.user} 기록만 보기
+              </button>
+            </li>
+          )}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+/** 한 화면에서 한 것을 시간 순서로: 잇단 단추는 한 줄 (같은 단추를 잇달아 누르면 '×N'), 한 일은 ✔, 챗봇은 질문과 답 */
+function BlockItems({ items, wiki }: { items: Item[]; wiki: Wiki }) {
+  const list = [...items].sort((a, b) => a.at - b.at);
+  const out: ReactNode[] = [];
+  let taps: { label: string; n: number }[] = [];
+  const flush = () => {
+    if (!taps.length) return;
+    const row = taps;
+    out.push(
+      <p key={out.length} className="lg-taps">
+        {row.map((t, j) => (
+          <span key={j} className="lg-tap">
+            {t.label}
+            {t.n > 1 && <small> ×{t.n}</small>}
+          </span>
+        ))}
+      </p>,
+    );
+    taps = [];
+  };
+  for (const it of list) {
+    if ("tap" in it) {
+      const prev = taps[taps.length - 1];
+      if (prev && prev.label === it.tap) prev.n += it.n;
+      else taps.push({ label: it.tap, n: it.n });
+      continue;
+    }
+    flush();
+    if ("act" in it)
+      out.push(
+        <p key={out.length} className="lg-act">
+          <i aria-hidden>✔</i>
+          {it.act}
+          <small> {timeText(it.at)}</small>
+        </p>,
+      );
+    else
+      out.push(
+        it.chat ? (
+          <ChatCard key={out.length} qa={it.chat} wiki={wiki} when={timeText(it.at)} />
+        ) : (
+          <p key={out.length} className="lg-act">
+            {it.text}
+          </p>
+        ),
+      );
+  }
+  flush();
+  return <>{out}</>;
+}
+
+/** 챗봇 질문과 답만 (새것부터 30개씩) */
+function ChatFeed({ wiki, user }: { wiki: Wiki; user: string | null }) {
+  const key = user ?? "";
+  const [data, setData] = useState(chatCache.get(key) ?? null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    setData(chatCache.get(key) ?? null);
+    setError("");
+    fetchChatFeed(user).then(
+      (r) => {
+        if (!alive) return;
+        chatCache.set(key, r);
+        setData(r);
+      },
+      (x) => alive && setError(errorText(x)),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [key]);
+  async function loadMore() {
+    if (!data?.list.length) return;
+    setBusy(true);
+    try {
+      const r = await fetchChatFeed(user, data.list[data.list.length - 1].id);
+      const d = { list: [...data.list, ...r.list], more: r.more };
+      chatCache.set(key, d);
+      setData(d);
+    } catch (x) {
+      setError(errorText(x));
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!data) return <Loading error={error} />;
+  if (!data.list.length) return <div className="empty">아직 챗봇 질문이 없어요.</div>;
+  let lastDay = "";
+  return (
+    <>
+      <ol className="lg-sessions">
+        {data.list.map((qa) => {
+          const day = dayText(qa.at);
+          const head = day !== lastDay;
+          lastDay = day;
+          return (
+            <li key={qa.id}>
+              {head && <h3 className="log-day">{day}</h3>}
+              <div className="lg-card lg-card-qa">
+                <ChatCard qa={qa} wiki={wiki} who={!user} when={timeText(qa.at)} />
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+      {error && <p className="form-error">{error}</p>}
+      {data.more && (
+        <div className="links">
+          <button className="btn btn-ghost" disabled={busy} onClick={loadMore}>
+            {busy ? "불러오는 중…" : "더 보기"}
+          </button>
+        </div>
+      )}
     </>
   );
 }
@@ -190,6 +566,7 @@ const SORTS: { key: Sort; name: string }[] = [
 
 /** 사람: 점수 고리, 마지막 접속, 14일 막대, 기기 표시. 누르면 위에 그 사람 자세히 */
 function PeopleTab({
+  wiki,
   people,
   today,
   now,
@@ -200,6 +577,7 @@ function PeopleTab({
   error,
   onRecords,
 }: {
+  wiki: Wiki;
   people?: DashPerson[];
   today: number;
   now: number;
@@ -240,6 +618,7 @@ function PeopleTab({
     <>
       {user && (
         <PersonPanel
+          wiki={wiki}
           id={user}
           person={sel}
           data={data}
@@ -250,8 +629,16 @@ function PeopleTab({
           onRecords={onRecords}
           onClose={() => setUser(null)}
         >
-          {data && data.overlaps.length > 0 && <Overlaps user={user} overlaps={data.overlaps} />}
-          {data && data.devices.length > 0 && <Devices user={user} devices={data.devices} />}
+          {data && data.overlaps.length > 0 && (
+            <Fold k="log.pf.overlap" title="다른 도시 동시 접속" note={`${data.overlaps.length}번`}>
+              <Overlaps user={user} overlaps={data.overlaps} />
+            </Fold>
+          )}
+          {data && data.devices.length > 0 && (
+            <Fold k="log.pf.dev" title="기기" note={`${data.devices.length}대`}>
+              <Devices user={user} devices={data.devices} />
+            </Fold>
+          )}
         </PersonPanel>
       )}
       <section className="panel">
@@ -358,174 +745,6 @@ function Devices({ devices }: { user: string; devices: DeviceInfo[] }) {
         ))}
       </ul>
     </section>
-  );
-}
-
-/** 기록: 누가 어디서 무엇을 했는지 (사람을 고르면 그 사람 것만) */
-function RecordsTab({ wiki, user, setUser }: { wiki: Wiki; user: string | null; setUser: (u: string | null) => void }) {
-  /** 묶음 요약에 쓰는 짧은 이름 ('게시판: 자유' -> '자유', '게시판 글: 제목' -> '제목') */
-  const itemText = (r: ActivityRow) =>
-    r.kind === "view" ? pageName(r.what, wiki, r.detail).replace(/^(게시판|게시판 글|아이모 소식 글|글|사냥터|몬스터|아이템|메뉴|장비|검색): /, "") : actionText(r.what, r.detail, r.at);
-  const lineText = (r: ActivityRow) =>
-    r.kind === "visit" ? "접속" : r.kind === "view" ? pageName(r.what, wiki, r.detail) : actionText(r.what, r.detail, r.at);
-  const [kind, setKind] = useEntryState<Kind | null>("log.kind", null);
-  const [rows, setRows] = useState<ActivityRow[] | null>(null);
-  const [more, setMore] = useState(false);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  /** 펼친 묶음 (그 묶음 맨 위 기록 번호) */
-  const [opened, setOpened] = useState<Set<number>>(new Set());
-
-  useEffect(() => {
-    let alive = true;
-    const key = `${user ?? ""}|${kind ?? ""}`;
-    const had = rowsCache.get(key);
-    setRows(had?.rows ?? null);
-    setMore(had?.more ?? false);
-    setError("");
-    fetchActivity({ user, kind, part: "rows" }).then(
-      (r) => {
-        if (!alive) return;
-        rowsCache.set(key, { rows: r.rows, more: r.more });
-        setRows(r.rows);
-        setMore(r.more);
-      },
-      (x) => alive && setError(errorText(x)),
-    );
-    return () => {
-      alive = false;
-    };
-  }, [user, kind]);
-
-  async function loadMore() {
-    if (!rows?.length) return;
-    setBusy(true);
-    try {
-      const r = await fetchActivity({ user, kind, before: rows[rows.length - 1].id });
-      setRows([...rows, ...r.rows]);
-      setMore(r.more);
-    } catch (x) {
-      setError(errorText(x));
-    } finally {
-      setBusy(false);
-    }
-  }
-  let lastDay = "";
-  return (
-    <>
-      <nav className="sub-tabs ld-kinds">
-        {KINDS.map((k) => (
-          <button key={k ?? "all"} type="button" className={"sub-tab" + (kind === k ? " sub-tab-on" : "")} onClick={() => setKind(k)}>
-            {k ? KIND_NAME[k] : "전체"}
-          </button>
-        ))}
-      </nav>
-      {user && (
-        <div className="filter">
-          <button className="pill pill-on" onClick={() => setUser(null)}>
-            {user} ✕
-          </button>
-        </div>
-      )}
-      {!rows ? (
-        <Loading error={error} />
-      ) : rows.length === 0 ? (
-        <div className="empty">아직 기록이 없어요.</div>
-      ) : (
-        <ol className="log-list">
-          {groupRows(rows).map((it) => {
-            const first = "one" in it ? it.one : it.group[0];
-            const day = dayText(first.at);
-            const head = day !== lastDay;
-            lastDay = day;
-            if ("one" in it) {
-              const r = it.one;
-              return (
-                <li key={r.id}>
-                  {head && <h3 className="log-day">{day}</h3>}
-                  <div className={"log-row log-" + r.kind}>
-                    <time>{timeText(r.at)}</time>
-                    <span>
-                      <b>{r.user}</b>
-                      {r.via && <small> · {VIA_NAME[r.via]}</small>}
-                      <br />
-                      <i className={"ld-kdot ld-k-" + r.kind} aria-hidden />
-                      {lineText(r)}
-                    </span>
-                  </div>
-                </li>
-              );
-            }
-            // 묶음: 메뉴 이름과 화면·한 일 수, 무엇을 봤는지 짧게. 누르면 그 안의 기록을 처음부터 차례로
-            const g = it.group;
-            const last = g[g.length - 1];
-            const views = g.filter((r) => r.kind === "view").length;
-            const acts = g.length - views;
-            const names = [...new Set([...g].reverse().map(itemText).filter((t) => t !== it.section))];
-            const open = opened.has(first.id);
-            return (
-              <li key={first.id}>
-                {head && <h3 className="log-day">{day}</h3>}
-                <button
-                  className={"log-row log-group" + (open ? " log-group-open" : "")}
-                  aria-expanded={open}
-                  onClick={() =>
-                    setOpened((o) => {
-                      const n = new Set(o);
-                      if (n.has(first.id)) n.delete(first.id);
-                      else n.add(first.id);
-                      return n;
-                    })
-                  }
-                >
-                  <time>
-                    {timeText(first.at)}
-                    <small>~{timeText(last.at)}</small>
-                  </time>
-                  <span>
-                    <b>{first.user}</b>
-                    {first.via && <small> · {VIA_NAME[first.via]}</small>}
-                    <br />
-                    <i className="ld-kdot ld-k-group" aria-hidden />
-                    {it.section}
-                    <small className="log-group-n">
-                      {" "}
-                      · 화면 {views}
-                      {acts > 0 && ` · 한 일 ${acts}`}
-                    </small>
-                    {names.length > 0 && (
-                      <small className="log-group-sum">
-                        {names.slice(0, 3).join(" · ")}
-                        {names.length > 3 && ` 외 ${names.length - 3}`}
-                      </small>
-                    )}
-                  </span>
-                  <i className="log-chev" aria-hidden />
-                </button>
-                {open && (
-                  <ol className="log-sub">
-                    {[...g].reverse().map((r) => (
-                      <li key={r.id} className={"log-" + r.kind}>
-                        <time>{timeText(r.at)}</time>
-                        <span>{lineText(r)}</span>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </li>
-            );
-          })}
-        </ol>
-      )}
-      {error && rows && <p className="form-error">{error}</p>}
-      {more && rows && (
-        <div className="links">
-          <button className="btn btn-ghost" disabled={busy} onClick={loadMore}>
-            {busy ? "불러오는 중…" : "더 보기"}
-          </button>
-        </div>
-      )}
-    </>
   );
 }
 

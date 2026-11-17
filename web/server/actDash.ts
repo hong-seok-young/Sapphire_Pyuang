@@ -4,6 +4,7 @@
 // 무료 요금제의 하루 읽기 500만 줄을 아끼려고 지난 날은 한 번만 사용 기록 DB(2~10, server/logdb.ts)를 훑어 하루 요약(act_day_*)에 적고,
 // 오늘은 그때그때 센다. 요약은 사람(캐릭터)·날마다 접속·화면·한 일·5분 칸 수(사용 시간), 시간대, 메뉴, 어디서(앱·웹).
 // 사람은 부캐를 본캐로 합친다. 테스트 계정은 뺀다. 챗봇 질문 수는 chat_usage, AI 토큰은 api_usage(server/apiUsage.ts, 2026-11-13 부터).
+import { chatFeed } from "./actChat";
 import { TEST_IDS } from "./auth";
 import type { Env, Role } from "./auth";
 import { covering, fromLogs, logDbs } from "./logdb";
@@ -40,14 +41,14 @@ async function aggregate(dbs: LogDb[], from: number, to: number) {
     run<UR>(
       `SELECT ${DAYX} AS d, user_id AS u, SUM(kind = 'visit') AS v, SUM(kind = 'view') AS w, SUM(kind = 'act') AS a, COUNT(DISTINCT at / 300000) AS m FROM activity ${W} GROUP BY d, u`,
     ),
-    run<HR>(`SELECT ${DAYX} AS d, ((at + ${KST}) % ${DAY}) / 3600000 AS h, COUNT(*) AS n, COUNT(DISTINCT user_id) AS us FROM activity ${W} GROUP BY d, h`),
+    run<HR>(`SELECT ${DAYX} AS d, ((at + ${KST}) % ${DAY}) / 3600000 AS h, COUNT(*) AS n, COUNT(DISTINCT user_id) AS us FROM activity ${W} AND kind != 'tap' GROUP BY d, h`),
     // 메뉴: 화면은 주소 첫 칸('#/board?…' -> view:board), 한 일은 API 첫 칸('POST /api/market/3' -> act:market)
     run<SR>(
       "SELECT d, kind || ':' || substr(r, 1, min(CASE instr(r, '/') WHEN 0 THEN 99 ELSE instr(r, '/') END, CASE instr(r, '?') WHEN 0 THEN 99 ELSE instr(r, '?') END) - 1) AS s, " +
         `COUNT(*) AS n, COUNT(DISTINCT u) AS us FROM (SELECT ${DAYX} AS d, kind, user_id AS u, CASE kind WHEN 'view' THEN substr(what, 3) ELSE substr(what, instr(what, '/api/') + 5) END AS r ` +
-        `FROM activity ${W} AND kind != 'visit') GROUP BY d, s`,
+        `FROM activity ${W} AND kind IN ('view', 'act')) GROUP BY d, s`,
     ),
-    run<VR>(`SELECT ${DAYX} AS d, COALESCE(via, '') AS via, COUNT(*) AS n, COUNT(DISTINCT user_id) AS us FROM activity ${W} GROUP BY d, COALESCE(via, '')`),
+    run<VR>(`SELECT ${DAYX} AS d, COALESCE(via, '') AS via, COUNT(*) AS n, COUNT(DISTINCT user_id) AS us FROM activity ${W} AND kind != 'tap' GROUP BY d, COALESCE(via, '')`),
   ]);
   // 여러 DB 에 걸친 날은 더한다 (사람 수는 DB 가 바뀐 날만 조금 겹쳐 셀 수 있다)
   const sum = <T extends { n: number; us: number }>(rows: T[], key: (r: T) => string) => {
@@ -384,12 +385,13 @@ export async function personDash(env: Env, ids: string[], period: number) {
     run<{ d: number; v: number; w: number; a: number; m: number }>(
       `SELECT ${DAYX} AS d, SUM(kind = 'visit') AS v, SUM(kind = 'view') AS w, SUM(kind = 'act') AS a, COUNT(DISTINCT at / 300000) AS m FROM activity ${W} GROUP BY d`,
     ),
-    run<{ wd: number; h: number; n: number }>(`SELECT (${DAYX} + 4) % 7 AS wd, ((at + ${KST}) % ${DAY}) / 3600000 AS h, COUNT(*) AS n FROM activity ${W} GROUP BY wd, h`),
+    run<{ wd: number; h: number; n: number }>(`SELECT (${DAYX} + 4) % 7 AS wd, ((at + ${KST}) % ${DAY}) / 3600000 AS h, COUNT(*) AS n FROM activity ${W} AND kind != 'tap' GROUP BY wd, h`),
     run<{ s: string; n: number }>(
       "SELECT kind || ':' || substr(r, 1, min(CASE instr(r, '/') WHEN 0 THEN 99 ELSE instr(r, '/') END, CASE instr(r, '?') WHEN 0 THEN 99 ELSE instr(r, '?') END) - 1) AS s, COUNT(*) AS n " +
-        `FROM (SELECT kind, CASE kind WHEN 'view' THEN substr(what, 3) ELSE substr(what, instr(what, '/api/') + 5) END AS r FROM activity ${W} AND kind != 'visit') GROUP BY s`,
+        `FROM (SELECT kind, CASE kind WHEN 'view' THEN substr(what, 3) ELSE substr(what, instr(what, '/api/') + 5) END AS r FROM activity ${W} AND kind IN ('view', 'act')) GROUP BY s`,
     ),
-    run<{ detail: string | null; at: number }>(`SELECT detail, at FROM activity ${W} AND kind = 'act' AND what = 'POST /api/chat' ORDER BY at DESC LIMIT 8`),
+    // 최근 챗봇 질문과 답 (계정 DB 의 대화에서, server/actChat.ts)
+    chatFeed(env, ids, 0, 8).then((r) => r.list),
     env.DB.prepare("SELECT day, SUM(count) AS n FROM chat_usage WHERE user_id IN (SELECT value FROM json_each(?1)) AND day >= ?2 GROUP BY day")
       .bind(idj, dayKey(today - period + 1))
       .all<{ day: string; n: number }>(),
@@ -416,17 +418,7 @@ export async function personDash(env: Env, ids: string[], period: number) {
   for (const r of hours) heat[r.wd][r.h] += r.n;
   const sm = new Map<string, number>();
   for (const r of secs) sm.set(r.s, (sm.get(r.s) ?? 0) + r.n);
-  const questions = asks
-    .sort((a, b) => b.at - a.at)
-    .slice(0, 8)
-    .map((r) => {
-      try {
-        const d = JSON.parse(r.detail ?? "{}") as { question?: unknown; photos?: unknown };
-        return { at: r.at, text: typeof d.question === "string" ? d.question.slice(0, 200) : "", photos: Number(d.photos) || 0 };
-      } catch {
-        return { at: r.at, text: "", photos: 0 };
-      }
-    });
+  const questions = asks;
   return {
     period,
     today,

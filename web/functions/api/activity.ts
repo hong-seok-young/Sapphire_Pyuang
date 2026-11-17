@@ -10,14 +10,16 @@
 //      기기는 화면이 보내는 기기 표(activity.dev)로 가린다. 기기 표가 없던 예전 기록은 기기 글(device)로 묶어 목록에만 보인다
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../server/auth";
 import type { Env } from "../../server/auth";
-import { canSeeLog, record, whereOf } from "../../server/activity";
+import { canSeeLog, record, tapDetail, whereOf } from "../../server/activity";
+import { chatFeed, chatForRows } from "../../server/actChat";
 import { dashboard, liveNow, personDash } from "../../server/actDash";
 import { canSim, earn } from "../../server/simcoin";
 import { anonView } from "../../server/board";
 import { LOG_FULL, LOG_NUMS, REMOTE_N, covering, fromLogs, logBinding, logDbs, newestLogs } from "../../server/logdb";
 import type { LogDb } from "../../server/logdb";
 
-const PAGE = 150;
+/** 한 번에 읽는 기록 줄 (누른 단추 줄이 생겨 150 에서 늘림. 사용 기록 DB(둘째 계정)에서 읽는다) */
+const PAGE = 200;
 /** 같은 때로 보는 사이, 기기 목록을 보는 기간 */
 const TOGETHER_MS = 10 * 60_000;
 const DEVICE_DAYS = 60;
@@ -122,7 +124,16 @@ async function logSizes(env: Env) {
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  const { path, open } = await readJson<{ path: unknown; open: unknown }>(request);
+  const { path, open, taps, at } = await readJson<{ path: unknown; open: unknown; taps: unknown; at: unknown }>(request);
+  // 한 화면에서 누른 단추를 모은 한 줄 (화면이 화면을 떠날 때, 다른 앱으로 갈 때, 60개가 모이면 보낸다)
+  if (taps !== undefined) {
+    if (typeof path !== "string" || !path.startsWith("#/") || path.length > 200) return json({ error: "화면 주소가 맞지 않아요" }, 400);
+    const detail = tapDetail(taps);
+    if (!detail || (await anonView(env, me, path).catch(() => false))) return json({ ok: true });
+    const when = typeof at === "number" && at > Date.now() - 3_600_000 && at <= Date.now() + 60_000 ? at : Date.now();
+    await record(env, me.id, "tap", path, detail, whereOf(request), when);
+    return json({ ok: true });
+  }
   if (open === true) {
     await record(env, me.id, "visit", "open", null, whereOf(request));
     // 하루 첫 접속 코인 (시뮬레이터, server/simcoin.ts)
@@ -159,6 +170,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
   if (!canSeeLog(me)) return FORBIDDEN();
   const q = new URL(request.url).searchParams;
   if (q.get("usage")) return json(await usage(env));
+  // 챗봇 질문과 답 (계정 DB 의 대화에서, 새것부터 30개씩)
+  if (q.get("part") === "chat") {
+    const who = q.get("user");
+    const before = Number(q.get("before"));
+    return json(await chatFeed(env, who ? await charIds(env, who) : null, Number.isInteger(before) && before > 0 ? before : 0));
+  }
   // 대시보드 (2026-11-13 개편, server/actDash.ts): 기간 1·7·30일
   const period = [1, 7, 30].includes(Number(q.get("days"))) ? Number(q.get("days")) : 7;
   if (q.get("part") === "dash") return cached(request, 180, waitUntil, () => dashboard(env, period));
@@ -204,7 +221,7 @@ async function logRows(env: Env, dbs: LogDb[], user: string | null, kind: string
     where.push("user_id IN (SELECT value FROM json_each(?))");
     binds.push(JSON.stringify(await charIds(env, user)));
   }
-  if (kind === "visit" || kind === "view" || kind === "act") {
+  if (kind === "visit" || kind === "view" || kind === "act" || kind === "tap") {
     where.push("kind = ?");
     binds.push(kind);
   }
@@ -221,7 +238,9 @@ async function logRows(env: Env, dbs: LogDb[], user: string | null, kind: string
       )
       .bind(...binds),
   );
-  return { rows, more: rows.length === PAGE };
+  // 챗봇 질문 줄에는 그 질문과 답을 같이 (계정 DB 의 대화에서)
+  const chats = await chatForRows(env, rows as { id: number; user: string; kind: string; what: string; at: number }[]).catch(() => ({}));
+  return { rows, more: rows.length === PAGE, chats };
 }
 
 /** 사람별 요약, DB 크기, (고른 사람이면) 기기와 겹친 접속. 서로 기다리지 않게 한꺼번에 */

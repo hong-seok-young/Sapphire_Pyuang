@@ -69,7 +69,7 @@ import { SpaceBackground } from "./pages/SpaceBg";
 import { BgNotice } from "./pages/BgSettings";
 import { CoinToast, RaceToast } from "./coinToast";
 import { Opening, shouldCelebrate } from "./pages/Opening";
-import { reportOpen, reportView } from "./activity";
+import { reportOpen, reportView, startTapLog } from "./activity";
 import { markMenuVisit } from "./updates";
 import { ensurePush, reportPush } from "./push";
 import {
@@ -403,6 +403,8 @@ function Wiki({
   useEffect(() => resetFavorites(me.id), [me.id]);
   // 사용 기록: 웹이나 앱을 새로 열었으면 접속 하나, 그리고 지금 보는 화면
   useEffect(() => reportOpen(me.id), [me.id]);
+  // 누른 단추 모으기 (사용 기록, src/activity.ts startTapLog)
+  useEffect(() => startTapLog(), [me.id]);
   useEffect(() => reportView(location.hash), [route]);
   // 폰이 이미 알림을 허락했으면 폰 알림을 저절로 켠다 (제작자 요청: 기본은 허용)
   // 그 뒤 이 폰의 알림 허용 상태를 알린다 ('길드원 관리'에 보인다)

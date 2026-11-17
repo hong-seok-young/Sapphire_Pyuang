@@ -543,7 +543,7 @@ async function activityParts(env: Env, mentioned: string[], now: number, today: 
         )
         .bind(since),
     ),
-    newestLogs<Recent>(dbs, 50, (db, left) => db.prepare(`SELECT user_id, kind, what, detail, via, at FROM activity WHERE kind != 'view' ORDER BY id DESC LIMIT ${left}`)),
+    newestLogs<Recent>(dbs, 50, (db, left) => db.prepare(`SELECT user_id, kind, what, detail, via, at FROM activity WHERE kind NOT IN ('view', 'tap') ORDER BY id DESC LIMIT ${left}`)),
     ...people.map((id) =>
       newestLogs<Person>(dbs, 40, (db, left) =>
         db.prepare(`SELECT kind, what, detail, via, place, ip, device, at FROM activity WHERE user_id = ? ORDER BY id DESC LIMIT ${left}`).bind(id),
@@ -574,7 +574,7 @@ async function activityParts(env: Env, mentioned: string[], now: number, today: 
   const recentR = { results: recentRows };
   const personR = personRows.map((results) => ({ results }));
   const row = (r: { kind: string; what: string; detail: string | null; via: string | null; at: number }) =>
-    `${when(r.at)} ${r.kind === "visit" ? "접속" : r.kind === "view" ? "화면" : "한 일"} ${r.what}${r.detail ? ` ${oneLine(r.detail).slice(0, 100)}` : ""}${r.via ? ` [${VIA[r.via] ?? r.via}]` : ""}`;
+    `${when(r.at)} ${r.kind === "visit" ? "접속" : r.kind === "view" ? "화면" : r.kind === "tap" ? "누른 단추" : "한 일"} ${r.what}${r.detail ? ` ${oneLine(r.detail).slice(0, 100)}` : ""}${r.via ? ` [${VIA[r.via] ?? r.via}]` : ""}`;
   const out = [
     section(
       "앱개발자 전용: 사용 기록 7일 요약 (최근 접속 순). 화면 주소: #/ranking 랭킹, #/market 중개인, #/requests 의뢰소, #/board 게시판, #/shop 상점, #/chat 챗봇, #/me 내 정보, #/admin 길드원 관리, #/alerts 알림, #/info 정보",
