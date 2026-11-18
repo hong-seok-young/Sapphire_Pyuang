@@ -1338,9 +1338,12 @@ export function DexSnippet({ spec }: { spec: string }) {
           const name = k.replace(/%$/, "");
           return (
             <div key={k} className={"dex-snip-stat" + (short ? " dex-snip-short" : "")}>
+              {/* 한 줄에 '마나 53', 못 채우면 값 옆에 붉은 '최대 N' (채움 글자는 뺐다, 제작자 2026-11-18 '무의미') */}
               <span>{SHORT[name] ?? name}{k.endsWith("%") ? "%" : ""}</span>
-              <b>{num(v)}</b>
-              <small className="muted">{short ? `최대 ${num(pick(plan.max, name, k.endsWith("%")))}` : `채움 ${num(g)}`}</small>
+              <b>
+                {num(v)}
+                {short && <small> 최대 {num(pick(plan.max, name, k.endsWith("%")))}</small>}
+              </b>
             </div>
           );
         })}
