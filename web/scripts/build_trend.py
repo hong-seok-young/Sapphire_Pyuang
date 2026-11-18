@@ -1674,9 +1674,10 @@ def whole_char_sale(text: str) -> bool:
 # 규칙으로 읽은 뒤, 물건 값이 있거나 있을 법한 글마다 Claude 가 그 글과 앞뒤 대화를 보고 물건·강화·옵션·값(단위)·사고파는 쪽을 바로잡는다 (scripts/trend-ai.mjs).
 # 답은 글마다 계정 DB(D1 trend_ai)에 남아 한 번만 묻는다. 여기서는 그 답(TREND_AI_CACHE)이 있는 글은 규칙 대신 AI 답을 쓰고,
 # 없는 글은 규칙 그대로 두고 물을 목록(TREND_AI_TODO)에 적는다. 배포가 '빌드 -> AI 검수 -> 다시 빌드' 순서로 돌린다
-AI_VER = "t1"
+AI_VER = "t2"  # t2: 확실함·애매함(sure, why)을 같이 받는다
 AI_DIR = Path(os.environ.get("TREND_AI_DIR") or ROOT / "web" / ".trend-ai")
 _AI_CACHE: dict | None = None
+REVIEW: list[dict] = []  # 확인 필요 (trend.json 의 review, 앱개발자만 보고 자료 저장소 시세/확인필요.json 으로)
 
 
 def ai_key(m: dict) -> str:
@@ -1740,6 +1741,11 @@ def ai_records(m: dict, mi: int, res: dict, rs: Resolver, known: dict[str, tuple
         line = re.sub(r"\s+", " ", str(it.get("line") or "")).strip() or re.sub(r"\s+", " ", m["text"]).strip()
         p = {"name": name, "wiki": wiki, "unknown": unknown, "enh": enh, "opts": opts, "price": _r(max(price, 0.001)), "bare": None, "abbr": name,
              "date": m["date"], "side": side, "who": m["who"], "tel": m["tel"], "raw": line[:60], "mi": mi, "ai": True}
+        # 확실한 것만 시세에 (제작자 2026-11-18 '정말 확실한 것만 사람들이 보이게, 애매하거나 정보없는 건 정보없음으로 해 놨다가 내가 나중에 클로드로'):
+        # AI 가 애매하다고 한 것과 이름을 못 푼 것은 확인 필요 목록(REVIEW)으로. 톡방_고침.json 으로 고치면 시세에 들어간다
+        if it.get("sure") is False or unknown:
+            p["unsure"] = True
+            p["why"] = str(it.get("why") or ("이름을 모름" if unknown else "애매함"))[:80]
         try:
             if int(it.get("count") or 1) >= 2:
                 p["per"] = int(it["count"])
@@ -1888,17 +1894,32 @@ def all_lines(msgs: list[dict], rs: Resolver) -> list[dict]:
         ai_todo(msgs, rule_by_mi, rs)
     out = [p for p in out if p["name"] not in DROP_NAMES and p.get("abbr") not in DROP_ABBR]
     # 제작자가 원글을 보고 바로잡은 값 (자료 `시세/톡방_고침.json`: 누가·날짜·줄 -> 값(만 원), 값이 null 이면 뺀다. 오타로 적힌 글)
+    # 고침 한 줄: 누가·날짜·줄 -> 값(만 원, null 이면 뺀다)과 고칠 칸 이름·강화·옵션·쪽 (확인 필요 줄을 고치면 시세에 들어간다)
     fixes = line_fixes()
     if fixes:
         kept = []
         for p in out:
             f = next((f for f in fixes if f["누가"] == p["who"] and f["줄"] in p["raw"] and f.get("날짜", p["date"]) == p["date"]), None)
-            if f and f.get("값") is None:
+            if f and "값" in f and f["값"] is None:
                 continue
             if f:
-                p["price"], p["bare"] = _r(float(f["값"])), None
+                if f.get("값") is not None:
+                    p["price"], p["bare"] = _r(float(f["값"])), None
+                if f.get("이름"):
+                    p["name"], p["wiki"] = f["이름"], f["이름"] in set(rs.names.values())
+                if "강화" in f:
+                    p["enh"] = int(f["강화"] or 0)
+                if "옵션" in f:
+                    p["opts"] = [norm_opt(o) or o for o in f["옵션"] or []]
+                if f.get("쪽") in ("sell", "buy"):
+                    p["side"] = f["쪽"]
+                p["unknown"] = False
+                p.pop("unsure", None)
             kept.append(p)
         out = kept
+    REVIEW.clear()
+    REVIEW.extend(p for p in out if p.get("unsure"))
+    out = [p for p in out if not p.get("unsure")]
 
     def same(p: dict) -> tuple:
         return (p["who"], p["date"], p["side"], p["name"], p["enh"], tuple(p["opts"]), p.get("pet"))
@@ -2390,6 +2411,8 @@ def write_chat_market(data: dict, rs: "Resolver") -> None:
             slang.setdefault(k + "북", v + " 스킬북")
             slang.setdefault(k + "마북", v + " 마지막 단계 스킬북")
     for it in data["items"] + data["itemsBuy"]:
+        if it.get("unknown"):
+            continue
         for a in it.get("abbr") or []:
             if len(a) >= 2:
                 slang.setdefault(a, it["name"])
@@ -2401,8 +2424,8 @@ def write_chat_market(data: dict, rs: "Resolver") -> None:
         "source": data["source"],
         "gold": {"sell7": meds[len(meds) // 2] if meds else None, "buy7": buys[len(buys) // 2] if buys else None,
                  "days": [[d["date"], (d.get("sell") or {}).get("med"), (d.get("buy") or {}).get("med")] for d in gold[-14:]]},
-        "items": [item(it) for it in data["items"]],
-        "itemsBuy": [item(it) for it in data["itemsBuy"]],
+        "items": [item(it) for it in data["items"] if not it.get("unknown")],
+        "itemsBuy": [item(it) for it in data["itemsBuy"] if not it.get("unknown")],
         "chars": data["chars"].get("bands", []),
         "slang": slang,
     }
@@ -2451,9 +2474,9 @@ def group_icon(it: dict, wiki_items: dict) -> None:
             return
 
 
-def sample_msgs(msgs: list[dict], items: list[dict]) -> dict[str, list[str]]:
+def sample_msgs(msgs: list[dict], items: list[dict], review: list[dict] = ()) -> dict[str, list[str]]:
     """원글 표의 줄이 가리키는 카톡 글 -> {번호: [글 그대로, '2026-11-10 오후 6:02']}. 같은 글은 한 번만 넣는다"""
-    used: set[int] = set()
+    used: set[int] = {p["mi"] for p in review}
     for it in items:
         for g in [it, *it.get("groups", [])]:
             used.update(s["m"] for s in g.get("samples", []) if "m" in s)
@@ -2509,7 +2532,9 @@ def main() -> None:
         "items": items,
         "itemsBuy": items_buy,
         "chars": chars,
-        "msgs": sample_msgs(msgs, items + items_buy),
+        "msgs": sample_msgs(msgs, items + items_buy, REVIEW),
+        "review": [{"d": p["date"], "who": p["who"], "tel": p["tel"], "raw": p["raw"], "m": p["mi"], "side": p["side"], "name": p["name"],
+                    "enh": p["enh"], "opts": p["opts"], "price": p["price"], "why": p.get("why", "")} for p in REVIEW],
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

@@ -117,7 +117,10 @@ export interface Trend {
   chars: { rows: TrendChar[]; bands: TrendBand[] };
   /** 원글 표 줄이 가리키는 카톡 글: 번호 -> [글 그대로, '2026-11-10 오후 6:02'] */
   msgs?: Record<string, [string, string]>;
+  /** AI 가 애매하다고 한 줄 (확인 필요, 앱개발자만 정보없음 칸에서 본다. 고치는 곳은 자료 시세/톡방_고침.json) */
+  review?: TrendReview[];
 }
+export interface TrendReview { d: string; who: string; tel: string; raw: string; m: number; side: "sell" | "buy"; name: string; enh: number; opts: string[]; price: number; why: string }
 export const loadTrend = () => getJson<Trend>("trend");
 
 /** 강화 비교 (개발중): scripts/build_enhance.py 가 만든다. bonus: common = 전사·레인저·무도가 공통 가산치, mage = 마법사 무기마다, null = 강화 수치 모름 */

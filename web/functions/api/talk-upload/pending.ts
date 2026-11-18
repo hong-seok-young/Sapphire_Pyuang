@@ -1,6 +1,7 @@
 // 자료 저장소(sapphire-imo-data)의 Actions(.github/workflows/talk-import.yml)만 부른다. 로그인 대신 GitHub OIDC 토큰 (server/ghOidc.ts).
 // GET  /api/talk-upload/pending        -> 기다리는 것 [{ id, title }] (5개까지)
 // GET  /api/talk-upload/pending?id=N   -> 그 글 (gzip 그대로)
+// GET  /api/talk-upload/pending?review=1 -> 시세 동향 확인 필요 목록과 그 원문 (자료 저장소 시세/확인필요.json 으로, 나중에 Claude 세션이 고친다)
 // POST /api/talk-upload/pending { results: [{ id, status: done|same|fail|wait, note }] } -> 상태를 고치고 조각을 지우고 올린 사람에게 알림
 import { json } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
@@ -12,7 +13,17 @@ const DENY = () => json({ error: "권한이 없어요" }, 403);
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (!(await verifyGithubOidc(request, GH))) return DENY();
-  const id = Number(new URL(request.url).searchParams.get("id"));
+  const url = new URL(request.url);
+  if (url.searchParams.get("review")) {
+    const res = await env.ASSETS.fetch(new URL("/data/trend.json", url));
+    if (!res.ok) return json({ error: "시세 자료가 없어요" }, 404);
+    const t = (await res.json()) as { source?: { to?: string }; review?: { m: number }[]; msgs?: Record<string, [string, string]> };
+    const review = t.review ?? [];
+    const msgs: Record<string, [string, string]> = {};
+    for (const r of review) if (t.msgs?.[String(r.m)]) msgs[String(r.m)] = t.msgs[String(r.m)];
+    return json({ to: t.source?.to ?? null, review, msgs });
+  }
+  const id = Number(url.searchParams.get("id"));
   if (!id) {
     const { results } = await env.DB.prepare("SELECT id, title FROM talk_uploads WHERE status = 'wait' ORDER BY id LIMIT 5").all();
     return json({ uploads: results });

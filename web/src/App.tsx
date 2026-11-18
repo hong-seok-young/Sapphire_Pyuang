@@ -578,7 +578,7 @@ function Wiki({
     body = <RentalPage wiki={wiki} me={me} view={route.query.get("v") ?? ""} />;
   // 시세 동향 (개발중, 제작자 요청 2026-11-03): 거래 톡방 대화에서 모은 골드·물건·캐릭터 시세
   // 개발 중 칸은 미리 보는 사람(길드마스터, 오피서, 앱개발자, 테스트 계정)만. 길드원은 주소로 들어와도 개발 중 안내 (제작자 요청 2026-11-04)
-  else if (page === "trend") body = <TrendPage wiki={wiki} />;
+  else if (page === "trend") body = <TrendPage wiki={wiki} dev={me.role === "developer"} />;
   // 도감 계산기 (개발중, 제작자 요청 2026-11-10): 제작자 도감 영상을 옮긴 항목으로 완료 효과 합계와 필요 재료. 미리 보는 사람만
   else if (page === "dex") body = <DexPage wiki={wiki} me={me} />;
   else if (page === "damage") body = canPreview(me) ? <DamagePage wiki={wiki} me={me} /> : <DevSoon title="데미지 계산기" />;

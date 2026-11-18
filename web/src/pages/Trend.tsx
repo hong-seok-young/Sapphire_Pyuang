@@ -317,7 +317,7 @@ const FILTERS: { key: Filter; label: string }[] = [
   ...(["장비", "장신구", "스킬북", "코스튬", "기타"] as const).map((c) => ({ key: c, label: c })),
   { key: "unknown", label: "정보없음" },
 ];
-const inFilter = (it: TrendItem, f: Filter) => (f === "all" ? true : f === "unknown" ? !!it.unknown : it.cat === f);
+const inFilter = (it: TrendItem, f: Filter) => (f === "all" ? !it.unknown : f === "unknown" ? !!it.unknown : it.cat === f && !it.unknown);
 type Sort = "posts" | "price" | "recent";
 const SORTS: { key: Sort; label: string }[] = [
   { key: "posts", label: "글 많은 순" },
@@ -535,7 +535,7 @@ function SampleTable({ samples, msgs }: { samples: TrendGroup["samples"]; msgs?:
 }
 
 /** 팝니다 = 파는 사람이 부른 값, 삽니다 = 사는 사람이 부른 값. 파는 쪽은 비싸게, 사는 쪽은 싸게 부르니 섞지 않는다 (제작자 지적) */
-function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
+function ItemsPanel({ t, wiki, dev }: { t: Trend; wiki: Wiki; dev: boolean }) {
   const [q, setQ] = useState("");
   const [side, setSide] = useState<"sell" | "buy">("sell");
   const [filter, setFilter] = useState<Filter>("all");
@@ -554,7 +554,9 @@ function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
     else if (sort === "recent") xs.sort((a, b) => (a.last < b.last ? 1 : a.last > b.last ? -1 : b.n - a.n));
     return xs;
   }, [source, q, filter, sort]);
-  const count = (f: Filter) => source.filter((it) => inFilter(it, f)).length;
+  const count = (f: Filter) => source.filter((it) => inFilter(it, f)).length + (f === "unknown" ? (t.review ?? []).filter((r) => r.side === side).length : 0);
+  // 정보없음(이름을 못 푼 것, AI 가 애매하다고 한 것)은 앱개발자만 (제작자 2026-11-18 '정말 확실한 것만 사람들이 보이게, 애매한 건 정보없음으로 해 놨다가 내가 나중에 클로드로')
+  const filters = dev ? FILTERS : FILTERS.filter((f) => f.key !== "unknown");
   return (
     <Panel>
       {/* 찾기 칸은 눈에 띄게 (제작자 2026-11-18 '검색 치는 칸이 눈에 안 띄어, 보호색이야 거의'): 돋보기, 밝은 칸, 금색 테두리, 누르면 빛, 지우기 */}
@@ -575,7 +577,7 @@ function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
           ))}
         </div>
         <div className="mk-cats">
-          {FILTERS.map((f) => (
+          {filters.map((f) => (
             <button key={f.key} type="button" className={"sub-tab" + (filter === f.key ? " sub-tab-on" : "")} onClick={() => { setFilter(f.key); setShown(PAGE); }}>
               {f.label} <small>{count(f.key)}</small>
             </button>
@@ -593,7 +595,42 @@ function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
           더 보기 ({list.length - shown})
         </button>
       )}
+      {dev && filter === "unknown" && <ReviewList t={t} side={side} />}
     </Panel>
+  );
+}
+
+/** AI 가 애매하다고 한 줄 (앱개발자만): 짐작한 값과 까닭, 누르면 카톡 원문. 고치는 곳은 자료 시세/톡방_고침.json (Claude 세션에서) */
+function ReviewList({ t, side }: { t: Trend; side: "sell" | "buy" }) {
+  const rows = (t.review ?? []).filter((r) => r.side === side);
+  const [open, setOpen] = useState<number | null>(null);
+  const [shown, setShown] = useState(PAGE);
+  if (!rows.length) return null;
+  return (
+    <div className="trend-review">
+      <h4 className="trend-review-h">확인 필요 {rows.length}</h4>
+      <ul className="trend-review-list">
+        {rows.slice(0, shown).map((r, i) => (
+          <li key={i}>
+            <button type="button" className="trend-review-row" onClick={() => setOpen(open === i ? null : i)}>
+              <span className="trend-review-top">
+                <b>{(r.enh ? `+${r.enh} ` : "") + r.name}</b>
+                {r.opts.length > 0 && <small>{r.opts.join(" ")}</small>}
+                <span className="trend-review-price">{shortWon(r.price)}?</span>
+              </span>
+              <span className="trend-review-why">{r.why}</span>
+              <span className="trend-review-raw">{r.d.slice(5).replace("-", "/")} · {r.who} · {r.raw}</span>
+            </button>
+            {open === i && t.msgs?.[String(r.m)] && <p className="trend-review-msg">{t.msgs[String(r.m)][0]}</p>}
+          </li>
+        ))}
+      </ul>
+      {shown < rows.length && (
+        <button type="button" className="pill trend-more" onClick={() => setShown(shown + PAGE)}>
+          더 보기 ({rows.length - shown})
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -765,7 +802,7 @@ function tabFromHash(): Tab {
 }
 
 /** 골드 · 물건 · 캐릭터를 단추로 나눠 하나씩 본다 (제작자 요청 2026-11-03: 한 화면에 다 늘어놓지 않기) */
-export function TrendPage({ wiki }: { wiki: Wiki }) {
+export function TrendPage({ wiki, dev = false }: { wiki: Wiki; dev?: boolean }) {
   const { data: t, error } = useAsync(useCallback(() => loadTrend(), []));
   const [tab, setTab] = useState<Tab>(tabFromHash);
   const pick = (k: Tab) => {
@@ -794,7 +831,7 @@ export function TrendPage({ wiki }: { wiki: Wiki }) {
             ))}
           </nav>
           {tab === "gold" && <GoldPanel t={t} />}
-          {tab === "item" && <ItemsPanel t={t} wiki={wiki} />}
+          {tab === "item" && <ItemsPanel t={t} wiki={wiki} dev={dev} />}
           {tab === "char" && <CharsPanel t={t} />}
           {tab === "scam" && <ScamPanel />}
         </>
@@ -810,7 +847,8 @@ export function TrendPage({ wiki }: { wiki: Wiki }) {
 let trendOnce: Promise<Trend> | null = null;
 const loadTrendOnce = () => (trendOnce ??= loadTrend().catch((e) => { trendOnce = null; throw e; }));
 const keyOf = (x: string) => x.replace(/\s*\(.*\)\s*$/, "").replace(/\s/g, "").toLowerCase();
-function findItem(list: TrendItem[], q: string): TrendItem | undefined {
+function findItem(all: TrendItem[], q: string): TrendItem | undefined {
+  const list = all.filter((it) => !it.unknown); // 정보없음은 챗봇에도 안 보인다
   const k = keyOf(q);
   return (
     list.find((it) => keyOf(it.name) === k) ??

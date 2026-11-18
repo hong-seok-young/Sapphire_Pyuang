@@ -104,6 +104,8 @@ const SYSTEM = `너는 모바일 게임 '아이모(IMO)' 거래 오픈톡방의 
 옵션 (opts): ['명중9', '힘7', '크리3', '민첩2', '지능3', '체력30', '마나20', '이속5', '속저9', '마재2', '체재1', '불저3' …] 처럼 옵션 이름 + 값. 체·마 1~3 은 속성부여 10/20/30 (체3 = 체력30).
   '334' 처럼 옵션을 숫자만 늘어놓았으면 규칙이 읽은 옵션을 참고해.
 line: 그 물건 값이 적힌 원글 줄 그대로.
+sure: 물건 이름·강화·옵션·값(단위까지)·사고파는 쪽을 글과 문맥으로 확실히 알 때만 true. 하나라도 짐작이면 false 로 하고 why 에 무엇이 애매한지 한 줄
+  (예: '단위 없는 숫자 20 이 만 원인지 만 골드인지 모름', '줄임말 쿠찌가 무엇인지 모름', '값이 묶음 값인지 개당인지 모름'). sure 가 false 인 것은 시세에 넣지 않고 사람이 나중에 확인해. 확실하면 why 는 빈 글.
 
 규칙이 읽은 것(rule)의 unit '모름(단위 없는 숫자)' 은 규칙이 단위를 몰라 일단 만 원으로 둔 값이야.
 
@@ -131,7 +133,7 @@ const schema = {
             items: {
               type: "object",
               additionalProperties: false,
-              required: ["line", "side", "name", "enh", "opts", "price", "unit", "count", "pet"],
+              required: ["line", "side", "name", "enh", "opts", "price", "unit", "count", "pet", "sure", "why"],
               properties: {
                 line: { type: "string" },
                 side: { type: "string", enum: ["sell", "buy"] },
@@ -142,6 +144,8 @@ const schema = {
                 unit: { type: "string", enum: ["won", "gold"] },
                 count: { type: "integer" },
                 pet: { type: "string" },
+                sure: { type: "boolean" },
+                why: { type: "string" },
               },
             },
           },
@@ -182,7 +186,7 @@ async function worker() {
       // 답이 빠진 글은 물건 없음으로 (같은 글을 다시 묻지 않게). 오류 묶음은 다음에 다시
       const byKey = new Map(got.map((m) => [m.key, m.items]));
       for (const t of batch) {
-        const v = { items: (byKey.get(t.key) ?? []).map(({ count, pet, ...it }) => ({ ...it, ...(count > 1 ? { count } : {}), ...(pet ? { pet } : {}) })) };
+        const v = { items: (byKey.get(t.key) ?? []).map(({ count, pet, why, ...it }) => ({ ...it, ...(count > 1 ? { count } : {}), ...(pet ? { pet } : {}), ...(why ? { why } : {}) })) };
         cache[t.key] = v;
         pending.push(`INSERT INTO trend_ai (k, v, at) VALUES (${q(t.key)}, ${q(JSON.stringify(v))}, ${now}) ON CONFLICT (k) DO UPDATE SET v = excluded.v, at = excluded.at;`);
         added++;
