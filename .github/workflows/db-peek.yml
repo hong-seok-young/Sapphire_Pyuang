@@ -44,4 +44,6 @@ jobs:
           q rental_weapons "SELECT weapon, COUNT(*) AS n FROM rental_items WHERE status != 'gone' GROUP BY weapon ORDER BY weapon"
           # 도감 계산기 시세 설정 (앱개발자가 앱에서 적은 마법서·스탬프·플래티넘 값, 제작자 2026-11-13 '마법서 가격은 내가 앱에 적어 둔 걸 써')
           q dex_price_set "SELECT * FROM dex_price_set"
+          # 홈 배치를 저장해 둔 사람 (제작자 2026-11-18 '자기 배치를 해 둔 사람 아이디 알려줘': 배치 편집·기본 배치를 누를 때만 저장된다)
+          q layouts "SELECT user_id, datetime(updated_at/1000,'unixepoch','+9 hours') AS updated_kst, data FROM layouts ORDER BY updated_at"
           q donate_names "SELECT item, COUNT(*) AS n FROM donate_items WHERE status IN ('request', 'done', 'hall', 'honor') GROUP BY item ORDER BY item"
