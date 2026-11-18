@@ -1207,19 +1207,6 @@ function Solving() {
   );
 }
 
-/** 챗봇 도감 칸: 골드로 살 칸의 골드 + 스탬프로 할 칸의 장 수 */
-function SnipSplit({ s }: { s: { gold: number; stamps: (readonly [string, number])[] } }) {
-  if (!s.stamps.length) return null;
-  return (
-    <span className="dex-snip-split">
-      <span>골드 {fmtGold(s.gold)}</span>
-      {s.stamps.map(([g, n]) => (
-        <span key={g} className={stampCls(g)}>{g} {n.toLocaleString("ko-KR")}장</span>
-      ))}
-    </span>
-  );
-}
-
 /** 능력치 목표 글('명중=4;체력=244.3;체력%=7.4')을 처음부터 채우는 최저가 묶음 (챗봇 도감 칸, 시세 동향 캐릭터 매물이 같이 쓴다) */
 function useSpecPlan(spec: string, withEv: boolean) {
   const { data: all } = useAsync(useCallback(() => loadDex(), []), "dex");
@@ -1267,24 +1254,10 @@ function useSpecPlan(spec: string, withEv: boolean) {
   const { plan: res, busy: solving } = useBestPlan(base?.entries ?? null, base?.targets ?? EMPTY_TARGETS, base?.costOf ?? NO_COST);
   const plan = useMemo(() => {
     if (!base || !res) return null;
-    const { targets, bad, max, price } = base;
-    // 칸마다 가장 싼 수단: 골드가 싼 칸은 골드, 장비스탬프가 싼 칸은 스탬프 장 수로 (도감 계산기 필요 재료와 같은 셈, 제작자 2026-11-12 '챗봇 쪽에서도 반영')
-    const split = (mode: "normal" | "event") => {
-      const st = new Map<string, number>();
-      let gold = 0;
-      if (price)
-        for (const { e } of res.picks)
-          for (const it of e.items) {
-            const w = pickWay(slotCost(it, price, pset), mode);
-            if (!w) continue;
-            if (w.by === "stamp" && it.sg && it.sn) st.set(it.sg, (st.get(it.sg) ?? 0) + it.sn * it.n);
-            else gold += w.v;
-          }
-      const order = ["S", "A", "B", ...[...st.keys()].filter((g) => !["S", "A", "B"].includes(g)).sort()].filter((g) => st.has(g));
-      return { gold, stamps: order.map((g) => [g, st.get(g)!] as const) };
-    };
-    return { targets, bad, max, ...res, split: { normal: split("normal"), event: split("event") } };
-  }, [base, res, pset]);
+    const { targets, bad, max } = base;
+    // 골드·스탬프 나눔은 도감 계산기에서 보여서 뺐다 (제작자 2026-11-18 '어차피 도감계산기 가면 보이니까')
+    return { targets, bad, max, ...res };
+  }, [base, res]);
   return { all, me, rate, base, plan, solving };
 }
 
@@ -1353,13 +1326,11 @@ export function DexSnippet({ spec }: { spec: string }) {
           <small>평소</small>
           <b>{fmtGold(plan.gold)} 골드</b>
           <small className="muted">≈ {wonText(Math.round(plan.gold / rate / 10_000) * 10_000)}</small>
-          <SnipSplit s={plan.split.normal} />
         </div>
         <div className="dex-cost-col">
           <small>아바돈 이벤트</small>
           <b>{fmtGold(plan.goldEv)} 골드</b>
           <small className="muted">≈ {wonText(Math.round(plan.goldEv / rate / 10_000) * 10_000)}</small>
-          <SnipSplit s={plan.split.event} />
         </div>
       </div>
       {/* 도감 계산기는 아직 개발 중이라 들어갈 수 있는 사람(운영진·미리 보는 사람)에게만 단추를 보인다. 길드원이 누르면 '개발 중이에요' 화면뿐이라 */}

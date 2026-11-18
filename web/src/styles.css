@@ -5374,8 +5374,6 @@ a.ctl-line:active { background: rgba(255, 255, 255, 0.06); }
 .dex-snip-list li span { min-width: 0; }
 .dex-snip-list li b { flex: none; color: var(--gold); font-weight: normal; }
 /* 챗봇 도감 칸의 칸마다 싼 수단 (골드 + 스탬프 장 수) */
-.dex-snip-split { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 5px; margin-top: 2px; font-size: 10px; color: var(--muted); }
-.dex-snip-split .dex-stamp { font-size: 10px; margin: 0; }
 /* '도감 계산기에서 보기' (제작자 2026-11-12 '엄청 눈에 띄게 애니메이션 팍팍, 딱 봐도 누르고 싶게'):
    금빛 큰 단추가 통통 뛰고, 빛이 지나가고, 둘레로 고리가 퍼지고, 모서리 별이 반짝이고, 화살표가 앞으로 쿡쿡. transform·opacity 만 */
 .dex-go {
