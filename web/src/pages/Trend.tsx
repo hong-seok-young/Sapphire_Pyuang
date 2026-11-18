@@ -7,7 +7,7 @@ import type { PointerEvent } from "react";
 import { loadTrend, useAsync } from "../data";
 import type { GoldDay, Trend, TrendCat, TrendChar, TrendGroup, TrendItem, TrendPerson } from "../data";
 import { MARKET_PIC, goldWords, wonText } from "../market";
-import { Loading, Panel, PicImg, TopBar } from "../ui";
+import { Loading, Panel, PicImg, PixelIcon, TopBar } from "../ui";
 import type { Wiki } from "../types";
 import { filterByName } from "../search";
 import { useEntryState } from "../router";
@@ -549,9 +549,14 @@ function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
   const count = (f: Filter) => source.filter((it) => inFilter(it, f)).length;
   return (
     <Panel>
-      <div className="search-box">
+      {/* 찾기 칸은 눈에 띄게 (제작자 2026-11-18 '검색 치는 칸이 눈에 안 띄어, 보호색이야 거의'): 돋보기, 밝은 칸, 금색 테두리, 누르면 빛, 지우기 */}
+      <label className="trend-search">
+        <PixelIcon name="search" size={16} />
         <input value={q} onChange={(e) => { setQ(e.target.value); setShown(PAGE); }} placeholder="물건 이름 또는 톡방 줄임말" aria-label="물건 찾기" />
-      </div>
+        {q && (
+          <button type="button" className="trend-search-x" aria-label="지우기" onClick={() => { setQ(""); setShown(PAGE); }}>✕</button>
+        )}
+      </label>
       <div className="mk-sub trend-strip">
         <div className="mk-side" role="tablist">
           {(["sell", "buy"] as const).map((x) => (
