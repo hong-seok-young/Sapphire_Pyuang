@@ -366,7 +366,7 @@ def parse(path: Path) -> tuple[str, list[dict]]:
                     cur = None
                     continue
                 name, tel = norm_who(who)
-                cur = {"date": day, "who": name, "tel": tel, "text": text}
+                cur = {"date": day, "time": f"{pc.group(2)} {pc.group(3)}:{pc.group(4)}", "who": name, "tel": tel, "text": text}
                 msgs.append(cur)
                 continue
             if JOINED.search(line):
@@ -374,12 +374,12 @@ def parse(path: Path) -> tuple[str, list[dict]]:
                 continue
             m = HEAD.match(line)
             if m:
-                y, mo, d, _ap, _h, _mi, who, text = m.groups()
+                y, mo, d, ap, h, mi, who, text = m.groups()
                 if who == "오픈채팅봇":
                     cur = None
                     continue
                 name, tel = norm_who(who)
-                cur = {"date": f"{y}-{int(mo):02d}-{int(d):02d}", "who": name, "tel": tel, "text": text}
+                cur = {"date": f"{y}-{int(mo):02d}-{int(d):02d}", "time": f"{ap} {h}:{mi}", "who": name, "tel": tel, "text": text}
                 msgs.append(cur)
             elif SYSTEM.search(line):
                 cur = None
@@ -2149,12 +2149,16 @@ def char_prices(msgs: list[dict], rs: Resolver) -> dict:
         for c in parse_chars(m, rs):
             key = (m["who"], m["tel"], c["server"], c["level"], c["job"], c["price"], c["side"])
             r = rows.get(key)
+            # 카톡 원문 (제작자 2026-11-18 '매물마다 카톡 원문 보기, 그 사람이 친 원래 메시지'): 가장 나중에 올린 글 그대로
+            msg = {"msg": m["text"].strip(), "msgAt": f"{m['date']} {m.get('time', '')}".strip()}
             if r:
                 r["n"] += 1
+                if m["date"] >= r["last"]:
+                    r.update(msg)
                 r["last"] = max(r["last"], m["date"])
                 r["first"] = min(r["first"], m["date"])
             else:
-                c.update({"who": m["who"], "tel": m["tel"], "n": 1, "first": m["date"], "last": m["date"]})
+                c.update({"who": m["who"], "tel": m["tel"], "n": 1, "first": m["date"], "last": m["date"], **msg})
                 rows[key] = c
     out = sorted(rows.values(), key=lambda r: (r["last"], r["first"]), reverse=True)
     bands = []

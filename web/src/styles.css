@@ -5905,3 +5905,12 @@ a.cf-at { color: #9fb4ff; }
 .trend-charhead > span:first-child { width: 44px; flex: none; text-align: center; }
 .trend-charhead .trend-chartitle { flex: 1; min-width: 0; font-size: 10px; }
 .trend-charhead .trend-itemprice { color: var(--muted); }
+
+/* 시세 동향 캐릭터 매물의 카톡 원문 (제작자 2026-11-18) */
+.trend-kakao { margin-top: 6px; }
+.trend-kakao-btn { width: 100%; padding: 5px 8px; font: inherit; font-size: 12px; color: #3c1e1e; background: #fee500; border: var(--px) solid #c9b400; cursor: pointer; text-align: center; }
+.trend-kakao-msg { margin-top: 6px; padding: 8px 10px; background: #b2c7da; color: #111; border-radius: 2px; }
+.trend-kakao-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; font-size: 12px; }
+.trend-kakao-head b { color: #111; font-weight: 400; }
+.trend-kakao-head .muted { color: #4a5a6a; }
+.trend-kakao-text { padding: 7px 9px; background: #fff; border-radius: 6px; font-size: 12px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow-y: auto; }

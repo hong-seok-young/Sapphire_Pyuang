@@ -677,10 +677,31 @@ function dexSpecOf(table: [string, string][]): string {
   return out.join(";");
 }
 
+/** 카톡 원문 보기 (제작자 2026-11-18 '매물마다 카톡 원문 보기, 그 사람이 친 원래 메시지 원문을 볼 수 있게'): 누르면 펼쳐지는 말풍선 */
+function KakaoOriginal({ who, at, text }: { who: string; at?: string; text: string }) {
+  const [open, setOpen] = useEntryState("trend.msg:" + who + at, false);
+  return (
+    <div className="trend-kakao">
+      <button type="button" className="trend-kakao-btn" aria-expanded={open} onClick={() => setOpen(!open)}>
+        카톡 원문 {open ? "접기 ▲" : "보기 ▼"}
+      </button>
+      {open && (
+        <div className="trend-kakao-msg">
+          <div className="trend-kakao-head">
+            <b>{who}</b>
+            {at && <small className="muted">{at.replace(/^\d{4}-(\d{2})-(\d{2})/, (_, mo, d) => `${Number(mo)}/${Number(d)}`)}</small>}
+          </div>
+          <div className="trend-kakao-text">{text}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CharRow({ r, open, onToggle }: { r: TrendChar; open: boolean; onToggle: () => void }) {
   const spec = useMemo(() => dexSpecOf(r.dexTable), [r.dexTable]);
-  // 펼쳐서 보일 것(도감 계산기 칸, 도감 %)이 없는 줄은 펼치지 않는다
-  const hasBody = !!spec || Object.keys(r.collect).length > 0;
+  // 펼쳐서 보일 것(도감 계산기 칸, 도감 %, 카톡 원문)이 없는 줄은 펼치지 않는다
+  const hasBody = !!spec || Object.keys(r.collect).length > 0 || !!r.msg;
   const skills = r.skills.split(" · ").filter(Boolean);
   return (
     <li className={"trend-item" + (open ? " mk-open" : "")}>
@@ -733,6 +754,7 @@ function CharRow({ r, open, onToggle }: { r: TrendChar; open: boolean; onToggle:
           )}
           {/* 이 도감 수치를 처음부터 채우는 데 드는 값과 '도감 계산기에서 보기' (제작자 2026-11-18) */}
           {spec && <DexSnippet spec={spec} />}
+          {r.msg && <KakaoOriginal who={r.who} at={r.msgAt} text={r.msg} />}
         </div>
       )}
     </li>

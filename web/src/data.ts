@@ -103,6 +103,8 @@ export interface TrendChar {
   /** 도감 요약 한 줄, 게임 '획득 옵션' 순서의 [이름, 값] 표, 도감 랭킹 % (일반, 코스튬, 라이딩) */
   dex: string; dexTable: [string, string][]; collect: Record<string, number>; gems: string;
   pvp: boolean; scope: "" | "캘" | "템통"; price: number; raw: string; n: number; first: string; last: string;
+  /** 카톡 원문 (가장 나중에 올린 글 그대로)과 올린 때 '2026-11-10 오후 2:44' */
+  msg?: string; msgAt?: string;
 }
 export interface TrendBand { band: string; n: number; med: number; min: number; max: number }
 export interface Trend {
