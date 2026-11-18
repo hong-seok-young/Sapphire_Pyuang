@@ -1217,19 +1217,20 @@ function SnipSplit({ s }: { s: { gold: number; stamps: (readonly [string, number
   );
 }
 
-export function DexSnippet({ spec }: { spec: string }) {
+/** 능력치 목표 글('명중=4;체력=244.3;체력%=7.4')을 처음부터 채우는 최저가 묶음 (챗봇 도감 칸, 시세 동향 캐릭터 매물이 같이 쓴다) */
+function useSpecPlan(spec: string, withEv: boolean) {
   const { data: all } = useAsync(useCallback(() => loadDex(), []), "dex");
   // '도감 계산기에서 보기'의 목표는 계정별로 둬서 누구인지 묻는다. 마법서·스탬프 값은 서버 한 벌
   const { data: me } = useAsync(useCallback(() => fetchMe(), []), "me");
   const { pset } = usePriceSet(me ?? null);
   const { data: market } = useAsync(useCallback(() => fetchMarket(), []), "market");
-  const [withEv, setWithEv] = useState(false); // 이벤트 도감은 처음엔 뺀다 (제작자 2026-11-12)
-  const [open, setOpen] = useState(false);
   const rate = market?.goldRate || 75;
   const base = useMemo(() => {
     if (!all) return null;
     const now = Date.now();
     const entries = all.entries.filter((e) => isLive(e, now) && (withEv || e.cat !== "이벤트"));
+    // 도감에 있는 줄 (고정값 · % 따로): 톡방 글은 '경험치 3' 처럼 % 를 빼고 적기도 해서, 없는 쪽이면 다른 쪽으로 맞춘다
+    const has = new Set(all.entries.flatMap((e) => e.effects.map(([st, , p]) => rowKey(st, p))));
     const targets = new Map<string, number>();
     const bad: string[] = [];
     for (const part of spec.split(/[;,]/)) {
@@ -1242,7 +1243,9 @@ export function DexSnippet({ spec }: { spec: string }) {
         bad.push(m[1].trim());
         continue;
       }
-      targets.set(rowKey(row[0], row[1]), v);
+      let key = rowKey(row[0], row[1]);
+      if (!has.has(key) && has.has(rowKey(row[0], !row[1]))) key = rowKey(row[0], !row[1]);
+      targets.set(key, Math.max(v, targets.get(key) ?? 0));
     }
     const price = all.price;
     const costOf = (e: DexEntry, mode: "normal" | "event") => {
@@ -1279,6 +1282,27 @@ export function DexSnippet({ spec }: { spec: string }) {
     };
     return { targets, bad, max, ...res, split: { normal: split("normal"), event: split("event") } };
   }, [base, res, pset]);
+  return { all, me, rate, base, plan, solving };
+}
+
+/** 시세 동향 캐릭터 매물 줄의 작은 칩: 그 캐릭터 도감 수치를 처음부터 채우는 최저가 (평소, 골드 · 현금 어림) */
+export function DexCostChip({ spec }: { spec: string }) {
+  const { plan, solving, rate } = useSpecPlan(spec, false);
+  if (solving || !plan) return <span className="trend-gchip trend-gchip-dex muted">도감 계산 중</span>;
+  if (!plan.targets.size) return null;
+  const short = [...plan.targets].some(([k, v]) => (plan.got.get(k) ?? 0) < v - 1e-9);
+  return (
+    <span className="trend-gchip trend-gchip-dex">
+      도감 <em>{fmtGold(plan.gold)}</em>
+      <small className="muted"> ≈{wonText(Math.round(plan.gold / rate / 10_000) * 10_000)}{short ? " · 최대 넘음" : ""}</small>
+    </span>
+  );
+}
+
+export function DexSnippet({ spec }: { spec: string }) {
+  const [withEv, setWithEv] = useState(false); // 이벤트 도감은 처음엔 뺀다 (제작자 2026-11-12)
+  const [open, setOpen] = useState(false);
+  const { all, me, rate, base, plan, solving } = useSpecPlan(spec, withEv);
   if (solving && base)
     return (
       <div className="dex-snip">

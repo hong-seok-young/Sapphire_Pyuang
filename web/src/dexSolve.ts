@@ -37,7 +37,7 @@ export function solveCover(key: string, costs: number[], vals: [number, number][
   const id = ++seq;
   return new Promise((resolve) => {
     waiting.set(id, (p) => {
-      if (cache.size > 40) cache.clear();
+      if (cache.size > 200) cache.clear();
       cache.set(key, p);
       resolve(p);
     });

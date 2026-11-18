@@ -10,6 +10,8 @@ import { MARKET_PIC, goldWords, wonText } from "../market";
 import { Loading, Panel, PicImg, TopBar } from "../ui";
 import type { Wiki } from "../types";
 import { filterByName } from "../search";
+import { useEntryState } from "../router";
+import { DexCostChip, DexSnippet } from "./Dex";
 
 /** 가격은 만 원 단위 (17 = 17만 원, 0.5 = 5000원) */
 const priceText = (manwon: number) => wonText(Math.round(manwon * 10_000));
@@ -591,9 +593,11 @@ const CHAR_FILTERS: { key: CharFilter; label: string }[] = [
 
 /** 캐릭터 시세: 레벨대별 한 줄 요약과 캐릭터 줄 (레벨, 서버·직업·캘/템통, 닉, 스킬·보석·쟁·도감 칩, 도감 요약, 가격) */
 function CharsPanel({ t }: { t: Trend }) {
-  const [side, setSide] = useState<"sell" | "buy">("sell");
-  const [filter, setFilter] = useState<CharFilter>("all");
-  const [shown, setShown] = useState(PAGE);
+  // 도감 계산기에 갔다가 뒤로 오면 보던 칸·펼친 줄 그대로 (제작자 2026-11-18)
+  const [side, setSide] = useEntryState<"sell" | "buy">("trend.charSide", "sell");
+  const [filter, setFilter] = useEntryState<CharFilter>("trend.charFilter", "all");
+  const [shown, setShown] = useEntryState("trend.charShown", PAGE);
+  const [opened, setOpened] = useEntryState<string[]>("trend.charOpen", []);
   const bySide = t.chars.rows.filter((r) => r.side === side);
   const ofScope = (f: CharFilter) => bySide.filter((r) => (f !== "char" || r.scope === "캘") && (f !== "bundle" || r.scope === "템통"));
   const rows = ofScope(filter);
@@ -627,7 +631,10 @@ function CharsPanel({ t }: { t: Trend }) {
         </div>
       )}
       <ul className="mk-list trend-list">
-        {rows.slice(0, shown).map((r, i) => <CharRow key={i} r={r} />)}
+        {rows.slice(0, shown).map((r) => {
+          const id = charId(r);
+          return <CharRow key={id} r={r} open={opened.includes(id)} onToggle={() => setOpened((o) => (o.includes(id) ? o.filter((x) => x !== id) : [...o, id]))} />;
+        })}
       </ul>
       {shown < rows.length && (
         <button type="button" className="pill trend-more" onClick={() => setShown(shown + PAGE)}>
@@ -638,13 +645,32 @@ function CharsPanel({ t }: { t: Trend }) {
   );
 }
 
-function CharRow({ r }: { r: TrendChar }) {
-  const [open, setOpen] = useState(false);
+function charId(r: TrendChar): string {
+  return [r.side, r.who, r.tel, r.server, r.level, r.job, r.price, r.first].join("|");
+}
+
+/** 캐릭터 글의 도감 효과 표 -> 도감 계산기 목표 글 ('체력 186 / 3.35%' -> '체력=186;체력%=3.35') */
+function dexSpecOf(table: [string, string][]): string {
+  const out: string[] = [];
+  for (const [k, v] of table) {
+    const [a, b] = v.split("/").map((x) => x.trim());
+    const put = (x: string | undefined, pct: boolean) => {
+      const n = x ? parseFloat(x) : NaN;
+      if (n > 0) out.push(`${k}${pct || x!.endsWith("%") ? "%" : ""}=${n}`);
+    };
+    put(a, false);
+    if (b != null) put(b, true);
+  }
+  return out.join(";");
+}
+
+function CharRow({ r, open, onToggle }: { r: TrendChar; open: boolean; onToggle: () => void }) {
+  const spec = useMemo(() => dexSpecOf(r.dexTable), [r.dexTable]);
   const skills = r.skills.split(" · ").filter(Boolean);
   const dexShort = r.dex.replace(/^도감 효과 · /, "").replace(/^도감 효과$/, "");
   return (
     <li className={"trend-item" + (open ? " mk-open" : "")}>
-      <button type="button" className="trend-itemrow" onClick={() => setOpen(!open)}>
+      <button type="button" className="trend-itemrow" onClick={onToggle}>
         <span className={"trend-lv" + (r.side === "buy" ? " trend-lv-buy" : "")}>
           <small>{r.side === "buy" ? "삽니다" : "팝니다"}</small>
           <b>{r.level}</b>
@@ -662,6 +688,7 @@ function CharRow({ r }: { r: TrendChar }) {
             {(r.dex === "노도감" || r.dex === "저도감") && <span className="trend-gchip muted">{r.dex}</span>}
             {"일반" in r.collect && <span className="trend-gchip">도감 <em>{r.collect["일반"]}%</em></span>}
             {!skills.length && !r.gems && !r.pvp && !r.dex && <span className="trend-gchip muted">상세 없음</span>}
+            {spec && <DexCostChip spec={spec} />}
           </span>
           <span className="trend-sub">
             {!open && dexShort && r.dex !== "노도감" && r.dex !== "저도감" && <span className="trend-dex">{dexShort}</span>}
@@ -686,6 +713,8 @@ function CharRow({ r }: { r: TrendChar }) {
               ))}
             </dl>
           )}
+          {/* 이 도감 수치를 처음부터 채우는 데 드는 값과 '도감 계산기에서 보기' (제작자 2026-11-18) */}
+          {spec && <DexSnippet spec={spec} />}
         </div>
       )}
     </li>
@@ -715,7 +744,7 @@ export function TrendPage({ wiki }: { wiki: Wiki }) {
   const pick = (k: Tab) => {
     setTab(k);
     const base = window.location.hash.split("?")[0] || "#/trend";
-    window.history.replaceState(null, "", k === "gold" ? base : `${base}?t=${k}`);
+    window.history.replaceState(window.history.state, "", k === "gold" ? base : `${base}?t=${k}`);
   };
   return (
     <>
