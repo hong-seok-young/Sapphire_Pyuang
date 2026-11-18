@@ -380,6 +380,16 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
         </MeGroup>
       )}
 
+      {/* 톡방 올리기 (제작자 2026-11-18): 앱개발자·길드마스터. 카톡 대화 내보내기를 자료 저장소에 더한다 (pages/TalkUpload.tsx) */}
+      {(me.role === "developer" || me.role === "master") && (
+        <MeGroup title="자료">
+          <a className="me-row me-row-link" href="#/talk">
+            <span className="me-row-label">톡방 올리기</span>
+            <span className="me-row-value">카톡 대화 내보내기</span>
+          </a>
+        </MeGroup>
+      )}
+
       {/* 앱개발자만: 테스트 계정으로 바꿔서 상대방 쪽 화면과 알림을 혼자 시험한다 (제작자 요청) */}
       {me.role === "developer" && (
         <MeGroup title="개발자">

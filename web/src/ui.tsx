@@ -132,6 +132,7 @@ export const TITLE_EN: Record<string, string> = {
   "명예의 전당": "HALL OF FAME",
   "개선 접수": "FIX DESK",
   "내 접수": "MY REPORTS",
+  "톡방 올리기": "CHAT IMPORT",
 };
 
 export function TopBar({

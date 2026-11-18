@@ -5,7 +5,7 @@ import { GCOIN_OPEN } from "./launcher";
 
 export type AlertKind =
   | "market_want" | "market_bid" | "market_outbid" | "market_auction" | "market_new" | "gold_want" | "request" | "request_new" | "talk" | "account" | "shop"
-  | "board" | "board_notice" | "imo_news" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo" | "gdungeon" | "app_news" | "devreq" | "bday" | "gcoin" | "donate" | "fix" | "push_test";
+  | "board" | "board_notice" | "imo_news" | "chat_fixed" | "chat_gap" | "chat_done" | "rent" | "todo" | "gdungeon" | "app_news" | "devreq" | "bday" | "gcoin" | "donate" | "fix" | "talk_up" | "push_test";
 
 export interface Alert {
   id: number;
@@ -53,7 +53,7 @@ export const ALERT_GROUPS: { menu: string; kinds: { kind: AlertKind; name: strin
   { menu: "기부함", kinds: [{ kind: "donate", name: "신청·확정" }] },
   // 단추가 없는 알림: 역할 바뀜·아이디 생성·계정 삭제 요청(account), 새 기능(server/appNews.ts)
   // 오류·개선 접수 (메뉴마다 위 줄 🔔 왼쪽 단추, 운영진은 홈 칸 '개선 접수'): 접수·대화·처리 결과
-  { menu: "기타", kinds: [{ kind: "account", name: "계정 (역할·요청)" }, { kind: "app_news", name: "새 기능" }, { kind: "fix", name: "오류·개선 접수" }] },
+  { menu: "기타", kinds: [{ kind: "account", name: "계정 (역할·요청)" }, { kind: "app_news", name: "새 기능" }, { kind: "fix", name: "오류·개선 접수" }, { kind: "talk_up", name: "톡방 올리기", developer: true }] },
 ];
 
 export const fetchAlerts = () =>

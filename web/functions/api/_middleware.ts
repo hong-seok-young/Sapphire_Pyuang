@@ -9,7 +9,7 @@ import { canSim, earnFor } from "../../server/simcoin";
 import { anonWrite } from "../../server/board";
 
 /** 본문이 JSON 이 아닌 곳: 캐릭터 사진, AI 지우기(그림 파일)는 크기만 적는다 */
-const BINARY = /^\/api\/(avatar(\/cutout)?|board\/\d+\/files)$/;
+const BINARY = /^\/api\/(avatar(\/cutout)?|board\/\d+\/files|fix\/\d+\/shots|talk-upload)$/;
 
 /**
  * 처리하다 예외가 나면 빈 500 대신 알 수 있는 글로 (2026-11-02: 장비대여 기부 적립이 '문제가 생겼어요 (500)'만 보여 원인을 몰랐다).

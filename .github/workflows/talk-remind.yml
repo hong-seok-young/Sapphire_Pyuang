@@ -1,0 +1,21 @@
+# 톡방 내보내기 알림 (제작자 2026-11-18 '오픈톡방 대화 내보내기 정기적으로'): 매주 일요일 저녁 8시 47분(한국 시간)에 앱개발자에게
+# '톡방 내보내기 할 때예요' 알림 (누르면 톡방 올리기 #/talk). 서버 POST /api/talk-upload/remind (server/talkUpload.ts remindTalk: 주마다 한 번만이라 비밀값 없이 부른다)
+name: Talk export reminder
+
+on:
+  schedule:
+    - cron: "47 11 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Remind
+        run: |
+          out=$(curl -fsS -X POST https://sapphire-guild.pages.dev/api/talk-upload/remind) || { echo "::warning::알림 요청이 실패했어요"; exit 0; }
+          echo "보낸 알림: $(printf '%s' "$out" | tr -cd '0-9')"

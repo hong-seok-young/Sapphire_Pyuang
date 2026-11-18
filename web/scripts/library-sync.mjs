@@ -4,7 +4,7 @@
 // (lib_files 의 해시). 챗봇은 질문 낱말이 든 조각을 찾아 '<길드 자료 저장소>' 로 붙인다 (server/library.ts).
 // - 빼는 것: 다른 길로 이미 챗봇에 가는 것(공식/소식.json = official_news, 공식/확률 = odds.json), 받아 적기 중간 기록(도감/작업), 그림 목록·주소 목록(이미지/, scripts/,
 //   드랍표_원본, 저장할_글_*, 2차_링크.json), 누가 익명 글쓴이를 보는지(길드/익명_보기.txt, 아무에게도 알리지 않는다).
-// - 카톡은 같은 방을 여러 번 내보낸 파일 중 가장 새 것만 넣고(파일 이름 '<방>_<날짜>.txt'), 닉네임 뒤 휴대폰 뒷자리 '(1234)' 는 지운다.
+// - 카톡은 같은 방 파일들을 날짜마다 가장 새 파일의 글로 이어 붙여 한 글로 넣고(파일 이름 '<방>_<날짜>.txt', 가장 새 파일 이름으로), 닉네임 뒤 휴대폰 뒷자리 '(1234)' 는 지운다.
 // - 길드/ 아래(장비대여 목록, 기부 내역 등)는 운영진(오피서 이상)에게만 붙인다 (staff 1).
 // 자료 저장소 main 이 바뀌면 GitHub Actions(.github/workflows/data-watch.yml, 30분마다)가 이것을 돌리고 배포도 다시 한다. 배포 끝에도 돈다.
 // 공개 저장소라 실행 기록에는 파일·조각 수만 찍는다.
@@ -15,6 +15,7 @@ import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { mergeRoom } from "./talkDays.mjs";
 
 const DB = "sapphire-accounts";
 const ROOT = "../자료";
@@ -80,20 +81,26 @@ function walk(dir) {
   return out;
 }
 
-// 넣을 파일: 글 파일, 뺄 것 빼고, 카톡은 방마다 가장 새 파일만
+// 넣을 파일: 글 파일, 뺄 것 빼고. 카톡은 방마다 한 글로: 그 방 파일들을 날짜마다 가장 새 파일의 글로 이어 붙여 가장 새 파일 이름으로 넣는다
+// (톡방 올리기 scripts/talk-import.mjs 가 앞 파일 이후 날짜만 새 파일로 더해서, 가장 새 파일만 넣으면 앞의 글이 빠진다. 시세 동향 build_trend.py 와 같은 규칙)
 let files = walk(ROOT)
   .map((f) => relative(ROOT, f).split(sep).join("/"))
   .filter((p) => TEXT.test(p) && !SKIP.some((re) => re.test(p)));
-const newestTalk = new Map();
+const talkRooms = new Map();
 for (const p of files.filter((p) => p.startsWith("카톡/"))) {
   const m = p.match(/^카톡\/(.+)_(\d{4}-\d{2}-\d{2})\.txt$/);
   if (!m) continue;
-  const cur = newestTalk.get(m[1]);
-  if (!cur || cur.date < m[2]) newestTalk.set(m[1], { date: m[2], path: p });
+  talkRooms.set(m[1], [...(talkRooms.get(m[1]) ?? []), { date: m[2], path: p }]);
+}
+/** 카톡 방의 가장 새 파일 이름 -> 이어 붙인 글 */
+const talkText = new Map();
+for (const list of talkRooms.values()) {
+  const newest = list.reduce((a, b) => (a.date >= b.date ? a : b));
+  talkText.set(newest.path, mergeRoom(list.map((f) => ({ date: f.date, text: readFileSync(join(ROOT, f.path), "utf8") }))));
 }
 files = files.filter((p) => {
   const m = p.match(/^카톡\/(.+)_(\d{4}-\d{2}-\d{2})\.txt$/);
-  return !m || newestTalk.get(m[1])?.path === p;
+  return !m || talkText.has(p);
 });
 
 /** 파일 글 -> 조각 (줄 단위로 2천 자쯤. JSON 은 줄을 나눠 읽기 좋게) */
@@ -172,7 +179,7 @@ const lines = [];
 let changed = 0;
 let parts = 0;
 for (const p of files) {
-  const raw = readFileSync(join(ROOT, p), "utf8");
+  const raw = talkText.get(p) ?? readFileSync(join(ROOT, p), "utf8");
   const hash = createHash("sha1").update(raw).digest("hex");
   if (had.get(p) === hash) continue;
   const chunks = chunksOf(p, raw);

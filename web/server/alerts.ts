@@ -7,6 +7,8 @@ import { later } from "./background";
 
 /** 알림 종류와 처음 켜짐 여부 (화면 web/src/alerts.ts 의 이름과 같다) */
 export const ALERT_KINDS = {
+  // 톡방 올리기 (server/talkUpload.ts): 매주 내보내기 알림과 올린 결과 (앱개발자)
+  talk_up: true,
   market_want: true,
   market_bid: true,
   market_outbid: true,

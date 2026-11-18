@@ -105,6 +105,7 @@ const CHUNKS = {
   ActivityLog: () => import("./pages/ActivityLog"),
   Alerts: () => import("./pages/Alerts"),
   FixDesk: () => import("./pages/FixDesk"),
+  TalkUpload: () => import("./pages/TalkUpload"),
   PlatShop: () => import("./pages/PlatShop"),
   Board: () => import("./pages/Board"),
   Official: () => import("./pages/Official"),
@@ -135,6 +136,7 @@ const ActivityLogPage = lazy(() => CHUNKS.ActivityLog().then((m) => ({ default: 
 const LogAnswerPage = lazy(() => CHUNKS.ActivityLog().then((m) => ({ default: m.LogAnswerPage })));
 const AlertsPage = lazy(() => CHUNKS.Alerts().then((m) => ({ default: m.AlertsPage })));
 const FixDeskPage = lazy(() => CHUNKS.FixDesk());
+const TalkUploadPage = lazy(() => CHUNKS.TalkUpload());
 const PlatShopPage = lazy(() => CHUNKS.PlatShop().then((m) => ({ default: m.PlatShopPage })));
 const BoardPage = lazy(() => CHUNKS.Board().then((m) => ({ default: m.BoardPage })));
 const SuggestPage = lazy(() => CHUNKS.Board().then((m) => ({ default: m.SuggestPage })));
@@ -522,6 +524,8 @@ function Wiki({
         <FixDeskPage me={me} mine query={route.query} wiki={wiki ?? null} />
       );
   else if (page === "fix") body = <FixDeskPage me={me} mine query={route.query} wiki={wiki ?? null} />;
+  // 톡방 올리기 (제작자 2026-11-18): 카톡 대화 내보내기를 공유·파일로 받아 자료 저장소에 더한다. 앱개발자·길드마스터
+  else if (page === "talk") body = RANK[me.role] >= 2 ? <TalkUploadPage query={route.query} /> : <NotFound what="페이지" />;
   // 길드 던전은 1군 전용 (제작자 요청 2026-11-02): 2군은 들어와도 안내만 (앱개발자는 길드와 상관없이 본다)
   else if (page === "match")
     body =

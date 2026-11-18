@@ -1215,3 +1215,28 @@ CREATE TABLE IF NOT EXISTS patch_extra (
   report_id INTEGER,
   created_at INTEGER NOT NULL
 );
+
+-- 톡방 올리기 (제작자 2026-11-18 '카톡 대화 내보내기 → 공유로 Sapphire 에 올리면 깃 아이모 데이터에 쌓이게, 이전 톡방 일자 이후 것만'):
+-- 화면(#/talk, 공유 받기·파일 고르기)이 내보낸 글을 gzip 으로 보내면 1.5MB 조각으로 둔다. GitHub Actions(data-watch.yml, scripts/talk-import.mjs)가
+-- 30분마다 가져가 자료 저장소 카톡/<방>_<날짜>.txt 에 새 날짜 것만 더해 올리고 조각은 지운다 (파일은 깃에 있어서)
+CREATE TABLE IF NOT EXISTS talk_uploads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  name TEXT,                     -- 올린 파일 이름
+  title TEXT,                    -- 방 이름 (글 첫 줄)
+  size INTEGER NOT NULL,         -- 글 크기 (바이트)
+  first_day TEXT,
+  last_day TEXT,
+  lines INTEGER,                 -- 글(메시지) 수
+  status TEXT NOT NULL DEFAULT 'wait',  -- wait 기다림 | done 올림 | same 새 글 없음 | fail 실패
+  note TEXT,                     -- 결과 한 줄 ('시리온거래톡방 · 11/10 ~ 11/18 · 새 글 1,203')
+  created_at INTEGER NOT NULL,
+  done_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS talk_uploads_status ON talk_uploads (status, id);
+CREATE TABLE IF NOT EXISTS talk_parts (
+  upload_id INTEGER NOT NULL,
+  n INTEGER NOT NULL,
+  data BLOB NOT NULL,
+  PRIMARY KEY (upload_id, n)
+);

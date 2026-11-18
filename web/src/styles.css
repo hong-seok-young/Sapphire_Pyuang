@@ -6051,3 +6051,21 @@ a.cf-at { color: #9fb4ff; }
 .fx-patch-box label { display: grid; gap: 4px; margin-bottom: 8px; font-size: 12px; color: var(--muted); }
 .fx-patch-box input { padding: 7px 8px; font-size: 13px; }
 .fx-del-sure { color: #fff; background: var(--red); }
+
+/* 톡방 올리기 (pages/TalkUpload.tsx, 제작자 2026-11-18) */
+.me-row-link .me-row-value { margin-left: auto; }
+.tu-how { margin: 0 0 10px; padding: 8px 10px; font-size: 12px; color: var(--muted); background: var(--night-2); border: var(--px) solid var(--edge); }
+.tu-file { display: grid; gap: 6px; margin-bottom: 10px; padding: 12px; }
+.tu-title { font-size: 15px; color: var(--gold); text-shadow: 1px 1px 0 var(--edge); }
+.tu-meta { font-size: 12px; color: var(--muted); }
+.tu-sent { margin: 0 0 10px; font-size: 13px; color: #7fe0a0; }
+.tu-pick { display: block; width: 100%; margin-bottom: 14px; }
+.tu-h { margin: 6px 0; font-size: 13px; color: var(--gold); }
+.tu-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.tu-row { display: flex; gap: 8px; align-items: flex-start; padding: 8px; background: var(--panel); border: var(--px) solid var(--edge); }
+.tu-row-main { display: flex; flex-direction: column; min-width: 0; font-size: 13px; }
+.tu-row-main small { font-size: 11px; color: var(--muted); }
+.tu-st { flex: none; padding: 1px 5px; font-size: 10px; color: var(--edge); border: 1px solid var(--edge); background: var(--muted); }
+.tu-st-done { background: #7fe0a0; }
+.tu-st-same { background: #9fd8ff; }
+.tu-st-fail { background: #ff8a8a; }

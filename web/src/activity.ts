@@ -310,7 +310,7 @@ export function reportOpen(userId: string) {
 const PAGE_NAME: Record<string, string> = {
   "": "홈", places: "사냥터 목록", search: "검색", equip: "장비", chat: "챗봇", ranking: "길드 랭킹", market: "사파이어 중개인",
   requests: "길드원 의뢰소", alerts: "알림", shop: "플래티넘 할인 상점", board: "게시판", me: "설정", admin: "길드원 관리", app: "앱", password: "비밀번호 바꾸기", log: "사용 기록", patch: "패치 내역", odds: "공식 확률",
-  match: "길드 던전", todo: "To do", rent: "장비대여", gaps: "개선 접수", fix: "내 접수", info: "정보", as: "캐릭터 바꿔서 열기", trend: "시세 동향", dex: "도감 계산기", enhance: "강화 비교", sim: "확률 시뮬레이터", simtest: "시뮬레이터 테스트", devreq: "개발 요청", fit: "헬스 루틴", donate: "기부함", hall: "명예의 전당",
+  match: "길드 던전", todo: "To do", rent: "장비대여", gaps: "개선 접수", fix: "내 접수", talk: "톡방 올리기", info: "정보", as: "캐릭터 바꿔서 열기", trend: "시세 동향", dex: "도감 계산기", enhance: "강화 비교", sim: "확률 시뮬레이터", simtest: "시뮬레이터 테스트", devreq: "개발 요청", fit: "헬스 루틴", donate: "기부함", hall: "명예의 전당",
   suggest: "건의함",
 };
 const RENT_VIEW: Record<string, string> = { apps: "신청함", staff: "운영", log: "기록" };
@@ -392,7 +392,7 @@ const TODO_NAME: Record<string, string> = {
 const ALERT_NAME: Record<string, string> = {
   market_want: "중개인 살래요", market_bid: "경매 입찰", market_outbid: "더 높은 입찰", market_auction: "경매 전환", market_new: "새 물건", gold_want: "골드 거래",
   request: "의뢰", request_new: "새 의뢰", talk: "토론방", account: "계정", shop: "상점", board: "게시판 댓글", board_notice: "새 공지·이벤트", imo_news: "아이모 소식",
-  chat_fixed: "챗봇 개선됨", chat_gap: "챗봇 모르는 질문", chat_done: "챗봇 답변 완료", rent: "장비대여", todo: "To do 함께", gdungeon: "길드 던전", app_news: "새 기능", devreq: "개발 요청", bday: "생일 축하", donate: "기부함", fix: "오류·개선 접수",
+  chat_fixed: "챗봇 개선됨", chat_gap: "챗봇 모르는 질문", chat_done: "챗봇 답변 완료", rent: "장비대여", todo: "To do 함께", gdungeon: "길드 던전", app_news: "새 기능", devreq: "개발 요청", bday: "생일 축하", donate: "기부함", fix: "오류·개선 접수", talk_up: "톡방 올리기",
 };
 const RENT_ACTION: Record<string, string> = { accept: "대여 신청 수락", reject: "대여 신청 거절", cancel: "대여 신청 취소", hand: "대여 완료 (건네줌)" };
 
@@ -438,6 +438,7 @@ const ACTIONS: [RegExp, (d: Rec, m: RegExpMatchArray, at: number) => string][] =
   [/^POST \/api\/chat\/stop$/, () => "챗봇 답 중지"],
   // 개발 요청
   // 오류·개선 접수 (server/fix.ts)
+  [/^POST \/api\/talk-upload$/, () => "톡방 올리기 (카톡 대화 내보내기)"],
   [/^POST \/api\/fix$/, (d) => join("오류·개선 접수", quote(d.text, 60))],
   [/^POST \/api\/fix\/(\d+)\/shots$/, (_d, m) => `접수 #${m[1]} 스샷 올림`],
   [/^POST \/api\/fix\/(\d+)\/talk$/, (d, m) => join(`접수 #${m[1]} 대화`, quote(d.text, 60))],
