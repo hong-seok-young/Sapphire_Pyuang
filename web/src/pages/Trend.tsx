@@ -184,7 +184,7 @@ function GoldPanel({ t }: { t: Trend }) {
   const today = t.gold[t.gold.length - 1];
   const [who, setWho] = useState<"sell" | "buy">("sell");
   return (
-    <Panel title="골드 시세">
+    <Panel>
       <div className="trend-stats">
         <div className="trend-stat">
           <span className="muted">팝니다 7일</span>
@@ -548,7 +548,7 @@ function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
   }, [source, q, filter, sort]);
   const count = (f: Filter) => source.filter((it) => inFilter(it, f)).length;
   return (
-    <Panel title={`물건 시세 (${list.length})`}>
+    <Panel>
       <div className="search-box">
         <input value={q} onChange={(e) => { setQ(e.target.value); setShown(PAGE); }} placeholder="물건 이름 또는 톡방 줄임말" aria-label="물건 찾기" />
       </div>
@@ -602,7 +602,7 @@ function CharsPanel({ t }: { t: Trend }) {
   const ofScope = (f: CharFilter) => bySide.filter((r) => (f !== "char" || r.scope === "캘") && (f !== "bundle" || r.scope === "템통"));
   const rows = ofScope(filter);
   return (
-    <Panel title={`캐릭터 시세 (${rows.length})`}>
+    <Panel>
       <div className="mk-sub trend-strip">
         <div className="mk-side" role="tablist">
           {(["sell", "buy"] as const).map((x) => (
@@ -631,6 +631,17 @@ function CharsPanel({ t }: { t: Trend }) {
         </div>
       )}
       <ul className="mk-list trend-list">
+        {rows.length > 0 && (
+          <li className="trend-charhead" aria-hidden>
+            <span>레벨</span>
+            <span className="trend-chartitle">
+              <span>진영</span>
+              <span>직업</span>
+              <span>닉네임</span>
+              <span className="trend-itemprice">가격</span>
+            </span>
+          </li>
+        )}
         {rows.slice(0, shown).map((r) => {
           const id = charId(r);
           return <CharRow key={id} r={r} open={opened.includes(id)} onToggle={() => setOpened((o) => (o.includes(id) ? o.filter((x) => x !== id) : [...o, id]))} />;
@@ -677,12 +688,15 @@ function CharRow({ r, open, onToggle }: { r: TrendChar; open: boolean; onToggle:
           <b>{r.level}</b>
         </span>
         <span className="trend-itemmain">
-          <span className="trend-itemtitle">
-            <span className="row-title">{[r.server, r.job ?? "직업 모름", r.scope].filter(Boolean).join(" · ")}</span>
-            <Who who={r.who} tel={r.tel} />
+          {/* 진영 · 직업 · 닉네임 · 가격을 열로 나눠 늘 같은 자리에 (제작자 2026-11-18 '제각각 나열하지 말고 열을 구획해서', 없으면 '미기재', '캘'은 뺀다) */}
+          <span className="trend-itemtitle trend-chartitle">
+            <span className={r.server ? "" : "tc-none"}>{r.server ?? "미기재"}</span>
+            <span className={r.job ? "" : "tc-none"}>{r.job ?? "미기재"}</span>
+            {r.who ? <Who who={r.who} tel={r.tel} /> : <span className="tc-none">미기재</span>}
             <span className="trend-itemprice"><b>{priceText(r.price)}</b></span>
           </span>
           <span className="trend-groupchips">
+            {r.scope === "템통" && <span className="trend-gchip">템통</span>}
             {skills.map((s) => <span key={s} className="trend-gchip trend-gchip-skill">{s}</span>)}
             {r.gems && <span className="trend-gchip">보석 <em>{r.gems}</em></span>}
             {r.pvp && <span className="trend-gchip trend-gchip-pvp">쟁캐</span>}
@@ -725,18 +739,19 @@ function CharRow({ r, open, onToggle }: { r: TrendChar; open: boolean; onToggle:
 
 type Tab = "gold" | "item" | "char" | "scam";
 const TABS: { key: Tab; label: string }[] = [
-  { key: "gold", label: "골드" },
+  // 물건 · 캐릭터 · 골드 차례, 처음 화면은 물건 (제작자 2026-11-18)
   { key: "item", label: "물건" },
   { key: "char", label: "캐릭터" },
+  { key: "gold", label: "골드" },
   // 아이모 사기꾼 명단 (제작자 2026-11-11 '만들 거면 시세 동향 쪽에', pages/Scam.tsx)
   { key: "scam", label: "사기꾼" },
 ];
 
-/** 주소의 ?t= 로 칸을 기억한다 (#/trend?t=item). 없으면 골드 */
+/** 주소의 ?t= 로 칸을 기억한다 (#/trend?t=char). 없으면 물건 */
 function tabFromHash(): Tab {
   const q = window.location.hash.split("?")[1] ?? "";
   const t = new URLSearchParams(q).get("t");
-  return t === "item" || t === "char" || t === "scam" ? t : "gold";
+  return t === "gold" || t === "char" || t === "scam" ? t : "item";
 }
 
 /** 골드 · 물건 · 캐릭터를 단추로 나눠 하나씩 본다 (제작자 요청 2026-11-03: 한 화면에 다 늘어놓지 않기) */
@@ -746,7 +761,7 @@ export function TrendPage({ wiki }: { wiki: Wiki }) {
   const pick = (k: Tab) => {
     setTab(k);
     const base = window.location.hash.split("?")[0] || "#/trend";
-    window.history.replaceState(window.history.state, "", k === "gold" ? base : `${base}?t=${k}`);
+    window.history.replaceState(window.history.state, "", k === "item" ? base : `${base}?t=${k}`);
   };
   return (
     <>

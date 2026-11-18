@@ -5893,3 +5893,15 @@ a.cf-at { color: #9fb4ff; }
 .search-skill .row { align-items: center; }
 .search-skill .skill-ic { width: 30px; height: 30px; flex: none; image-rendering: pixelated; margin-right: 8px; }
 .search-skill .row-sub { white-space: normal; }
+
+/* 시세 동향 캐릭터 줄: 진영 · 직업 · 닉네임 · 가격 열 (제작자 2026-11-18 '열을 구획해서 딱딱') */
+.trend-chartitle { display: grid; grid-template-columns: 2.7em 3.3em minmax(0, 1fr) auto; align-items: baseline; gap: 6px; font-size: 13px; }
+.trend-chartitle > span { min-width: 0; white-space: nowrap; }
+.trend-chartitle .trend-who { display: flex; flex-direction: column; margin-left: 0; font-size: 12px; line-height: 1.15; white-space: normal; overflow-wrap: anywhere; }
+.trend-chartitle .trend-who .trend-tel { margin-left: 0; font-size: 9px; }
+.trend-chartitle .trend-itemprice { margin-left: 0; justify-self: end; }
+.trend-chartitle .tc-none { color: var(--muted); font-size: 11px; }
+.trend-charhead { display: flex; gap: 8px; padding: 2px 8px; font-size: 10px; color: var(--muted); list-style: none; }
+.trend-charhead > span:first-child { width: 44px; flex: none; text-align: center; }
+.trend-charhead .trend-chartitle { flex: 1; min-width: 0; font-size: 10px; }
+.trend-charhead .trend-itemprice { color: var(--muted); }
