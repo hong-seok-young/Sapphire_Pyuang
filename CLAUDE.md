@@ -1002,11 +1002,13 @@
     실행 기록에는 수만 찍는다.
   - 매주 일요일 20:47(한국 시간) `talk-remind.yml` -> `POST /api/talk-upload/remind`(주마다 한 번) -> 앱개발자에게 '톡방 내보내기 할 때예요' 알림(누르면 `#/talk`).
   - 챗봇은 톡방 글 원문을 조각으로 넣고 물을 때 Claude 가 읽는다. 시세 동향은 규칙(`build_trend.py`)으로 읽은 뒤 **AI 검수** (제작자 2026-11-18 '규칙 스크립트는 문맥 파악이 안 되잖아, 무조건 AI 가 껴야 오차가 없어'):
-    `build_trend.py` 가 물건 값이 있거나 있을 법한 글(4,257개, 2026-11-18)마다 글 해시(`ai_key`, 판 `AI_VER`)를 보고, 계정 DB `trend_ai` 에 AI 답이 있으면 그 글은 규칙 대신 AI 답을 쓰고(`ai_records`, 규칙이 정한 이름의 표시·`DROP_NAMES` 그대로),
-    없으면 그 글·앞 3개 뒤 2개 글·같은 사람의 그날 다른 글·규칙이 읽은 것을 `web/.trend-ai/todo.json` 에 적는다. `scripts/trend-ai.mjs`(Claude Opus 5.5 effort high, 답 모양 지정, 20글씩 10개 같이)가 단위(장·콩·냥 = 만 원, 골드)·
-    단위 없는 숫자·개당·사고파는 쪽·캐릭터 판매 글·장난을 문맥으로 바로잡아 `trend_ai` 에 넣는다 (글마다 한 번, 같은 글은 다시 안 묻는다). 배포 순서: 'Trend AI answers'(답 받기 -> `build_trend.py` 다시) -> 사이트 배포 ->
-    'Trend AI review'(남은 글 20분까지) -> 새로 읽은 것이 있으면 배포를 한 번 더 (처음 4천여 글은 배포 두세 번에 나눠 끝난다). 사람이 고친 `시세/톡방_고침.json` 은 AI 답보다 먼저다.
-    프롬프트(규칙·줄임말·이름 목록)를 고쳐 다시 읽히려면 `AI_VER` 를 올린다. 실행 기록에는 수만. 캐릭터 시세·골드 시세는 아직 규칙.
+    `build_trend.py` 가 물건 값이 있거나 있을 법한 글(4,257개, 2026-11-18)마다 글 해시(`ai_key`, 판 `AI_VER`)를 보고, AI 답이 있으면 그 글은 규칙 대신 AI 답을 쓰고(`ai_records`, 규칙이 정한 이름의 표시·`DROP_NAMES` 그대로),
+    없으면 그 글·앞 3개 뒤 2개 글·같은 사람의 그날 다른 글·규칙이 읽은 것을 `web/.trend-ai/todo.json` 에 적는다 (`ai_todo`, 이름 목록·줄임말·뺄 이름도).
+    **AI 답은 API 가 아니라 Claude Code 세션이 만든다** (제작자 2026-11-18 'api 를 왜 썼어, 너가 하라고, 클로드로': 처음엔 배포가 Claude API 로 3,120글을 읽다가 API 크레딧이 바닥났다. 그 답은 그대로 쓴다):
+    답은 자료 저장소 `시세/톡방_AI.json`({"답": {글 해시: {items: [{line, side, name, enh, opts, price, unit won|gold, count?, pet?, sure, why?}]}}}, 챗봇 자료에는 안 넣음)이고 `ai_cache` 가 읽는다.
+    API 때 계정 DB `trend_ai` 에 넣은 답은 자료 저장소 Actions(talk-import.yml)가 `GET /api/talk-upload/pending?ai=1` 로 받아 그 파일에 합쳤다 (없는 키만 더함).
+    제작자가 '시세 AI 검수해'·'톡방 정리해'라고 하면(새 톡방을 올린 뒤 등): 자료 저장소를 받아 `SAPPHIRE_DATA=자료 python web/scripts/build_trend.py` 로 todo.json 을 만들고, 글 100개쯤씩 나눠 서브에이전트들이 읽고(위 규칙: 단위·단위 없는 숫자·개당·쪽·캐릭터 판매 글·장난, 확실할 때만 sure)
+    답을 그 파일에 합쳐 자료 저장소 main 에 올린다 (30분 안에 배포). 답이 없는 새 글은 그때까지 규칙대로 보인다. 프롬프트·규칙을 크게 바꿔 다시 읽히려면 `AI_VER` 를 올린다. 캐릭터 시세·골드 시세는 아직 규칙.
     **확실한 것만 보인다** (제작자 2026-11-18 '정말 확실한 것만 사람들이 보이게, 애매하거나 정보없는 건 정보없음으로 해 놨다가 내가 나중에 클로드로 작업'): AI 는 물건마다 sure·why 를 답하고(`AI_VER` t2),
     애매한 것과 이름을 못 푼 것은 시세에서 빼 trend.json `review`(확인 필요)로. '정보없음' 칸은 없앴고(제작자 같은 날 '확인 필요로 하자 정보없음 카테고리 없애고') 앱개발자만 보는 '확인 필요' 칸(`Trend.tsx` `ItemsPanel` dev: 이름을 못 푼 물건과 그 아래 `ReviewList` 짐작한 값·까닭·카톡 원문). 길드원·챗봇 시세 칸·chatmarket 에는 없다.
     자료 저장소 Actions(talk-import.yml)가 한 시간마다 `GET /api/talk-upload/pending?review=1` 로 받아 `시세/확인필요.json`(줄·까닭·원문)으로 커밋한다 (바뀌었을 때만, 챗봇 자료에는 안 넣음).

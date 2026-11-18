@@ -1670,10 +1670,10 @@ def whole_char_sale(text: str) -> bool:
     return bool(WHOLE_SALE.search(text)) and not SOLD_APART.search(text)
 
 
-# AI 검수 (제작자 2026-11-18 '규칙 스크립트는 문맥 파악이 안 되잖아, 무조건 AI 가 껴야 오차가 없어'):
-# 규칙으로 읽은 뒤, 물건 값이 있거나 있을 법한 글마다 Claude 가 그 글과 앞뒤 대화를 보고 물건·강화·옵션·값(단위)·사고파는 쪽을 바로잡는다 (scripts/trend-ai.mjs).
-# 답은 글마다 계정 DB(D1 trend_ai)에 남아 한 번만 묻는다. 여기서는 그 답(TREND_AI_CACHE)이 있는 글은 규칙 대신 AI 답을 쓰고,
-# 없는 글은 규칙 그대로 두고 물을 목록(TREND_AI_TODO)에 적는다. 배포가 '빌드 -> AI 검수 -> 다시 빌드' 순서로 돌린다
+# AI 검수 (제작자 2026-11-18 '규칙 스크립트는 문맥 파악이 안 되잖아, 무조건 AI 가 껴야 오차가 없어' -> 'api 를 왜 써, 너가 하라고, 클로드로'):
+# 규칙으로 읽은 뒤, 물건 값이 있거나 있을 법한 글마다 Claude 가 그 글과 앞뒤 대화를 보고 물건·강화·옵션·값(단위)·사고파는 쪽을 바로잡는다.
+# 답은 자료 저장소 시세/톡방_AI.json (글 해시 -> {items}) 에 둔다: Claude Code 세션이 web/.trend-ai/todo.json 을 읽어 채운다 (API 를 부르지 않는다).
+# 답이 있는 글은 규칙 대신 AI 답을 쓰고, 없는 글은 규칙 그대로 두고 물을 목록에 적는다
 AI_VER = "t2"  # t2: 확실함·애매함(sure, why)을 같이 받는다
 AI_DIR = Path(os.environ.get("TREND_AI_DIR") or ROOT / "web" / ".trend-ai")
 _AI_CACHE: dict | None = None
@@ -1687,8 +1687,11 @@ def ai_key(m: dict) -> str:
 def ai_cache() -> dict:
     global _AI_CACHE
     if _AI_CACHE is None:
-        f = AI_DIR / "cache.json"
-        _AI_CACHE = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+        _AI_CACHE = {}
+        for f in (AI_DIR / "cache.json", DATA / "시세" / "톡방_AI.json"):
+            if f.exists():
+                d = json.loads(f.read_text(encoding="utf-8"))
+                _AI_CACHE.update(d.get("답", d) if isinstance(d, dict) else {})
     return _AI_CACHE
 
 

@@ -32,7 +32,6 @@ concurrency:
 
 permissions:
   contents: read
-  actions: write
 
 jobs:
   check:
@@ -57,7 +56,7 @@ jobs:
     needs: check
     if: needs.check.outputs.ready == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 70
+    timeout-minutes: 45
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -196,15 +195,6 @@ jobs:
           CF2_ACCOUNT_ID: ${{ secrets.CF2_ACCOUNT_ID }}
         run: node scripts/log-worker.mjs
 
-      # 시세 동향 AI 검수 (제작자 2026-11-18 '규칙 스크립트는 문맥 파악이 안 되잖아, 무조건 AI 가 껴야 오차가 없어', scripts/trend-ai.mjs):
-      # 계정 DB 에 둔 AI 답(글마다 한 번)을 받아 시세 동향을 다시 만든다. 아직 답이 없는 글은 배포 뒤 'Trend AI review' 가 Claude 로 읽고, 새로 읽은 것이 있으면 배포를 한 번 더 부른다
-      - name: Trend AI answers
-        continue-on-error: true
-        working-directory: web
-        run: |
-          node scripts/trend-ai.mjs pull
-          python scripts/build_trend.py | tail -n 3
-
       - name: Deploy to Cloudflare Pages
         working-directory: web
         run: |
@@ -217,22 +207,6 @@ jobs:
           else
             exit 1
           fi
-
-      - name: Trend AI review
-        id: trendai
-        continue-on-error: true
-        working-directory: web
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
-          TREND_AI_BUDGET: "1200"
-        run: node scripts/trend-ai.mjs
-
-      - name: Trend AI redeploy
-        if: steps.trendai.outputs.added != '' && steps.trendai.outputs.added != '0'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run deploy-web.yml --repo "$GITHUB_REPOSITORY" --ref main && echo "시세 동향 AI 답 ${{ steps.trendai.outputs.added }}개로 다시 배포해요"
 
       # 공식 글 속 그림을 글자로 (제작자 요청 2026-11-06 '이벤트에 있는 모든 데이터 이미지 포함해서 싹 다 데이터화'): 사람이 확인한 그림 글(비공개 자료 공식/그림글.json)을 넣고,
       # 새 글의 그림 자리를 만들고, 남은 그림을 Claude 로 5분까지 옮긴다 (scripts/read-official-images.mjs. 남은 것은 30분마다 도는 공식 소식 작업이 한다). 실패해도 배포는 성공으로 둔다
