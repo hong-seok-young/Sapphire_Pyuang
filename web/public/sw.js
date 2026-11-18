@@ -1,4 +1,4 @@
-// 폰 알림을 받는 서비스 워커 (server/push.ts, web/src/push.ts). 화면 파일을 저장해 두지는 않는다 (fetch 는 공유로 받은 파일 하나만 가로챈다, 아래 share-target).
+// 폰 알림을 받는 서비스 워커 (server/push.ts, web/src/push.ts). 화면 파일을 저장해 두지는 않는다.
 // 서버는 '새 알림' 신호만 보내므로, 받으면 내 알림 목록에서 가장 새 것을 가져와 간략 내용과 함께 띄운다.
 // 누르면 그 글이 있는 화면을 연다. 주소의 ?icon= 은 manifest start_url 과 같은 판 (platform.ts ICON_VERSION, 바꾸면 같이 바꾼다)
 const ICON_VERSION = "2026-10-31-galaxy";
@@ -37,33 +37,6 @@ const KIND_TITLE = {
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
-
-// 톡방 올리기 (제작자 2026-11-18): 카톡 '대화 내보내기 → 공유'에서 Sapphire 를 고르면 (manifest share_target) 받은 파일을 잠깐 넣어 두고
-// 톡방 올리기 화면(#/talk, src/pages/TalkUpload.tsx)을 연다. 화면이 읽고 지운다. 그 밖의 요청은 가로채지 않는다
-const SHARE_CACHE = "sapphire-share";
-self.addEventListener("fetch", (e) => {
-  const url = new URL(e.request.url);
-  if (e.request.method !== "POST" || url.pathname !== "/share-target") return;
-  e.respondWith(
-    (async () => {
-      try {
-        const form = await e.request.formData();
-        const cache = await caches.open(SHARE_CACHE);
-        for (const k of await cache.keys()) await cache.delete(k);
-        const files = form.getAll("file").filter((f) => f && typeof f !== "string");
-        let i = 0;
-        for (const f of files)
-          await cache.put(`/share-inbox/${i++}`, new Response(f, { headers: { "x-name": encodeURIComponent(f.name || "talk.txt"), "content-type": f.type || "application/octet-stream" } }));
-        const text = form.get("text");
-        if (!files.length && typeof text === "string" && text.length > 50)
-          await cache.put("/share-inbox/0", new Response(text, { headers: { "x-name": "talk.txt", "content-type": "text/plain" } }));
-      } catch {
-        /* 화면이 '파일을 못 받았어요'를 보인다 */
-      }
-      return Response.redirect("/#/talk?shared=1", 303);
-    })(),
-  );
-});
 
 self.addEventListener("push", (e) => {
   e.waitUntil(

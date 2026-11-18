@@ -18,6 +18,6 @@ export async function remindTalk(env: Env, now = Date.now()): Promise<number> {
   if (!put.meta.changes) return 0;
   const { results } = await env.DB.prepare("SELECT id FROM users WHERE role = 'developer' AND main_id IS NULL").all<{ id: string }>();
   const to = results.map((r) => r.id);
-  await notify(env, to, "talk_up", "톡방 내보내기 할 때예요 · 카톡 방 ≡ → 설정 → 대화 내보내기 → 텍스트만 → 공유 → Sapphire", "#/talk", "Sapphire");
+  await notify(env, to, "talk_up", "톡방 내보내기 할 때예요 · 카톡 방 ≡ → 설정 → 대화 내보내기 → 텍스트만 저장 → 톡방 올리기에서 파일 고르기", "#/talk", "Sapphire");
   return to.length;
 }

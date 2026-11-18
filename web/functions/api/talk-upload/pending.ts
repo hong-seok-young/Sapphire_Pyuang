@@ -32,7 +32,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   }
   const id = Number(url.searchParams.get("id"));
   if (!id) {
-    const { results } = await env.DB.prepare("SELECT id, title FROM talk_uploads WHERE status = 'wait' ORDER BY id LIMIT 5").all();
+    const { results } = await env.DB.prepare("SELECT id, title FROM talk_uploads WHERE status = 'wait' ORDER BY id LIMIT 20").all();
     return json({ uploads: results });
   }
   const { results } = await env.DB.prepare("SELECT data FROM talk_parts WHERE upload_id = ? ORDER BY n").bind(id).all<{ data: ArrayBuffer | number[] }>();

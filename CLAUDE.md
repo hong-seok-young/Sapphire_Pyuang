@@ -989,9 +989,9 @@
 - 새 대화를 받으면 `자료/카톡/` 에 `<방이름>_<날짜>.txt` 로 더 넣고 자료 저장소에 올리면 30분 안에 배포에 반영된다 (data-watch.yml, 같은 글은 하나로 센다).
 - **톡방 올리기** (제작자 2026-11-18 '오픈톡방 대화 내보내기를 정기적으로', '공유 한 번으로 올리기 + 정기 알림 둘 다', '올라간 파일은 깃 아이모 데이터에 쌓이게, 이전 톡방 일자 이후의 것만'):
   카톡은 대화를 읽는 공개 API 가 없고 알림을 읽는 봇·PC 매크로는 카카오 약관 위반이라 내보내기는 사람이 누르고, 그 뒤만 저절로 한다.
-  - 카톡 방 ≡ → 설정 → 대화 내보내기 → 텍스트만 → 공유 → Sapphire (홈 화면에 깐 웹앱, `manifest.webmanifest` share_target -> `public/sw.js` 가 받은 파일을 캐시 'sapphire-share' 에 두고 `#/talk?shared=1`.
-    안드로이드 크롬으로 깐 웹앱만, 아이폰·PC 는 화면의 '파일 고르기'. zip 이면 안의 txt). 서비스 워커가 없을 때는 `functions/share-target.ts` 가 화면으로 보낸다.
-  - 톡방 올리기 화면 (`#/talk`, `src/pages/TalkUpload.tsx`·`src/talk.ts`, 앱개발자·길드마스터, 설정의 '자료' 묶음): 방 이름·기간·글 수를 보고 '올리기' -> gzip 으로 `POST /api/talk-upload`(`server/talkUpload.ts`) ->
+  - 카톡 방 ≡ → 설정 → 대화 내보내기 → 텍스트만 저장 -> 톡방 올리기 화면의 '파일 고르기'에서 그 txt(zip 이면 안의 txt 모두)를 **여러 개 한 번에** 고른다 (제작자 2026-11-18 '여러 개 선택해서 올리게').
+    카톡 '공유 → Sapphire'(manifest share_target·sw.js)는 뺐다 (제작자 같은 날 '공유 사파이어 이딴 건 없어 카톡에'). 예전에 깐 홈 화면 앱이 `/share-target` 으로 보내면 `functions/share-target.ts` 가 `#/talk` 로.
+  - 톡방 올리기 화면 (`#/talk`, `src/pages/TalkUpload.tsx`·`src/talk.ts`, 앱개발자·길드마스터, 설정의 '자료' 묶음): 고른 파일마다 방 이름·기간·글 수 한 줄과 '빼기'(같은 방이 둘이면 마지막 날짜가 늦은 것 하나, `oneEachRoom`), '더 고르기', '모두 올리기 (N)' -> 파일마다 gzip 으로 `POST /api/talk-upload`(`server/talkUpload.ts`) ->
     D1 `talk_uploads`(기다림·올림·새 글 없음·실패와 결과 한 줄) · `talk_parts`(1.5MB 조각). 아래 '올린 기록'.
   - 한 시간에 한 번(매시 7분) **자료 저장소의** Actions `talk-import.yml`(`자료/scripts/talk_import.mjs`, 날짜 나누기는 같은 `talkDays.mjs` 두 벌: 앱 `web/scripts/` 와 자료 `scripts/`, 고치면 둘 다)이
     `GET /api/talk-upload/pending`(`functions/api/talk-upload/pending.ts`)으로 기다리는 것을 받아 자료 저장소 `카톡/<방>_<오늘>.txt` 에 **그 방의 마지막 날짜부터의 글만** 넣어 커밋·올리고(방은 글 첫 줄 방 이름으로 이미 있는 파일과 맞춤,
@@ -1000,6 +1000,8 @@
     (`server/ghOidc.ts`: RS256·GitHub JWKS, 저장소 sapphire-imo-data · main · 작업 파일 talk-import.yml · audience 'sapphire-talk'). 커밋 이름 'Sapphire 톡방 올리기'.
     올라가면 앱 저장소 `data-watch.yml`(30분마다)이 새 커밋을 보고 배포를 부른다 -> 시세 동향(`build_trend.py`)·챗봇 자료(`library-sync.mjs`). 비공개 저장소라 Actions 시간을 써서 한 시간에 한 번(한 달 720분 안팎, 무료 2,000분).
     실행 기록에는 수만 찍는다.
+  - **제작자가 "올렸어" 하면** (제작자 2026-11-18 '올렸어라고 하면 깃헙 아이모 데이터에 최신본 넣고 이 작업 ㄱㄱ, api 달지 말고'): 세션이 GitHub MCP `actions_run_trigger` 로 자료 저장소 `talk-import.yml` 을 바로 돌리고(한 번에 20개),
+    끝나면 자료 저장소를 받아 `자료/scripts/talk_review/review.py`(todo · dup · next · put · tidy · check · build)로 새 글만 직접 읽어 `시세/톡방_AI.json` 에 넣고 main 에 올린 뒤 보고한다. 순서와 읽는 규칙은 `자료/scripts/talk_review/README.md`.
   - 매주 일요일 20:47(한국 시간) `talk-remind.yml` -> `POST /api/talk-upload/remind`(주마다 한 번) -> 앱개발자에게 '톡방 내보내기 할 때예요' 알림(누르면 `#/talk`).
   - 챗봇은 톡방 글 원문을 조각으로 넣고 물을 때 Claude 가 읽는다. 시세 동향은 규칙(`build_trend.py`)으로 읽은 뒤 **AI 검수** (제작자 2026-11-18 '규칙 스크립트는 문맥 파악이 안 되잖아, 무조건 AI 가 껴야 오차가 없어'):
     `build_trend.py` 가 물건 값이 있거나 있을 법한 글(4,257개, 2026-11-18)마다 글 해시(`ai_key`, 판 `AI_VER`)를 보고, AI 답이 있으면 그 글은 규칙 대신 AI 답을 쓰고(`ai_records`, 규칙이 정한 이름의 표시·`DROP_NAMES` 그대로),
@@ -1007,7 +1009,7 @@
     **AI 답은 API 가 아니라 Claude Code 세션이 만든다** (제작자 2026-11-18 'api 를 왜 썼어, 너가 하라고, 클로드로': 처음엔 배포가 Claude API 로 3,120글을 읽다가 API 크레딧이 바닥났다. 그 답은 그대로 쓴다):
     답은 자료 저장소 `시세/톡방_AI.json`({"답": {글 해시: {items: [{line, side, name, enh, opts, price, unit won|gold, count?, pet?, sure, why?}]}}}, 챗봇 자료에는 안 넣음)이고 `ai_cache` 가 읽는다.
     API 때 계정 DB `trend_ai` 에 넣은 답은 자료 저장소 Actions(talk-import.yml)가 `GET /api/talk-upload/pending?ai=1` 로 받아 그 파일에 합쳤다 (없는 키만 더함).
-    제작자가 '시세 AI 검수해'·'톡방 정리해'라고 하면(새 톡방을 올린 뒤 등): 자료 저장소를 받아 `SAPPHIRE_DATA=자료 python web/scripts/build_trend.py` 로 todo.json 을 만들고, 글 100개쯤씩 나눠 서브에이전트들이 읽고(위 규칙: 단위·단위 없는 숫자·개당·쪽·캐릭터 판매 글·장난, 확실할 때만 sure)
+    제작자가 '올렸어'·'시세 AI 검수해'·'톡방 정리해'라고 하면(새 톡방을 올린 뒤 등): 위 '올렸어' 순서대로 세션이 직접 읽고(서브에이전트·API 없이, 제작자 '그냥 클로드 너가 하라고'. 규칙: 단위·단위 없는 숫자·개당·쪽·캐릭터 판매 글·장난, 확실할 때만 sure)
     답을 그 파일에 합쳐 자료 저장소 main 에 올린다 (30분 안에 배포). **물건 시세에는 AI 가 읽은 것만 넣는다** (제작자 같은 날 '규칙으로 하지 마, 그냥 AI 로 해'): 규칙이 읽은 줄은 AI 에게 줄 참고와 거래 글 고르기에만 쓰고, AI 답이 없는 글은 시세에 안 나온다. 프롬프트·규칙을 크게 바꿔 다시 읽히려면 `AI_VER` 를 올린다. 캐릭터 시세·골드 시세는 아직 규칙.
     **확실한 것만 보인다** (제작자 2026-11-18 '정말 확실한 것만 사람들이 보이게, 애매하거나 정보없는 건 정보없음으로 해 놨다가 내가 나중에 클로드로 작업'): AI 는 물건마다 sure·why 를 답하고(`AI_VER` t2),
     애매한 것과 이름을 못 푼 것은 시세에서 빼 trend.json `review`(확인 필요)로. 단 확인 필요는 **DB 어디에도 없는 이름만** (제작자 2026-11-18 '좀 상식적으로 하자, DB 에 얼마나 많은 데이터가 있는데': 단위는 같은 물건의 다른 글 값과 견주고, 이름은 위키·도감 사전(`game_names`)·게임 상점·거래소 녹화(`db_names`)로 맞추고, 옵션 세부·강화 범위·펫 이름 같은 값과 상관없는 애매함은 확실로 둔다. 1,250줄 -> 34줄 -> 같은 날 다시 싹 검토(퓨앙 '분명 너가 알아서 넣을수잇는게 잇을거야')로 0줄: 마소 = 마력의소용돌이, 리에티·마녀 반지, 헌그벨트 등 DB·톡방에서 찾고 이름·직업 장비·옵션·단위를 장비 표와 맞춤, 자료 `제공/시세동향_줄임말.md`). '정보없음' 칸은 없앴고(제작자 같은 날 '확인 필요로 하자 정보없음 카테고리 없애고') 앱개발자만 보는 '확인 필요' 칸(`Trend.tsx` `ItemsPanel` dev: 이름을 못 푼 물건과 그 아래 `ReviewList` 짐작한 값·까닭·카톡 원문). 길드원·챗봇 시세 칸·chatmarket 에는 없다.
