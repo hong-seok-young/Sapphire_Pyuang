@@ -1889,8 +1889,10 @@ def all_lines(msgs: list[dict], rs: Resolver) -> list[dict]:
     cache = ai_cache()
     answered = {mi for mi, m in enumerate(msgs) if ai_key(m) in cache}
     known = {p["name"]: (p["wiki"], False) for p in out if not p.get("unknown")}
+    # 물건 시세는 AI 가 읽은 것만 (제작자 2026-11-18 '규칙으로 하지 마, 그냥 AI 로 해'): 규칙이 읽은 줄은 AI 에게 줄 참고로만 쓰고 시세에는 넣지 않는다.
+    # 아직 AI 가 안 읽은 글은 시세에 안 나오고 todo.json 에 남아 다음 검수 때 읽힌다
+    out = []
     if answered:
-        out = [p for p in out if p["mi"] not in answered]
         for mi in sorted(answered):
             out.extend(ai_records(msgs[mi], mi, cache[ai_key(msgs[mi])], rs, known))
     if os.environ.get("TREND_AI_TODO", "1") != "0":
