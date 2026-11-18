@@ -669,7 +669,6 @@ function CharRow({ r, open, onToggle }: { r: TrendChar; open: boolean; onToggle:
   // 펼쳐서 보일 것(도감 계산기 칸, 도감 %)이 없는 줄은 펼치지 않는다
   const hasBody = !!spec || Object.keys(r.collect).length > 0;
   const skills = r.skills.split(" · ").filter(Boolean);
-  const dexShort = r.dex.replace(/^도감 효과 · /, "").replace(/^도감 효과$/, "");
   return (
     <li className={"trend-item" + (open ? " mk-open" : "")}>
       <button type="button" className="trend-itemrow" onClick={hasBody ? onToggle : undefined}>
@@ -693,8 +692,8 @@ function CharRow({ r, open, onToggle }: { r: TrendChar; open: boolean; onToggle:
             {spec && <DexCostChip spec={spec} />}
           </span>
           <span className="trend-sub">
-            {!open && dexShort && r.dex !== "노도감" && r.dex !== "저도감" && <span className="trend-dex">{dexShort}</span>}
-            <span className="muted"> {md(r.first)}{r.first !== r.last && `~${md(r.last)}`}{r.n > 1 && ` · ${r.n}번`}</span>
+            {/* 마지막으로 올린 날만 (제작자 2026-11-18 '몇 번 / 능력치 안 보여 줘도 돼, 최종 날짜만') */}
+            <span className="muted">{md(r.last)}</span>
           </span>
         </span>
       </button>
