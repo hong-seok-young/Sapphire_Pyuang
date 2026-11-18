@@ -706,7 +706,8 @@ function CharRow({ r, open, onToggle }: { r: TrendChar; open: boolean; onToggle:
               ))}
             </div>
           )}
-          {r.dexTable.length > 0 && (
+          {/* 도감 표는 아래 도감 계산기 칸에 같은 수치가 나와서 뺀다 (제작자 2026-11-18 '이거 삭제 어차피 아래 뜨잖아'). 계산기 칸을 못 그리는 표만 */}
+          {r.dexTable.length > 0 && !spec && (
             <dl className="trend-dexgrid">
               {r.dexTable.map(([k, v]) => (
                 <div key={k}><dt className="muted">{k}</dt><dd>{v}</dd></div>
