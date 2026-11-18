@@ -43,6 +43,30 @@ TREND_OUT = ROOT / "web" / "public" / "data" / "trend"
 _more: dict[str, Path] | None = None
 
 
+
+
+_STATLINE = re.compile(r"^(요구 레벨|쿨타임|\d 세트|거래불가|캐쉬샵|떨구는 몬스터|[가-힣]{1,7} ?[-+]?[\d?])")
+
+
+def join_wrapped(lines) -> list[str]:
+    """게임 정보창이 칸 폭에서 끊은 설명 글을 한 줄로 잇는다 ('… 교환할 수' + '있습니다.'). 능력치 줄은 그대로 (2026-11-18 검토)."""
+    out: list[str] = []
+    for x in lines or []:
+        t = str(x or "").strip()
+        if not t:
+            continue
+        if out and not _STATLINE.match(out[-1]) and not _STATLINE.match(t) and not re.search(r"[.!)%:]$", out[-1]):
+            out[-1] = out[-1] + " " + t
+        else:
+            out.append(t)
+    return out
+
+def tip_info(t: str) -> str:
+    """도감 툴팁 받아 적기의 메모를 뺀다: '(이름 파란 글씨)' 같은 괄호, '직업 아이콘 칼' (2026-11-18 검토)."""
+    t = re.sub(r"\s*\([^)]*(파란|글씨|흰|보라|색)[^)]*\)", "", t or "")
+    t = re.sub(r"직업 아이콘 (칼|부메랑|지팡이|주먹)", lambda m: {"칼": "전사", "부메랑": "레인저", "지팡이": "마법사", "주먹": "무도가"}[m.group(1)], t)
+    return re.sub(r"\s*·\s*직업 아이콘\b", "", t).strip()
+
 def _pic_key(s: str) -> str:
     return re.sub(r"\s", "", s.rstrip("("))
 
@@ -131,7 +155,7 @@ def _load_ref() -> dict:
             for e in json.loads(fp.read_text(encoding="utf-8")).get("entries", []):
                 for it in e.get("items", []):
                     if it.get("name") and it.get("info"):
-                        put(_nk(re.sub(r"^\+\d+\s*", "", it["name"])), re.split(r"\s*·\s*", it["info"]), "도감 툴팁")
+                        put(_nk(re.sub(r"^\+\d+\s*", "", it["name"])), re.split(r"\s*·\s*", tip_info(it["info"])), "도감 툴팁")
     days = sorted((DATA / "시세" / "암거래중개인").glob("*/시세.json"))
     for day in days:
         s = json.loads(day.read_text(encoding="utf-8"))
@@ -139,11 +163,11 @@ def _load_ref() -> dict:
         for it in s.get("items", []):
             k = _nk(it.get("base"))
             if it.get("info"):
-                put(k, it["info"], "게임 거래소 정보창")
+                put(k, join_wrapped(it["info"]), "게임 거래소 정보창")
         for o in s.get("others", []):
             k = _nk(o.get("base"))
             if o.get("info"):
-                put(k, o["info"], "게임 거래소 정보창")
+                put(k, join_wrapped(o["info"]), "게임 거래소 정보창")
     _ref = ref
     return ref
 

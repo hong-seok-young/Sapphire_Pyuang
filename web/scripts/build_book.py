@@ -39,6 +39,30 @@ url_name = lambda s: re.sub(r"[^0-9A-Za-z가-힣_\-]", "_", s)  # 주소에 그�
 _cut: dict | None = None
 
 
+
+
+_STATLINE = re.compile(r"^(요구 레벨|쿨타임|\d 세트|거래불가|캐쉬샵|떨구는 몬스터|[가-힣]{1,7} ?[-+]?[\d?])")
+
+
+def join_wrapped(lines) -> list[str]:
+    """게임 정보창이 칸 폭에서 끊은 설명 글을 한 줄로 잇는다 ('… 교환할 수' + '있습니다.'). 능력치 줄은 그대로 (2026-11-18 검토)."""
+    out: list[str] = []
+    for x in lines or []:
+        t = str(x or "").strip()
+        if not t:
+            continue
+        if out and not _STATLINE.match(out[-1]) and not _STATLINE.match(t) and not re.search(r"[.!)%:]$", out[-1]):
+            out[-1] = out[-1] + " " + t
+        else:
+            out.append(t)
+    return out
+
+def tip_info(t: str) -> str:
+    """도감 툴팁 받아 적기의 메모를 뺀다: '(이름 파란 글씨)' 같은 괄호, '직업 아이콘 칼' (2026-11-18 검토)."""
+    t = re.sub(r"\s*\([^)]*(파란|글씨|흰|보라|색)[^)]*\)", "", t or "")
+    t = re.sub(r"직업 아이콘 (칼|부메랑|지팡이|주먹)", lambda m: {"칼": "전사", "부메랑": "레인저", "지팡이": "마법사", "주먹": "무도가"}[m.group(1)], t)
+    return re.sub(r"\s*·\s*직업 아이콘\b", "", t).strip()
+
 def cut_index() -> dict:
     """오린 아이콘: stem(파일 이름) -> {f: 파일, url: 올라갈 이름, src: 도감정보/거래소}, 그리고 띄어쓰기 뺀 이름 -> stem"""
     global _cut
@@ -350,7 +374,7 @@ def main() -> None:
         exact.setdefault((t, name), (key, v))
 
     def set_lines(v: dict, lines, src: str) -> None:
-        lines = [str(x).strip() for x in (lines or []) if str(x or "").strip()]
+        lines = join_wrapped(lines) if src == "게임 거래소 정보창" else [str(x).strip() for x in (lines or []) if str(x or "").strip()]
         if lines and v.get("src") != "도감 정보" and not v.get("lines"):
             v["lines"], v["src"] = lines, src
 
@@ -401,7 +425,7 @@ def main() -> None:
             if row not in v.setdefault("dex", []):
                 v["dex"].append(row)
             if it.get("info"):
-                set_lines(v, re.split(r"\s*·\s*", it["info"]), "도감 툴팁")
+                set_lines(v, re.split(r"\s*·\s*", tip_info(it["info"])), "도감 툴팁")
             set_pic(v, base)
 
     # 4) 거래 톡방 시세 (팝니다 중간값, 만 원)
