@@ -315,7 +315,7 @@ type Filter = "all" | TrendCat | "unknown";
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "전체" },
   ...(["장비", "장신구", "스킬북", "코스튬", "기타"] as const).map((c) => ({ key: c, label: c })),
-  { key: "unknown", label: "정보없음" },
+  { key: "unknown", label: "확인 필요" },
 ];
 const inFilter = (it: TrendItem, f: Filter) => (f === "all" ? !it.unknown : f === "unknown" ? !!it.unknown : it.cat === f && !it.unknown);
 type Sort = "posts" | "price" | "recent";
@@ -555,7 +555,7 @@ function ItemsPanel({ t, wiki, dev }: { t: Trend; wiki: Wiki; dev: boolean }) {
     return xs;
   }, [source, q, filter, sort]);
   const count = (f: Filter) => source.filter((it) => inFilter(it, f)).length + (f === "unknown" ? (t.review ?? []).filter((r) => r.side === side).length : 0);
-  // 정보없음(이름을 못 푼 것, AI 가 애매하다고 한 것)은 앱개발자만 (제작자 2026-11-18 '정말 확실한 것만 사람들이 보이게, 애매한 건 정보없음으로 해 놨다가 내가 나중에 클로드로')
+  // 확인 필요(이름을 못 푼 것, AI 가 애매하다고 한 것)은 앱개발자만 (제작자 2026-11-18 '정말 확실한 것만 사람들이 보이게, 애매한 건 나중에 클로드로', '확인 필요로 하자 정보없음 카테고리 없애고')
   const filters = dev ? FILTERS : FILTERS.filter((f) => f.key !== "unknown");
   return (
     <Panel>
@@ -608,7 +608,7 @@ function ReviewList({ t, side }: { t: Trend; side: "sell" | "buy" }) {
   if (!rows.length) return null;
   return (
     <div className="trend-review">
-      <h4 className="trend-review-h">확인 필요 {rows.length}</h4>
+      <h4 className="trend-review-h">AI 가 애매하다고 한 줄 {rows.length}</h4>
       <ul className="trend-review-list">
         {rows.slice(0, shown).map((r, i) => (
           <li key={i}>
@@ -848,7 +848,7 @@ let trendOnce: Promise<Trend> | null = null;
 const loadTrendOnce = () => (trendOnce ??= loadTrend().catch((e) => { trendOnce = null; throw e; }));
 const keyOf = (x: string) => x.replace(/\s*\(.*\)\s*$/, "").replace(/\s/g, "").toLowerCase();
 function findItem(all: TrendItem[], q: string): TrendItem | undefined {
-  const list = all.filter((it) => !it.unknown); // 정보없음은 챗봇에도 안 보인다
+  const list = all.filter((it) => !it.unknown); // 확인 필요는 챗봇에도 안 보인다
   const k = keyOf(q);
   return (
     list.find((it) => keyOf(it.name) === k) ??
