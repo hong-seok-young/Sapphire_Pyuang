@@ -5913,7 +5913,7 @@ a.cf-at { color: #9fb4ff; }
 .trend-kakao-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; font-size: 12px; }
 .trend-kakao-head b { color: #111; font-weight: 400; }
 .trend-kakao-head .muted { color: #4a5a6a; }
-.trend-kakao-text { padding: 7px 9px; background: #fff; border-radius: 6px; font-size: 12px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow-y: auto; }
+.trend-kakao-text { padding: 7px 9px; background: #fff; border-radius: 6px; font-size: 12px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* 시세 동향 캐릭터 표 (제작자 2026-11-18 '한 행으로, 열마다 구분 가시성'): 레벨 · 진영 · 직업 · 닉네임 · 도감 · 날짜 · 가격 */
 .tc-list { list-style: none; margin: 0; padding: 0; border: var(--px) solid var(--edge); background: var(--night-2); }
@@ -5935,7 +5935,7 @@ a.cf-at { color: #9fb4ff; }
 .tc-none { color: var(--muted); font-size: 10px; opacity: .7; }
 .tc-open > .tc-row { background: rgb(101 133 245 / .16) !important; box-shadow: inset 3px 0 0 var(--sapphire); }
 .tc-item .trend-charbody { padding: 8px; border-top: 1px dashed rgb(255 255 255 / .1); }
-.tc-item .trend-kakao-msg { margin-top: 0; }
+.tc-item .trend-kakao { margin-top: 0; }
 @media (max-width: 360px) { .tc-row { font-size: 11px; } .tc-dex { font-size: 10px; } .tc-row > span, .tc-head > span { padding: 0 2px; } .tc-row, .tc-head { grid-template-columns: 22px 30px 37px minmax(0, 1fr) 40px 36px 42px; } }
 
 /* 시세 동향 물건 찾기 칸 (제작자 2026-11-18 '눈에 안 띄어, 보호색이야'): 판 바탕보다 밝은 칸, 금색 테두리, 돋보기, 누르면 금빛 */

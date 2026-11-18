@@ -676,16 +676,24 @@ function dexSpecOf(table: [string, string][]): string {
   return out.join(";");
 }
 
-/** 카톡 원문 (제작자 2026-11-18 '매물마다 카톡 원문 보기', '냉기부여 마스터 등은 원문에서 보게'): 줄을 펼치면 맨 위에 카톡 대화창 모양으로 */
-function KakaoOriginal({ who, tel, at, text }: { who: string; tel?: string | null; at?: string; text: string }) {
+/** 카톡 원문 (제작자 2026-11-18 '매물마다 카톡 원문 보기' -> '일단 접어 두고 카톡 원문 보기 버튼으로, 원문은 스크롤 없이 처음부터 끝까지'): 노란 단추를 누르면 카톡 대화창 모양으로 글 전체 */
+function KakaoOriginal({ id, who, tel, at, text }: { id: string; who: string; tel?: string | null; at?: string; text: string }) {
+  const [open, setOpen] = useEntryState("trend.msg:" + id, false);
   return (
-    <div className="trend-kakao-msg">
-      <div className="trend-kakao-head">
-        <b>{who}</b>
-        {tel && <small>{tel}</small>}
-        {at && <small className="muted">{at.replace(/^\d{4}-(\d{2})-(\d{2})/, (_, mo, d) => `${Number(mo)}/${Number(d)}`)}</small>}
-      </div>
-      <div className="trend-kakao-text">{text}</div>
+    <div className="trend-kakao">
+      <button type="button" className="trend-kakao-btn" aria-expanded={open} onClick={() => setOpen(!open)}>
+        카톡 원문 {open ? "접기 ▲" : "보기 ▼"}
+      </button>
+      {open && (
+        <div className="trend-kakao-msg">
+          <div className="trend-kakao-head">
+            <b>{who}</b>
+            {tel && <small>{tel}</small>}
+            {at && <small className="muted">{at.replace(/^\d{4}-(\d{2})-(\d{2})/, (_, mo, d) => `${Number(mo)}/${Number(d)}`)}</small>}
+          </div>
+          <div className="trend-kakao-text">{text}</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -708,7 +716,7 @@ function CharRow({ r, open, onToggle }: { r: TrendChar; open: boolean; onToggle:
       </button>
       {open && (
         <div className="trend-itembody trend-charbody">
-          {r.msg && <KakaoOriginal who={r.who} tel={r.tel} at={r.msgAt} text={r.msg} />}
+          {r.msg && <KakaoOriginal id={charId(r)} who={r.who} tel={r.tel} at={r.msgAt} text={r.msg} />}
           {Object.keys(r.collect).length > 0 && (
             <div className="trend-chips">
               {["일반", "코스튬", "라이딩"].filter((k) => k in r.collect).map((k) => (
