@@ -1872,8 +1872,9 @@ details.odds-sec[open] > summary { margin-bottom: 6px; color: var(--gold); }
 .tile-empty { visibility: hidden; pointer-events: none; }
 .launch-editing .tile-empty { visibility: visible; pointer-events: auto; cursor: default; animation: none; background: transparent; border: 2px dashed rgba(255, 255, 255, 0.22); box-shadow: none; }
 .launch-editing .tile-empty:active { transform: none; }
-.launch-editing .tile, .tabbar.launch-editing .tab, .launch-editing .search-entry { touch-action: none; cursor: grab; animation: launch-wiggle 0.22s ease-in-out infinite alternate; }
+.launch-editing .tile, .tabbar.launch-editing .tab, .launch-editing .search-entry { touch-action: pan-y; cursor: grab; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; animation: launch-wiggle 0.22s ease-in-out infinite alternate; }
 .launch-editing .tile:nth-child(2n), .tabbar.launch-editing .tab:nth-child(2n) { animation-delay: -0.11s; }
+.tabbar.launch-editing .tab { touch-action: none; }
 .tabbar.launch-editing { box-shadow: 0 calc(-1 * var(--px)) 0 #3fe0a0; }
 @keyframes launch-wiggle { from { transform: rotate(-1.2deg); } to { transform: rotate(1.2deg); } }
 @media (prefers-reduced-motion: reduce) { .launch-editing .tile, .tabbar.launch-editing .tab, .launch-editing .search-entry { animation: none; } }

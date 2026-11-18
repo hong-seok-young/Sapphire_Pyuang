@@ -3,7 +3,7 @@
 // - 검색이 홈 칸으로 올라오면 홈 맨 위에 검색 칸이 생긴다 (아래 탭에 있으면 없다, 같은 기능이라서).
 // - 홈에서 칸을 꾹 누르면(0.45초) 편집. 끌어서 홈 칸끼리, 홈 칸과 아래 탭 사이를 옮긴다. 아래 탭이 꽉 찼으면 놓은 자리의 칸과 바꾼다.
 // - 홈 칸은 3칸 격자의 정해진 자리(slot)에만 놓인다 (제작자 요청 2026-11-03: '위로 정렬 말고 중간에 빈칸 있더라도 지정된 칸에만, 너무 자유롭게는 말고'):
-//   grid 는 자리 순서대로 칸 이름이고 빈 자리는 "" 다. 빈 자리에 놓으면 거기 그대로, 다른 칸 위에 놓으면 둘이 자리를 바꾼다 (위로 몰리지 않는다).
+//   grid 는 자리 순서대로 칸 이름이고 빈 자리는 "" 다. 빈 자리에 놓으면 거기 그대로, 다른 칸 위에 놓으면 그 사이 칸들이 한 칸씩 밀린다 (위로 몰리지 않는다).
 //   검색 칸은 자리가 아니라 맨 위 한 줄이라 grid 맨 앞에 "search" 로만 둔다 (gridSlots 는 그것을 뺀 자리 목록).
 // - 배치는 계정마다 서버에 둔다 (/api/layout, D1 layouts. 다른 기기에서도 같게). 이 기기에도 적어 두어 열자마자 그 배치로 그린다.
 // - 없는 칸이 새로 생기면 홈 칸 끝에 붙는다. 그 사람에게 안 보이는 칸(운영진, 개발자 칸)은 배치에 있어도 그리지 않는다.
@@ -341,7 +341,7 @@ export type Drop = { zone: "grid"; index: number | null } | { zone: "dock"; targ
 
 /**
  * key 를 놓은 배치 (제작자 요청 2026-11-03: 정해진 자리에만, 빈 자리 그대로):
- * - 홈 자리: 빈 자리면 거기에, 다른 칸이 있으면 둘이 자리를 바꾼다 (끌던 칸이 아래 탭에서 왔으면 밀려난 칸은 다음 빈 자리로).
+ * - 홈 자리: 빈 자리면 거기에, 다른 칸이 있으면 원래 자리와 놓은 자리 사이 칸들이 한 칸씩 밀린다 (끌던 칸이 아래 탭에서 왔으면 놓은 자리부터 다음 빈 자리까지 뒤로).
  *   자리 번호가 없으면(검색 칸이나 격자 바탕에 놓음) 첫 빈 자리. 검색 칸은 자리 없이 맨 위.
  * - 아래 탭: 홈 앞에는 못 넣고, 꽉 찼으면 놓은 자리(없으면 마지막) 칸과 바꾼다 (빠진 칸은 끌던 칸이 있던 홈 자리로, 없으면 첫 빈 자리).
  */
@@ -362,8 +362,17 @@ export function placeItem(base: Layout, key: string, drop: Drop): Layout {
     if (key === "search") return build(dock, [...slots, ...tail], true);
     const i = Math.min(drop.index ?? firstEmpty(slots), MAX_SLOTS - 1);
     while (slots.length <= i) slots.push(EMPTY);
-    const other = slots[i];
-    if (other !== EMPTY) putAt(other, from >= 0 ? from : firstEmpty(slots, i + 1));
+    // 다른 칸 위에 놓으면 자리를 바꾸지 않고 그 사이 칸들이 한 칸씩 밀린다 (제작자 2026-11-18 '교체가 아니라 뒤로 한 칸씩 밀리게').
+    // 격자 안에서 옮기면 원래 자리와 놓은 자리 사이만 당기거나 밀고, 아래 탭에서 가져오면 놓은 자리부터 다음 빈 자리까지 뒤로 민다. 빈 자리에 놓으면 그대로
+    if (slots[i] !== EMPTY && from !== i) {
+      if (from >= 0 && from < i) for (let j = from; j < i; j++) slots[j] = slots[j + 1];
+      else if (from > i) for (let j = from; j > i; j--) slots[j] = slots[j - 1];
+      else {
+        const e = firstEmpty(slots, i);
+        while (slots.length <= e) slots.push(EMPTY);
+        for (let j = e; j > i; j--) slots[j] = slots[j - 1];
+      }
+    }
     putAt(key, i);
     return build(dock, [...slots, ...tail], search);
   }
@@ -400,8 +409,42 @@ let pressTimer: number | undefined;
 let pressStart: { x: number; y: number } | null = null;
 /** 꾹 눌러 편집을 켠 뒤 손을 떼면 오는 클릭은 열지 않는다 */
 let swallowClick = false;
+// 배치 편집 중 위아래 스크롤 (제작자 2026-11-18 '배치 중인 상태에서 위아래 스크롤이 안 돼'): 홈 칸은 손가락을 대자마자 끌기를 시작해서(touch-action none)
+// 칸이 화면을 덮으면 스크롤할 곳이 없었다. 손가락은 칸 위에서 잠깐(HOLD_MS) 멈춰야 끌기가 시작되고, 그 전에 움직이면 화면이 스크롤된다.
+// 끄는 동안은 touchmove 를 막아 스크롤이 끼어들지 않고, 화면 위·아래 끝(아래 탭 위)으로 가져가면 화면이 그쪽으로 저절로 흐른다 (edgeScroll).
+const HOLD_MS = 180;
+let holdKey: string | null = null;
+let last = { x: 0, y: 0 };
+let scrollRaf = 0;
+
+if (typeof document !== "undefined") {
+  document.addEventListener("touchmove", (e) => { if (state.drag && e.cancelable) e.preventDefault(); }, { passive: false });
+}
+
+function startDrag(key: string, x: number, y: number) {
+  set({ drag: { key, x, y, startX: x, startY: y, moved: false, base: state.layout }, preview: null });
+}
+
+function edgeScroll() {
+  scrollRaf = 0;
+  const d = state.drag;
+  if (!d || !d.moved) return;
+  const bottom = document.querySelector(".tabbar")?.getBoundingClientRect().top ?? window.innerHeight;
+  const ZONE = 64;
+  let v = 0;
+  if (d.y < ZONE) v = -Math.ceil((ZONE - d.y) / 4);
+  else if (d.y > bottom - ZONE && d.y < bottom) v = Math.ceil((d.y - (bottom - ZONE)) / 4);
+  if (!v) return;
+  const before = window.scrollY;
+  window.scrollBy(0, v);
+  if (window.scrollY === before) return;
+  const t = dropTarget(d.x, d.y);
+  set({ preview: t ? placeItem(d.base, d.key, t) : state.preview });
+  scrollRaf = requestAnimationFrame(edgeScroll);
+}
 
 function onMove(e: PointerEvent) {
+  last = { x: e.clientX, y: e.clientY };
   if (pressStart && Math.hypot(e.clientX - pressStart.x, e.clientY - pressStart.y) > 10) cancelPress();
   const d = state.drag;
   if (!d) return;
@@ -409,10 +452,13 @@ function onMove(e: PointerEvent) {
   const t = moved ? dropTarget(e.clientX, e.clientY) : null;
   const preview = t ? placeItem(d.base, d.key, t) : state.preview;
   set({ drag: { ...d, x: e.clientX, y: e.clientY, moved }, preview });
+  if (moved && !scrollRaf) scrollRaf = requestAnimationFrame(edgeScroll);
 }
 
 function onUp() {
   cancelPress();
+  cancelAnimationFrame(scrollRaf);
+  scrollRaf = 0;
   const d = state.drag;
   window.removeEventListener("pointermove", onMove);
   window.removeEventListener("pointerup", onUp);
@@ -429,11 +475,13 @@ function cancelPress() {
   window.clearTimeout(pressTimer);
   pressTimer = undefined;
   pressStart = null;
+  holdKey = null;
 }
 
 /**
  * 칸(홈 칸, 아래 탭, 검색 칸)을 누를 때. editable 이 아니면(홈이 아닌 화면의 아래 탭) 아무것도 하지 않는다.
- * 편집 중이 아니면 꾹 누르기를 재고, 편집 중이면 끌기를 시작한다 (홈은 끌 수 없다)
+ * 편집 중이 아니면 꾹 누르기를 재고, 편집 중이면 끌기를 시작한다 (홈은 끌 수 없다).
+ * 편집 중 손가락은 잠깐 멈춘 뒤에 끌기(그 전에 움직이면 스크롤), 마우스와 아래 탭(스크롤이 없다)은 바로 끌기
  */
 export function pressItem(e: ReactPointerEvent<HTMLElement>, key: string, editable: boolean) {
   swallowClick = false;
@@ -441,6 +489,7 @@ export function pressItem(e: ReactPointerEvent<HTMLElement>, key: string, editab
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp);
   window.addEventListener("pointercancel", onUp);
+  last = { x: e.clientX, y: e.clientY };
   if (!state.editing) {
     pressStart = { x: e.clientX, y: e.clientY };
     pressTimer = window.setTimeout(() => {
@@ -452,8 +501,21 @@ export function pressItem(e: ReactPointerEvent<HTMLElement>, key: string, editab
     return;
   }
   if (key === "home") return;
-  e.preventDefault();
-  set({ drag: { key, x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY, moved: false, base: state.layout }, preview: null });
+  if (e.pointerType === "mouse" || e.currentTarget.closest(".tabbar")) {
+    e.preventDefault();
+    startDrag(key, e.clientX, e.clientY);
+    return;
+  }
+  holdKey = key;
+  pressStart = { x: e.clientX, y: e.clientY };
+  pressTimer = window.setTimeout(() => {
+    const k = holdKey;
+    pressStart = null;
+    holdKey = null;
+    if (!k || !state.editing) return;
+    navigator.vibrate?.(10);
+    startDrag(k, last.x, last.y);
+  }, HOLD_MS);
 }
 
 /** 칸 클릭: 편집 중이거나 방금 꾹 눌러 편집을 켰으면 열지 않는다 */
