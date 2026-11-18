@@ -19,7 +19,6 @@ import { fetchMe } from "../auth";
 import type { Wiki } from "../types";
 import { iconLookup } from "../simIcons";
 import { solveCover } from "../dexSolve";
-import { canPreview } from "../launcher";
 import { filterByName } from "../search";
 import { weaponOf } from "../rental";
 import type { IconOf } from "../simIcons";
@@ -1332,8 +1331,7 @@ export function DexSnippet({ spec }: { spec: string }) {
           <small className="muted">≈ {wonText(Math.round(plan.goldEv / rate / 10_000) * 10_000)}</small>
         </div>
       </div>
-      {/* 도감 계산기는 아직 개발 중이라 들어갈 수 있는 사람(운영진·미리 보는 사람)에게만 단추를 보인다. 길드원이 누르면 '개발 중이에요' 화면뿐이라 */}
-      {me && canPreview(me) && (
+      {me && (
         <button type="button" className="dex-go" onClick={goDex}>
         <span className="dex-go-clip" aria-hidden>
           <span className="dex-go-shine" />

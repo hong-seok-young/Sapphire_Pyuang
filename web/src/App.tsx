@@ -155,7 +155,7 @@ const HallPage = lazy(() => CHUNKS.Hall().then((m) => ({ default: m.HallPage }))
 function prefetchPages(staff: boolean, master: boolean, logViewer = master) {
   const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
   if (conn?.saveData || /(^|-)2g$/.test(conn?.effectiveType ?? "")) return () => undefined;
-  const list: (keyof typeof CHUNKS)[] = ["Board", "Ranking", "Market", "Todo", "GuildDungeon", "Requests", "Rental", "Enhance", "DevRequests", "Chat", "Profile", "Alerts", "PlatShop", "Official"];
+  const list: (keyof typeof CHUNKS)[] = ["Board", "Ranking", "Market", "Todo", "GuildDungeon", "Requests", "Rental", "Enhance", "DevRequests", "Trend", "Dex", "Chat", "Profile", "Alerts", "PlatShop", "Official"];
   if (GCOIN_OPEN) list.push("GrowthShop");
   if (DONATE_OPEN) list.push("Hall", "Donate");
   if (staff) list.push("Admin");
@@ -566,9 +566,9 @@ function Wiki({
     body = <RentalPage wiki={wiki} me={me} view={route.query.get("v") ?? ""} />;
   // 시세 동향 (개발중, 제작자 요청 2026-11-03): 거래 톡방 대화에서 모은 골드·물건·캐릭터 시세
   // 개발 중 칸은 미리 보는 사람(길드마스터, 오피서, 앱개발자, 테스트 계정)만. 길드원은 주소로 들어와도 개발 중 안내 (제작자 요청 2026-11-04)
-  else if (page === "trend") body = canPreview(me) ? <TrendPage wiki={wiki} /> : <DevSoon title="시세 동향" />;
+  else if (page === "trend") body = <TrendPage wiki={wiki} />;
   // 도감 계산기 (개발중, 제작자 요청 2026-11-10): 제작자 도감 영상을 옮긴 항목으로 완료 효과 합계와 필요 재료. 미리 보는 사람만
-  else if (page === "dex") body = canPreview(me) ? <DexPage wiki={wiki} me={me} /> : <DevSoon title="도감 계산기" />;
+  else if (page === "dex") body = <DexPage wiki={wiki} me={me} />;
   else if (page === "damage") body = canPreview(me) ? <DamagePage wiki={wiki} me={me} /> : <DevSoon title="데미지 계산기" />;
   // 강화 비교 (제작자 요청 2026-11-04, 2026-11-05 모두에게 열었다): 두 무기(+강)의 데미지와 몇 % 강해지는지
   else if (page === "enhance") body = <EnhancePage wiki={wiki} query={route.query} me={me} />;

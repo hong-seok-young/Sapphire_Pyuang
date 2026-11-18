@@ -123,11 +123,11 @@ export const ITEMS: LaunchItem[] = [
   { key: "hall", title: "명예의 전당", short: "명예의 전당", to: "#/hall", icon: "🏛️", iconPic: "/icons/hall.png", managers: !DONATE_OPEN, soon: !DONATE_OPEN, badge: "개발중", match: ["hall", "donate"] },
   // 담당자 유어아너 (제작자 2026-11-10 '장비대여 담당자처럼 버튼에 유어아너로')
   { key: "gcoin", title: "성장코인샵", short: "코인샵", to: "#/gcoin", icon: "🪙", iconPic: "/icons/gcoin.png", corner: ["담당자", "유어아너"], split: [{ label: "1군", to: "#/gcoin1", tone: "gold" }, { label: "2군", to: "#/gcoin", tone: "silver" }], managers: !GCOIN_OPEN, soon: !GCOIN_OPEN, badge: "개발중", match: ["gcoin", "gcoin1"] },
-  { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", soon: true, badge: "개발중", match: ["trend"] },
+  { key: "trend", title: "시세 동향", short: "시세", to: "#/trend", icon: "📈", iconPic: "/data/market/coin.png", match: ["trend"] },
   // 도감 계산기 (개발중, 제작자 요청 2026-11-10: 게임 도감 항목을 웹에서 정리, 제작자 도감 영상에서 옮긴 자료). 개발 중 묶음 (미리 보는 사람만, pages/Dex.tsx)
   // 데미지 계산기 (개발중, 제작자 요청 2026-11-11 '데미지 계산기' + 카페 글 331187 기본 데미지 산출공식): 내 무기·강화와 상대 방어도로 방어도/5 를 뺀 기본 데미지 (pages/Damage.tsx)
   { key: "damage", title: "데미지 계산기", short: "데미지", to: "#/damage", icon: "🎯", soon: true, badge: "개발중", match: ["damage"] },
-  { key: "dex", title: "도감 계산기", short: "도감", to: "#/dex", icon: "📖", soon: true, badge: "개발중", match: ["dex"] },
+  { key: "dex", title: "도감 계산기", short: "도감", to: "#/dex", icon: "📖", match: ["dex"] },
   // 헬스 루틴 (개발중, 길드원 완뻔치 님 개발 요청 #8, 제작자 2026-11-09 '플릭 같은 헬스 어플'): 실제 헬스장 운동 기록 (pages/Fit.tsx). 게임과 상관없다
   { key: "fit", title: "헬스 루틴", short: "헬스", to: "#/fit", icon: "🏋️", developer: !FIT_OPEN, soon: !FIT_OPEN, badge: "개발중", match: ["fit"] },
   // 장비대여 (2026-11-02 제작자 요청으로 열었다), 길드던전과 인던 같이 갈 사람 찾기 (칸만 먼저 두고 개발 중으로 막는다)

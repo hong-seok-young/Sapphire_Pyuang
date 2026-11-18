@@ -42,6 +42,12 @@ export const APP_NEWS: AppNews[] = [
     text: "명예의 전당 추가 · 기부로 쌓인 마일리지 순위, 안의 기부함 단추로 어떤 템이든 기부 신청하면 마일리지가 쌓여요",
     link: "#/hall",
   },
+  {
+    key: "app_news_trend_dex_20261118",
+    at: Date.parse("2026-11-18T14:50:00+09:00"),
+    text: "시세 동향·도감 계산기 추가 · 거래 톡방 물건·캐릭터·골드 시세와 도감 능력치 최저가 계산",
+    link: "#/trend",
+  },
 ];
 
 const WINDOW = 2 * 86_400_000;
