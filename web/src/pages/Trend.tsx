@@ -586,7 +586,7 @@ function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
 
 type CharSort = "price" | "level" | "recent";
 const CHAR_SORTS: { key: CharSort; label: string }[] = [
-  { key: "price", label: "금액순" },
+  { key: "price", label: "판매가격순" },
   { key: "level", label: "레벨순" },
   { key: "recent", label: "최신순" },
 ];

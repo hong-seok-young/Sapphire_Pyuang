@@ -244,9 +244,11 @@ def load_skills() -> dict[str, dict]:
         return {}
     posts = json.loads(POSTS_JSON.read_text(encoding="utf-8"))
     menu = json.loads(MENU_JSON.read_text(encoding="utf-8"))
-    ids = [p["id"] for sec in menu if sec.get("title") == "직업별 스킬" for p in sec.get("posts", [])]
+    ids = [(p["id"], p.get("title", "")) for sec in menu if sec.get("title") == "직업별 스킬" for p in sec.get("posts", [])]
     out: dict[str, dict] = {}
-    for pid in ids:
+    for pid, title in ids:
+        jm = re.match(r"(전사|레인저|마법사|무도가)", title)
+        job = {"전사": "전사", "레인저": "레인저", "마법사": "법사", "무도가": "무도가"}[jm.group(1)] if jm else None
         for b in posts.get(pid, {}).get("blocks", []):
             if b.get("k") != "table" or not b.get("rows") or len(b["rows"][0]) < 2:
                 continue
@@ -255,7 +257,7 @@ def load_skills() -> dict[str, dict]:
             name = next((r["t"].strip() for line in head for r in line if r.get("b") and r.get("t", "").strip() and not r["t"].strip().startswith("(")), None)
             stages = [r["t"] for line in desc for r in line if re.match(r"\s*\d단", r.get("t", ""))]
             if icon and name and stages:
-                out[name.replace(" ", "")] = {"name": name, "max": len(stages), "icon": "/" + icon}
+                out[name.replace(" ", "")] = {"name": name, "max": len(stages), "icon": "/" + icon, "job": job}
     return out
 
 
@@ -2064,6 +2066,41 @@ def char_skills(text: str) -> str:
 SCAM = re.compile(r"사기.{0,12}(주의|조심|신고)|(주의|조심|신고).{0,12}사기|먹튀", re.S)
 
 
+# 직업을 안 적은 캐릭터 글 (제작자 2026-11-18 '화폭도 법사 스킬이고 콘법은 콘을 찍은 법사란 뜻'):
+# 스탯 찍은 모양 + 직업 줄임말 (콘 = 체력, 덱 = 민첩, 정석 = 주 스탯만. 자료 제공/초보자톡방_정리.md '콘법 / 정석법 / 반콘법', '덱렌 / 콘렌')
+JOB_BUILD = re.compile(r"(?:반콘|콘|정석|덱|인트|힘|올마|구올마|신올마|쟁)(법|렌|전|무)(?![가-힣])")
+# 한 직업만 쓰는 스킬 이름·줄임말 (위키 '직업별 스킬' 글). 두 글자 스킬 이름(공포·집중·강타 …)은 코스튬·낱말과 겹쳐 빼고, '소드'는 칼 이름과 겹쳐 뺀다
+SKILL_ABBR_JOB = {k: v for k, v in SKILL_FULL.items() if len(k) >= 2 and k != "소드"}
+
+
+def skill_jobs(text: str) -> set[str]:
+    jobs: set[str] = set()
+    for key, full in SKILL_ABBR_JOB.items():
+        sk = SKILLS.get(full.replace(" ", ""))
+        if sk and sk.get("job") and re.search(r"(?<![가-힣])" + key, text):
+            jobs.add(sk["job"])
+    for word, desc in SKILL_WORDS.items():
+        if re.search(r"(?<![가-힣])" + word, text):
+            for nm in re.split(r"[·\s]", desc):
+                sk = SKILLS.get(nm)
+                if sk and sk.get("job"):
+                    jobs.add(sk["job"])
+    flat = re.sub(r"\s+", "", text)
+    for key, sk in SKILLS.items():
+        if len(key) >= 3 and sk.get("job") and key in flat:
+            jobs.add(sk["job"])
+    return jobs
+
+
+def infer_job(text: str) -> str | None:
+    """직업 말이 없는 캐릭터 글의 직업: '콘법' 같은 말, 아니면 글에 나온 스킬이 모두 한 직업일 때만"""
+    bm = JOB_BUILD.search(text)
+    if bm:
+        return JOBS[bm.group(1)]
+    jobs = skill_jobs(text)
+    return next(iter(jobs)) if len(jobs) == 1 else None
+
+
 def _char_fields(text: str, level: int, job: str | None, price: float, side: str, raw: str, server: str | None = None) -> dict:
     sv = re.search(SERVER_WORD, text)
     server = server or (SERVERS[sv.group(0)] if sv else None)
@@ -2126,7 +2163,7 @@ def parse_chars(m: dict, rs: Resolver) -> list[dict]:
         if lf:
             level = int(lf.group(1))
             jm = re.search(r"전사|렌저|레인저|법사|마법사|무도가", text)
-            job = JOBS[jm.group(0)] if jm else None
+            job = JOBS[jm.group(0)] if jm else infer_job(text)
     if level is None:
         return []
     price = None
