@@ -176,9 +176,10 @@ for (let i = 0; i < waiting.length; i += BATCH) batches.push(waiting.slice(i, i 
 let added = 0;
 let failed = 0;
 let next = 0;
+let stop = false; // API 크레딧이 떨어지면 나머지 묶음은 묻지 않는다 (다음 배포에 다시)
 const pending = [];
 async function worker() {
-  while (next < batches.length && Date.now() - started < BUDGET_MS) {
+  while (!stop && next < batches.length && Date.now() - started < BUDGET_MS) {
     const batch = batches[next++];
     try {
       const got = await ask(batch);
@@ -193,6 +194,7 @@ async function worker() {
       }
     } catch (e) {
       failed++;
+      if (e instanceof Error && /credit balance/i.test(e.message)) stop = true;
       if (failed <= 3) console.log("시세 동향 AI 검수: 묶음 실패", e instanceof Error ? e.message.slice(0, 100) : "");
     }
     if (pending.length >= 200) flush();
@@ -211,6 +213,6 @@ await Promise.all(Array.from({ length: Math.min(PARALLEL, batches.length) }, wor
 flush();
 writeFileSync(`${DIR}cache.json`, JSON.stringify(cache));
 const left = waiting.length - added;
-console.log(`시세 동향 AI 검수: 새로 읽음 ${added}개 · 남음 ${left}개 · 실패 묶음 ${failed}개 · ${Math.round((Date.now() - started) / 1000)}초`);
+console.log(`시세 동향 AI 검수: 새로 읽음 ${added}개 · 남음 ${left}개 · 실패 묶음 ${failed}개 · ${Math.round((Date.now() - started) / 1000)}초${stop ? " · API 크레딧 부족으로 멈춤" : ""}`);
 output("added", added);
 output("left", left);
