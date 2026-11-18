@@ -702,7 +702,7 @@ function KakaoOriginal({ id, who, tel, at, text }: { id: string; who: string; te
  *  닉네임은 원문에 캐릭터 닉네임을 적은 것만 (판매자 닉네임은 카톡 원문에서), 스킬·보석·쟁캐 같은 것도 원문에서 본다 */
 function CharRow({ r, open, onToggle }: { r: TrendChar; open: boolean; onToggle: () => void }) {
   const spec = useMemo(() => dexSpecOf(r.dexTable), [r.dexTable]);
-  const none = <span className="tc-none">미기재</span>;
+  const none = <span className="tc-none">-</span>;
   return (
     <li className={"tc-item" + (open ? " tc-open" : "") + (r.side === "buy" ? " tc-buy" : "")}>
       <button type="button" className="tc-row" aria-expanded={open} onClick={onToggle}>
