@@ -1,4 +1,5 @@
 import { useEntryState } from "../router";
+import { useBackClose } from "../backClose";
 // 도감 계산기 (개발중, 제작자 요청 2026-11-10: '도감 항목 정리가 인게임에서 안 되어 있어서 이 웹에서', '영상 찍어서 하나하나 클릭했어, 다 보고 기록해').
 // 자료는 제작자가 찍은 게임 도감 퀘스트 영상(일반 > 전체 > 미완료)을 사람이(Claude) 장면마다 보고 옮긴 것: 비공개 자료 `도감/일반.json`
 // -> web/scripts/build_dex.py -> data/dex.json. 앱은 게임을 읽지 않는다. 사람이 '완료'를 직접 누르는 계산기 (게임 안전 규칙에 맞는다).
@@ -725,6 +726,8 @@ function EntryRow({ e, listW, done, onToggle, iconOf, sel: stats, onItem, wiki, 
   const [sel, setSel] = useState<number | null>(null);
   const it = sel === null ? null : e.items[sel];
   const ref = useRef<HTMLLIElement>(null);
+  // 펼친 칸 정보는 폰 뒤로 가기로 닫는다 (화면은 그대로)
+  useBackClose(sel !== null, () => setSel(null));
   // 칸을 연 채로 다른 곳을 누르면 닫는다 (제작자 2026-11-10)
   useEffect(() => {
     if (sel === null) return;

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useEntryState } from "../router";
+import { useBackClose } from "../backClose";
 import type { ChangeEvent, ReactNode } from "react";
 import { errorText } from "../auth";
 import { ago, goldText, goldWords } from "../market";
@@ -78,6 +79,8 @@ export function PlatShopPage() {
   const [error, setError] = useState("");
   const [tab, setTab] = useEntryState<Tab>("tab", "shop");
   const [picked, setPicked] = useState<string | null>(null);
+  // 아래에 뜬 구매 칸은 폰 뒤로 가기로 닫는다 (화면은 그대로)
+  useBackClose(picked !== null, () => setPicked(null));
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
 
