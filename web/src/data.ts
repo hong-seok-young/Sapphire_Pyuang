@@ -105,6 +105,8 @@ export interface TrendChar {
   pvp: boolean; scope: "" | "캘" | "템통"; price: number; raw: string; n: number; first: string; last: string;
   /** 카톡 원문 (가장 나중에 올린 글 그대로)과 올린 때 '2026-11-10 오후 2:44' */
   msg?: string; msgAt?: string;
+  /** 원문에 적힌 캐릭터 닉네임 ('닉 은', '닉네임: 꼬물'), 없으면 null */
+  nick?: string | null;
 }
 export interface TrendBand { band: string; n: number; med: number; min: number; max: number }
 export interface Trend {

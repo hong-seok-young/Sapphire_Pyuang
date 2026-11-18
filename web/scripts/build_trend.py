@@ -2078,6 +2078,19 @@ def _char_fields(text: str, level: int, job: str | None, price: float, side: str
             "scope": scope, "price": price, "raw": re.sub(r"\s+", " ", raw).strip()[:60]}
 
 
+# 캐릭터 닉네임 (제작자 2026-11-18 '원문 보면 캐릭터 닉네임 적어 둔 사람들만 닉네임으로'): '닉 은', '닉네임: 꼬물', '(닉: 전사)', '닉넴 루피'
+CHAR_NICK = re.compile(r"(?<![가-힣])닉(?:네임|넴|명)?(?:\s*[:：]\s*|\s+)([^\s()/,·:：]+)")
+NICK_NOT = re.compile(r"^(?:변경|변경가능|가능|x|X|비공개|미공개|변|추후|문의|공개)$")
+
+
+def char_nick(text: str) -> str | None:
+    m = CHAR_NICK.search(text)
+    if not m:
+        return None
+    n = m.group(1).strip(".!~")
+    return None if not n or NICK_NOT.match(n) or len(n) > 12 else n
+
+
 def parse_chars(m: dict, rs: Resolver) -> list[dict]:
     text = m["text"]
     lines = [l.strip() for l in text.split("\n") if l.strip()]
@@ -2095,8 +2108,10 @@ def parse_chars(m: dict, rs: Resolver) -> list[dict]:
         if cl.group(6) is None and v >= 300:
             continue
         if 3 <= v <= 1500:
-            out.append(_char_fields(line + "\n" + text, int(cl.group(2)), JOBS[cl.group(4)], v, side, line,
-                                    SERVERS.get(cl.group(1) or "")))
+            c = _char_fields(line + "\n" + text, int(cl.group(2)), JOBS[cl.group(4)], v, side, line,
+                             SERVERS.get(cl.group(1) or ""))
+            c["nick"] = char_nick(line)  # 여러 캐릭터를 늘어놓은 글은 그 줄의 닉네임만
+            out.append(c)
     if out:
         return out
     # 2) 글 전체가 캐릭터 하나
@@ -2139,7 +2154,9 @@ def parse_chars(m: dict, rs: Resolver) -> list[dict]:
             price = float(ps.group(1))
     if price is None or (unit == "만" and price >= 300):
         return []
-    return [_char_fields(text, level, job, price, side, lines[0])]
+    c = _char_fields(text, level, job, price, side, lines[0])
+    c["nick"] = char_nick(text)
+    return [c]
 
 
 def char_prices(msgs: list[dict], rs: Resolver) -> dict:
@@ -2153,6 +2170,7 @@ def char_prices(msgs: list[dict], rs: Resolver) -> dict:
             msg = {"msg": m["text"].strip(), "msgAt": f"{m['date']} {m.get('time', '')}".strip()}
             if r:
                 r["n"] += 1
+                r["nick"] = r.get("nick") or c.get("nick")
                 if m["date"] >= r["last"]:
                     r.update(msg)
                 r["last"] = max(r["last"], m["date"])

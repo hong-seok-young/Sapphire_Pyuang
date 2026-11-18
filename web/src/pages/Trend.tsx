@@ -11,7 +11,7 @@ import { Loading, Panel, PicImg, TopBar } from "../ui";
 import type { Wiki } from "../types";
 import { filterByName } from "../search";
 import { useEntryState } from "../router";
-import { DexCostChip, DexSnippet } from "./Dex";
+import { DexCostCell, DexSnippet } from "./Dex";
 
 /** 가격은 만 원 단위 (17 = 17만 원, 0.5 = 5000원) */
 const priceText = (manwon: number) => wonText(Math.round(manwon * 10_000));
@@ -632,16 +632,10 @@ function CharsPanel({ t }: { t: Trend }) {
           );
         })}
       </div>
-      <ul className="mk-list trend-list">
+      <ul className="tc-list">
         {rows.length > 0 && (
-          <li className="trend-charhead" aria-hidden>
-            <span>레벨</span>
-            <span className="trend-chartitle">
-              <span>진영</span>
-              <span>직업</span>
-              <span>닉네임</span>
-              <span className="trend-itemprice">가격</span>
-            </span>
+          <li className="tc-head" aria-hidden>
+            <span>Lv</span><span>진영</span><span>직업</span><span>닉네임</span><span>도감</span><span>날짜</span><span>가격</span>
           </li>
         )}
         {rows.slice(0, shown).map((r) => {
@@ -677,66 +671,39 @@ function dexSpecOf(table: [string, string][]): string {
   return out.join(";");
 }
 
-/** 카톡 원문 보기 (제작자 2026-11-18 '매물마다 카톡 원문 보기, 그 사람이 친 원래 메시지 원문을 볼 수 있게'): 누르면 펼쳐지는 말풍선 */
-function KakaoOriginal({ who, at, text }: { who: string; at?: string; text: string }) {
-  const [open, setOpen] = useEntryState("trend.msg:" + who + at, false);
+/** 카톡 원문 (제작자 2026-11-18 '매물마다 카톡 원문 보기', '냉기부여 마스터 등은 원문에서 보게'): 줄을 펼치면 맨 위에 카톡 대화창 모양으로 */
+function KakaoOriginal({ who, tel, at, text }: { who: string; tel?: string | null; at?: string; text: string }) {
   return (
-    <div className="trend-kakao">
-      <button type="button" className="trend-kakao-btn" aria-expanded={open} onClick={() => setOpen(!open)}>
-        카톡 원문 {open ? "접기 ▲" : "보기 ▼"}
-      </button>
-      {open && (
-        <div className="trend-kakao-msg">
-          <div className="trend-kakao-head">
-            <b>{who}</b>
-            {at && <small className="muted">{at.replace(/^\d{4}-(\d{2})-(\d{2})/, (_, mo, d) => `${Number(mo)}/${Number(d)}`)}</small>}
-          </div>
-          <div className="trend-kakao-text">{text}</div>
-        </div>
-      )}
+    <div className="trend-kakao-msg">
+      <div className="trend-kakao-head">
+        <b>{who}</b>
+        {tel && <small>{tel}</small>}
+        {at && <small className="muted">{at.replace(/^\d{4}-(\d{2})-(\d{2})/, (_, mo, d) => `${Number(mo)}/${Number(d)}`)}</small>}
+      </div>
+      <div className="trend-kakao-text">{text}</div>
     </div>
   );
 }
 
+/** 캐릭터 매물 한 줄 (제작자 2026-11-18 '불필요한 정보 빼고 한 행으로, 열마다 구분'): 레벨 · 진영 · 직업 · 닉네임 · 도감 · 날짜 · 가격.
+ *  닉네임은 원문에 캐릭터 닉네임을 적은 것만 (판매자 닉네임은 카톡 원문에서), 스킬·보석·쟁캐 같은 것도 원문에서 본다 */
 function CharRow({ r, open, onToggle }: { r: TrendChar; open: boolean; onToggle: () => void }) {
   const spec = useMemo(() => dexSpecOf(r.dexTable), [r.dexTable]);
-  // 펼쳐서 보일 것(도감 계산기 칸, 도감 %, 카톡 원문)이 없는 줄은 펼치지 않는다
-  const hasBody = !!spec || Object.keys(r.collect).length > 0 || !!r.msg;
-  const skills = r.skills.split(" · ").filter(Boolean);
+  const none = <span className="tc-none">미기재</span>;
   return (
-    <li className={"trend-item" + (open ? " mk-open" : "")}>
-      <button type="button" className="trend-itemrow" onClick={hasBody ? onToggle : undefined}>
-        <span className={"trend-lv" + (r.side === "buy" ? " trend-lv-buy" : "")}>
-          <small>{r.side === "buy" ? "삽니다" : "팝니다"}</small>
-          <b>{r.level}</b>
-        </span>
-        <span className="trend-itemmain">
-          {/* 진영 · 직업 · 닉네임 · 가격을 열로 나눠 늘 같은 자리에 (제작자 2026-11-18 '제각각 나열하지 말고 열을 구획해서', 없으면 '미기재', '캘'은 뺀다) */}
-          <span className="trend-itemtitle trend-chartitle">
-            <span className={r.server ? "" : "tc-none"}>{r.server ?? "미기재"}</span>
-            <span className={r.job ? "" : "tc-none"}>{r.job ?? "미기재"}</span>
-            {r.who ? <Who who={r.who} tel={r.tel} /> : <span className="tc-none">미기재</span>}
-            <span className="trend-itemprice"><b>{priceText(r.price)}</b></span>
-          </span>
-          <span className="trend-groupchips">
-            {r.scope === "템통" && <span className="trend-gchip">템통</span>}
-            {skills.map((s) => <span key={s} className="trend-gchip trend-gchip-skill">{s}</span>)}
-            {r.gems && <span className="trend-gchip">보석 <em>{r.gems}</em></span>}
-            {r.pvp && <span className="trend-gchip trend-gchip-pvp">쟁캐</span>}
-            {(r.dex === "노도감" || r.dex === "저도감") && <span className="trend-gchip muted">{r.dex}</span>}
-            {"일반" in r.collect && <span className="trend-gchip">도감 <em>{r.collect["일반"]}%</em></span>}
-            {!skills.length && !r.gems && !r.pvp && !r.dex && <span className="trend-gchip muted">상세 없음</span>}
-            {spec && <DexCostChip spec={spec} />}
-          </span>
-          <span className="trend-sub">
-            {/* 마지막으로 올린 날만 (제작자 2026-11-18 '몇 번 / 능력치 안 보여 줘도 돼, 최종 날짜만') */}
-            <span className="muted">{md(r.last)}</span>
-          </span>
-        </span>
+    <li className={"tc-item" + (open ? " tc-open" : "") + (r.side === "buy" ? " tc-buy" : "")}>
+      <button type="button" className="tc-row" aria-expanded={open} onClick={onToggle}>
+        <span className="tc-lv">{r.level}</span>
+        <span>{r.server ?? none}</span>
+        <span>{r.job ?? none}</span>
+        <span className="tc-nick">{r.nick ?? none}</span>
+        <span className="tc-dex">{spec ? <DexCostCell spec={spec} /> : <span className="tc-none">-</span>}</span>
+        <span className="tc-day">{md(r.last)}</span>
+        <span className="tc-price">{priceText(r.price).replace(/ 원$/, "")}</span>
       </button>
-      {open && hasBody && (
+      {open && (
         <div className="trend-itembody trend-charbody">
-          {/* 원글 첫 줄('제국 팝니다', '(버섯)캐릭터판매')은 뺐다 (제작자 2026-11-18 '이거도 없애', '이건 닉넴 같은데') */}
+          {r.msg && <KakaoOriginal who={r.who} tel={r.tel} at={r.msgAt} text={r.msg} />}
           {Object.keys(r.collect).length > 0 && (
             <div className="trend-chips">
               {["일반", "코스튬", "라이딩"].filter((k) => k in r.collect).map((k) => (
@@ -744,7 +711,6 @@ function CharRow({ r, open, onToggle }: { r: TrendChar; open: boolean; onToggle:
               ))}
             </div>
           )}
-          {/* 도감 표는 아래 도감 계산기 칸에 같은 수치가 나와서 뺀다 (제작자 2026-11-18 '이거 삭제 어차피 아래 뜨잖아'). 계산기 칸을 못 그리는 표만 */}
           {r.dexTable.length > 0 && !spec && (
             <dl className="trend-dexgrid">
               {r.dexTable.map(([k, v]) => (
@@ -754,7 +720,6 @@ function CharRow({ r, open, onToggle }: { r: TrendChar; open: boolean; onToggle:
           )}
           {/* 이 도감 수치를 처음부터 채우는 데 드는 값과 '도감 계산기에서 보기' (제작자 2026-11-18) */}
           {spec && <DexSnippet spec={spec} />}
-          {r.msg && <KakaoOriginal who={r.who} at={r.msgAt} text={r.msg} />}
         </div>
       )}
     </li>

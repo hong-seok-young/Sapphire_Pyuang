@@ -5914,3 +5914,26 @@ a.cf-at { color: #9fb4ff; }
 .trend-kakao-head b { color: #111; font-weight: 400; }
 .trend-kakao-head .muted { color: #4a5a6a; }
 .trend-kakao-text { padding: 7px 9px; background: #fff; border-radius: 6px; font-size: 12px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow-y: auto; }
+
+/* 시세 동향 캐릭터 표 (제작자 2026-11-18 '한 행으로, 열마다 구분 가시성'): 레벨 · 진영 · 직업 · 닉네임 · 도감 · 날짜 · 가격 */
+.tc-list { list-style: none; margin: 0; padding: 0; border: var(--px) solid var(--edge); background: var(--night-2); }
+.tc-row, .tc-head { display: grid; grid-template-columns: 2.1em 2.7em 3.3em minmax(0, 1fr) 3.4em 3.1em 3.9em; align-items: stretch; width: 100%; }
+.tc-row > span, .tc-head > span { display: flex; align-items: center; justify-content: center; min-width: 0; padding: 0 3px; white-space: nowrap; border-left: 1px solid rgb(255 255 255 / .08); }
+.tc-row > span:first-child, .tc-head > span:first-child { border-left: 0; }
+.tc-head { position: sticky; top: 0; z-index: 1; height: 22px; font-size: 10px; color: var(--muted); background: #1a1640; border-bottom: var(--px) solid var(--edge); }
+.tc-item { list-style: none; border-top: 1px solid rgb(255 255 255 / .06); }
+.tc-item:nth-child(odd) .tc-row { background: rgb(255 255 255 / .025); }
+.tc-row { min-height: 30px; padding: 0; font: inherit; font-size: 12px; color: var(--text); background: none; border: 0; text-align: center; cursor: pointer; }
+.tc-row:active { background: rgb(101 133 245 / .18) !important; }
+.tc-lv { font-size: 14px; color: var(--sapphire); background: rgb(101 133 245 / .08); }
+.tc-buy .tc-lv { color: var(--gold); }
+.tc-nick { justify-content: flex-start !important; color: #cfe0ff; white-space: normal !important; overflow-wrap: anywhere; line-height: 1.1; }
+.tc-dex { font-size: 11px; color: #ffcf6b; }
+.tc-day { font-size: 10px; color: var(--muted); }
+.tc-dex .tc-over { color: #ff7a6b; }
+.tc-price { justify-content: flex-end !important; color: var(--gold); font-size: 12px; }
+.tc-none { color: var(--muted); font-size: 10px; opacity: .7; }
+.tc-open > .tc-row { background: rgb(101 133 245 / .16) !important; box-shadow: inset 3px 0 0 var(--sapphire); }
+.tc-item .trend-charbody { padding: 8px; border-top: 1px dashed rgb(255 255 255 / .1); }
+.tc-item .trend-kakao-msg { margin-top: 0; }
+@media (max-width: 360px) { .tc-row { font-size: 11px; } .tc-dex { font-size: 10px; } .tc-row > span, .tc-head > span { padding: 0 2px; } .tc-row, .tc-head { grid-template-columns: 1.9em 2.5em 3.1em minmax(0, 1fr) 3.4em 3.1em 3.6em; } }

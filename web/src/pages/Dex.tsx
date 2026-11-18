@@ -1262,17 +1262,16 @@ function useSpecPlan(spec: string, withEv: boolean) {
 }
 
 /** 시세 동향 캐릭터 매물 줄의 작은 칩: 그 캐릭터 도감 수치를 처음부터 채우는 최저가 (평소, 골드 · 현금 어림) */
-export function DexCostChip({ spec }: { spec: string }) {
-  const { plan, solving, rate } = useSpecPlan(spec, false);
-  if (solving || !plan) return <span className="trend-gchip trend-gchip-dex muted">도감 계산 중</span>;
-  if (!plan.targets.size) return null;
+/** 시세 동향 캐릭터 표의 도감 칸: 골드만 짧게 ('2.1억', '3933만'), 도감 최대를 넘는 수치면 붉게 */
+export function DexCostCell({ spec }: { spec: string }) {
+  const { plan, solving } = useSpecPlan(spec, false);
+  if (solving || !plan) return <span className="muted">…</span>;
+  if (!plan.targets.size) return <span className="muted">-</span>;
   const short = [...plan.targets].some(([k, v]) => (plan.got.get(k) ?? 0) < v - 1e-9);
-  return (
-    <span className="trend-gchip trend-gchip-dex">
-      도감 <em>{fmtGold(plan.gold)}</em>
-      <small className="muted"> ≈{wonText(Math.round(plan.gold / rate / 10_000) * 10_000)}{short ? " · 최대 넘음" : ""}</small>
-    </span>
-  );
+  const g = plan.gold;
+  const txt = g >= 1e8 ? `${(g / 1e8).toFixed(g >= 1e9 ? 0 : 1)}억` : `${Math.round(g / 1e4)}만`;
+  // 도감 최대를 넘는 수치가 있으면 붉게 (그 값으로도 못 채운다)
+  return <span className={short ? "tc-over" : undefined} title={short ? "도감 최대를 넘는 수치가 있어요" : undefined}>{txt}</span>;
 }
 
 export function DexSnippet({ spec }: { spec: string }) {
