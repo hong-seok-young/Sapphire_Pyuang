@@ -224,7 +224,7 @@ function build(dock: string[], slots: string[], search: boolean): Layout {
  *  안 보이는 칸은 normalize 가 빼고 위부터 채운다. 개발 중 칸은 뒤에 두어 '개발 중' 묶음 순서) */
 export const DEFAULT_LAYOUT: Layout = {
   dock: ["home", "board", "info", "search", "chat"],
-  grid: ["ranking", "hall", "shop", "gcoin", "market", "match", "rent", "enhance", "todo", "requests", "suggest", "devreq", "admin", "gaps", "log", "trend", "dex", "damage", "sim", "simtest", "fit", "app"],
+  grid: ["ranking", "hall", "shop", "gcoin", "market", "trend", "dex", "match", "rent", "enhance", "requests", "todo", "suggest", "devreq", "admin", "gaps", "log", "damage", "sim", "simtest", "fit", "app"],
 };
 
 /**
