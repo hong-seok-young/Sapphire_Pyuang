@@ -34,6 +34,10 @@ export const KEYS = [
   "gcoin.staff1",
   // 1군 성장코인샵: 담당자가 더 준 코인 중 아직 팝업으로 안 본 것 (서버가 센다, 들어가서 팝업을 닫으면 0)
   "gcoin.gift",
+  // 개선 접수: 아직 손대지 않은 접수 수 (처리하는 사람, 서버가 본 때와 상관없이 센다)
+  "fix.new",
+  // 개선 접수 대화: 다른 사람이 쓴 대화를 접수마다 ('fixt:<접수>', 그 접수를 펼치면 지운다)
+  "fix.talk",
 ] as const;
 export type NewsKey = (typeof KEYS)[number];
 /** 홈 칸(launcher.ts 의 key)마다 더하는 단추들 */
@@ -45,6 +49,7 @@ const GROUPS: Record<string, string[]> = {
   requests: ["requests"],
   rent: ["rent."],
   gcoin: ["gcoin."],
+  gaps: ["fix."],
 };
 const POLL_MS = 120_000;
 /**
@@ -68,6 +73,7 @@ export const THING_KEYS: NewsKey[] = [
   "rent.list",
   "rent.apps",
   "rent.staff",
+  "fix.talk",
 ];
 const isThingKey = (k: NewsKey) => THING_KEYS.includes(k);
 /** 글·물건 하나의 새 일: 단추, 때, 쪽(물건·골드의 sell|buy, 장비대여의 직업) */

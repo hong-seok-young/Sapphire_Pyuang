@@ -30,6 +30,7 @@ const KIND_TITLE = {
   bday: "🎂 생일 축하해요!",
   gcoin: "📈 성장코인샵",
   donate: "🎁 기부함",
+  fix: "🚨 오류·개선 접수",
   push_test: "🔔 폰 알림 시험",
 };
 

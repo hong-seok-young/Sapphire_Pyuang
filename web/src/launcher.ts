@@ -140,9 +140,9 @@ export const ITEMS: LaunchItem[] = [
   { key: "app", title: "안드로이드 앱 받기", short: "앱 받기", to: "#/app", icon: "📲", androidOnly: true, soon: !APP_OPEN, badge: "검토 후 오픈", match: [] },
   { key: "admin", title: "길드원 관리", short: "관리", to: "#/admin", icon: "👥", managers: true, ribbon: "운영진", ring: "blue", match: ["admin"] },
   { key: "log", title: "사용 기록", to: "#/log", icon: "📊", logViewer: true, ribbon: "길마", ring: "purple", match: ["log"] },
-  // 챗봇이 모르는 질문 (제작자 요청: 보고 고친 뒤 물은 사람에게 알린다)
-  // 아이콘은 고치는 연장 (제작자 요청 2026-11-02 '챗봇 개선 아이콘은 좀 바꾸자', 예전 🧙)
-  { key: "gaps", title: "챗봇 개선", to: "#/gaps", icon: "🛠️", masters: true, ribbon: "길마", ring: "purple", match: ["gaps"] },
+  // 개선 접수 (제작자 2026-11-18 '챗봇 개선 말고 개선 접수, 모든 개선 사항을 다 받고 싶은데'): 메뉴 위 줄 경광등 단추로 받은 오류·불편·아이디어와 예전 챗봇 개선(챗봇 칩).
+  // 보는 사람은 오피서·길드마스터·앱개발자 (제작자 '보는 사람은 길마 개발자 오피서'). 아이콘은 고치는 연장 (예전 🧙). 칸 key·주소는 그대로라 저장된 배치가 이어진다
+  { key: "gaps", title: "개선 접수", to: "#/gaps", icon: "🛠️", managers: true, ribbon: "운영진", ring: "blue", match: ["gaps", "fix"] },
 ];
 const BY_KEY = new Map(ITEMS.map((i) => [i.key, i]));
 export const itemOf = (key: string) => BY_KEY.get(key);

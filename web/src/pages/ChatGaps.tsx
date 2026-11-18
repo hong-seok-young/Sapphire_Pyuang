@@ -12,7 +12,7 @@ import { ChatAnswer } from "./ChatAnswer";
  * '목록 복사'로 Claude 에게 넘겨 위키 자료나 프롬프트를 고치고 배포한 뒤 '개선 완료'를 누르면,
  * 물은 사람에게 '챗봇이 개선됐어요' 알림이 가고 누르면 그 대화에서 새 답을 받는다
  */
-export function ChatGapsPage({ role, wiki }: { role: string; wiki: Wiki | null }) {
+export function ChatGapsPage({ role, wiki, embedded = false }: { role: string; wiki: Wiki | null; embedded?: boolean }) {
   const [tab, setTab] = useState<"open" | "fixed">("open");
   const [gaps, setGaps] = useState<ChatGap[] | null>(null);
   const [error, setError] = useState("");
@@ -58,12 +58,12 @@ export function ChatGapsPage({ role, wiki }: { role: string; wiki: Wiki | null }
 
   return (
     <>
-      <TopBar title="챗봇 개선" />
-      <MasterNote role={role}>
+      {!embedded && <TopBar title="챗봇 개선" />}
+      {!embedded && <MasterNote role={role}>
         챗봇이 몰라서 짐작한 답과 길드원이 '별로'를 누른 답이 모여요. 개발자가
         보고 자료를 채워 챗봇을 고치는 메뉴예요. 고치고 '개선 완료'를 누르면
         물어본 길드원에게 알림이 가요.
-      </MasterNote>
+      </MasterNote>}
       <div className="gap-top">
         <button
           className={"pill" + (tab === "open" ? " pill-on" : "")}

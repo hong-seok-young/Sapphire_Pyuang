@@ -18,6 +18,7 @@ import { NEW_OFFICIAL_SQL, announceOfficial } from "../../server/officialAlert";
 import type { NewOfficial } from "../../server/officialAlert";
 import { canEnter, isManager } from "../../server/rental";
 import { canManageGcoin, canUseGcoin } from "../../server/gcoin";
+import { canSeeFix } from "../../server/fix";
 import { remindIfDue } from "../../server/gdungeon";
 import { announceApp } from "../../server/appNews";
 import { announceBday } from "../../server/birthday";
@@ -50,6 +51,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
   const manager = rent && isManager(me);
   // 성장코인샵 담당자: 기다리는 구매 신청 수 (처리할 일이라 본 때와 상관없이 남은 만큼, 홈 칸 배지)
   const gcoinStaff = canUseGcoin(me) && canManageGcoin(me);
+  // 개선 접수를 처리하는 사람 (오피서 이상, server/fix.ts)
+  const fixStaffer = canSeeFix(me);
   // 모든 문장이 같은 자리표를 쓴다 (?9 = 본캐 아이디). 문장에 있는 자리표 수만큼만 넣는다 (더 넣으면 D1 이 거절한다)
   const q = (sql: string, ...args: unknown[]) => {
     const count = Math.max(0, ...[...sql.matchAll(/\?(\d+)/g)].map((m) => Number(m[1])));
@@ -96,6 +99,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
       `SELECT 'req:' || o.request_id AS k, 'requests' AS c, o.created_at AS t, NULL AS s FROM request_offers o JOIN requests r ON r.id = o.request_id ` +
         `WHERE o.created_at > ?1 AND r.owner IN ${MINE} AND o.user_id NOT IN ${MINE} AND o.status = 'pledged' AND r.status != 'done'`,
       floor("requests"),
+    ),
+    // 개선 접수 대화: 다른 사람이 쓴 대화를 접수마다 ('fixt:<접수>'). 처리하는 사람은 모든 접수, 그 밖에는 내 접수만 (색인 fix_talk_at)
+    q(
+      `SELECT 'fixt:' || t.report_id AS k, 'fix.talk' AS c, t.created_at AS t, r.status AS s FROM fix_talk t JOIN fix_reports r ON r.id = t.report_id ` +
+        `WHERE t.created_at > ?1 AND t.user_id NOT IN ${MINE}${fixStaffer ? "" : ` AND r.user_id IN ${MINE}`}`,
+      floor("fix.talk"),
     ),
     ...(rent
       ? [
@@ -170,6 +179,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
           ),
         ]
       : []),
+    // 개선 접수: 아직 손대지 않은 접수 수 (처리할 일이라 본 때와 상관없이 남은 만큼, 색인 fix_reports_status)
+    ...(fixStaffer ? [q("SELECT COUNT(*) AS n FROM fix_reports WHERE status = 'new'")] : []),
     // 1군 담당자가 더 준 코인 중 아직 팝업으로 안 본 것 (1군 성장코인샵이 열린 뒤에만, 지금 캐릭터). 성장코인샵 칸과 1군 단추에 배지
     env.DB.prepare(
       "SELECT COUNT(*) AS n FROM gc_ledger WHERE user_id = ?1 AND kind = 'adjust' AND delta > 0 AND grp = 1 AND created_at > ?2 " +
@@ -212,6 +223,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
     counts["gcoin.staff"] = Number(g.g2 ?? 0);
     counts["gcoin.staff1"] = Number(g.g1 ?? 0);
   }
+  if (fixStaffer) counts["fix.new"] = n(results[i++]);
   counts["gcoin.gift"] = n(results[i++]);
   const maint = results[i++];
   const checked = results[i++];

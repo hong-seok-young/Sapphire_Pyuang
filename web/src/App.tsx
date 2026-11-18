@@ -40,6 +40,8 @@ import {
 } from "./launcher";
 import type { LaunchItem } from "./launcher";
 import { markNewsSeen, newsFor, refreshNews, startNews, useNews } from "./news";
+import { setFixStaff } from "./fixState";
+import { startFixTrail } from "./fix";
 import { Search } from "./pages/Search";
 import { Places, PlacePage } from "./pages/Places";
 import { ItemPage, MonsterPage } from "./pages/Detail";
@@ -102,7 +104,7 @@ const CHUNKS = {
   Damage: () => import("./pages/Damage"),
   ActivityLog: () => import("./pages/ActivityLog"),
   Alerts: () => import("./pages/Alerts"),
-  ChatGaps: () => import("./pages/ChatGaps"),
+  FixDesk: () => import("./pages/FixDesk"),
   PlatShop: () => import("./pages/PlatShop"),
   Board: () => import("./pages/Board"),
   Official: () => import("./pages/Official"),
@@ -132,7 +134,7 @@ const DamagePage = lazy(() => CHUNKS.Damage().then((m) => ({ default: m.DamagePa
 const ActivityLogPage = lazy(() => CHUNKS.ActivityLog().then((m) => ({ default: m.ActivityLogPage })));
 const LogAnswerPage = lazy(() => CHUNKS.ActivityLog().then((m) => ({ default: m.LogAnswerPage })));
 const AlertsPage = lazy(() => CHUNKS.Alerts().then((m) => ({ default: m.AlertsPage })));
-const ChatGapsPage = lazy(() => CHUNKS.ChatGaps().then((m) => ({ default: m.ChatGapsPage })));
+const FixDeskPage = lazy(() => CHUNKS.FixDesk());
 const PlatShopPage = lazy(() => CHUNKS.PlatShop().then((m) => ({ default: m.PlatShopPage })));
 const BoardPage = lazy(() => CHUNKS.Board().then((m) => ({ default: m.BoardPage })));
 const SuggestPage = lazy(() => CHUNKS.Board().then((m) => ({ default: m.SuggestPage })));
@@ -159,7 +161,7 @@ function prefetchPages(staff: boolean, master: boolean, logViewer = master) {
   if (GCOIN_OPEN) list.push("GrowthShop");
   if (DONATE_OPEN) list.push("Hall", "Donate");
   if (staff) list.push("Admin");
-  if (master) list.push("ChatGaps");
+  if (staff) list.push("FixDesk");
   if (logViewer) list.push("ActivityLog");
   let stop = false;
   let timer = 0;
@@ -424,6 +426,11 @@ function Wiki({
   );
   // 새 글·새 물건 숫자 배지 (news.ts): 그 메뉴를 열면 지우고, 홈으로 올 때 다시 묻는다
   useEffect(() => startNews(me.id), [me.id]);
+  // 오류·개선 접수 (src/fix.ts): 접수에 붙일 직전 화면, 위 줄 단추가 운영진인지
+  useEffect(() => {
+    setFixStaff(RANK[me.role] >= 1);
+    startFixTrail();
+  }, [me.role]);
   useEffect(() => {
     // 게시판·중개인·의뢰소·장비대여 목록의 새 것은 그 글·물건을 열어야 지운다 (news.ts markThingSeen, 여기 markNewsSeen 은 그 단추들을 건너뛴다)
     if (page === "requests") markNewsSeen("requests");
@@ -506,14 +513,15 @@ function Wiki({
   else if (page === "info") body = <InfoPage me={me} />;
   // 타이머는 안드로이드 앱에만 있다. 예전 주소(#/timer)로 와도 앱 안내를 보여 준다
   else if (page === "app" || page === "timer") body = <AppPage />;
-  // 사용 기록, 챗봇 개선: 길드마스터와 앱개발자 (제작자 요청 2026-11-02)
+  // 개선 접수 (제작자 2026-11-18, 예전 챗봇 개선): 오피서·길드마스터·앱개발자. 챗봇 칩(예전 챗봇 개선)은 길드마스터·앱개발자만. 내 접수(#/fix)는 누구나
   else if (page === "gaps")
     body =
-      RANK[me.role] >= 2 ? (
-        <ChatGapsPage role={me.role} wiki={wiki ?? null} />
+      RANK[me.role] >= 1 ? (
+        <FixDeskPage me={me} mine={false} query={route.query} wiki={wiki ?? null} />
       ) : (
-        <NotFound what="페이지" />
+        <FixDeskPage me={me} mine query={route.query} wiki={wiki ?? null} />
       );
+  else if (page === "fix") body = <FixDeskPage me={me} mine query={route.query} wiki={wiki ?? null} />;
   // 길드 던전은 1군 전용 (제작자 요청 2026-11-02): 2군은 들어와도 안내만 (앱개발자는 길드와 상관없이 본다)
   else if (page === "match")
     body =

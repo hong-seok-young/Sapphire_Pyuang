@@ -37,6 +37,8 @@ export const ALERT_KINDS = {
   donate: true,
   // 생일 축하 (server/birthday.ts, 제작자 2026-11-07 '11월 8일 되는 순간 알림 무조건'): 알림 설정에 줄을 두지 않아 끄지 못한다
   bday: true,
+  // 오류·개선 접수 (server/fix.ts, 제작자 2026-11-18): 새 접수·대화(운영진에게), 처리 중·고침·대화(쓴 사람에게)
+  fix: true,
   // 폰 알림 시험 (내 정보 > 알림 설정의 '시험 알림', functions/api/push.ts): 설정에 줄이 없다
   push_test: true,
 } as const;
