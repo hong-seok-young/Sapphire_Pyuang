@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useUpdate } from "./update";
 import { isFavorite, toggleFavorite, useFavorites } from "./favorites";
 import type { FavKind } from "./favorites";
@@ -12,6 +12,7 @@ import { ClickTag, hasGuide, openGuide, useClickHint } from "./tutorial";
 import type { Pic } from "./types";
 import { useBackClose } from "./backClose";
 import { thingNew, useNews } from "./news";
+import { isFixStaff } from "./fixState";
 
 /**
  * 픽셀 그림. 작은 아이콘은 scale 배로 키워도 흐려지지 않게 그린다.
@@ -129,6 +130,8 @@ export const TITLE_EN: Record<string, string> = {
   "1군 성장코인샵": "GROWTH COIN SHOP · 1",
   기부함: "DONATION BOX",
   "명예의 전당": "HALL OF FAME",
+  "개선 접수": "FIX DESK",
+  "내 접수": "MY REPORTS",
 };
 
 export function TopBar({
@@ -206,6 +209,7 @@ export function TopBar({
       )}
       {right ?? (
         <span className="topbar-right">
+          <FixButton />
           {star}
           {!location.hash.startsWith("#/alerts") && (
             <Bell className="topbar-me" size={18} />
@@ -574,6 +578,32 @@ export function PixelIcon({
       alt=""
       aria-hidden
     />
+  );
+}
+
+/** 오류·개선 접수 창 (처음 누를 때 받는다, pages/FixReport.tsx) */
+const FixReport = lazy(() => import("./pages/FixReport"));
+
+/**
+ * 오류·개선 접수 단추 (제작자 2026-11-18 '각 버튼 들어가면 알림 종 왼쪽에 오류 개선 접수하는 버튼, 스샷도 올리고 정보도 적게'): 메뉴 화면 위 줄 🔔 왼쪽 도트 경광등.
+ * 누르면 지금 화면(메뉴·칸)을 적어 둔 접수 창. 운영진이 아니면 내 접수에 새 대화가 오면 그 수
+ */
+export function FixButton() {
+  const [open, setOpen] = useState(false);
+  const news = useNews();
+  const n = isFixStaff() ? 0 : news["fix.talk"];
+  return (
+    <>
+      <button className="topbar-me fix-btn" onClick={() => setOpen(true)} aria-label="오류·개선 접수" title="오류·개선 접수">
+        <img className="px-icon" src="/icons/report.png" width={18} height={18} alt="" aria-hidden />
+        {n > 0 && <i className="bell-dot">{n > 99 ? "99+" : n}</i>}
+      </button>
+      {open && (
+        <Suspense fallback={null}>
+          <FixReport onClose={() => setOpen(false)} />
+        </Suspense>
+      )}
+    </>
   );
 }
 

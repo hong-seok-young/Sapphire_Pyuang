@@ -102,7 +102,7 @@ button { font: inherit; color: inherit; }
 /* 단추가 기본(🔔 👤)인 위 줄은 제목 배너를 화면 가운데에 둔다 (제작자 요청 2026-11-02: 타이틀은 가운데) */
 .topbar-std .topbar-title-banner {
   position: absolute; left: 50%; top: calc(50% + env(safe-area-inset-top) / 2); transform: translate(-50%, -50%);
-  flex: none; width: max-content; max-width: calc(100% - 2 * 76px);
+  flex: none; width: max-content; max-width: calc(100% - 2 * 98px);
 }
 .topbar-std .topbar-right { margin-left: auto; }
 .tb-banner { display: flex; max-width: 100%; min-width: 0; }
@@ -5966,3 +5966,88 @@ a.cf-at { color: #9fb4ff; }
 .ts-open > .ts-row { background: rgb(101 133 245 / .16) !important; box-shadow: inset 3px 0 0 var(--sapphire); }
 .ts-msg { margin: 6px; }
 @media (max-width: 360px) { .ts-row, .ts-head { grid-template-columns: 34px 44px 70px minmax(0, 1fr); } }
+
+/* 오류·개선 접수 (제작자 2026-11-18): 위 줄 🔔 왼쪽 경광등(ui.tsx FixButton), 접수 창(pages/FixReport.tsx), 개선 접수·내 접수(pages/FixDesk.tsx) */
+.topbar-right { gap: 2px; }
+.topbar-right .topbar-me { width: 28px; }
+.fix-btn { position: relative; }
+.fix-btn .px-icon { animation: fx-lamp 2.6s steps(1) infinite; }
+@keyframes fx-lamp { 0%, 86% { opacity: 1; } 88%, 92% { opacity: 0.55; } 94% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .fix-btn .px-icon { animation: none; } }
+.fx-back { position: fixed; inset: 0; z-index: 80; display: flex; align-items: flex-end; justify-content: center; background: rgba(7, 6, 15, 0.6); }
+.fx-sheet {
+  width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto; padding: 12px 12px calc(14px + env(safe-area-inset-bottom));
+  background: var(--panel); border: var(--px) solid var(--edge); border-bottom: 0; box-shadow: inset 0 var(--px) 0 var(--hi);
+  animation: fx-up 0.16s ease-out;
+}
+@keyframes fx-up { from { transform: translateY(24px); opacity: 0.6; } to { transform: none; opacity: 1; } }
+.fx-head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 15px; }
+.fx-head b { color: var(--gold); text-shadow: 1px 1px 0 var(--edge); }
+.fx-siren { flex: none; }
+.fx-mine { position: relative; margin-left: auto; padding: 4px 8px; font-size: 12px; color: var(--text); background: var(--night-2); border: var(--px) solid var(--edge); }
+.fx-mine .news-badge { top: -8px; right: -8px; }
+.fx-x { flex: none; width: 30px; height: 30px; padding: 0; background: none; border: 0; box-shadow: none; color: var(--muted); font-size: 15px; }
+.fx-where { display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px; padding: 6px 8px; background: var(--night-2); border: var(--px) solid var(--edge); font-size: 13px; }
+.fx-where-k { flex: none; font-size: 11px; color: var(--muted); }
+.fx-where-v { min-width: 0; color: var(--text); }
+.fx-kinds { margin-bottom: 8px; }
+.fx-kinds .pill { padding: 7px 4px; font-size: 12px; }
+.fx-text { display: block; width: 100%; height: 108px; padding: 8px 10px; font-size: 14px; line-height: 1.45; resize: vertical; }
+.fx-shots { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.fx-shot { position: relative; width: 74px; height: 74px; padding: 0; background: var(--night); border: var(--px) solid var(--edge); overflow: hidden; }
+.fx-shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fx-shot button { position: absolute; top: 0; right: 0; width: 22px; height: 22px; padding: 0; font-size: 11px; color: #fff; background: rgba(7, 6, 15, 0.75); border: 0; box-shadow: none; }
+.fx-add { width: 74px; height: 74px; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px; color: var(--text); background: var(--night-2); border: var(--px) dashed var(--hi); }
+.fx-add small { font-size: 10px; color: var(--muted); }
+.fx-auto { margin: 8px 0 10px; font-size: 11px; color: var(--muted); }
+.fx-send { display: block; width: 100%; }
+.fx-done { padding: 14px 4px 4px; text-align: center; }
+.fx-done-big { margin: 0 0 6px; font-size: 18px; color: #7fe0a0; text-shadow: 1px 1px 0 var(--edge); }
+.fx-done .muted { font-size: 13px; line-height: 1.5; }
+.fx-done .pill-row { margin-top: 12px; }
+.fx-tabs .pill { position: relative; }
+.fx-tabs .pill small { opacity: 0.8; }
+.fx-kinds-sub { margin-bottom: 10px; }
+.fx-empty { margin: 24px 0; text-align: center; font-size: 13px; }
+.fx-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.fx-row { background: var(--panel); border: var(--px) solid var(--edge); }
+.fx-row-open { box-shadow: 0 0 0 var(--px) var(--gold); }
+.fx-row-head { display: flex; gap: 8px; width: 100%; padding: 8px; text-align: left; background: none; border: 0; box-shadow: none; color: var(--text); cursor: pointer; }
+.fx-ico { flex: none; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 20px; background: var(--night-2); border: var(--px) solid var(--edge); }
+.fx-ico img { width: 22px; height: 22px; image-rendering: pixelated; }
+.fx-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.fx-row-top { position: relative; display: flex; align-items: center; gap: 5px; min-width: 0; padding-right: 18px; }
+.fx-row-top .row-new { position: absolute; right: 0; top: -2px; }
+.fx-menu { min-width: 0; font-size: 12px; color: var(--gold); overflow: hidden; text-overflow: clip; white-space: nowrap; }
+.fx-kind, .fx-st { flex: none; padding: 1px 5px; font-style: normal; font-size: 10px; color: var(--edge); border: 1px solid var(--edge); }
+.fx-kind-bug { background: #ff8a8a; }
+.fx-kind-ux { background: #ffd27a; }
+.fx-kind-idea { background: #9fd8ff; }
+.fx-st-new { background: var(--muted); }
+.fx-st-doing { background: #b6a0ff; }
+.fx-st-done { background: #7fe0a0; }
+.fx-row-text { font-size: 13px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fx-row-open .fx-row-text { display: none; }
+.fx-row-meta { font-size: 11px; color: var(--muted); }
+.fx-detail { padding: 0 8px 10px; }
+.fx-full { margin: 0 0 8px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+.fx-shots-view .fx-shot { width: 96px; height: 96px; cursor: zoom-in; }
+.fx-info { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 10px; margin: 10px 0; padding: 8px; font-size: 12px; background: var(--night-2); border: var(--px) solid var(--edge); }
+.fx-info dt { color: var(--muted); }
+.fx-info dd { margin: 0; min-width: 0; }
+.fx-info a { color: var(--sapphire); }
+.fx-patch { color: #7fe0a0; }
+.fx-talk h4 { margin: 10px 0 6px; font-size: 13px; color: var(--gold); }
+.fx-talk-none { font-size: 12px; }
+.fx-say { margin-bottom: 6px; padding: 6px 8px; background: var(--night-2); border: var(--px) solid var(--edge); max-width: 88%; }
+.fx-say-me { margin-left: auto; background: #2c3a6e; }
+.fx-say-who { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+.fx-say-who small { margin-left: auto; padding-left: 6px; }
+.fx-role { padding: 0 4px; font-style: normal; font-size: 10px; color: var(--edge); background: var(--gold); }
+.fx-say-text { display: block; margin-top: 2px; font-size: 13px; line-height: 1.45; white-space: pre-wrap; }
+.fx-say-box { display: flex; gap: 6px; margin-top: 6px; }
+.fx-say-box input { flex: 1; min-width: 0; padding: 7px 8px; font-size: 13px; }
+.fx-acts { margin-top: 10px; }
+.fx-patch-box label { display: grid; gap: 4px; margin-bottom: 8px; font-size: 12px; color: var(--muted); }
+.fx-patch-box input { padding: 7px 8px; font-size: 13px; }
+.fx-del-sure { color: #fff; background: var(--red); }

@@ -1165,3 +1165,53 @@ CREATE INDEX IF NOT EXISTS rental_talk_created ON rental_talk (created_at);
 CREATE INDEX IF NOT EXISTS board_comments_created ON board_comments (created_at);
 CREATE INDEX IF NOT EXISTS listing_talk_created ON listing_talk (created_at);
 CREATE INDEX IF NOT EXISTS alerts_user_kind ON alerts (user_id, kind, created_at);
+
+-- 오류·개선 접수 (제작자 2026-11-18: 메뉴마다 위 줄 🔔 왼쪽 단추로 오류·오정보·불편·개선 아이디어를 스샷과 함께 접수, server/fix.ts).
+-- 보는 사람은 오피서·길드마스터·앱개발자와 쓴 사람. 고치면 쓴 사람에게 알림과 패치 내역 한 줄(patch_extra). 지우지 않는다(운영진이 지운 것만)
+CREATE TABLE IF NOT EXISTS fix_reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  kind TEXT NOT NULL,            -- bug(오류·오정보) | ux(불편) | idea(개선 아이디어)
+  menu TEXT NOT NULL,            -- '사파이어 중개인 · 목록'
+  menu_key TEXT,                 -- 홈 칸 key (아이콘)
+  path TEXT NOT NULL,            -- 접수한 화면 주소
+  text TEXT NOT NULL,
+  device TEXT,                   -- 기기와 브라우저 (User-Agent)
+  version TEXT,                  -- 앱 판
+  trail TEXT,                    -- 직전에 본 화면 JSON
+  status TEXT NOT NULL DEFAULT 'new',   -- new 접수 | doing 처리 중 | done 고침
+  created_at INTEGER NOT NULL,
+  done_at INTEGER,
+  done_by TEXT,
+  patch TEXT,                    -- 고칠 때 패치 내역에 넣은 한 줄
+  talk_at INTEGER                -- 마지막 대화 때 (새 대화 배지)
+);
+CREATE INDEX IF NOT EXISTS fix_reports_status ON fix_reports (status, created_at);
+CREATE INDEX IF NOT EXISTS fix_reports_user ON fix_reports (user_id, created_at);
+CREATE INDEX IF NOT EXISTS fix_reports_at ON fix_reports (created_at);
+CREATE TABLE IF NOT EXISTS fix_shots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  report_id INTEGER NOT NULL,
+  type TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  data BLOB NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS fix_shots_report ON fix_shots (report_id);
+CREATE TABLE IF NOT EXISTS fix_talk (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  report_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS fix_talk_report ON fix_talk (report_id, created_at);
+CREATE INDEX IF NOT EXISTS fix_talk_at ON fix_talk (created_at);
+-- 패치 내역에 저절로 더해지는 줄 (개선 접수에서 '고침', 화면 #/patch 가 그 판에 붙인다)
+CREATE TABLE IF NOT EXISTS patch_extra (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  version TEXT NOT NULL,
+  text TEXT NOT NULL,
+  report_id INTEGER,
+  created_at INTEGER NOT NULL
+);

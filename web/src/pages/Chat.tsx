@@ -27,7 +27,7 @@ import { loadOdds } from "../odds";
 import { appDataContext } from "../chatMarket";
 import { inFloat } from "../platform";
 import { go } from "../router";
-import { Loading, TopBar } from "../ui";
+import { FixButton, Loading, TopBar } from "../ui";
 import { ChatAnswer } from "./ChatAnswer";
 
 /**
@@ -680,6 +680,7 @@ export function ChatPage({ wiki, arg, query, me }: { wiki: Wiki; arg: string; qu
         guide="AI 챗봇"
         right={
           <span className="topbar-right">
+            <FixButton />
             <a className="topbar-action" href="#/chat/list">
               ☰ 목록
             </a>
