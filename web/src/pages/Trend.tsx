@@ -419,9 +419,9 @@ function ItemChart({ it }: { it: TrendItem }) {
 }
 
 
-/** 물건 한 줄 (접힌 채로도 묶음별 가격이 보인다): 그림, 이름·줄임말, 묶음 칩(속성·강화마다 가격과 오르내림), 글·사람·기간, 가격, 추세선.
+/** 물건 한 줄 (접힌 채로도 묶음별 가격이 보인다): 그림, 이름·줄임말, 묶음 칩(속성·강화마다 가격과 오르내림), 가격, 추세선.
  *  펼치면 묶음별 날짜 그림과 표 */
-function ItemRow({ it, t, wiki, side, open, onToggle }: { it: TrendItem; t: Trend; wiki: Wiki; side: "sell" | "buy"; open: boolean; onToggle: () => void }) {
+function ItemRow({ it, t, wiki, open, onToggle }: { it: TrendItem; t: Trend; wiki: Wiki; side?: "sell" | "buy"; open: boolean; onToggle: () => void }) {
   // 그림: 위키 아이템이면 위키 그림 (괄호 설명을 뗀 이름으로도 찾는다), 아니면 it.icon (도감 스샷에서 자른 그림, 스킬북은 위키 직업별 스킬의 아이콘), 그것도 없으면 동전
   const base = it.name.replace(/\s*\(.*\)\s*$/, "");
   const pic = (wiki.items[it.name] ?? wiki.items[base] ?? wiki.items[base.replace(/\s/g, "")])?.icon;
@@ -447,11 +447,7 @@ function ItemRow({ it, t, wiki, side, open, onToggle }: { it: TrendItem; t: Tren
             ))}
             {it.groups.length > chips.length && <span className="trend-gchip muted">+{it.groups.length - chips.length}</span>}
           </span>
-          <span className="trend-sub muted">
-            글 {it.n} · {it.sellers}명 · {md(it.first)}{it.first !== it.last && `~${md(it.last)}`} · {shortWon(it.min)}~{shortWon(it.max)}
-            {it.other && <span className="trend-other"> · {side === "sell" ? "삽니다" : "팝니다"} {shortWon(it.other.med)} ({it.other.n})</span>}
-            {it.abbr.length > 0 && <span className="trend-abbr"> · 톡방 {it.abbr.slice(0, 3).join(", ")}</span>}
-          </span>
+          {/* 글 수·사람 수·날짜·범위·반대쪽 값·톡방 줄임말 줄은 뺐다 (제작자 2026-11-18 '너무 나열식, 이건 지워도 될 거 같아'): 펼치면 묶음 표에 있다 */}
         </span>
       </button>
       {open && (
