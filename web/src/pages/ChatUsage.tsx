@@ -10,6 +10,8 @@ interface Usage {
   limit: number;
   guild: number;
   me: number;
+  /** 콘솔 월 한도에 닿아 막혔다 */
+  over?: boolean;
 }
 
 const usd = (n: number) => (n >= 100 ? `$${n.toFixed(1)}` : `$${n.toFixed(2)}`);
@@ -71,12 +73,12 @@ export function ChatUsageBar() {
   }, [info]);
   if (!u) return null;
   const r = resetOf(u.month);
-  const all = Math.min(1, u.guild / u.limit);
+  const all = u.over ? 1 : Math.min(1, u.guild / u.limit);
   const mine = Math.min(all, u.me / u.limit);
   return (
     <div className="chat-use" title={`이번 달 AI 사용 · 나 ${usd(u.me)} · 길드 ${usd(u.guild)} / $${u.limit}`}>
       <div
-        className={"chat-use-bar" + (all >= 0.9 ? " chat-use-hot" : "")}
+        className={"chat-use-bar" + (all >= 0.9 ? " chat-use-hot" : "") + (u.over ? " chat-use-over" : "")}
         role="button"
         tabIndex={0}
         onClick={() => setInfo((v) => (v ? 0 : Date.now()))}
@@ -85,7 +87,12 @@ export function ChatUsageBar() {
         <i className="chat-use-me" style={{ transform: `scaleX(${mine})` }} />
         <i className="chat-use-shine" />
         {bump > 0 && <i key={bump} className="chat-use-pop" style={{ left: `${all * 100}%` }} />}
-        {info ? (
+        {u.over && !info ? (
+          <span className="chat-use-lbl">
+            <b>이번 달 한도 다 씀</b>
+            <span>{r.mon}월 1일 초기화</span>
+          </span>
+        ) : info ? (
           <span key={info} className="chat-use-lbl chat-use-info">
             <b>{r.mon}월 1일 한도 초기화</b>
             <span>{r.days ? `${r.days}일 남음` : "오늘"} · 남은 한도 {usd(Math.max(0, u.limit - u.guild))}</span>

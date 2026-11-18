@@ -23,7 +23,8 @@ import { costContext } from "../../../server/chatCost";
 import { libraryContext } from "../../../server/library";
 import { addMsg, finishInBackground, newThread, ownThread, runStub, titleOf } from "../../../server/chatlog";
 import { cacheKey, cachedAnswer, cachedSse, routeSame, similarQuestion } from "../../../server/chatCache";
-import { errorCause, errorText, isWebOff, wellFormed } from "../../../server/chatErrors";
+import { errorCause, errorText, isOverLimit, isWebOff, wellFormed } from "../../../server/chatErrors";
+import { markOver } from "../../../server/apiUsage";
 import type { RunStart } from "../../../server/chatRun";
 
 /** 챗봇 모델. 바꾸려면 이 줄만 고친다 (더 싸게: "claude-sonnet-5-5", 가장 싸게: "claude-haiku-5-5") */
@@ -294,6 +295,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
     }
   } catch (e) {
     console.error("chat request failed", e instanceof Anthropic.APIError ? e.status : e);
+    if (isOverLimit(e)) await markOver(env);
     await refund();
     return json({ error: errorText(e) + (me.role === "developer" ? errorCause(e) : "") }, e instanceof Anthropic.RateLimitError ? 429 : 502);
   }

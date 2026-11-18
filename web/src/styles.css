@@ -378,6 +378,8 @@ button { font: inherit; color: inherit; }
 .chat-use-all, .chat-use-me { transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .chat-use-all { background: var(--sapphire); }
 .chat-use-hot .chat-use-all { background: #d9574f; }
+.chat-use-over .chat-use-all { background: #c0392b; }
+.chat-use-over .chat-use-me { display: none; }
 .chat-use-me { background: var(--gold); }
 .chat-use-shine { width: 30% !important; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent); animation: chat-use-shine 3.2s linear infinite; }
 @keyframes chat-use-shine { from { transform: translateX(-100%); } to { transform: translateX(340%); } }

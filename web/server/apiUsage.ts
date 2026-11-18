@@ -204,3 +204,14 @@ async function monthUsdOf(env: Env, month: string): Promise<{ month: string; usd
   const row = await env.DB.prepare(`SELECT COALESCE(SUM(${USD_MICRO_SQL}), 0) AS m FROM api_usage WHERE day >= ?`).bind(`${month}-01`).first<{ m: number }>();
   return { month, usd: Number(row?.m ?? 0) / 1e6, base: null, console: false, refreshedAt: null };
 }
+
+/**
+ * 콘솔의 월 사용 한도에 닿아 API 가 막혔다는 표시 (제작자 2026-11-18 '이미 300달러 다 써서 호출 막혔는데'): 챗봇이 그 오류를 받으면 setup 'ai_over_<UTC 달>' 을 적고,
+ * 챗봇 위 사용량 막대가 '이번 달 한도 다 씀'으로 보인다. 그 뒤 답을 하나라도 받으면(한도를 늘림) 지운다
+ */
+const overKey = () => "ai_over_" + new Date().toISOString().slice(0, 7);
+export const markOver = (env: Env) =>
+  env.DB.prepare("INSERT OR REPLACE INTO setup (key, done_at) VALUES (?, ?)").bind(overKey(), Date.now()).run().catch(() => undefined);
+export const clearOver = (env: Env) => env.DB.prepare("DELETE FROM setup WHERE key = ?").bind(overKey()).run().catch(() => undefined);
+export const isOverNow = async (env: Env) =>
+  !!(await env.DB.prepare("SELECT 1 AS o FROM setup WHERE key = ?").bind(overKey()).first().catch(() => null));

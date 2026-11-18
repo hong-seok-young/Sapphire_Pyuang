@@ -2,11 +2,12 @@
 // 이번 달 길드 전체 AI 비용(사용 기록의 '11월 누적'과 같은 값), 내 몫(묶은 캐릭터 모두), 월 한도. 로그인한 길드원 누구나
 import { NEED_LOGIN, currentUser, json } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { monthUsd, personMonthUsd } from "../../../server/apiUsage";
+import { isOverNow, monthUsd, personMonthUsd } from "../../../server/apiUsage";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
-  const [guild, mine] = await Promise.all([monthUsd(env), personMonthUsd(env, me.chars ?? [me.id]).catch(() => 0)]);
-  return json({ month: guild.month, limit: guild.limit, guild: guild.usd, me: Math.min(mine, guild.usd) });
+  const [guild, mine, over] = await Promise.all([monthUsd(env), personMonthUsd(env, me.chars ?? [me.id]).catch(() => 0), isOverNow(env)]);
+  // over: 콘솔 월 한도에 닿아 API 가 막혔다 (챗봇이 그 오류를 받았을 때, server/apiUsage.ts markOver)
+  return json({ month: guild.month, limit: guild.limit, guild: guild.usd, me: Math.min(mine, guild.usd), over });
 };

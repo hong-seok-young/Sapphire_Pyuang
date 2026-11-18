@@ -13,7 +13,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Env } from "./auth";
 import { notify } from "./alerts";
 import { GAP_TOKEN, MAX_ANSWER, MAX_THINKING, addMsg, recordGap } from "./chatlog";
-import { errorCause, errorText, isWebOff, wellFormed } from "./chatErrors";
+import { errorCause, errorText, isOverLimit, isWebOff, wellFormed } from "./chatErrors";
+import { clearOver, markOver } from "./apiUsage";
 import { rememberAnswer } from "./chatCache";
 import { recordUsage, usageFromSse } from "./apiUsage";
 
@@ -391,6 +392,7 @@ export class ChatRun extends DurableObject<Env> {
       clearTimeout(timer);
       if (job.stopped) return;
       console.error("chat run request failed", e instanceof Anthropic.APIError ? e.status : e);
+      if (isOverLimit(e)) await markOver(env);
       await refund();
       this.push(job, errorLine(e, meta.developer));
       const watched = job.watchers.size > 0;
@@ -464,7 +466,10 @@ export class ChatRun extends DurableObject<Env> {
         console.error("chat run save failed", e);
       }
     }
-    if (savedId !== null) this.push(job, line({ type: "sapphire_saved", id: savedId }));
+    if (savedId !== null) {
+      this.push(job, line({ type: "sapphire_saved", id: savedId }));
+      await clearOver(env);
+    }
     const watched = job.watchers.size > 0;
     this.finish(job);
     // 보고 있는 화면이 없으면 알린다 (폰 알림까지)

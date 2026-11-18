@@ -5,7 +5,15 @@ import Anthropic from "@anthropic-ai/sdk";
 /** API 크레딧(요금)이 다 떨어졌다는 오류인지 (400 'Your credit balance is too low to access the Anthropic API') */
 export const isNoCredit = (e: unknown) => e instanceof Anthropic.APIError && /credit balance|billing|purchase credits/i.test(String(e.message));
 
+/** 콘솔에서 정한 월 사용 한도에 닿았다는 오류인지 ('You have reached your specified API usage limits. You will regain access on 2026-12-01 at 00:00 UTC') */
+export const isOverLimit = (e: unknown) => e instanceof Anthropic.APIError && /usage limit|spend(ing)? limit|reached your specified/i.test(String(e.message));
+
 export function errorText(e: unknown): string {
+  if (isOverLimit(e)) {
+    const m = String((e as Error).message).match(/regain access on (\d{4})-(\d{2})-(\d{2})/);
+    const when = m ? `${Number(m[2])}월 ${Number(m[3])}일에 다시 열리거나, ` : "";
+    return `이번 달 챗봇 사용 한도를 다 썼어요. ${when}앱개발자가 한도를 늘리면 다시 쓸 수 있어요`;
+  }
   if (isNoCredit(e)) return "챗봇 이용 요금이 다 떨어졌어요. 앱개발자가 충전하면 다시 쓸 수 있어요";
   if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) {
     return "챗봇 API 키에 문제가 있어요. 앱개발자에게 알려 주세요";
