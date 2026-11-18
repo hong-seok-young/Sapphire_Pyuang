@@ -666,11 +666,13 @@ function dexSpecOf(table: [string, string][]): string {
 
 function CharRow({ r, open, onToggle }: { r: TrendChar; open: boolean; onToggle: () => void }) {
   const spec = useMemo(() => dexSpecOf(r.dexTable), [r.dexTable]);
+  // 펼쳐서 보일 것(도감 계산기 칸, 도감 %)이 없는 줄은 펼치지 않는다
+  const hasBody = !!spec || Object.keys(r.collect).length > 0;
   const skills = r.skills.split(" · ").filter(Boolean);
   const dexShort = r.dex.replace(/^도감 효과 · /, "").replace(/^도감 효과$/, "");
   return (
     <li className={"trend-item" + (open ? " mk-open" : "")}>
-      <button type="button" className="trend-itemrow" onClick={onToggle}>
+      <button type="button" className="trend-itemrow" onClick={hasBody ? onToggle : undefined}>
         <span className={"trend-lv" + (r.side === "buy" ? " trend-lv-buy" : "")}>
           <small>{r.side === "buy" ? "삽니다" : "팝니다"}</small>
           <b>{r.level}</b>
@@ -696,10 +698,9 @@ function CharRow({ r, open, onToggle }: { r: TrendChar; open: boolean; onToggle:
           </span>
         </span>
       </button>
-      {open && (
+      {open && hasBody && (
         <div className="trend-itembody trend-charbody">
-          {/* 원글 첫 줄('제국 팝니다')은 뺐다 (제작자 2026-11-18 '이거도 없애'). 펼쳐도 보일 게 없는 줄만 남긴다 */}
-          {!spec && !Object.keys(r.collect).length && <div className="trend-raw muted">{r.raw}</div>}
+          {/* 원글 첫 줄('제국 팝니다', '(버섯)캐릭터판매')은 뺐다 (제작자 2026-11-18 '이거도 없애', '이건 닉넴 같은데') */}
           {Object.keys(r.collect).length > 0 && (
             <div className="trend-chips">
               {["일반", "코스튬", "라이딩"].filter((k) => k in r.collect).map((k) => (
