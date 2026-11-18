@@ -6,7 +6,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { PointerEvent } from "react";
 import { loadTrend, useAsync } from "../data";
 import type { GoldDay, Trend, TrendCat, TrendChar, TrendGroup, TrendItem, TrendPerson } from "../data";
-import { MARKET_PIC, goldWords, wonText } from "../market";
+import { MARKET_PIC, wonText } from "../market";
 import { Loading, Panel, PicImg, PixelIcon, TopBar } from "../ui";
 import type { Wiki } from "../types";
 import { filterByName } from "../search";
@@ -15,7 +15,6 @@ import { DexCostCell, DexSnippet } from "./Dex";
 
 /** 가격은 만 원 단위 (17 = 17만 원, 0.5 = 5000원) */
 const priceText = (manwon: number) => wonText(Math.round(manwon * 10_000));
-const goldText = (manwon: number, rate: number) => `≈ ${goldWords(Math.round(manwon * rate * 10_000))} 골드`;
 /** '2026-10-12' -> '10/12' */
 const md = (date: string) => date.slice(5).replace(/^0/, "").replace("-", "/").replace("/0", "/");
 
@@ -492,33 +491,46 @@ function GroupRows({ g, t, open, onToggle }: { g: TrendGroup; t: Trend; open: bo
       {open && (
         <tr className="trend-groupdetail">
           <td colSpan={5}>
-            <div className="trend-detailtitle muted">올린 사람 · {goldText(g.med, t.source.rate)}</div>
-            <PeopleChips people={g.people} value={shortWon} />
-            {g.variants.length > 1 && (
-              <>
-                <div className="trend-detailtitle muted">옵션 묶음</div>
-                <div className="trend-chips">
-                  {g.variants.map((v) => (
-                    <span key={v.label} className="trend-chip">
-                      <em>{v.label || "노작"}</em> <b>{shortWon(v.med)}</b>
-                      <small className="muted">{v.n}건</small>
-                    </span>
-                  ))}
-                </div>
-              </>
-            )}
-            <div className="trend-detailtitle muted">원글</div>
-            <ul className="trend-sample-list">
-              {g.samples.map((s, i) => (
-                <li key={i}>
-                  <span className="muted">{md(s.date)}</span> <b>{s.per ? "개당 " : ""}{shortWon(s.price)}</b> <Who who={s.who} tel={s.tel} /> <span className="trend-raw muted">{s.raw}</span>
-                </li>
-              ))}
-            </ul>
+            {/* 올린 사람 칩과 옵션 묶음은 뺐다, 원글만 캐릭터 매물처럼 열을 맞춘 표로 (제작자 2026-11-18 '너저분해, 올린 사람 리스트는 싹 없애고 원글 쪽만, 열 맞추고 클릭하면 카톡 원문') */}
+            <SampleTable samples={g.samples} msgs={t.msgs} />
           </td>
         </tr>
       )}
     </>
+  );
+}
+
+/** 원글 표: 날짜 · 가격 · 닉네임 · 글 한 줄. 줄을 누르면 그 아래 카톡 원문 전체 (스크롤 없이) */
+function SampleTable({ samples, msgs }: { samples: TrendGroup["samples"]; msgs?: Trend["msgs"] }) {
+  const [open, setOpen] = useState<number | null>(null);
+  return (
+    <ul className="ts-list">
+      <li className="ts-head" aria-hidden><span>날짜</span><span>가격</span><span>닉네임</span><span>글</span></li>
+      {samples.map((s, i) => {
+        const msg = s.m != null ? msgs?.[String(s.m)] : undefined;
+        const on = open === i;
+        return (
+          <li key={i} className={"ts-item" + (on ? " ts-open" : "")}>
+            <button type="button" className="ts-row" aria-expanded={on} onClick={() => msg && setOpen(on ? null : i)}>
+              <span className="ts-day">{md(s.date)}</span>
+              <span className="ts-price">{s.per ? <small>개당 </small> : null}{shortWon(s.price)}</span>
+              <span className="ts-who"><Who who={s.who} tel={s.tel} /></span>
+              <span className="ts-raw">{s.raw}</span>
+            </button>
+            {on && msg && (
+              <div className="trend-kakao-msg ts-msg">
+                <div className="trend-kakao-head">
+                  <b>{s.who}</b>
+                  {s.tel && <small>{s.tel}</small>}
+                  <small className="muted">{msg[1].replace(/^\d{4}-(\d{2})-(\d{2})/, (_, mo, d) => `${Number(mo)}/${Number(d)}`)}</small>
+                </div>
+                <div className="trend-kakao-text">{msg[0]}</div>
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -763,7 +775,7 @@ export function TrendPage({ wiki }: { wiki: Wiki }) {
   };
   return (
     <>
-      <TopBar title="시세 동향" right={<span className="pill trend-dev">개발중</span>} />
+      <TopBar title="시세 동향" />
       {!t ? (
         <Loading error={error?.includes("404") ? "시세 자료가 아직 없어요" : error} />
       ) : (

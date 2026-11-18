@@ -1796,7 +1796,7 @@ def item_prices(msgs: list[dict], last_week: str, rs: Resolver, side: str = "sel
         if p["side"] == side:  # 파는 사람이 부른 값과 사는 사람이 부른 값은 따로 센다 (제작자 지적 2026-11-03)
             items[p["name"]].append(dict(p))
 
-    def summary(xs: list[dict]) -> dict:
+    def summary(xs: list[dict], limit: int = 6) -> dict:
         prices = [x["price"] for x in xs]
         recent = [x["price"] for x in xs if x["date"] >= last_week]
         before = [x["price"] for x in xs if x["date"] < last_week]
@@ -1808,8 +1808,10 @@ def item_prices(msgs: list[dict], last_week: str, rs: Resolver, side: str = "sel
             if x["raw"] in seen:
                 continue
             seen.add(x["raw"])
-            samples.append({"date": x["date"], "price": x["price"], "who": x["who"], "tel": x["tel"], "raw": x["raw"], **({"per": x["per"]} if x.get("per") else {})})
-            if len(samples) >= 6:
+            # m = 원글 번호 (trend.json 의 msgs: 카톡 원문, 제작자 2026-11-18 '원글 쪽도 열 맞추고 클릭하면 카톡 원문')
+            samples.append({"date": x["date"], "price": x["price"], "who": x["who"], "tel": x["tel"], "raw": x["raw"],
+                            **({"per": x["per"]} if x.get("per") else {}), **({"m": x["mi"]} if x.get("mi") is not None else {})})
+            if len(samples) >= limit:
                 break
         return {
             "n": len(xs), "sellers": len({(x["who"], x["tel"]) for x in xs}), "people": people(xs),
@@ -1863,7 +1865,7 @@ def item_prices(msgs: list[dict], last_week: str, rs: Resolver, side: str = "sel
                 by_var[vl].append(x)
             variants = [{"label": vl, **summary(v)} for vl, v in by_var.items()]
             variants.sort(key=lambda v: (-v["n"], v["label"]))
-            groups.append({"label": label, **summary(gx), "variants": variants})
+            groups.append({"label": label, **summary(gx, 40), "variants": variants})  # 묶음을 펼치면 원글 표: 40줄까지
         groups.sort(key=lambda g: group_sort_key(kind, g))
         variants = [v for g in groups for v in g["variants"]]
         variants.sort(key=lambda v: (-v["n"], v["label"]))
@@ -2321,6 +2323,15 @@ def group_icon(it: dict, wiki_items: dict) -> None:
             return
 
 
+def sample_msgs(msgs: list[dict], items: list[dict]) -> dict[str, list[str]]:
+    """원글 표의 줄이 가리키는 카톡 글 -> {번호: [글 그대로, '2026-11-10 오후 6:02']}. 같은 글은 한 번만 넣는다"""
+    used: set[int] = set()
+    for it in items:
+        for g in [it, *it.get("groups", [])]:
+            used.update(s["m"] for s in g.get("samples", []) if "m" in s)
+    return {str(i): [msgs[i]["text"].strip(), f"{msgs[i]['date']} {msgs[i].get('time', '')}".strip()] for i in sorted(used)}
+
+
 def main() -> None:
     files = sorted(SRC.glob("*.txt")) if SRC.exists() else []
     if not files:
@@ -2370,6 +2381,7 @@ def main() -> None:
         "items": items,
         "itemsBuy": items_buy,
         "chars": chars,
+        "msgs": sample_msgs(msgs, items + items_buy),
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

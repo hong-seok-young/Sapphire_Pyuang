@@ -166,7 +166,7 @@ export function DexPage({ wiki, me }: { wiki: Wiki | null; me: Me }) {
   const { data: dex, error } = useAsync(useCallback(() => loadDex(), []), "dex");
   return (
     <>
-      <TopBar title="도감 계산기" right={<span className="pill trend-dev">개발중</span>} />
+      <TopBar title="도감 계산기" />
       {!dex ? <Loading error={error?.includes("404") ? "도감 자료가 아직 없어요" : error} /> : <DexBody dex={dex} wiki={wiki} me={me} />}
     </>
   );

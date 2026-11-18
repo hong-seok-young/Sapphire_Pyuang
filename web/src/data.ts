@@ -68,7 +68,7 @@ export interface TrendVariant {
   label: string; n: number; sellers: number; sell: number; buy: number;
   /** 가격은 만 원 (1장 = 1만 원) */
   med: number; min: number; max: number; recent: number | null; before: number | null;
-  first: string; last: string; days: [string, number][]; samples: { date: string; price: number; who: string; tel: string; raw: string; per?: number }[];
+  first: string; last: string; days: [string, number][]; samples: { date: string; price: number; who: string; tel: string; raw: string; per?: number; m?: number }[];
   /** 싼 사람부터 */
   people: TrendPerson[];
 }
@@ -115,6 +115,8 @@ export interface Trend {
   /** items = 파는 사람이 부른 값, itemsBuy = 사는 사람이 부른 값 (제작자: 파는 쪽은 비싸게, 사는 쪽은 싸게 부르니 구분) */
   items: TrendItem[]; itemsBuy: TrendItem[];
   chars: { rows: TrendChar[]; bands: TrendBand[] };
+  /** 원글 표 줄이 가리키는 카톡 글: 번호 -> [글 그대로, '2026-11-10 오후 6:02'] */
+  msgs?: Record<string, [string, string]>;
 }
 export const loadTrend = () => getJson<Trend>("trend");
 
