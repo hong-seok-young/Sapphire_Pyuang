@@ -1240,3 +1240,10 @@ CREATE TABLE IF NOT EXISTS talk_parts (
   data BLOB NOT NULL,
   PRIMARY KEY (upload_id, n)
 );
+
+-- 시세 동향 AI 검수 (제작자 2026-11-18 '무조건 AI 가 껴야 오차가 없어'): 톡방 글마다 Claude 가 읽은 물건·값 (k = 글 해시, v = {"items": [...]}). scripts/trend-ai.mjs 가 넣고 build_trend.py 가 쓴다
+CREATE TABLE IF NOT EXISTS trend_ai (
+  k TEXT PRIMARY KEY,
+  v TEXT NOT NULL,
+  at INTEGER NOT NULL
+);

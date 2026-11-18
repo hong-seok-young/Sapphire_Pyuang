@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import datetime
+import hashlib
 import json
 import os
 import math
@@ -1669,6 +1670,120 @@ def whole_char_sale(text: str) -> bool:
     return bool(WHOLE_SALE.search(text)) and not SOLD_APART.search(text)
 
 
+# AI 검수 (제작자 2026-11-18 '규칙 스크립트는 문맥 파악이 안 되잖아, 무조건 AI 가 껴야 오차가 없어'):
+# 규칙으로 읽은 뒤, 물건 값이 있거나 있을 법한 글마다 Claude 가 그 글과 앞뒤 대화를 보고 물건·강화·옵션·값(단위)·사고파는 쪽을 바로잡는다 (scripts/trend-ai.mjs).
+# 답은 글마다 계정 DB(D1 trend_ai)에 남아 한 번만 묻는다. 여기서는 그 답(TREND_AI_CACHE)이 있는 글은 규칙 대신 AI 답을 쓰고,
+# 없는 글은 규칙 그대로 두고 물을 목록(TREND_AI_TODO)에 적는다. 배포가 '빌드 -> AI 검수 -> 다시 빌드' 순서로 돌린다
+AI_VER = "t1"
+AI_DIR = Path(os.environ.get("TREND_AI_DIR") or ROOT / "web" / ".trend-ai")
+_AI_CACHE: dict | None = None
+
+
+def ai_key(m: dict) -> str:
+    return hashlib.sha1(f"{AI_VER}|{m['date']}|{m.get('time', '')}|{m['who']}|{m['tel']}|{m['text']}".encode("utf-8")).hexdigest()[:24]
+
+
+def ai_cache() -> dict:
+    global _AI_CACHE
+    if _AI_CACHE is None:
+        f = AI_DIR / "cache.json"
+        _AI_CACHE = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+    return _AI_CACHE
+
+
+def ai_candidate(text: str) -> bool:
+    """규칙이 물건을 못 읽었어도 AI 에게 보일 글: 숫자가 있고 값·사고파는 말이 있다"""
+    return bool(re.search(r"\d", text)) and bool(PRICE.search(text) or SELL.search(text) or BUY.search(text))
+
+
+def ai_records(m: dict, mi: int, res: dict, rs: Resolver, known: dict[str, tuple[bool, bool]]) -> list[dict]:
+    """AI 답 한 글 -> 규칙과 같은 모양의 물건 줄들. known = 규칙이 읽은 이름 -> (wiki, unknown) (스킬북·보석·직업 묶음처럼 규칙이 정한 이름은 그 표시 그대로)"""
+    wiki_names = set(rs.names.values())
+    nonwiki = set(v for v in NON_WIKI.values() if v)
+    out = []
+    for it in res.get("items") or []:
+        try:
+            name = str(it.get("name") or "").strip()
+            price = float(it.get("price"))
+        except (TypeError, ValueError):
+            continue
+        if not name or price <= 0:
+            continue
+        if it.get("unit") == "gold":
+            price = price / USUAL_RATE
+        if name in DROP_NAMES or _norm_name(name) in DROP_ABBR:
+            continue
+        wiki, unknown = False, False
+        if name in known:
+            wiki, unknown = known[name]
+        elif name in wiki_names:
+            wiki = True
+        elif _norm_name(name) in rs.names:
+            name, wiki = rs.names[_norm_name(name)], True
+        elif name in nonwiki or name == "펫" or "(코스튬)" in name or name in game_names().values():
+            pass
+        else:
+            r = rs.resolve(_norm_name(name))
+            if r:
+                name, wiki = r, True
+            else:
+                unknown = True
+        opts = []
+        for o in it.get("opts") or []:
+            o = re.sub(r"\s+", "", str(o))
+            opts.append(norm_opt(o) or o)
+        try:
+            enh = max(0, min(20, int(it.get("enh") or 0)))
+        except (TypeError, ValueError):
+            enh = 0
+        side = "buy" if it.get("side") == "buy" else "sell"
+        line = re.sub(r"\s+", " ", str(it.get("line") or "")).strip() or re.sub(r"\s+", " ", m["text"]).strip()
+        p = {"name": name, "wiki": wiki, "unknown": unknown, "enh": enh, "opts": opts, "price": _r(max(price, 0.001)), "bare": None, "abbr": name,
+             "date": m["date"], "side": side, "who": m["who"], "tel": m["tel"], "raw": line[:60], "mi": mi, "ai": True}
+        try:
+            if int(it.get("count") or 1) >= 2:
+                p["per"] = int(it["count"])
+        except (TypeError, ValueError):
+            pass
+        if it.get("pet"):
+            p["pet"] = str(it["pet"])[:30]
+        out.append(p)
+    return out
+
+
+def ai_todo(msgs: list[dict], rule_by_mi: dict[int, list[dict]], rs: Resolver) -> None:
+    """AI 답이 없는 글을 물을 목록으로 (앞 3개·뒤 2개 글과 같은 사람의 그날 다른 글을 문맥으로)"""
+    cache = ai_cache()
+    by_day: dict[str, list[int]] = defaultdict(list)
+    for i, m in enumerate(msgs):
+        by_day[m["date"]].append(i)
+    pos = {i: (d, k) for d, ids in by_day.items() for k, i in enumerate(ids)}
+    clip = lambda t, n: t if len(t) <= n else t[:n] + "…"
+    todo = []
+    for mi, m in enumerate(msgs):
+        if mi not in rule_by_mi and not ai_candidate(m["text"]):
+            continue
+        key = ai_key(m)
+        if key in cache:
+            continue
+        d, k = pos[mi]
+        ids = by_day[d]
+        near = ids[max(0, k - 3):k] + ids[k + 1:k + 3]
+        same = [j for j in ids if j != mi and j not in near and msgs[j]["who"] == m["who"]][:4]
+        todo.append({
+            "key": key, "date": m["date"], "time": m.get("time", ""), "who": m["who"], "text": m["text"],
+            "context": [{"who": msgs[j]["who"], "time": msgs[j].get("time", ""), "text": clip(msgs[j]["text"], 400), "same": msgs[j]["who"] == m["who"]} for j in sorted(near + same)],
+            "rule": [{"line": p["raw"], "side": p["side"], "name": p["name"], "enh": p["enh"], "opts": p["opts"], "price": p["price"],
+                      "unit": "모름(단위 없는 숫자)" if p.get("bare") is not None else "만 원", **({"per": p["per"]} if p.get("per") else {}), **({"pet": p["pet"]} if p.get("pet") else {})}
+                     for p in rule_by_mi.get(mi, [])],
+        })
+    names = sorted(set(rs.names.values()) | set(game_names().values()) | {v for v in NON_WIKI.values() if v} | {p["name"] for ps in rule_by_mi.values() for p in ps})
+    slang = {k: v for k, v in {**ALIASES, **NON_WIKI}.items() if v}
+    AI_DIR.mkdir(parents=True, exist_ok=True)
+    (AI_DIR / "todo.json").write_text(json.dumps({"ver": AI_VER, "rate": USUAL_RATE, "names": names, "slang": slang, "drop": sorted(DROP_NAMES | DROP_ABBR), "todo": todo}, ensure_ascii=False), encoding="utf-8")
+    print("시세 동향 AI 검수", {"answered": sum(1 for i, m in enumerate(msgs) if ai_key(m) in cache), "todo": len(todo)})
+
+
 def all_lines(msgs: list[dict], rs: Resolver) -> list[dict]:
     """모든 글의 물건 줄 (팝니다·삽니다 같이, 한 번만 만든다). 글 단위로 문맥을 본다:
     - 단위를 밝힌 글은 그 단위로 (GOLD_UNIT_MSG)
@@ -1758,6 +1873,19 @@ def all_lines(msgs: list[dict], rs: Resolver) -> list[dict]:
                 if not united.get((p["side"], p["name"])):
                     p["price"], p["bare"] = _r(max(p["bare"] / USUAL_RATE, 0.001)), None
 
+    # AI 검수: 답이 있는 글은 규칙 대신 AI 가 읽은 것, 없는 글은 물을 목록으로
+    rule_by_mi: dict[int, list[dict]] = defaultdict(list)
+    for p in out:
+        rule_by_mi[p["mi"]].append(p)
+    cache = ai_cache()
+    answered = {mi for mi, m in enumerate(msgs) if ai_key(m) in cache}
+    known = {p["name"]: (p["wiki"], False) for p in out if not p.get("unknown")}
+    if answered:
+        out = [p for p in out if p["mi"] not in answered]
+        for mi in sorted(answered):
+            out.extend(ai_records(msgs[mi], mi, cache[ai_key(msgs[mi])], rs, known))
+    if os.environ.get("TREND_AI_TODO", "1") != "0":
+        ai_todo(msgs, rule_by_mi, rs)
     out = [p for p in out if p["name"] not in DROP_NAMES and p.get("abbr") not in DROP_ABBR]
     # 제작자가 원글을 보고 바로잡은 값 (자료 `시세/톡방_고침.json`: 누가·날짜·줄 -> 값(만 원), 값이 null 이면 뺀다. 오타로 적힌 글)
     fixes = line_fixes()
