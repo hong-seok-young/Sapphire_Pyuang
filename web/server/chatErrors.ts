@@ -2,7 +2,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 /** 길드원에게 보여 줄 오류 글 */
+/** API 크레딧(요금)이 다 떨어졌다는 오류인지 (400 'Your credit balance is too low to access the Anthropic API') */
+export const isNoCredit = (e: unknown) => e instanceof Anthropic.APIError && /credit balance|billing|purchase credits/i.test(String(e.message));
+
 export function errorText(e: unknown): string {
+  if (isNoCredit(e)) return "챗봇 이용 요금이 다 떨어졌어요. 앱개발자가 충전하면 다시 쓸 수 있어요";
   if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) {
     return "챗봇 API 키에 문제가 있어요. 앱개발자에게 알려 주세요";
   }
@@ -22,3 +26,23 @@ export function errorCause(e: unknown): string {
 /** 웹 찾기를 쓸 수 없는 계정(콘솔에서 꺼 둔 경우)이라 웹 없이 다시 물어야 하는 오류인지 */
 export const isWebOff = (e: unknown) =>
   (e instanceof Anthropic.BadRequestError || e instanceof Anthropic.PermissionDeniedError) && /web_(search|fetch)|tool/i.test(String(e.message));
+
+/**
+ * 글자 속 짝 잃은 서로게이트(이모지를 반쯤 자른 것)를 � 로 바꾼다. 그대로 보내면 API 가 요청 본문을 JSON 으로 못 읽는다
+ * (2026-11-18 '…unexpected end of hex escape at line 1 column 83931', 400: 자료를 글자 수로 자른 곳이 이모지 한가운데를 잘랐다)
+ */
+export function wellFormed<T>(v: T): T {
+  if (typeof v === "string") {
+    const s = v as string;
+    const ok = (s as unknown as { isWellFormed?: () => boolean }).isWellFormed?.();
+    if (ok === true) return v;
+    return s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "\uFFFD") as unknown as T;
+  }
+  if (Array.isArray(v)) return v.map((x) => wellFormed(x)) as unknown as T;
+  if (v && typeof v === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, x] of Object.entries(v as Record<string, unknown>)) out[k] = wellFormed(x);
+    return out as T;
+  }
+  return v;
+}

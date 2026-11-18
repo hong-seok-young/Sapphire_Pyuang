@@ -23,7 +23,7 @@ import { costContext } from "../../../server/chatCost";
 import { libraryContext } from "../../../server/library";
 import { addMsg, finishInBackground, newThread, ownThread, runStub, titleOf } from "../../../server/chatlog";
 import { cacheKey, cachedAnswer, cachedSse, routeSame, similarQuestion } from "../../../server/chatCache";
-import { errorCause, errorText, isWebOff } from "../../../server/chatErrors";
+import { errorCause, errorText, isWebOff, wellFormed } from "../../../server/chatErrors";
 import type { RunStart } from "../../../server/chatRun";
 
 /** 챗봇 모델. 바꾸려면 이 줄만 고친다 (더 싸게: "claude-sonnet-5-5", 가장 싸게: "claude-haiku-5-5") */
@@ -278,7 +278,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
 
   const ask = (web: boolean) =>
     client.beta.messages
-      .create({ ...params(web), stream: true } as unknown as Anthropic.Beta.Messages.MessageCreateParamsStreaming)
+      .create({ ...wellFormed(params(web)), stream: true } as unknown as Anthropic.Beta.Messages.MessageCreateParamsStreaming)
       .asResponse(); // 키, 한도 같은 오류는 답을 흘려보내기 전에 알 수 있다
   let upstream: Response;
   let web = true;

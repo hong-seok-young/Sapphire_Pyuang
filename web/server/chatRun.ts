@@ -13,7 +13,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Env } from "./auth";
 import { notify } from "./alerts";
 import { GAP_TOKEN, MAX_ANSWER, MAX_THINKING, addMsg, recordGap } from "./chatlog";
-import { errorCause, errorText, isWebOff } from "./chatErrors";
+import { errorCause, errorText, isWebOff, wellFormed } from "./chatErrors";
 import { rememberAnswer } from "./chatCache";
 import { recordUsage, usageFromSse } from "./apiUsage";
 
@@ -366,7 +366,7 @@ export class ChatRun extends DurableObject<Env> {
     });
     const ask = (params: Record<string, unknown>) =>
       client.beta.messages
-        .create({ ...params, stream: true } as unknown as Anthropic.Beta.Messages.MessageCreateParamsStreaming, { signal: job.ctrl.signal })
+        .create({ ...wellFormed(params), stream: true } as unknown as Anthropic.Beta.Messages.MessageCreateParamsStreaming, { signal: job.ctrl.signal })
         .asResponse();
     const refund = () =>
       env.DB.prepare("UPDATE chat_usage SET count = count - 1 WHERE user_id = ? AND day = ? AND count > 0")
