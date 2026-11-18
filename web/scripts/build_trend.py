@@ -841,6 +841,27 @@ def item_chunk(c: str) -> bool:
 _GAME: dict[str, str] | None = None
 
 
+_DBN = None
+
+
+def db_names() -> dict[str, str]:
+    """게임 상점(상점/*.json)과 거래소 녹화(시세/암거래중개인)에 나온 물건 이름: 띄어쓰기 없는 모양 -> 이름 (앞의 '+7' 은 뗌)"""
+    global _DBN
+    if _DBN is None:
+        _DBN = {}
+        files = list((DATA / "상점").glob("*.json")) + list((DATA / "시세" / "암거래중개인").glob("*/*.json"))
+        for f in files:
+            try:
+                text = f.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            for nm in re.findall(r'"(?:name|이름)"\s*:\s*"([^"]+)"', text):
+                nm = re.sub(r"^\+\d+\s*", "", nm).strip()
+                if nm:
+                    _DBN.setdefault(_nk(nm), nm)
+    return _DBN
+
+
 def game_names() -> dict[str, str]:
     """게임 속 이름 (도감 정보 사전, 영상에서 오린 아이콘 목록): 띄어쓰기 없는 모양 -> 화면 이름 ('얼기설기 고양이 (코스튬)', '쿠라다 (가방)').
     톡방에 게임 이름을 그대로 적은 물건은 '정보없음'이 아니다 (제작자 2026-11-12 '더 모르는 거 말해 줘')"""
@@ -1725,6 +1746,15 @@ def ai_records(m: dict, mi: int, res: dict, rs: Resolver, known: dict[str, tuple
         elif _norm_name(name) in rs.names:
             name, wiki = rs.names[_norm_name(name)], True
         elif name in nonwiki or name == "펫" or "(코스튬)" in name or name in game_names().values():
+            pass
+        elif _nk(name) in db_names():
+            # 게임 상점·거래소 녹화에 있는 이름 ('시온의 무기 패키지', '스톰 브레이커')
+            name = db_names()[_nk(name)]
+        elif _nk(name) in game_names():
+            # 게임 도감 사전의 이름 (띄어쓰기·'(코스튬)' 꼬리만 다른 것: '현철도' -> '현철도 (코스튬)')
+            name = game_names()[_nk(name)]
+        elif re.fullmatch(r"\S.*\s[1-5]단", name):
+            # 스킬북 'N단' ('더블샷 4단' = 덥마북): 규칙의 스킬북 이름과 같은 모양
             pass
         else:
             r = rs.resolve(_norm_name(name))
