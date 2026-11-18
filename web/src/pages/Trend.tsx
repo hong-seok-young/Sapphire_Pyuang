@@ -698,7 +698,8 @@ function CharRow({ r, open, onToggle }: { r: TrendChar; open: boolean; onToggle:
       </button>
       {open && (
         <div className="trend-itembody trend-charbody">
-          <div className="trend-raw muted">{r.raw}</div>
+          {/* 원글 첫 줄('제국 팝니다')은 뺐다 (제작자 2026-11-18 '이거도 없애'). 펼쳐도 보일 게 없는 줄만 남긴다 */}
+          {!spec && !Object.keys(r.collect).length && <div className="trend-raw muted">{r.raw}</div>}
           {Object.keys(r.collect).length > 0 && (
             <div className="trend-chips">
               {["일반", "코스튬", "라이딩"].filter((k) => k in r.collect).map((k) => (
