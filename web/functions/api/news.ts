@@ -100,6 +100,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
         `WHERE o.created_at > ?1 AND r.owner IN ${MINE} AND o.user_id NOT IN ${MINE} AND o.status = 'pledged' AND r.status != 'done'`,
       floor("requests"),
     ),
+    // 개선 접수: 다른 사람이 보낸 새 접수를 접수마다 ('fixr:<접수>', 처리하는 사람만, 쪽 = 상태). 새 일이라 그 접수를 펼치면 지운다
+    // (제작자 2026-11-18 '봤는데 안 사라져': 처음엔 처리할 일로 세어 열어 봐도 남았다. 색인 fix_reports_at)
+    ...(fixStaffer
+      ? [q(`SELECT 'fixr:' || id AS k, 'fix.new' AS c, created_at AS t, status AS s FROM fix_reports WHERE created_at > ?1 AND user_id NOT IN ${MINE}`, floor("fix.new"))]
+      : []),
     // 개선 접수 대화: 다른 사람이 쓴 대화를 접수마다 ('fixt:<접수>'). 처리하는 사람은 모든 접수, 그 밖에는 내 접수만 (색인 fix_talk_at)
     q(
       `SELECT 'fixt:' || t.report_id AS k, 'fix.talk' AS c, t.created_at AS t, r.status AS s FROM fix_talk t JOIN fix_reports r ON r.id = t.report_id ` +
@@ -179,8 +184,6 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
           ),
         ]
       : []),
-    // 개선 접수: 아직 손대지 않은 접수 수 (처리할 일이라 본 때와 상관없이 남은 만큼, 색인 fix_reports_status)
-    ...(fixStaffer ? [q("SELECT COUNT(*) AS n FROM fix_reports WHERE status = 'new'")] : []),
     // 1군 담당자가 더 준 코인 중 아직 팝업으로 안 본 것 (1군 성장코인샵이 열린 뒤에만, 지금 캐릭터). 성장코인샵 칸과 1군 단추에 배지
     env.DB.prepare(
       "SELECT COUNT(*) AS n FROM gc_ledger WHERE user_id = ?1 AND kind = 'adjust' AND delta > 0 AND grp = 1 AND created_at > ?2 " +
@@ -223,7 +226,6 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
     counts["gcoin.staff"] = Number(g.g2 ?? 0);
     counts["gcoin.staff1"] = Number(g.g1 ?? 0);
   }
-  if (fixStaffer) counts["fix.new"] = n(results[i++]);
   counts["gcoin.gift"] = n(results[i++]);
   const maint = results[i++];
   const checked = results[i++];

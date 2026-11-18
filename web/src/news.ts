@@ -34,7 +34,7 @@ export const KEYS = [
   "gcoin.staff1",
   // 1군 성장코인샵: 담당자가 더 준 코인 중 아직 팝업으로 안 본 것 (서버가 센다, 들어가서 팝업을 닫으면 0)
   "gcoin.gift",
-  // 개선 접수: 아직 손대지 않은 접수 수 (처리하는 사람, 서버가 본 때와 상관없이 센다)
+  // 개선 접수: 다른 사람이 보낸 새 접수를 접수마다 ('fixr:<접수>', 처리하는 사람, 그 접수를 펼치면 지운다)
   "fix.new",
   // 개선 접수 대화: 다른 사람이 쓴 대화를 접수마다 ('fixt:<접수>', 그 접수를 펼치면 지운다)
   "fix.talk",
@@ -73,6 +73,7 @@ export const THING_KEYS: NewsKey[] = [
   "rent.list",
   "rent.apps",
   "rent.staff",
+  "fix.new",
   "fix.talk",
 ];
 const isThingKey = (k: NewsKey) => THING_KEYS.includes(k);

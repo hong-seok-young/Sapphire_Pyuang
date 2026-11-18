@@ -40,7 +40,7 @@ export default function FixDeskPage({ me, mine, query, wiki }: { me: Me; mine: b
   const [error, setError] = useState("");
   const [open, setOpen] = useEntryState<number | null>("fix.open", null);
   const [tick, setTick] = useState(0);
-  const news = useNews();
+  useNews(); // 배지가 바뀌면 다시 그린다
   const asked = useRef(false);
 
   // 알림으로 들어오면 (?r=번호) 그 접수가 있는 칸으로 가서 펼친다
@@ -95,7 +95,7 @@ export default function FixDeskPage({ me, mine, query, wiki }: { me: Me; mine: b
               <button key={s} className={"pill" + (status === s && kind !== "chat" ? " pill-on" : "")} onClick={() => (setStatus(s), kind === "chat" && setKind("all"))}>
                 {STATUS_NAME[s]}
                 {s !== "done" && countOf(s) > 0 && <small> {countOf(s)}</small>}
-                <NewsDot n={(s === "new" ? news["fix.new"] : 0) + newsSide("fix.talk", (x) => x === s)} />
+                <NewsDot n={newsSide("fix.new", (x) => x === s) + newsSide("fix.talk", (x) => x === s)} />
               </button>
             ))}
           </div>
@@ -175,7 +175,7 @@ function FixRow({
             <i className={"fx-kind fx-kind-" + r.kind}>{KIND_SHORT[r.kind]}</i>
             {mine && <i className={"fx-st fx-st-" + r.status}>{STATUS_NAME[r.status]}</i>}
             <span className="fx-menu">{r.menu}</span>
-            <ThingDot k={`fixt:${r.id}`} />
+            <ThingDot k={[`fixr:${r.id}`, `fixt:${r.id}`]} />
           </span>
           <span className="fx-row-text">{r.text}</span>
           <span className="fx-row-meta">
@@ -207,6 +207,7 @@ function FixDetail({ r, me, staff, onChanged }: { r: FixReport; me: Me; staff: b
   const [del, setDel] = useState(false);
   // 열었을 때: 그 전에 본 때 (그 뒤에 남이 쓴 대화에 N)
   const [since] = useState(() => thingSince(`fixt:${r.id}`));
+  // 펼치면 새 접수·새 대화 배지를 지운다 (배지 규칙: 새 일은 그 줄을 열어야 사라진다)
   const load = () =>
     fixOne(r.id).then(
       (x) => setTalk(x.talk),
@@ -214,7 +215,7 @@ function FixDetail({ r, me, staff, onChanged }: { r: FixReport; me: Me; staff: b
     );
   useEffect(() => {
     void load();
-    markThingSeen(`fixt:${r.id}`);
+    markThingSeen(`fixr:${r.id}`, `fixt:${r.id}`);
     const t = window.setInterval(() => !document.hidden && void load(), 20_000);
     return () => window.clearInterval(t);
   }, [r.id]);

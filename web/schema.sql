@@ -1188,6 +1188,7 @@ CREATE TABLE IF NOT EXISTS fix_reports (
 );
 CREATE INDEX IF NOT EXISTS fix_reports_status ON fix_reports (status, created_at);
 CREATE INDEX IF NOT EXISTS fix_reports_user ON fix_reports (user_id, created_at);
+CREATE INDEX IF NOT EXISTS fix_reports_at ON fix_reports (created_at);
 CREATE TABLE IF NOT EXISTS fix_shots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   report_id INTEGER NOT NULL,
