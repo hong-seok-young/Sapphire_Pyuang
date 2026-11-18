@@ -1,6 +1,6 @@
 // 톡방 올리기 (#/talk, 앱개발자·길드마스터. 제작자 2026-11-18 '오픈톡방 대화 내보내기를 공유 한 번으로', '깃 아이모 데이터에 쌓이게, 이전 톡방 일자 이후 것만').
 // 카톡 '대화 내보내기 → 공유 → Sapphire'(manifest share_target, public/sw.js) 로 오거나 파일을 골라 올린다.
-// 올린 글은 30분 안에 GitHub Actions(scripts/talk-import.mjs)가 자료 저장소 카톡/ 에 새 날짜 것만 더하고, 그 뒤 배포가 시세 동향·챗봇에 넣는다
+// 올린 글은 한 시간 안에 자료 저장소(sapphire-imo-data)의 Actions(talk-import.yml, scripts/talk_import.mjs) 가 자료 저장소 카톡/ 에 새 날짜 것만 더하고, 그 뒤 배포가 시세 동향·챗봇에 넣는다
 import { useEffect, useRef, useState } from "react";
 import { fileText, listTalkUploads, readTalk, takeShared, uploadTalk } from "../talk";
 import type { TalkFile, TalkUploadRow } from "../talk";
@@ -76,7 +76,7 @@ export default function TalkUploadPage({ query }: { query: URLSearchParams }) {
           </div>
         </div>
       )}
-      {sent && <p className="tu-sent">올렸어요 · 30분 안에 자료 저장소에 새 날짜 것만 더해져요</p>}
+      {sent && <p className="tu-sent">올렸어요 · 한 시간 안에 자료 저장소에 새 날짜 것만 더해져요</p>}
       {error && <p className="form-error">{error}</p>}
       {!file && (
         <button className="btn tu-pick" onClick={() => pick.current?.click()}>

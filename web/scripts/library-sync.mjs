@@ -82,7 +82,7 @@ function walk(dir) {
 }
 
 // 넣을 파일: 글 파일, 뺄 것 빼고. 카톡은 방마다 한 글로: 그 방 파일들을 날짜마다 가장 새 파일의 글로 이어 붙여 가장 새 파일 이름으로 넣는다
-// (톡방 올리기 scripts/talk-import.mjs 가 앞 파일 이후 날짜만 새 파일로 더해서, 가장 새 파일만 넣으면 앞의 글이 빠진다. 시세 동향 build_trend.py 와 같은 규칙)
+// (톡방 올리기 (자료 저장소 scripts/talk_import.mjs) 가 앞 파일 이후 날짜만 새 파일로 더해서, 가장 새 파일만 넣으면 앞의 글이 빠진다. 시세 동향 build_trend.py 와 같은 규칙)
 let files = walk(ROOT)
   .map((f) => relative(ROOT, f).split(sep).join("/"))
   .filter((p) => TEXT.test(p) && !SKIP.some((re) => re.test(p)));

@@ -1,5 +1,5 @@
 // 톡방 올리기 (제작자 2026-11-18): 카톡 '대화 내보내기 → 공유'에서 Sapphire 웹앱을 고르거나 파일을 골라 올리면 D1 에 잠깐 두고,
-// GitHub Actions(scripts/talk-import.mjs)가 자료 저장소 카톡/ 에 새 날짜 것만 더해 올린다. 화면 src/pages/TalkUpload.tsx, 표 schema.sql talk_uploads·talk_parts
+// 자료 저장소(sapphire-imo-data)의 Actions(talk-import.yml, scripts/talk_import.mjs) 가 한 시간에 한 번 (비밀값 없이 GitHub OIDC, api/talk-upload/pending.ts) 자료 저장소 카톡/ 에 새 날짜 것만 더해 올린다. 화면 src/pages/TalkUpload.tsx, 표 schema.sql talk_uploads·talk_parts
 import { RANK } from "./auth";
 import type { Env, User } from "./auth";
 import { notify } from "./alerts";

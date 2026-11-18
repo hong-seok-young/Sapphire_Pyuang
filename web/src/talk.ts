@@ -1,5 +1,5 @@
 // 톡방 올리기 (제작자 2026-11-18): 카톡 '대화 내보내기' 글을 읽어 보이고 gzip 으로 서버에 보낸다 (server/talkUpload.ts).
-// 자료 저장소에 더하는 일은 GitHub Actions 의 scripts/talk-import.mjs (같은 날짜 읽기 규칙, scripts/talkDays.mjs)
+// 자료 저장소에 더하는 일은 자료 저장소(sapphire-imo-data)의 Actions(talk-import.yml, scripts/talk_import.mjs) (같은 날짜 읽기 규칙, scripts/talkDays.mjs)
 import { api } from "./auth";
 
 export interface TalkFile {

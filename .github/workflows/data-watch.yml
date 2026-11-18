@@ -52,37 +52,12 @@ jobs:
         working-directory: web
         run: npm ci
 
-      # 톡방 올리기 (제작자 2026-11-18, scripts/talk-import.mjs): 화면(#/talk)에서 올린 카톡 대화 내보내기를 자료 저장소 카톡/ 에 새 날짜 것만 더한다.
-      # 쓰기 권한이 있는 토큰(DATA_REPO_WRITE_TOKEN: sapphire-imo-data 의 Contents 읽기·쓰기)이 있어야 올린다. 실행 기록에는 수만 찍는다
-      - name: Talk uploads waiting
-        id: talkwait
-        working-directory: web
-        run: node scripts/talk-import.mjs --check
-
-      - name: Data repo (talk folder, write)
-        if: steps.talkwait.outputs.pending == '1'
-        uses: actions/checkout@v4
-        with:
-          repository: hong-seok-young/sapphire-imo-data
-          token: ${{ secrets.DATA_REPO_WRITE_TOKEN || secrets.DATA_REPO_TOKEN || github.token }}
-          path: 자료-talk
-          fetch-depth: 1
-          sparse-checkout: 카톡
-          persist-credentials: true
-
-      - name: Talk uploads
-        id: talk
-        if: steps.talkwait.outputs.pending == '1'
-        working-directory: web
-        run: node scripts/talk-import.mjs ../자료-talk
-
       - name: Deploy if the data changed
         working-directory: web
         env:
           GH_TOKEN: ${{ github.token }}
-          TALK_SHA: ${{ steps.talk.outputs.sha }}
         run: |
-          sha="${TALK_SHA:-$(git -C ../자료 rev-parse HEAD)}"
+          sha="$(git -C ../자료 rev-parse HEAD)"
           if node scripts/data-watch.mjs "$sha"; then
             gh workflow run deploy-web.yml --repo "$GITHUB_REPOSITORY" --ref main
             echo "자료 저장소 ${sha:0:7} 이 바뀌어 배포를 불렀어요"

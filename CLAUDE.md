@@ -993,10 +993,13 @@
     안드로이드 크롬으로 깐 웹앱만, 아이폰·PC 는 화면의 '파일 고르기'. zip 이면 안의 txt). 서비스 워커가 없을 때는 `functions/share-target.ts` 가 화면으로 보낸다.
   - 톡방 올리기 화면 (`#/talk`, `src/pages/TalkUpload.tsx`·`src/talk.ts`, 앱개발자·길드마스터, 설정의 '자료' 묶음): 방 이름·기간·글 수를 보고 '올리기' -> gzip 으로 `POST /api/talk-upload`(`server/talkUpload.ts`) ->
     D1 `talk_uploads`(기다림·올림·새 글 없음·실패와 결과 한 줄) · `talk_parts`(1.5MB 조각). 아래 '올린 기록'.
-  - 30분마다 `data-watch.yml` 이 `scripts/talk-import.mjs` 로 기다리는 것을 가져와 자료 저장소 `카톡/<방>_<오늘>.txt` 에 **그 방의 마지막 날짜부터의 글만** 넣어 커밋·올리고(방은 글 첫 줄 방 이름으로 이미 있는 파일과 맞춤,
-    마지막 날짜 하루는 통째로 다시: 시세 동향·챗봇이 날짜마다 가장 새 파일의 글을 쓰므로), 조각을 지우고 올린 사람에게 알림 'talk_up'. 같은 실행이 그 커밋으로 배포를 부른다 -> 시세 동향(`build_trend.py`)·챗봇 자료(`library-sync.mjs`).
-    새 글이 없으면 '새 글 없음'. 저장소 비밀값 **`DATA_REPO_WRITE_TOKEN`**(sapphire-imo-data Contents 읽기·쓰기)이 있어야 올린다: 없으면 기다림으로 두고 다음 실행에 다시 (알림은 처음 한 번).
-    날짜 나누기는 `scripts/talkDays.mjs`. 실행 기록에는 수만 찍는다.
+  - 한 시간에 한 번(매시 7분) **자료 저장소의** Actions `talk-import.yml`(`자료/scripts/talk_import.mjs`, 날짜 나누기는 같은 `talkDays.mjs` 두 벌: 앱 `web/scripts/` 와 자료 `scripts/`, 고치면 둘 다)이
+    `GET /api/talk-upload/pending`(`functions/api/talk-upload/pending.ts`)으로 기다리는 것을 받아 자료 저장소 `카톡/<방>_<오늘>.txt` 에 **그 방의 마지막 날짜부터의 글만** 넣어 커밋·올리고(방은 글 첫 줄 방 이름으로 이미 있는 파일과 맞춤,
+    마지막 날짜 하루는 통째로 다시: 시세 동향·챗봇이 날짜마다 가장 새 파일의 글을 쓰므로), `POST` 로 결과를 알리면 사이트가 조각을 지우고 올린 사람에게 알림 'talk_up'. 새 글이 없으면 '새 글 없음'.
+    **비밀값이 없다** (제작자 2026-11-18 '너가 해': 쓰기 토큰을 만들 수 없어서): 자료 저장소에 쓰는 것은 그 작업의 GITHUB_TOKEN(contents: write), 사이트는 GitHub 이 서명한 OIDC 토큰을 확인한다
+    (`server/ghOidc.ts`: RS256·GitHub JWKS, 저장소 sapphire-imo-data · main · 작업 파일 talk-import.yml · audience 'sapphire-talk'). 커밋 이름 'Sapphire 톡방 올리기'.
+    올라가면 앱 저장소 `data-watch.yml`(30분마다)이 새 커밋을 보고 배포를 부른다 -> 시세 동향(`build_trend.py`)·챗봇 자료(`library-sync.mjs`). 비공개 저장소라 Actions 시간을 써서 한 시간에 한 번(한 달 720분 안팎, 무료 2,000분).
+    실행 기록에는 수만 찍는다.
   - 매주 일요일 20:47(한국 시간) `talk-remind.yml` -> `POST /api/talk-upload/remind`(주마다 한 번) -> 앱개발자에게 '톡방 내보내기 할 때예요' 알림(누르면 `#/talk`).
   - 시세 동향·챗봇에 넣는 것은 AI 가 아니라 규칙 스크립트(GitHub Actions)다. Claude API 는 누가 챗봇에 물을 때 그 조각을 읽는 데만 쓴다.
   - 로컬 시험 2026-11-18 (`scratchpad talk/ui.cjs`·`up.mjs`, `TALK_LOCAL=<persist>` 로 import): 320px 파일 고르기·올리기, 서비스 워커 공유 받기, 길드원 403, 임시 git 저장소에 11/10~ 만 커밋, 같은 파일 다시 올리면 새 글 없음, 날짜 하나 더하면 그날만, 챗봇 이어 붙이기 겹친 날 0.
