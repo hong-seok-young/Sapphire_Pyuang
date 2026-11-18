@@ -584,23 +584,29 @@ function ItemsPanel({ t, wiki }: { t: Trend; wiki: Wiki }) {
   );
 }
 
-type CharFilter = "all" | "char" | "bundle";
-const CHAR_FILTERS: { key: CharFilter; label: string }[] = [
-  { key: "all", label: "전체" },
-  { key: "char", label: "캘" },
-  { key: "bundle", label: "템통" },
+type CharSort = "price" | "level" | "recent";
+const CHAR_SORTS: { key: CharSort; label: string }[] = [
+  { key: "price", label: "금액순" },
+  { key: "level", label: "레벨순" },
+  { key: "recent", label: "최신순" },
 ];
 
-/** 캐릭터 시세: 레벨대별 한 줄 요약과 캐릭터 줄 (레벨, 서버·직업·캘/템통, 닉, 스킬·보석·쟁·도감 칩, 도감 요약, 가격) */
+/** 캐릭터 시세: 정렬(금액·레벨·최신)과 캐릭터 줄 (레벨, 진영·직업·닉네임·가격 열, 템통·스킬·보석·쟁·도감 칩, 도감 값, 마지막 날짜) */
 function CharsPanel({ t }: { t: Trend }) {
   // 도감 계산기에 갔다가 뒤로 오면 보던 칸·펼친 줄 그대로 (제작자 2026-11-18)
   const [side, setSide] = useEntryState<"sell" | "buy">("trend.charSide", "sell");
-  const [filter, setFilter] = useEntryState<CharFilter>("trend.charFilter", "all");
   const [shown, setShown] = useEntryState("trend.charShown", PAGE);
   const [opened, setOpened] = useEntryState<string[]>("trend.charOpen", []);
-  const bySide = t.chars.rows.filter((r) => r.side === side);
-  const ofScope = (f: CharFilter) => bySide.filter((r) => (f !== "char" || r.scope === "캘") && (f !== "bundle" || r.scope === "템통"));
-  const rows = ofScope(filter);
+  const bySide = useMemo(() => t.chars.rows.filter((r) => r.side === side), [t, side]);
+  const [csort, setCsort] = useEntryState<{ k: CharSort; up: boolean }>("trend.charSort", { k: "recent", up: false });
+  const rows = useMemo(() => {
+    const val = (r: TrendChar) => (csort.k === "price" ? r.price : csort.k === "level" ? r.level : r.last);
+    return [...bySide].sort((a, b) => {
+      const x = val(a), y = val(b);
+      const c = x < y ? -1 : x > y ? 1 : 0;
+      return csort.up ? c : -c;
+    });
+  }, [bySide, csort]);
   return (
     <Panel>
       <div className="mk-sub trend-strip">
@@ -612,24 +618,20 @@ function CharsPanel({ t }: { t: Trend }) {
             </button>
           ))}
         </div>
-        <div className="mk-cats">
-          {CHAR_FILTERS.map((f) => (
-            <button key={f.key} type="button" className={"sub-tab" + (filter === f.key ? " sub-tab-on" : "")} onClick={() => { setFilter(f.key); setShown(PAGE); }}>
-              {f.label} <small>{ofScope(f.key).length}</small>
-            </button>
-          ))}
-        </div>
+        {/* 캘·템통 칩은 뺐다: 대부분 글에 둘 다 안 적혀 합이 전체가 안 됐다 (제작자 2026-11-18). 템통이라고 적은 글만 줄에 '템통' 칩 */}
       </div>
-      {/* 레벨대별 팝니다 중간값 (템통 제외) */}
-      {side === "sell" && filter !== "bundle" && t.chars.bands.length > 0 && (
-        <div className="trend-bands">
-          {t.chars.bands.map((b) => (
-            <span key={b.band} className="trend-gchip">
-              <em>{b.band}</em> {shortWon(b.med)} <small className="muted">{b.n}개 · {shortWon(b.min)}~{shortWon(b.max)}</small>
-            </span>
-          ))}
-        </div>
-      )}
+      {/* 레벨대 칩은 뺐다. 금액순 · 레벨순 · 최신순, 다시 누르면 오름·내림 (제작자 2026-11-18) */}
+      <div className="trend-sortline">
+        {CHAR_SORTS.map((f) => {
+          const on = csort.k === f.key;
+          return (
+            <button key={f.key} type="button" className={on ? "on" : ""} aria-pressed={on}
+              onClick={() => { setCsort(on ? { k: f.key, up: !csort.up } : { k: f.key, up: false }); setShown(PAGE); }}>
+              {f.label}{on ? (csort.up ? " ▲" : " ▼") : ""}
+            </button>
+          );
+        })}
+      </div>
       <ul className="mk-list trend-list">
         {rows.length > 0 && (
           <li className="trend-charhead" aria-hidden>
