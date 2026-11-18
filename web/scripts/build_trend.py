@@ -1646,6 +1646,27 @@ def line_fixes() -> list[dict]:
     return [x for x in json.loads(f.read_text(encoding="utf-8")).get("고침", []) if x.get("누가") and x.get("줄")]
 
 
+# 캐릭터 판매 글 속 물건 (제작자 2026-11-18 '캐릭터 판매글에 있는 내용은 거래가 불가능한 템들이 그 캐릭터 안에 있다고 설명하는 게 대부분, 시세 동향에 안 띄워도 돼'):
+# - '길드주화 12만 보유', '플티 17만 보유중' 처럼 가진 것을 적은 줄은 파는 물건이 아니다
+# - 캐릭터를 통으로 파는 글('통으로 600 팝니다 각개문의X', '통 가격 300', '몸800, 통1030')의 물건 값은 통 값을 나눠 적은 것이라 뺀다.
+#   '각개중', '각개 예약 받습니다' 처럼 따로도 판다고 했거나, '(버섯)아이템 판매' 같은 머리 줄 아래의 물건은 그대로 센다
+OWNED_LINE = re.compile(r"보유|소지|장착\s?중|착용\s?중")
+CHAR_POST_WORD = re.compile(r"올마|와마|프마|덥마|쉴마|노도감|저도감|도감\s?\d|쟁캐|쟁캘|(?<![가-힣])캘|캐릭|템통|몸\s?\d|몸만|몸\s?팝")
+CHAR_POST_LEVEL = re.compile(r"(?<![\d.+])[2-6]\d\s?(?:렙|랩|레벨)(?![가-힣])|(?:렙|랩|레벨|Lv\.?)\s?[2-6]\d(?![\d.])")
+WHOLE_SALE = re.compile(r"템통|통\s?(?:가격|으로|값)?\s?:?\s?\d|통\s?\d+\s?(?:장|콩)")
+SOLD_APART = re.compile(r"각개(?!\s*(?:문의)?\s*(?:x|X|불가|안\s?(?:함|해|됨|돼)|노|ㄴ|없))|개별\s?(?:판매|가능)|따로\s?(?:판매|팝|가능)")
+ITEM_SECTION = re.compile(r"아이템\s?(?:판매|팝)|(?<![가-힣])템\s?(?:판매|팝)|템도\s?(?:팝|판매|팔)|장비\s?판매")
+
+
+def whole_char_sale(text: str) -> bool:
+    """캐릭터를 통으로 파는 글이고 물건을 따로 판다는 말이 없다"""
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    head = "\n".join(lines[:4])
+    if not (CHAR_POST_WORD.search(text) and (LEVEL_JOB.search(head) or CHAR_POST_LEVEL.search(head) or LEVEL_FIRST.search(head))):
+        return False
+    return bool(WHOLE_SALE.search(text)) and not SOLD_APART.search(text)
+
+
 def all_lines(msgs: list[dict], rs: Resolver) -> list[dict]:
     """모든 글의 물건 줄 (팝니다·삽니다 같이, 한 번만 만든다). 글 단위로 문맥을 본다:
     - 단위를 밝힌 글은 그 단위로 (GOLD_UNIT_MSG)
@@ -1660,6 +1681,7 @@ def all_lines(msgs: list[dict], rs: Resolver) -> list[dict]:
         t = m["text"]
         msg_side = side_of(t.split("\n")[0]) or side_of(t)
         gold_msg = bool(GOLD_UNIT_MSG.search(t))
+        char_sale = whole_char_sale(t)  # 통으로 파는 캐릭터 글: 아이템 판매 머리 줄 전까지 물건 값은 세지 않는다
         cur = ""  # 앞 문단의 머리 줄에서 이어진 쪽
         paras: list[tuple[int, int, list[dict]]] = []  # (숫자 든 줄 수, 값이 읽힌 줄 수, 물건들)
         for para in re.split(r"\n\s*\n", t):
@@ -1670,6 +1692,10 @@ def all_lines(msgs: list[dict], rs: Resolver) -> list[dict]:
             head = ""  # 이 문단에서 본 머리 줄
             after_char = False  # 바로 앞줄이 캐릭터 파는 줄 ('제국 쟁 44 투쉴마 법사 32/35')
             for line in para.split("\n"):
+                if char_sale and ITEM_SECTION.search(line):
+                    char_sale = False
+                if OWNED_LINE.search(line) or char_sale or (LEVEL_JOB.search(line) and WHOLE_SALE.search(line)):
+                    continue
                 was_char, after_char = after_char, bool(LEVEL_JOB.search(line) and re.search(r"\d\s*(장|콩)?\s*[ㅍㅅ]*\s*$", line))
                 own = side_of(line)
                 if own and not re.search(r"\d", line) and len(re.findall(r"[가-힣]", line)) <= 10:
