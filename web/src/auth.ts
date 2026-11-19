@@ -70,6 +70,8 @@ export interface Me {
   shopOpen?: boolean;
   /** 1군 성장코인샵 오픈 (담당자가 켠다) */
   gcoin1Open?: boolean;
+  /** 도감 계산기 완료 체크를 아직 서버에 백업하지 않은 사람 (server/dexBackup.ts) */
+  dexBackupAsk?: boolean;
 }
 
 /** 같은 사람의 캐릭터 하나 (부캐 묶기, 제작자 요청 2026-11-01) */
