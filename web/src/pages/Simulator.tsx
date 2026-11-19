@@ -1666,8 +1666,9 @@ function StatInner(p: {
     setType(pick(others).name);
     setFx((f) => ({ kind: "ok", n: (f?.n ?? 0) + 1 }));
   };
-  const per = STATS.find((x) => x.k === p.stat)?.per ?? 1;
-  const shown = pet ? (p.type ? `${p.type} +${stage}` : stage ? `+${stage}` : "옵션 없음") : stage ? `${p.stat} ${stage * per}` : `${p.stat} 0`;
+  // 체력·마나는 한 단계에 10씩 (힘·민첩·지능은 1씩). 펫은 옵션 종류가 정해진 뒤에
+  const per = STATS.find((x) => x.k === (pet ? p.type : p.stat))?.per ?? 1;
+  const shown = pet ? (p.type ? `${p.type} +${stage * per}` : stage ? `+${stage}` : "옵션 없음") : `${p.stat} +${stage * per}`;
   const left = stepsExpected(st, stage);
   return (
     <div className="sim">
@@ -1767,8 +1768,8 @@ function StatInner(p: {
         {step && stage < st.max ? (
           <OddsBar
             parts={[
-              { p: step.a, tone: "ok", label: "+1" },
-              { p: step.b, tone: "gold", label: "+2" },
+              { p: step.a, tone: "ok", label: `+${per}` },
+              { p: step.b, tone: "gold", label: `+${per * 2}` },
               { p: 1 - step.a - step.b, tone: "keep", label: "유지" },
             ]}
           />
@@ -1798,7 +1799,7 @@ function StatInner(p: {
         items={[
           { label: "시도", value: p.stats.tries },
           { label: "성공", value: p.stats.ok, tone: "sim-good" },
-          { label: "+2", value: p.stats.big, tone: "sim-gold" },
+          { label: `+${per * 2}`, value: p.stats.big, tone: "sim-gold" },
         ]}
       />
       <RankBox rec={rec} title={st.name} />
