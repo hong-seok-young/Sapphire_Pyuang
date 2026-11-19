@@ -426,6 +426,15 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   const tot = price ? totals(todoListed.filter((e) => e.effects.length > 0).flatMap((e) => e.items), price, pset) : null;
 
 
+  // 내 도감: 채운 비용(완료한 항목을 지금 시세로 친 값)과 남은 비용 (제작자 2026-11-19 '내 도감은 남은 비용과 채운 비용도 보게'). 고른 최저가 기준(평소·이벤트), 효과 없는 항목은 뺀다
+  const mineCost = useMemo(() => {
+    if (!price || other) return null;
+    const eff = dex.entries.filter((e) => e.effects.length > 0);
+    const sum = (list: DexEntry[]) => totals(list.flatMap((e) => e.items), price, pset).by[basis].sum;
+    const doneN = dex.entries.filter((e) => myDone.has(e.name)).length;
+    return { done: sum(eff.filter((e) => myDone.has(e.name))), todo: sum(eff.filter((e) => !myDone.has(e.name))), doneN, todoN: dex.entries.length - doneN };
+  }, [dex, myDone, price, pset, basis, other]);
+
   return (
     <div className="dex">
       <nav className="pill-row dex-mode" role="tablist">
@@ -436,6 +445,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
           다른 캐릭
         </button>
       </nav>
+      {!other && mineCost && <MineCost c={mineCost} />}
       <StatPanel other={other} have={have} full={full} over={over} setOver={setOver} sel={sel} onPick={pickStat} doneN={doneEntries.length} total={dex.entries.length}
         goalOf={price ? exactGoalOf : null} stepsOf={(k) => planFor(k).map((x) => x.v)} withEv={withEv} setWithEv={setWithEv} />
 
@@ -850,6 +860,32 @@ function NumIn({ value, def, onSet, label, ro }: { value: number | undefined; de
 /** 도감 비용 (제작자 요청 2026-11-11): 지금 목록의 미완료 칸을 다 채우는 골드. 칸마다 '골드로 장비 사기'와 '장비스탬프' 중 싼 쪽을 더한다.
  *  평소와 아바돈 이벤트(스탬프가 싸진다)를 나란히, 이벤트 때 아끼는 골드. 아래에서 마법서·스탬프·플래티넘 값을 직접 고친다 */
 /** 가장 큰 단위의 정수로: 59.7억 -> '60억', 8008.3만 -> '8008만' (제작자 2026-11-12 '정수 단위 반올림') */
+/** 내 도감 맨 위: 채운 비용 | 남은 비용 과 채운 비율 막대 */
+function MineCost({ c }: { c: { done: number; todo: number; doneN: number; todoN: number } }) {
+  const { data: market } = useAsync(useCallback(() => fetchMarket(), []), "market");
+  const rate = market?.goldRate || 75;
+  const all = c.done + c.todo;
+  const pct = all > 0 ? Math.round((c.done / all) * 100) : 0;
+  return (
+    <div className="dex-mine">
+      <div className="dex-mine-col dex-mine-done">
+        <small>채운 비용 · {c.doneN.toLocaleString("ko-KR")}개</small>
+        <b>{intUnit(c.done)}</b>
+        <small className="muted">{intUnit(c.done / rate)}원</small>
+      </div>
+      <div className="dex-mine-col">
+        <small>남은 비용 · {c.todoN.toLocaleString("ko-KR")}개</small>
+        <b>{intUnit(c.todo)}</b>
+        <small className="muted">{intUnit(c.todo / rate)}원</small>
+      </div>
+      <div className="dex-mine-bar" aria-label={`채운 비율 ${pct}%`}>
+        <i style={{ width: `${pct}%` }} />
+        <span>{pct}%</span>
+      </div>
+    </div>
+  );
+}
+
 function intUnit(v: number): string {
   if (v >= 1e8) return `${Math.round(v / 1e8).toLocaleString("ko-KR")}억`;
   if (v >= 1e4) return `${Math.round(v / 1e4).toLocaleString("ko-KR")}만`;
