@@ -33,11 +33,8 @@
 .sim-hud-delta { position: absolute; left: 30px; top: -2px; font-style: normal; font-size: 12px; font-weight: 700; color: var(--red); text-shadow: 1px 1px 0 var(--edge); pointer-events: none; opacity: 0; animation: sim-delta 0.9s ease-out; }
 .sim-hud-plus { color: #7ee2a8; }
 @keyframes sim-delta { 0% { opacity: 0; transform: translateY(6px); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-16px); } }
-.sim-hud-chips { flex: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
-.sim-hud-chips i { font-style: normal; font-size: 10px; line-height: 1.5; padding: 0 5px; white-space: nowrap; }
 .sim-hud-today { color: var(--edge); background: #7ee2a8; }
 .sim-hud-streak { color: var(--edge); background: #ffb24a; }
-.sim-title { color: #d9bcff; border: 1px solid rgba(199, 155, 255, 0.55); }
 /* 도는 동전 */
 .sim-coin-pic { position: relative; display: block; width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle at 38% 35%, #fff3c4 0 18%, #ffc35c 20% 60%, #d98b2a 62% 100%);
   box-shadow: 0 0 0 2px var(--edge), inset 0 0 0 2px rgba(217, 139, 42, 0.9); animation: sim-coin-flip 3.6s ease-in-out infinite; }
@@ -63,9 +60,6 @@
 .sim-q-done small { color: #7ee2a8; }
 .sim-ticker { overflow: hidden; padding: 2px 0; background: rgba(255, 195, 92, 0.08); border-top: 1px solid rgba(255, 195, 92, 0.3); }
 .sim-ticker-run { display: flex; width: max-content; gap: 24px; animation: sim-tick linear infinite; }
-.sim-tick { white-space: nowrap; font-size: 11px; }
-.sim-tick b { color: var(--gold); }
-.sim-tick small { color: #c79bff; }
 @keyframes sim-tick { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 /* 알림 한 장 (도전 완료, 판 장비) */
 .sim-cheer { position: fixed; left: 50%; bottom: calc(var(--tab-h) + 24px + env(safe-area-inset-bottom)); z-index: 60; display: grid; justify-items: center; min-width: 160px; margin-left: -80px; padding: 6px 14px 8px; text-align: center;
@@ -76,11 +70,8 @@
 
 /* ---------------------------------------------------------------- 고르는 띠 */
 .sim-strip { margin: 0; }
-.sim-strip .mk-cats, .sim-shop-filter .mk-cats { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; }
-.sim-sep { width: 1px; height: 12px; margin: 0 2px; background: rgba(169, 162, 207, 0.35); }
-.sim-ev { margin-left: auto; color: var(--gold); }
-.sim-secs { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
-.sim-secs .sub-tab { max-width: 100%; white-space: normal; text-align: left; }
+.sim-ev { color: var(--gold); }
+.sim-ev:disabled { opacity: 0.3; }
 
 /* ---------------------------------------------------------------- 무대 (강화 · 성장): 도는 빛살, 떠오르는 불티, 그림 틀과 강화도 빛 */
 .sim-anvil { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 6px; padding: 6px 10px 10px; overflow: hidden;
@@ -304,41 +295,15 @@
 .sim-locked li small { position: absolute; right: 1px; bottom: 0; font-size: 8px; line-height: 1.2; color: var(--muted); }
 
 /* ---------------------------------------------------------------- 순위 */
-.sim-rank, .sim-king, .sim-earn, .sim-dex { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; padding: 7px 9px; }
-.sim-rank-row, .sim-king-row { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 7px; align-items: center; padding: 2px 0; font-size: 12px; }
-.sim-rank-row em, .sim-king-row em { grid-row: 1 / 3; display: grid; place-items: center; width: 18px; height: 18px; font-style: normal; font-size: 11px; color: var(--muted); background: rgba(11, 10, 26, 0.6); }
-.sim-rank-row > small { grid-column: 3; grid-row: 1; text-align: right; color: #c79bff; font-size: 11px; white-space: nowrap; }
-.sim-rank-row > b { grid-column: 2 / 4; grid-row: 2; font-size: 12px; font-weight: 400; color: var(--text); }
-.sim-rank-row > em { grid-column: 1; }
-.sim-rank-row > .sim-rank-who { grid-column: 2; grid-row: 1; }
-.sim-rank-who { min-width: 0; color: var(--muted); }
-.sim-rank-1 em { color: var(--edge); background: var(--gold); box-shadow: 0 0 6px rgba(255, 195, 92, 0.7); animation: sim-blink 2.4s ease-in-out infinite; }
-.sim-rank-2 em { color: var(--edge); background: #d8dbe8; }
-.sim-rank-3 em { color: var(--edge); background: #e0a070; }
-.sim-rank-1 > b { color: var(--gold); }
-.sim-rank-mine { background: rgba(111, 143, 255, 0.12); }
-.sim-king-row > b { font-size: 16px; color: var(--gold); text-align: right; text-shadow: 1px 1px 0 var(--edge); }
-.sim-king-row .sim-rank-who { color: var(--text); font-size: 13px; }
-.sim-king-parts { grid-column: 2 / 4; display: flex; flex-wrap: wrap; gap: 3px; }
-.sim-king-parts i { font-style: normal; font-size: 10px; padding: 0 4px; color: var(--muted); background: rgba(11, 10, 26, 0.5); }
-.sim-king .sim-rank-1 { background: linear-gradient(90deg, rgba(255, 195, 92, 0.16), transparent); }
-.sim-first-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; padding: 2px 0; font-size: 12px; border-bottom: 1px solid rgba(74, 63, 134, 0.3); }
-.sim-first-row small { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }
-.sim-first-row em { font-style: normal; color: #c79bff; }
+.sim-rank, .sim-earn, .sim-dex { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; padding: 7px 9px; }
 /* 옵션 목록의 레벨 표 (이노티아의 축복 'Lv.30~43') */
 .sim-pick-tag { display: inline-block; margin-left: 5px; padding: 0 4px; font-style: normal; font-weight: 400; font-size: 10px; line-height: 1.5; color: var(--muted); border: 1px solid rgba(169, 162, 207, 0.3); vertical-align: 1px; white-space: nowrap; }
 /* 강화 비용 순위: 보는 강화도 − +8 +, 줄의 코인 */
 .sim-rank-step { display: flex; align-items: center; gap: 4px; margin-left: auto; align-self: center; }
 .sim-rank-step .pill { display: grid; place-items: center; min-width: 26px; padding: 1px 0; font-size: 13px; }
 .sim-rank-step b { min-width: 30px; text-align: center; color: var(--gold); font-size: 13px; animation: sim-pop 0.25s ease-out; }
-.sim-rank-row > b.sim-rank-cost { color: var(--gold); font-weight: 700; }
-.sim-first-row em .sim-c { vertical-align: 0; }
 .sim-avg-now { color: var(--gold); }
 /* 강화 도감 */
-.sim-dex-strip { margin: 0; }
-.sim-dex-strip .mk-cats { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
-.sim-dex-strip .sub-tab small { margin-left: 3px; font-size: 10px; color: var(--muted); }
-.sim-dex-strip .sub-tab-on small { color: var(--edge); }
 .sim-dex-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 3px; }
 .sim-dex-grid li { position: relative; display: grid; justify-items: center; padding: 3px 2px 2px; background: rgba(11, 10, 26, 0.45); border: var(--px) solid var(--edge); }
 .sim-dex-grid li b { font-size: 11px; line-height: 1.2; color: var(--gold); }
@@ -549,52 +514,187 @@ button.sim-card { cursor: pointer; }
 .sim-avgs > span { display: flex; align-items: center; gap: 4px; font-size: 13px; }
 .sim-avgs .sim-gem-dot { width: 14px; height: 14px; }
 
-/* ---------------------------------------------------------------- 옵션 재설정 창: 게임의 '원하는 옵션을 선택하세요' 화면 그대로 (제작자 2026-11-19 스샷, 자료 이미지/시뮬레이터/옵션_재설정_화면_20261119.webp) */
-.rs-back { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; padding: 24px 12px; background: rgba(6, 5, 18, 0.62); animation: rs-fade 0.15s ease-out; }
-@keyframes rs-fade { from { opacity: 0; } }
-.rs-wrap { position: relative; width: min(100%, 360px); animation: rs-in 0.28s cubic-bezier(0.2, 1.5, 0.4, 1); }
-@keyframes rs-in { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: none; opacity: 1; } }
-.rs-title { position: absolute; left: 50%; top: 0; z-index: 2; transform: translate(-50%, -50%); min-width: 62%; padding: 7px 18px; text-align: center; font-size: 15px; font-weight: 800; color: #fff;
-  background: linear-gradient(#6c6aa6, #4a477f); border: 3px solid #a9b4d4; border-radius: 14px; box-shadow: 0 0 0 2px #2c2a55; text-shadow: 0 1px 0 #2c2a55; white-space: nowrap; }
-.rs-frame { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 30px 14px 16px; color: #2b3150;
-  background: #e1e8f3; border: 3px solid #b6c2d9; border-radius: 10px; box-shadow: 0 0 0 2px #7d8aa8, inset 0 0 0 4px #eef3fa, inset 0 0 0 5px #b6c2d9; }
-.rs-rv { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #8f9bb9; box-shadow: inset 0 0 0 2px #cfd8ea; }
-.rs-tl { left: 7px; top: 7px; }
-.rs-tr { right: 7px; top: 7px; }
-.rs-bl { left: 7px; bottom: 7px; }
-.rs-br { right: 7px; bottom: 7px; }
-.rs-ask { margin: 0; text-align: center; font-size: 14px; font-weight: 700; }
-.rs-item { display: flex; align-items: center; justify-content: center; gap: 10px; min-width: 0; }
-.rs-icon { display: grid; place-items: center; flex: none; width: 52px; height: 52px; background: #eef3fb; border: 3px solid #8f9bb9; border-radius: 8px; box-shadow: 0 0 10px rgba(255, 255, 255, 0.9); }
-.rs-icon .sim-pic { width: 44px; height: 44px; }
-.rs-name { min-width: 0; font-size: 17px; font-weight: 800; color: #6cf23a;
-  text-shadow: -1.5px 0 #1d4a14, 1.5px 0 #1d4a14, 0 -1.5px #1d4a14, 0 1.5px #1d4a14, 1.5px 1.5px #1d4a14, -1.5px -1.5px #1d4a14, 1.5px -1.5px #1d4a14, -1.5px 1.5px #1d4a14; }
-.rs-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.rs-panel { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; overflow: hidden;
-  background: #e9eff8; border: 2px solid #8f9bb9; border-radius: 8px; box-shadow: 0 0 0 1px #d3dbea; transition: transform 80ms ease-out; }
-.rs-ph { display: block; padding: 6px 4px; text-align: center; font-size: 14px; font-weight: 800; color: #2b3150; background: #9db0c9; border-bottom: 2px solid #8f9bb9; }
-.rs-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; padding: 7px 12px; font-size: 14px; font-weight: 700; }
-.rs-row b { font-size: 15px; font-variant-numeric: tabular-nums; }
-/* 신규 옵션 값은 한 줄씩 톡 떨어진다 */
-.rs-panel:nth-child(2) .rs-row b { animation: sim-land 0.4s cubic-bezier(0.2, 1.8, 0.4, 1) both; }
-.rs-panel:nth-child(2) .rs-row:nth-child(2) b { animation-delay: 0.25s; }
-.rs-panel:nth-child(2) .rs-row:nth-child(3) b { animation-delay: 0.4s; }
-.rs-panel:nth-child(2) .rs-row:nth-child(4) b { animation-delay: 0.55s; }
-.rs-panel:nth-child(2) .rs-row:nth-child(n + 5) b { animation-delay: 0.7s; }
-.rs-panel:active { transform: scale(0.97); }
-.rs-on { border-color: #e0a526; box-shadow: 0 0 0 2px #ffd25c, 0 0 10px rgba(255, 190, 60, 0.7); }
-.rs-on .rs-ph { background: #e8c565; border-bottom-color: #e0a526; }
-.rs-ok { justify-self: center; width: min(62%, 190px); padding: 11px 0; font: inherit; font-size: 15px; font-weight: 800; color: #fff; cursor: pointer; background: #6a7497; border: 3px solid #4a5273; border-radius: 8px; box-shadow: inset 0 3px 0 #8791b3, 0 2px 0 #3a4160; }
-.rs-ok:active { transform: translateY(1px); }
-.rs-ok:disabled { opacity: 0.55; cursor: default; }
-@media (max-width: 360px) { .rs-row { padding: 6px 8px; font-size: 13px; } .rs-name { font-size: 15px; } }
+/* ---------------------------------------------------------------- 한 줄 단추 띠 (제작자 2026-11-19 '버튼들이 두 줄로 돼 있는 거 싹 한 줄로'): 같은 폭 칸, 줄이 바뀌지 않는다 */
+.sim-strip { margin: 0; gap: 4px; }
+.sim-row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; min-width: 0; }
+.sim-row > .sub-tab { min-width: 0; padding: 5px 0; font-size: 12px; text-align: center; white-space: nowrap; overflow: hidden; }
+.sim-row-6 > .sub-tab, .sim-row-7 > .sub-tab { font-size: 11px; letter-spacing: -0.4px; }
+.sim-row-8 > .sub-tab, .sim-row-9 > .sub-tab { font-size: 10px; letter-spacing: -0.6px; }
+.sim-row > .sub-tab:active { transform: translateY(1px); }
+.sim-row > .sub-tab-on { animation: sim-pop 0.22s ease-out; }
+.sim-row-x { grid-auto-columns: auto; grid-template-columns: repeat(4, minmax(0, 1fr)) 26px; }
+.sim-row-x > .sim-shop-x { margin: 0; width: auto; height: auto; }
+.sim-secs { display: grid; gap: 3px; margin: 0; }
+.sim-secs-1 { grid-template-columns: minmax(0, 1fr); }
+.sim-secs-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sim-secs-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sim-secs-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.sim-secs .sub-tab { min-width: 0; padding: 4px 2px; font-size: 11px; line-height: 1.25; white-space: normal; text-align: center; background: rgba(11, 10, 26, 0.5); }
+.sim-secs .sub-tab-on { background: var(--sunset); }
+.sim-dex-strip { margin: 0; }
+.sim-fold-b .sim-dex-grid { margin-top: 2px; }
+
+/* ---------------------------------------------------------------- 맨 위 줄: 코인 · 계급 · 오늘의 도전 */
+.sim-hud-rank { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; padding: 0 2px; font: inherit; text-align: left; color: var(--text); background: none; border: 0; cursor: pointer; }
+.sim-hud-rank:active { transform: translateY(1px); }
+.sim-hud-up .rk { animation: sim-land 0.5s cubic-bezier(0.2, 1.8, 0.4, 1); }
+.sim-hud-up .sim-hud-rkname { animation: rk-name-up 1.1s ease-out; }
+@keyframes rk-name-up { 0% { color: #fff; transform: translateY(5px); } 30% { color: #fff; transform: none; } 100% { transform: none; } }
+.sim-hud-rk { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; min-width: 0; }
+.sim-hud-rkname { font-size: 12px; line-height: 1.15; font-weight: 700; color: var(--rk-l, var(--text)); text-shadow: 1px 1px 0 var(--edge); white-space: nowrap; }
+.sim-hud-bar { display: block; height: 4px; background: rgba(7, 6, 15, 0.7); box-shadow: 0 0 0 1px rgba(169, 162, 207, 0.25); overflow: hidden; }
+.sim-hud-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--rk-c, var(--gold)), var(--rk-l, #fff3c4)); transform-origin: left; transition: transform 0.35s ease-out; }
+.sim-tick { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-size: 11px; }
+.sim-tick b { color: var(--gold); font-weight: 400; }
+.sim-tick-up b { color: var(--rk-l); font-weight: 700; }
+.sim-tick-up b::before { content: "▲ "; font-size: 9px; }
+
+/* 코인 버는 곳 (맨 위 코인을 누르면 아래에서 올라온다) */
+.sim-sheet-back { position: fixed; inset: 0; z-index: 300; display: flex; align-items: flex-end; justify-content: center; background: rgba(6, 5, 18, 0.66); animation: sim-fade 0.15s ease-out; }
+.sim-sheet { width: min(100%, 520px); max-height: 82vh; overflow-y: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 10px 10px calc(12px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 3px solid var(--gold); box-shadow: 0 -8px 0 rgba(0, 0, 0, 0.3); animation: sim-sheet 0.22s cubic-bezier(0.2, 1.2, 0.4, 1); }
+.sim-sheet-h { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.sim-sheet-h > b { font-size: 20px; line-height: 1; color: var(--gold); text-shadow: 2px 2px 0 var(--edge); }
+.sim-sheet-h > i { font-style: normal; font-size: 11px; line-height: 1.5; padding: 0 6px; white-space: nowrap; }
+@keyframes sim-fade { from { opacity: 0; } }
+@keyframes sim-sheet { from { transform: translateY(40px); opacity: 0; } }
+
+/* ---------------------------------------------------------------- 시뮬레이터 안의 이번 주 순위 (작게, 한 줄씩) */
+.sim-rank-row { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 2px 0; font-size: 12px; }
+.sim-rank-row > em { flex: none; display: grid; place-items: center; width: 18px; height: 18px; font-style: normal; font-size: 11px; color: var(--muted); background: rgba(11, 10, 26, 0.6); }
+.sim-rank-who { flex: 1; min-width: 0; color: var(--text); }
+.sim-rank-v { flex: none; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.sim-rank-1 > em { color: var(--edge); background: var(--gold); box-shadow: 0 0 6px rgba(255, 195, 92, 0.7); animation: sim-blink 2.4s ease-in-out infinite; }
+.sim-rank-2 > em { color: var(--edge); background: #d8dbe8; }
+.sim-rank-3 > em { color: var(--edge); background: #e0a070; }
+.sim-rank-1 > .sim-rank-v { color: var(--gold); }
+.sim-rank-mine { background: rgba(111, 143, 255, 0.12); }
+
+/* ---------------------------------------------------------------- 옵션 재설정: 전 · 후 두 칸 (누르면 그쪽이 내 옵션), 좋은 쪽 자동 */
+.sim-items-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sim-ba { display: grid; grid-template-columns: minmax(0, 1fr) 12px minmax(0, 1fr); align-items: stretch; gap: 3px; }
+.sim-ba-arrow { align-self: center; width: 0; height: 0; border: 6px solid transparent; border-left-color: var(--muted); border-right: 0; animation: sim-nudge 1.2s ease-in-out infinite; }
+@keyframes sim-nudge { 50% { transform: translateX(3px); } }
+.sim-ba-card { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 2px; min-width: 0; padding: 5px 8px 6px; font: inherit; text-align: left; color: var(--text); background: rgba(11, 10, 26, 0.55); border: 2px solid rgba(169, 162, 207, 0.3); cursor: pointer; transition: opacity 0.2s; }
+.sim-ba-card:disabled { cursor: default; }
+.sim-ba-card:not(:disabled):active { transform: scale(0.97); }
+.sim-ba-h { justify-self: start; padding: 0 6px; font-style: normal; font-size: 10px; line-height: 1.5; color: var(--edge); background: var(--muted); }
+.sim-ba-new .sim-ba-h { background: #7ee2a8; }
+.sim-ba-row { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; min-width: 0; font-size: 12px; color: var(--muted); }
+.sim-ba-row > b { font-size: 17px; line-height: 1.1; color: var(--text); text-shadow: 1px 1px 0 var(--edge); font-variant-numeric: tabular-nums; }
+.sim-ba-new .sim-ba-row { animation: sim-drop 0.3s ease-out both; }
+.sim-ba-p { justify-self: end; font-size: 10px; line-height: 1.3; }
+.sim-ba-u { border-color: rgba(111, 143, 255, 0.6); }
+.sim-ba-r { border-color: rgba(199, 155, 255, 0.75); }
+.sim-ba-r .sim-ba-row > b { color: #d9bcff; }
+.sim-ba-sr { border-color: var(--gold); }
+.sim-ba-sr .sim-ba-row > b { color: var(--gold); }
+.sim-ba-new.sim-ba-sr { animation: sim-land 0.45s cubic-bezier(0.2, 1.8, 0.4, 1); }
+.sim-ba-on { background: rgba(255, 195, 92, 0.14); box-shadow: 0 0 0 2px var(--gold), 0 0 12px rgba(255, 195, 92, 0.45); }
+.sim-ba-off { opacity: 0.5; }
+.sim-ba-ask.sim-ba-new::after { content: ""; position: absolute; inset: -2px; border: 2px solid #7ee2a8; pointer-events: none; animation: rk-pulse 1.3s ease-in-out infinite; }
+.sim-ba-ok { position: absolute; right: 5px; top: 5px; width: 13px; height: 13px; background: var(--gold); clip-path: polygon(8% 52%, 22% 38%, 40% 58%, 78% 16%, 92% 30%, 40% 86%); animation: sim-pop 0.3s cubic-bezier(0.2, 1.8, 0.4, 1); }
+.sim-oline-c { padding-top: 4px; gap: 2px; }
+.sim-oline-c .sim-ohead { min-height: 0; }
+.sim-oline-c .sim-oname { font-size: 10px; }
+.sim-tile-was { box-shadow: inset 0 0 0 1px #8fb0ff; }
+.sim-tile-was::before { content: "전"; position: absolute; left: 1px; top: 0; z-index: 2; font-size: 8px; line-height: 1.2; color: #8fb0ff; }
+.sim-check { display: flex; align-items: center; justify-content: center; gap: 7px; }
+.sim-check-box { flex: none; position: relative; width: 14px; height: 14px; background: rgba(7, 6, 15, 0.7); box-shadow: 0 0 0 2px var(--muted); }
+.sim-check-on { color: var(--gold); }
+.sim-check-on .sim-check-box { box-shadow: 0 0 0 2px var(--gold); }
+.sim-check-on .sim-check-box::after { content: ""; position: absolute; inset: 1px; background: var(--gold); clip-path: polygon(8% 52%, 22% 38%, 40% 58%, 78% 16%, 92% 30%, 40% 86%); animation: sim-pop 0.25s cubic-bezier(0.2, 1.8, 0.4, 1); }
+.sim-actions-hunt { grid-template-columns: minmax(0, 1fr) auto; }
+
+/* ---------------------------------------------------------------- 계급장 (pages/SimBadge.tsx): 재질이 오를수록 움직임이 하나씩 더해진다. 모두 transform·opacity */
+.rk { position: relative; display: inline-block; flex: none; vertical-align: middle; line-height: 0; }
+.rk > svg { position: relative; display: block; width: 100%; height: 100%; overflow: visible; }
+.rk-dim { opacity: 0.45; filter: grayscale(0.7); }
+.rk-glow { position: absolute; inset: -22%; border-radius: 50%; background: radial-gradient(circle, var(--rk-l) 0, transparent 64%); opacity: 0.3; animation: rk-breathe 2.6s ease-in-out infinite; pointer-events: none; }
+.rk-rainbow { position: absolute; inset: -10%; border-radius: 50%; background: conic-gradient(#ff7a9a, #ffd36e, #8ef0b0, #7cc4ff, #c79bff, #ff7a9a); opacity: 0.6; filter: blur(2px); animation: rk-spin 6s linear infinite; pointer-events: none; }
+.rk-rays { position: absolute; inset: -42%; border-radius: 50%; background: repeating-conic-gradient(var(--rk-l) 0 5deg, transparent 5deg 30deg); opacity: 0.3; -webkit-mask: radial-gradient(circle, #000 28%, transparent 68%); mask: radial-gradient(circle, #000 28%, transparent 68%); animation: rk-spin 16s linear infinite; pointer-events: none; }
+.rk-ring { position: absolute; inset: -16%; border-radius: 50%; border: 1px dashed var(--rk-l); opacity: 0.75; animation: rk-spin 10s linear infinite; pointer-events: none; }
+.rk-ring-2 { inset: -30%; border-style: dotted; opacity: 0.5; animation-duration: 15s; animation-direction: reverse; }
+.rk-shine { position: absolute; inset: 0; overflow: hidden; clip-path: polygon(16.7% 11.5%, 83.3% 11.5%, 83.3% 73%, 56% 92%, 44% 92%, 16.7% 73%); pointer-events: none; }
+.rk-shine > i { position: absolute; top: -10%; bottom: -10%; left: -70%; width: 40%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent); transform: skewX(-18deg); animation: rk-shine var(--rk-t, 4.5s) ease-in-out infinite; }
+.rk-spark { position: absolute; width: 22%; aspect-ratio: 1; margin: -11% 0 0 -11%; background: #fff; clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%); opacity: 0; animation: rk-twinkle 2.1s ease-in-out infinite; pointer-events: none; }
+@keyframes rk-breathe { 0%, 100% { opacity: 0.18; transform: scale(0.92); } 50% { opacity: 0.5; transform: scale(1.06); } }
+@keyframes rk-spin { to { transform: rotate(360deg); } }
+@keyframes rk-shine { 0%, 50% { transform: skewX(-18deg) translateX(0); } 100% { transform: skewX(-18deg) translateX(520%); } }
+@keyframes rk-twinkle { 0%, 100% { opacity: 0; transform: scale(0.3) rotate(0deg); } 45% { opacity: 1; transform: scale(1) rotate(45deg); } 70% { opacity: 0; transform: scale(0.4) rotate(90deg); } }
+
+/* ---------------------------------------------------------------- 순위 줄과 내 계급 카드: 테두리와 움직임이 계급(재질)에 따라 더해진다
+   rk-f0 나무·무쇠·청동: 왼쪽 띠만 / rk-f1 은·금: 테두리 / rk-f2 에메랄드·사파이어: 빛이 지나감 / rk-f3 루비·자수정: 둘레 빛이 숨 쉼 / rk-f4 오팔: 도는 무지개 테두리 / rk-f5 우주: 별이 반짝 */
+.rk-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.rk-row { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 5px 9px 5px 7px; overflow: hidden; background: rgba(11, 10, 26, 0.55); border: var(--px) solid var(--edge); box-shadow: inset 3px 0 0 var(--rk-c); isolation: isolate; }
+.rk-row > * { position: relative; z-index: 1; }
+.rk-row > .rk-row-fx { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.rk-pos { flex: none; display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 3px; font-style: normal; font-size: 12px; color: var(--muted); background: rgba(7, 6, 15, 0.6); }
+.rk-top-1 .rk-pos { color: var(--edge); background: var(--gold); box-shadow: 0 0 8px rgba(255, 195, 92, 0.8); }
+.rk-top-2 .rk-pos { color: var(--edge); background: #d8dbe8; }
+.rk-top-3 .rk-pos { color: var(--edge); background: #e0a070; }
+.rk-who { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.rk-nick { font-size: 13px; line-height: 1.25; min-width: 0; }
+.rk-name { font-size: 10px; line-height: 1.3; color: var(--rk-l); letter-spacing: -0.2px; }
+.rk-gain { flex: none; font-size: 13px; color: var(--gold); text-shadow: 1px 1px 0 var(--edge); font-variant-numeric: tabular-nums; }
+.rk-row-me { background: rgba(111, 143, 255, 0.16); }
+.rk-row-me .rk-nick { font-weight: 700; }
+.rk-f1, .rk-f2, .rk-f3, .rk-f4, .rk-f5 { border-color: var(--rk-c); box-shadow: inset 0 0 0 1px rgba(7, 6, 15, 0.6); }
+.rk-f1 { background: linear-gradient(90deg, color-mix(in srgb, var(--rk-c) 16%, transparent), rgba(11, 10, 26, 0.55) 60%); }
+.rk-f2, .rk-f3, .rk-f4, .rk-f5 { background: linear-gradient(90deg, color-mix(in srgb, var(--rk-c) 26%, transparent), rgba(11, 10, 26, 0.6) 70%); }
+.rk-f2 > .rk-row-fx::before, .rk-f3 > .rk-row-fx::before, .rk-f4 > .rk-row-fx::before, .rk-f5 > .rk-row-fx::before { content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--rk-l) 45%, transparent), transparent); animation: rk-sweep 4.2s ease-in-out infinite; }
+.rk-f3 > .rk-row-fx::before { animation-duration: 3.2s; }
+.rk-f4 > .rk-row-fx::before, .rk-f5 > .rk-row-fx::before { animation-duration: 2.4s; }
+.rk-f3 > .rk-row-fx::after, .rk-f4 > .rk-row-fx::after, .rk-f5 > .rk-row-fx::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 12px var(--rk-c), inset 0 0 0 1px var(--rk-l); animation: rk-pulse 2.2s ease-in-out infinite; }
+.rk-f3 .rk-name, .rk-f4 .rk-name, .rk-f5 .rk-name { font-weight: 700; }
+.rk-f4, .rk-f5 { border-color: transparent; }
+.rk-f4::before, .rk-f5::before { content: ""; position: absolute; left: 50%; top: 50%; z-index: 0; width: 120vw; height: 120vw; margin: -60vw 0 0 -60vw; background: conic-gradient(#ff7a9a, #ffd36e, #8ef0b0, #7cc4ff, #c79bff, #ff7a9a); animation: rk-spin 5s linear infinite; }
+.rk-f5::before { background: conic-gradient(#8f7dff, #ffe58a, #7cc4ff, #ff7a9a, #8f7dff); animation-duration: 3.5s; }
+.rk-f4::after, .rk-f5::after { content: ""; position: absolute; inset: 2px; z-index: 0; background: #12102b; }
+.rk-f4 > .rk-row-fx, .rk-f5 > .rk-row-fx { z-index: 1; inset: 2px; }
+.rk-f5 > .rk-row-fx { background-image: radial-gradient(#fff 1px, transparent 1.5px), radial-gradient(#ffe58a 1px, transparent 1.5px); background-size: 46px 30px, 70px 38px; background-position: 6px 4px, 30px 18px; animation: rk-stars 2.6s ease-in-out infinite; }
+@keyframes rk-sweep { 0%, 45% { transform: translateX(0); } 100% { transform: translateX(480%); } }
+@keyframes rk-pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.9; } }
+@keyframes rk-stars { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.9; } }
+
+.rk-card { position: relative; display: flex; align-items: center; gap: 12px; min-width: 0; margin-bottom: 8px; padding: 12px 10px 12px 14px; overflow: hidden; isolation: isolate; border: var(--px) solid var(--rk-c);
+  background: radial-gradient(ellipse at 18% 50%, color-mix(in srgb, var(--rk-c) 34%, transparent), transparent 62%), linear-gradient(180deg, #1d1a44, var(--panel)); }
+.rk-card > * { position: relative; z-index: 1; }
+.rk-card > .rk-row-fx { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.rk-card-t { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; min-width: 0; }
+.rk-card-name { font-size: 17px; line-height: 1.2; color: var(--rk-l); text-shadow: 2px 2px 0 var(--edge); animation: sim-land 0.45s cubic-bezier(0.2, 1.8, 0.4, 1); }
+.rk-card-bar { height: 8px; background: rgba(7, 6, 15, 0.75); box-shadow: 0 0 0 1px rgba(169, 162, 207, 0.3); overflow: hidden; }
+.rk-card-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--rk-c), var(--rk-l)); transform-origin: left; transition: transform 0.4s ease-out; }
+.rk-card-xp { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rk-card-xp b { color: var(--text); }
+.rk-card-next { flex: none; display: grid; justify-items: center; gap: 2px; }
+.rk-card-next::before { content: ""; width: 0; height: 0; border: 5px solid transparent; border-left-color: var(--muted); border-right: 0; position: absolute; left: -11px; top: 50%; margin-top: -5px; animation: sim-nudge 1.2s ease-in-out infinite; }
+.rk-period { margin: 0 2px 4px; text-align: right; font-size: 10px; color: var(--muted); }
+
+/* 승급 알림: 가운데 위에 계급장이 떴다 사라진다. 새 칭호는 크게 */
+.rk-promo { position: fixed; left: 50%; top: 96px; z-index: 70; display: flex; align-items: center; gap: 10px; padding: 7px 16px 7px 10px; transform: translateX(-50%); background: var(--night-2); border: 2px solid var(--rk-c); box-shadow: 0 5px 0 rgba(0, 0, 0, 0.35), 0 0 16px color-mix(in srgb, var(--rk-c) 60%, transparent); pointer-events: none; animation: rk-promo 1.7s ease-out forwards; }
+.rk-promo-t { display: grid; }
+.rk-promo-t small { font-size: 10px; line-height: 1.2; color: var(--muted); }
+.rk-promo-t b { font-size: 14px; line-height: 1.25; color: var(--rk-l); text-shadow: 1px 1px 0 var(--edge); white-space: nowrap; }
+.rk-promo-big { top: 30%; flex-direction: column; gap: 8px; padding: 22px 26px 16px; border-width: 3px; text-align: center; animation: rk-promo-big 3.4s ease-out forwards; }
+.rk-promo-big .rk-promo-t { justify-items: center; }
+.rk-promo-big .rk-promo-t small { font-size: 12px; color: var(--gold); }
+.rk-promo-big .rk-promo-t b { font-size: 21px; }
+.rk-promo-rays { position: absolute; left: 50%; top: 44px; width: 300px; height: 300px; margin: -150px 0 0 -150px; border-radius: 50%; background: repeating-conic-gradient(color-mix(in srgb, var(--rk-l) 40%, transparent) 0 8deg, transparent 8deg 24deg); -webkit-mask: radial-gradient(circle, #000 14%, transparent 62%); mask: radial-gradient(circle, #000 14%, transparent 62%); animation: rk-spin 9s linear infinite; z-index: -1; }
+.rk-promo .sim-sparks { left: 50%; top: 50px; }
+@keyframes rk-promo { 0% { transform: translate(-50%, -16px) scale(0.8); opacity: 0; } 14% { transform: translate(-50%, 0) scale(1.06); opacity: 1; } 22% { transform: translate(-50%, 0) scale(1); } 82% { opacity: 1; } 100% { transform: translate(-50%, -8px); opacity: 0; } }
+@keyframes rk-promo-big { 0% { transform: translate(-50%, 20px) scale(0.5); opacity: 0; } 9% { transform: translate(-50%, 0) scale(1.12); opacity: 1; } 15% { transform: translate(-50%, 0) scale(1); } 88% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { transform: translate(-50%, -14px) scale(0.96); opacity: 0; } }
 
 @media (max-width: 340px) {
   .sim-tile > small { font-size: 8px; }
-  .sim-hud-chips .sim-title { display: none; }
+  .sim-hud-rkname { font-size: 11px; }
+  .sim-ba-row > b { font-size: 15px; }
+  .rk-card { gap: 9px; padding-left: 10px; }
+  .rk-card-name { font-size: 15px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .sim *, .sim *::before, .sim *::after, .sim-hud *, .sim-hud *::after, .sim-cheer, .rs-back, .rs-wrap, .rs-row b { animation: none !important; transition: none !important; }
+  .sim *, .sim *::before, .sim *::after, .sim-hud *, .sim-hud *::after, .sim-cheer, .sim-sheet, .sim-sheet-back, .rk *, .rk-row::before, .rk-promo-rays { animation: none !important; transition: none !important; }
   .sim-card { opacity: 1; }
-  .sim-win, .sim-burst, .sim-tang, .sim-rays, .sim-hud-delta, .sim-chest-tag { display: none; }
+  .sim-win, .sim-burst, .sim-tang, .sim-rays, .sim-hud-delta, .sim-chest-tag, .rk-rays, .rk-rainbow, .rk-ring, .rk-spark, .rk-shine, .rk-promo-rays { display: none; }
+  .rk-promo, .rk-promo-big { animation: rk-promo-still 2.4s linear forwards; }
 }
+@keyframes rk-promo-still { 0%, 90% { opacity: 1; } 100% { opacity: 0; } }

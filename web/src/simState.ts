@@ -5,10 +5,8 @@
 //   'enh:<장비>' 직접 강화해 닿은 가장 높은 강화도, 'stat:<표>' 직접 닿은 가장 높은 단계, 'opt:<아이템>:<옵션 번호>' 직접 굴려 본 가장 높은 값,
 //   'box:<상자>:<묶음>:<이름>' 직접 열어 나온 것 (1), 'gem:<단계>' 그 단계를 직접 합성해 봤다 (1)
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { apiHeaders } from "./auth";
 import type { Part } from "./sim";
 import type { Held } from "./simGear";
-import type { Space } from "./simRank";
 
 export interface SimSave {
   held?: Partial<Record<Part, Held | null>>;
@@ -27,8 +25,10 @@ export interface SimSave {
   best?: Record<string, number>;
   /** 판 장비 수와 받은 코인 (2026-11-17) */
   sold?: { n: number; coins: number };
-  /** 강화 비용 최저 기록 (2026-11-19): 순위 이름(simRank.ts upGame) -> [코인, 마법서]. 이보다 좋을 때만 서버에 보낸다 */
+  /** 강화 비용 최저 기록 (2026-11-19): 순위 이름(simRank.ts upGame, 이번 주 것만 남긴다) -> [코인, 마법서]. 이보다 좋을 때만 서버에 보낸다 */
   cost?: Record<string, [number, number]>;
+  /** 옵션 재설정: 전·후 중 더 좋은 쪽을 저절로 고른다 (2026-11-19) */
+  optAuto?: boolean;
   statN?: { tries: number; ok: number; big: number };
   /** 보석 합성: 가진 보석, 합성 수, 처음 1단계 개수, 닿은 가장 높은 단계 */
   gem?: { inv: number[]; runs: number; start: number; best: number };
@@ -71,34 +71,18 @@ export const expOf = (s: SimSave, key: string) => s.exp?.[key] ?? 0;
 /** 직접 겪은 값을 더 높으면 바꾼다 */
 export const raiseExp = (s: SimSave, key: string, v: number): SimSave => (expOf(s, key) >= v ? s : { ...s, exp: { ...(s.exp ?? {}), [key]: v } });
 
-/** 서버에 둔다: 바뀌면 1.2초 모아서, 화면을 떠날 때도 */
-export function useSaveState(space: Space, initial: SimSave | null | undefined): SaveApi & { ready: boolean; set: (s: SimSave) => void } {
+/** 서버에 둔다: 바뀌면 쓴 코인과 같이 모아서 보낸다 (queue = simRank.ts useCoinState 의 queueState: 8초마다, 화면을 떠날 때는 바로) */
+export function useSaveState(queue: (state: unknown) => void, initial: SimSave | null | undefined): SaveApi & { ready: boolean; set: (s: SimSave) => void } {
   const [save, setSave] = useState<SimSave>({});
   const [ready, setReady] = useState(false);
   const ref = useRef<SimSave>({});
-  const dirty = useRef(false);
-  const timer = useRef(0);
-  const flush = useCallback(() => {
-    window.clearTimeout(timer.current);
-    timer.current = 0;
-    if (!dirty.current) return;
-    dirty.current = false;
-    void fetch("/api/sim/wallet", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: apiHeaders(true),
-      body: JSON.stringify({ state: ref.current }),
-      keepalive: true,
-    }).catch(() => undefined);
-  }, [space]);
   const set = useCallback(
     (s: SimSave) => {
       ref.current = s;
       setSave(s);
-      dirty.current = true;
-      if (!timer.current) timer.current = window.setTimeout(flush, 1200);
+      queue(s);
     },
-    [flush],
+    [queue],
   );
   const update = useCallback((fn: (s: SimSave) => SimSave) => set(fn(ref.current)), [set]);
   useEffect(() => {
@@ -107,13 +91,5 @@ export function useSaveState(space: Space, initial: SimSave | null | undefined):
     setSave(ref.current);
     setReady(true);
   }, [initial, ready]);
-  useEffect(() => {
-    const hide = () => document.visibilityState === "hidden" && flush();
-    document.addEventListener("visibilitychange", hide);
-    return () => {
-      document.removeEventListener("visibilitychange", hide);
-      flush();
-    };
-  }, [flush]);
   return { save, update, ready, set };
 }

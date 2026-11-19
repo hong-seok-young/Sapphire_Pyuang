@@ -16,6 +16,18 @@ export const tbl = (space: Space) => (space === "test" ? "sim_t_" : "sim_");
 // 2026-11-19 테스트판을 뺐다 (제작자 '테스트 메뉴도 빼 버리고 개발 중만 냅두고'): ?space=test 는 더 받지 않고 늘 개발 중판. 표 sim_t_* 는 기록으로 남긴다
 export const spaceOf = (_request: Request, me: User): Space | null => (canSim(me) ? "live" : null);
 
+// 명성과 계급 (제작자 2026-11-19 '통합 랭킹, 계급으로, 수백 가지, 어디가 끝인지 모르게'): 명성 = 지금까지 쓴 코인 (sim_wallet.spent, 서버 값).
+// 계급 n 이 되는 명성 = round(10 x n^2.15) (화면 src/simTier.ts 와 같은 식: 이름·계급장은 화면이 그린다). 이번 주 명성은 week_spent (목요일 10시부터, server/week.ts)
+export const tierXp = (n: number) => Math.round(10 * Math.pow(Math.max(0, n), 2.15));
+export function rankOf(xp: number): number {
+  let n = Math.max(0, Math.floor(Math.pow(Math.max(0, xp) / 10, 1 / 2.15)));
+  while (tierXp(n + 1) <= xp) n++;
+  while (n > 0 && tierXp(n) > xp) n--;
+  return n;
+}
+/** 순위·전광판에서 빼는 사람: 테스트 계정과 앱개발자 (코인이 저절로 채워져서 명성이 끝없이 오른다) */
+export const NOT_RANKED = (col: string) => `${col} NOT IN (${TEST_IDS.map((t) => `'${t}'`).join(", ")}) AND ${col} NOT IN (SELECT id FROM users WHERE role = 'developer')`;
+
 /** 한국 날짜 (하루 한도를 0시에 새로) */
 export const kstDate = (ms: number) => new Date(ms + 9 * 3_600_000).toISOString().slice(0, 10);
 
