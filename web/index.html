@@ -47,18 +47,20 @@
         function retry() {
           try {
             var last = Number(sessionStorage.getItem("sapphire-reload") || 0);
-            if (Date.now() - last < 30000) return;
+            if (Date.now() - last < 30000) return false;
             sessionStorage.setItem("sapphire-reload", String(Date.now()));
           } catch (e) {}
           var msg = document.getElementById("boot-msg");
           if (msg) msg.textContent = "새로 업데이트됐어요. 새 버전으로 다시 불러올게요…";
           setTimeout(function () { location.reload(); }, 600);
+          return true;
         }
         window.addEventListener("error", function (e) {
           var t = e.target;
           if (t && (t.tagName === "SCRIPT" || t.tagName === "LINK") && (t.src || t.href || "").indexOf("/assets/") >= 0) retry();
         }, true);
-        window.addEventListener("vite:preloadError", function (e) { e.preventDefault(); retry(); });
+        // 새로 불러올 때만 오류를 삼킨다: 삼키면 import 가 빈 값으로 끝나 화면이 'reading SimulatorPage' 로 깨졌다 (2026-11-20 제작자 스샷)
+        window.addEventListener("vite:preloadError", function (e) { if (retry()) e.preventDefault(); });
         // 첫 화면에서 멈추면 (제작자 2026-11-02: '새 버전으로 여는 중 100%'에서 안 넘어감) 12초 뒤 '다시 불러오기' 단추와 오류 글을 보인다.
         // 코드가 받아지는 중이면 그대로 기다리다가 뜨고, 오류가 있었으면 그 글을 작게 적어 원인을 알 수 있게 한다
         var bootErr = "";

@@ -91,7 +91,29 @@ import type { Me } from "./auth";
 // 홈·정보·위키 화면·로그인·오픈 축하·튜토리얼은 그대로 한 덩어리. 떼어 둔 화면은 처음 들어갈 때 한 번 받고(잠깐 '불러오는 중'), 배포 뒤 옛 조각을 못 찾으면
 // index.html 의 vite:preloadError 가 새로 불러온다
 // 화면 조각을 받는 곳 (lazy 와 미리 받기가 같은 것을 쓴다: 한 번 받으면 다시 받지 않는다)
-const CHUNKS = {
+// 옛 조각을 못 받아 import 가 빈 값으로 끝나면(배포 직후) 한 번 새로 불러오고, 그래도면 알아볼 수 있는 글로 PageBoundary 에 넘긴다
+// (2026-11-20 제작자 스샷: 'Cannot read properties of undefined (reading SimulatorPage)')
+function freshChunks<T extends Record<string, () => Promise<unknown>>>(c: T): T {
+  for (const k of Object.keys(c) as (keyof T)[]) {
+    const load = c[k];
+    c[k] = (() =>
+      load().then((m) => {
+        if (m) return m;
+        try {
+          const last = Number(sessionStorage.getItem("sapphire-chunk-reload") || 0);
+          if (Date.now() - last > 20000) {
+            sessionStorage.setItem("sapphire-chunk-reload", String(Date.now()));
+            setTimeout(() => location.reload(), 300);
+          }
+        } catch {
+          /* 저장소를 못 쓰면 단추로 */
+        }
+        throw new Error("새 버전이 올라왔어요. 다시 불러오기를 눌러 주세요.");
+      })) as T[keyof T];
+  }
+  return c;
+}
+const CHUNKS = freshChunks({
   Chat: () => import("./pages/Chat"),
   Admin: () => import("./pages/Admin"),
   Profile: () => import("./pages/Profile"),
@@ -120,7 +142,7 @@ const CHUNKS = {
   GrowthShop: () => import("./pages/GrowthShop"),
   Donate: () => import("./pages/Donate"),
   Hall: () => import("./pages/Hall"),
-};
+});
 const ChatPage = lazy(() => CHUNKS.Chat().then((m) => ({ default: m.ChatPage })));
 const AdminPage = lazy(() => CHUNKS.Admin().then((m) => ({ default: m.AdminPage })));
 const MePage = lazy(() => CHUNKS.Profile().then((m) => ({ default: m.MePage })));
