@@ -444,7 +444,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   };
   const allPct = catStat("all").p;
   const costEl = price && tot && (draft === 5 ? !!mineCost : todoListed.length > 0 && tot.slots > 0)
-    ? <CostPanel price={price} tot={tot} pset={pset} setPset={setPset} canEdit={canSetPrice} basis={basis} setBasis={setBasis} draft={draft} filled={mineCost?.done ?? null} left={mineCost?.todo ?? null} pct={allPct} />
+    ? <CostPanel price={price} tot={tot} pset={pset} setPset={setPset} canEdit={canSetPrice} basis={basis} setBasis={setBasis} draft={draft} filled={mineCost?.done ?? null} left={mineCost?.todo ?? null} pct={allPct} doneN={mineCost?.doneN ?? 0} todoN={mineCost?.todoN ?? 0} />
     : null;
 
   return (
@@ -942,10 +942,10 @@ function FoldHead({ open, onClick, children }: { open: boolean; onClick: () => v
   );
 }
 
-function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft = 0, filled = null, left = null, pct = 0 }: {
+function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft = 0, filled = null, left = null, pct = 0, doneN = 0, todoN = 0 }: {
   price: DexPrice; tot: Totals; pset: PriceSet; setPset: (v: PriceSet) => void; canEdit: boolean;
   basis: "normal" | "event"; setBasis: (v: "normal" | "event") => void;
-  draft?: number; filled?: number | null; left?: number | null; pct?: number;
+  draft?: number; filled?: number | null; left?: number | null; pct?: number; doneN?: number; todoN?: number;
 }) {
   const [open, setOpen] = useState(false);
   // 마법서·스탬프 값 칸은 접어 둔다 (제작자 2026-11-12 '마법서 가격으로 해서 접어놓고 스탬프 가격으로 해서 접어놔')
@@ -989,14 +989,30 @@ function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft 
   const touched = Object.keys(pset.scroll).length + Object.keys(pset.stamp).length > 0 || pset.plat != null;
   return (
     <Panel className="dex-need dex-cost">
+      {draft === 5 && filled != null && left != null ? (
+        <button type="button" className="dex-board" onClick={() => setOpen(!open)} aria-expanded={open}>
+          <span className="dex-board-side dex-board-fill">
+            <small>채운 비용</small>
+            <b>{intUnit(filled)}</b>
+            <small>{doneN.toLocaleString("ko-KR")}개 완료</small>
+          </span>
+          <span className="dex-board-mid">
+            <b>{pct}%</b>
+            <i className="dex-board-bar"><i style={{ width: `${pct}%` }} /></i>
+            <small>{open ? "접기 ▲" : "자세히 ▼"}</small>
+          </span>
+          <span className="dex-board-side dex-board-left">
+            <small>남은 비용</small>
+            <b>{intUnit(left)}</b>
+            <small>{todoN.toLocaleString("ko-KR")}개 남음</small>
+          </span>
+        </button>
+      ) : (
       <button type="button" className="dex-need-head" onClick={() => setOpen(!open)} aria-expanded={open}>
         <b>도감 비용</b>
         {!open && draft === 1 ? (
           <span className="muted">이벤트 때 {intUnit(tot.by.event.sum)} · {intUnit(tot.by.normal.sum - tot.by.event.sum)} 아낌</span>
-        ) : draft === 5 && filled != null && left != null ? (
-          <span className="muted">
-            <b className="dex-cost-pct">{pct}%</b> · 채움 <b className="dex-cost-fill">{intUnit(filled)}</b> · 남음 <b className="dex-cost-left">{intUnit(left)}</b><span className="dex-cost-won"> ({intUnit(left / rate)}원)</span>
-          </span>
+
         ) : !open && draft === 2 && filled != null ? (
           <span className="muted">
             채움 <b className="dex-cost-fill">{intUnit(filled)}</b> · 남음 <b className="dex-cost-left">{intUnit(tot.by[basis].sum)}</b> ({intUnit(tot.by[basis].sum / rate)}원)
@@ -1008,8 +1024,8 @@ function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft 
         )}
         {on && !open && <span className="dex-sale-dot">판매 중</span>}
         <span className="dex-caret">{open ? "▲" : "▼"}</span>
-        {draft === 5 && <i className="dex-cost-bar"><i style={{ width: `${pct}%` }} /></i>}
       </button>
+      )}
       {open && (
         <div className="dex-cost-body">
           {/* 어느 값으로 최저가 조합을 고를지 (제작자 2026-11-13 2안 '평소 최저가 | 아바돈 이벤트 최저가', 처음은 평소) */}
@@ -1020,6 +1036,7 @@ function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft 
               </button>
             ))}
           </div>
+          {draft === 5 && <small className="dex-cost-cap">남은 비용 · 평소와 아바돈 이벤트 때</small>}
           <div className="dex-cost-cols">
             {MODES.map((m) => (
               <div key={m.key} className={"dex-cost-col" + (m.key === "event" && on ? " dex-cost-now" : "") + (basis === m.key ? " dex-cost-pick" : " dex-cost-dim")}
