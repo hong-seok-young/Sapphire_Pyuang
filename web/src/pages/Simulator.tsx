@@ -1977,7 +1977,7 @@ type Val = Dist["vals"][number];
 const jointP = (item: OptItem, vals: Val[]) => item.opts.reduce((p, d, i) => (d.vals.length > 1 ? p * atLeast(d, vals[i].n) : p), 1);
 
 /** 옵션 굴리기. reset(옵션 재설정)이면 전 · 후 두 칸: 굴린 값은 '후'에 뜨고, 전이나 후를 누르면 그쪽이 내 옵션이 된다 (다음에 굴릴 때 '전' 자리로).
- *  '좋은 쪽 자동'을 켜면 더 드문(좋은) 쪽을 저절로 고른다 (제작자 2026-11-19 '팝업 띄우지 말고 앱 화면에 전 후 정도만, 전이나 후 고르면 선택, 체크박스로 자동으로 더 희박한 더 좋은 옵션 선택').
+ *  아이템 이름 오른쪽 체크 '옵션 자동선택'(2026-11-19 제작자 '아이템명 우측에 체크박스, 옵션 자동선택이라고')을 켜면 더 드문(좋은) 쪽을 저절로 고른다 (제작자 2026-11-19 '팝업 띄우지 말고 앱 화면에 전 후 정도만, 전이나 후 고르면 선택, 체크박스로 자동으로 더 희박한 더 좋은 옵션 선택').
  *  순위는 없고 1/100 보다 드문 결과만 전광판에 남긴다 */
 function OptionRoller({ item, onBack, verb, game, reset }: { item: OptItem; onBack?: () => void; verb: string; game?: string; reset?: boolean }) {
   const roll = useCallback(() => item.opts.map((d) => pick(d.vals)), [item]);
@@ -2103,6 +2103,12 @@ function OptionRoller({ item, onBack, verb, game, reset }: { item: OptItem; onBa
               상위 {pctOnly(joint)}
             </em>
           )}
+          {reset && (
+            <button type="button" className={"sim-check sim-check-head" + (autoPick ? " sim-check-on" : "")} aria-pressed={autoPick} onClick={() => update((s) => ({ ...s, optAuto: !s.optAuto }))}>
+              <i className="sim-check-box" aria-hidden />
+              옵션 자동선택
+            </button>
+          )}
         </div>
         {reset && (
           <div className="sim-ba">
@@ -2116,13 +2122,9 @@ function OptionRoller({ item, onBack, verb, game, reset }: { item: OptItem; onBa
         ))}
       </section>
       {reset ? (
-        <div className="sim-actions sim-actions-2">
+        <div className="sim-actions sim-actions-1">
           <button type="button" className="btn sim-go" disabled={coins.coins === 0} onClick={again}>
             {verb}
-          </button>
-          <button type="button" className={"btn btn-ghost sim-check" + (autoPick ? " sim-check-on" : "")} aria-pressed={autoPick} onClick={() => update((s) => ({ ...s, optAuto: !s.optAuto }))}>
-            <i className="sim-check-box" aria-hidden />
-            좋은 쪽 자동
           </button>
         </div>
       ) : null}
