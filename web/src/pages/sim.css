@@ -397,31 +397,35 @@ a.sim-earn-cell:active { transform: translateY(1px); }
 .sim-rolling .sim-oval { color: #fff; animation: none; opacity: 0.75; }
 @keyframes sim-land { 0% { transform: scale(1.7); } 100% { transform: scale(1); } }
 .sim-otop { margin-left: auto; padding: 0 6px; font-size: 10px; border: 1px solid currentColor; animation: sim-drop 0.25s ease-out; }
-.sim-tiles { display: grid; gap: 3px; }
-.sim-tile { position: relative; display: grid; justify-items: center; min-width: 0; padding: 3px 0 2px; font: inherit; color: var(--text); background: rgba(11, 10, 26, 0.6); border: 1px solid rgba(169, 162, 207, 0.28); overflow: hidden; cursor: pointer; }
-.sim-tile > b, .sim-tile > small { position: relative; z-index: 1; }
-.sim-tile > b { font-size: 13px; line-height: 1.15; }
-.sim-tile > small { font-size: 9px; line-height: 1.2; color: var(--muted); letter-spacing: -0.3px; white-space: nowrap; }
-.sim-tile-fill { position: absolute; inset: 0; transform-origin: bottom; background: rgba(169, 162, 207, 0.2); }
-.sim-tile-u { border-color: rgba(111, 143, 255, 0.5); }
-.sim-tile-u .sim-tile-fill { background: rgba(111, 143, 255, 0.3); }
-.sim-tile-r { border-color: rgba(199, 155, 255, 0.6); }
-.sim-tile-r .sim-tile-fill { background: rgba(199, 155, 255, 0.34); }
-.sim-tile-r > b { color: #d9bcff; }
-.sim-tile-sr { border-color: rgba(255, 195, 92, 0.7); }
-.sim-tile-sr .sim-tile-fill { background: rgba(255, 195, 92, 0.4); }
-.sim-tile-sr > b { color: var(--gold); }
-/* 목표 값 이상인 타일: 아래 금색 줄 */
-.sim-tile-aim::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; z-index: 2; background: var(--gold); }
-/* 도는 불빛, 멈춘 자리 */
-.sim-tile-run { border-color: #fff; background: rgba(255, 255, 255, 0.28); }
-.sim-tile-run > b, .sim-tile-run > small { color: #fff; }
-.sim-tile-on { z-index: 1; border-color: #fff3c4; background: var(--gold); box-shadow: 0 0 0 1px var(--edge), 0 0 10px rgba(255, 195, 92, 0.9); animation: sim-tile-land 0.5s cubic-bezier(0.2, 1.8, 0.4, 1); }
-.sim-tile-on .sim-tile-fill { opacity: 0; }
-.sim-tile-on > b, .sim-tile-on > small { color: var(--edge); }
-.sim-tile-on::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 60%; z-index: 1; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.7), transparent); animation: sim-shine 2.4s ease-in-out infinite; }
-@keyframes sim-tile-land { 0% { transform: scale(1.45); } 60% { transform: scale(0.94); } 100% { transform: scale(1); } }
-.sim-tile:active { transform: scale(0.92); }
+/* 값 분포 그래프: 값마다 막대 하나 (높이 = 확률), 아래에 값과 % */
+.sim-hist { display: flex; align-items: stretch; gap: 1px; padding: 3px 2px 0; background: rgba(11, 10, 26, 0.5); border: 1px solid rgba(169, 162, 207, 0.22); }
+.sim-col { position: relative; flex: 1 1 0; display: grid; grid-template-rows: 24px auto auto; justify-items: center; min-width: 0; padding: 0 0 2px; font: inherit; color: var(--text); background: none; border: 0; cursor: pointer; }
+.sim-col-bar { position: relative; justify-self: stretch; margin: 0 12%; border-bottom: 1px solid rgba(169, 162, 207, 0.35); }
+.sim-col-bar > i { position: absolute; inset: 0; transform-origin: bottom; background: rgba(169, 162, 207, 0.5); }
+.sim-col > b { margin-top: 1px; font-size: 12px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.sim-col > small { font-size: 9px; line-height: 1.15; color: var(--muted); letter-spacing: -0.3px; white-space: nowrap; }
+.sim-hist-n .sim-col > b { font-size: 11px; }
+.sim-hist-n .sim-col > small { font-size: 8px; letter-spacing: -0.5px; }
+.sim-hist-x .sim-col > b { font-size: 10px; letter-spacing: -0.3px; }
+@media (min-width: 380px) { .sim-hist-x .sim-col > b { font-size: 11px; letter-spacing: 0; } }
+.sim-col-u .sim-col-bar > i { background: #6f8fff; }
+.sim-col-r .sim-col-bar > i { background: #c79bff; }
+.sim-col-r > b { color: #d9bcff; }
+.sim-col-sr .sim-col-bar > i { background: var(--gold); }
+.sim-col-sr > b { color: var(--gold); }
+.sim-col-aim { box-shadow: inset 0 -2px 0 var(--gold); }
+.sim-col-run { background: rgba(255, 255, 255, 0.24); }
+.sim-col-run .sim-col-bar > i { background: #fff; }
+.sim-col-run > b, .sim-col-run > small { color: #fff; }
+.sim-col-on { z-index: 1; background: var(--gold); box-shadow: 0 0 0 1px var(--edge), 0 0 9px rgba(255, 195, 92, 0.9); animation: sim-tile-land 0.5s cubic-bezier(0.2, 1.8, 0.4, 1); }
+.sim-col-on .sim-col-bar { border-bottom-color: var(--edge); }
+.sim-col-on .sim-col-bar > i { background: var(--edge); }
+.sim-col-on > b, .sim-col-on > small { color: var(--edge); }
+@keyframes sim-tile-land { 0% { transform: scale(1.35); } 60% { transform: scale(0.95); } 100% { transform: scale(1); } }
+.sim-col:active { transform: scale(0.92); }
+.sim-oread { display: inline-flex; align-items: baseline; gap: 4px; margin-left: auto; font-size: 10px; color: var(--gold); font-variant-numeric: tabular-nums; }
+.sim-oread > b { font-size: 12px; }
+.sim-rolling .sim-oread { color: #fff; opacity: 0.75; }
 /* 목표: − 값 + · 나올 때까지 */
 .sim-aim { display: flex; align-items: stretch; gap: 3px; min-width: 0; }
 .sim-aim .pill { display: grid; place-items: center; padding: 0 10px; }
@@ -529,6 +533,8 @@ button.sim-card { cursor: pointer; }
 .sim-secs-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .sim-secs-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .sim-secs-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.sim-secs-many { display: flex; gap: 2px; }
+.sim-secs-many .sub-tab { flex: 1 1 auto; padding: 4px 1px; font-size: 10px; }
 .sim-secs .sub-tab { min-width: 0; padding: 4px 2px; font-size: 11px; line-height: 1.25; white-space: normal; text-align: center; background: rgba(11, 10, 26, 0.5); }
 .sim-secs .sub-tab-on { background: var(--sunset); }
 .sim-dex-strip { margin: 0; }
@@ -596,8 +602,9 @@ button.sim-card { cursor: pointer; }
 .sim-oline-c { padding-top: 4px; gap: 2px; }
 .sim-oline-c .sim-ohead { min-height: 0; }
 .sim-oline-c .sim-oname { font-size: 10px; }
-.sim-tile-was { box-shadow: inset 0 0 0 1px #8fb0ff; }
-.sim-tile-was::before { content: "전"; position: absolute; left: 1px; top: 0; z-index: 2; font-size: 8px; line-height: 1.2; color: #8fb0ff; }
+.sim-col-was:not(.sim-col-on) { background: rgba(111, 143, 255, 0.2); box-shadow: inset 0 0 0 1px #8fb0ff; }
+.sim-col-was.sim-col-aim:not(.sim-col-on) { box-shadow: inset 0 0 0 1px #8fb0ff, inset 0 -3px 0 var(--gold); }
+.sim-col-was:not(.sim-col-on) > b { color: #b7ccff; }
 .sim-check { display: flex; align-items: center; justify-content: center; gap: 7px; }
 .sim-check-box { flex: none; position: relative; width: 14px; height: 14px; background: rgba(7, 6, 15, 0.7); box-shadow: 0 0 0 2px var(--muted); }
 .sim-check-on { color: var(--gold); }
@@ -685,7 +692,6 @@ button.sim-card { cursor: pointer; }
 @keyframes rk-promo-big { 0% { transform: translate(-50%, 20px) scale(0.5); opacity: 0; } 9% { transform: translate(-50%, 0) scale(1.12); opacity: 1; } 15% { transform: translate(-50%, 0) scale(1); } 88% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { transform: translate(-50%, -14px) scale(0.96); opacity: 0; } }
 
 @media (max-width: 340px) {
-  .sim-tile > small { font-size: 8px; }
   .sim-hud-rkname { font-size: 11px; }
   .sim-ba-row > b { font-size: 15px; }
   .rk-card { gap: 9px; padding-left: 10px; }

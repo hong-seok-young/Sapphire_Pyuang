@@ -2169,8 +2169,21 @@ const pctOnly = (p: number) => {
   return `${t.replace(/\.?0+$/, "")}%`;
 };
 
-/** 옵션 한 줄 (2026-11-19 개편): 이름 · 큰 값 · 등급, 그 아래 값마다 타일(값, %, 확률만큼 차오른 바탕).
-    굴리면 불빛이 타일을 차례로 돌다가 느려지며 나온 값에 멈춘다. 타일을 누르면 그 값 이상이 목표 */
+/** 좁은 칸에 넣는 확률: % 없이 짧게 (50 · 6.5 · .79) */
+const pctTiny = (p: number) => {
+  const x = p * 100;
+  return x < 0.005 ? "0" : x >= 9.95 ? String(Math.round(x)) : x >= 0.995 ? x.toFixed(1).replace(/\.0$/, "") : x.toFixed(2).replace(/^0/, "");
+};
+
+/** 칸이 7~9개일 때: 앞의 0 을 떼고 다섯 글자 안으로 (.523% · 3.29% · 21.7%) */
+const pctMid = (p: number) => {
+  const x = p * 100;
+  return x < 0.1 ? `${x.toFixed(2).replace(/^0/, "")}%` : pctOnly(p).replace(/^0\./, ".");
+};
+
+/** 옵션 한 줄: 이름 · 큰 값 · 등급, 그 아래 값마다 막대 하나인 분포 그래프 (막대 높이 = 확률, 아래에 값과 %).
+    2026-11-19 제작자 '옵션 숫자 쭉 나열한 게 가시성이 떨어져, 너저분, 확률도 한눈에 보이면서 집약적으로': 값마다 네모 칸이던 것을 한 줄 그래프로.
+    굴리면 불빛이 막대를 차례로 돌다가 느려지며 나온 값에 멈춘다. 막대를 누르면 그 값 이상이 목표 */
 function OptLine({ d, v, n, i, aim, onAim, compact = false, mark }: { d: Dist; v: Dist["vals"][number]; n: number; i: number; aim: number | null; onAim: (min: number) => void; compact?: boolean; mark?: number }) {
   const at = Math.max(0, d.vals.indexOf(v));
   const [hot, setHot] = useState(at);
@@ -2206,44 +2219,70 @@ function OptLine({ d, v, n, i, aim, onAim, compact = false, mark }: { d: Dist; v
   const top = Math.max(...d.vals.map((x) => x.p)) || 1;
   const total = d.vals.reduce((a, x) => a + x.p, 0) || 1;
   const P = atLeast(d, v.n);
-  const cols = d.vals.length <= 7 ? d.vals.length : Math.ceil(d.vals.length / Math.ceil(d.vals.length / 7));
+  // 한 줄에 넣는 막대 수: 값 글자가 짧으면 18개, 길면 8개까지. 넘으면 줄을 고르게 나눈다
+  const wide = d.vals.some((x) => String(x.v).length > 2);
+  const lines = Math.ceil(d.vals.length / (wide ? 8 : 18));
+  const per = Math.ceil(d.vals.length / lines);
+  const chunks = Array.from({ length: lines }, (_, k) => d.vals.slice(k * per, (k + 1) * per));
+  const shown = d.vals[hot] ?? v;
   return (
     <div className={"sim-oline" + (rolling ? " sim-rolling" : "") + (compact ? " sim-oline-c" : "")}>
       <div className="sim-ohead">
         <span className="sim-oname">{d.label}</span>
         {!compact && (
           <b key={rolling ? "r" : `v${n}`} className={`sim-oval ${rolling ? "" : tierClass(P)}`}>
-            {d.vals[hot]?.v ?? v.v}
+            {shown.v}
           </b>
         )}
         {!rolling && n > 1 && P <= 0.05 && <Sparks key={n} kind={P <= 0.01 ? "plus2" : "box-r"} n={P <= 0.01 ? 16 : 9} />}
         {!compact && !rolling && P < 1 && <small className={`sim-otop ${tierClass(P)}`}>상위 {pctOnly(P)}</small>}
+        {compact && d.vals.length > 1 && (
+          <small className="sim-oread">
+            <b>{shown.v}</b>
+            {pctOnly(shown.p / total)}
+          </small>
+        )}
       </div>
-      {d.vals.length > 1 && (
-        <div className="sim-tiles" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-          {d.vals.map((x, j) => {
-            const p = x.p / total;
-            return (
-              <button
-                key={j}
-                type="button"
-                className={`sim-tile sim-tile-${tierOf(p)}` + (j === hot ? (rolling ? " sim-tile-run" : " sim-tile-on") : "") + (aim !== null && x.n >= aim ? " sim-tile-aim" : "") + (mark !== undefined && x.n === mark ? " sim-tile-was" : "")}
-                onClick={() => onAim(x.n)}
-                aria-label={`${d.label} ${x.v} ${pctOnly(p)}`}
-              >
-                <i className="sim-tile-fill" style={{ transform: `scaleY(${Math.max(0.06, Math.sqrt(x.p / top)).toFixed(3)})` }} aria-hidden />
-                <b>{x.v}</b>
-                <small>{pctOnly(p)}</small>
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {d.vals.length > 1 &&
+        chunks.map((row, r) => (
+          <div key={r} className={"sim-hist" + (per > 9 ? " sim-hist-n" : "") + (per > 14 ? " sim-hist-x" : "")}>
+            {row.map((x, c) => {
+              const j = r * per + c;
+              const p = x.p / total;
+              return (
+                <button
+                  key={j}
+                  type="button"
+                  className={`sim-col sim-col-${tierOf(p)}` + (j === hot ? (rolling ? " sim-col-run" : " sim-col-on") : "") + (aim !== null && x.n >= aim ? " sim-col-aim" : "") + (mark !== undefined && x.n === mark ? " sim-col-was" : "")}
+                  onClick={() => onAim(x.n)}
+                  aria-label={`${d.label} ${x.v} ${pctOnly(p)}`}
+                >
+                  <span className="sim-col-bar" aria-hidden>
+                    <i style={{ transform: `scaleY(${Math.max(0.07, Math.sqrt(x.p / top)).toFixed(3)})` }} />
+                  </span>
+                  <b>{x.v}</b>
+                  <small>{per > 9 ? pctTiny(p) : per > 6 ? pctMid(p) : pctOnly(p)}</small>
+                </button>
+              );
+            })}
+          </div>
+        ))}
     </div>
   );
 }
 
 // ================================================================ 상자
+
+/** 묶음 이름들에서 모두 같은 앞 낱말(lead)과 뒤 낱말을 뗀다. 'A -> B' 는 'A→B' */
+function trimNames(names: string[]): { lead: string; short: string[] } {
+  const words = names.map((n) => n.replace(/\s*->\s*/g, "→").trim().split(/\s+/));
+  const w0 = words[0] ?? [];
+  let a = 0;
+  while (words.every((w) => w.length > a + 1 && w[a] === w0[a])) a++;
+  let z = 0;
+  while (words.every((w) => w.length - a - z > 1 && w[w.length - 1 - z] === w0[w0.length - 1 - z])) z++;
+  return { lead: w0.slice(0, a).join(" "), short: words.map((w) => w.slice(a, w.length - z).join(" ")) };
+}
 
 /** 공식 이벤트 글 그림 속 확률표 상자 (제작자 2026-11-06 '시너지 다 하자', '이벤트 공지' 칸). 못 받으면 없이 */
 const eventBoxCache = new Map<string, Box>();
@@ -2447,6 +2486,9 @@ function BoxOpener({
   const rows = [...sec.items].sort((a, b) => a.p - b.p);
   const topP = Math.max(...sec.items.map((x) => x.p)) || 1;
   const tier = tierOf(best);
+  // 묶음이 다섯 넘으면 모두 같은 앞말·뒷말을 떼고 한 줄로 ('랜덤 코스튬 A' … 'M' -> A … M, 앞말은 이름 옆 작은 표)
+  const many = box.sections.length > 4;
+  const secNames = many ? trimNames(box.sections.map((s) => s.title)) : null;
   return (
     <>
       <section className="panel sim-box">
@@ -2456,7 +2498,10 @@ function BoxOpener({
               ◀
             </button>
           )}
-          <b>{box.name}</b>
+          <b>
+            {box.name}
+            {secNames?.lead && <em className="sim-pick-tag">{secNames.lead}</em>}
+          </b>
           {opened > 0 && <em className="sim-luck">{opened.toLocaleString()}회</em>}
           {box.post && (
             <a className="sim-post" href={`#/official/${box.post}`}>
@@ -2465,7 +2510,7 @@ function BoxOpener({
           )}
         </div>
         {box.sections.length > 1 && (
-          <div className={`sim-secs sim-secs-${Math.min(4, box.sections.length)}`}>
+          <div className={many ? "sim-secs sim-secs-many" : `sim-secs sim-secs-${box.sections.length}`}>
             {box.sections.map((s, i) => (
               <button
                 key={i}
@@ -2479,7 +2524,7 @@ function BoxOpener({
                   setOpened(keptOf(i)?.opened ?? 0);
                 }}
               >
-                {s.title}
+                {secNames ? secNames.short[i] : s.title}
               </button>
             ))}
           </div>

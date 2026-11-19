@@ -17,7 +17,7 @@
 //   폰의 뒤로 가기나 '그만'으로 꺼진다 (제작자 요청 2026-11-02): 열 때 방문 기록을 하나 넣어 두고(사진 크게 보기와 같은 방법) 뒤로 가기가 그 기록을 빼면 닫는다.
 //   그만·끝으로 닫을 때는 넣어 둔 기록을 뺀다 (안 빼면 다음 뒤로 가기가 한 번 헛돈다). 튜토리얼이 다른 주소로 옮긴 채 끝나면 그 기록을 그 주소로 남긴다
 //   (뒤로 가기가 시작한 화면으로 가게). 눌러 보기로 사용자가 새 화면에 들어가 기록이 그 뒤에 쌓이면, 나중에 뒤로 가다 그 기록에 닿을 때 한 번 더 뒤로 가 건너뛴다 (skipStale).
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { Me } from "./auth";
@@ -436,6 +436,13 @@ function Tutorial({
    * 날씨 샘플의 '빈 곳을 눌러 보세요'(fx + tap)는 누를 때마다 터지기만 하고 넘어가지 않는다: 다음 단추로 넘어간다
    * (제작자 2026-11-03: 여기서는 아무 데나 눌러서 넘어가게 하지 말고 다음 버튼을 눌러야. 전에는 1.8초 뒤 저절로 넘어가 '14번 누르니 넘어갔다')
    */
+  // 글 상자 높이를 재서 화면 아래로 잘리지 않게 (2026-11-19: 글이 긴 단계에서 자리가 아래쪽이면 상자가 화면 밖으로 나가 다음 단추가 안 보였다)
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [boxH, setBoxH] = useState(160);
+  useLayoutEffect(() => {
+    const h = boxRef.current?.offsetHeight;
+    if (h && Math.abs(h - boxH) > 2) setBoxH(h);
+  });
   const onOverlay = (e: React.MouseEvent) => {
     if ((e.target as Element).closest(".tut-box")) return;
     if (shownAt !== i) return;
@@ -491,14 +498,14 @@ function Tutorial({
   const ey = r ? Math.min(H - 2, r.bottom + pad) : 0;
   // 글 상자: 비춘 자리 아래, 자리가 아래쪽이면 위, 자리가 크면 아래쪽에. 날씨 샘플은 위에 (아래에 쌓이는 것을 보게)
   const tall = !!r && r.height > H * 0.45;
-  const below = !!r && !tall && r.bottom + 160 < H;
+  const below = !!r && !tall && r.bottom + Math.max(160, boxH + 26) < H;
   const boxStyle: CSSProperties = vstep.fx
     ? { top: 12 }
     : !r || tall
       ? { bottom: 80 }
       : below
-        ? { top: Math.max(8, Math.min(H - 170, ey + 10)) }
-        : { bottom: Math.max(8, Math.min(H - 170, H - sy + 10)) };
+        ? { top: Math.max(8, Math.min(H - Math.max(170, boxH + 10), ey + 10)) }
+        : { bottom: Math.max(8, Math.min(H - Math.max(170, boxH + 10), H - sy + 10)) };
   return createPortal(
     <>
       {vstep.fx && <WeatherFx key={vstep.fx} sky={vstep.fx} />}
@@ -521,7 +528,7 @@ function Tutorial({
           <div className="tut-dim" />
         )}
         {cur && (
-          <div className="tut-box" style={boxStyle}>
+          <div ref={boxRef} className="tut-box" style={boxStyle}>
             <small>
               {guide.title} 튜토리얼 {i + 1}/{steps.length}
             </small>
