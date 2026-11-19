@@ -325,6 +325,22 @@ runSql([
   console.log(`시뮬레이터 처음 코인 차이 900 넣음 ${n}명`);
 }
 
+// 확률 시뮬레이터 오픈 (2026-11-20): 앱개발자도 다른 사람과 같게 처음부터 (제작자 '나도 다른 사람과 동등한 입장에서 시작하게, 순위에도 반영').
+// 앱개발자와 그 부캐의 개발 중판 진행 상황·지갑·해금·순위 기록·전광판 줄을 지운다 (지갑은 다음에 열 때 처음 코인으로 새로 생긴다).
+// 오늘 받은 코인 횟수(sim_earn)는 두어 같은 날 두 번 받지 않게 한다. setup 'sim_dev_reset_20261120' 로 한 번만, 실행 기록에는 수만
+{
+  const KEY = "sim_dev_reset_20261120";
+  const now = Date.now();
+  const NOT_DONE = `NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}')`;
+  const DEV = `(SELECT id FROM users WHERE role = 'developer' OR main_id IN (SELECT id FROM users WHERE role = 'developer'))`;
+  const n = queryFirst(`SELECT COUNT(*) AS n FROM sim_wallet WHERE user_id IN ${DEV} AND ${NOT_DONE}`)?.n ?? 0;
+  runSql([
+    ...["sim_wallet", "sim_state", "sim_unlocks", "sim_records", "sim_feed"].map((t) => `DELETE FROM ${t} WHERE user_id IN ${DEV} AND ${NOT_DONE};`),
+    `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+  ]);
+  console.log(`시뮬레이터 앱개발자 처음부터 ${n}명`);
+}
+
 // 확률 시뮬레이터 칭호가 66 -> 264개가 되면서 (제작자 2026-11-19 '칭호 66개 너무 적어') 계급 번호가 네 배로 촘촘해졌다 (server/simcoin.ts tierXp).
 // 전광판에 남은 새 칭호 줄(sim_feed game 'rank', label = 계급 번호)을 같은 명성의 새 번호로 옮긴다. setup 'sim_rank_x4_20261119' 로 한 번만
 {

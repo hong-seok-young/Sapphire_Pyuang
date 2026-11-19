@@ -6,7 +6,7 @@ import type { Env, User } from "./auth";
 
 /** 개발 중을 미리 보는 사람 (제작자 2026-11-04 '앞으로 개발 중인 것들은 길드마스터 오피서 달팽이 간다이 이렇게 볼 수 있는 거야'): 운영진·앱개발자·테스트 계정과 이 길드원들(묶은 캐릭터 중 하나라도).
  *  닉네임으로 정하므로 닉네임을 바꾸면 고친다. 화면은 src/launcher.ts canPreview (같은 목록). 시뮬레이터 개발 중판과 행운 코인 벌기도 이 사람들 */
-export const PREVIEW_PEOPLE = ["달팽이", "간다이", "힐러님저피1남았어요"]; // 힐러님저피1남았어요: 테스터 (제작자 2026-11-19)
+export const PREVIEW_PEOPLE = ["달팽이", "간다이"]; // 힐러님저피1남았어요 는 2026-11-19 넣었다가 2026-11-20 뺐다 (제작자)
 /** 2026-11-20 모두에게 열었다 (제작자 '이거도 그냥 오픈하자', 뽑기 칸만 개발 중). 다시 닫으려면 false */
 export const SIM_OPEN = true;
 export const canSim = (me: User) => RANK[me.role] >= 1 || TEST_IDS.includes(me.id) || [me.id, ...(me.chars ?? [])].some((c) => PREVIEW_PEOPLE.includes(c));
@@ -30,7 +30,8 @@ export function rankOf(xp: number): number {
   return n;
 }
 /** 순위·전광판에서 빼는 사람: 테스트 계정과 앱개발자 (코인이 저절로 채워져서 명성이 끝없이 오른다) */
-export const NOT_RANKED = (col: string) => `${col} NOT IN (${TEST_IDS.map((t) => `'${t}'`).join(", ")}) AND ${col} NOT IN (SELECT id FROM users WHERE role = 'developer')`;
+// 앱개발자도 2026-11-20 부터 다른 사람과 같이 순위에 나온다 (제작자 '나도 다른 사람과 동등한 입장에서 시작, 순위에도 반영')
+export const NOT_RANKED = (col: string) => `${col} NOT IN (${TEST_IDS.map((t) => `'${t}'`).join(", ")})`;
 
 /** 한국 날짜 (하루 한도를 0시에 새로) */
 export const kstDate = (ms: number) => new Date(ms + 9 * 3_600_000).toISOString().slice(0, 10);
@@ -151,6 +152,7 @@ export async function earnFor(env: Env, userId: string, method: string, path: st
  *  화면(simRank.ts useCoinState)도 같은 규칙으로 바로 채워 보인다 */
 export const DEV_REFILL = 1000;
 export const DEV_FLOOR = 100;
-export const refillable = (me: { id: string; role: string }) => me.role === "developer" || ["테스트1", "테스트2"].includes(me.id);
+// 2026-11-20 앱개발자는 빼고 테스트 계정만 (제작자 '나도 다른 사람과 동등한 입장에서')
+export const refillable = (me: { id: string; role: string }) => ["테스트1", "테스트2"].includes(me.id);
 export const refillSql = (env: { DB: D1Database }, id: string, space: Space = "live") =>
   env.DB.prepare(`UPDATE ${tbl(space)}wallet SET coins = coins + ?2, earned = earned + ?2, updated_at = ?4 WHERE user_id = ?1 AND coins < ?3`).bind(id, DEV_REFILL, DEV_FLOOR, Date.now());
