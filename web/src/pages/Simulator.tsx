@@ -2036,6 +2036,13 @@ function ResetDialog({ item, cur, next, onChoose }: { item: OptItem; cur: Dist["
   );
 }
 
+/** 값마다 확률은 늘 % 로 (1/N 으로 바꾸지 않는다): 91.5%, 2.69%, 0.052% */
+const pctOnly = (p: number) => {
+  const v = p * 100;
+  const t = v >= 10 ? v.toFixed(1) : v >= 1 ? v.toFixed(2) : v >= 0.01 ? v.toFixed(3) : v.toFixed(4);
+  return `${t.replace(/\.?0+$/, "")}%`;
+};
+
 /** 옵션 한 줄: 이름, 굴러가다 멈추는 값, 그 옵션의 값마다 작은 막대(나온 값만 밝게) */
 function OptLine({ d, v, n, i }: { d: Dist; v: Dist["vals"][number]; n: number; i: number }) {
   const [shown, setShown] = useState(v.v);
@@ -2052,6 +2059,7 @@ function OptLine({ d, v, n, i }: { d: Dist; v: Dist["vals"][number]; n: number; 
     return () => window.clearInterval(t);
   }, [n, v, d, i]);
   const top = Math.max(...d.vals.map((x) => x.p)) || 1;
+  const total = d.vals.reduce((a, x) => a + x.p, 0) || 1;
   const P = atLeast(d, v.n);
   return (
     <div className="sim-oline">
@@ -2065,6 +2073,15 @@ function OptLine({ d, v, n, i }: { d: Dist; v: Dist["vals"][number]; n: number; 
         ))}
       </span>
       <small className="sim-muted">{P < 1 ? `상위 ${pctText(P)}` : ""}</small>
+      {/* 값마다 골라질 확률 (제작자 2026-11-19 '명중 0 은 몇퍼 1은 몇퍼'), 지금 나온 값은 강조 */}
+      <span className="sim-pv">
+        {d.vals.map((x, j) => (
+          <span key={j} className={"sim-pvc" + (x === v ? " on" : "")}>
+            <i>{x.v}</i>
+            <b>{pctOnly(x.p / total)}</b>
+          </span>
+        ))}
+      </span>
     </div>
   );
 }

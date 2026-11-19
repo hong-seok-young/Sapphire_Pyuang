@@ -6119,3 +6119,11 @@ a.cf-at { color: #9fb4ff; }
 .rs-ok:active { transform: translateY(1px); }
 .rs-ok:disabled { opacity: 0.55; cursor: default; }
 @media (max-width: 360px) { .rs-row { padding: 6px 8px; font-size: 13px; } .rs-name { font-size: 15px; } }
+
+/* 옵션 값마다 골라질 확률 칩 (제작자 2026-11-19) */
+.sim-pv { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 3px; }
+.sim-pvc { display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 6px; font-size: 11px; background: rgba(169, 162, 207, 0.14); border: 1px solid rgba(169, 162, 207, 0.3); }
+.sim-pvc i { font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sim-pvc b { font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sim-pvc.on { background: rgba(255, 195, 92, 0.2); border-color: var(--gold); }
+.sim-pvc.on i, .sim-pvc.on b { color: var(--gold); }
