@@ -43,7 +43,9 @@ export type ScrollGrade = "D" | "C" | "B" | "A" | "S" | "SS";
 export const scrollGrade = (lv: number): ScrollGrade => (lv < 10 ? "D" : lv < 20 ? "C" : lv < 30 ? "B" : lv < 40 ? "A" : lv < 50 ? "S" : "SS");
 export const SCROLL_COIN: Record<ScrollGrade, number> = { D: 1, C: 1, B: 2, A: 3, S: 4, SS: 6 };
 export const scrollCost = (g: { lv: number }) => SCROLL_COIN[scrollGrade(g.lv)];
-export const gearPrice = (part: Part, lv: number) => (part === "무기" ? 5 + Math.round(lv ** 1.5 / 6) : 3 + Math.round(lv ** 1.5 / 10));
+/** 장비 값 (제작자 2026-11-20 '무기 구매가 너무 비싸, 파괴될 때마다 사야 하잖아, 에스컬레이션은 주되 싸게'): 레벨이 높을수록 비싸되 예전의 1/3 쯤.
+ *  무기 Lv.6 3 · Lv.27 9 · Lv.44 17 · Lv.52 21, 방어구 Lv.44 11 (예전 무기 7 · 28 · 54 · 67, 방어구 32). 수리(1/4)·자동 해금(5·10배)·시세도 같이 내려간다 */
+export const gearPrice = (part: Part, lv: number) => (part === "무기" ? 2 + Math.round(lv ** 1.5 / 20) : 1 + Math.round(lv ** 1.5 / 30));
 
 function tableRows(odds: Odds, key: string) {
   return odds.tables.find((t) => t.key === key)?.sections[0]?.r ?? [];
