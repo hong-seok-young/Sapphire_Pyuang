@@ -2,6 +2,7 @@
 // 맨 위 같은 폭 단추 강화 · 성장 · 옵션 · 보석 · 뽑기, 그 아래 어두운 띠에서 고르고, 해 보면서 확률을 몸으로 느끼게 결과마다 짧은 움직임(transform·opacity 만)을 준다.
 // 아이템은 우리가 가진 그림으로 그린다 (제작자 2026-11-04 '텍스트 말고 우리 가지고 있는 이미지 써', src/simIcons.ts). 그림이 없는 것만 글자. 강화 장면 이미지·동영상을 받으면 sim-item 자리를 그 모양으로 바꾼다.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useAsync } from "../data";
 import { loadOdds } from "../odds";
 import type { Odds } from "../odds";
@@ -1826,6 +1827,7 @@ function OptionSim({ odds }: { odds: Odds }) {
           item={item}
           onBack={() => setName("")}
           verb={source.name === "옵션 재설정" ? "재설정" : "굴리기"}
+          reset={source.name === "옵션 재설정"}
           game={`opt:${source.key}:${item.name}`.slice(0, 60)}
           cat="option"
         />
@@ -1852,7 +1854,7 @@ function OptionSim({ odds }: { odds: Odds }) {
 /** 한꺼번에 나온 옵션이 이만큼(이상) 나올 확률 (값이 하나뿐인 옵션은 뺀다) */
 const jointP = (item: OptItem, vals: Dist["vals"][number][]) => item.opts.reduce((p, d, i) => (d.vals.length > 1 ? p * atLeast(d, vals[i].n) : p), 1);
 
-function OptionRoller({ item, onBack, verb, game, cat }: { item: OptItem; onBack?: () => void; verb: string; game?: string; cat?: Cat }) {
+function OptionRoller({ item, onBack, verb, game, cat, reset }: { item: OptItem; onBack?: () => void; verb: string; game?: string; cat?: Cat; reset?: boolean }) {
   const roll = useCallback(() => item.opts.map((d) => pick(d.vals)), [item]);
   const [vals, setVals] = useState(roll);
   const [n, setN] = useState(1);
@@ -1875,15 +1877,28 @@ function OptionRoller({ item, onBack, verb, game, cat }: { item: OptItem; onBack
   // 나올 때까지는 직접 굴려 본 값까지만 (제작자 2026-11-04 '내가 수동으로 겪은 것만 자동으로'): 옵션마다 직접 본 가장 높은 값
   const { save, update } = useSave();
   const seenKey = (i: number) => `opt:${item.name}:${i}`;
+  // 옵션 재설정은 게임처럼 '현재 옵션 / 신규 옵션' 창에서 하나를 골라 '선택' (제작자 2026-11-19 '옵션은 이런 식으로, 완전 똑같이'): 굴린 값은 신규로 두고 고르면 바뀐다
+  const [fresh, setFresh] = useState<Dist["vals"][number][] | null>(null);
   const again = () => {
     if (coins.take(1) < 1) return;
     rolls.current++;
     const got = roll();
     update((s) => got.reduce((acc, v, i) => raiseExp(acc, seenKey(i), v.n), s));
-    setVals(got);
-    setN((x) => x + 1);
     setHunt(null);
     report(got);
+    if (reset) {
+      setFresh(got);
+      return;
+    }
+    setVals(got);
+    setN((x) => x + 1);
+  };
+  const choose = (useNew: boolean) => {
+    if (useNew && fresh) {
+      setVals(fresh);
+      setN((x) => x + 1);
+    }
+    setFresh(null);
   };
   const huntGoal = () => {
     const d = item.opts[aim.i];
@@ -1938,6 +1953,7 @@ function OptionRoller({ item, onBack, verb, game, cat }: { item: OptItem; onBack
           {verb === "굴리기" ? "한 번 더" : verb}
         </button>
       </div>
+      {fresh && <ResetDialog item={item} cur={vals} next={fresh} onChoose={choose} />}
       <section className="panel sim-aim">
         <div className="mk-cats">
           {item.opts.map((o, i) => (
@@ -1971,6 +1987,52 @@ function OptionRoller({ item, onBack, verb, game, cat }: { item: OptItem; onBack
       </section>
       {game && <RankBox rec={rec} title={item.name} luck />}
     </>
+  );
+}
+
+/** 옵션 재설정 창: 게임의 '원하는 옵션을 선택하세요' 화면 (현재 옵션 / 신규 옵션 두 칸, 하나를 눌러 고르고 '선택'). 바깥을 누르거나 폰 뒤로 가기는 현재 옵션 그대로 */
+function ResetDialog({ item, cur, next, onChoose }: { item: OptItem; cur: Dist["vals"][number][]; next: Dist["vals"][number][]; onChoose: (useNew: boolean) => void }) {
+  const [sel, setSel] = useState<"cur" | "new" | null>(null);
+  const keep = () => onChoose(false);
+  useBackClose(true, keep);
+  const panel = (key: "cur" | "new", title: string, vals: Dist["vals"][number][]) => (
+    <button type="button" className={"rs-panel" + (sel === key ? " rs-on" : "")} onClick={() => setSel(key)} aria-pressed={sel === key}>
+      <span className="rs-ph">{title}</span>
+      {item.opts.map((o, i) => (
+        <span key={i} className="rs-row">
+          <span>{o.label}</span>
+          <b>{vals[i]?.v}</b>
+        </span>
+      ))}
+    </button>
+  );
+  return createPortal(
+    <div className="rs-back" onClick={keep} role="presentation">
+      <div className="rs-wrap" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="옵션 재설정">
+        <div className="rs-title">옵션 재설정</div>
+        <div className="rs-frame">
+          <i className="rs-rv rs-tl" />
+          <i className="rs-rv rs-tr" />
+          <i className="rs-rv rs-bl" />
+          <i className="rs-rv rs-br" />
+          <p className="rs-ask">원하는 옵션을 선택하세요.</p>
+          <div className="rs-item">
+            <span className="rs-icon">
+              <NameIcon name={item.name} size={44} />
+            </span>
+            <b className="rs-name">{item.name}</b>
+          </div>
+          <div className="rs-cols">
+            {panel("cur", "현재 옵션", cur)}
+            {panel("new", "신규 옵션", next)}
+          </div>
+          <button type="button" className="rs-ok" disabled={!sel} onClick={() => onChoose(sel === "new")}>
+            선택
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
