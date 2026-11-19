@@ -766,3 +766,5 @@ button.sim-kind { cursor: pointer; }
 }
 @keyframes rk-promo-still { 0%, 90% { opacity: 1; } 100% { opacity: 0; } }
 .sim-pick.sim-lock .sim-pic { filter: grayscale(1); }
+/* 강화 단추의 마법서 등급 (D·C·B·A·S·SS, 2026-11-20) */
+.sim-grade { font-size: 10px; font-weight: 800; padding: 0 3px; margin-left: 2px; border: 1px solid currentColor; opacity: 0.8; line-height: 1.3; }

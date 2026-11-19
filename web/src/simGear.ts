@@ -37,6 +37,12 @@ const num = (s: string | undefined) => {
 const squash = (s: string) => s.replace(/\s/g, "");
 
 /** 노작 값 (코인): 무기 Lv.10 10 · Lv.27 28 · Lv.40 47 · Lv.52 67, 방어구는 그 절반쯤 */
+/** 강화 한 번(마법서 한 장) 값 (제작자 2026-11-20 '주문서 SS S A B C D 비용 에스컬레이션' -> 표를 보이니 '좀만 더 싸게'):
+ *  등급은 장비 요구 레벨로 (도감 계산기와 같다: D 10 미만 · C 20 미만 · B 30 미만 · A 40 미만 · S 50 미만 · SS), 마법서 종류(일반·축복·아바돈 …)와는 상관없다 */
+export type ScrollGrade = "D" | "C" | "B" | "A" | "S" | "SS";
+export const scrollGrade = (lv: number): ScrollGrade => (lv < 10 ? "D" : lv < 20 ? "C" : lv < 30 ? "B" : lv < 40 ? "A" : lv < 50 ? "S" : "SS");
+export const SCROLL_COIN: Record<ScrollGrade, number> = { D: 1, C: 1, B: 2, A: 3, S: 4, SS: 6 };
+export const scrollCost = (g: { lv: number }) => SCROLL_COIN[scrollGrade(g.lv)];
 export const gearPrice = (part: Part, lv: number) => (part === "무기" ? 5 + Math.round(lv ** 1.5 / 6) : 3 + Math.round(lv ** 1.5 / 10));
 
 function tableRows(odds: Odds, key: string) {
@@ -98,7 +104,7 @@ export function gearValue(g: Gear, lv: number, scrolls: Scroll[]): number {
     for (const rates of [s.rates, s.event]) {
       if (!rates) continue;
       const e = expectedTo((k) => rates[k] ?? 0, s.keep, 0, lv);
-      if (e) cost = Math.min(cost, g.price + e.tries + e.broken * g.price);
+      if (e) cost = Math.min(cost, g.price + e.tries * scrollCost(g) + e.broken * g.price);
     }
   }
   if (!Number.isFinite(cost)) return Math.max(1, Math.floor(g.price / 2));
@@ -146,9 +152,9 @@ export function startRun(g: Gear, prev: Held | null): Pick<Held, "cost" | "used"
   const go = prev && prev.broken && prev.name === g.name && prev.cost !== undefined;
   return go ? { cost: prev.cost! + g.price, used: prev.used ?? 0, broke: prev.broke ?? 0 } : { cost: g.price, used: 0, broke: 0 };
 }
-/** 마법서 한 장을 쓴 뒤의 비용 (broke 면 부서진 수도) */
-export const spendRun = (h: Held, broke = false): Pick<Held, "cost" | "used" | "broke"> =>
-  h.cost === undefined ? {} : { cost: h.cost + 1, used: (h.used ?? 0) + 1, broke: (h.broke ?? 0) + (broke ? 1 : 0) };
+/** 마법서 한 장(값 c 코인)을 쓴 뒤의 비용 (broke 면 부서진 수도) */
+export const spendRun = (h: Held, broke = false, c = 1): Pick<Held, "cost" | "used" | "broke"> =>
+  h.cost === undefined ? {} : { cost: h.cost + c, used: (h.used ?? 0) + 1, broke: (h.broke ?? 0) + (broke ? 1 : 0) };
 const heldKey = (id: string, part: Part) => `sapphire.sim.held.${id}.${part}`;
 export function loadHeld(id: string, part: Part): Held | null {
   try {

@@ -10,7 +10,7 @@ import { useEntryState } from "../router";
 import { BOX_CATS, atLeast, boxFor, boxesOf, expectedTo, gemBox, gemIdOf, gemKinds, gemSynth, optTitle, optionFor, optionSources, pick, repairItems, scrollsOf, stepsExpected, stepsOf, tierOf } from "../sim";
 import type { Box, Dist, OptItem, OptSource, Part, Scroll, Steps } from "../sim";
 import { FitLine, Loading, PicImg, TopBar } from "../ui";
-import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, gearOf, gearPower, gearStat, gearValue, repairCost, spendRun, startRun, unlockCost } from "../simGear";
+import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, scrollCost, scrollGrade, gearOf, gearPower, gearStat, gearValue, repairCost, spendRun, startRun, unlockCost } from "../simGear";
 import type { ArmorSlot, Gear, GearJob, Held } from "../simGear";
 import type { Wiki } from "../types";
 import { JOB_NAME } from "../auth";
@@ -1088,7 +1088,8 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
       const cur = h.lv;
       const p = rates[cur + 1] ?? 0;
       if (!(p > 0)) return false;
-      if (coins.take(1) < 1) {
+      const sc = scrollCost(g);
+      if (coins.take(sc) < sc) {
         setAuto(false);
         return false;
       }
@@ -1099,7 +1100,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
         setCombo(comboRef.current);
       }
       // 비용 순위: 위험한 강화에 성공하면 그 강화도까지 쓴 코인을 내 최저 기록과 견주어, 더 적게 썼을 때만 보낸다
-      const run = spendRun(h);
+      const run = spendRun(h, false, sc);
       if (ok && p < 1 && !h.tainted && run.cost !== undefined) {
         const key = upGame(g.name, scroll.name, cur + 1, evOn);
         const cost = run.cost;
@@ -1117,7 +1118,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
         setRankLv(cur + 1);
       }
       if (ok && !h.tainted) emit({ kind: "enh", part: scroll.part, scroll: scroll.name, level: cur + 1, combo: comboRef.current });
-      setStats((s) => ({ ...s, tries: s.tries + 1, coins: s.coins + 1, broke: s.broke + (!ok && !scroll.keep && p < 1 ? 1 : 0), best: Math.max(s.best, ok ? cur + 1 : cur) }));
+      setStats((s) => ({ ...s, tries: s.tries + 1, coins: s.coins + sc, broke: s.broke + (!ok && !scroll.keep && p < 1 ? 1 : 0), best: Math.max(s.best, ok ? cur + 1 : cur) }));
       setLog((l) => [...l.slice(-39), { to: cur + 1, ok, broke: !ok && !scroll.keep }]);
       // 강화 도감(best)에 닿은 강화도를 적고, 앞 장비 기준(+8·+6)에 닿으면 다음 장비를 연다
       if (ok)
@@ -1140,7 +1141,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
         setFx((f) => ({ kind: "keep", n: (f?.n ?? 0) + 1 }));
       } else {
         brokeAt.current = Date.now();
-        setHeld({ ...h, ...spendRun(h, true), tries, broken: true }, scroll.part);
+        setHeld({ ...h, ...spendRun(h, true, sc), tries, broken: true }, scroll.part);
         setFx((f) => ({ kind: "break", n: (f?.n ?? 0) + 1 }));
         setGain(null);
       }
@@ -1382,9 +1383,9 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
             </div>
           ) : (
             <div className="sim-actions sim-actions-enh">
-              <Act className="btn sim-go" busy={auto || !!charge} lock={!(p > 0) ? "더 올릴 수 없어요" : coins.coins === 0 && NO_COIN} onClick={press}>
-                강화
-                <Cost n={1} />
+              <Act className="btn sim-go" busy={auto || !!charge} lock={!(p > 0) ? "더 올릴 수 없어요" : (coins.coins ?? 0) < scrollCost(gear!) && NO_COIN} onClick={press}>
+                강화 <small className="sim-grade">{scrollGrade(gear!.lv)}</small>
+                <Cost n={scrollCost(gear!)} />
               </Act>
               {!autoOn ? (
                 <Act className="btn btn-ghost sim-unlock" busy={unlocking || coins.coins === null} lock={(coins.coins ?? 0) < unlockCost(gear!, "auto") && `자동 강화 해금 · ${NO_COIN}`} onClick={() => doUnlock(autoKey, unlockCost(gear!, "auto"))}>
@@ -1403,7 +1404,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
                     onClick={() => setAuto(!auto)}
                   >
                     {auto ? "멈춤" : lv >= expMax ? "자동" : `+${autoGoal} 자동`}
-                    {!auto && <Cost n={1} per />}
+                    {!auto && <Cost n={scrollCost(gear!)} per />}
                   </Act>
                   <button type="button" className="pill" onClick={() => setGoal(Math.min(15, expMax, autoGoal + 1))} aria-label="목표 올리기">
                     +
