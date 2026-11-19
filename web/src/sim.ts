@@ -335,6 +335,23 @@ export interface GemKind {
   skill: string;
   p: number;
 }
+const GEM_NAME = /^(\S+?)의(\S+)\s*\((\d)단계\)\s*\((힘|민첩|지능|체력)\s*(\d+),\s*(.+)\)$/;
+/** 보석 이름으로 열쇠: '시프넬의흑요석 (1단계) (힘 1, 여신의축복 8)' -> '1:시프넬:힘'. 보석이 아니면 null (상자에서 나온 보석을 보석 칸에 넣을 때) */
+export function gemIdOf(name: string): string | null {
+  const m = GEM_NAME.exec(name.trim());
+  return m ? `${m[3]}:${m[1]}:${m[4]}` : null;
+}
+/** 보석 뽑기: 영웅의 보석상자 (공식 표 20101, 가챠 '이노티아의 보석들'). 보석 여든 가지, 1단계 75 · 2단계 20 · 3단계 4.5 · 4단계 0.5% */
+export function gemBox(odds: Odds): { id: string; st: number; p: number }[] {
+  const t = odds.tables.find((x) => x.key === "20101");
+  const out: { id: string; st: number; p: number }[] = [];
+  for (const r of t?.sections[0]?.r ?? []) {
+    const id = gemIdOf(r[0] ?? "");
+    const p = pct(r[r.length - 1]);
+    if (id && p > 0) out.push({ id, st: Number(id[0]), p });
+  }
+  return out;
+}
 export function gemKinds(odds: Odds): Record<number, GemKind[]> {
   const t = odds.tables.find((x) => x.key === "30201");
   const out: Record<number, GemKind[]> = {};

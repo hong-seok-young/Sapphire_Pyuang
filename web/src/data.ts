@@ -186,6 +186,8 @@ export interface Craft { to: [string, number | string][]; ins: [string, number][
 export interface Book {
   built: string; src: { book: string }; items: Record<string, BookVariant[]>; abbr: Record<string, string[]>; slang: Record<string, string>;
   craft?: Craft[]; use?: Record<string, number[]>; make?: Record<string, number[]>;
+  /** 펫 도감에 나오는 차례 (옛날 펫부터, build_book.py): 확률 시뮬레이터 펫 추가 옵션의 차례 */
+  pets?: string[];
 }
 let bookPromise: Promise<Book> | null = null;
 /** 한 번 받으면 이번에 연 동안 그대로. 못 받으면 다음에 다시 */

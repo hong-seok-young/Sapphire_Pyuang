@@ -412,6 +412,8 @@ def main() -> None:
 
     # 3) 도감 퀘스트: 그 아이템이 들어가는 항목 (이름, 강화, 개수)
     dex = _read("dex.json") or {}
+    # 펫 도감에 나오는 차례 (게임 도감 목록 순서 = 옛날 펫부터): 확률 시뮬레이터 '펫 추가 옵션'이 이 차례로 하나씩 연다
+    pet_order: list[str] = []
     for e in dex.get("entries", []):
         if e.get("period"):
             continue  # 기간이 있는 이벤트 도감은 도감 계산기에서만 (기간이 끝나면 화면이 빼는데 책은 배포 때만 다시 만들어서)
@@ -420,6 +422,8 @@ def main() -> None:
             if not it.get("name"):
                 continue
             base = re.sub(r"^\+\d+\s*", "", it["name"]).strip()
+            if t == "펫" and base not in pet_order:
+                pet_order.append(base)
             v = variant_any(t, base)
             row = [e["name"], it.get("plus") or 0, it.get("n") or 1]
             if row not in v.setdefault("dex", []):
@@ -530,7 +534,7 @@ def main() -> None:
             keep[key] = vs
     out = {"built": date.today().isoformat(),
            "src": {"book": "게임 도감 정보 (2026-11-11 녹화)"},
-           "items": keep, "abbr": abbr, "slang": slang, "craft": craft, "use": use, "make": make}
+           "items": keep, "abbr": abbr, "slang": slang, "craft": craft, "use": use, "make": make, "pets": pet_order}
     (OUT / "book.json").write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     count = lambda f: sum(1 for vs in keep.values() if any(f(v) for v in vs))
     print("아이템 책", {"이름": len(keep), "위키에 없는 이름": sum(1 for k in keep if k not in wiki), "그림": count(lambda v: v.get("pic")),
