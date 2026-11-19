@@ -435,30 +435,71 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
     return { done: sum(eff.filter((e) => myDone.has(e.name))), todo: sum(eff.filter((e) => !myDone.has(e.name))), doneN, todoN: dex.entries.length - doneN };
   }, [dex, myDone, price, pset, basis, other]);
 
+  // 초안 고르기 (이 기기 localStorage sapphire.dex.draft 1~5, 확인 전)
+  const draft = other ? 0 : readJson<number>("sapphire.dex.draft", 0);
+  const catStat = (c: string) => {
+    const list = c === "all" ? dex.entries : dex.entries.filter((e) => (e.cat ?? "일반") === c);
+    const d = list.filter((e) => myDone.has(e.name)).length;
+    return { d, n: list.length, p: list.length ? Math.floor((d / list.length) * 100) : 0 };
+  };
+  const allPct = catStat("all").p;
+  const costEl = price && tot && todoListed.length > 0 && tot.slots > 0
+    ? <CostPanel price={price} tot={tot} pset={pset} setPset={setPset} canEdit={canSetPrice} basis={basis} setBasis={setBasis} draft={draft} filled={mineCost?.done ?? null} pct={allPct} />
+    : null;
+
   return (
-    <div className="dex">
+    <div className={"dex" + (draft ? ` dex-d${draft}` : "")}>
       <nav className="pill-row dex-mode" role="tablist">
-        <button type="button" role="tab" aria-selected={!other} className={"pill" + (!other ? " pill-on" : "")} onClick={() => setMode("mine")}>
-          내 도감 <small>{myDone.size}</small>
+        <button type="button" role="tab" aria-selected={!other} className={"pill" + (!other ? " pill-on" : "") + (draft === 4 ? " dex-mode-two" : "")} onClick={() => setMode("mine")}>
+          {draft === 4 && mineCost ? (
+            <>
+              <span>내 도감 <b>{allPct}%</b></span>
+              <i>채움 {intUnit(mineCost.done)} · {myDone.size.toLocaleString("ko-KR")}개</i>
+            </>
+          ) : (
+            <>내 도감 <small>{draft ? `${allPct}%` : myDone.size}</small></>
+          )}
         </button>
         <button type="button" role="tab" aria-selected={other} className={"pill" + (other ? " pill-on" : "")} onClick={() => setMode("other")}>
           다른 캐릭
         </button>
       </nav>
-      {!other && mineCost && <MineCost c={mineCost} />}
+      {!other && mineCost && draft === 0 && <MineCost c={mineCost} />}
+      {draft === 3 && mineCost && (
+        <div className="dex-band">
+          <i style={{ width: `${allPct}%` }} />
+          <span>{allPct}% · 채움 {intUnit(mineCost.done)} · {myDone.size.toLocaleString("ko-KR")} / {dex.entries.length.toLocaleString("ko-KR")}</span>
+        </div>
+      )}
+      {draft === 5 && costEl}
       <StatPanel other={other} have={have} full={full} over={over} setOver={setOver} sel={sel} onPick={pickStat} doneN={doneEntries.length} total={dex.entries.length}
         goalOf={price ? exactGoalOf : null} stepsOf={(k) => planFor(k).map((x) => x.v)} withEv={withEv} setWithEv={setWithEv} />
 
+      {draft === 2 ? (
+        <div className="dex-catcells">
+          {CATS.map((c) => {
+            const st = catStat(c);
+            return st.n ? (
+              <button key={c} type="button" className={"dex-catcell" + (cat === c ? " dex-catcell-on" : "")} onClick={() => setCat(c)}>
+                <small>{c === "all" ? "전체" : c}</small>
+                <b>{st.p}%</b>
+                <i><i style={{ width: `${st.p}%` }} /></i>
+              </button>
+            ) : null;
+          })}
+        </div>
+      ) : (
       <div className="mk-cats dex-cats">
         {CATS.map((c) => {
-          const n = c === "all" ? dex.entries.length : dex.entries.filter((e) => (e.cat ?? "일반") === c).length;
-          return n ? (
+          const st = catStat(c);
+          return st.n ? (
             <button key={c} type="button" className={"sub-tab" + (cat === c ? " sub-tab-on" : "")} onClick={() => setCat(c)}>
-              {c === "all" ? "전체" : c} <small>{n}</small>
+              {c === "all" ? "전체" : c} <small>{draft ? `${st.p}%` : st.n}</small>
             </button>
           ) : null;
         })}
       </div>
+      )}
 
       {cat === "펫" && rewards.length > 0 && (
         <p className="dex-petrw">
@@ -475,6 +516,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
         {TABS.map((x) => (
           <button key={x.key} type="button" role="tab" aria-selected={tab === x.key} className={"pill" + (tab === x.key ? " pill-on" : "")} onClick={() => setTab(x.key)}>
             {x.label} <small>{x.key === "all" ? dex.entries.length : x.key === "done" ? doneEntries.length : dex.entries.length - doneEntries.length}</small>
+            {draft === 1 && mineCost && <i className="dex-tab-gold">{intUnit(x.key === "all" ? mineCost.done + mineCost.todo : x.key === "done" ? mineCost.done : mineCost.todo)}</i>}
           </button>
         ))}
       </nav>}
@@ -531,7 +573,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
         </div>
       )}
 
-      {price && tot && todoListed.length > 0 && tot.slots > 0 && <CostPanel price={price} tot={tot} pset={pset} setPset={setPset} canEdit={canSetPrice} basis={basis} setBasis={setBasis} />}
+      {draft !== 5 && costEl}
 
       {todoListed.length > 0 && (
         <Panel className="dex-need">
@@ -900,9 +942,10 @@ function FoldHead({ open, onClick, children }: { open: boolean; onClick: () => v
   );
 }
 
-function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis }: {
+function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft = 0, filled = null, pct = 0 }: {
   price: DexPrice; tot: Totals; pset: PriceSet; setPset: (v: PriceSet) => void; canEdit: boolean;
   basis: "normal" | "event"; setBasis: (v: "normal" | "event") => void;
+  draft?: number; filled?: number | null; pct?: number;
 }) {
   const [open, setOpen] = useState(false);
   // 마법서·스탬프 값 칸은 접어 둔다 (제작자 2026-11-12 '마법서 가격으로 해서 접어놓고 스탬프 가격으로 해서 접어놔')
@@ -948,13 +991,21 @@ function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis }: {
     <Panel className="dex-need dex-cost">
       <button type="button" className="dex-need-head" onClick={() => setOpen(!open)} aria-expanded={open}>
         <b>도감 비용</b>
-        {!open && (
+        {!open && draft === 1 ? (
+          <span className="muted">이벤트 때 {intUnit(tot.by.event.sum)} · {intUnit(tot.by.normal.sum - tot.by.event.sum)} 아낌</span>
+        ) : !open && (draft === 2 || draft === 5) && filled != null ? (
+          <span className="muted">
+            {draft === 5 && <b className="dex-cost-pct">{pct}%</b>}
+            {draft === 5 && " · "}채움 <b className="dex-cost-fill">{intUnit(filled)}</b> · 남음 <b className="dex-cost-left">{intUnit(tot.by[basis].sum)}</b> ({intUnit(tot.by[basis].sum / rate)}원)
+          </span>
+        ) : !open && (
           <span className="muted">
             평소 {intUnit(tot.by.normal.sum)} ({intUnit(tot.by.normal.sum / rate)}원) · 이벤트 {intUnit(tot.by.event.sum)} ({intUnit(tot.by.event.sum / rate)}원)
           </span>
         )}
         {on && !open && <span className="dex-sale-dot">판매 중</span>}
         <span className="dex-caret">{open ? "▲" : "▼"}</span>
+        {draft === 5 && <i className="dex-cost-bar"><i style={{ width: `${pct}%` }} /></i>}
       </button>
       {open && (
         <div className="dex-cost-body">
