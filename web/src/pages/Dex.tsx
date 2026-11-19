@@ -151,6 +151,26 @@ function writeStats(me: Me, v: Record<string, number>) {
   }
 }
 
+/** 다른 캐릭 수치 (내 도감과 따로): 완료 체크 없이 처음부터 드는 비용을 본다. 챗봇 '도감 계산기에서 보기'도 여기로 */
+type Mode = "mine" | "other";
+const otherKey = (me: Me) => `sapphire.dex.other.${me.id}`;
+const modeKey = (me: Me) => `sapphire.dex.mode.${me.id}`;
+function readJson<T>(key: string, d: T): T {
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? "null") ?? d;
+  } catch {
+    return d;
+  }
+}
+function writeJson(key: string, v: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(v));
+  } catch {
+    /* 이번에 연 동안만 */
+  }
+}
+const NONE_DONE = new Set<string>();
+
 /** 이름 찾기용: 띄어쓰기·대소문자·앞의 +N 무시 */
 const norm = (s: string) => s.replace(/\s/g, "").toLowerCase();
 /** 장비 칸인지 (강화 단계나 장비스탬프가 있다). 장비는 칸의 강화 단계와 같은 것만 등록된다: 노강 칸은 노강, +1 칸은 +1 만 (제작자 2026-11-10) */
@@ -192,8 +212,16 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
     }
   };
   const dex = useMemo(() => ({ ...all, entries: all.entries.filter((e) => isLive(e, now) && (withEv || e.cat !== "이벤트")) }), [all, liveKey, withEv]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [done, setDone] = useState<Set<string>>(() => readDone(me));
-  const [tab, setTab] = useEntryState<Tab>("dex.tab", "todo");
+  const [mode, setModeState] = useState<Mode>(() => readJson<Mode>(modeKey(me), "mine"));
+  const setMode = (m: Mode) => {
+    setModeState(m);
+    writeJson(modeKey(me), m);
+  };
+  const other = mode === "other";
+  const [myDone, setDone] = useState<Set<string>>(() => readDone(me));
+  const done = other ? NONE_DONE : myDone;
+  const [myTab, setTab] = useEntryState<Tab>("dex.tab", "todo");
+  const tab: Tab = other ? "all" : myTab;
   const [q, setQ] = useEntryState("dex.q", "");
   // 능력치 칸은 여러 개 고를 수 있다 (제작자 2026-11-12 '능력치 두 개 누르면 그 두 개를 위한 것들을, 중복 선택되게')
   const [selArr, setSel] = useEntryState<string[]>("dex.sel", []);
@@ -211,10 +239,17 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
     setListW(el.clientWidth);
     return () => ro.disconnect();
   }, []);
-  const [over, setOverState] = useState<Record<string, number>>(() => readStats(me));
+  const [myOver, setMyOver] = useState<Record<string, number>>(() => readStats(me));
+  const [otherOver, setOtherOver] = useState<Record<string, number>>(() => readJson(otherKey(me), {}));
+  const over = other ? otherOver : myOver;
   const setOver = (v: Record<string, number>) => {
-    setOverState(v);
-    writeStats(me, v);
+    if (other) {
+      setOtherOver(v);
+      writeJson(otherKey(me), v);
+    } else {
+      setMyOver(v);
+      writeStats(me, v);
+    }
   };
   // 시세 비교에서 손으로 고친 마법서·스탬프 값 (제작자 2026-11-11)
   // 마법서·스탬프·플래티넘 값: 서버 한 벌, 앱개발자만 고친다 (제작자 2026-11-12 '나만 세팅할 수 있어야')
@@ -225,6 +260,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   const iconOf: IconOf = useMemo(() => (wiki ? iconLookup(wiki, null) : () => null), [wiki]);
 
   const toggle = (name: string) => {
+    if (other) return;
     const next = new Set(done);
     if (next.has(name)) next.delete(name);
     else next.add(name);
@@ -392,7 +428,15 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
 
   return (
     <div className="dex">
-      <StatPanel have={have} full={full} over={over} setOver={setOver} sel={sel} onPick={pickStat} doneN={doneEntries.length} total={dex.entries.length}
+      <nav className="pill-row dex-mode" role="tablist">
+        <button type="button" role="tab" aria-selected={!other} className={"pill" + (!other ? " pill-on" : "")} onClick={() => setMode("mine")}>
+          내 도감 <small>{myDone.size}</small>
+        </button>
+        <button type="button" role="tab" aria-selected={other} className={"pill" + (other ? " pill-on" : "")} onClick={() => setMode("other")}>
+          다른 캐릭
+        </button>
+      </nav>
+      <StatPanel other={other} have={have} full={full} over={over} setOver={setOver} sel={sel} onPick={pickStat} doneN={doneEntries.length} total={dex.entries.length}
         goalOf={price ? exactGoalOf : null} stepsOf={(k) => planFor(k).map((x) => x.v)} withEv={withEv} setWithEv={setWithEv} />
 
       <div className="mk-cats dex-cats">
@@ -417,13 +461,13 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
         </p>
       )}
 
-      <nav className="pill-row" role="tablist">
+      {!other && <nav className="pill-row" role="tablist">
         {TABS.map((x) => (
           <button key={x.key} type="button" role="tab" aria-selected={tab === x.key} className={"pill" + (tab === x.key ? " pill-on" : "")} onClick={() => setTab(x.key)}>
             {x.label} <small>{x.key === "all" ? dex.entries.length : x.key === "done" ? doneEntries.length : dex.entries.length - doneEntries.length}</small>
           </button>
         ))}
-      </nav>
+      </nav>}
 
       <div className="mk-search">
         <input className="mk-input" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="항목 · 아이템 이름" aria-label="도감 찾기" />
@@ -522,7 +566,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
 
       <ul className="dex-list" ref={listRef}>
         {listed.map((e) => (
-          <EntryRow key={e.name} e={e} listW={listW} done={done.has(e.name)} onToggle={() => toggle(e.name)} iconOf={iconOf} sel={sel} onItem={(name) => setQ(name)} wiki={wiki} price={price} pset={pset} />
+          <EntryRow key={e.name} e={e} listW={listW} noCheck={other} done={done.has(e.name)} onToggle={() => toggle(e.name)} iconOf={iconOf} sel={sel} onItem={(name) => setQ(name)} wiki={wiki} price={price} pset={pset} />
         ))}
       </ul>
       {!listed.length && !(solving && multiOn) && <p className="muted dex-empty">맞는 항목이 없어요</p>}
@@ -536,8 +580,8 @@ interface Goal { steps: GoalStep[]; gold: number; unknown: number; reached: bool
 /** 획득 옵션: 게임 창의 37줄을 비슷한 것끼리 좌우 두 칸으로 (OPTION_PAIRS). 칸마다 이름, 그 아래 '최대'(도감을 다 채웠을 때, 제작자 2026-11-10 '최대치만'),
  *  오른쪽 숫자 칸은 완료로 누른 항목의 합, 거기에 목표를 적거나 좌우로 끌면 이름 아래에 그 수치까지 1 당 싼 항목부터 채우는 골드와 항목 수 (제작자 2026-11-12),
  *  이름을 누르면 그 항목들이 싼 순서로 아래 목록에 (슬라이더는 '바를 빼는 게 좋을 듯'으로 뺐다) */
-function StatPanel({ have, full, over, setOver, sel, onPick, doneN, total, goalOf, stepsOf, withEv, setWithEv }: {
-  have: Sum; full: Sum; over: Record<string, number>; setOver: (v: Record<string, number>) => void;
+function StatPanel({ other, have, full, over, setOver, sel, onPick, doneN, total, goalOf, stepsOf, withEv, setWithEv }: {
+  other: boolean; have: Sum; full: Sum; over: Record<string, number>; setOver: (v: Record<string, number>) => void;
   sel: Set<string>; onPick: (k: string) => void; doneN: number; total: number;
   goalOf: ((k: string, target: number) => Goal | "busy" | null) | null; stepsOf: (k: string) => number[];
   withEv: boolean; setWithEv: (v: boolean) => void;
@@ -650,7 +694,7 @@ function StatPanel({ have, full, over, setOver, sel, onPick, doneN, total, goalO
     );
   };
   return (
-    <Panel className="dex-sum" title={<>획득 옵션 <small className="muted">완료 {doneN} / {total}</small></>}>
+    <Panel className="dex-sum" title={other ? <>다른 캐릭 수치 <small className="muted">처음부터 · 최저가</small></> : <>획득 옵션 <small className="muted">완료 {doneN} / {total}</small></>}>
       {shown.length ? (
         <div className="dex-cells">
           {shown.map(([a, b], i) => [cell(a, i * 2), cell(b, i * 2 + 1)])}
@@ -718,8 +762,8 @@ function ItemInfo({ it, wiki }: { it: DexItem; wiki: Wiki | null }) {
   );
 }
 
-function EntryRow({ e, listW, done, onToggle, iconOf, sel: stats, onItem, wiki, price, pset }: {
-  e: DexEntry; listW: number; done: boolean; onToggle: () => void; iconOf: IconOf; sel: Set<string>; onItem: (name: string) => void; wiki: Wiki | null;
+function EntryRow({ e, listW, noCheck, done, onToggle, iconOf, sel: stats, onItem, wiki, price, pset }: {
+  e: DexEntry; listW: number; noCheck?: boolean; done: boolean; onToggle: () => void; iconOf: IconOf; sel: Set<string>; onItem: (name: string) => void; wiki: Wiki | null;
   price?: DexPrice; pset: PriceSet;
 }) {
   const [sel, setSel] = useState<number | null>(null);
@@ -739,10 +783,10 @@ function EntryRow({ e, listW, done, onToggle, iconOf, sel: stats, onItem, wiki, 
   const sz = slotSize(e.items.length, listW);
   const box = sz ?? 28;
   return (
-    <li ref={ref} className={"dex-entry" + (done ? " dex-done" : "") + (sz === null ? " dex-entry-wide" : "")}>
-      <button type="button" className="dex-check" onClick={onToggle} aria-pressed={done} aria-label={done ? "완료 취소" : "완료"}>
+    <li ref={ref} className={"dex-entry" + (done ? " dex-done" : "") + (sz === null ? " dex-entry-wide" : "") + (noCheck ? " dex-entry-nocheck" : "")}>
+      {!noCheck && <button type="button" className="dex-check" onClick={onToggle} aria-pressed={done} aria-label={done ? "완료 취소" : "완료"}>
         {done ? "✓" : ""}
-      </button>
+      </button>}
       <div className="dex-main">
         <div className="dex-title">
           <b>{e.name}</b>
@@ -1290,7 +1334,10 @@ export function DexSnippet({ spec }: { spec: string }) {
     );
   if (!all || !plan || !plan.targets.size) return null;
   const goDex = () => {
-    if (me) writeStats(me, Object.fromEntries(plan.targets));
+    if (me) {
+      writeJson(otherKey(me), Object.fromEntries(plan.targets));
+      writeJson(modeKey(me), "other");
+    }
     window.location.hash = "#/dex";
   };
   return (
