@@ -5654,3 +5654,14 @@ a.cf-at { color: #9fb4ff; }
 .dex-ctab-diff { border-left: 1px dashed rgba(169, 162, 207, 0.3); }
 .dex-ctab-c.dex-ctab-diff b { font-size: 13px; color: #3fe0a0; opacity: 1; white-space: nowrap; }
 .dex-ctab-c b, .dex-ctab-c small { white-space: nowrap; }
+
+/* 도감 완료 체크 백업 (pages/DexBackup.tsx) */
+.dexbk .rn-say { margin-top: 2px; }
+.dexbk-toast {
+  position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  z-index: 260; max-width: calc(100vw - 32px); padding: 8px 12px; border-radius: 10px;
+  background: rgb(20 40 30 / 0.95); border: 1px solid #4fd18b; color: #c9f5dc; font-size: 12px; text-align: center;
+  animation: dexbk-in 0.25s ease-out;
+}
+@keyframes dexbk-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .dexbk-toast { animation: none; } }

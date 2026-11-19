@@ -917,6 +917,27 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
   }
 }
 
+// 도감 계산기 완료 체크 백업 알림 (제작자 2026-11-19 '섬예님 어디든 접속하면 안내 뜨게, 알림도 하나 보내 주고'):
+// 서버에 백업(dex_done)이 아직 없는 server/dexBackup.ts 명단의 사람에게 한 번. 폰 알림은 push_queue. setup 'dex_backup_notice_20261119'
+{
+  const KEY = "dex_backup_notice_20261119";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    const now = Date.now();
+    const NOT_DONE = `NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}')`;
+    runSql([
+      "INSERT INTO alerts (user_id, kind, text, link, created_at) " +
+        `SELECT u.id, 'account', '[도감 계산기] 완료 체크해 두신 기록을 서버에 백업해 드려요 · 체크해 둔 PC로 사이트를 한 번만 열어 주세요 · 그 뒤로는 폰에서도 같이 보여요', '#/dex', ${now} ` +
+        "FROM users u WHERE u.id IN ('섬예') AND u.main_id IS NULL " +
+        "AND NOT EXISTS (SELECT 1 FROM dex_done d WHERE d.n > 0 AND (d.user_id = u.id OR d.user_id IN (SELECT id FROM users WHERE main_id = u.id))) " +
+        `AND ${NOT_DONE};`,
+      `INSERT INTO push_queue (kind, created_at, last, claimed_at) SELECT 'account', ${now}, '', NULL WHERE EXISTS (SELECT 1 FROM alerts WHERE kind = 'account' AND created_at = ${now}) AND ${NOT_DONE};`,
+      `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`,
+    ]);
+    const n = queryFirst(`SELECT COUNT(*) AS n FROM alerts WHERE kind = 'account' AND created_at = ${now}`)?.n ?? 0;
+    console.log(`도감 백업 알림 ${n}명 (한 번)`);
+  }
+}
+
 // 시리온 통제 리스트를 공지사항으로 (제작자 2026-11-10 '우리 길드는 중립길드야, 이 몹들을 잡으면 안 되는 통제 리스트, 길드의 공지사항에 넣어줘, 글쓴이는 사파이어로').
 // 비공개 자료 길드/통제_리스트.json 과 표 그림으로 글(고정)·그림 첨부·모두에게 알림 (scripts/controlNotice.mjs). setup 'control_notice_20261110' 로 한 번만
 {

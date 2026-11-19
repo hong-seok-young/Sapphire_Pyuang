@@ -4,6 +4,7 @@
 import { NEED_LOGIN, currentUser, json, meInfo, renewSession } from "../../server/auth";
 import type { Env } from "../../server/auth";
 import { grantRentDonation } from "../../server/donate";
+import { dexBackupAsk } from "../../server/dexBackup";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil }) => {
   const me = await currentUser(env, request);
@@ -12,5 +13,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
   waitUntil(grantRentDonation(env, me).catch((e) => console.error("rent donor grant", e instanceof Error ? e.message : e)));
   // 세션 늘리기와 내 정보를 한꺼번에 (앱을 열 때마다 부른다)
   const [renewed, info] = await Promise.all([renewSession(env, request), meInfo(env, me)]);
-  return json(info, 200, renewed ? { "set-cookie": renewed } : {});
+  // 도감 완료 체크 백업을 기다리는 사람 (server/dexBackup.ts, 명단에 있을 때만 읽는다)
+  const ids = info.characters?.map((c) => c.id) ?? [me.id];
+  const ask = await dexBackupAsk(env, ids).catch(() => false);
+  return json(ask ? { ...info, dexBackupAsk: true } : info, 200, renewed ? { "set-cookie": renewed } : {});
 };
