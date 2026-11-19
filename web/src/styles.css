@@ -4689,6 +4689,7 @@ button.gd-member-row { cursor: pointer; }
 .dex-cost-pct { color: #3fe0a0; }
 .dex-cost-fill { color: #3fe0a0; }
 .dex-cost-left { color: #fff; }
+@media (max-width: 359px) { .dex-cost-won { display: none; } }
 .dex-d5 .dex-cost .dex-need-head { position: relative; }
 .dex-cost-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--night-2); }
 .dex-cost-bar i { position: absolute; inset: 0 auto 0 0; background: #3fe0a0; }
