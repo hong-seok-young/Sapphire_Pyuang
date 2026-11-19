@@ -231,6 +231,7 @@
 .sim-actions-1 { grid-template-columns: minmax(0, 1fr); }
 .sim-actions-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .sim-actions-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+.sim-actions-w { width: 100%; }
 .sim-actions-enh { grid-template-columns: minmax(0, 1fr) auto; }
 .sim-actions-grow { display: flex; }
 .sim-actions-grow > .sim-go { flex: 1.4; }
@@ -518,6 +519,49 @@ button.sim-card { cursor: pointer; }
 .sim-avgs { display: flex; justify-content: center; gap: 12px; animation: sim-drop 0.3s ease-out; }
 .sim-avgs > span { display: flex; align-items: center; gap: 4px; font-size: 13px; }
 .sim-avgs .sim-gem-dot { width: 14px; height: 14px; }
+/* 단추 안의 코인 값 · 잠긴 단추 · 눌렀을 때 뜨는 안내 (제작자 2026-11-19 '비용 드는 모든 버튼은 비용을', '비활성화 상태에서 누르면 안내') */
+.sim-cost { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.btn-ghost .sim-cost, .sub-tab .sim-cost { color: var(--gold); }
+.sim-go .sim-cost, .sim-gem-go .sim-cost { color: inherit; opacity: 0.8; }
+.sim-gem-go .sim-cost { margin-left: 3px; }
+/* 한 번마다·평균 값은 단추 이름 아랫줄에 (320px 에서 한 줄에 안 들어간다) */
+.sim-actions .btn .sim-cost-sub, .sim-cost-sub { display: block; margin-left: 0; font-size: 10px; line-height: 1.15; }
+.sim-autobuy .sim-cost-sub { display: inline; margin-left: 5px; }
+.sim-until .sim-cost-sub { display: inline; margin-left: 4px; }
+.sim-lock { opacity: 0.5; }
+.sim-lock::after { display: none !important; }
+.sim-buy.sim-lock { background: rgba(169, 162, 207, 0.2); color: var(--muted); opacity: 1; }
+.sim-autobuy.sim-lock { opacity: 0.45; }
+.sim-tip { position: fixed; left: 12px; right: 12px; bottom: calc(var(--tab-h) + 86px + env(safe-area-inset-bottom)); z-index: 61; width: fit-content; max-width: calc(100% - 24px); margin: 0 auto; padding: 7px 12px; font-size: 12px; line-height: 1.35; text-align: center;
+  color: var(--text); background: var(--night-2); border: 2px solid var(--gold); box-shadow: 0 4px 0 rgba(0, 0, 0, 0.4); pointer-events: none; animation: sim-tip 2.4s ease-out forwards; }
+@keyframes sim-tip { 0% { opacity: 0; transform: translateY(8px) scale(0.96); } 6% { opacity: 1; transform: translateY(-2px) scale(1.02); } 10%, 85% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-4px); } }
+.sim-locked li { cursor: pointer; }
+
+/* 보석 세공 · 분해: 단계 고르기와 보석 스무 가지 (이름 다섯 x 능력치 넷) */
+.sim-crystal { display: block; width: auto; image-rendering: pixelated; }
+button.sim-gem { font: inherit; color: inherit; cursor: pointer; border-left: 0; border-right: 0; border-bottom: 0; }
+.sim-gems-pick .sim-gem::after { display: none; }
+.sim-gem-on { background: rgba(255, 195, 92, 0.12); box-shadow: inset 0 0 0 2px var(--gold); }
+button.sim-gem:active { transform: translateY(1px); }
+.sim-gem-back { color: var(--good, #7fe3a0); animation: sim-land 0.45s cubic-bezier(0.2, 1.8, 0.4, 1); }
+.sim-kinds { display: grid; grid-template-columns: minmax(0, 2.4fr) repeat(4, minmax(0, 1fr)); gap: 3px; padding: 8px; align-items: stretch; }
+.sim-kinds-row { display: contents; }
+.sim-kinds-h { align-self: end; text-align: center; font-size: 10px; color: var(--muted); white-space: nowrap; }
+.sim-kind-fam { display: flex; align-items: center; gap: 5px; min-width: 0; padding: 2px 0; }
+.sim-kind-fam > .sim-gem-dot { flex: none; width: 16px; height: 16px; }
+.sim-kind-fam > span { display: grid; min-width: 0; }
+.sim-kind-fam b { font-size: 12px; line-height: 1.2; white-space: nowrap; }
+.sim-kind-fam small { font-size: 9px; line-height: 1.2; color: var(--muted); white-space: nowrap; letter-spacing: -0.4px; }
+.sim-kind { position: relative; display: grid; place-items: center; min-width: 0; min-height: 32px; padding: 0; font: inherit; color: var(--text); background: rgba(11, 10, 26, 0.5); border: 1px solid rgba(169, 162, 207, 0.18); }
+.sim-kind b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.sim-kind-zero b { opacity: 0.22; }
+.sim-kind em { position: absolute; top: -5px; right: -2px; padding: 0 3px; font-style: normal; font-size: 10px; font-weight: 700; line-height: 1.3; color: var(--edge); background: var(--gold); animation: sim-land 0.45s cubic-bezier(0.2, 1.8, 0.4, 1); }
+.sim-kind-hit { border-color: var(--gold); background: rgba(255, 195, 92, 0.16); animation: sim-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1); }
+.sim-kind-hit b { color: var(--gold); }
+button.sim-kind { cursor: pointer; }
+.sim-kinds-undo button.sim-kind:not(.sim-kind-zero) { border-color: rgba(255, 195, 92, 0.55); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35); }
+.sim-kinds-undo button.sim-kind:not(.sim-kind-zero):active { transform: translateY(2px); box-shadow: none; }
+.sim-actions-cut { grid-template-columns: auto minmax(0, 1fr); }
 
 /* ---------------------------------------------------------------- 한 줄 단추 띠 (제작자 2026-11-19 '버튼들이 두 줄로 돼 있는 거 싹 한 줄로'): 같은 폭 칸, 줄이 바뀌지 않는다 */
 .sim-strip { margin: 0; gap: 4px; }

@@ -316,6 +316,39 @@ export function gemSynth(odds: Odds): Record<number, { to: number; p: number }[]
   return out;
 }
 
+// ---------------------------------------------------------------- 보석 세공 (30201): 보석결정 1개 -> 같은 단계의 보석 스무 가지 중 하나
+// 게임 '보석관리' 창 (제작자 2026-11-19 녹화): 합성 = 보석결정 3개로 한 단계 위를 노림, 세공 = 보석결정(과 기원석)으로 같은 단계의 랜덤한 보석,
+// 분해 = 보석을 그 단계의 보석결정으로. 그래서 세공으로 얻은 보석이 마음에 안 들면 분해해서 같은 단계 안에서 종류만 다시 뽑는다.
+
+export interface GemKind {
+  /** 가진 수를 적는 열쇠: '<단계>:<이름>:<능력치>' */
+  id: string;
+  st: number;
+  /** 시프넬 · 세레인 · 로베르토 · 윙프릴 · 카노스 */
+  family: string;
+  /** 보석 이름 그대로: 시프넬의흑요석 */
+  name: string;
+  /** 힘 · 민첩 · 지능 · 체력 과 그 값 */
+  stat: string;
+  value: string;
+  /** 보석마다 정해진 효과: 여신의축복 8 */
+  skill: string;
+  p: number;
+}
+export function gemKinds(odds: Odds): Record<number, GemKind[]> {
+  const t = odds.tables.find((x) => x.key === "30201");
+  const out: Record<number, GemKind[]> = {};
+  for (const s of t?.sections ?? []) {
+    for (const r of s.r) {
+      const m = /^(\S+?)의(\S+)\s*\((\d)단계\)\s*\((\S+)\s+(\d+),\s*(.+)\)$/.exec((r[0] ?? "").trim());
+      if (!m) continue;
+      const st = Number(m[3]);
+      (out[st] ??= []).push({ id: `${st}:${m[1]}:${m[4]}`, st, family: m[1], name: `${m[1]}의${m[2]}`, stat: m[4], value: m[5], skill: m[6].trim(), p: pct(r[1]) });
+    }
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- 장비 수리 (80101): 수리하면 강화도가 다시 정해진다
 
 export function repairItems(odds: Odds): OptItem[] {

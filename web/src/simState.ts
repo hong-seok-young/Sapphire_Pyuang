@@ -30,8 +30,8 @@ export interface SimSave {
   /** 옵션 재설정: 전·후 중 더 좋은 쪽을 저절로 고른다 (2026-11-19) */
   optAuto?: boolean;
   statN?: { tries: number; ok: number; big: number };
-  /** 보석 합성: 가진 보석, 합성 수, 처음 1단계 개수, 닿은 가장 높은 단계 */
-  gem?: { inv: number[]; runs: number; start: number; best: number };
+  /** 보석: 가진 보석결정(단계마다), 합성 수, 처음 1단계 개수, 닿은 가장 높은 단계. gems = 세공으로 얻은 보석 (sim.ts GemKind.id -> 수), cuts = 세공 수 */
+  gem?: { inv: number[]; runs: number; start: number; best: number; gems?: Record<string, number>; cuts?: number };
   /** 상자: 상자·묶음마다 연 수와 나온 것 */
   box?: Record<string, { opened: number; tally: Record<string, number> }>;
 }

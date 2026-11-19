@@ -17,10 +17,10 @@ export const tbl = (space: Space) => (space === "test" ? "sim_t_" : "sim_");
 export const spaceOf = (_request: Request, me: User): Space | null => (canSim(me) ? "live" : null);
 
 // 명성과 계급 (제작자 2026-11-19 '통합 랭킹, 계급으로, 수백 가지, 어디가 끝인지 모르게'): 명성 = 지금까지 쓴 코인 (sim_wallet.spent, 서버 값).
-// 계급 n 이 되는 명성 = round(10 x n^2.15) (화면 src/simTier.ts 와 같은 식: 이름·계급장은 화면이 그린다). 이번 주 명성은 week_spent (목요일 10시부터, server/week.ts)
-export const tierXp = (n: number) => Math.round(10 * Math.pow(Math.max(0, n), 2.15));
+// 계급 n 이 되는 명성 = round(10 x (n / 4)^2.15) (칭호를 66 -> 264개로 늘리며 네 배 촘촘하게. 화면 src/simTier.ts 와 같은 식: 이름·계급장은 화면이 그린다). 이번 주 명성은 week_spent (목요일 10시부터, server/week.ts)
+export const tierXp = (n: number) => Math.round(10 * Math.pow(Math.max(0, n) / 4, 2.15));
 export function rankOf(xp: number): number {
-  let n = Math.max(0, Math.floor(Math.pow(Math.max(0, xp) / 10, 1 / 2.15)));
+  let n = Math.max(0, Math.floor(4 * Math.pow(Math.max(0, xp) / 10, 1 / 2.15)));
   while (tierXp(n + 1) <= xp) n++;
   while (n > 0 && tierXp(n) > xp) n--;
   return n;

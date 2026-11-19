@@ -1,7 +1,7 @@
 // 확률 시뮬레이터 계급장 (제작자 2026-11-19 '말로만 견습 도박꾼 이렇게 하지 말고 앞에 계급장을, 누가 봐도 이 사람이 더 높구나 티나게',
 // '테두리나 애니메이션도 높아질수록 점점 추가되고 완전 고급일수록 더 삐까뻔쩍하게'). 계급 규칙은 src/simTier.ts.
 // 그림 파일 없이 28x24 도트 칸에 그린다: 재질(판 색과 모양: 나무·무쇠는 네모 판, 청동부터 방패, 금부터 성가퀴, 에메랄드부터 날개, 루비부터 꼭대기 보석),
-// 가운데 그림(동전 · 망치 · 클로버 · 보석 · 별 · 왕관), 아래 다섯 칸(그 칭호 안의 계급).
+// 가운데 그림(동전 · 망치 · 클로버 · 보석 · 별 · 왕관, 칭호 넷마다), 그 오른쪽 작은 줄 0 ~ 3개(그 넷 중 몇째), 아래 다섯 칸(그 칭호 안의 계급).
 // 움직임은 재질이 오를수록 하나씩 더한다 (은: 빛 지나감, 에메랄드: 뒤 빛이 숨 쉼, 사파이어: 반짝이, 자수정: 도는 고리, 오팔: 도는 무지개, 우주: 도는 빛살). 모두 transform·opacity 만 (sim.css .rk-*)
 import { memo, useMemo } from "react";
 import type { CSSProperties } from "react";
@@ -126,6 +126,8 @@ function draw(n: number) {
   const g = GLYPHS[t.fam];
   bitmap(g, 9, 5, "+").forEach((r, i) => els.push(rect(r, m.shade, `gs${i}`)));
   bitmap(g, 9, 5, "#").forEach((r, i) => els.push(rect(r, m.glyph, `g${i}`)));
+  // 오른쪽 작은 줄: 같은 그림을 쓰는 칭호 넷 중 몇째인가 (0 ~ 3개, 아래부터 쌓인다)
+  for (let i = 0; i < t.sub; i++) els.push(rect([20, 12 - i * 3, 2, 2], t.era === 9 ? "#2a2350" : m.glyph, `sb${i}`), rect([20, 13 - i * 3, 2, 1], t.era === 9 ? "#6a5fb0" : m.shade, `sc${i}`));
   // 아래 다섯 칸: 그 칭호 안의 계급
   for (let i = 0; i < GRADES; i++) els.push(rect([7 + i * 3, 16, 2, 2], i < t.grade ? (t.era === 9 ? "#2a2350" : m.glyph) : m.off, `pp${i}`));
   return { t, els };

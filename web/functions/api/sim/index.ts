@@ -73,10 +73,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const b = await readJson<Partial<Rec> & { feed?: unknown; promo?: unknown }>(request);
   const now = Date.now();
   const quiet = TEST_IDS.includes(me.id);
-  // 새 칭호: 다섯 계급마다. 서버가 가진 명성으로 그 계급이 맞는지 보고, 같은 칭호는 한 번만 전광판에 (코인이 저절로 채워지는 앱개발자는 남기지 않는다)
+  // 새 칭호 마디: 계급 스물마다 (칭호 넷, 계급장 그림이 바뀔 때. 화면 src/simTier.ts FEED_EVERY). 서버가 가진 명성으로 그 계급이 맞는지 보고, 같은 칭호는 한 번만 전광판에 (코인이 저절로 채워지는 앱개발자는 남기지 않는다)
   if (b.promo !== undefined) {
     const n = Math.round(Number(b.promo));
-    if (!(n >= 5 && n <= 100_000) || n % 5 !== 0) return json({ error: "계급이 맞지 않아요" }, 400);
+    if (!(n >= 20 && n <= 100_000) || n % 20 !== 0) return json({ error: "계급이 맞지 않아요" }, 400);
     if (quiet || refillable(me)) return json({ ok: true, posted: false });
     const w = await env.DB.prepare(`SELECT spent FROM ${T}wallet WHERE user_id = ?`).bind(me.id).first<{ spent: number }>();
     if (!w || rankOf(w.spent) < n) return json({ ok: true, posted: false });

@@ -1430,7 +1430,8 @@ def copy_rank_pictures():
     # 생일: 생일 스티커 (src/birthday.tsx, 자료/scripts/make_birthday_sticker.py)
     # 성장코인샵: 2군 성장코인샵 물건 칸 그림, 제작자가 보낸 거래소 스샷에서 자른 것 (src/gcoin.ts itemPic, 자료/scripts/make_gcoin_icons.py)
     # 때리기: 운영진 때리기의 데미지 숫자와 CRITICAL! · DEADLY!, 제작자가 보낸 인게임 영상에서 오린 것 (src/smackFx.ts, 자료/scripts/make_smack_marks.py)
-    for src, dst in (("랭킹", "rank"), ("중개인", "market"), ("상점", "shop"), ("시세동향", "trend"), ("생일", "birthday"), ("성장코인샵", "gcoin"), ("때리기", "smack")):
+    # 시뮬레이터: 확률 시뮬레이터 보석 칸의 보석결정 그림 (crystal1~4.png), 제작자가 보낸 게임 보석관리 창 녹화에서 오린 것 (자료/scripts/make_sim_crystals.py)
+    for src, dst in (("랭킹", "rank"), ("중개인", "market"), ("상점", "shop"), ("시세동향", "trend"), ("생일", "birthday"), ("성장코인샵", "gcoin"), ("때리기", "smack"), ("시뮬레이터", "sim")):
         out = OUT / "data" / dst
         if out.exists():
             shutil.rmtree(out)

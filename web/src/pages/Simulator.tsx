@@ -1,13 +1,13 @@
 // 확률 시뮬레이터 (개발중, 제작자 요청 2026-11-04). 자료와 규칙은 src/sim.ts (컴투스 공식 확률 표 106개).
 // 맨 위 같은 폭 단추 강화 · 성장 · 옵션 · 보석 · 뽑기, 그 아래 어두운 띠에서 고르고, 해 보면서 확률을 몸으로 느끼게 결과마다 짧은 움직임(transform·opacity 만)을 준다.
 // 아이템은 우리가 가진 그림으로 그린다 (제작자 2026-11-04 '텍스트 말고 우리 가지고 있는 이미지 써', src/simIcons.ts). 그림이 없는 것만 글자. 강화 장면 이미지·동영상을 받으면 sim-item 자리를 그 모양으로 바꾼다.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAsync } from "../data";
 import { loadOdds } from "../odds";
 import type { Odds } from "../odds";
 import { useEntryState } from "../router";
-import { BOX_CATS, GEM_NAMES, atLeast, boxFor, boxOf, boxesOf, expectedTo, gemSynth, optTitle, optionFor, optionSources, pick, repairItems, scrollsOf, stepsExpected, stepsOf, tierOf } from "../sim";
+import { BOX_CATS, atLeast, boxFor, boxesOf, expectedTo, gemKinds, gemSynth, optTitle, optionFor, optionSources, pick, repairItems, scrollsOf, stepsExpected, stepsOf, tierOf } from "../sim";
 import type { Box, Dist, OptItem, OptSource, Part, Scroll, Steps } from "../sim";
 import { FitLine, Loading, PicImg, TopBar } from "../ui";
 import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, gearOf, gearPower, gearStat, gearValue, spendRun, startRun, unlockCost } from "../simGear";
@@ -22,7 +22,7 @@ import { BAG_MAX, SaveCtx, expOf, raiseExp, useKept, useSave, useSaveState } fro
 import type { SimSave } from "../simState";
 import { QuestCtx, kstDay, todayQuests, useQuest } from "../simQuest";
 import type { SimEvent } from "../simQuest";
-import { GRADES, rankOf, tierAt, tierOfXp, tierProgress } from "../simTier";
+import { FEED_EVERY, GRADES, rankOf, tierAt, tierOfXp, tierProgress } from "../simTier";
 import type { Tier } from "../simTier";
 import { RankBadge, eraColor, fxOf } from "./SimBadge";
 import { api } from "../auth";
@@ -182,6 +182,30 @@ function Seg<T extends string | number>({ items, value, onPick, extra, className
   );
 }
 
+/** 잠긴 단추를 누르면 잠깐 뜨는 안내 (제작자 2026-11-19 '비활성화 상태에서 누르면 안내가 뜨게 해야지'). 화면에 늘 적어 두는 설명 대신 눌렀을 때만 */
+const TipCtx = createContext<(text: string) => void>(() => undefined);
+const useTip = () => useContext(TipCtx);
+const NO_COIN = "코인이 모자라요";
+/** 단추 안의 코인 값 (제작자 2026-11-19 '비용 드는 모든 버튼은 들어가는 비용을 적어 줘야지'): 한 번 값, per 이면 한 번마다, avg 면 평균 */
+function Cost({ n, per = false, avg = false }: { n: number; per?: boolean; avg?: boolean }) {
+  return (
+    <small className={"sim-cost" + (per || avg ? " sim-cost-sub" : "")}>
+      {per ? "회당 " : avg ? "평균 " : ""}
+      <i className="sim-c" aria-hidden />
+      {n >= 100 ? Math.round(n).toLocaleString() : n >= 10 ? Math.round(n) : Math.round(n * 10) / 10}
+    </small>
+  );
+}
+/** 잠길 수 있는 단추: lock 에 까닭이 있으면 흐리게 보이고, 눌러도 일은 안 하고 그 까닭을 띄운다 (disabled 로 두면 눌러도 아무 일이 없어 왜 안 되는지 모른다) */
+function Act({ lock, onClick, className = "btn", children, busy = false, ...rest }: { lock?: string | false | null; onClick: () => void; className?: string; children: React.ReactNode; busy?: boolean } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "onClick" | "className" | "children" | "disabled" | "type">) {
+  const tip = useTip();
+  return (
+    <button type="button" {...rest} className={className + (lock ? " sim-lock" : "")} aria-disabled={lock ? true : undefined} disabled={busy} onClick={() => (lock ? tip(lock) : onClick())}>
+      {children}
+    </button>
+  );
+}
+
 export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const space: Space = "live";
   const { data: odds, error } = useAsync(useCallback(() => loadOdds(), []), "odds");
@@ -237,7 +261,7 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
     const t = window.setInterval(() => document.visibilityState === "visible" && reload(), 120_000);
     return () => window.clearInterval(t);
   }, [reload]);
-  // 계급 (src/simTier.ts): 명성(쓴 코인)이 오르면 그 자리에서 승급. 새 칭호(다섯 계급마다)는 크게 축하하고 전광판에 알린다
+  // 계급 (src/simTier.ts): 명성(쓴 코인)이 오르면 그 자리에서 승급. 새 칭호(다섯 계급마다)는 크게 축하한다
   const tier = useMemo(() => tierOfXp(coin.xp), [coin.xp]);
   const seenTier = useRef<number | null>(null);
   const [promo, setPromo] = useState<{ n: number; k: number; big: boolean } | null>(null);
@@ -249,7 +273,8 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
     // 한꺼번에 여러 계급을 넘었으면 그 사이에 새 칭호가 있었는지 본다
     const big = Math.floor(tier.n / GRADES) > Math.floor(was / GRADES);
     setPromo((p) => ({ n: tier.n, k: (p?.k ?? 0) + 1, big }));
-    if (big) void sendPromo(Math.floor(tier.n / GRADES) * GRADES);
+    // 전광판에는 계급장 그림이 바뀔 때만 (칭호 넷마다: 칭호마다 알리면 전광판이 승급으로 찬다)
+    if (Math.floor(tier.n / FEED_EVERY) > Math.floor(was / FEED_EVERY)) void sendPromo(Math.floor(tier.n / FEED_EVERY) * FEED_EVERY);
   }, [tier.n, coin.wallet]);
   useEffect(() => {
     if (!promo) return;
@@ -257,6 +282,14 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
     return () => window.clearTimeout(t);
   }, [promo]);
   const [earnOpen, setEarnOpen] = useState(false);
+  // 잠긴 단추를 누르면 그 까닭이 잠깐 (같은 글을 또 눌러도 다시 톡 뜬다)
+  const [tip, setTip] = useState<{ text: string; n: number } | null>(null);
+  const showTip = useCallback((text: string) => setTip((t) => ({ text, n: (t?.n ?? 0) + 1 })), []);
+  useEffect(() => {
+    if (!tip) return;
+    const t = window.setTimeout(() => setTip(null), 2400);
+    return () => window.clearTimeout(t);
+  }, [tip]);
   // 위키에 없는 물건(코스튬 등)의 그림 목록 (시세 동향 그림, 없으면 위키 그림만)
   const [trendPics, setTrendPics] = useState<Record<string, [number, number]> | null>(null);
   useEffect(() => {
@@ -273,6 +306,7 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
     <CoinCtx.Provider value={coin}>
       <QuestCtx.Provider value={emit}>
       <IconCtx.Provider value={iconOf}>
+      <TipCtx.Provider value={showTip}>
       <TopBar title="확률 시뮬레이터" />
       <div className="pill-row sim-tabs" role="tablist">
         {TABS.map((t) => (
@@ -290,6 +324,11 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
         </div>
       )}
       {promo?.big && <PromoToast key={promo.k} n={promo.n} />}
+      {tip && (
+        <div key={tip.n} className="sim-tip" role="status">
+          {tip.text}
+        </div>
+      )}
       {!odds || !saveState.ready ? (
         <Loading error={error} />
       ) : tab === "enhance" ? (
@@ -305,6 +344,7 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
       ) : (
         <RankTab me={me} />
       )}
+      </TipCtx.Provider>
       </IconCtx.Provider>
       </QuestCtx.Provider>
     </CoinCtx.Provider>
@@ -776,6 +816,7 @@ function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClo
   }, [sellIdx]);
   const openList = list.filter((_, i) => canBuy(list, i, cleared));
   const locked = list.filter((_, i) => !canBuy(list, i, cleared));
+  const tip = useTip();
   return (
     <section className="panel sim-shop">
       <div className="mk-sub sim-shop-filter">
@@ -841,10 +882,10 @@ function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClo
               </small>
             </span>
             {cleared.has(g.name) && <span className="sim-shop-clear">+{CLEAR_LV[part]}</span>}
-            <button type="button" className="sim-buy" disabled={coins === null || coins < g.price} onClick={() => onBuy(g)}>
+            <Act className="sim-buy" busy={coins === null} lock={coins !== null && coins < g.price && `코인이 ${(g.price - coins).toLocaleString()} 모자라요`} onClick={() => onBuy(g)}>
               <i className="sim-c" aria-hidden />
               {g.price}
-            </button>
+            </Act>
           </li>
         ))}
         {!list.length && <li className="sim-muted">없음</li>}
@@ -852,7 +893,7 @@ function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClo
       {locked.length > 0 && (
         <ul className="sim-locked" aria-label="잠김">
           {locked.map((g) => (
-            <li key={g.name} title={`${g.name} Lv.${g.lv}`}>
+            <li key={g.name} title={`${g.name} Lv.${g.lv}`} onClick={() => tip(`${g.name} · ${list[list.indexOf(g) - 1]?.name ?? "앞 장비"} +${CLEAR_LV[part]} 먼저`)}>
               {g.icon ? <PicImg pic={g.icon} fit={24} className="sim-pic" /> : null}
               <small>{g.lv}</small>
             </li>
@@ -1310,43 +1351,39 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
 
           {broken && !auto ? (
             <div className="sim-actions sim-actions-2">
-              <button type="button" className="btn sim-go" disabled={!buyable(gear!) || coins.coins === null || coins.coins < gear!.price} onClick={() => buy(gear!)}>
+              <Act className="btn sim-go" busy={coins.coins === null} lock={!buyable(gear!) ? `앞 장비 +${CLEAR_LV[part]} 먼저` : (coins.coins ?? 0) < gear!.price && NO_COIN} onClick={() => buy(gear!)}>
                 다시 사기
-                <small>
-                  <i className="sim-c" aria-hidden />
-                  {gear!.price}
-                </small>
-              </button>
+                <Cost n={gear!.price} />
+              </Act>
               <button type="button" className="btn btn-ghost" onClick={() => setShop(true)}>
                 다른 장비
               </button>
             </div>
           ) : (
             <div className="sim-actions sim-actions-enh">
-              <button type="button" className="btn sim-go" disabled={!(p > 0) || auto || !!charge || coins.coins === 0} onClick={press}>
+              <Act className="btn sim-go" busy={auto || !!charge} lock={!(p > 0) ? "더 올릴 수 없어요" : coins.coins === 0 && NO_COIN} onClick={press}>
                 강화
-              </button>
+                <Cost n={1} />
+              </Act>
               {!autoOn ? (
-                <button
-                  type="button"
-                  className="btn btn-ghost sim-unlock"
-                  disabled={unlocking || coins.coins === null || coins.coins < unlockCost(gear!, "auto")}
-                  onClick={() => doUnlock(autoKey, unlockCost(gear!, "auto"))}
-                >
-                  자동
-                  <small>
-                    <i className="sim-c" aria-hidden />
-                    {unlockCost(gear!, "auto")}
-                  </small>
-                </button>
+                <Act className="btn btn-ghost sim-unlock" busy={unlocking || coins.coins === null} lock={(coins.coins ?? 0) < unlockCost(gear!, "auto") && `자동 강화 해금 · ${NO_COIN}`} onClick={() => doUnlock(autoKey, unlockCost(gear!, "auto"))}>
+                  자동 해금
+                  <Cost n={unlockCost(gear!, "auto")} />
+                </Act>
               ) : (
                 <span className="sim-goal">
                   <button type="button" className="pill" onClick={() => setGoal(Math.max(lv + 1, autoGoal - 1))} aria-label="목표 내리기">
                     −
                   </button>
-                  <button type="button" className={"btn btn-ghost" + (auto ? " sim-running" : "")} disabled={!!charge || (!auto && lv >= autoGoal)} onClick={() => setAuto(!auto)}>
-                    {auto ? "멈춤" : lv >= expMax ? "직접 먼저" : `+${autoGoal} 자동`}
-                  </button>
+                  <Act
+                    className={"btn btn-ghost" + (auto ? " sim-running" : "")}
+                    busy={!!charge}
+                    lock={auto ? null : lv >= expMax ? `자동은 직접 띄워 본 강화까지만 · +${lv + 1} 을 직접 먼저` : lv >= autoGoal ? "목표를 올려요" : coins.coins === 0 && NO_COIN}
+                    onClick={() => setAuto(!auto)}
+                  >
+                    {auto ? "멈춤" : lv >= expMax ? "자동" : `+${autoGoal} 자동`}
+                    {!auto && <Cost n={1} per />}
+                  </Act>
                   <button type="button" className="pill" onClick={() => setGoal(Math.min(15, expMax, autoGoal + 1))} aria-label="목표 올리기">
                     +
                   </button>
@@ -1356,20 +1393,13 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
                 (buyOn ? (
                   <button type="button" aria-pressed={autoBuy} className={"sim-autobuy sub-tab" + (autoBuy ? " sub-tab-on" : "")} onClick={() => setAutoBuy(!autoBuy)}>
                     자동 구매
+                    <Cost n={gear!.price} per />
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    className="sim-autobuy sim-unlock sub-tab"
-                    disabled={unlocking || coins.coins === null || coins.coins < unlockCost(gear!, "buy")}
-                    onClick={() => doUnlock(buyKey, unlockCost(gear!, "buy"))}
-                  >
-                    자동 구매
-                    <small>
-                      <i className="sim-c" aria-hidden />
-                      {unlockCost(gear!, "buy")}
-                    </small>
-                  </button>
+                  <Act className="sim-autobuy sim-unlock sub-tab" busy={unlocking || coins.coins === null} lock={(coins.coins ?? 0) < unlockCost(gear!, "buy") && `자동 구매 해금 · ${NO_COIN}`} onClick={() => doUnlock(buyKey, unlockCost(gear!, "buy"))}>
+                    자동 구매 해금
+                    <Cost n={unlockCost(gear!, "buy")} />
+                  </Act>
                 ))}
             </div>
           )}
@@ -1843,16 +1873,23 @@ function StatInner(p: {
       )}
 
       <div className="sim-actions sim-actions-grow">
-        <button type="button" className="btn sim-go" disabled={stage >= st.max || auto || coins.coins === 0} onClick={() => tryOnce(true)}>
+        <Act className="btn sim-go" busy={auto} lock={stage >= st.max ? "끝 단계예요" : coins.coins === 0 && NO_COIN} onClick={() => tryOnce(true)}>
           {pet ? "강화" : "부여"}
-        </button>
-        <button type="button" className={"btn btn-ghost" + (auto ? " sim-running" : "")} disabled={stage >= cap && !auto} onClick={() => setAuto(!auto)}>
-          {auto ? "멈춤" : stage >= cap ? "직접 먼저" : `${cap}단계 자동`}
-        </button>
+          <Cost n={1} />
+        </Act>
+        <Act
+          className={"btn btn-ghost" + (auto ? " sim-running" : "")}
+          lock={auto ? null : stage >= st.max ? "끝 단계예요" : stage >= cap ? `자동은 직접 올려 본 단계까지만 · ${stage + 1}단계를 직접 먼저` : coins.coins === 0 && NO_COIN}
+          onClick={() => setAuto(!auto)}
+        >
+          {auto ? "멈춤" : stage >= cap ? "자동" : `${cap}단계 자동`}
+          {!auto && <Cost n={1} per />}
+        </Act>
         {pet && p.type && st.types && (
-          <button type="button" className="btn btn-ghost" onClick={resetStat}>
-            스탯 리셋
-          </button>
+          <Act className="btn btn-ghost" lock={coins.coins === 0 && NO_COIN} onClick={resetStat}>
+            리셋
+            <Cost n={1} />
+          </Act>
         )}
         <button type="button" className="btn btn-ghost sim-again" onClick={reset} aria-label="처음부터">
           ↺
@@ -2123,16 +2160,18 @@ function OptionRoller({ item, onBack, verb, game, reset }: { item: OptItem; onBa
       </section>
       {reset ? (
         <div className="sim-actions sim-actions-1">
-          <button type="button" className="btn sim-go" disabled={coins.coins === 0} onClick={again}>
+          <Act className="btn sim-go" lock={coins.coins === 0 && NO_COIN} onClick={again}>
             {verb}
-          </button>
+            <Cost n={1} />
+          </Act>
         </div>
       ) : null}
       <div className={"sim-actions " + (reset ? "sim-actions-hunt" : "sim-actions-opt")}>
         {!reset && (
-          <button type="button" className="btn sim-go" disabled={coins.coins === 0} onClick={again}>
+          <Act className="btn sim-go" lock={coins.coins === 0 && NO_COIN} onClick={again}>
             {verb}
-          </button>
+            <Cost n={1} />
+          </Act>
         )}
         <span className="sim-aim">
           <button type="button" className="pill" onClick={() => step(-1)} aria-label="목표 내리기">
@@ -2148,9 +2187,14 @@ function OptionRoller({ item, onBack, verb, game, reset }: { item: OptItem; onBa
             +
           </button>
         </span>
-        <button type="button" className="btn btn-ghost sim-hunt-go" disabled={!(P > 0) || coins.coins === 0 || !canHunt} onClick={huntGoal}>
-          {canHunt ? "나올 때까지" : "직접 먼저"}
-        </button>
+        <Act
+          className="btn btn-ghost sim-hunt-go"
+          lock={!(P > 0) ? "나올 수 없는 값이에요" : !canHunt ? `자동은 직접 굴려 본 값까지만 · ${d.label} ${aim.min} 이상을 직접 먼저` : coins.coins === 0 && NO_COIN}
+          onClick={huntGoal}
+        >
+          자동 굴리기
+          {P > 0 && <Cost n={1 / P} avg />}
+        </Act>
       </div>
       {hunt && (
         <p key={hunt.k} className={"sim-hunt" + (hunt.short ? " sim-hunt-short" : "")}>
@@ -2276,6 +2320,12 @@ function OptLine({ d, v, n, i, aim, onAim, compact = false, mark }: { d: Dist; v
 // ================================================================ 상자
 
 /** 묶음 이름들에서 모두 같은 앞 낱말(lead)과 뒤 낱말을 뗀다. 'A -> B' 는 'A→B' */
+/** '나올 때까지'의 평균 값: 그것 하나가 나올 확률의 역수 */
+function TargetCost({ items, total, name }: { items: { name: string; p: number }[]; total: number; name: string }) {
+  const g = items.find((x) => x.name === name);
+  return g && g.p > 0 ? <Cost n={total / g.p} avg /> : null;
+}
+
 function trimNames(names: string[]): { lead: string; short: string[] } {
   const words = names.map((n) => n.replace(/\s*->\s*/g, "→").trim().split(/\s+/));
   const w0 = words[0] ?? [];
@@ -2538,18 +2588,23 @@ function BoxOpener({
           {!charging && shake > 0 && tier !== "n" && tier !== "u" && <b className="sim-chest-tag">{tier === "sr" ? "대박" : "희귀"}</b>}
           {shake > 0 && !charging && <Sparks kind={`box-${tier}`} n={tier === "sr" ? 18 : 10} />}
         </div>
-        <div className="sim-actions sim-actions-3">
-          {[1, 10, 100].map((k) => (
-            <button key={k} type="button" className={"btn" + (k === 1 ? " sim-go" : " btn-ghost")} disabled={coins.coins === 0 || charging} onClick={() => openFx(k)}>
+        {/* 100회는 뺐다 (제작자 2026-11-19 '100회 없애, 100개 보이지도 않는구만': 나온 것은 열 개까지만 보인다) */}
+        <div className="sim-actions sim-actions-2 sim-actions-w">
+          {[1, 10].map((k) => (
+            <Act key={k} className={"btn" + (k === 1 ? " sim-go" : " btn-ghost")} busy={charging} lock={coins.coins === 0 && NO_COIN} onClick={() => openFx(k)}>
               {k}회
-            </button>
+              <Cost n={k} />
+            </Act>
           ))}
         </div>
         {target && (
-          <button type="button" className="btn btn-ghost sim-until" disabled={!expOf(save, gotKey(target))} onClick={untilTarget}>
+          <Act className="btn btn-ghost sim-until" lock={!expOf(save, gotKey(target)) ? "자동은 직접 열어서 나온 것만 · 직접 먼저 뽑아요" : coins.coins === 0 && NO_COIN} onClick={untilTarget}>
             <NameIcon name={target} size={16} />
-            {target} <small>{expOf(save, gotKey(target)) ? "나올 때까지" : "직접 먼저"}</small>
-          </button>
+            {target}
+            <small>
+              나올 때까지 <TargetCost items={sec.items} total={total} name={target} />
+            </small>
+          </Act>
         )}
         {hunt && (
           <p key={hunt.k} className={"sim-hunt" + (hunt.short ? " sim-hunt-short" : "")}>
@@ -2624,17 +2679,22 @@ function BoxOpener({
   );
 }
 
-// ================================================================ 보석 (합성 · 세공)
+// ================================================================ 보석 (합성 · 세공 · 분해)
+// 게임 '보석관리' 창의 세 칸 그대로 (제작자 2026-11-19 녹화 '이런 식이야', '세공은 가지고 있는 보석 안에서 같은 등급 안에서 종류만 바꾸는 거'):
+// 합성 = 보석결정 3개 -> 그 단계·한 단계 위·두 단계 위, 세공 = 보석결정 1개 -> 같은 단계의 보석 스무 가지 중 하나, 분해 = 보석 -> 그 단계 보석결정.
+// 세 칸이 같은 보석결정과 보석(진행 상황 save.gem)을 쓴다. 그래서 마음에 안 드는 보석은 분해해 같은 단계에서 다시 세공한다.
 
+type GemMode = "synth" | "polish" | "break";
 function GemTab({ odds }: { odds: Odds }) {
-  const [mode, setMode] = useEntryState<"synth" | "polish">("sim.gmode", "synth");
-  const polish = useMemo(() => boxOf(odds, "30201"), [odds]);
+  const [modeRaw, setMode] = useEntryState<GemMode>("sim.gmode", "synth");
+  const mode: GemMode = modeRaw === "polish" || modeRaw === "break" ? modeRaw : "synth";
   const head = (
     <Seg
       items={
         [
           ["synth", "보석 합성"],
           ["polish", "보석 세공"],
+          ["break", "보석 분해"],
         ] as const
       }
       value={mode}
@@ -2642,18 +2702,181 @@ function GemTab({ odds }: { odds: Odds }) {
     />
   );
   if (mode === "synth") return <GemSynth odds={odds} head={head} />;
+  return <GemCut key={mode} odds={odds} head={head} undo={mode === "break"} />;
+}
+
+/** 보석결정 그림 (게임 보석관리 창에서 오린 것, data/sim/crystalN.png). 못 받으면 그 색의 도트 보석 */
+function Crystal({ st, size = 30 }: { st: number; size?: number }) {
+  const [bad, setBad] = useState(false);
+  if (bad) return <i className={`sim-gem-dot sim-gem-dot-${st}`} />;
+  return <img className="sim-crystal" src={`/data/sim/crystal${st}.png?v=1`} alt="" style={{ height: size }} onError={() => setBad(true)} />;
+}
+
+const GEM_STATS = ["힘", "민첩", "지능", "체력"];
+/** 보석 세공과 분해. 세공: 고른 단계의 보석결정 n개(코인 n) -> 그 단계 보석 스무 가지 중에서. 분해(undo): 가진 보석을 눌러 그 단계 보석결정으로 (코인 없이) */
+function GemCut({ odds, head, undo }: { odds: Odds; head: React.ReactNode; undo: boolean }) {
+  const kinds = useMemo(() => gemKinds(odds), [odds]);
+  const { save, update } = useSave();
+  const coins = useCoins();
+  const tip = useTip();
+  const iconOf = useIcon();
+  const g = save.gem;
+  const inv = g?.inv?.length === 5 ? g.inv : [0, g?.start ?? 30, 0, 0, 0];
+  const gems = g?.gems ?? {};
+  const [stRaw, setSt] = useEntryState("sim.gcut", 1);
+  const st = stRaw >= 1 && stRaw <= 4 ? stRaw : 1;
+  const [want, setWant] = useState(1);
+  // 방금 얻은 보석(세공)이나 돌아온 보석결정(분해)이 톡 튄다
+  const [fx, setFx] = useState<{ got: Record<string, number>; back: number; n: number } | null>(null);
+  const [sure, setSure] = useState(false);
+  useEffect(() => {
+    if (!sure) return;
+    const t = window.setTimeout(() => setSure(false), 3000);
+    return () => window.clearTimeout(t);
+  }, [sure]);
+  const list = kinds[st] ?? [];
+  const families = [...new Set(list.map((k) => k.family))];
+  const have = inv[st] ?? 0;
+  const n = Math.max(1, Math.min(want, have, coins.coins ?? 1));
+  const owned = list.reduce((t, k) => t + (gems[k.id] ?? 0), 0);
+  const change = (dInv: number, dGems: Record<string, number>, cuts: number) =>
+    update((s) => {
+      const base = s.gem ?? { inv, runs: 0, start: 30, best: 1 };
+      const nextInv = base.inv.length === 5 ? [...base.inv] : [...inv];
+      nextInv[st] = Math.max(0, nextInv[st] + dInv);
+      const gg = { ...(base.gems ?? {}) };
+      for (const [id, c] of Object.entries(dGems)) {
+        const v = (gg[id] ?? 0) + c;
+        if (v > 0) gg[id] = v;
+        else delete gg[id];
+      }
+      return { ...s, gem: { ...base, inv: nextInv, gems: gg, cuts: (base.cuts ?? 0) + cuts } };
+    });
+  const cut = () => {
+    const k = coins.take(Math.min(n, have));
+    if (k < 1) return;
+    const got: Record<string, number> = {};
+    for (let i = 0; i < k; i++) {
+      const x = pick(list);
+      got[x.id] = (got[x.id] ?? 0) + 1;
+    }
+    change(-k, got, k);
+    setFx((f) => ({ got, back: 0, n: (f?.n ?? 0) + 1 }));
+  };
+  const breakOne = (id: string) => {
+    if (!(gems[id] > 0)) return tip("가진 보석만 분해돼요");
+    change(1, { [id]: -1 }, 0);
+    setFx((f) => ({ got: {}, back: 1, n: (f?.n ?? 0) + 1 }));
+  };
+  const breakAll = () => {
+    if (!sure) return setSure(true);
+    setSure(false);
+    change(owned, Object.fromEntries(list.filter((k) => gems[k.id] > 0).map((k) => [k.id, -gems[k.id]])), 0);
+    setFx((f) => ({ got: {}, back: owned, n: (f?.n ?? 0) + 1 }));
+  };
   return (
     <div className="sim">
       <div className="mk-sub sim-strip">{head}</div>
-      {polish ? <BoxOpener box={polish} cat="gem" /> : <div className="empty">세공 자료가 없어요</div>}
+      <section className="panel sim-gems sim-gems-pick" role="tablist">
+        {[1, 2, 3, 4].map((k) => (
+          <button key={k} type="button" role="tab" aria-selected={k === st} className={`sim-gem sim-gem-${k}` + (k === st ? " sim-gem-on" : "") + (inv[k] ? "" : " sim-gem-zero")} onClick={() => setSt(k)}>
+            <small className="sim-gem-st">{k}단계</small>
+            <span className="sim-gem-pic" aria-hidden>
+              <Crystal st={k} />
+            </span>
+            <b key={k === st && fx?.back ? fx.n : 0} className={"sim-gem-n" + (k === st && fx?.back ? " sim-gem-back" : "")}>
+              <Count value={inv[k] ?? 0} ms={300} />
+            </b>
+          </button>
+        ))}
+      </section>
+      {list.length ? (
+        <section className={"panel sim-kinds" + (undo ? " sim-kinds-undo" : "")}>
+          <span />
+          {GEM_STATS.map((x) => (
+            <small key={x} className="sim-kinds-h">
+              {x} {list.find((k) => k.stat === x)?.value}
+            </small>
+          ))}
+          {families.map((f) => {
+            const row = list.filter((k) => k.family === f);
+            return (
+              <div key={f} className="sim-kinds-row">
+                <span className="sim-kind-fam">
+                  {iconOf(row[0].name) ? <NameIcon name={row[0].name} size={20} /> : <i className={`sim-gem-dot sim-gem-dot-${st}`} />}
+                  <span>
+                    <b>{f}</b>
+                    <small>{row[0].skill}</small>
+                  </span>
+                </span>
+                {GEM_STATS.map((x) => {
+                  const k = row.find((r) => r.stat === x);
+                  if (!k) return <span key={x} />;
+                  const c = gems[k.id] ?? 0;
+                  const hit = fx?.got[k.id] ?? 0;
+                  const cls = "sim-kind" + (c ? "" : " sim-kind-zero") + (hit ? " sim-kind-hit" : "");
+                  const body = (
+                    <>
+                      <b>{c}</b>
+                      {hit > 0 && <em>+{hit}</em>}
+                    </>
+                  );
+                  return undo ? (
+                    <button key={x} type="button" className={cls} onClick={() => breakOne(k.id)} aria-label={`${k.name} ${k.stat} ${k.value} 분해 (${c}개)`}>
+                      {body}
+                    </button>
+                  ) : (
+                    <span key={`${x}-${hit ? fx!.n : 0}`} className={cls} aria-label={`${k.name} ${k.stat} ${k.value} ${c}개`}>
+                      {body}
+                    </span>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </section>
+      ) : (
+        <div className="empty">세공 자료가 없어요</div>
+      )}
+      {undo ? (
+        <div className="sim-actions sim-actions-1">
+          <Act className={"btn btn-ghost" + (sure ? " sim-sell-sure" : "")} lock={!owned && `${st}단계 보석이 없어요 · 세공으로 만들어요`} onClick={breakAll}>
+            {sure ? `${st}단계 모두 분해?` : `${st}단계 모두 분해`}
+            {owned > 0 && <small>{owned.toLocaleString()}</small>}
+          </Act>
+        </div>
+      ) : (
+        <div className="sim-actions sim-actions-cut">
+          <span className="sim-aim">
+            <button type="button" className="pill" onClick={() => setWant(Math.max(1, n - 1))} aria-label="개수 줄이기">
+              −
+            </button>
+            <span className="sim-aim-t">
+              <b>{n}개</b>
+            </span>
+            <button type="button" className="pill" onClick={() => setWant(n >= have ? 1 : Math.min(have, n < 10 ? n + 1 : n + 10))} aria-label="개수 늘리기">
+              +
+            </button>
+          </span>
+          <Act className="btn sim-go" lock={!have ? `${st}단계 보석결정이 없어요 · 합성이나 분해로 만들어요` : coins.coins === 0 && NO_COIN} onClick={cut}>
+            세공
+            <Cost n={n} />
+          </Act>
+        </div>
+      )}
+      <StatStrip
+        items={[
+          { label: "세공", value: g?.cuts ?? 0 },
+          { label: `${st}단계 보석`, value: owned },
+          { label: "종류", value: list.filter((k) => gems[k.id] > 0).length, tone: "sim-good", unit: `/${list.length}` },
+        ]}
+      />
     </div>
   );
 }
 
 const GEM_STARTS = [30, 90, 300, 1000];
-/** 단계마다 보일 보석 그림 (아이템 책의 도감 아이콘, 세레인의 보석 1~4단계) */
-const GEM_PIC = ["", "세레인의흑요석", "세레인의자수정", "세레인의사파이어", "세레인의아쿠아마린"];
-/** 1단계 보석 N개로 시작해 같은 단계 3개씩 합성한다 (실패하면 3개가 같은 단계 1개로) */
+/** 1단계 보석결정 N개로 시작해 같은 단계 3개씩 합성한다 (실패하면 3개가 같은 단계 1개로) */
 function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
   const rules = useMemo(() => gemSynth(odds), [odds]);
   // 가진 보석과 합성 수는 진행 상황에 (제작자 2026-11-06 '껐다가 다시 오면 기록이 사라지네')
@@ -2664,8 +2887,6 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
   const [fx, setFx] = useState<{ from: number; to: number; n: number } | null>(null);
   const [avg, setAvg] = useState<number[] | null>(null);
   const coins = useCoins();
-  // 보석 그림이 없는 단계(아쿠아마린은 자료에 그림이 없다)는 그 색의 도트 보석
-  const iconOf = useIcon();
   const best = useRef(kept?.best ?? 1);
   const can = (st: number, v = inv) => v[st] >= 3 && !!rules[st];
   const emit = useQuest();
@@ -2676,7 +2897,7 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
     // 이 수로 이 단계까지 갈 확률 (400번 해 본다): 1/100 보다 드물면 전광판에
     let hit = 0;
     for (let i = 0; i < 400; i++) if (synthAll([0, start, 0, 0, 0]).best >= stage) hit++;
-    sendFeed("gem:synth", `${GEM_NAMES[stage]} · 1단계 ${start}개`, luckOf(Math.max(hit, 0.5) / 400));
+    sendFeed("gem:synth", `보석결정 ${stage}단계 · 1단계 ${start}개`, luckOf(Math.max(hit, 0.5) / 400));
   };
   // 모두 합성은 직접 합성해 본 단계만 (제작자 2026-11-04 '내가 수동으로 겪은 것만 자동으로')
   const { save, update } = useSave();
@@ -2686,7 +2907,8 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
       firstKeep.current = false;
       return;
     }
-    update((s) => ({ ...s, gem: { inv, runs, start, best: best.current } }));
+    // 세공으로 얻은 보석(gems)과 세공 수는 그대로 둔다
+    update((s) => ({ ...s, gem: { ...s.gem, inv, runs, start, best: best.current } }));
   }, [inv, runs, start, update]);
   const tried = (st: number) => expOf(save, `gem:${st}`) > 0;
   const once = (st: number) => {
@@ -2732,6 +2954,8 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
     setRuns(0);
     setFx(null);
     setAvg(null);
+    // 처음부터: 세공해 둔 보석도 비운다
+    update((s) => (s.gem ? { ...s, gem: { ...s.gem, gems: {}, cuts: 0 } } : s));
   };
   // 같은 수로 1000번 해 본 평균 (단계마다 남는 수)
   const average = () => {
@@ -2754,9 +2978,9 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
           const hit = fx && fx.to === st;
           return (
             <div key={st} className={`sim-gem sim-gem-${st}` + (hit ? (fx.to > fx.from ? " sim-gem-hit" : " sim-gem-same") : "") + (inv[st] ? "" : " sim-gem-zero")}>
-              <small className="sim-gem-st">{GEM_NAMES[st]}</small>
+              <small className="sim-gem-st">{st}단계</small>
               <span key={hit ? fx.n : 0} className="sim-gem-pic" aria-hidden>
-                {iconOf(GEM_PIC[st]) ? <NameIcon name={GEM_PIC[st]} size={30} /> : <i className={`sim-gem-dot sim-gem-dot-${st}`} />}
+                <Crystal st={st} />
                 {hit && fx.to > fx.from && <Sparks kind={fx.to - fx.from > 1 ? "plus2" : "ok"} n={8} />}
               </span>
               <b key={`n${hit ? fx.n : 0}`} className="sim-gem-n">
@@ -2770,9 +2994,10 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
                     ))}
                   </span>
                   <small className="sim-gem-pct">{rules[st].map((r) => Math.round(r.p * 100)).join("·")}</small>
-                  <button type="button" className="sim-mini sim-gem-go" disabled={!can(st) || coins.coins === 0} onClick={() => once(st)}>
+                  <Act className="sim-mini sim-gem-go" lock={!can(st) ? `${st}단계 보석결정 3개가 있어야 해요` : coins.coins === 0 && NO_COIN} onClick={() => once(st)}>
                     합성
-                  </button>
+                    <Cost n={1} />
+                  </Act>
                 </>
               ) : (
                 <span className="sim-max">MAX</span>
@@ -2782,9 +3007,14 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
         })}
       </section>
       <div className="sim-actions sim-actions-grow">
-        <button type="button" className="btn sim-go" disabled={![1, 2, 3].some((k) => tried(k) && can(k)) || coins.coins === 0} onClick={all}>
-          {[1, 2, 3].some(tried) ? "모두 합성" : "직접 먼저"}
-        </button>
+        <Act
+          className="btn sim-go"
+          lock={![1, 2, 3].some((k) => can(k)) ? "합성할 보석이 없어요" : ![1, 2, 3].some((k) => tried(k) && can(k)) ? "모두 합성은 직접 합성해 본 단계만 · 직접 먼저 합성해요" : coins.coins === 0 && NO_COIN}
+          onClick={all}
+        >
+          모두 합성
+          <Cost n={1} per />
+        </Act>
         <button type="button" className="btn btn-ghost" onClick={average}>
           1000번 평균
         </button>
@@ -2798,7 +3028,7 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
             .filter((k) => avg[k] >= 0.005)
             .map((k) => (
               <span key={k} className={`sim-gem-${k}`}>
-                {iconOf(GEM_PIC[k]) ? <NameIcon name={GEM_PIC[k]} size={18} /> : <i className={`sim-gem-dot sim-gem-dot-${k}`} />}
+                <Crystal st={k} size={18} />
                 <b>{avg[k] >= 10 ? avg[k].toFixed(0) : avg[k].toFixed(2)}</b>
               </span>
             ))}
@@ -2807,7 +3037,7 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
       <StatStrip
         items={[
           { label: "합성", value: runs },
-          { label: "보석", value: inv.reduce((a, b) => a + b, 0) },
+          { label: "보석결정", value: inv.reduce((a, b) => a + b, 0) },
           { label: "최고", value: [4, 3, 2, 1].find((k) => inv[k] > 0) ?? 0, tone: "sim-good", unit: "단계" },
         ]}
       />
