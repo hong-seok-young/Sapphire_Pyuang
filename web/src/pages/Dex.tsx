@@ -7,7 +7,7 @@ import { useBackClose } from "../backClose";
 // - 지금 목록(칸 · 찾기 · 능력치 거르기)의 미완료 항목을 다 하면 더 오르는 값(+)과, 그러려면 필요한 재료 합계.
 // - 완료 표시는 이 기기에 계정별로 (localStorage sapphire.dex.done.<아이디>).
 // - 기간이 있는 이벤트 도감은 '이벤트' 칸, 기간(한국 시간 시작 날 ~ 끝 날, 둘 다 정기 점검 시작 10:30) 안의 것만 보인다 (제작자 2026-11-12 '이벤트로 따로 넣고 기간 끝나면 자동으로 사라지게').
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { loadDex, useAsync } from "../data";
 import { fetchMarket, wonText } from "../market";
@@ -430,9 +430,14 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   const mineCost = useMemo(() => {
     if (!price || other) return null;
     const eff = dex.entries.filter((e) => e.effects.length > 0);
-    const sum = (list: DexEntry[]) => totals(list.flatMap((e) => e.items), price, pset).by[basis].sum;
+    const by = (list: DexEntry[]) => totals(list.flatMap((e) => e.items), price, pset).by;
     const doneN = dex.entries.filter((e) => myDone.has(e.name)).length;
-    return { done: sum(eff.filter((e) => myDone.has(e.name))), todo: sum(eff.filter((e) => !myDone.has(e.name))), doneN, todoN: dex.entries.length - doneN };
+    const d = by(eff.filter((e) => myDone.has(e.name)));
+    const t = by(eff.filter((e) => !myDone.has(e.name)));
+    return {
+      done: d[basis].sum, todo: t[basis].sum, doneN, todoN: dex.entries.length - doneN,
+      doneBy: { normal: d.normal.sum, event: d.event.sum }, todoBy: { normal: t.normal.sum, event: t.event.sum },
+    };
   }, [dex, myDone, price, pset, basis, other]);
 
   // 초안 고르기 (이 기기 localStorage sapphire.dex.draft 1~5, 확인 전)
@@ -444,7 +449,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   };
   const allPct = catStat("all").p;
   const costEl = price && tot && (draft === 5 ? !!mineCost : todoListed.length > 0 && tot.slots > 0)
-    ? <CostPanel price={price} tot={tot} pset={pset} setPset={setPset} canEdit={canSetPrice} basis={basis} setBasis={setBasis} draft={draft} filled={mineCost?.done ?? null} left={mineCost?.todo ?? null} pct={allPct} doneN={mineCost?.doneN ?? 0} todoN={mineCost?.todoN ?? 0} />
+    ? <CostPanel price={price} tot={tot} pset={pset} setPset={setPset} canEdit={canSetPrice} basis={basis} setBasis={setBasis} draft={draft} filled={mineCost?.done ?? null} left={mineCost?.todo ?? null} pct={allPct} mine={mineCost ? { done: mineCost.doneBy, todo: mineCost.todoBy } : null} />
     : null;
 
   return (
@@ -942,10 +947,12 @@ function FoldHead({ open, onClick, children }: { open: boolean; onClick: () => v
   );
 }
 
-function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft = 0, filled = null, left = null, pct = 0 }: {
+function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft = 0, filled = null, left = null, pct = 0, mine = null }: {
   price: DexPrice; tot: Totals; pset: PriceSet; setPset: (v: PriceSet) => void; canEdit: boolean;
   basis: "normal" | "event"; setBasis: (v: "normal" | "event") => void;
-  draft?: number; filled?: number | null; left?: number | null; pct?: number; doneN?: number; todoN?: number;
+  draft?: number; filled?: number | null; left?: number | null; pct?: number;
+  /** 5안: 내 도감 전체의 채운 비용·남은 비용 (평소 · 이벤트) */
+  mine?: { done: Record<"normal" | "event", number>; todo: Record<"normal" | "event", number> } | null;
 }) {
   const [open, setOpen] = useState(false);
   // 마법서·스탬프 값 칸은 접어 둔다 (제작자 2026-11-12 '마법서 가격으로 해서 접어놓고 스탬프 가격으로 해서 접어놔')
@@ -1018,6 +1025,30 @@ function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft 
       )}
       {open && (
         <div className="dex-cost-body">
+          {draft === 5 && mine ? (
+            /* 표: 왼쪽 열 채운 비용 · 남은 비용, 위 줄은 최저가 기준 고르기 (평소 | 아바돈 이벤트) */
+            <div className="dex-ctab" role="tablist">
+              <span />
+              {MODES.map((m) => (
+                <button key={m.key} type="button" role="tab" aria-selected={basis === m.key} className={"dex-ctab-h" + (basis === m.key ? " dex-ctab-on" : "")} onClick={() => setBasis(m.key)}>
+                  {m.label}
+                  {m.key === "event" && mine.todo.normal - mine.todo.event > 0 && <em className="dex-cost-save">−{fmtGold(mine.todo.normal - mine.todo.event)}</em>}
+                </button>
+              ))}
+              {(["done", "todo"] as const).map((row) => (
+                <Fragment key={row}>
+                  <small className={"dex-ctab-l " + (row === "done" ? "dex-ctab-fill" : "dex-ctab-left")}>{row === "done" ? "채운 비용" : "남은 비용"}</small>
+                  {MODES.map((m) => (
+                    <span key={m.key} className={"dex-ctab-c" + (basis === m.key ? " dex-ctab-on" : "") + (row === "done" ? " dex-ctab-fill" : " dex-ctab-left")}>
+                      <b>{fmtGold(mine[row][m.key])}</b>
+                      <small>{intUnit(mine[row][m.key] / rate)}원</small>
+                    </span>
+                  ))}
+                </Fragment>
+              ))}
+            </div>
+          ) : (
+          <>
           {/* 어느 값으로 최저가 조합을 고를지 (제작자 2026-11-13 2안 '평소 최저가 | 아바돈 이벤트 최저가', 처음은 평소) */}
           <div className="dex-basis" role="tablist">
             {MODES.map((m) => (
@@ -1026,7 +1057,6 @@ function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft 
               </button>
             ))}
           </div>
-          {draft === 5 && <small className="dex-cost-cap">남은 비용 · 평소와 아바돈 이벤트 때</small>}
           <div className="dex-cost-cols">
             {MODES.map((m) => (
               <div key={m.key} className={"dex-cost-col" + (m.key === "event" && on ? " dex-cost-now" : "") + (basis === m.key ? " dex-cost-pick" : " dex-cost-dim")}
@@ -1048,6 +1078,8 @@ function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft 
               </div>
             ))}
           </div>
+          </>
+          )}
 
           {scrolls.length > 0 && (
             <div className="dex-cost-set">
