@@ -59,17 +59,20 @@ const n0 = (v: number) => (v >= 1e8 ? `${Number((v / 1e8).toFixed(v >= 1e9 ? 0 :
 /** 숫자가 바뀌면 잠깐 굴러가며 바뀐다 */
 function Count({ value, ms = 500 }: { value: number; ms?: number }) {
   const [shown, setShown] = useState(value);
-  const from = useRef(value);
+  // 지금 화면에 보이는 값: 굴러가는 도중에 값이 또 바뀌면 여기서부터 이어 간다.
+  // (예전에는 굴러가기가 끝나야 시작 값을 바꿔서, 자동처럼 빨리 바뀌면 매번 옛 값으로 돌아갔다가 다시 올라가 숫자가 줄었다 늘었다 했다)
+  const cur = useRef(value);
   useEffect(() => {
-    const a = from.current;
+    const a = cur.current;
+    if (a === value) return;
     const t0 = performance.now();
     let raf = 0;
     const tick = (t: number) => {
       const k = Math.min(1, (t - t0) / ms);
       const e = 1 - (1 - k) ** 3;
-      setShown(a + (value - a) * e);
+      cur.current = k < 1 ? a + (value - a) * e : value;
+      setShown(cur.current);
       if (k < 1) raf = requestAnimationFrame(tick);
-      else from.current = value;
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
