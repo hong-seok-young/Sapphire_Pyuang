@@ -427,84 +427,54 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
 
 
   // 내 도감: 채운 비용(완료한 항목을 지금 시세로 친 값)과 남은 비용 (제작자 2026-11-19 '내 도감은 남은 비용과 채운 비용도 보게'). 고른 최저가 기준(평소·이벤트), 효과 없는 항목은 뺀다
-  const mineCost = useMemo(() => {
+  // 내 도감 전체의 채운 비용(완료한 항목을 지금 시세로) · 남은 비용, 평소 · 아바돈 이벤트 (제작자 2026-11-19 '내 도감은 남은 비용과 채운 비용도').
+  // 효과 없는 항목은 '도감 비용'과 같이 뺀다
+  const mineCost = useMemo((): MineCost | null => {
     if (!price || other) return null;
     const eff = dex.entries.filter((e) => e.effects.length > 0);
     const by = (list: DexEntry[]) => totals(list.flatMap((e) => e.items), price, pset).by;
-    const doneN = dex.entries.filter((e) => myDone.has(e.name)).length;
     const d = by(eff.filter((e) => myDone.has(e.name)));
     const t = by(eff.filter((e) => !myDone.has(e.name)));
-    return {
-      done: d[basis].sum, todo: t[basis].sum, doneN, todoN: dex.entries.length - doneN,
-      doneBy: { normal: d.normal.sum, event: d.event.sum }, todoBy: { normal: t.normal.sum, event: t.event.sum },
-    };
-  }, [dex, myDone, price, pset, basis, other]);
+    return { done: { normal: d.normal.sum, event: d.event.sum }, todo: { normal: t.normal.sum, event: t.event.sum } };
+  }, [dex, myDone, price, pset, other]);
 
-  // 초안 고르기 (이 기기 localStorage sapphire.dex.draft 1~5, 확인 전)
-  const draft = other ? 0 : readJson<number>("sapphire.dex.draft", 0);
+  // 칸마다 완료 % (제작자 2026-11-19 '코스튬 몇퍼 일반 몇퍼 펫 몇퍼, 전체 표기')
   const catStat = (c: string) => {
     const list = c === "all" ? dex.entries : dex.entries.filter((e) => (e.cat ?? "일반") === c);
     const d = list.filter((e) => myDone.has(e.name)).length;
     return { d, n: list.length, p: list.length ? Math.floor((d / list.length) * 100) : 0 };
   };
   const allPct = catStat("all").p;
-  const costEl = price && tot && (draft === 5 ? !!mineCost : todoListed.length > 0 && tot.slots > 0)
-    ? <CostPanel price={price} tot={tot} pset={pset} setPset={setPset} canEdit={canSetPrice} basis={basis} setBasis={setBasis} draft={draft} filled={mineCost?.done ?? null} left={mineCost?.todo ?? null} pct={allPct} mine={mineCost ? { done: mineCost.doneBy, todo: mineCost.todoBy } : null} />
+  // 내 도감: 도감 비용 칸을 맨 위로, 내 도감 전체의 채운 비용 | 막대 | 남은 비용 한 줄, 펼치면 채운·남은 x 평소·이벤트·차액 표 (제작자 2026-11-19 초안 5안).
+  // 다른 캐릭: 예전처럼 목록 아래, 지금 목록(목표 묶음)의 비용
+  const costEl = price && tot && (mineCost ? true : todoListed.length > 0 && tot.slots > 0)
+    ? <CostPanel price={price} tot={tot} pset={pset} setPset={setPset} canEdit={canSetPrice} basis={basis} setBasis={setBasis} pct={allPct} mine={mineCost} />
     : null;
 
   return (
-    <div className={"dex" + (draft ? ` dex-d${draft}` : "")}>
+    <div className="dex">
       <nav className="pill-row dex-mode" role="tablist">
-        <button type="button" role="tab" aria-selected={!other} className={"pill" + (!other ? " pill-on" : "") + (draft === 4 ? " dex-mode-two" : "")} onClick={() => setMode("mine")}>
-          {draft === 4 && mineCost ? (
-            <>
-              <span>내 도감 <b>{allPct}%</b></span>
-              <i>채움 {intUnit(mineCost.done)} · {myDone.size.toLocaleString("ko-KR")}개</i>
-            </>
-          ) : (
-            <>내 도감 <small>{draft ? `${allPct}%` : myDone.size}</small></>
-          )}
+        <button type="button" role="tab" aria-selected={!other} className={"pill" + (!other ? " pill-on" : "")} onClick={() => setMode("mine")}>
+          내 도감 <small>{allPct}%</small>
         </button>
         <button type="button" role="tab" aria-selected={other} className={"pill" + (other ? " pill-on" : "")} onClick={() => setMode("other")}>
           다른 캐릭
         </button>
       </nav>
-      {!other && mineCost && draft === 0 && <MineCost c={mineCost} />}
-      {draft === 3 && mineCost && (
-        <div className="dex-band">
-          <i style={{ width: `${allPct}%` }} />
-          <span>{allPct}% · 채움 {intUnit(mineCost.done)} · {myDone.size.toLocaleString("ko-KR")} / {dex.entries.length.toLocaleString("ko-KR")}</span>
-        </div>
-      )}
-      {draft === 5 && costEl}
+      {mineCost && costEl}
       <StatPanel other={other} have={have} full={full} over={over} setOver={setOver} sel={sel} onPick={pickStat} doneN={doneEntries.length} total={dex.entries.length}
         goalOf={price ? exactGoalOf : null} stepsOf={(k) => planFor(k).map((x) => x.v)} withEv={withEv} setWithEv={setWithEv} />
 
-      {draft === 2 ? (
-        <div className="dex-catcells">
-          {CATS.map((c) => {
-            const st = catStat(c);
-            return st.n ? (
-              <button key={c} type="button" className={"dex-catcell" + (cat === c ? " dex-catcell-on" : "")} onClick={() => setCat(c)}>
-                <small>{c === "all" ? "전체" : c}</small>
-                <b>{st.p}%</b>
-                <i><i style={{ width: `${st.p}%` }} /></i>
-              </button>
-            ) : null;
-          })}
-        </div>
-      ) : (
       <div className="mk-cats dex-cats">
         {CATS.map((c) => {
           const st = catStat(c);
           return st.n ? (
             <button key={c} type="button" className={"sub-tab" + (cat === c ? " sub-tab-on" : "")} onClick={() => setCat(c)}>
-              {c === "all" ? "전체" : c} <small>{draft ? `${st.p}%` : st.n}</small>
+              {c === "all" ? "전체" : c} <small>{other ? st.n : `${st.p}%`}</small>
             </button>
           ) : null;
         })}
       </div>
-      )}
 
       {cat === "펫" && rewards.length > 0 && (
         <p className="dex-petrw">
@@ -521,7 +491,6 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
         {TABS.map((x) => (
           <button key={x.key} type="button" role="tab" aria-selected={tab === x.key} className={"pill" + (tab === x.key ? " pill-on" : "")} onClick={() => setTab(x.key)}>
             {x.label} <small>{x.key === "all" ? dex.entries.length : x.key === "done" ? doneEntries.length : dex.entries.length - doneEntries.length}</small>
-            {draft === 1 && mineCost && <i className="dex-tab-gold">{intUnit(x.key === "all" ? mineCost.done + mineCost.todo : x.key === "done" ? mineCost.done : mineCost.todo)}</i>}
           </button>
         ))}
       </nav>}
@@ -578,7 +547,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
         </div>
       )}
 
-      {draft !== 5 && costEl}
+      {!mineCost && costEl}
 
       {todoListed.length > 0 && (
         <Panel className="dex-need">
@@ -907,32 +876,6 @@ function NumIn({ value, def, onSet, label, ro }: { value: number | undefined; de
 /** 도감 비용 (제작자 요청 2026-11-11): 지금 목록의 미완료 칸을 다 채우는 골드. 칸마다 '골드로 장비 사기'와 '장비스탬프' 중 싼 쪽을 더한다.
  *  평소와 아바돈 이벤트(스탬프가 싸진다)를 나란히, 이벤트 때 아끼는 골드. 아래에서 마법서·스탬프·플래티넘 값을 직접 고친다 */
 /** 가장 큰 단위의 정수로: 59.7억 -> '60억', 8008.3만 -> '8008만' (제작자 2026-11-12 '정수 단위 반올림') */
-/** 내 도감 맨 위: 채운 비용 | 남은 비용 과 채운 비율 막대 */
-function MineCost({ c }: { c: { done: number; todo: number; doneN: number; todoN: number } }) {
-  const { data: market } = useAsync(useCallback(() => fetchMarket(), []), "market");
-  const rate = market?.goldRate || 75;
-  const all = c.done + c.todo;
-  const pct = all > 0 ? Math.round((c.done / all) * 100) : 0;
-  return (
-    <div className="dex-mine">
-      <div className="dex-mine-col dex-mine-done">
-        <small>채운 비용 · {c.doneN.toLocaleString("ko-KR")}개</small>
-        <b>{intUnit(c.done)}</b>
-        <small className="muted">{intUnit(c.done / rate)}원</small>
-      </div>
-      <div className="dex-mine-col">
-        <small>남은 비용 · {c.todoN.toLocaleString("ko-KR")}개</small>
-        <b>{intUnit(c.todo)}</b>
-        <small className="muted">{intUnit(c.todo / rate)}원</small>
-      </div>
-      <div className="dex-mine-bar" aria-label={`채운 비율 ${pct}%`}>
-        <i style={{ width: `${pct}%` }} />
-        <span>{pct}%</span>
-      </div>
-    </div>
-  );
-}
-
 /** 차액 칸: 1억 넘으면 3.4억, 아래는 2,171만 (좁은 칸에 한 줄로) */
 const shortGold = (v: number) => (v >= 1e8 ? `${Math.round(v / 1e7) / 10}억` : intUnit(v));
 function intUnit(v: number): string {
@@ -949,12 +892,12 @@ function FoldHead({ open, onClick, children }: { open: boolean; onClick: () => v
   );
 }
 
-function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft = 0, filled = null, left = null, pct = 0, mine = null }: {
+type MineCost = { done: Record<"normal" | "event", number>; todo: Record<"normal" | "event", number> };
+function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, pct = 0, mine = null }: {
   price: DexPrice; tot: Totals; pset: PriceSet; setPset: (v: PriceSet) => void; canEdit: boolean;
   basis: "normal" | "event"; setBasis: (v: "normal" | "event") => void;
-  draft?: number; filled?: number | null; left?: number | null; pct?: number;
-  /** 5안: 내 도감 전체의 채운 비용·남은 비용 (평소 · 이벤트) */
-  mine?: { done: Record<"normal" | "event", number>; todo: Record<"normal" | "event", number> } | null;
+  /** 내 도감: 완료 %와 내 도감 전체의 채운 비용·남은 비용. 없으면(다른 캐릭) 지금 목록의 비용 */
+  pct?: number; mine?: MineCost | null;
 }) {
   const [open, setOpen] = useState(false);
   // 마법서·스탬프 값 칸은 접어 둔다 (제작자 2026-11-12 '마법서 가격으로 해서 접어놓고 스탬프 가격으로 해서 접어놔')
@@ -998,25 +941,19 @@ function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft 
   const touched = Object.keys(pset.scroll).length + Object.keys(pset.stamp).length > 0 || pset.plat != null;
   return (
     <Panel className="dex-need dex-cost">
-      {draft === 5 && filled != null && left != null ? (
+      {mine ? (
         <button type="button" className="dex-board" onClick={() => setOpen(!open)} aria-expanded={open}
-          aria-label={`채운 비용 ${intUnit(filled)}, 남은 비용 ${intUnit(left)}, ${pct}%`}>
-          <span className="dex-board-fill"><b>{intUnit(filled)}</b><small>{intUnit(filled / rate)}원</small></span>
+          aria-label={`도감 비용: 채운 비용 ${intUnit(mine.done[basis])}, 남은 비용 ${intUnit(mine.todo[basis])}, ${pct}%`}>
+          <span className="dex-board-fill"><b>{intUnit(mine.done[basis])}</b><small>{intUnit(mine.done[basis] / rate)}원</small></span>
           <span className="dex-board-bar"><i style={{ width: `${pct}%` }} /><em>{pct}%</em></span>
-          <span className="dex-board-left"><b>{intUnit(left)}</b><small>{intUnit(left / rate)}원</small></span>
+          <span className="dex-board-left"><b>{intUnit(mine.todo[basis])}</b><small>{intUnit(mine.todo[basis] / rate)}원</small></span>
+          {on && !open && <span className="dex-sale-dot">판매 중</span>}
           <span className="dex-caret">{open ? "▲" : "▼"}</span>
         </button>
       ) : (
       <button type="button" className="dex-need-head" onClick={() => setOpen(!open)} aria-expanded={open}>
         <b>도감 비용</b>
-        {!open && draft === 1 ? (
-          <span className="muted">이벤트 때 {intUnit(tot.by.event.sum)} · {intUnit(tot.by.normal.sum - tot.by.event.sum)} 아낌</span>
-
-        ) : !open && draft === 2 && filled != null ? (
-          <span className="muted">
-            채움 <b className="dex-cost-fill">{intUnit(filled)}</b> · 남음 <b className="dex-cost-left">{intUnit(tot.by[basis].sum)}</b> ({intUnit(tot.by[basis].sum / rate)}원)
-          </span>
-        ) : !open && (
+        {!open && (
           <span className="muted">
             평소 {intUnit(tot.by.normal.sum)} ({intUnit(tot.by.normal.sum / rate)}원) · 이벤트 {intUnit(tot.by.event.sum)} ({intUnit(tot.by.event.sum / rate)}원)
           </span>
@@ -1027,8 +964,8 @@ function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft 
       )}
       {open && (
         <div className="dex-cost-body">
-          {draft === 5 && mine ? (
-            /* 표: 왼쪽 열 채운 비용 · 남은 비용, 위 줄은 최저가 기준 고르기 (평소 | 아바돈 이벤트) */
+          {mine ? (
+            /* 표: 왼쪽 열 채운 비용 · 남은 비용, 위 줄은 최저가 기준 고르기 (평소 | 아바돈 이벤트), 오른쪽 차액 (제작자 2026-11-19) */
             <div className="dex-ctab" role="tablist">
               <span />
               {MODES.map((m) => (
