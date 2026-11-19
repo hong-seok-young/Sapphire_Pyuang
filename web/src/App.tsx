@@ -585,8 +585,8 @@ function Wiki({
   // 강화 비교 (제작자 요청 2026-11-04, 2026-11-05 모두에게 열었다): 두 무기(+강)의 데미지와 몇 % 강해지는지
   else if (page === "enhance") body = <EnhancePage wiki={wiki} query={route.query} me={me} />;
   // 확률 시뮬레이터 개발 중판은 미리 보는 사람(길드마스터·오피서·달팽이·간다이, launcher.ts canPreview), 테스트판은 앱개발자(와 테스트 계정)만 (제작자 2026-11-04 '도플갱어로')
-  else if (page === "sim") body = canPreview(me) ? <SimulatorPage key="live" wiki={wiki} me={me} space="live" /> : <DevSoon title="확률 시뮬레이터" />;
-  else if (page === "simtest") body = me.role === "developer" || TEST_IDS.includes(me.id) ? <SimulatorPage key="test" wiki={wiki} me={me} space="test" /> : <DevSoon title="확률 시뮬레이터" />;
+  // #/simtest (예전 앱개발자 테스트판, 2026-11-19 에 뺌)로 와도 같은 화면
+  else if (page === "sim" || page === "simtest") body = canPreview(me) ? <SimulatorPage wiki={wiki} me={me} /> : <DevSoon title="확률 시뮬레이터" />;
   else if (page === "log")
     body =
       canSeeLog(me) ? (

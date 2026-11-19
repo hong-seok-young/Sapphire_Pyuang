@@ -27,6 +27,8 @@ export interface SimSave {
   best?: Record<string, number>;
   /** 판 장비 수와 받은 코인 (2026-11-17) */
   sold?: { n: number; coins: number };
+  /** 강화 비용 최저 기록 (2026-11-19): 순위 이름(simRank.ts upGame) -> [코인, 마법서]. 이보다 좋을 때만 서버에 보낸다 */
+  cost?: Record<string, [number, number]>;
   statN?: { tries: number; ok: number; big: number };
   /** 보석 합성: 가진 보석, 합성 수, 처음 1단계 개수, 닿은 가장 높은 단계 */
   gem?: { inv: number[]; runs: number; start: number; best: number };
@@ -81,7 +83,7 @@ export function useSaveState(space: Space, initial: SimSave | null | undefined):
     timer.current = 0;
     if (!dirty.current) return;
     dirty.current = false;
-    void fetch(`/api/sim/wallet${space === "test" ? "?space=test" : ""}`, {
+    void fetch("/api/sim/wallet", {
       method: "POST",
       credentials: "same-origin",
       headers: apiHeaders(true),
@@ -114,48 +116,4 @@ export function useSaveState(space: Space, initial: SimSave | null | undefined):
     };
   }, [flush]);
   return { save, update, ready, set };
-}
-
-/** 예전 폰 자료 (localStorage, 부위마다 장비 하나와 +8 기록): 테스트판을 처음 열 때 한 번 옮긴다 */
-export function legacySave(id: string): SimSave {
-  const read = <T,>(k: string): T | null => {
-    try {
-      return JSON.parse(localStorage.getItem(k) ?? "null") as T | null;
-    } catch {
-      return null;
-    }
-  };
-  const held: Partial<Record<Part, Held | null>> = {};
-  for (const part of ["무기", "갑옷"] as Part[]) {
-    const h = read<Held>(`sapphire.sim.held.${id}.${part}`);
-    if (h && typeof h.name === "string") held[part] = h;
-  }
-  const cleared = read<string[]>(`sapphire.sim.cleared.${id}`);
-  let autoBuy = false;
-  try {
-    autoBuy = localStorage.getItem(`sapphire.sim.autobuy.${id}`) === "1";
-  } catch {
-    /* 없으면 꺼짐 */
-  }
-  let s: SimSave = { held, cleared: Array.isArray(cleared) ? cleared.filter((x) => typeof x === "string") : [], autoBuy };
-  // 들고 있던 장비의 강화도는 직접 겪은 것으로 본다
-  for (const h of Object.values(held)) if (h && !h.broken) s = raiseExp(s, `enh:${h.name}`, h.lv);
-  return s;
-}
-
-/** 순위 기록('+8 참나무지팡이')에서 들고 있지 않은 장비를 보관함에 되살린다 (제작자 2026-11-04 '내가 만든 거 어디 감') */
-export function restoreFromRecords(s: SimSave, mine: { game?: string; label: string }[]): SimSave {
-  let out: SimSave = { ...s, bag: { ...(s.bag ?? {}) } };
-  for (const r of mine) {
-    const m = /^enh:(무기|갑옷):/.exec(r.game ?? "");
-    const l = /^\+(\d+) (.+)$/.exec(r.label);
-    if (!m || !l) continue;
-    const part = m[1] as Part;
-    const lv = Number(l[1]);
-    const name = l[2];
-    const have = [out.held?.[part], ...(out.bag?.[part] ?? [])].some((h) => h && !h.broken && h.name === name && h.lv >= lv);
-    if (!have) out.bag![part] = [{ name, lv, broken: false, tries: 0, tainted: true }, ...(out.bag![part] ?? [])].slice(0, BAG_MAX);
-    out = raiseExp(out, `enh:${name}`, lv);
-  }
-  return { ...out, restored: true };
 }

@@ -10,15 +10,15 @@ import { useEntryState } from "../router";
 import { BOX_CATS, GEM_NAMES, atLeast, boxFor, boxOf, boxesOf, expectedTo, gemSynth, optionFor, optionSources, pick, repairItems, scrollsOf, stepsExpected, stepsOf, tierOf } from "../sim";
 import type { Box, Dist, OptItem, OptSource, Part, Scroll, Steps } from "../sim";
 import { Loading, PicImg, TopBar } from "../ui";
-import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, gearOf, gearPower, gearStat, gearValue, unlockCost } from "../simGear";
+import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, gearOf, gearPower, gearStat, gearValue, spendRun, startRun, unlockCost } from "../simGear";
 import type { ArmorSlot, Gear, GearJob, Held } from "../simGear";
 import type { Wiki } from "../types";
 import { JOB_NAME } from "../auth";
 import type { Me } from "../auth";
 import { Nick } from "../kakao";
-import { CAT_NAME, CoinCtx, SpaceCtx, fetchKing, luckOf, reachWithin, simUrl, stepsWithin, useCoinState, useCoins, useRecord, useSpace } from "../simRank";
+import { CAT_NAME, CoinCtx, SpaceCtx, fetchKing, luckOf, reachWithin, sendRecord, simUrl, stepsWithin, upGame, useCoinState, useCoins, useRecord, useSpace } from "../simRank";
 import type { Cat, King, SimRec, Space } from "../simRank";
-import { BAG_MAX, SaveCtx, expOf, legacySave, raiseExp, restoreFromRecords, useKept, useSave, useSaveState } from "../simState";
+import { BAG_MAX, SaveCtx, expOf, raiseExp, useKept, useSave, useSaveState } from "../simState";
 import type { SimSave } from "../simState";
 import { QuestCtx, kstDay, titleOf, todayQuests, useQuest } from "../simQuest";
 import type { SimEvent } from "../simQuest";
@@ -162,24 +162,14 @@ function Fold({ k, title, children }: { k: string; title: string; children: Reac
   );
 }
 
-export function SimulatorPage({ wiki, me, space }: { wiki: Wiki; me: Me; space: Space }) {
+export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
+  const space: Space = "live";
   const { data: odds, error } = useAsync(useCallback(() => loadOdds(), []), "odds");
   const [tabRaw, setTab] = useEntryState<Tab>("sim.tab", "enhance");
   const tab: Tab = TABS.some((t) => t.key === tabRaw) ? tabRaw : "enhance";
   const coin = useCoinState(space);
   // 진행 상황 (장비, 보관함, 직접 겪은 것): 서버에 (src/simState.ts). 지갑을 받으면 시작
   const saveState = useSaveState(space, coin.wallet ? ((coin.wallet.state as SimSave | null) ?? null) : undefined);
-  // 테스트판을 처음 열면 예전 폰 자료와 순위 기록의 장비를 한 번 옮긴다 (제작자 2026-11-04 '8강 참나무지팡이 어디 감')
-  const restoring = useRef(false);
-  useEffect(() => {
-    if (!saveState.ready || space !== "test" || saveState.save.restored || restoring.current) return;
-    restoring.current = true;
-    const base: SimSave = Object.keys(saveState.save).length ? saveState.save : legacySave(me.id);
-    fetchKing(space).then(
-      (d) => saveState.set(restoreFromRecords(base, d.mine)),
-      () => saveState.set({ ...base, restored: true }),
-    );
-  }, [saveState, space, me.id]);
   const today =
     (coin.wallet?.rules.reduce((t, r) => t + r.n * r.coin, 0) ?? 0) + (coin.wallet?.quests.filter(Boolean).length ?? 0) * (coin.wallet?.questCoin ?? 0) + (coin.wallet?.streak?.bonus ?? 0);
   // 오늘의 도전 (src/simQuest.ts): 결과마다 알리면 맞는 도전을 깨고 코인을 받는다.
@@ -258,7 +248,7 @@ export function SimulatorPage({ wiki, me, space }: { wiki: Wiki; me: Me; space: 
           <span>{cheer.text}</span>
         </div>
       )}
-      {!odds || !saveState.ready || (space === "test" && !saveState.save.restored) ? (
+      {!odds || !saveState.ready ? (
         <Loading error={error} />
       ) : tab === "enhance" ? (
         <EnhanceTab odds={odds} wiki={wiki} me={me} />
@@ -358,19 +348,26 @@ function Ticker({ feed }: { feed: { user_id: string; label: string; luck: number
 
 const luckText = (luck: number) => `1/${n0(Math.pow(10, luck))}`;
 
-/** 시뮬레이터 하나의 순위 (5위까지와 내 기록). luck 이면 드문 정도로, 아니면 몇 번 만에. 기록이 없으면 그리지 않는다 */
-export function RankBox({ rec, title, luck = false }: { rec: ReturnType<typeof useRecord>; title: string; luck?: boolean }) {
+/** 시뮬레이터 하나의 순위 (5위까지와 내 기록). luck 이면 드문 정도로, cost 면 쓴 코인(적을수록 위)과 마법서 수, 아니면 몇 번 만에.
+ *  기록이 없으면 그리지 않는다 (step 이 있으면 머리만: 강화도를 바꿔 볼 수 있게) */
+export function RankBox({ rec, title, luck = false, cost = false, step }: { rec: ReturnType<typeof useRecord>; title: string; luck?: boolean; cost?: boolean; step?: React.ReactNode }) {
   const d = rec.data;
-  if (!d) return null;
-  const top = d.board.slice(0, 5);
-  const mine = d.mine;
-  if (!top.length && !mine) return null;
+  const top = d?.board.slice(0, 5) ?? [];
+  const mine = d?.mine ?? null;
+  if (!step && !top.length && !mine) return null;
   const line = (r: SimRec) => (luck ? luckText(r.luck) : `${r.tries.toLocaleString()}번`);
   const row = (r: SimRec, rank: number, me = false) => (
     <div key={me ? "me" : r.user_id} className={`sim-rank-row sim-rank-${rank}` + (me ? " sim-rank-mine" : "")}>
       <em>{rank}</em>
       <span className="sim-rank-who">{me ? "나" : <Nick name={r.user_id} />}</span>
-      <b>{r.label}</b>
+      {cost ? (
+        <b className="sim-rank-cost">
+          <i className="sim-c" aria-hidden />
+          {(-r.score).toLocaleString()}
+        </b>
+      ) : (
+        <b>{r.label}</b>
+      )}
       <small>{line(r)}</small>
     </div>
   );
@@ -379,6 +376,7 @@ export function RankBox({ rec, title, luck = false }: { rec: ReturnType<typeof u
       <div className="sim-head">
         <b>순위</b>
         <small>{title}</small>
+        {step}
       </div>
       {top.map((r, i) => row(r, i + 1))}
       {mine && (mine.rank ?? 99) > 5 && row(mine, mine.rank ?? 99, true)}
@@ -394,7 +392,8 @@ function gameNamer(odds: Odds) {
   const steps = new Map(stepsOf(odds).map((x) => [x.key, x.name]));
   const srcs = new Map(optionSources(odds).map((x) => [x.key, x.name]));
   return (game: string) => {
-    const [k, a, b, c] = game.split(":");
+    const [k, a, b, c, e] = game.split(":");
+    if (k === "up") return `+${c} ${a} · ${b}${e ? " 이벤트" : ""}`;
     if (k === "box" && !boxes.has(a) && eventBoxCache.has(a)) boxes.set(a, eventBoxCache.get(a)!);
     if (k === "enh") return `${a} · ${b} 마법서${c ? " (이벤트)" : ""}`;
     if (k === "stat") return steps.get(a) ?? "스탯 부여";
@@ -462,13 +461,27 @@ function RankTab({ odds, wiki, me }: { odds: Odds; wiki: Wiki; me: Me }) {
           <div className="sim-head">
             <b>1위</b>
           </div>
-          {data.firsts.map((r) => (
+          {/* 강화 비용 순위는 강화도마다 따로라 줄이 많다: 기준 강화도(+8, 방어구 +6)의 1위만 */}
+          {data.firsts
+            .filter((r) => !/^up:/.test(r.game ?? "") || /^up:[^:]+:[^:]+:(6|8)(:|$)/.test(r.game ?? ""))
+            .map((r) => (
             <div key={r.game} className="sim-first-row">
               <small>{name(r.game ?? "")}</small>
               <span>
-                <Nick name={r.user_id} /> <b>{r.label}</b>
+                <Nick name={r.user_id} /> {!/^up:/.test(r.game ?? "") && <b>{r.label}</b>}
               </span>
-              <em>{/^(enh|stat):/.test(r.game ?? "") ? `${r.tries.toLocaleString()}번` : luckText(r.luck)}</em>
+              <em>
+                {/^up:/.test(r.game ?? "") ? (
+                  <>
+                    <i className="sim-c" aria-hidden />
+                    {(-r.score).toLocaleString()}
+                  </>
+                ) : /^stat:/.test(r.game ?? "") ? (
+                  `${r.tries.toLocaleString()}번`
+                ) : (
+                  luckText(r.luck)
+                )}
+              </em>
             </div>
           ))}
         </section>
@@ -918,9 +931,14 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
     await coins.unlock(key, cost);
     setUnlocking(false);
   };
-  // 순위: 무기·갑옷과 마법서(이벤트 확률은 따로)마다. 산 장비로 몇 번 만에 몇 강, 점수는 강화한 장비의 세기(무기 평균 데미지, 방어구 방어도)라서 강한 장비일수록 위
-  const game = `enh:${part}:${scroll.name}${ev && scroll.event ? ":ev" : ""}`;
+  // 순위 (제작자 2026-11-19 '이 무기를 최저 비용으로 +8강까지 띄운 사람'): 장비 · 마법서(이벤트 확률은 따로) · 강화도마다, 쓴 코인이 적은 순 (simRank.ts upGame).
+  // 보는 강화도(rankLv)는 − + 로 바꾸고, 위험한 강화에 성공하면 그 강화도로 옮긴다
+  const evOn = ev && !!scroll.event;
+  const [rankLv, setRankLv] = useState(CLEAR_LV[part]);
+  const game = held ? upGame(held.name, scroll.name, rankLv, evOn) : "";
   const rec = useRecord(game);
+  const gameRef = useRef(game);
+  gameRef.current = game;
   const emit = useQuest();
   const [combo, setCombo] = useState(0);
   const comboRef = useRef(0);
@@ -939,7 +957,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
     if (!buyable(g) || coins.coins === null || coins.coins < g.price || coins.take(g.price) < g.price) return;
     clearFx();
     const cur = heldRef.current;
-    const item: Held = { name: g.name, lv: 0, broken: false, tries: 0, tainted: false };
+    const item: Held = { name: g.name, lv: 0, broken: false, tries: 0, tainted: false, ...startRun(g, cur) };
     heldRef.current = item;
     setHeldState(item);
     update((s) => {
@@ -966,7 +984,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
   // 자동 구매: 자동 강화를 멈추지 않고 같은 장비를 다시 산다 (코인이 모자라거나 살 수 없으면 false)
   const rebuy = (g: Gear) => {
     if (!buyable(g) || !coins.has(g.price) || coins.take(g.price) < g.price) return false;
-    setHeld({ name: g.name, lv: 0, broken: false, tries: 0, tainted: false });
+    setHeld({ name: g.name, lv: 0, broken: false, tries: 0, tainted: false, ...startRun(g, heldRef.current) });
     setStats((s) => ({ ...s, coins: s.coins + g.price }));
     comboRef.current = 0;
     setCombo(0);
@@ -998,13 +1016,22 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
         comboRef.current = ok ? comboRef.current + 1 : 0;
         setCombo(comboRef.current);
       }
-      if (ok && p < 1 && !h.tainted)
-        rec.submit("enhance", {
-          label: `+${cur + 1} ${g.name}`,
-          score: Math.round(gearPower(g, cur + 1) * 10) / 10,
-          tries,
-          luck: luckOf(reachWithin((k) => rates[k] ?? 0, scroll.keep, cur + 1, tries)),
-        });
+      // 비용 순위: 위험한 강화에 성공하면 그 강화도까지 쓴 코인을 내 최저 기록과 견주어, 더 적게 썼을 때만 보낸다
+      const run = spendRun(h);
+      if (ok && p < 1 && !h.tainted && run.cost !== undefined) {
+        const key = upGame(g.name, scroll.name, cur + 1, evOn);
+        const cost = run.cost;
+        const used = run.used ?? tries;
+        const best = save.cost?.[key];
+        if (!best || cost < best[0] || (cost === best[0] && used < best[1])) {
+          update((s) => ({ ...s, cost: { ...(s.cost ?? {}), [key]: [cost, used] } }));
+          sendRecord(key, "enhance", { label: `+${cur + 1} ${g.name}`, score: -cost, tries: used, luck: luckOf(reachWithin((k) => rates[k] ?? 0, scroll.keep, cur + 1, tries)) }).then(
+            () => gameRef.current === key && rec.reload(),
+            () => undefined,
+          );
+        }
+        setRankLv(cur + 1);
+      }
       if (ok && !h.tainted) emit({ kind: "enh", part: scroll.part, scroll: scroll.name, level: cur + 1, combo: comboRef.current });
       setStats((s) => ({ ...s, tries: s.tries + 1, coins: s.coins + 1, broke: s.broke + (!ok && !scroll.keep && p < 1 ? 1 : 0), best: Math.max(s.best, ok ? cur + 1 : cur) }));
       setLog((l) => [...l.slice(-39), { to: cur + 1, ok, broke: !ok && !scroll.keep }]);
@@ -1018,25 +1045,25 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
       // 직접 눌러 닿은 강화도: 자동은 여기까지
       if (ok && manual) update((s) => raiseExp(s, `enh:${g.name}`, cur + 1));
       if (ok) {
-        heldRef.current = { ...h, lv: cur + 1, tries };
+        heldRef.current = { ...h, ...run, lv: cur + 1, tries };
         setHeld(heldRef.current, scroll.part);
         const big = p < 0.35 || cur + 1 >= (scroll.part === "무기" ? 8 : 6);
         setFx((f) => ({ kind: "ok", n: (f?.n ?? 0) + 1, big }));
         const a = gearPower(g, cur), b = gearPower(g, cur + 1);
         setGain((x) => ({ from: gearStat(g, cur), to: gearStat(g, cur + 1), pct: a ? Math.round(((b - a) / a) * 1000) / 10 : 0, n: (x?.n ?? 0) + 1 }));
       } else if (scroll.keep) {
-        setHeld({ ...h, tries }, scroll.part);
+        setHeld({ ...h, ...run, tries }, scroll.part);
         setFx((f) => ({ kind: "keep", n: (f?.n ?? 0) + 1 }));
       } else {
         brokeAt.current = Date.now();
-        setHeld({ ...h, tries, broken: true }, scroll.part);
+        setHeld({ ...h, ...spendRun(h, true), tries, broken: true }, scroll.part);
         setFx((f) => ({ kind: "break", n: (f?.n ?? 0) + 1 }));
         setGain(null);
       }
       return ok || scroll.keep;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rates, scroll.keep, scroll.part, scroll.name, coins, rec, emit, gears],
+    [rates, scroll.keep, scroll.part, scroll.name, evOn, save.cost, coins, rec, emit, gears],
   );
   // 두근두근: 직접 누르면 결과를 먼저 정하고 게이지 바늘이 그 자리에 멈춘 뒤 보여 준다 (위험할수록 오래)
   const press = () => {
@@ -1085,6 +1112,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
   const switchPart = (x: Part) => {
     setPart(x);
     setGoal(x === "무기" ? 8 : 6);
+    setRankLv(CLEAR_LV[x]);
     clearFx();
     setCharge(null);
     const h = save.held?.[x] ?? null;
@@ -1095,7 +1123,9 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
 
   const next = lv + 1;
   const p = rate(next);
-    const ladder = Array.from({ length: 15 }, (_, i) => i + 1).filter((k) => rate(k) > 0);
+  const ladder = Array.from({ length: 15 }, (_, i) => i + 1).filter((k) => rate(k) > 0);
+  // 순위를 매기는 강화도: 성공이 정해져 있지 않은 곳
+  const risky = ladder.filter((k) => rate(k) < 1);
   const showShop = !gear || shop;
   // 장비 바꾸기 칸은 폰 뒤로 가기로 닫는다 (들고 있는 장비가 있을 때만 닫을 수 있다, backClose.ts)
   useBackClose(!!gear && shop, () => setShop(false));
@@ -1335,12 +1365,21 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
           </span>
         </div>
       )}
+      {/* 이번 도전의 비용 (제작자 2026-11-19 '+8강까지 든 비용'): 이 장비를 +0 부터 올리며 쓴 마법서 · 부서진 수 · 코인. 비용을 모르는 예전 장비는 지금까지의 합 */}
       <StatStrip
-        items={[
-          { label: "시도", value: stats.tries },
-          { label: "파괴", value: stats.broke, tone: "sim-bad" },
-          { label: "코인", value: stats.coins },
-        ]}
+        items={
+          held && held.cost !== undefined
+            ? [
+                { label: "마법서", value: held.used ?? 0 },
+                { label: "파괴", value: held.broke ?? 0, tone: "sim-bad" },
+                { label: "비용", value: held.cost, tone: "sim-gold" },
+              ]
+            : [
+                { label: "시도", value: stats.tries },
+                { label: "파괴", value: stats.broke, tone: "sim-bad" },
+                { label: "코인", value: stats.coins },
+              ]
+        }
       />
       {log.length > 0 && (
         <div className="sim-log" aria-label="최근 결과">
@@ -1350,7 +1389,24 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
         </div>
       )}
 
-      <RankBox rec={rec} title={`${part === "갑옷" ? "방어구" : part} · ${scroll.name}${ev && scroll.event ? " 이벤트" : ""}`} />
+      {gear && (
+        <RankBox
+          rec={rec}
+          cost
+          title={`${gear.name} · ${scroll.name}${evOn ? " 이벤트" : ""}`}
+          step={
+            <span className="sim-rank-step">
+              <button type="button" className="pill" disabled={!risky.some((k) => k < rankLv)} onClick={() => setRankLv([...risky].reverse().find((k) => k < rankLv) ?? rankLv)} aria-label="강화도 내리기">
+                −
+              </button>
+              <b key={rankLv}>+{rankLv}</b>
+              <button type="button" className="pill" disabled={!risky.some((k) => k > rankLv)} onClick={() => setRankLv(risky.find((k) => k > rankLv) ?? rankLv)} aria-label="강화도 올리기">
+                +
+              </button>
+            </span>
+          }
+        />
+      )}
       <Fold k="chance" title="확률표">
         <ChanceTable rate={rate} keep={scroll.keep} ladder={ladder} from={broken ? 0 : lv} />
         <Thousand rate={rate} keep={scroll.keep} goal={goal} />
@@ -1738,6 +1794,7 @@ function StatInner(p: {
         <span className="sim-rays" aria-hidden />
         <div className="sim-gearline">
           <span>{item ? item.sub : pet ? "펫" : "장신구"}</span>
+          {since.current > 0 && <span className="sim-avg sim-avg-now">{n0(since.current)}번</span>}
           {left !== null && stage < st.max && <span className="sim-avg">평균 {n0(left)}번</span>}
           {picks.length > 0 && (
             <button type="button" className="sim-change" onClick={() => setPicking(true)} disabled={auto}>

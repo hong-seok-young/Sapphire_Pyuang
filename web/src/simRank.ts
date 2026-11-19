@@ -50,11 +50,17 @@ export interface King {
 export type Space = "live" | "test";
 export const SpaceCtx = createContext<Space>("live");
 export const useSpace = () => useContext(SpaceCtx);
-/** '/api/sim/wallet' -> 테스트판이면 '?space=test' 를 붙인다 */
-export const simUrl = (path: string, space: Space) => (space === "test" ? `${path}${path.includes("?") ? "&" : "?"}space=test` : path);
+/** 테스트판(?space=test)은 2026-11-19 에 뺐다: 늘 개발 중판 주소 그대로 */
+export const simUrl = (path: string, _space?: Space) => path;
 export const fetchWallet = (space: Space) => api<Wallet & { state?: unknown }>(simUrl("/api/sim/wallet", space));
 export const fetchBoard = (game: string, space: Space) => api<{ board: SimRec[]; mine: SimRec | null }>(simUrl(`/api/sim?game=${encodeURIComponent(game)}`, space));
 export const fetchKing = (space: Space) => api<{ king: King[]; firsts: SimRec[]; mine: SimRec[] }>(simUrl("/api/sim", space));
+
+// 강화 비용 순위 (제작자 2026-11-19 '이 무기를 최저 비용으로 +8강까지 띄운 사람'): 비용 = 그 장비를 +0 부터 그 강화도까지 올리며 쓴 코인 (장비 값 + 마법서, 부서져 다시 산 것까지).
+// 기록 이름 'up:<장비>:<마법서>:<강화도>[:ev]', 점수 = -비용 (적게 쓴 사람이 위), tries = 마법서 수
+export const upGame = (gear: string, scroll: string, lv: number, ev: boolean) => `up:${gear}:${scroll}:${lv}${ev ? ":ev" : ""}`;
+/** 기록을 보낸다 (서버는 내 기록보다 좋을 때만 바꾼다) */
+export const sendRecord = (game: string, cat: Cat, r: { label: string; score: number; tries: number; luck: number }) => api<{ ok: boolean; better?: boolean }>("/api/sim", "POST", { ...r, cat, game });
 
 /** 확률 -> 운 (1/10 이면 1, 1/1000 이면 3) */
 export const luckOf = (p: number) => Math.min(15, Math.max(0, -Math.log10(Math.max(p, 1e-15))));
@@ -231,10 +237,14 @@ export function useRecord(game: string) {
   const space = useSpace();
   const [data, setData] = useState<{ board: SimRec[]; mine: SimRec | null } | null>(null);
   const mine = useRef<SimRec | null>(null);
+  // 보는 순위가 바뀐 뒤에 늦게 온 앞 순위의 답은 버린다 (강화도마다 순위가 달라 자주 바뀐다)
+  const now = useRef(game);
+  now.current = game;
   const load = useCallback(() => {
     if (!game) return;
     fetchBoard(game, space).then(
       (d) => {
+        if (now.current !== game) return;
         mine.current = d.mine;
         setData(d);
       },
@@ -259,5 +269,5 @@ export function useRecord(game: string) {
     },
     [game, load, space],
   );
-  return { data, submit };
+  return { data, submit, reload: load };
 }

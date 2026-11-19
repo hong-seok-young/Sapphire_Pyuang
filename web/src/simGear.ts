@@ -133,7 +133,20 @@ export interface Held {
   broken: boolean;
   tries: number;
   tainted: boolean;
+  /** 이번 도전의 비용 (제작자 2026-11-19 '+8강까지 든 비용'): 이 장비를 +0 부터 올리며 쓴 코인(장비 값 + 마법서 1개씩), 마법서 수, 부서진 수.
+   *  부서져 같은 장비를 다시 사면 이어서 센다. 이 칸이 생기기 전에 산 장비는 없다 (비용을 모른다) */
+  cost?: number;
+  used?: number;
+  broke?: number;
 }
+/** 새로 산 장비의 비용: 부서진 같은 장비를 다시 사는 것이면 이어서, 아니면 처음부터 */
+export function startRun(g: Gear, prev: Held | null): Pick<Held, "cost" | "used" | "broke"> {
+  const go = prev && prev.broken && prev.name === g.name && prev.cost !== undefined;
+  return go ? { cost: prev.cost! + g.price, used: prev.used ?? 0, broke: prev.broke ?? 0 } : { cost: g.price, used: 0, broke: 0 };
+}
+/** 마법서 한 장을 쓴 뒤의 비용 (broke 면 부서진 수도) */
+export const spendRun = (h: Held, broke = false): Pick<Held, "cost" | "used" | "broke"> =>
+  h.cost === undefined ? {} : { cost: h.cost + 1, used: (h.used ?? 0) + 1, broke: (h.broke ?? 0) + (broke ? 1 : 0) };
 const heldKey = (id: string, part: Part) => `sapphire.sim.held.${id}.${part}`;
 export function loadHeld(id: string, part: Part): Held | null {
   try {

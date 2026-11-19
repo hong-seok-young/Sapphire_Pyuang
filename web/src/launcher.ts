@@ -107,9 +107,7 @@ export const ITEMS: LaunchItem[] = [
   // 확률 시뮬레이터 (개발중, 제작자 요청 2026-11-04): 공식 확률 표로 강화·스탯 부여·옵션·상자를 해 본다
   // 확률 시뮬레이터는 앱개발자만 (제작자 2026-11-04 '개발 중으로 나만 보게')
   { key: "sim", title: "확률 시뮬레이터", short: "확률", to: "#/sim", icon: "🎰", soon: true, badge: "개발중", match: ["sim"] },
-  // 확률 시뮬레이터 테스트판 (제작자 2026-11-04 '내가 테스트하는 공간을 따로 도플갱어로, 나만 보이는 테스트 버튼'): 같은 화면, 자료만 따로 (?space=test, 표 sim_t_*)
-  // 홈에서는 '개발 중' 묶음 안에 확률 시뮬레이터와 똑같은 칸, 오른쪽 위 표만 '테스트' (제작자 2026-11-04 '개발 중으로 넣고 이름이랑 아이콘 다 똑같이, 오른쪽 위에 테스트라고만')
-  { key: "simtest", title: "확률 시뮬레이터", short: "확률", to: "#/simtest", icon: "🎰", developer: true, soon: true, badge: "테스트", match: ["simtest"] },
+  // 확률 시뮬레이터 테스트판(simtest, 앱개발자만)은 2026-11-19 에 뺐다 (제작자 '테스트 메뉴도 빼 버리고 개발 중만 냅두고'). 저장된 배치의 그 칸은 normalize 가 뺀다
   // 개발 요청 (개발중, 제작자 요청 2026-11-05 '개발 중 버튼 하나 더, 개발자한테 자유롭게 신청, 결재선'): src/pages/DevRequests.tsx
   { key: "devreq", title: "개발 요청", short: "요청", to: "#/devreq", icon: "📮", match: ["devreq"] },
   // 건의함 (개발중, 제작자 요청 2026-11-09 '건의사항은 게시판에서 빼고 별도 버튼, 익명 기능'): 게시판의 건의 사항을 따로, 익명 글·댓글.
@@ -224,7 +222,7 @@ function build(dock: string[], slots: string[], search: boolean): Layout {
  *  안 보이는 칸은 normalize 가 빼고 위부터 채운다. 개발 중 칸은 뒤에 두어 '개발 중' 묶음 순서) */
 export const DEFAULT_LAYOUT: Layout = {
   dock: ["home", "board", "info", "search", "chat"],
-  grid: ["ranking", "hall", "shop", "gcoin", "market", "trend", "dex", "match", "rent", "enhance", "requests", "todo", "suggest", "devreq", "admin", "gaps", "log", "damage", "sim", "simtest", "fit", "app"],
+  grid: ["ranking", "hall", "shop", "gcoin", "market", "trend", "dex", "match", "rent", "enhance", "requests", "todo", "suggest", "devreq", "admin", "gaps", "log", "damage", "sim", "fit", "app"],
 };
 
 /**

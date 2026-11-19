@@ -2,6 +2,8 @@
 // GET  /api/sim?game=… -> { board(그 시뮬레이터 20위까지), mine(내 기록과 순위) }
 // GET  /api/sim        -> { king(도박왕 20위까지: 묶음마다 가장 큰 운의 합), firsts(시뮬레이터마다 1위), mine(내 기록 모두) }
 // POST /api/sim { game, cat, label, score, tries, luck } -> 내 기록보다 좋을 때만 바꾼다 (화면이 셈한 값이라 재미로만, 값의 범위만 본다)
+// 강화 순위 (제작자 2026-11-19 '이 무기를 최저 비용으로 +8강까지 띄운 사람'): game 'up:<장비>:<마법서>:<강화도>[:ev]', score = -(쓴 코인), tries = 마법서 수.
+// 예전 강화 순위('enh:<부위>:<마법서>', 강화한 장비의 세기 순)는 기록으로 남기고 1위 목록에서 뺀다 (도박의 신 점수에는 그대로)
 // 쓰는 사람(server/simcoin.ts canSim)만. 테스트 계정은 순위에 안 나온다. ?space=test 는 앱개발자 테스트판 (표 sim_t_*)
 import { FORBIDDEN, NEED_LOGIN, RANK, TEST_IDS, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
@@ -44,7 +46,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         `(SELECT user_id, cat, MAX(luck) AS best FROM ${T}records WHERE ${NOT_TEST} GROUP BY user_id, cat) GROUP BY user_id ORDER BY total DESC LIMIT 20`,
     ),
     env.DB.prepare(
-      `SELECT game, user_id, label, score, tries, luck FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY game ORDER BY ${ORDER}) AS rn FROM ${T}records WHERE ${NOT_TEST} AND game <> 'dun') WHERE rn = 1 ORDER BY luck DESC`,
+      `SELECT game, user_id, label, score, tries, luck, at FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY game ORDER BY ${ORDER}) AS rn FROM ${T}records WHERE ${NOT_TEST} AND game <> 'dun' AND game NOT LIKE 'enh:%') WHERE rn = 1 ORDER BY at DESC LIMIT 120`,
     ),
     env.DB.prepare(`SELECT game, cat, label, score, tries, luck, at FROM ${T}records WHERE user_id = ?`).bind(me.id),
   ]);

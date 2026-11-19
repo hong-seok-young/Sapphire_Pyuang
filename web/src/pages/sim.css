@@ -325,6 +325,13 @@
 .sim-first-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; padding: 2px 0; font-size: 12px; border-bottom: 1px solid rgba(74, 63, 134, 0.3); }
 .sim-first-row small { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }
 .sim-first-row em { font-style: normal; color: #c79bff; }
+/* 강화 비용 순위: 보는 강화도 − +8 +, 줄의 코인 */
+.sim-rank-step { display: flex; align-items: center; gap: 4px; margin-left: auto; align-self: center; }
+.sim-rank-step .pill { display: grid; place-items: center; min-width: 26px; padding: 1px 0; font-size: 13px; }
+.sim-rank-step b { min-width: 30px; text-align: center; color: var(--gold); font-size: 13px; animation: sim-pop 0.25s ease-out; }
+.sim-rank-row > b.sim-rank-cost { color: var(--gold); font-weight: 700; }
+.sim-first-row em .sim-c { vertical-align: 0; }
+.sim-avg-now { color: var(--gold); }
 /* 강화 도감 */
 .sim-dex-strip { margin: 0; }
 .sim-dex-strip .mk-cats { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }

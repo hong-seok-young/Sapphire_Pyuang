@@ -13,13 +13,13 @@ export const canSim = (me: User) => RANK[me.role] >= 1 || TEST_IDS.includes(me.i
  *  코드는 하나라 배포 한 번이 둘 다에 들어가고, 자료(코인, 순위, 해금, 장비)만 따로다. ?space=test 는 앱개발자와 테스트 계정만 */
 export type Space = "live" | "test";
 export const tbl = (space: Space) => (space === "test" ? "sim_t_" : "sim_");
-export const spaceOf = (request: Request, me: User): Space | null =>
-  new URL(request.url).searchParams.get("space") === "test" ? (me.role === "developer" || TEST_IDS.includes(me.id) ? "test" : null) : canSim(me) ? "live" : null;
+// 2026-11-19 테스트판을 뺐다 (제작자 '테스트 메뉴도 빼 버리고 개발 중만 냅두고'): ?space=test 는 더 받지 않고 늘 개발 중판. 표 sim_t_* 는 기록으로 남긴다
+export const spaceOf = (_request: Request, me: User): Space | null => (canSim(me) ? "live" : null);
 
 /** 한국 날짜 (하루 한도를 0시에 새로) */
 export const kstDate = (ms: number) => new Date(ms + 9 * 3_600_000).toISOString().slice(0, 10);
 
-export const WELCOME = 100;
+export const WELCOME = 1000;
 export interface EarnRule {
   key: string;
   label: string;
@@ -31,34 +31,35 @@ export interface EarnRule {
   /** 그 일을 하는 화면 (버는 법 표에서 누르면 간다) */
   to?: string;
 }
+// 2026-11-19 모두 열 배로 (제작자 '코인제도 괜찮다, 대신 넉넉하게, 지금보다 열 배씩 더 주면': 처음 코인 100 -> 1000, 버는 일·오늘의 도전·연속 접속 보너스 x10. 장비 값·해금 값은 그대로)
 export const EARN: EarnRule[] = [
-  { key: "visit", label: "하루 첫 접속", coin: 20, cap: 1 },
-  { key: "board", label: "게시판 글쓰기", coin: 30, cap: 3, method: "POST", re: /^\/api\/board$/, to: "#/board" },
-  { key: "comment", label: "게시판 댓글", coin: 5, cap: 10, method: "POST", re: /^\/api\/(board|official)\/\d+\/comments$/, to: "#/board" },
-  { key: "like", label: "게시판 좋아요", coin: 1, cap: 10, method: "PUT", re: /^\/api\/(board|official)\/\d+\/like$/, to: "#/board" },
-  { key: "gd", label: "길드 던전 시간표 확정", coin: 20, cap: 1, method: "POST", re: /^\/api\/gd\/confirm$/, to: "#/match" },
-  { key: "gdpaint", label: "길드 던전 시간표 칠하기", coin: 2, cap: 5, method: "PUT", re: /^\/api\/gd\/avail$/, to: "#/match" },
-  { key: "gdanswer", label: "길드 던전 후보 확정 · 불참", coin: 5, cap: 3, method: "POST", re: /^\/api\/gd\/answer$/, to: "#/match" },
-  { key: "chat", label: "챗봇 질문", coin: 3, cap: 20, method: "POST", re: /^\/api\/chat$/, to: "#/chat" },
-  { key: "market", label: "중개인 물건 올리기", coin: 10, cap: 3, method: "POST", re: /^\/api\/market$/, to: "#/market" },
-  { key: "want", label: "중개인 살래요 · 팔래요", coin: 3, cap: 5, method: "PUT", re: /^\/api\/market\/\d+\/want$/, to: "#/market" },
-  { key: "bid", label: "중개인 경매 입찰", coin: 3, cap: 5, method: "POST", re: /^\/api\/market\/\d+\/bids$/, to: "#/market" },
-  { key: "talk", label: "중개인 토론방", coin: 2, cap: 10, method: "POST", re: /^\/api\/market\/\d+\/talk$/, to: "#/market" },
-  { key: "gold", label: "골드 글", coin: 10, cap: 2, method: "POST", re: /^\/api\/gold$/, to: "#/market" },
-  { key: "request", label: "의뢰 올리기", coin: 10, cap: 3, method: "POST", re: /^\/api\/requests$/, to: "#/requests" },
-  { key: "accept", label: "의뢰 수락 · 완료", coin: 5, cap: 5, method: "PATCH", re: /^\/api\/requests\/\d+$/, to: "#/requests" },
-  { key: "profile", label: "레벨 · 경험치 기록", coin: 5, cap: 2, method: "PUT", re: /^\/api\/profile$/, to: "#/ranking" },
-  { key: "avatar", label: "캐릭터 사진 등록", coin: 10, cap: 1, method: "PUT", re: /^\/api\/avatar$/, to: "#/me" },
-  { key: "todo", label: "To do 체크", coin: 1, cap: 15, method: "PUT", re: /^\/api\/todo$/, to: "#/todo" },
-  { key: "rent", label: "장비대여 신청", coin: 5, cap: 2, method: "POST", re: /^\/api\/rent\/apply$/, to: "#/rent" },
-  { key: "donate", label: "기부함 기부 신청", coin: 15, cap: 2, method: "POST", re: /^\/api\/donate$/, to: "#/donate" },
-  { key: "gcoin", label: "성장코인샵 신청", coin: 5, cap: 2, method: "POST", re: /^\/api\/gcoin\/orders$/, to: "#/gcoin" },
-  { key: "devreq", label: "개발 요청", coin: 10, cap: 2, method: "POST", re: /^\/api\/devreq$/, to: "#/devreq" },
+  { key: "visit", label: "하루 첫 접속", coin: 200, cap: 1 },
+  { key: "board", label: "게시판 글쓰기", coin: 300, cap: 3, method: "POST", re: /^\/api\/board$/, to: "#/board" },
+  { key: "comment", label: "게시판 댓글", coin: 50, cap: 10, method: "POST", re: /^\/api\/(board|official)\/\d+\/comments$/, to: "#/board" },
+  { key: "like", label: "게시판 좋아요", coin: 10, cap: 10, method: "PUT", re: /^\/api\/(board|official)\/\d+\/like$/, to: "#/board" },
+  { key: "gd", label: "길드 던전 시간표 확정", coin: 200, cap: 1, method: "POST", re: /^\/api\/gd\/confirm$/, to: "#/match" },
+  { key: "gdpaint", label: "길드 던전 시간표 칠하기", coin: 20, cap: 5, method: "PUT", re: /^\/api\/gd\/avail$/, to: "#/match" },
+  { key: "gdanswer", label: "길드 던전 후보 확정 · 불참", coin: 50, cap: 3, method: "POST", re: /^\/api\/gd\/answer$/, to: "#/match" },
+  { key: "chat", label: "챗봇 질문", coin: 30, cap: 20, method: "POST", re: /^\/api\/chat$/, to: "#/chat" },
+  { key: "market", label: "중개인 물건 올리기", coin: 100, cap: 3, method: "POST", re: /^\/api\/market$/, to: "#/market" },
+  { key: "want", label: "중개인 살래요 · 팔래요", coin: 30, cap: 5, method: "PUT", re: /^\/api\/market\/\d+\/want$/, to: "#/market" },
+  { key: "bid", label: "중개인 경매 입찰", coin: 30, cap: 5, method: "POST", re: /^\/api\/market\/\d+\/bids$/, to: "#/market" },
+  { key: "talk", label: "중개인 토론방", coin: 20, cap: 10, method: "POST", re: /^\/api\/market\/\d+\/talk$/, to: "#/market" },
+  { key: "gold", label: "골드 글", coin: 100, cap: 2, method: "POST", re: /^\/api\/gold$/, to: "#/market" },
+  { key: "request", label: "의뢰 올리기", coin: 100, cap: 3, method: "POST", re: /^\/api\/requests$/, to: "#/requests" },
+  { key: "accept", label: "의뢰 수락 · 완료", coin: 50, cap: 5, method: "PATCH", re: /^\/api\/requests\/\d+$/, to: "#/requests" },
+  { key: "profile", label: "레벨 · 경험치 기록", coin: 50, cap: 2, method: "PUT", re: /^\/api\/profile$/, to: "#/ranking" },
+  { key: "avatar", label: "캐릭터 사진 등록", coin: 100, cap: 1, method: "PUT", re: /^\/api\/avatar$/, to: "#/me" },
+  { key: "todo", label: "To do 체크", coin: 10, cap: 15, method: "PUT", re: /^\/api\/todo$/, to: "#/todo" },
+  { key: "rent", label: "장비대여 신청", coin: 50, cap: 2, method: "POST", re: /^\/api\/rent\/apply$/, to: "#/rent" },
+  { key: "donate", label: "기부함 기부 신청", coin: 150, cap: 2, method: "POST", re: /^\/api\/donate$/, to: "#/donate" },
+  { key: "gcoin", label: "성장코인샵 신청", coin: 50, cap: 2, method: "POST", re: /^\/api\/gcoin\/orders$/, to: "#/gcoin" },
+  { key: "devreq", label: "개발 요청", coin: 100, cap: 2, method: "POST", re: /^\/api\/devreq$/, to: "#/devreq" },
 ];
 
 /** 연속 접속 보너스 (2026-11-17 고도화): 어제도 들어왔으면 하루 첫 접속에 더 준다. 2일째 +5 … 7일째부터 +30 (STREAK_STEP x (이어진 날 - 1), STREAK_MAX 까지). sim_earn 의 key 'streak' 에 그날 이어진 날 수 */
-export const STREAK_STEP = 5;
-export const STREAK_MAX = 30;
+export const STREAK_STEP = 50;
+export const STREAK_MAX = 300;
 export const streakBonus = (days: number) => Math.min(STREAK_MAX, Math.max(0, days - 1) * STREAK_STEP);
 /** 장비 팔기 (2026-11-17 고도화): 강화한 장비를 코인으로 판다. 값은 화면이 공식 확률로 셈한다 (만드는 데 드는 평균 코인의 반쯤, 재미로만. 서버는 범위와 하루 횟수만 본다) */
 export const SELL_CAP = 40;
@@ -69,7 +70,7 @@ export const ensureWallet = (env: Env, userId: string, space: Space = "live") =>
   env.DB.prepare(`INSERT OR IGNORE INTO ${tbl(space)}wallet (user_id, coins, earned, spent, updated_at) VALUES (?, ?, 0, 0, ?)`).bind(userId, WELCOME, Date.now()).run();
 
 /** 오늘의 도전 (화면 src/simQuest.ts 가 날마다 셋을 고른다): 하나 깰 때마다 */
-export const QUEST_COIN = 30;
+export const QUEST_COIN = 300;
 export const QUEST_KEYS = ["quest0", "quest1", "quest2"];
 
 /** 그 일로 코인을 준다 (오늘 한도 안이면). 실패해도 하던 일은 그대로. 받았으면 true */

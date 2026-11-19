@@ -9,7 +9,7 @@
 //      폰에만 두다 덮였다. 이제 서버에, 다른 폰에서도 그대로) -> { ok }
 import { FORBIDDEN, NEED_LOGIN, TEST_IDS, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { DEV_FLOOR, DEV_REFILL, EARN, QUEST_COIN, QUEST_KEYS, SELL_CAP, SELL_MAX, earn, ensureWallet, kstDate, refillSql, refillable, sellGear, spaceOf, streakBonus, tbl } from "../../../server/simcoin";
+import { DEV_FLOOR, DEV_REFILL, EARN, QUEST_COIN, QUEST_KEYS, SELL_CAP, SELL_MAX, STREAK_MAX, STREAK_STEP, earn, ensureWallet, kstDate, refillSql, refillable, sellGear, spaceOf, streakBonus, tbl } from "../../../server/simcoin";
 
 const unlocksOf = async (env: Env, id: string, T: string) =>
   ((await env.DB.prepare(`SELECT key FROM ${T}unlocks WHERE user_id = ?`).bind(id).all<{ key: string }>()).results ?? []).map((r) => r.key);
@@ -47,7 +47,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       ...(w.results[0] as object),
       rules: EARN.map((r) => ({ key: r.key, label: r.label, coin: r.coin, cap: r.cap, n: n.get(r.key) ?? 0, to: r.to })),
       // 연속 접속 (server/simcoin.ts streakEarn): 오늘까지 이어진 날 수와 오늘 받은 보너스, 장비 판 횟수
-      streak: { days: n.get("streak") ?? 0, bonus: streakBonus(n.get("streak") ?? 0), step: 5, max: 30 },
+      streak: { days: n.get("streak") ?? 0, bonus: streakBonus(n.get("streak") ?? 0), step: STREAK_STEP, max: STREAK_MAX },
       sold: { n: n.get("sell") ?? 0, cap: SELL_CAP, max: SELL_MAX },
       quests: QUEST_KEYS.map((k) => (n.get(k) ?? 0) > 0),
       questCoin: QUEST_COIN,
