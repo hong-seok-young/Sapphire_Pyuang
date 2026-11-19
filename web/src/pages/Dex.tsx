@@ -933,6 +933,8 @@ function MineCost({ c }: { c: { done: number; todo: number; doneN: number; todoN
   );
 }
 
+/** 차액 칸: 1억 넘으면 3.4억, 아래는 2,171만 (좁은 칸에 한 줄로) */
+const shortGold = (v: number) => (v >= 1e8 ? `${Math.round(v / 1e7) / 10}억` : intUnit(v));
 function intUnit(v: number): string {
   if (v >= 1e8) return `${Math.round(v / 1e8).toLocaleString("ko-KR")}억`;
   if (v >= 1e4) return `${Math.round(v / 1e4).toLocaleString("ko-KR")}만`;
@@ -1031,19 +1033,23 @@ function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft 
               <span />
               {MODES.map((m) => (
                 <button key={m.key} type="button" role="tab" aria-selected={basis === m.key} className={"dex-ctab-h" + (basis === m.key ? " dex-ctab-on" : "")} onClick={() => setBasis(m.key)}>
-                  {m.label}
-                  {m.key === "event" && mine.todo.normal - mine.todo.event > 0 && <em className="dex-cost-save">−{fmtGold(mine.todo.normal - mine.todo.event)}</em>}
+                  {m.key === "event" ? <>아바돈<br />이벤트</> : m.label}
                 </button>
               ))}
+              <span className="dex-ctab-h dex-ctab-dh">차액</span>
               {(["done", "todo"] as const).map((row) => (
                 <Fragment key={row}>
-                  <small className={"dex-ctab-l " + (row === "done" ? "dex-ctab-fill" : "dex-ctab-left")}>{row === "done" ? "채운 비용" : "남은 비용"}</small>
+                  <small className={"dex-ctab-l " + (row === "done" ? "dex-ctab-fill" : "dex-ctab-left")}>{row === "done" ? "채운" : "남은"}<br />비용</small>
                   {MODES.map((m) => (
                     <span key={m.key} className={"dex-ctab-c" + (basis === m.key ? " dex-ctab-on" : "") + (row === "done" ? " dex-ctab-fill" : " dex-ctab-left")}>
                       <b>{fmtGold(mine[row][m.key])}</b>
                       <small>{intUnit(mine[row][m.key] / rate)}원</small>
                     </span>
                   ))}
+                  <span className="dex-ctab-c dex-ctab-diff">
+                    <b>−{shortGold(Math.max(0, mine[row].normal - mine[row].event))}</b>
+                    <small>{intUnit(Math.max(0, mine[row].normal - mine[row].event) / rate)}원</small>
+                  </span>
                 </Fragment>
               ))}
             </div>
