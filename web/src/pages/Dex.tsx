@@ -207,22 +207,10 @@ const rowKey = (s: string, pct: boolean) => s + (pct ? "%" : "");
 const SHORT: Record<string, string> = { "PVE 데미지 감소": "PVE 뎀감", "PVP 데미지 감소": "PVP 뎀감", "크리티컬 데미지 감소": "크리 뎀감", "크리티컬 저항": "크리 저항", "데들리 데미지 감소": "데들리 뎀감" };
 const pick = (sum: Sum, s: string, pct: boolean) => (pct ? sum.get(s)?.pct : sum.get(s)?.flat) ?? 0;
 
-/** 손으로 맞춘 내 능력치 (줄마다, 없으면 완료 합계). 이 기기에 계정별로 (localStorage sapphire.dex.stat.<아이디>) */
-const statKey = (me: Me) => `sapphire.dex.stat.${me.id}`;
-function readStats(me: Me): Record<string, number> {
-  try {
-    return JSON.parse(localStorage.getItem(statKey(me)) ?? "{}") as Record<string, number>;
-  } catch {
-    return {};
-  }
-}
-function writeStats(me: Me, v: Record<string, number>) {
-  try {
-    localStorage.setItem(statKey(me), JSON.stringify(v));
-  } catch {
-    /* 이번에 연 동안만 */
-  }
-}
+/** 내 도감의 내 수치 (제작자 2026-11-19 '완료한 걸 일일이 대조하며 체크하기 힘드니 수치만 적어도'): 완료 합보다 높게 적은 줄은
+ *  모자란 만큼을 아직 안 한 항목 중 최저가 묶음으로 채운 것으로 친다 (채운 비용·남은 비용·목록). 완료 합보다 낮게는 못 적는다.
+ *  예전 목표 칸(sapphire.dex.stat.<아이디>)과 뜻이 달라 따로 둔다. 서버에도 (src/userSync.ts) */
+const haveKey = (me: Me) => `sapphire.dex.have.${me.id}`;
 
 /** 다른 캐릭 수치 (내 도감과 따로): 완료 체크 없이 처음부터 드는 비용을 본다. 챗봇 '도감 계산기에서 보기'도 여기로 */
 type Mode = "mine" | "other";
@@ -313,7 +301,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
     setListW(el.clientWidth);
     return () => ro.disconnect();
   }, []);
-  const [myOver, setMyOver] = useState<Record<string, number>>(() => readStats(me));
+  const [myOver, setMyOver] = useState<Record<string, number>>(() => readJson(haveKey(me), {}));
   const [otherOver, setOtherOver] = useState<Record<string, number>>(() => readJson(otherKey(me), {}));
   const over = other ? otherOver : myOver;
   const setOver = (v: Record<string, number>) => {
@@ -322,7 +310,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
       writeJson(otherKey(me), v);
     } else {
       setMyOver(v);
-      writeStats(me, v);
+      writeJson(haveKey(me), v);
     }
   };
   // 시세 비교에서 손으로 고친 마법서·스탬프 값 (제작자 2026-11-11)
@@ -358,7 +346,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
     if (on && !sel.size) window.setTimeout(() => statBar.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   };
   const inCat = (e: DexEntry) => cat === "all" || (e.cat ?? "일반") === cat;
-  const inTab = (e: DexEntry) => inCat(e) && (tab === "all" ? true : tab === "done" ? done.has(e.name) : !done.has(e.name));
+  const inTab = (e: DexEntry) => inCat(e) && (tab === "all" ? true : tab === "done" ? seen.has(e.name) : !seen.has(e.name));
   const doneEntries = dex.entries.filter((e) => done.has(e.name));
   const petDone = doneEntries.filter((e) => e.cat === "펫").length;
   const have = useMemo(() => withRewards(addUp(doneEntries), dex.petRewards, petDone), [done, dex]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -428,7 +416,14 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   const notDone = useMemo(() => (price ? dex.entries.filter((e) => !done.has(e.name)) : null), [dex, done, price]);
   // "normal" 자리 = 고르는 기준 값(평소 또는 이벤트), "event" 자리 = 이벤트 값
   const planCost = useCallback((e: DexEntry, mode: "normal" | "event") => (mode === "normal" ? entryGold.get(e.name) ?? null : goldEvent.get(e.name) ?? null), [entryGold, goldEvent]);
-  const { plan: multi, busy: solving } = useBestPlan(notDone, planNeeds, planCost);
+  // 내 도감은 적은 수치 모두를 함께 채우는 묶음(고른 능력치와 상관없이), 다른 캐릭은 고른 능력치의 목표만
+  const { plan: multi, busy: solving } = useBestPlan(notDone, other ? planNeeds : needs, planCost);
+  // 내 도감: 수치로 채운 것으로 친 항목 (푸는 동안은 앞 답을 그대로 두어 금액이 떴다 바뀌지 않게)
+  const lastPlan = useRef<MultiPlan | null>(null);
+  if (!other && !solving) lastPlan.current = needs.size ? multi : null;
+  const estPlan = other ? null : solving ? lastPlan.current : multi;
+  const assumed = useMemo(() => new Set((estPlan?.picks ?? []).map((p) => p.e.name).filter((n) => !myDone.has(n))), [estPlan, myDone]);
+  const seen = useMemo(() => (other ? NONE_DONE : assumed.size ? new Set([...myDone, ...assumed]) : myDone), [other, myDone, assumed]);
   // 능력치 칸마다의 목표 비용도 정수 최적화로 정확히 (제작자 2026-11-13 'pve 1퍼 이동속도 8 각각 올리면 더 싸게 되는데':
   // 칸 하나의 목표 비용이 차례로 고른 값이라 PVE 데미지% 1 이 106.6만 · 2개로 떴다. 정확히는 74.2만 · 1개)
   const cellGoals = useCellGoals(notDone, needs, planCost);
@@ -438,7 +433,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
     return g === undefined ? goalOf(k, target) : g;
   };
   const [allList, setAllList] = useEntryState("dex.allList", false);
-  const multiOn = (!!multi || solving) && (sel.size > 0 || !allList);
+  const multiOn = other && (!!multi || solving) && (sel.size > 0 || !allList);
   const multiShort = multi ? [...planNeeds].some(([k, v]) => (multi.got.get(k) ?? 0) < v - 1e-9) : false;
   const goalNames = multiOn ? new Map((multi?.picks ?? []).map((x, i) => [x.e.name, i])) : null;
   const selLabel = [...sel].map((k) => (SHORT[k.replace(/%$/, "")] ?? k.replace(/%$/, "")) + (k.endsWith("%") ? "%" : "")).join(" · ");
@@ -447,7 +442,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
     : dex.entries.filter((e) => inTab(e) && matchQ(e) && matchStat(e));
   const rewards = (dex.petRewards ?? []).filter(([n]) => n <= petTotal);
   const nextReward = rewards.find(([n]) => n > petDone);
-  const todoListed = listed.filter((e) => !done.has(e.name));
+  const todoListed = listed.filter((e) => !seen.has(e.name));
 
 
   // 필요 재료는 칸마다 가장 싼 수단으로 (제작자 2026-11-12 '골드로 사는 게 더 싼 칸은 골드 가격으로 합산하고 스탬프는 그만큼 빼 줘야지, 가장 싼 수단'):
@@ -507,22 +502,24 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
     if (!price || other) return null;
     const eff = dex.entries.filter((e) => e.effects.length > 0);
     const by = (list: DexEntry[]) => totals(list.flatMap((e) => e.items), price, pset).by;
-    const d = by(eff.filter((e) => myDone.has(e.name)));
-    const t = by(eff.filter((e) => !myDone.has(e.name)));
+    const d = by(eff.filter((e) => seen.has(e.name)));
+    const t = by(eff.filter((e) => !seen.has(e.name)));
     return { done: { normal: d.normal.sum, event: d.event.sum }, todo: { normal: t.normal.sum, event: t.event.sum } };
-  }, [dex, myDone, price, pset, other]);
+  }, [dex, seen, price, pset, other]);
 
   // 칸마다 완료 % (제작자 2026-11-19 '코스튬 몇퍼 일반 몇퍼 펫 몇퍼, 전체 표기')
   const catStat = (c: string) => {
     const list = c === "all" ? dex.entries : dex.entries.filter((e) => (e.cat ?? "일반") === c);
-    const d = list.filter((e) => myDone.has(e.name)).length;
-    return { d, n: list.length, p: list.length ? Math.floor((d / list.length) * 100) : 0 };
+    const d = list.filter((e) => seen.has(e.name)).length;
+    const r = list.filter((e) => myDone.has(e.name)).length;
+    return { d, n: list.length, p: list.length ? Math.floor((d / list.length) * 100) : 0, real: list.length ? Math.floor((r / list.length) * 100) : 0 };
   };
   const allPct = catStat("all").p;
+  const realPct = catStat("all").real;
   // 내 도감: 도감 비용 칸을 맨 위로, 내 도감 전체의 채운 비용 | 막대 | 남은 비용 한 줄, 펼치면 채운·남은 x 평소·이벤트·차액 표 (제작자 2026-11-19 초안 5안).
   // 다른 캐릭: 예전처럼 목록 아래, 지금 목록(목표 묶음)의 비용
   const costEl = price && tot && (mineCost ? true : todoListed.length > 0 && tot.slots > 0)
-    ? <CostPanel price={price} tot={tot} pset={pset} setPset={setPset} canEdit={canSetPrice} basis={basis} setBasis={setBasis} pct={allPct} mine={mineCost} />
+    ? <CostPanel price={price} tot={tot} pset={pset} setPset={setPset} canEdit={canSetPrice} basis={basis} setBasis={setBasis} pct={allPct} realPct={realPct} mine={mineCost} />
     : null;
 
   return (
@@ -538,6 +535,17 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
       {mineCost && costEl}
       <StatPanel other={other} have={have} full={full} over={over} setOver={setOver} sel={sel} onPick={pickStat} doneN={doneEntries.length} total={dex.entries.length}
         goalOf={price ? exactGoalOf : null} stepsOf={(k) => planFor(k).map((x) => x.v)} withEv={withEv} setWithEv={setWithEv} />
+      {!other && needs.size > 0 && (
+        <p className="dex-estline">
+          {solving && !estPlan ? <Solving /> : (
+            <>
+              수치로 채운 항목 <b>{assumed.size}</b>개{estPlan && <> · {fmtGold(estPlan.gold)}{estPlan.unknown > 0 && <> · 값 모름 {estPlan.unknown}</>}</>}
+              {estPlan && [...needs].some(([k, v]) => (estPlan.got.get(k) ?? 0) < v - 1e-9) && <> · 다 해도 모자람</>}
+              {solving && <i className="dex-solving-dots" aria-hidden><b>.</b><b>.</b><b>.</b></i>}
+            </>
+          )}
+        </p>
+      )}
 
       <div className="mk-cats dex-cats">
         {CATS.map((c) => {
@@ -564,7 +572,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
       {!other && <nav className="pill-row" role="tablist">
         {TABS.map((x) => (
           <button key={x.key} type="button" role="tab" aria-selected={tab === x.key} className={"pill" + (tab === x.key ? " pill-on" : "")} onClick={() => setTab(x.key)}>
-            {x.label} <small>{x.key === "all" ? dex.entries.length : x.key === "done" ? doneEntries.length : dex.entries.length - doneEntries.length}</small>
+            {x.label} <small>{x.key === "all" ? dex.entries.length : x.key === "done" ? seen.size : dex.entries.length - seen.size}</small>
           </button>
         ))}
       </nav>}
@@ -578,7 +586,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
         )}
       </div>
 
-      {!sel.size && (multi || solving) && (
+      {other && !sel.size && (multi || solving) && (
         <div className="dex-statbar">
           <span>
             {allList ? (
@@ -603,9 +611,9 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
         <div className="dex-statbar" ref={statBar}>
           <span>
             <b>{selLabel}</b>{" "}
-            {solving ? (
+            {other && solving ? (
               <Solving />
-            ) : multi ? (
+            ) : other && multi ? (
               <>
                 최저가 <b>{multi.picks.length}</b>개 · <b>{fmtGold(multi.gold)}</b>
                 {multi.unknown > 0 && <> · 값 모름 {multi.unknown}</>}
@@ -666,7 +674,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
 
       <ul className="dex-list" ref={listRef}>
         {listed.map((e) => (
-          <EntryRow key={e.name} e={e} listW={listW} noCheck={other} done={done.has(e.name)} onToggle={() => toggle(e.name)} iconOf={iconOf} sel={sel} onItem={(name) => setQ(name)} wiki={wiki} price={price} pset={pset} />
+          <EntryRow key={e.name} e={e} listW={listW} noCheck={other} done={seen.has(e.name)} est={assumed.has(e.name)} onToggle={() => toggle(e.name)} iconOf={iconOf} sel={sel} onItem={(name) => setQ(name)} wiki={wiki} price={price} pset={pset} />
         ))}
       </ul>
       {!listed.length && !(solving && multiOn) && <p className="muted dex-empty">맞는 항목이 없어요</p>}
@@ -697,8 +705,25 @@ function StatPanel({ other, have, full, over, setOver, sel, onPick, doneN, total
   const extra: Row[] = [];
   for (const [s, x] of full) for (const pct of [false, true]) if ((pct ? x.pct : x.flat) && !known.has(rowKey(s, pct))) extra.push([s, pct]);
   for (let i = 0; i < extra.length; i += 2) pairs.push([extra[i], extra[i + 1] ?? null]);
-  const valueOf = (s: string, pct: boolean) => over[rowKey(s, pct)] ?? pick(have, s, pct);
-  const set = (k: string, v: number) => setOver({ ...over, [k]: Math.max(0, Math.round(v * 100) / 100) });
+  const valueOf = (s: string, pct: boolean) => Math.max(over[rowKey(s, pct)] ?? 0, pick(have, s, pct));
+  const set = (k: string, v: number) => {
+    const n = Math.max(0, Math.round(v * 100) / 100);
+    if (!other) {
+      // 내 도감: 완료 합보다 낮게는 못 적고(같으면 적은 값이 없는 것), 다 채운 값보다 높게도 못 적는다
+      const s = k.replace(/%$/, "");
+      const pct = k.endsWith("%");
+      const cur = pick(have, s, pct);
+      const mx = pick(full, s, pct);
+      const c = Math.min(n, mx);
+      if (c <= cur + 1e-9) {
+        clear(k);
+        return;
+      }
+      setOver({ ...over, [k]: c });
+      return;
+    }
+    setOver({ ...over, [k]: n });
+  };
   // 칸을 비우거나 ✕ 를 누르면 그 목표를 지운다 (제작자 2026-11-13 '수치 지우면 자동으로 0, 수치 칸 우측에 x')
   const clear = (k: string) => {
     if (k in over) {
@@ -718,7 +743,8 @@ function StatPanel({ other, have, full, over, setOver, sel, onPick, doneN, total
     const v = valueOf(s, pct);
     const mx = pick(full, s, pct);
     const cur = pick(have, s, pct);
-    const g = goalOf && k in over ? goalOf(k, over[k]) : null;
+    const g = goalOf && k in over && over[k] > cur + 1e-9 ? goalOf(k, over[k]) : null;
+    const low = !other && draft[k] != null && draft[k].trim() !== "" && parseFloat(draft[k]) < cur - 1e-9;
     return (
       <div key={k} className={"dex-cell" + (sel.has(k) ? " dex-cell-on" : "") + (k in over ? " dex-cell-set" : "") + (g ? " dex-cell-goal" : "")}>
         <button type="button" className="dex-cell-name" onClick={() => onPick(k)} disabled={!mx} aria-pressed={sel.has(k)}>
@@ -733,7 +759,7 @@ function StatPanel({ other, have, full, over, setOver, sel, onPick, doneN, total
             <small className="muted">{mx ? `최대 ${num(mx)}` : "최대 -"}</small>
           )}
         </button>
-        <input className="dex-row-num" type="number" inputMode="decimal" min={0} step={mx > 50 ? 0.5 : 0.01} aria-label={`${s}${pct ? " %" : ""} 내 수치`}
+        <input className={"dex-row-num" + (low ? " dex-row-low" : "")} title={low ? `완료 합 ${num(cur)}보다 적게는 못 적어요` : undefined} type="number" inputMode="decimal" min={0} step={mx > 50 ? 0.5 : 0.01} aria-label={`${s}${pct ? " %" : ""} 내 수치`}
           value={draft[k] ?? num(v)}
           onFocus={(e) => {
             // 0 은 지우고 쓰지 않게 비우고, 다른 값은 통째로 골라 바로 덮어쓴다 (제작자 2026-11-12)
@@ -773,7 +799,8 @@ function StatPanel({ other, have, full, over, setOver, sel, onPick, doneN, total
           onChange={(e) => {
             setDraft({ ...draft, [k]: e.target.value });
             const n = parseFloat(e.target.value);
-            if (!Number.isNaN(n)) set(k, n);
+            // 내 도감은 완료 합보다 낮은 값을 적는 동안(200 을 치려고 2 를 친 때)은 그대로 두고, 손을 떼면 되돌린다
+            if (!Number.isNaN(n) && (other || n >= cur - 1e-9)) set(k, n);
             else if (e.target.value.trim() === "") clear(k);
           }}
           onBlur={() => {
@@ -808,7 +835,7 @@ function StatPanel({ other, have, full, over, setOver, sel, onPick, doneN, total
         <button type="button" className="sub-tab" onClick={() => setAll(!all)}>{all ? "접기 ▲" : "전체 능력치 ▼"}</button>
         {touched && (
           <button type="button" className="sub-tab" onClick={() => { setOver({}); setDraft({}); }}>
-            목표 지우기
+            {other ? "목표 지우기" : "수치 지우기"}
           </button>
         )}
         {/* 목표 지우기 줄 오른쪽 끝 (제작자 2026-11-13 '목표 지우기 행에서 우측 정렬로, 이벤트 도감 포함') */}
@@ -862,8 +889,8 @@ function ItemInfo({ it, wiki }: { it: DexItem; wiki: Wiki | null }) {
   );
 }
 
-function EntryRow({ e, listW, noCheck, done, onToggle, iconOf, sel: stats, onItem, wiki, price, pset }: {
-  e: DexEntry; listW: number; noCheck?: boolean; done: boolean; onToggle: () => void; iconOf: IconOf; sel: Set<string>; onItem: (name: string) => void; wiki: Wiki | null;
+function EntryRow({ e, listW, noCheck, done, est, onToggle, iconOf, sel: stats, onItem, wiki, price, pset }: {
+  e: DexEntry; listW: number; noCheck?: boolean; done: boolean; est?: boolean; onToggle: () => void; iconOf: IconOf; sel: Set<string>; onItem: (name: string) => void; wiki: Wiki | null;
   price?: DexPrice; pset: PriceSet;
 }) {
   const [sel, setSel] = useState<number | null>(null);
@@ -883,9 +910,9 @@ function EntryRow({ e, listW, noCheck, done, onToggle, iconOf, sel: stats, onIte
   const sz = slotSize(e.items.length, listW);
   const box = sz ?? 28;
   return (
-    <li ref={ref} className={"dex-entry" + (done ? " dex-done" : "") + (sz === null ? " dex-entry-wide" : "") + (noCheck ? " dex-entry-nocheck" : "")}>
-      {!noCheck && <button type="button" className="dex-check" onClick={onToggle} aria-pressed={done} aria-label={done ? "완료 취소" : "완료"}>
-        {done ? "✓" : ""}
+    <li ref={ref} className={"dex-entry" + (done ? " dex-done" : "") + (est ? " dex-est" : "") + (sz === null ? " dex-entry-wide" : "") + (noCheck ? " dex-entry-nocheck" : "")}>
+      {!noCheck && <button type="button" className="dex-check" onClick={onToggle} aria-pressed={done && !est} aria-label={est ? "수치로 채운 항목 · 완료" : done ? "완료 취소" : "완료"}>
+        {est ? "≈" : done ? "✓" : ""}
       </button>}
       <div className="dex-main">
         <div className="dex-title">
@@ -967,11 +994,11 @@ function FoldHead({ open, onClick, children }: { open: boolean; onClick: () => v
 }
 
 type MineCost = { done: Record<"normal" | "event", number>; todo: Record<"normal" | "event", number> };
-function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, pct = 0, mine = null }: {
+function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, pct = 0, realPct = pct, mine = null }: {
   price: DexPrice; tot: Totals; pset: PriceSet; setPset: (v: PriceSet) => void; canEdit: boolean;
   basis: "normal" | "event"; setBasis: (v: "normal" | "event") => void;
   /** 내 도감: 완료 %와 내 도감 전체의 채운 비용·남은 비용. 없으면(다른 캐릭) 지금 목록의 비용 */
-  pct?: number; mine?: MineCost | null;
+  pct?: number; realPct?: number; mine?: MineCost | null;
 }) {
   const [open, setOpen] = useState(false);
   // 마법서·스탬프 값 칸은 접어 둔다 (제작자 2026-11-12 '마법서 가격으로 해서 접어놓고 스탬프 가격으로 해서 접어놔')
@@ -1019,7 +1046,7 @@ function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, pct = 
         <button type="button" className="dex-board" onClick={() => setOpen(!open)} aria-expanded={open}
           aria-label={`도감 비용: 채운 비용 ${intUnit(mine.done[basis])}, 남은 비용 ${intUnit(mine.todo[basis])}, ${pct}%`}>
           <span className="dex-board-fill"><b>{intUnit(mine.done[basis])}</b><small>{intUnit(mine.done[basis] / rate)}원</small></span>
-          <span className="dex-board-bar"><i style={{ width: `${pct}%` }} /><em>{pct}%</em></span>
+          <span className="dex-board-bar">{pct > realPct && <i className="dex-board-est" style={{ width: `${pct}%` }} />}<i style={{ width: `${realPct}%` }} /><em>{pct}%</em></span>
           <span className="dex-board-left"><b>{intUnit(mine.todo[basis])}</b><small>{intUnit(mine.todo[basis] / rate)}원</small></span>
           {on && !open && <span className="dex-sale-dot">판매 중</span>}
           <span className="dex-caret">{open ? "▲" : "▼"}</span>

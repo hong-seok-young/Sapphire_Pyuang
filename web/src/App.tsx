@@ -64,6 +64,7 @@ import {
   standalone,
 } from "./platform";
 import { LoginPage, PasswordPage } from "./pages/Login";
+import { loadUserSync, resetUserSync } from "./userSync";
 import { GuideHost } from "./tutorial";
 import { BirthdaySticker } from "./birthday";
 import { SpaceBackground } from "./pages/SpaceBg";
@@ -253,11 +254,15 @@ export function App() {
   const [appLogin, setAppLogin] = useState(false);
   // 로그인 확인이 인터넷이나 서버 문제로 안 됐을 때 (로그아웃이 아니다)
   const [bootError, setBootError] = useState("");
+  // 로그인하면 계정에 둔 화면 기록을 먼저 받는다
+  const loggedIn = (m: Me) => void loadUserSync().then(() => setMe(m));
   const [bootTry, setBootTry] = useState(0);
   useEffect(() => {
     // 위키 자료도 같이 받기 시작한다 (로그인 확인이 끝나기를 기다리지 않게)
     void loadWiki().catch(() => undefined);
-    fetchMe().then(setMe, (e) => {
+    // 계정에 둔 화면 기록(도감 수치, 배지 본 때 …)을 같이 받아 이 기기에 먼저 넣고 그린다 (src/userSync.ts, 2.5초까지)
+    const kv = loadUserSync();
+    fetchMe().then((m) => kv.then(() => setMe(m)), (e) => {
       // 로그인이 풀린 것(401)만 로그인 화면으로. 인터넷이 잠깐 끊기거나 서버 오류면 다시 시도한다
       // (제작자 요청: 로그인은 직접 로그아웃하기 전까지 유지. 2026-11-01 검토)
       if (e instanceof ApiError && e.status === 401) setMe(null);
@@ -337,14 +342,14 @@ export function App() {
   }
   // 안드로이드 앱은 검토 후 오픈: 이미 깐 앱 안에서는 웹으로 안내만 한다. 앱개발자(퓨앙)는 그대로 쓴다 (제작자 요청)
   if (inApp && !APP_OPEN && me?.role !== "developer") {
-    if (me === null && appLogin) return <LoginPage onLogin={setMe} />;
+    if (me === null && appLogin) return <LoginPage onLogin={loggedIn} />;
     return (
       <AppClosedPage
         onLogin={me === null ? () => setAppLogin(true) : undefined}
       />
     );
   }
-  if (me === null) return <LoginPage onLogin={setMe} />;
+  if (me === null) return <LoginPage onLogin={loggedIn} />;
   if (me.mustChange) {
     return (
       <PasswordPage
@@ -367,7 +372,10 @@ export function App() {
     <Wiki
       me={me}
       onMe={(p) => setMe({ ...me, ...p })}
-      onLogout={() => setMe(null)}
+      onLogout={() => {
+        resetUserSync();
+        setMe(null);
+      }}
     />
   );
 }

@@ -1,3 +1,4 @@
+import { onUserSync } from "./userSync";
 // 메뉴 튜토리얼이 도는지 (src/tutorial.tsx 가 켜고 끄고, 화면들은 useSample 로 '예시 자료'를 보일지 안다).
 // 제작자 2026-11-03: 실제 자료(내가 올린 물건, 내 파티)에 기대니 지우거나 없으면 단계가 건너뛰어지거나 엉뚱한 칸을 비췄다 -> 튜토리얼 동안만 예시 자료를 보인다 (src/sample.ts)
 import { useSyncExternalStore } from "react";
@@ -38,6 +39,12 @@ const readSeen = (): string[] => {
   }
 };
 let seen = readSeen();
+// 계정에 둔 값을 받아 바뀌면 다시 읽는다 (src/userSync.ts)
+onUserSync((keys) => {
+  if (!keys.includes(SEEN_KEY)) return;
+  seen = readSeen();
+  emit();
+});
 export const tutorialSeen = (key: string) => seen.includes(key);
 export function markTutorialSeen(key: string) {
   if (seen.includes(key)) return;

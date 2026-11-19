@@ -1251,3 +1251,13 @@ CREATE TABLE IF NOT EXISTS trend_ai (
   v TEXT NOT NULL,
   at INTEGER NOT NULL
 );
+
+-- 이 기기에만 두던 화면 기록을 계정에도 (제작자 2026-11-19 '로컬에만 남는 거 아니지? 모든 거를 서버에'): src/userSync.ts, functions/api/kv.ts.
+-- 캐릭터마다 열쇠(localStorage 이름) 하나에 한 줄, v NULL 은 지운 것(다른 기기가 되살리지 않게), at 은 고친 때(늦은 것만 덮는다)
+CREATE TABLE IF NOT EXISTS user_kv (
+  user_id TEXT NOT NULL,
+  k TEXT NOT NULL,
+  v TEXT,
+  at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, k)
+);
