@@ -765,3 +765,4 @@ button.sim-kind { cursor: pointer; }
   .rk-promo, .rk-promo-big { animation: rk-promo-still 2.4s linear forwards; }
 }
 @keyframes rk-promo-still { 0%, 90% { opacity: 1; } 100% { opacity: 0; } }
+.sim-pick.sim-lock .sim-pic { filter: grayscale(1); }

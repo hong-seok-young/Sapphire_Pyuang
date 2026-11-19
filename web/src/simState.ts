@@ -27,6 +27,8 @@ export interface SimSave {
   sold?: { n: number; coins: number };
   /** 강화 비용 최저 기록 (2026-11-19): 순위 이름(simRank.ts upGame, 이번 주 것만 남긴다) -> [코인, 마법서]. 이보다 좋을 때만 서버에 보낸다 */
   cost?: Record<string, [number, number]>;
+  /** 한 번이라도 산 장비 이름 (2026-11-19 제작자 '한 번이라도 구매한 적이 있는 장비면 옵션 쪽에서 해금'): 옵션 재설정은 이 장비만 */
+  owned?: string[];
   /** 옵션 재설정: 전·후 중 더 좋은 쪽을 저절로 고른다 (2026-11-19) */
   optAuto?: boolean;
   statN?: { tries: number; ok: number; big: number };
@@ -63,6 +65,18 @@ export function addGems(s: SimSave, ids: string[]): SimSave {
   for (const id of ids) gems[id] = (gems[id] ?? 0) + 1;
   return { ...s, gem: { ...b, gems } };
 }
+
+/** 산 적 있는 장비 (띄어쓰기 뺀 이름): owned 와, 이 칸이 생기기 전에 산 것(들고 있는 것·보관함·강화 도감) */
+export function ownedGear(s: SimSave): Set<string> {
+  const out = new Set<string>();
+  const add = (n?: string) => n && out.add(n.replace(/\s+/g, ""));
+  for (const n of s.owned ?? []) add(n);
+  for (const h of Object.values(s.held ?? {})) add(h?.name);
+  for (const list of Object.values(s.bag ?? {})) for (const h of list ?? []) add(h.name);
+  for (const n of Object.keys(s.best ?? {})) add(n);
+  return out;
+}
+export const addOwned = (s: SimSave, name: string): SimSave => (s.owned?.includes(name) ? s : { ...s, owned: [...(s.owned ?? []), name] });
 
 /** 보관함은 부위마다 이만큼 */
 export const BAG_MAX = 30;

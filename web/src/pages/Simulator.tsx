@@ -18,7 +18,7 @@ import type { Me } from "../auth";
 import { Nick } from "../kakao";
 import { CoinCtx, SpaceCtx, fetchBoard, luckOf, reachWithin, sendFeed, sendPromo, sendRecord, stepsWithin, upGame, useCoinState, useCoins, useRecord, weekGame } from "../simRank";
 import type { Board, Cat, CoinState, FeedRow, SimRec, Space } from "../simRank";
-import { BAG_MAX, SaveCtx, addGems, expOf, gemOf, raiseExp, useKept, useSave, useSaveState } from "../simState";
+import { BAG_MAX, SaveCtx, addGems, addOwned, expOf, gemOf, ownedGear, raiseExp, useKept, useSave, useSaveState } from "../simState";
 import type { SimSave } from "../simState";
 import { QuestCtx, kstDay, todayQuests, useQuest } from "../simQuest";
 import type { SimEvent } from "../simQuest";
@@ -1016,7 +1016,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
     setHeldState(item);
     update((s) => {
       const list = s.bag?.[part] ?? [];
-      return { ...s, held: { ...(s.held ?? {}), [part]: item }, bag: { ...(s.bag ?? {}), [part]: cur && !cur.broken ? [cur, ...list].slice(0, BAG_MAX) : list } };
+      return addOwned({ ...s, held: { ...(s.held ?? {}), [part]: item }, bag: { ...(s.bag ?? {}), [part]: cur && !cur.broken ? [cur, ...list].slice(0, BAG_MAX) : list } }, g.name);
     });
     setStats((s) => ({ ...s, coins: s.coins + g.price }));
     setShop(false);
@@ -1998,6 +1998,12 @@ function OptionSim({ odds, wiki, me }: { odds: Odds; wiki: Wiki; me: Me }) {
   // 과거의 유물도 같다 (제작자 같은 날 '유물도 그렇지 않나? 뽑기로 가야 돼': 과거의 기억 -> 유물 -> 장비가 뜨고 옵션이 붙어 나온다). 옵션 칸에는 재설정 · 조합 · 코스튬만
   const sources = useMemo(() => optionSources(odds).filter((x) => x.name !== "이노티아의 축복" && x.name !== "과거의 유물"), [odds]);
   const eq = useMemo(() => equipIndex(wiki), [wiki]);
+  // 옵션 재설정은 장비 강화에서 한 번이라도 산 장비만 (제작자 2026-11-19 '장비 구매 쪽에서 구매해야 옵션 쪽에서 그 장비만, 한 번이라도 구매한 적이 있으면 해금').
+  // 장비 상점에 없는 장비(장신구, 거래불가, 상인 장비)는 목록에 두지 않는다
+  const shopNames = useMemo(() => new Set(gearOf(wiki, odds).map((g) => g.name.replace(/\s+/g, ""))), [wiki, odds]);
+  const { save } = useSave();
+  const owned = useMemo(() => ownedGear(save), [save]);
+  const tip = useTip();
   const [src, setSrc] = useEntryState("sim.osrc", sources[0]?.key ?? "");
   const source = sources.find((s) => s.key === src) ?? sources[0];
   const [picked, setPicked] = useEntryState("sim.oitem", "");
@@ -2006,18 +2012,22 @@ function OptionSim({ odds, wiki, me }: { odds: Odds; wiki: Wiki; me: Me }) {
   const [bandSel, setBand] = useEntryState("sim.oband", "");
   const items = source?.items ?? [];
   const idOf = (x: OptItem) => x.id ?? x.name;
-  const item = items.find((x) => idOf(x) === picked) ?? null;
+  const gearOnly = source?.name === "옵션 재설정";
   const rows = useMemo(
     () =>
-      items.map((x) => {
-        const [title, tag] = optTitle(x.name);
-        const e = eq.get(title.replace(/\s+/g, ""));
-        // 표가 직업마다 나뉜 곳(이노티아의 축복)은 그 표의 직업, 아니면 장비 표의 직업
-        const tableJob = GEAR_JOBS.find((j) => j === x.group);
-        return { x, title, tag, jobs: tableJob ? [tableJob] : (e?.jobs ?? null), slot: e?.slot ?? "", lv: e?.lv ?? 0 };
-      }),
-    [items, eq],
+      items
+        .map((x) => {
+          const [title, tag] = optTitle(x.name);
+          const key = title.replace(/\s+/g, "");
+          const e = eq.get(key);
+          // 표가 직업마다 나뉜 곳(이노티아의 축복)은 그 표의 직업, 아니면 장비 표의 직업
+          const tableJob = GEAR_JOBS.find((j) => j === x.group);
+          return { x, title, tag, key, jobs: tableJob ? [tableJob] : (e?.jobs ?? null), slot: e?.slot ?? "", lv: e?.lv ?? 0, open: !gearOnly || owned.has(key) };
+        })
+        .filter((r) => !gearOnly || shopNames.has(r.key)),
+    [items, eq, gearOnly, owned, shopNames],
   );
+  const item = rows.find((r) => r.open && idOf(r.x) === picked)?.x ?? null;
   // 몇 개 안 되는 곳(조합, 코스튬)은 고르는 줄 없이 그대로
   const many = rows.length > 8;
   const useJob = many && rows.some((r) => r.jobs && r.jobs.length < GEAR_JOBS.length);
@@ -2030,7 +2040,7 @@ function OptionSim({ odds, wiki, me }: { odds: Odds; wiki: Wiki; me: Me }) {
   const slot = slots.includes(slotSel) ? slotSel : (slots[0] ?? "");
   const list = ofJob
     .filter((r) => (!bands.length || r.tag === band) && (!slots.length || r.slot === slot))
-    .sort((a, b) => (many ? a.lv - b.lv || a.title.localeCompare(b.title, "ko") : 0));
+    .sort((a, b) => Number(b.open) - Number(a.open) || (many ? a.lv - b.lv || a.title.localeCompare(b.title, "ko") : 0));
   if (!source) return <div className="empty">옵션 자료가 없어요</div>;
   return (
     <div className="sim">
@@ -2052,7 +2062,13 @@ function OptionSim({ odds, wiki, me }: { odds: Odds; wiki: Wiki; me: Me }) {
       ) : (
         <div className="sim-items sim-items-2">
           {list.map((r) => (
-            <button key={idOf(r.x)} type="button" className="sim-pick" onClick={() => setPicked(idOf(r.x))}>
+            <button
+              key={idOf(r.x)}
+              type="button"
+              className={"sim-pick" + (r.open ? "" : " sim-lock")}
+              aria-disabled={r.open ? undefined : true}
+              onClick={() => (r.open ? setPicked(idOf(r.x)) : tip(`${r.title} · 장비 강화에서 한 번 사면 열려요`))}
+            >
               <IconBox name={r.x.icon ?? r.x.name} size={26} />
               <span className="sim-pick-t">
                 <b>{r.title}</b>
