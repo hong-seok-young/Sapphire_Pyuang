@@ -1,4 +1,4 @@
-// 확률 시뮬레이터의 오늘의 도전과 칭호 (개발중, 제작자 요청 2026-11-04 '조금 재밌는 미니게임처럼').
+// 확률 시뮬레이터의 오늘의 도전 (칭호는 2026-11-19 계급으로 바뀌었다: src/simTier.ts) (개발중, 제작자 요청 2026-11-04 '조금 재밌는 미니게임처럼').
 // 도전은 날마다(한국 날짜) 아래 POOL 에서 셋을 고르고, 시뮬레이터가 결과마다 알리면(emit) 맞는 도전을 깬다. 깬 도전마다 서버가 코인 (server/simcoin.ts QUEST_COIN, 하루 한 번씩)
 import { createContext, useContext } from "react";
 
@@ -41,15 +41,6 @@ export function todayQuests(day = kstDay()): Quest[] {
   const out: Quest[] = [];
   while (out.length < 3 && list.length) out.push(list.splice(Math.floor(rnd() * list.length), 1)[0]);
   return out;
-}
-
-/** 도박의 신 점수로 칭호 (제작자 2026-11-04: 통합 순위 이름 도박왕 -> 도박의 신) */
-export function titleOf(total: number): string {
-  if (total >= 12) return "도박의 신";
-  if (total >= 8) return "강화의 신";
-  if (total >= 5) return "행운의 손";
-  if (total >= 2) return "운 좋은 길드원";
-  return "견습 도박꾼";
 }
 
 export const QuestCtx = createContext<(e: SimEvent) => void>(() => undefined);

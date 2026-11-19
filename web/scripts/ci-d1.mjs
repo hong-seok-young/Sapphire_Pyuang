@@ -93,6 +93,7 @@ const ADDED_COLUMNS = [
   ["chat_cache", "question", "TEXT"],
   ["gc_items", "info", "TEXT"],
   ["gc_items", "gold", "INTEGER"],
+  ["sim_wallet", "week", "INTEGER"], ["sim_wallet", "week_spent", "INTEGER"],
   ["users", "high_spec", "INTEGER NOT NULL DEFAULT 0"], ["plat_settings", "high_ratio", "REAL NOT NULL DEFAULT 4"],
   ["plat_items", "high_ratio", "REAL"],
   ["activity", "ip", "TEXT"],

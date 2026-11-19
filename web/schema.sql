@@ -760,8 +760,10 @@ CREATE TABLE IF NOT EXISTS sim_wallet (
   user_id TEXT PRIMARY KEY,
   coins INTEGER NOT NULL,
   earned INTEGER NOT NULL,
-  spent INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
+  spent INTEGER NOT NULL,                 -- 지금까지 쓴 코인 = 명성 (계급, src/simTier.ts)
+  updated_at INTEGER NOT NULL,
+  week INTEGER,                           -- week_spent 를 센 주 (그 주가 시작한 때, server/week.ts weekStart)
+  week_spent INTEGER                      -- 그 주에 쓴 코인 (이번 주 순위. 주가 바뀌면 0 부터)
 );
 CREATE TABLE IF NOT EXISTS sim_earn (
   user_id TEXT NOT NULL,
