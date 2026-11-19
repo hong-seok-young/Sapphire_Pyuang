@@ -249,7 +249,8 @@ export interface Box {
 const OWN = new Set(["50100", "40100", "40200", "40300", "30101", "30201", "80101"]);
 const NOT_BOX = (t: OddsTable) => t.key.startsWith("120") || OWN.has(t.key) || OPT_KEYS.has(t.key);
 const CATS: Record<string, string> = { 외형: "외형 · 염색", 염색: "외형 · 염색", "펫 강화": "기타", 아이템: "기타", "장비 수리": "기타", 조합책: "기타", 보석: "보석" };
-export const BOX_CATS = ["가챠샵", "랜덤상자", "랜덤 코스튬", "이벤트", "이벤트 공지", "외형 · 염색", "기타"];
+// 외형 · 염색과 기타는 뽑기에서 뺐다 (제작자 2026-11-19 '뽑기에서 외형하고 기타 빼'): 표는 그대로 읽지만 고르는 줄에 없다
+export const BOX_CATS = ["가챠샵", "랜덤상자", "랜덤 코스튬", "이벤트", "이벤트 공지"];
 
 const lastIndex = <T>(xs: T[], f: (x: T) => boolean) => {
   for (let i = xs.length - 1; i >= 0; i--) if (f(xs[i])) return i;

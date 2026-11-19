@@ -1995,7 +1995,8 @@ const SLOT_ORDER = ["무기", "보조 장비", "투구", "갑옷", "장갑", "�
 function OptionSim({ odds, wiki, me }: { odds: Odds; wiki: Wiki; me: Me }) {
   // 이노티아의 축복은 장비를 골라 옵션을 굴리는 것이 아니라 상자에서 장비가 뜨고 강화도·옵션이 붙어 나오는 것이라 뽑기 칸에서 한다
   // (제작자 2026-11-19 '이노티아는 저 장비들 중에 뭐가 뜨나가 아니야?')
-  const sources = useMemo(() => optionSources(odds).filter((x) => x.name !== "이노티아의 축복"), [odds]);
+  // 과거의 유물도 같다 (제작자 같은 날 '유물도 그렇지 않나? 뽑기로 가야 돼': 과거의 기억 -> 유물 -> 장비가 뜨고 옵션이 붙어 나온다). 옵션 칸에는 재설정 · 조합 · 코스튬만
+  const sources = useMemo(() => optionSources(odds).filter((x) => x.name !== "이노티아의 축복" && x.name !== "과거의 유물"), [odds]);
   const eq = useMemo(() => equipIndex(wiki), [wiki]);
   const [src, setSrc] = useEntryState("sim.osrc", sources[0]?.key ?? "");
   const source = sources.find((s) => s.key === src) ?? sources[0];
@@ -2421,9 +2422,11 @@ function BoxSim({ odds }: { odds: Odds }) {
   const boxes = useMemo(() => [...official, ...events], [official, events]);
   const sources = useMemo(() => optionSources(odds), [odds]);
   const cats = BOX_CATS.filter((c) => boxes.some((b) => b.cat === c));
-  const [cat, setCat] = useEntryState("sim.bcat", cats[0] ?? "");
+  const [catRaw, setCat] = useEntryState("sim.bcat", cats[0] ?? "");
+  // 빠진 묶음(외형 · 기타)을 보던 사람은 처음 묶음으로
+  const cat = cats.includes(catRaw) ? catRaw : (cats[0] ?? "");
   const [key, setKey] = useEntryState("sim.box", "");
-  const box = boxes.find((b) => b.key === key) ?? null;
+  const box = boxes.find((b) => b.key === key && cats.includes(b.cat)) ?? null;
   return (
     <div className="sim">
       <div className="mk-sub sim-strip">
