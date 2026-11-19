@@ -15,7 +15,7 @@ import type { Dex, DexEntry, DexItem, DexPrice } from "../data";
 import { MODES, STAMP_GRADES, amgeoText, gearKey, fmtGold, isCostSlot, pickWay, saleOn, scrollLabel, slotCost, totals, usePriceSet, wayText } from "../dexPrice";
 import type { PriceSet, Totals } from "../dexPrice";
 import type { Me } from "../auth";
-import { fetchMe } from "../auth";
+import { api, fetchMe } from "../auth";
 import type { Wiki } from "../types";
 import { iconLookup } from "../simIcons";
 import { solveCover } from "../dexSolve";
@@ -64,12 +64,85 @@ function readDone(me: Me): Set<string> {
     return new Set();
   }
 }
-function writeDone(me: Me, done: Set<string>) {
+/** 이 기기 목록을 마지막으로 고친 때 (0 = 서버 저장을 넣기 전의 기록) */
+const atKey = (me: Me) => `sapphire.dex.doneAt.${me.id}`;
+function readDoneAt(me: Me): number {
+  try {
+    return Number(localStorage.getItem(atKey(me))) || 0;
+  } catch {
+    return 0;
+  }
+}
+function writeDone(me: Me, done: Set<string>, at = Date.now()) {
   try {
     localStorage.setItem(storeKey(me), JSON.stringify([...done]));
+    localStorage.setItem(atKey(me), String(at));
   } catch {
-    /* 저장 못 하는 브라우저: 이번에 연 동안만 */
+    /* 저장 못 하는 브라우저: 이번에 연 동안만 (서버에는 올라간다) */
   }
+}
+const pushDone = (done: Set<string>, at: number) => api("/api/dex/done", "PUT", { names: [...done], at }).catch(() => undefined);
+
+/** 완료 체크 서버 저장 (제작자 2026-11-19 '도감은 완료 체크하는 거 힘들거든 백업', '섬예 거 백업해서 자동으로 넣어주고'):
+ *  열 때 서버 것과 이 기기 것을 견주어 늦게 고친 쪽으로 맞춘다. 서버 저장 전에 이 기기에만 있던 기록은 서버 것과 합쳐 올린다 (그래서 그 기기로 한 번 열면 저절로 백업된다).
+ *  고칠 때마다 1.2초 모아서 보내고, 다른 앱으로 가면 바로 보낸다. */
+function useDoneSync(me: Me, setDone: (s: Set<string>) => void) {
+  const touched = useRef(false);
+  const timer = useRef(0);
+  const pending = useRef<{ done: Set<string>; at: number } | null>(null);
+  const flush = () => {
+    window.clearTimeout(timer.current);
+    const p = pending.current;
+    pending.current = null;
+    if (p) void pushDone(p.done, p.at);
+  };
+  useEffect(() => {
+    let dead = false;
+    api<{ names: string[]; at: number }>("/api/dex/done")
+      .then((srv) => {
+        if (dead || touched.current) return;
+        const local = readDone(me);
+        const la = readDoneAt(me);
+        const server = new Set(srv.names);
+        if (!srv.at) {
+          if (local.size) void pushDone(local, la || Date.now());
+          return;
+        }
+        if (!la) {
+          const all = new Set([...server, ...local]);
+          if (all.size !== server.size) {
+            const at = Date.now();
+            setDone(all);
+            writeDone(me, all, at);
+            void pushDone(all, at);
+          } else {
+            setDone(server);
+            writeDone(me, server, srv.at);
+          }
+        } else if (srv.at > la) {
+          setDone(server);
+          writeDone(me, server, srv.at);
+        } else if (la > srv.at) void pushDone(local, la);
+      })
+      .catch(() => undefined);
+    const hide = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", hide);
+    return () => {
+      dead = true;
+      document.removeEventListener("visibilitychange", hide);
+      flush();
+    };
+  }, [me.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (done: Set<string>) => {
+    touched.current = true;
+    const at = Date.now();
+    writeDone(me, done, at);
+    pending.current = { done, at };
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(flush, 1200);
+  };
 }
 
 /** 능력치마다 고정값과 % 값을 따로 더한다 ('체력 +2.0', '보스 데미지 +1.0%') */
@@ -219,6 +292,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
   };
   const other = mode === "other";
   const [myDone, setDone] = useState<Set<string>>(() => readDone(me));
+  const saveDone = useDoneSync(me, setDone);
   const done = other ? NONE_DONE : myDone;
   const [myTab, setTab] = useEntryState<Tab>("dex.tab", "todo");
   const tab: Tab = other ? "all" : myTab;
@@ -265,7 +339,7 @@ function DexBody({ dex: all, wiki, me }: { dex: Dex; wiki: Wiki | null; me: Me }
     if (next.has(name)) next.delete(name);
     else next.add(name);
     setDone(next);
-    writeDone(me, next);
+    saveDone(next);
   };
 
   const query = norm(q);

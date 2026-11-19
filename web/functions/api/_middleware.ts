@@ -37,7 +37,7 @@ const handle: PagesFunction<Env> = async (context) => {
   // 캐릭터 사진 AI 검수(/api/avatar/review)도 같은 AI 보정의 둘째 단계라 /api/avatar/cutout 한 줄로 남는다
   // 생일 콤보 실시간 저장(?live=1, 콤보 중 3초마다)은 남기지 않는다 (콤보가 끝날 때 한 번 남는다)
   // 헬스 루틴의 하는 중인 운동 저장(/api/fit/draft, 세트를 누를 때마다)도 남기지 않는다 (운동 끝이 한 번 남는다). 운영진 때리기도 3초마다 모아 보내서 남기지 않는다
-  if (method === "GET" || method === "HEAD" || method === "OPTIONS" || path === "/api/activity" || path === "/api/chat/peek" || path === "/api/avatar/review" || path === "/api/push" || path === "/api/todo/digest" || path.startsWith("/api/alerts") || path.startsWith("/api/sim") || path === "/api/fit/draft" || (path === "/api/bday" && new URL(request.url).searchParams.has("live"))) return context.next();
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS" || path === "/api/activity" || path === "/api/chat/peek" || path === "/api/avatar/review" || path === "/api/push" || path === "/api/todo/digest" || path.startsWith("/api/alerts") || path.startsWith("/api/sim") || path === "/api/fit/draft" || path === "/api/dex/done" || (path === "/api/bday" && new URL(request.url).searchParams.has("live"))) return context.next();
 
   let me: User | null = null;
   let body: unknown = null;

@@ -105,6 +105,7 @@ export async function deleteAccountData(env: Env, user: { id: string; main_id: s
     env.DB.prepare("DELETE FROM sim_feed WHERE user_id = ?").bind(user.id),
     // 헬스 루틴 (개인 운동 기록, server/fit.ts)
     ...["exercises", "routines", "workouts", "drafts"].map((t) => env.DB.prepare(`DELETE FROM fit_${t} WHERE user_id = ?`).bind(user.id)),
+    env.DB.prepare("DELETE FROM dex_done WHERE user_id = ?").bind(user.id),
     ...["unlocks", "state", "t_records", "t_wallet", "t_earn", "t_feed", "t_unlocks", "t_state"].map((t) => env.DB.prepare(`DELETE FROM sim_${t} WHERE user_id = ?`).bind(user.id)),
     env.DB.prepare("DELETE FROM users WHERE id = ?").bind(user.id),
   ]);
