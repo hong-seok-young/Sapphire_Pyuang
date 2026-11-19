@@ -1,7 +1,6 @@
-// 도감 계산기 완료 체크 백업 (제작자 2026-11-19 '섬예님이 어디든 접속하면 안내 뜨게'. server/dexBackup.ts)
-// 백업을 기다리는 사람(/api/me 의 dexBackupAsk)이 어느 화면으로 들어오든:
-// - 이 기기에 체크해 둔 기록이 있으면(체크한 PC) 그 자리에서 서버로 올리고 '백업했어요'를 잠깐 보인다.
-// - 없으면 '체크해 둔 PC로 한 번만 열어 주세요' 안내 (열 때마다 한 번, 백업되면 더 안 뜬다).
+// 도감 계산기 완료 체크 백업 (제작자 2026-11-19 '섬예님이 어디든 접속하면 안내 뜨게', '체크한 기기로 들어오면 모두 저절로 백업': server/dexBackup.ts)
+// 모든 길드원: 이 기기에 서버 저장 전에 체크한 기록(고친 때 없음)이 있으면 어느 화면이든 들어오자마자 서버 것과 합쳐 올린다 (안내 없이, 한 번).
+// 백업을 기다리는 명단의 사람(/api/me 의 dexBackupAsk)은 올린 뒤 '백업했어요' 띠, 이 기기에 기록이 없으면 'PC로 한 번만 열어 주세요' 안내 (열 때마다 한 번).
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../auth";
@@ -25,23 +24,41 @@ export function DexBackupNotice({ me }: { me: Me }) {
   const [ask, setAsk] = useState(false);
   const [saved, setSaved] = useState(0);
   useEffect(() => {
-    if (!me.dexBackupAsk) return;
+    let dead = false;
     const names = localDone(me.id);
-    if (names.length) {
-      const at = Date.now();
-      api("/api/dex/done", "PUT", { names, at })
-        .then(() => {
-          try {
-            localStorage.setItem(`sapphire.dex.doneAt.${me.id}`, String(at));
-          } catch {
-            /* 저장소가 막혀도 서버에는 올라갔다 */
-          }
-          setSaved(names.length);
-          window.setTimeout(() => setSaved(0), 5000);
-        })
-        .catch(() => undefined);
-      return;
+    let at0 = 0;
+    try {
+      at0 = Number(localStorage.getItem(`sapphire.dex.doneAt.${me.id}`)) || 0;
+    } catch {
+      /* 못 읽으면 0 */
     }
+    if (names.length && !at0) {
+      // 서버 저장 전 기록: 서버 것과 합쳐 올린다 (다른 기기 체크를 지우지 않게)
+      (async () => {
+        const srv = await api<{ names: string[]; at: number }>("/api/dex/done").catch(() => null);
+        if (!srv || dead) return;
+        const all = new Set([...srv.names, ...names]);
+        let at = srv.at;
+        if (all.size > srv.names.length) {
+          at = Date.now();
+          const ok = await api("/api/dex/done", "PUT", { names: [...all], at }).then(() => true).catch(() => false);
+          if (!ok) return;
+        }
+        try {
+          localStorage.setItem(`sapphire.dex.done.${me.id}`, JSON.stringify([...all]));
+          localStorage.setItem(`sapphire.dex.doneAt.${me.id}`, String(at || Date.now()));
+        } catch {
+          /* 저장소가 막혀도 서버에는 올라갔다 */
+        }
+        if (dead || !me.dexBackupAsk) return;
+        setSaved(all.size);
+        window.setTimeout(() => setSaved(0), 5000);
+      })();
+      return () => {
+        dead = true;
+      };
+    }
+    if (!me.dexBackupAsk || names.length) return;
     try {
       if (sessionStorage.getItem(SEEN)) return;
     } catch {
@@ -50,7 +67,10 @@ export function DexBackupNotice({ me }: { me: Me }) {
     const t = window.setTimeout(() => {
       if (!tutorialOpen()) setAsk(true);
     }, 1500);
-    return () => clearTimeout(t);
+    return () => {
+      dead = true;
+      clearTimeout(t);
+    };
   }, [me.id, me.dexBackupAsk]);
   const close = () => {
     try {

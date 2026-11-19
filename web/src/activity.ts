@@ -178,29 +178,11 @@ function tapLabel(el: HTMLElement): string {
   return text.slice(0, 40) || "아이콘 단추";
 }
 
-/**
- * 무료 한도 (docs/무료한도.md): 한 기기에서 하루에 보내는 단추 줄은 TAP_DAY 까지 (보통 하루 수십 줄).
- * 넘으면 그날은 더 보내지 않는다 (화면 기록·한 일은 그대로 남는다)
- */
-const TAP_DAY = 200;
-function underTapCap(): boolean {
-  const day = new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
-  try {
-    const raw = JSON.parse(localStorage.getItem("sapphire.tapcap") ?? "{}") as { d?: string; n?: number };
-    const n = raw.d === day ? (raw.n ?? 0) : 0;
-    if (n >= TAP_DAY) return false;
-    localStorage.setItem("sapphire.tapcap", JSON.stringify({ d: day, n: n + 1 }));
-  } catch {
-    // 못 적는 브라우저는 그대로 보낸다 (한 화면에 한 줄이라 많지 않다)
-  }
-  return true;
-}
-
 function flushTaps() {
   window.clearTimeout(tapTimer);
   const b = tapBuf;
   tapBuf = null;
-  if (!b || !b.list.length || !underTapCap()) return;
+  if (!b || !b.list.length) return;
   fetch("/api/activity", {
     method: "POST",
     credentials: "same-origin",

@@ -645,8 +645,8 @@ function Wiki({
       {body.type === Home && <HomeWeather me={me} />}
       {/* 배경화면 새 기능 안내 (홈에서 이 기기·계정마다 한 번, 미리 보기로 바로, pages/BgSettings.tsx) */}
       {body.type === Home && !celebrate && !inFloat && <BgNotice me={me} />}
-      {/* 도감 완료 체크 백업: 체크해 둔 기기면 저절로 올리고 아니면 PC로 열어 달라는 안내 (어느 화면이든, pages/DexBackup.tsx) */}
-      {!celebrate && !inFloat && me.dexBackupAsk && <DexBackupNotice me={me} />}
+      {/* 도감 완료 체크 백업: 서버 저장 전 체크가 있는 기기면 누구든 저절로 올리고, 명단의 사람은 아니면 PC로 열어 달라는 안내 (어느 화면이든, pages/DexBackup.tsx) */}
+      {!celebrate && !inFloat && <DexBackupNotice me={me} />}
       {/* 메뉴 설명 칸과 튜토리얼 (제목을 누르면, src/tutorial.tsx) */}
       <GuideHost me={me} />
       {/* 생일 스티커 (그날 한국 시간 하루, src/birthday.tsx) */}
