@@ -942,7 +942,7 @@ function FoldHead({ open, onClick, children }: { open: boolean; onClick: () => v
   );
 }
 
-function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft = 0, filled = null, left = null, pct = 0, doneN = 0, todoN = 0 }: {
+function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft = 0, filled = null, left = null, pct = 0 }: {
   price: DexPrice; tot: Totals; pset: PriceSet; setPset: (v: PriceSet) => void; canEdit: boolean;
   basis: "normal" | "event"; setBasis: (v: "normal" | "event") => void;
   draft?: number; filled?: number | null; left?: number | null; pct?: number; doneN?: number; todoN?: number;
@@ -990,22 +990,12 @@ function CostPanel({ price, tot, pset, setPset, canEdit, basis, setBasis, draft 
   return (
     <Panel className="dex-need dex-cost">
       {draft === 5 && filled != null && left != null ? (
-        <button type="button" className="dex-board" onClick={() => setOpen(!open)} aria-expanded={open}>
-          <span className="dex-board-side dex-board-fill">
-            <small>채운 비용</small>
-            <b>{intUnit(filled)}</b>
-            <small>{doneN.toLocaleString("ko-KR")}개 완료</small>
-          </span>
-          <span className="dex-board-mid">
-            <b>{pct}%</b>
-            <i className="dex-board-bar"><i style={{ width: `${pct}%` }} /></i>
-            <small>{open ? "접기 ▲" : "자세히 ▼"}</small>
-          </span>
-          <span className="dex-board-side dex-board-left">
-            <small>남은 비용</small>
-            <b>{intUnit(left)}</b>
-            <small>{todoN.toLocaleString("ko-KR")}개 남음</small>
-          </span>
+        <button type="button" className="dex-board" onClick={() => setOpen(!open)} aria-expanded={open}
+          aria-label={`채운 비용 ${intUnit(filled)}, 남은 비용 ${intUnit(left)}, ${pct}%`}>
+          <span className="dex-board-fill"><b>{intUnit(filled)}</b><small>{intUnit(filled / rate)}원</small></span>
+          <span className="dex-board-bar"><i style={{ width: `${pct}%` }} /><em>{pct}%</em></span>
+          <span className="dex-board-left"><b>{intUnit(left)}</b><small>{intUnit(left / rate)}원</small></span>
+          <span className="dex-caret">{open ? "▲" : "▼"}</span>
         </button>
       ) : (
       <button type="button" className="dex-need-head" onClick={() => setOpen(!open)} aria-expanded={open}>
