@@ -166,7 +166,7 @@ export const INFO_TILES: LaunchItem[] = [
  */
 /** 개발 중을 미리 보는 길드원 (제작자 2026-11-04 '앞으로 개발 중인 것들은 길드마스터 오피서 달팽이 간다이 이렇게 볼 수 있는 거야'): 묶은 캐릭터 중 하나라도.
  *  닉네임으로 정하므로 닉네임을 바꾸면 고친다. 서버는 server/simcoin.ts PREVIEW_PEOPLE (같은 목록) */
-export const PREVIEW_PEOPLE = ["달팽이", "간다이"];
+export const PREVIEW_PEOPLE = ["달팽이", "간다이", "힐러님저피1남앗어요"]; // 힐러님저피1남앗어요: 테스터 (제작자 2026-11-19)
 export const canPreview = (me: Me) =>
   RANK[me.role] >= 1 || TEST_IDS.includes(me.id) || [me.id, ...(me.characters ?? []).map((c) => c.id)].some((c) => PREVIEW_PEOPLE.includes(c));
 /** 눌러도 안 열리는 칸인지: 개발 중인 칸은 길드원에게만 막는다 */

@@ -6,7 +6,7 @@ import type { Env, User } from "./auth";
 
 /** 개발 중을 미리 보는 사람 (제작자 2026-11-04 '앞으로 개발 중인 것들은 길드마스터 오피서 달팽이 간다이 이렇게 볼 수 있는 거야'): 운영진·앱개발자·테스트 계정과 이 길드원들(묶은 캐릭터 중 하나라도).
  *  닉네임으로 정하므로 닉네임을 바꾸면 고친다. 화면은 src/launcher.ts canPreview (같은 목록). 시뮬레이터 개발 중판과 행운 코인 벌기도 이 사람들 */
-export const PREVIEW_PEOPLE = ["달팽이", "간다이"];
+export const PREVIEW_PEOPLE = ["달팽이", "간다이", "힐러님저피1남앗어요"]; // 힐러님저피1남앗어요: 테스터 (제작자 2026-11-19)
 export const canSim = (me: User) => RANK[me.role] >= 1 || TEST_IDS.includes(me.id) || [me.id, ...(me.chars ?? [])].some((c) => PREVIEW_PEOPLE.includes(c));
 
 /** 공간 (제작자 2026-11-04 '내가 테스트하는 공간을 따로, 도플갱어로'): 개발 중판(live, 표 sim_*)과 앱개발자 테스트판(test, 표 sim_t_*).
