@@ -1,0 +1,63 @@
+# 한 사람의 사용 기록 중 한 화면 것만 읽어 실행 기록에 찍는다 (제작자 2026-11-19 '섬예님이 도감계산기에 완료한 거 일일이 체크했다는데 건들지 말고 실제로 그렇게 했나 보기만').
+# 손으로만 돈다. 읽기만 하고 DB 를 바꾸지 않는다. IP·위치·기기는 찍지 않는다.
+# 사용 기록은 DB 1(sapphire-accounts)·sapphire-log-2~10(첫째 계정)과 sapphire-log-r1(둘째 계정, 2026-11-14 부터)에 나뉘어 있다.
+# 누른 단추(kind tap)는 2026-11-17 부터 남는다.
+name: Activity peek
+
+on:
+  workflow_dispatch:
+    inputs:
+      nick:
+        description: "닉네임 (묶은 캐릭터도 같이)"
+        required: true
+      path:
+        description: "화면 주소 앞부분"
+        required: true
+        default: "#/dex"
+
+permissions:
+  contents: read
+
+jobs:
+  peek:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CF2_API_TOKEN: ${{ secrets.CF2_API_TOKEN }}
+      CF2_ACCOUNT_ID: ${{ secrets.CF2_ACCOUNT_ID }}
+      NICK: ${{ inputs.nick }}
+      PAGE: ${{ inputs.path }}
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        working-directory: web
+        run: npm ci
+      - name: Read
+        working-directory: web
+        run: |
+          W="$GITHUB_WORKSPACE/web/node_modules/.bin/wrangler"; cd "$RUNNER_TEMP"
+          N=$(printf '%s' "$NICK" | tr -d "'\"\\\\;"); P=$(printf '%s' "$PAGE" | tr -d "'\"\\\\;%")
+          show='const s=require("fs").readFileSync("out.txt","utf8");try{const j=JSON.parse(s.slice(s.search(/[[{]/)));const r=Array.isArray(j)?j[0]?.results:null;if(!r)console.log(s.slice(0,1500));else for(const x of r)console.log(JSON.stringify(x))}catch(e){console.log("(읽기 실패)",s.slice(0,600))}'
+          q() { echo "==== $1 ===="; "$W" d1 execute "$2" --remote --json --command "$3" > out.txt 2>&1 || true; node -e "$show"; }
+          echo "==== 계정 ===="
+          "$W" d1 execute sapphire-accounts --remote --json --command "SELECT u.id, u.role, u.main_id, p.guild, p.job, p.level FROM users u LEFT JOIN profiles p ON p.user_id = u.id WHERE u.id = '$N' OR u.main_id = '$N' OR u.id = (SELECT main_id FROM users WHERE id = '$N') OR u.main_id = (SELECT main_id FROM users WHERE id = '$N')" > out.txt 2>&1 || true
+          node -e "$show"
+          IDS=$(node -e 'const s=require("fs").readFileSync("out.txt","utf8");try{const j=JSON.parse(s.slice(s.search(/[[{]/)));for(const x of j[0]?.results||[])console.log(x.id)}catch{}' | sed "s/.*/'&'/" | paste -sd, -)
+          [ -z "$IDS" ] && IDS="'$N'"
+          echo "ids: $IDS"
+          SQL="SELECT datetime(at/1000,'unixepoch','+9 hours') AS kst, user_id, kind, what, detail, via FROM activity WHERE user_id IN ($IDS) AND (what LIKE '$P%' OR what LIKE '/api/${P#\#/}%') ORDER BY at"
+          SUM="SELECT date(at/1000,'unixepoch','+9 hours') AS day, kind, COUNT(*) AS n FROM activity WHERE user_id IN ($IDS) AND (what LIKE '$P%' OR what LIKE '/api/${P#\#/}%') GROUP BY day, kind ORDER BY day"
+          for db in sapphire-accounts sapphire-log-2 sapphire-log-3 sapphire-log-4 sapphire-log-5 sapphire-log-6 sapphire-log-7 sapphire-log-8 sapphire-log-9 sapphire-log-10; do
+            q "$db 날마다" "$db" "$SUM"
+          done
+          export CLOUDFLARE_API_TOKEN="$CF2_API_TOKEN" CLOUDFLARE_ACCOUNT_ID="$CF2_ACCOUNT_ID"
+          q "sapphire-log-r1 날마다" sapphire-log-r1 "$SUM"
+          q "sapphire-log-r1 기록" sapphire-log-r1 "$SQL"
