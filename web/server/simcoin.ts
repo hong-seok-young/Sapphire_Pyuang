@@ -7,6 +7,8 @@ import type { Env, User } from "./auth";
 /** 개발 중을 미리 보는 사람 (제작자 2026-11-04 '앞으로 개발 중인 것들은 길드마스터 오피서 달팽이 간다이 이렇게 볼 수 있는 거야'): 운영진·앱개발자·테스트 계정과 이 길드원들(묶은 캐릭터 중 하나라도).
  *  닉네임으로 정하므로 닉네임을 바꾸면 고친다. 화면은 src/launcher.ts canPreview (같은 목록). 시뮬레이터 개발 중판과 행운 코인 벌기도 이 사람들 */
 export const PREVIEW_PEOPLE = ["달팽이", "간다이", "힐러님저피1남았어요"]; // 힐러님저피1남았어요: 테스터 (제작자 2026-11-19)
+/** 2026-11-20 모두에게 열었다 (제작자 '이거도 그냥 오픈하자', 뽑기 칸만 개발 중). 다시 닫으려면 false */
+export const SIM_OPEN = true;
 export const canSim = (me: User) => RANK[me.role] >= 1 || TEST_IDS.includes(me.id) || [me.id, ...(me.chars ?? [])].some((c) => PREVIEW_PEOPLE.includes(c));
 
 /** 공간 (제작자 2026-11-04 '내가 테스트하는 공간을 따로, 도플갱어로'): 개발 중판(live, 표 sim_*)과 앱개발자 테스트판(test, 표 sim_t_*).
@@ -14,7 +16,9 @@ export const canSim = (me: User) => RANK[me.role] >= 1 || TEST_IDS.includes(me.i
 export type Space = "live" | "test";
 export const tbl = (space: Space) => (space === "test" ? "sim_t_" : "sim_");
 // 2026-11-19 테스트판을 뺐다 (제작자 '테스트 메뉴도 빼 버리고 개발 중만 냅두고'): ?space=test 는 더 받지 않고 늘 개발 중판. 표 sim_t_* 는 기록으로 남긴다
-export const spaceOf = (_request: Request, me: User): Space | null => (canSim(me) ? "live" : null);
+/** 시뮬레이터를 쓰고 코인을 버는 사람: 열었으면 모두, 아니면 미리 보는 사람 (canSim) */
+export const canUseSim = (me: User) => SIM_OPEN || canSim(me);
+export const spaceOf = (_request: Request, me: User): Space | null => (canUseSim(me) ? "live" : null);
 
 // 명성과 계급 (제작자 2026-11-19 '통합 랭킹, 계급으로, 수백 가지, 어디가 끝인지 모르게'): 명성 = 지금까지 쓴 코인 (sim_wallet.spent, 서버 값).
 // 계급 n 이 되는 명성 = round(10 x (n / 4)^2.15) (칭호를 66 -> 264개로 늘리며 네 배 촘촘하게. 화면 src/simTier.ts 와 같은 식: 이름·계급장은 화면이 그린다). 이번 주 명성은 week_spent (목요일 10시부터, server/week.ts)

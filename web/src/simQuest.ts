@@ -24,8 +24,7 @@ const POOL: Quest[] = [
   { id: "s3", text: "장비 스탯 부여 3단계", done: (e) => e.kind === "stat" && e.key === "50100" && e.stage >= e.max },
   { id: "p3", text: "펫 추가 옵션 3단계", done: (e) => e.kind === "stat" && e.key === "40100" && e.stage >= e.max },
   { id: "o2", text: "옵션 상위 1% 이상 뽑기", done: (e) => e.kind === "opt" && e.luck >= 2 },
-  { id: "b1", text: "뽑기에서 1% 이하 아이템", done: (e) => e.kind === "box" && e.p <= 0.01 },
-  { id: "b3", text: "뽑기에서 3% 이하 아이템", done: (e) => e.kind === "box" && e.p <= 0.03 },
+  // 뽑기 칸이 개발 중이라(2026-11-20) 뽑기 도전(b1 1% 이하, b3 3% 이하)은 뺐다. 열면 되살린다
   { id: "g3", text: "보석 3단계 만들기", done: (e) => e.kind === "gem" && e.stage >= 3 },
   { id: "g4", text: "보석 4단계 만들기", done: (e) => e.kind === "gem" && e.stage >= 4 },
   { id: "r5", text: "장비 수리로 +5 이상", done: (e) => e.kind === "repair" && e.level >= 5 },

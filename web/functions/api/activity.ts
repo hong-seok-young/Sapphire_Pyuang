@@ -13,7 +13,7 @@ import type { Env } from "../../server/auth";
 import { canSeeLog, record, tapDetail, whereOf } from "../../server/activity";
 import { chatFeed, chatForRows, chatOne } from "../../server/actChat";
 import { dashboard, liveNow, personDash } from "../../server/actDash";
-import { canSim, earn } from "../../server/simcoin";
+import { canUseSim, earn } from "../../server/simcoin";
 import { anonView } from "../../server/board";
 import { LOG_FULL, LOG_NUMS, REMOTE_N, covering, fromLogs, logBinding, logDbs, newestLogs } from "../../server/logdb";
 import type { LogDb } from "../../server/logdb";
@@ -137,7 +137,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (open === true) {
     await record(env, me.id, "visit", "open", null, whereOf(request));
     // 하루 첫 접속 코인 (시뮬레이터, server/simcoin.ts)
-    if (canSim(me)) await earn(env, me.id, "visit");
+    if (canUseSim(me)) await earn(env, me.id, "visit");
     return json({ ok: true });
   }
   if (typeof path !== "string" || !path.startsWith("#/") || path.length > 200) return json({ error: "화면 주소가 맞지 않아요" }, 400);

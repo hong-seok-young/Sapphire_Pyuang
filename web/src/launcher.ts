@@ -106,7 +106,7 @@ export const ITEMS: LaunchItem[] = [
   { key: "enhance", title: "강화 비교", short: "강화", to: "#/enhance", icon: "⚒️", iconPic: "/icons/enhance.png", match: ["enhance"] },
   // 확률 시뮬레이터 (개발중, 제작자 요청 2026-11-04): 공식 확률 표로 강화·스탯 부여·옵션·상자를 해 본다
   // 확률 시뮬레이터는 앱개발자만 (제작자 2026-11-04 '개발 중으로 나만 보게')
-  { key: "sim", title: "확률 시뮬레이터", short: "확률", to: "#/sim", icon: "🎰", soon: true, badge: "개발중", match: ["sim"] },
+  { key: "sim", title: "확률 시뮬레이터", short: "확률", to: "#/sim", icon: "🎰", match: ["sim"] }, // 2026-11-20 모두에게 열었다 (뽑기 칸만 개발 중)
   // 확률 시뮬레이터 테스트판(simtest, 앱개발자만)은 2026-11-19 에 뺐다 (제작자 '테스트 메뉴도 빼 버리고 개발 중만 냅두고'). 저장된 배치의 그 칸은 normalize 가 뺀다
   // 개발 요청 (개발중, 제작자 요청 2026-11-05 '개발 중 버튼 하나 더, 개발자한테 자유롭게 신청, 결재선'): src/pages/DevRequests.tsx
   { key: "devreq", title: "개발 요청", short: "요청", to: "#/devreq", icon: "📮", match: ["devreq"] },

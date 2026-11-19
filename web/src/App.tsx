@@ -161,7 +161,7 @@ const HallPage = lazy(() => CHUNKS.Hall().then((m) => ({ default: m.HallPage }))
 function prefetchPages(staff: boolean, master: boolean, logViewer = master) {
   const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
   if (conn?.saveData || /(^|-)2g$/.test(conn?.effectiveType ?? "")) return () => undefined;
-  const list: (keyof typeof CHUNKS)[] = ["Board", "Ranking", "Market", "Todo", "GuildDungeon", "Requests", "Rental", "Enhance", "DevRequests", "Trend", "Dex", "Chat", "Profile", "Alerts", "PlatShop", "Official"];
+  const list: (keyof typeof CHUNKS)[] = ["Board", "Ranking", "Market", "Todo", "GuildDungeon", "Requests", "Rental", "Enhance", "DevRequests", "Trend", "Dex", "Simulator", "Chat", "Profile", "Alerts", "PlatShop", "Official"];
   if (GCOIN_OPEN) list.push("GrowthShop");
   if (DONATE_OPEN) list.push("Hall", "Donate");
   if (staff) list.push("Admin");
@@ -595,7 +595,7 @@ function Wiki({
   else if (page === "enhance") body = <EnhancePage wiki={wiki} query={route.query} me={me} />;
   // 확률 시뮬레이터 개발 중판은 미리 보는 사람(길드마스터·오피서·달팽이·간다이, launcher.ts canPreview), 테스트판은 앱개발자(와 테스트 계정)만 (제작자 2026-11-04 '도플갱어로')
   // #/simtest (예전 앱개발자 테스트판, 2026-11-19 에 뺌)로 와도 같은 화면
-  else if (page === "sim" || page === "simtest") body = canPreview(me) ? <SimulatorPage wiki={wiki} me={me} /> : <DevSoon title="확률 시뮬레이터" />;
+  else if (page === "sim" || page === "simtest") body = <SimulatorPage wiki={wiki} me={me} />; // 2026-11-20 모두에게 열었다
   else if (page === "log")
     body =
       canSeeLog(me) ? (

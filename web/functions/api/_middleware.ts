@@ -5,7 +5,7 @@ import { currentUser } from "../../server/auth";
 import type { Env, User } from "../../server/auth";
 import { detailOf, record, subjectOf, whereOf } from "../../server/activity";
 import { withBackground } from "../../server/background";
-import { canSim, earnFor } from "../../server/simcoin";
+import { canUseSim, earnFor } from "../../server/simcoin";
 import { anonWrite } from "../../server/board";
 
 /** 본문이 JSON 이 아닌 곳: 캐릭터 사진, AI 지우기(그림 파일)는 크기만 적는다 */
@@ -69,7 +69,7 @@ const handle: PagesFunction<Env> = async (context) => {
       } else if (me) {
         await record(env, me.id, "act", `${method} ${decodeURIComponent(path)}`, detailOf(body, subject), where);
         // 시뮬레이터 행운 코인: 유의미한 일이면 (server/simcoin.ts)
-        if (canSim(me)) await earnFor(env, me.id, method, path);
+        if (canUseSim(me)) await earnFor(env, me.id, method, path);
       }
     } catch {
       // 기록 실패는 무시한다

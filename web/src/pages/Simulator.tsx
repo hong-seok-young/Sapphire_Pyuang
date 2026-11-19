@@ -37,6 +37,8 @@ import { useBackClose } from "../backClose";
 import "./sim.css";
 
 type Tab = "enhance" | "grow" | "option" | "gem" | "box" | "rank";
+/** 아직 개발 중인 칸: 단추는 흐리게 두고 누르면 '개발 중' 안내 (제작자 2026-11-20 '뽑기 버튼은 비활성화, 누르면 개발 중이라고 안내') */
+const LOCKED_TABS: Tab[] = ["box"];
 const TABS: { key: Tab; label: string }[] = [
   { key: "enhance", label: "강화" },
   { key: "grow", label: "속성" },
@@ -210,7 +212,7 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
   const space: Space = "live";
   const { data: odds, error } = useAsync(useCallback(() => loadOdds(), []), "odds");
   const [tabRaw, setTab] = useEntryState<Tab>("sim.tab", "enhance");
-  const tab: Tab = TABS.some((t) => t.key === tabRaw) ? tabRaw : "enhance";
+  const tab: Tab = TABS.some((t) => t.key === tabRaw) && !LOCKED_TABS.includes(tabRaw) ? tabRaw : "enhance";
   const coin = useCoinState();
   // 진행 상황 (장비, 보관함, 직접 겪은 것): 서버에 (src/simState.ts). 지갑을 받으면 시작, 쓴 코인과 같이 모아서 보낸다
   const saveState = useSaveState(coin.queueState, coin.wallet ? ((coin.wallet.state as SimSave | null) ?? null) : undefined);
@@ -310,7 +312,15 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
       <TopBar title="확률 시뮬레이터" />
       <div className="pill-row sim-tabs" role="tablist">
         {TABS.map((t) => (
-          <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} className={"pill" + (tab === t.key ? " pill-on" : "")} onClick={() => setTab(t.key)}>
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+            aria-disabled={LOCKED_TABS.includes(t.key) ? true : undefined}
+            className={"pill" + (tab === t.key ? " pill-on" : "") + (LOCKED_TABS.includes(t.key) ? " sim-lock" : "")}
+            onClick={() => (LOCKED_TABS.includes(t.key) ? showTip(`${t.label}는 개발 중이에요`) : setTab(t.key))}
+          >
             {t.label}
           </button>
         ))}
