@@ -139,6 +139,8 @@ export interface Held {
   used?: number;
   broke?: number;
 }
+/** 부서진 장비 수리 값: 다시 사는 값의 1/4 (제작자 2026-11-19 '가격은 수리가 훨씬 저렴하게'), 적어도 1 */
+export const repairCost = (g: Gear) => Math.max(1, Math.round(g.price / 4));
 /** 새로 산 장비의 비용: 부서진 같은 장비를 다시 사는 것이면 이어서, 아니면 처음부터 */
 export function startRun(g: Gear, prev: Held | null): Pick<Held, "cost" | "used" | "broke"> {
   const go = prev && prev.broken && prev.name === g.name && prev.cost !== undefined;

@@ -10,7 +10,7 @@ import { useEntryState } from "../router";
 import { BOX_CATS, atLeast, boxFor, boxesOf, expectedTo, gemKinds, gemSynth, optTitle, optionFor, optionSources, pick, repairItems, scrollsOf, stepsExpected, stepsOf, tierOf } from "../sim";
 import type { Box, Dist, OptItem, OptSource, Part, Scroll, Steps } from "../sim";
 import { FitLine, Loading, PicImg, TopBar } from "../ui";
-import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, gearOf, gearPower, gearStat, gearValue, spendRun, startRun, unlockCost } from "../simGear";
+import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, gearOf, gearPower, gearStat, gearValue, repairCost, spendRun, startRun, unlockCost } from "../simGear";
 import type { ArmorSlot, Gear, GearJob, Held } from "../simGear";
 import type { Wiki } from "../types";
 import { JOB_NAME } from "../auth";
@@ -689,38 +689,13 @@ function GearDex({ gears, me, best }: { gears: Gear[]; me: Me; best: Record<stri
 
 // ================================================================ 강화
 
-/** 강화 칸: 맨 위 한 줄 무기 강화 · 방어구 강화 · 무기 수리 · 방어구 수리 (수리하면 강화도가 다시 정해진다, 공식 표 80101) */
+/** 강화 칸: 맨 위 한 줄 무기 강화 · 방어구 강화. 수리는 따로 칸을 두지 않고 강화하다 부서진 장비에서 한다
+ *  (제작자 2026-11-19 '강화하다 파괴된 것을 수리하게 하자, 파괴도 안 됐는데 수리할 수 없잖아': 예전에는 무기 수리 · 방어구 수리 칸에서 아무 때나 굴렸다) */
 function EnhanceTab({ odds, wiki, me }: { odds: Odds; wiki: Wiki; me: Me }) {
-  const [mode, setMode] = useEntryState<"up" | "repair">("sim.emode", "up");
   const [part, setPart] = useEntryState<Part>("sim.part", "무기");
-  const repairs = useMemo(() => repairItems(odds), [odds]);
-  const [ri, setRi] = useEntryState("sim.repair", 0);
-  const item = repairs[ri] ?? repairs[0];
-  const up = mode === "up" || !item;
-  const head = (
-    <Seg
-      items={[["up:무기", "무기 강화"] as const, ["up:갑옷", "방어구 강화"] as const, ...repairs.map((x, i) => [`rp:${i}`, x.name] as const)]}
-      value={up ? `up:${part}` : `rp:${repairs.indexOf(item)}`}
-      onPick={(k) => {
-        if (k.startsWith("up:")) {
-          setMode("up");
-          setPart(k.slice(3) as Part);
-        } else {
-          setMode("repair");
-          setRi(Number(k.slice(3)));
-        }
-      }}
-    />
-  );
+  const head = <Seg items={[["무기", "무기 강화"] as const, ["갑옷", "방어구 강화"] as const]} value={part} onPick={setPart} />;
   // 부위를 바꾸면 그 부위의 장비·목표로 새로 시작한다 (key)
-  return up ? (
-    <EnhanceSim key={part} odds={odds} head={head} wiki={wiki} me={me} part={part} />
-  ) : (
-    <div className="sim">
-      <div className="mk-sub sim-strip">{head}</div>
-      <OptionRoller key={item.name} item={item} verb="수리" game={`repair:${item.name}`} />
-    </div>
-  );
+  return <EnhanceSim key={part} odds={odds} head={head} wiki={wiki} me={me} part={part} />;
 }
 
 interface Fx {
@@ -1017,6 +992,8 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
   const gameRef = useRef(game);
   gameRef.current = game;
   const emit = useQuest();
+  // 수리하면 다시 정해지는 강화도 (공식 표 80101: 무기 · 방어구)
+  const repairDist = useMemo(() => repairItems(odds).find((x) => x.name.startsWith(part === "무기" ? "무기" : "방어구"))?.opts[0] ?? null, [odds, part]);
   const [combo, setCombo] = useState(0);
   const comboRef = useRef(0);
   const [charge, setCharge] = useState<Charge | null>(null);
@@ -1057,6 +1034,24 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
     setHeldState(item);
     update((s) => ({ ...s, held: { ...(s.held ?? {}), [part]: item }, bag: { ...(s.bag ?? {}), [part]: list.slice(0, BAG_MAX) } }));
     setShop(false);
+  };
+  // 수리 (공식 표 80101 '무기/갑옷 수리 시 강화 수치 확률'): 부서진 장비를 고치면 강화도가 다시 정해진다 (무기 +1 ~ +6, 방어구 +1 ~ +4).
+  // 값은 다시 사는 값의 1/4 (simGear.ts repairCost). 이번 도전의 비용은 이어서 센다
+  const repair = () => {
+    const h = heldRef.current;
+    const g = h && gears.find((x) => x.part === part && x.name === h.name);
+    if (!h || !h.broken || !g || !repairDist) return false;
+    const c = repairCost(g);
+    if (!coins.has(c) || coins.take(c) < c) return false;
+    const got = pick(repairDist.vals);
+    setHeld({ ...h, lv: got.n, broken: false, ...(h.cost === undefined ? {} : { cost: h.cost + c }) });
+    setStats((s) => ({ ...s, coins: s.coins + c }));
+    comboRef.current = 0;
+    setCombo(0);
+    setGain(null);
+    setFx((f) => ({ kind: "buy", n: (f?.n ?? 0) + 1 }));
+    emit({ kind: "repair", level: got.n });
+    return true;
   };
   // 자동 구매: 자동 강화를 멈추지 않고 같은 장비를 다시 산다 (코인이 모자라거나 살 수 없으면 false)
   const rebuy = (g: Gear) => {
@@ -1175,7 +1170,8 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
     if (h?.broken) {
       const g = gears.find((x) => x.part === scroll.part && x.name === h.name);
       if (!rebuyRef.current || !g) setAuto(false);
-      else if (Date.now() - brokeAt.current >= 700 && !rebuy(g)) setAuto(false);
+      // 자동 수리: 부서지는 모습을 보인 뒤 수리해서 이어 간다 (수리 표가 없으면 예전처럼 다시 산다)
+      else if (Date.now() - brokeAt.current >= 700 && !(repairDist ? repair() : rebuy(g))) setAuto(false);
       return;
     }
     if (!h || h.lv >= autoGoal || !(rates[h.lv + 1] > 0)) setAuto(false);
@@ -1322,7 +1318,9 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
             </div>
             {charge ? (
               <Gauge c={charge} keep={scroll.keep} onDone={landed} />
-            ) : broken ? null : p > 0 ? (
+            ) : broken ? (
+              repairDist && <OddsBar parts={repairDist.vals.map((x) => ({ p: x.p, tone: x.n >= 5 ? ("gold" as const) : x.n >= 4 ? ("ok" as const) : ("keep" as const), label: x.v }))} />
+            ) : p > 0 ? (
               <OddsBar
                 parts={[
                   { p, tone: "ok", label: `+${next}` },
@@ -1351,13 +1349,26 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
 
           {broken && !auto ? (
             <div className="sim-actions sim-actions-2">
-              <Act className="btn sim-go" busy={coins.coins === null} lock={!buyable(gear!) ? `앞 장비 +${CLEAR_LV[part]} 먼저` : (coins.coins ?? 0) < gear!.price && NO_COIN} onClick={() => buy(gear!)}>
+              {repairDist && (
+                <Act className="btn sim-go" busy={coins.coins === null} lock={(coins.coins ?? 0) < repairCost(gear!) && NO_COIN} onClick={repair}>
+                  수리
+                  <Cost n={repairCost(gear!)} />
+                </Act>
+              )}
+              <Act
+                className={"btn " + (repairDist ? "btn-ghost" : "sim-go")}
+                busy={coins.coins === null}
+                lock={!buyable(gear!) ? `앞 장비 +${CLEAR_LV[part]} 먼저` : (coins.coins ?? 0) < gear!.price && NO_COIN}
+                onClick={() => buy(gear!)}
+              >
                 다시 사기
                 <Cost n={gear!.price} />
               </Act>
-              <button type="button" className="btn btn-ghost" onClick={() => setShop(true)}>
-                다른 장비
-              </button>
+              {!repairDist && (
+                <button type="button" className="btn btn-ghost" onClick={() => setShop(true)}>
+                  다른 장비
+                </button>
+              )}
             </div>
           ) : (
             <div className="sim-actions sim-actions-enh">
@@ -1392,12 +1403,12 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
               {autoOn &&
                 (buyOn ? (
                   <button type="button" aria-pressed={autoBuy} className={"sim-autobuy sub-tab" + (autoBuy ? " sub-tab-on" : "")} onClick={() => setAutoBuy(!autoBuy)}>
-                    자동 구매
-                    <Cost n={gear!.price} per />
+                    자동 수리
+                    <Cost n={repairDist ? repairCost(gear!) : gear!.price} per />
                   </button>
                 ) : (
-                  <Act className="sim-autobuy sim-unlock sub-tab" busy={unlocking || coins.coins === null} lock={(coins.coins ?? 0) < unlockCost(gear!, "buy") && `자동 구매 해금 · ${NO_COIN}`} onClick={() => doUnlock(buyKey, unlockCost(gear!, "buy"))}>
-                    자동 구매 해금
+                  <Act className="sim-autobuy sim-unlock sub-tab" busy={unlocking || coins.coins === null} lock={(coins.coins ?? 0) < unlockCost(gear!, "buy") && `자동 수리 해금 · ${NO_COIN}`} onClick={() => doUnlock(buyKey, unlockCost(gear!, "buy"))}>
+                    자동 수리 해금
                     <Cost n={unlockCost(gear!, "buy")} />
                   </Act>
                 ))}
