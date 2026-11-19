@@ -10,7 +10,7 @@ import { useEntryState } from "../router";
 import { BOX_CATS, atLeast, boxFor, boxesOf, expectedTo, gemBox, gemIdOf, gemKinds, gemSynth, optTitle, optionFor, optionSources, pick, repairItems, scrollsOf, stepsExpected, stepsOf, tierOf } from "../sim";
 import type { Box, Dist, OptItem, OptSource, Part, Scroll, Steps } from "../sim";
 import { FitLine, Loading, PicImg, TopBar } from "../ui";
-import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, scrollCost, scrollGrade, gearOf, gearPower, gearStat, gearValue, repairCost, spendRun, startRun, unlockCost } from "../simGear";
+import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, statPrice, scrollCost, scrollGrade, gearOf, gearPower, gearStat, gearValue, repairCost, spendRun, startRun, unlockCost } from "../simGear";
 import type { ArmorSlot, Gear, GearJob, Held } from "../simGear";
 import type { Wiki } from "../types";
 import { JOB_NAME } from "../auth";
@@ -975,15 +975,11 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
   const autoGoal = Math.min(goal, expMax);
   const [auto, setAuto] = useState(false);
   const coins = useCoins();
-  // 장비마다 해금 (코인): 자동 강화, 자동 구매(자동 강화 중에 부서지면 같은 장비를 다시 사서 목표까지 이어 간다)
-  // 자동 구매 켬/끔도 진행 상황에 (캐릭터마다)
-  const autoBuy = !!save.autoBuy;
-  const setAutoBuy = (v: boolean) => update((s) => ({ ...s, autoBuy: v }));
+  // 장비마다 자동 강화를 코인으로 해금한다. 자동 중에 부서지면 늘 수리해서 목표까지 이어 간다
+  // (제작자 2026-11-20 '자동수리가 안먹히고', '수리가 재구매보다 무조건 싸잖아, 재구매를 없애는 게': 따로 해금·켜던 '자동 수리'는 자동 해금에 합쳤다)
   const autoKey = held ? `auto:${held.name}` : "";
-  const buyKey = held ? `buy:${held.name}` : "";
   const autoOn = !!held && coins.unlocks.has(autoKey);
-  const buyOn = !!held && coins.unlocks.has(buyKey);
-  const rebuyOn = autoOn && buyOn && autoBuy;
+  const rebuyOn = autoOn;
   const rebuyRef = useRef(rebuyOn);
   rebuyRef.current = rebuyOn;
   const brokeAt = useRef(0);
@@ -1173,7 +1169,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
     if (c) tryOnce(c.ok, true);
   }, [tryOnce]);
 
-  // 목표까지 자동: 0.18초마다 한 번, 목표에 닿으면 멈춘다. 부서지면 멈추고, 자동 구매를 켰으면 부서지는 모습을 보인 뒤 다시 사서 이어 간다 (코인이 떨어질 때까지)
+  // 목표까지 자동: 0.18초마다 한 번, 목표에 닿으면 멈춘다. 부서지면 부서지는 모습을 보인 뒤 수리해서 이어 간다 (코인이 떨어질 때까지)
   // 타이머는 자동을 켤 때 한 번만 걸고 그때그때 가장 새 함수를 부른다 (다시 그릴 때마다 새로 걸면 간격이 들쭉날쭉해진다)
   const autoStep = useRef<() => void>(() => undefined);
   autoStep.current = () => {
@@ -1359,26 +1355,28 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
           </section>
 
           {broken && !auto ? (
-            <div className="sim-actions sim-actions-2">
-              {repairDist && (
+            // 부서지면 수리만 (제작자 2026-11-20 '수리가 재구매보다 무조건 싸잖아, 재구매를 없애는 게'). 다른 장비는 위 '바꾸기'
+            <div className={"sim-actions " + (repairDist ? "sim-actions-1" : "sim-actions-2")}>
+              {repairDist ? (
                 <Act className="btn sim-go" busy={coins.coins === null} lock={(coins.coins ?? 0) < repairCost(gear!) && NO_COIN} onClick={repair}>
                   수리
                   <Cost n={repairCost(gear!)} />
                 </Act>
-              )}
-              <Act
-                className={"btn " + (repairDist ? "btn-ghost" : "sim-go")}
-                busy={coins.coins === null}
-                lock={!buyable(gear!) ? `앞 장비 +${CLEAR_LV[part]} 먼저` : (coins.coins ?? 0) < gear!.price && NO_COIN}
-                onClick={() => buy(gear!)}
-              >
-                다시 사기
-                <Cost n={gear!.price} />
-              </Act>
-              {!repairDist && (
-                <button type="button" className="btn btn-ghost" onClick={() => setShop(true)}>
-                  다른 장비
-                </button>
+              ) : (
+                <>
+                  <Act
+                    className="btn sim-go"
+                    busy={coins.coins === null}
+                    lock={!buyable(gear!) ? `앞 장비 +${CLEAR_LV[part]} 먼저` : (coins.coins ?? 0) < gear!.price && NO_COIN}
+                    onClick={() => buy(gear!)}
+                  >
+                    다시 사기
+                    <Cost n={gear!.price} />
+                  </Act>
+                  <button type="button" className="btn btn-ghost" onClick={() => setShop(true)}>
+                    다른 장비
+                  </button>
+                </>
               )}
             </div>
           ) : (
@@ -1411,18 +1409,6 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
                   </button>
                 </span>
               )}
-              {autoOn &&
-                (buyOn ? (
-                  <button type="button" aria-pressed={autoBuy} className={"sim-autobuy sub-tab" + (autoBuy ? " sub-tab-on" : "")} onClick={() => setAutoBuy(!autoBuy)}>
-                    자동 수리
-                    <Cost n={repairDist ? repairCost(gear!) : gear!.price} per />
-                  </button>
-                ) : (
-                  <Act className="sim-autobuy sim-unlock sub-tab" busy={unlocking || coins.coins === null} lock={(coins.coins ?? 0) < unlockCost(gear!, "buy") && `자동 수리 해금 · ${NO_COIN}`} onClick={() => doUnlock(buyKey, unlockCost(gear!, "buy"))}>
-                    자동 수리 해금
-                    <Cost n={unlockCost(gear!, "buy")} />
-                  </Act>
-                ))}
             </div>
           )}
         </>
@@ -1727,6 +1713,26 @@ function StatInner(p: {
   const turn = picks.findIndex((x, i) => openAt(i) && !isDone(x.name));
   const idx = pickedAt >= 0 && openAt(pickedAt) ? pickedAt : turn >= 0 ? turn : Math.max(0, picks.length - 1);
   const item = picks[idx] ?? null;
+  // 물건을 사야 부여·강화한다 (제작자 2026-11-20 '속성부여도 다음 거 구매비용', '펫도 구매비용', simGear.ts statPrice). 산 것은 진행 상황 exp 'statb:<표>:<이름>'.
+  // 이 칸 전에 이미 하던 것(끝낸 것, 단계를 올리던 지금 물건)은 산 것으로 친다
+  const ownKey = (name: string) => `statb:${st.key}:${name}`;
+  const was = save.stat?.[st.key];
+  const owned = (name: string) =>
+    expOf(save, ownKey(name)) > 0 || isDone(name) || ((was?.item ? was.item === name : name === item?.name) && ((was?.stage ?? 0) > 0 || (was?.since ?? 0) > 0));
+  const priceAt = (i: number) => statPrice(pet, i, picks[i]?.lv ?? 0);
+  const itemOwned = !item || owned(item.name);
+  const price = item ? priceAt(idx) : 0;
+  // 이 칸 전에 하던 지금 물건은 산 것으로 한 번 적어 둔다 (처음부터·다른 물건으로 가도 다시 사지 않게)
+  useEffect(() => {
+    if (item && itemOwned && expOf(save, ownKey(item.name)) === 0) update((s) => raiseExp(s, ownKey(item.name), 1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item?.name, itemOwned]);
+  const buyItem = () => {
+    if (!item || itemOwned || !coins.has(price) || coins.take(price) < price) return;
+    update((s) => raiseExp(s, ownKey(item.name), 1));
+    if (itemName !== item.name) setItemName(item.name);
+    setFx(() => ({ kind: "buy", n: Date.now() % 100000 }));
+  };
   const found = pq.trim() ? filterByName(picks, pq, (x) => [x.name]) : picks;
   const tip = useTip();
   useBackClose(picking, () => setPicking(false));
@@ -1816,7 +1822,7 @@ function StatInner(p: {
   // (예전에는 화면을 다시 그릴 때마다 타이머를 새로 걸어서, 다시 그리는 일이 잦으면 간격이 들쭉날쭉했다)
   const autoStep = useRef<() => void>(() => undefined);
   autoStep.current = () => {
-    if (stageRef.current >= cap) setAuto(false);
+    if (stageRef.current >= cap || !itemOwned) setAuto(false);
     else tryOnce();
   };
   useEffect(() => {
@@ -1880,7 +1886,7 @@ function StatInner(p: {
                   <b>{x.name}</b>
                   <small>{x.sub}</small>
                 </span>
-                {isDone(x.name) && <em className="sim-shop-clear">{st.max}</em>}
+                {isDone(x.name) ? <em className="sim-shop-clear">{st.max}</em> : !owned(x.name) && <Cost n={priceAt(picks.indexOf(x))} />}
               </button>
             ))}
             {!found.length && <p className="sim-muted">없음</p>}
@@ -1939,13 +1945,20 @@ function StatInner(p: {
       )}
 
       <div className="sim-actions sim-actions-grow">
-        <Act className="btn sim-go" busy={auto} lock={stage >= st.max ? "끝 단계예요" : coins.coins === 0 && NO_COIN} onClick={() => tryOnce(true)}>
-          {pet ? "강화" : "부여"}
-          <Cost n={1} />
-        </Act>
+        {itemOwned ? (
+          <Act className="btn sim-go" busy={auto} lock={stage >= st.max ? "끝 단계예요" : coins.coins === 0 && NO_COIN} onClick={() => tryOnce(true)}>
+            {pet ? "강화" : "부여"}
+            <Cost n={1} />
+          </Act>
+        ) : (
+          <Act className="btn sim-go" busy={coins.coins === null} lock={(coins.coins ?? 0) < price && NO_COIN} onClick={buyItem}>
+            구매
+            <Cost n={price} />
+          </Act>
+        )}
         <Act
           className={"btn btn-ghost" + (auto ? " sim-running" : "")}
-          lock={auto ? null : stage >= st.max ? "끝 단계예요" : stage >= cap ? `자동은 직접 올려 본 단계까지만 · ${stage + 1}단계를 직접 먼저` : coins.coins === 0 && NO_COIN}
+          lock={auto ? null : !itemOwned ? "구매 먼저" : stage >= st.max ? "끝 단계예요" : stage >= cap ? `자동은 직접 올려 본 단계까지만 · ${stage + 1}단계를 직접 먼저` : coins.coins === 0 && NO_COIN}
           onClick={() => setAuto(!auto)}
         >
           {auto ? "멈춤" : stage >= cap ? "자동" : `${cap}단계 자동`}

@@ -149,6 +149,8 @@ export interface Held {
 }
 /** 부서진 장비 수리 값: 다시 사는 값의 1/4 (제작자 2026-11-19 '가격은 수리가 훨씬 저렴하게'), 적어도 1 */
 export const repairCost = (g: Gear) => Math.max(1, Math.round(g.price / 4));
+/** 속성 부여 장신구·펫 추가 옵션 펫의 구매 값 (제작자 2026-11-20 '속성부여도 다음 거 구매비용', '펫도 구매비용'): 장신구는 요구 레벨로 방어구 값과 같게, 펫은 펫 도감 차례가 뒤일수록 (2 ~ 23) */
+export const statPrice = (pet: boolean, i: number, lv: number) => (pet ? 2 + Math.round(Math.sqrt(i) * 1.2) : 1 + Math.round(lv ** 1.5 / 30));
 /** 새로 산 장비의 비용: 부서진 같은 장비를 다시 사는 것이면 이어서, 아니면 처음부터 */
 export function startRun(g: Gear, prev: Held | null): Pick<Held, "cost" | "used" | "broke"> {
   const go = prev && prev.broken && prev.name === g.name && prev.cost !== undefined;

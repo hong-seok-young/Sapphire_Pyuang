@@ -341,6 +341,20 @@ runSql([
   console.log(`시뮬레이터 앱개발자 처음부터 ${n}명`);
 }
 
+// 확률 시뮬레이터 '자동 수리 해금'(sim_unlocks 'buy:<장비>')을 없애고 자동 해금에 합쳤다 (제작자 2026-11-20 '자동수리가 안먹히고', '재구매를 없애는 게').
+// 그 해금에 쓴 코인을 지갑에 돌려주고 해금 줄을 지운다 (명성 spent 는 그대로). setup 'sim_buy_refund_20261120' 로 한 번만, 실행 기록에는 수만
+{
+  const KEY = "sim_buy_refund_20261120";
+  const NOT_DONE = `NOT EXISTS (SELECT 1 FROM setup WHERE key = '${KEY}')`;
+  const r = queryFirst(`SELECT COUNT(*) AS n, COALESCE(SUM(cost), 0) AS c FROM sim_unlocks WHERE key LIKE 'buy:%' AND ${NOT_DONE}`) ?? { n: 0, c: 0 };
+  runSql([
+    `UPDATE sim_wallet SET coins = coins + (SELECT COALESCE(SUM(u.cost), 0) FROM sim_unlocks u WHERE u.user_id = sim_wallet.user_id AND u.key LIKE 'buy:%') WHERE ${NOT_DONE} AND user_id IN (SELECT user_id FROM sim_unlocks WHERE key LIKE 'buy:%');`,
+    `DELETE FROM sim_unlocks WHERE key LIKE 'buy:%' AND ${NOT_DONE};`,
+    `INSERT OR IGNORE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
+  ]);
+  console.log(`시뮬레이터 자동 수리 해금 돌려줌 ${r.n}건 ${r.c}코인`);
+}
+
 // 확률 시뮬레이터 칭호가 66 -> 264개가 되면서 (제작자 2026-11-19 '칭호 66개 너무 적어') 계급 번호가 네 배로 촘촘해졌다 (server/simcoin.ts tierXp).
 // 전광판에 남은 새 칭호 줄(sim_feed game 'rank', label = 계급 번호)을 같은 명성의 새 번호로 옮긴다. setup 'sim_rank_x4_20261119' 로 한 번만
 {
