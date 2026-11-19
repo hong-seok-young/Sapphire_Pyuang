@@ -7,7 +7,7 @@ import { useAsync } from "../data";
 import { loadOdds } from "../odds";
 import type { Odds } from "../odds";
 import { useEntryState } from "../router";
-import { BOX_CATS, GEM_NAMES, atLeast, boxFor, boxOf, boxesOf, expectedTo, gemSynth, optionFor, optionSources, pick, repairItems, scrollsOf, stepsExpected, stepsOf, tierOf } from "../sim";
+import { BOX_CATS, GEM_NAMES, atLeast, boxFor, boxOf, boxesOf, expectedTo, gemSynth, optTitle, optionFor, optionSources, pick, repairItems, scrollsOf, stepsExpected, stepsOf, tierOf } from "../sim";
 import type { Box, Dist, OptItem, OptSource, Part, Scroll, Steps } from "../sim";
 import { Loading, PicImg, TopBar } from "../ui";
 import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, gearOf, gearPower, gearStat, gearValue, spendRun, startRun, unlockCost } from "../simGear";
@@ -255,7 +255,7 @@ export function SimulatorPage({ wiki, me }: { wiki: Wiki; me: Me }) {
       ) : tab === "grow" ? (
         <StatSim odds={odds} wiki={wiki} />
       ) : tab === "option" ? (
-        <OptionSim odds={odds} />
+        <OptionSim odds={odds} me={me} />
       ) : tab === "gem" ? (
         <GemTab odds={odds} />
       ) : tab === "box" ? (
@@ -1866,15 +1866,26 @@ function StatInner(p: {
 
 // ================================================================ 옵션
 
-function OptionSim({ odds }: { odds: Odds }) {
+function OptionSim({ odds, me }: { odds: Odds; me: Me }) {
   const sources = useMemo(() => optionSources(odds), [odds]);
   const [src, setSrc] = useEntryState("sim.osrc", sources[0]?.key ?? "");
   const source = sources.find((s) => s.key === src) ?? sources[0];
   const [q, setQ] = useEntryState("sim.oq", "");
-  const [name, setName] = useEntryState("sim.oitem", "");
+  const [picked, setPicked] = useEntryState("sim.oitem", "");
+  const [grp, setGrp] = useEntryState("sim.ogrp", "");
   const items = source?.items ?? [];
-  const item = items.find((x) => x.name === name) ?? null;
-  const found = q.trim() ? filterByName(items, q, (x) => [x.name]) : items;
+  const idOf = (x: OptItem) => x.id ?? x.name;
+  const item = items.find((x) => idOf(x) === picked) ?? null;
+  // 표가 직업·부위마다 나뉜 곳(이노티아의 축복, 과거의 유물, 옵션 재설정)은 묶음을 고른다. 처음은 내 직업
+  const groups = useMemo(() => [...new Set(items.map((x) => x.group ?? ""))].filter(Boolean), [items]);
+  const myJob = me.job ? JOB_NAME[me.job] : "";
+  const group = groups.includes(grp) ? grp : groups.includes(myJob) ? myJob : (groups[0] ?? "");
+  // 찾을 때는 모든 묶음에서, 같은 이름(직업 표마다 또 나오는 윙깃부츠·파워글러브)은 한 번만
+  const found = useMemo(() => {
+    if (!q.trim()) return groups.length > 1 ? items.filter((x) => x.group === group) : items;
+    const seen = new Set<string>();
+    return filterByName(items, q, (x) => [optTitle(x.name)[0]]).filter((x) => !seen.has(x.name) && !!seen.add(x.name));
+  }, [items, q, group, groups]);
   if (!source) return <div className="empty">옵션 자료가 없어요</div>;
   return (
     <div className="sim">
@@ -1889,19 +1900,28 @@ function OptionSim({ odds }: { odds: Odds }) {
               className={"sub-tab" + (s.key === source.key ? " sub-tab-on" : "")}
               onClick={() => {
                 setSrc(s.key);
-                setName("");
+                setPicked("");
               }}
             >
               {s.name}
             </button>
           ))}
         </div>
+        {!item && groups.length > 1 && (
+          <div className="mk-cats" role="tablist">
+            {groups.map((g) => (
+              <button key={g} type="button" role="tab" aria-selected={g === group} className={"sub-tab" + (g === group ? " sub-tab-on" : "")} onClick={() => setGrp(g)}>
+                {g}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {item ? (
         <OptionRoller
-          key={source.key + item.name}
+          key={source.key + idOf(item)}
           item={item}
-          onBack={() => setName("")}
+          onBack={() => setPicked("")}
           verb={source.name === "옵션 재설정" ? "재설정" : "굴리기"}
           reset={source.name === "옵션 재설정"}
           game={`opt:${source.key}:${item.name}`.slice(0, 60)}
@@ -1911,15 +1931,21 @@ function OptionSim({ odds }: { odds: Odds }) {
         <>
           <input className="sim-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="이름" aria-label="아이템 찾기" />
           <div className="sim-items">
-            {found.map((x) => (
-              <button key={x.name} type="button" className="sim-pick" onClick={() => setName(x.name)}>
-                <IconBox name={x.name} size={28} />
-                <span className="sim-pick-t">
-                  <b>{x.name}</b>
-                  <small>{x.opts.map((o) => o.label).join(" · ")}</small>
-                </span>
-              </button>
-            ))}
+            {found.map((x) => {
+              const [title, tag] = optTitle(x.name);
+              return (
+                <button key={idOf(x)} type="button" className="sim-pick" onClick={() => setPicked(idOf(x))}>
+                  <IconBox name={x.icon ?? x.name} size={28} />
+                  <span className="sim-pick-t">
+                    <b>
+                      {title}
+                      {tag && <i className="sim-pick-tag">{tag}</i>}
+                    </b>
+                    <small>{x.opts.map((o) => o.label).join(" · ")}</small>
+                  </span>
+                </button>
+              );
+            })}
             {!found.length && <p className="sim-muted">없음</p>}
           </div>
         </>
@@ -2020,8 +2046,11 @@ function OptionRoller({ item, onBack, verb, game, cat, reset }: { item: OptItem;
               ◀
             </button>
           )}
-          <IconBox name={item.name} size={28} />
-          <b>{item.name}</b>
+          <IconBox name={item.icon ?? item.name} size={28} />
+          <b>
+            {optTitle(item.name)[0]}
+            {optTitle(item.name)[1] && <i className="sim-pick-tag">{optTitle(item.name)[1]}</i>}
+          </b>
           {joint < 1 && (
             <em key={n} className={`sim-luck ${tierClass(joint)}`}>
               {luckText(luckOf(joint))}
@@ -2096,7 +2125,7 @@ function ResetDialog({ item, cur, next, onChoose }: { item: OptItem; cur: Dist["
           <p className="rs-ask">원하는 옵션을 선택하세요.</p>
           <div className="rs-item">
             <span className="rs-icon">
-              <NameIcon name={item.name} size={44} />
+              <NameIcon name={item.icon ?? item.name} size={44} />
             </span>
             <b className="rs-name">{item.name}</b>
           </div>

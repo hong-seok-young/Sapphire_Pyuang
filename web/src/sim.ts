@@ -149,8 +149,20 @@ export interface Dist {
   vals: { v: string; n: number; p: number }[];
 }
 export interface OptItem {
+  /** 표에 적힌 이름 그대로 ('Lv.30~43 윙깃부츠'). 기록·직접 겪은 것의 열쇠라 바꾸지 않는다 */
   name: string;
   opts: Dist[];
+  /** 목록에서 가리는 열쇠 (표 번호 + 이름): 같은 이름이 직업 표마다 또 나온다 (이노티아의 축복 윙깃부츠·파워글러브) */
+  id?: string;
+  /** 표의 묶음 (표 이름의 괄호: 전사 · 레인저 …, 무기 · 갑옷 …) */
+  group?: string;
+  /** 그림을 찾을 이름 (이름에 그림이 없는 코스튬 옵션은 그 상자 이름) */
+  icon?: string;
+}
+/** 'Lv.30~43 윙깃부츠' -> ['윙깃부츠', 'Lv.30~43'] */
+export function optTitle(name: string): [string, string] {
+  const m = /^(Lv\.\S+)\s+(.+)$/.exec(name);
+  return m ? [m[2], m[1]] : [name, ""];
 }
 export interface OptSource {
   key: string;
@@ -181,7 +193,13 @@ function optItemsOf(t: OddsTable): OptItem[] {
         const d = by.get(r[0]) ?? (by.set(r[0], { label: r[0], vals: [] }), by.get(r[0])!);
         d.vals.push({ v: r[1], n: num(r[1]), p: pct(r[2]) });
       }
-      for (const d of by.values()) add(s.t || oddsName(t), d);
+      // 코스튬 옵션은 묶음 이름이 모두 '체력 옵션'이고 한 표에 둘도 있다 (별무리의 실타래 6~10 · 8~12): 묶음마다 따로, 상자 이름과 값 범위로 부른다
+      const generic = /옵션$/.test(s.t) && !!t.path[1];
+      const ds = [...by.values()];
+      const ns = ds[0]?.vals.map((x) => x.n) ?? [];
+      const name = generic ? `${t.path[1]} · ${ds[0]?.label ?? ""} ${Math.min(...ns)}~${Math.max(...ns)}` : (s.t || oddsName(t)).replace(/\s*옵션 확률$/, "");
+      for (const d of ds) add(name, d);
+      if (generic) items.get(name)!.icon = t.path[1];
       continue;
     }
     const vals = s.r.map((r) => ({ v: r[0], n: num(r[0]), p: pct(r[1]) }));
@@ -201,7 +219,12 @@ export function optionSources(odds: Odds): OptSource[] {
   return OPT_SOURCES.map(([keys, name]) => ({
     key: keys[0],
     name,
-    items: keys.flatMap((k) => (T.get(k) ? optItemsOf(T.get(k)!) : [])),
+    items: keys.flatMap((k) => {
+      const t = T.get(k);
+      if (!t) return [];
+      const group = /\(([^)]+)\)/.exec(t.path[2] ?? "")?.[1];
+      return optItemsOf(t).map((it) => ({ ...it, id: `${k}:${it.name}`, group }));
+    }),
   })).filter((s) => s.items.length);
 }
 /** 그 값 이상이 나올 확률 */
