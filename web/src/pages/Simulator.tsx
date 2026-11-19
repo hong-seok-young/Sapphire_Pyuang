@@ -31,6 +31,7 @@ import type { IconOf } from "../simIcons";
 import type { Pic } from "../types";
 import type { Book } from "../data";
 import { useBackClose } from "../backClose";
+import "./sim.css";
 
 type Tab = "enhance" | "grow" | "option" | "gem" | "box" | "rank";
 const TABS: { key: Tab; label: string }[] = [
@@ -101,6 +102,64 @@ function Sparks({ n = 10, kind }: { n?: number; kind: string }) {
 function NameIcon({ name, size = 24 }: { name: string; size?: number }) {
   const pic: Pic | null = useIcon()(name);
   return pic ? <PicImg pic={pic} fit={size} className="sim-pic" /> : null;
+}
+
+/** 그림 칸: 그림이 없으면 도트 보석 */
+function IconBox({ name, size = 30 }: { name: string; size?: number }) {
+  const pic: Pic | null = useIcon()(name);
+  return <span className="sim-ib" style={{ width: size + 8, height: size + 8 }}>{pic ? <PicImg pic={pic} fit={size} className="sim-pic" /> : <i className="sim-ib-none" />}</span>;
+}
+
+/** 확률 막대: 칸마다 색 (ok 성공 · gold 대성공 · bad 파괴 · keep 그대로), 아래에 이름과 % */
+function OddsBar({ parts }: { parts: { p: number; tone: "ok" | "gold" | "bad" | "keep"; label: string }[] }) {
+  const shown = parts.filter((x) => x.p > 0);
+  return (
+    <div className="sim-odds">
+      <div className="sim-odds-bar" aria-hidden>
+        {shown.map((x, i) => (
+          <i key={i} className={`sim-odds-${x.tone}`} style={{ flexGrow: Math.max(x.p, 0.012) }} />
+        ))}
+      </div>
+      <div className="sim-odds-lab">
+        {shown.map((x, i) => (
+          <span key={i} className={`sim-odds-t-${x.tone}`}>
+            {x.label} <b>{pctText(x.p)}</b>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** 숫자 셋 한 줄 띠 */
+function StatStrip({ items }: { items: { label: string; value: number; tone?: string; unit?: string }[] }) {
+  return (
+    <div className="sim-stats">
+      {items.map((x) => (
+        <span key={x.label}>
+          <small>{x.label}</small>
+          <b className={x.value ? (x.tone ?? "") : ""}>
+            <Count value={x.value} ms={250} />
+            {x.unit ?? ""}
+          </b>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** 접는 칸 (연 것은 기록 칸마다 기억) */
+function Fold({ k, title, children }: { k: string; title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useEntryState(`sim.fold.${k}`, false);
+  return (
+    <section className={"panel sim-fold" + (open ? " sim-fold-open" : "")}>
+      <button type="button" className="sim-fold-h" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <b>{title}</b>
+        <i className="sim-chev" aria-hidden />
+      </button>
+      {open && <div className="sim-fold-b">{children}</div>}
+    </section>
+  );
 }
 
 export function SimulatorPage({ wiki, me, space }: { wiki: Wiki; me: Me; space: Space }) {
@@ -195,9 +254,8 @@ export function SimulatorPage({ wiki, me, space }: { wiki: Wiki; me: Me; space: 
       <SimHud coin={coin} today={today} quests={quests} done={done} onRank={() => setTab("rank")} />
       {cheer && (
         <div key={cheer.n} className="sim-cheer" role="status">
-          <b>도전 완료</b>
+          <b>+{coin.wallet?.questCoin ?? 30}</b>
           <span>{cheer.text}</span>
-          <small>+{coin.wallet?.questCoin ?? 30} 코인</small>
         </div>
       )}
       {!odds || !saveState.ready || (space === "test" && !saveState.save.restored) ? (
@@ -223,39 +281,59 @@ export function SimulatorPage({ wiki, me, space }: { wiki: Wiki; me: Me; space: 
   );
 }
 
-/** 맨 위 한 판 (2026-11-17 고도화): 도트 동전과 코인 수, 칭호, 오늘 번 코인과 연속 접속, 오늘의 도전 셋, 전광판. 코인을 누르면 순위·버는 법 */
+/** 맨 위 한 줄 (2026-11-19 개편: 설명 없이 콤팩트하게): 도는 동전과 코인 수(바뀌면 ±가 떠오른다), 오늘 번 코인, 연속 접속, 칭호, 오늘의 도전 점 셋(누르면 펼침), 전광판 */
 function SimHud({ coin, today, quests, done, onRank }: { coin: ReturnType<typeof useCoinState>; today: number; quests: { id: string; text: string }[]; done: boolean[]; onRank: () => void }) {
   const w = coin.wallet;
   const streak = w?.streak?.days ?? 0;
   const empty = coin.coins === 0;
+  const [open, setOpen] = useEntryState("sim.quests", false);
+  // 코인이 바뀐 만큼 잠깐 떠오른다
+  const prev = useRef<number | null>(coin.coins);
+  const [delta, setDelta] = useState<{ v: number; n: number } | null>(null);
+  useEffect(() => {
+    const a = prev.current;
+    prev.current = coin.coins;
+    if (a === null || coin.coins === null || a === coin.coins) return;
+    const v = coin.coins - a;
+    setDelta((d) => ({ v, n: (d?.n ?? 0) + 1 }));
+  }, [coin.coins]);
   return (
-    <section className={"panel sim-hud" + (empty ? " sim-hud-empty" : "")}>
-      <button type="button" className="sim-hud-coin" onClick={onRank}>
-        <span className="sim-coin-pic" aria-hidden>
-          <i />
-        </span>
-        <span className="sim-hud-n">
-          <small>행운 코인</small>
-          <b key={coin.coins ?? -1}>{coin.coins === null ? "…" : coin.coins.toLocaleString()}</b>
-        </span>
-        <span className="sim-hud-side">
-          <em className="sim-title">{w ? titleOf(w.total) : ""}</em>
-          <small className={today ? "sim-hud-today" : "sim-hud-how"}>{empty ? "버는 법 ›" : today ? `오늘 +${today}` : "버는 법 ›"}</small>
-          {streak >= 2 && <small className="sim-hud-streak">{streak}일 연속 접속</small>}
-        </span>
-      </button>
-      <div className="sim-hud-quests" aria-label="오늘의 도전">
-        <b>오늘의 도전</b>
-        {quests.map((q, i) => (
-          <span key={q.id} className={done[i] ? "sim-q-done" : ""}>
-            <i className="sim-q-box" aria-hidden>
-              {done[i] ? "✓" : ""}
-            </i>
-            {q.text}
-            <small>{done[i] ? "완료" : `+${w?.questCoin ?? 30}`}</small>
+    <section className={"sim-hud" + (empty ? " sim-hud-empty" : "")}>
+      <div className="sim-hud-row">
+        <button type="button" className="sim-hud-coin" onClick={onRank} aria-label="행운 코인">
+          <span className="sim-coin-pic" aria-hidden>
+            <i />
           </span>
-        ))}
+          <b key={coin.coins ?? -1}>{coin.coins === null ? "…" : coin.coins.toLocaleString()}</b>
+          {delta && (
+            <em key={delta.n} className={"sim-hud-delta" + (delta.v > 0 ? " sim-hud-plus" : "")} aria-hidden>
+              {delta.v > 0 ? "+" : ""}
+              {delta.v.toLocaleString()}
+            </em>
+          )}
+        </button>
+        <span className="sim-hud-chips">
+          {today > 0 && <i className="sim-hud-today">+{today}</i>}
+          {streak >= 2 && <i className="sim-hud-streak">{streak}일</i>}
+          {w && <i className="sim-title">{titleOf(w.total)}</i>}
+        </span>
+        <button type="button" className="sim-hud-q" aria-expanded={open} aria-label="오늘의 도전" onClick={() => setOpen(!open)}>
+          {quests.map((q, i) => (
+            <i key={q.id} className={done[i] ? "on" : ""} />
+          ))}
+        </button>
       </div>
+      {open && (
+        <div className="sim-hud-quests">
+          {quests.map((q, i) => (
+            <span key={q.id} className={done[i] ? "sim-q-done" : ""}>
+              <i className="sim-q-box" aria-hidden />
+              {q.text}
+              <small>+{w?.questCoin ?? 30}</small>
+            </span>
+          ))}
+        </div>
+      )}
       {w && w.feed.length > 0 && <Ticker feed={w.feed} />}
     </section>
   );
@@ -280,41 +358,30 @@ function Ticker({ feed }: { feed: { user_id: string; label: string; luck: number
 
 const luckText = (luck: number) => `1/${n0(Math.pow(10, luck))}`;
 
-/** 시뮬레이터 하나의 순위 (5위까지와 내 기록). luck 이면 드문 정도로, 아니면 몇 번 만에 */
+/** 시뮬레이터 하나의 순위 (5위까지와 내 기록). luck 이면 드문 정도로, 아니면 몇 번 만에. 기록이 없으면 그리지 않는다 */
 export function RankBox({ rec, title, luck = false }: { rec: ReturnType<typeof useRecord>; title: string; luck?: boolean }) {
   const d = rec.data;
   if (!d) return null;
   const top = d.board.slice(0, 5);
   const mine = d.mine;
-  const line = (r: SimRec) => (luck ? `${luckText(r.luck)} · ${r.tries.toLocaleString()}번째` : `${r.tries.toLocaleString()}번 만에`);
+  if (!top.length && !mine) return null;
+  const line = (r: SimRec) => (luck ? luckText(r.luck) : `${r.tries.toLocaleString()}번`);
+  const row = (r: SimRec, rank: number, me = false) => (
+    <div key={me ? "me" : r.user_id} className={`sim-rank-row sim-rank-${rank}` + (me ? " sim-rank-mine" : "")}>
+      <em>{rank}</em>
+      <span className="sim-rank-who">{me ? "나" : <Nick name={r.user_id} />}</span>
+      <b>{r.label}</b>
+      <small>{line(r)}</small>
+    </div>
+  );
   return (
     <section className="panel sim-rank">
-      <div className="sim-rank-head">
+      <div className="sim-head">
         <b>순위</b>
         <small>{title}</small>
       </div>
-      {top.length ? (
-        top.map((r, i) => (
-          <div key={r.user_id} className={`sim-rank-row sim-rank-${i + 1}`}>
-            <em>{i + 1}</em>
-            <span className="sim-rank-who">
-              <Nick name={r.user_id} />
-            </span>
-            <b>{r.label}</b>
-            <small>{line(r)}</small>
-          </div>
-        ))
-      ) : (
-        <p className="sim-muted sim-rank-none">아직 기록이 없어요</p>
-      )}
-      {mine && (mine.rank ?? 99) > 5 && (
-        <div className="sim-rank-row sim-rank-mine">
-          <em>{mine.rank}</em>
-          <span className="sim-rank-who">나</span>
-          <b>{mine.label}</b>
-          <small>{line(mine)}</small>
-        </div>
-      )}
+      {top.map((r, i) => row(r, i + 1))}
+      {mine && (mine.rank ?? 99) > 5 && row(mine, mine.rank ?? 99, true)}
     </section>
   );
 }
@@ -364,21 +431,21 @@ function RankTab({ odds, wiki, me }: { odds: Odds; wiki: Wiki; me: Me }) {
       .map((x) => x.split(":"))
       .filter((x) => x.length === 2)
       .sort((a, b) => Number(b[1]) - Number(a[1]));
+  const done = w ? w.rules.filter((r) => r.n >= r.cap).length : 0;
   return (
     <div className="sim">
-      <section className="panel sim-king">
-        <div className="sim-rank-head">
-          <b>도박의 신</b>
-          <small>1/10 = 1점 · 1/1000 = 3점</small>
-        </div>
-        {data.king.length ? (
-          data.king.map((k, i) => (
+      {data.king.length > 0 && (
+        <section className="panel sim-king">
+          <div className="sim-head">
+            <b>도박의 신</b>
+          </div>
+          {data.king.map((k, i) => (
             <div key={k.user_id} className={`sim-king-row sim-rank-${i + 1}`}>
               <em>{i + 1}</em>
               <span className="sim-rank-who">
                 <Nick name={k.user_id} />
               </span>
-              <b>{k.total.toFixed(1)}점</b>
+              <b>{k.total.toFixed(1)}</b>
               <span className="sim-king-parts">
                 {parts(k.parts).map(([c, v]) => (
                   <i key={c}>
@@ -387,22 +454,21 @@ function RankTab({ odds, wiki, me }: { odds: Odds; wiki: Wiki; me: Me }) {
                 ))}
               </span>
             </div>
-          ))
-        ) : (
-          <p className="sim-muted sim-rank-none">아직 기록이 없어요</p>
-        )}
-      </section>
+          ))}
+        </section>
+      )}
       {data.firsts.length > 0 && (
         <section className="panel sim-rank">
-          <div className="sim-rank-head">
-            <b>시뮬레이터별 1위</b>
+          <div className="sim-head">
+            <b>1위</b>
           </div>
           {data.firsts.map((r) => (
             <div key={r.game} className="sim-first-row">
               <small>{name(r.game ?? "")}</small>
               <span>
-                <Nick name={r.user_id} /> <b>{r.label}</b> <em>{/^(enh|stat):/.test(r.game ?? "") ? `${r.tries.toLocaleString()}번 만에` : luckText(r.luck)}</em>
+                <Nick name={r.user_id} /> <b>{r.label}</b>
               </span>
+              <em>{/^(enh|stat):/.test(r.game ?? "") ? `${r.tries.toLocaleString()}번` : luckText(r.luck)}</em>
             </div>
           ))}
         </section>
@@ -410,58 +476,57 @@ function RankTab({ odds, wiki, me }: { odds: Odds; wiki: Wiki; me: Me }) {
       <GearDex odds={odds} wiki={wiki} me={me} best={save.best ?? {}} />
       {w && (
         <section className="panel sim-earn">
-          <div className="sim-rank-head">
-            <b>행운 코인 버는 법</b>
-            <small>하루마다 새로 · 누르면 그 화면으로</small>
+          <div className="sim-head">
+            <b>코인 벌기</b>
+            <small>
+              {done}/{w.rules.length}
+            </small>
           </div>
-          {streak && (
-            <div className={"sim-earn-row sim-earn-streak" + (streak.days >= 2 ? "" : " sim-earn-wait")}>
-              <span>
-                연속 접속 보너스
-                <small className="sim-earn-note">{streak.days >= 2 ? `${streak.days}일째 · 2일째 +${streak.step} 부터 날마다 +${streak.step}, 최대 +${streak.max}` : `내일도 들어오면 +${streak.step} 부터, 최대 +${streak.max}`}</small>
-              </span>
-              <b>{streak.bonus ? `+${streak.bonus}` : "-"}</b>
-              <small>{streak.days ? `${streak.days}일` : ""}</small>
-            </div>
-          )}
-          {w.rules.map((r) => {
-            const body = (
-              <>
-                <span>
-                  <span className="sim-earn-label">{r.to && r.n < r.cap ? `${r.label} ›` : r.label}</span>
-                  <i className="sim-earn-bar" aria-hidden>
-                    <i style={{ width: `${Math.min(100, (r.n / r.cap) * 100)}%` }} />
-                  </i>
-                </span>
-                <b>+{r.coin}</b>
-                <small>
-                  {r.n}/{r.cap}
-                </small>
-              </>
-            );
-            const cls = "sim-earn-row" + (r.n >= r.cap ? " sim-earn-done" : "");
-            return r.to && r.n < r.cap ? (
-              <a key={r.key} className={cls + " sim-earn-link"} href={r.to}>
-                {body}
-              </a>
-            ) : (
-              <div key={r.key} className={cls}>
-                {body}
+          <div className="sim-earn-grid">
+            {streak && (
+              <div className={"sim-earn-cell sim-earn-streak" + (streak.bonus ? "" : " sim-earn-wait")}>
+                <span>연속 접속</span>
+                <b>{streak.bonus ? `+${streak.bonus}` : `+${streak.step}`}</b>
+                <small>{streak.days}일</small>
               </div>
-            );
-          })}
-          {w.sold && (
-            <div className={"sim-earn-row" + (w.sold.n >= w.sold.cap ? " sim-earn-done" : "")}>
-              <span>
-                장비 팔기
-                <small className="sim-earn-note">강화 칸에서 들고 있거나 보관한 장비를 시세로</small>
-              </span>
-              <b>시세</b>
-              <small>
-                {w.sold.n}/{w.sold.cap}
-              </small>
-            </div>
-          )}
+            )}
+            {w.rules.map((r) => {
+              const body = (
+                <>
+                  <span>{r.label}</span>
+                  <b>+{r.coin}</b>
+                  <small>
+                    {r.n}/{r.cap}
+                  </small>
+                  <i className="sim-earn-bar" aria-hidden>
+                    <i style={{ transform: `scaleX(${Math.min(1, r.n / r.cap)})` }} />
+                  </i>
+                </>
+              );
+              const cls = "sim-earn-cell" + (r.n >= r.cap ? " sim-earn-done" : "");
+              return r.to && r.n < r.cap ? (
+                <a key={r.key} className={cls} href={r.to}>
+                  {body}
+                </a>
+              ) : (
+                <div key={r.key} className={cls}>
+                  {body}
+                </div>
+              );
+            })}
+            {w.sold && (
+              <div className={"sim-earn-cell" + (w.sold.n >= w.sold.cap ? " sim-earn-done" : "")}>
+                <span>장비 팔기</span>
+                <b>시세</b>
+                <small>
+                  {w.sold.n}/{w.sold.cap}
+                </small>
+                <i className="sim-earn-bar" aria-hidden>
+                  <i style={{ transform: `scaleX(${Math.min(1, w.sold.n / w.sold.cap)})` }} />
+                </i>
+              </div>
+            )}
+          </div>
         </section>
       )}
     </div>
@@ -484,10 +549,11 @@ function GearDex({ odds, wiki, me, best }: { odds: Odds; wiki: Wiki; me: Me; bes
   const count = (x: (typeof DEX_SECTIONS)[number]) => gears.filter((g) => g.part === x.part && g.kind === x.kind && (best[g.name] ?? 0) > 0).length;
   return (
     <section className="panel sim-dex">
-      <div className="sim-rank-head">
+      <div className="sim-head">
         <b>강화 도감</b>
         <small>
-          {got.length}/{gears.length} 장비{top ? ` · 최고 +${top}` : ""}
+          {got.length}/{gears.length}
+          {top ? ` · +${top}` : ""}
         </small>
       </div>
       <div className="mk-sub sim-dex-strip">
@@ -576,11 +642,6 @@ interface Charge {
   ok: boolean;
   n: number;
 }
-/** 받침이 있으면 a, 없으면 b ('나무지팡이가', '고대의봉이') */
-const josa = (w: string, a: string, b: string) => {
-  const c = w.charCodeAt(w.length - 1) - 0xac00;
-  return c >= 0 && c < 11172 && c % 28 ? a : b;
-};
 /** 모루 둘레에 떠오르는 불티 (가로 자리 %, 늦게 시작 s, 한 번 도는 때 s, 크기 px). 늘 도는 움직임이라 transform·opacity 만 */
 const EMBERS: [number, number, number, number][] = [
   [8, 0, 5.2, 3], [18, 1.6, 6.1, 2], [31, 0.4, 4.6, 3], [44, 2.2, 5.8, 2], [57, 1.1, 5.1, 3], [69, 2.9, 6.4, 2], [82, 0.8, 4.9, 3], [93, 2.4, 5.5, 2], [25, 3.3, 7, 2], [75, 3.8, 6.8, 2],
@@ -622,8 +683,8 @@ function Gauge({ c, keep, onDone }: { c: Charge; keep: boolean; onDone: () => vo
         </span>
       </div>
       <div className="sim-gauge-lab">
-        <span className="sim-good">성공 {pctText(c.p)}</span>
-        <span className={keep ? "sim-muted" : "sim-bad"}>{keep ? "그대로" : "파괴"}</span>
+        <span className="sim-good">{pctText(c.p)}</span>
+        <span className={keep ? "sim-muted" : "sim-bad"}>{keep ? "유지" : "파괴"}</span>
       </div>
     </div>
   );
@@ -656,17 +717,10 @@ function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClo
     const t = window.setTimeout(() => setSellIdx(-1), 3000);
     return () => window.clearTimeout(t);
   }, [sellIdx]);
+  const openList = list.filter((_, i) => canBuy(list, i, cleared));
+  const locked = list.filter((_, i) => !canBuy(list, i, cleared));
   return (
     <section className="panel sim-shop">
-      <div className="sim-shop-head">
-        <b>장비 상점</b>
-        <small>노작 · 행운 코인</small>
-        {onClose && (
-          <button type="button" className="sim-shop-x" onClick={onClose}>
-            닫기
-          </button>
-        )}
-      </div>
       <div className="mk-sub sim-shop-filter">
         <div className="mk-cats" role="tablist">
           {GEAR_JOBS.map((j) => (
@@ -674,6 +728,11 @@ function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClo
               {j}
             </button>
           ))}
+          {onClose && (
+            <button type="button" className="sim-shop-x" onClick={onClose} aria-label="닫기">
+              ✕
+            </button>
+          )}
         </div>
         {part === "갑옷" && (
           <div className="mk-cats" role="tablist">
@@ -687,7 +746,7 @@ function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClo
       </div>
       {bag.length > 0 && (
         <>
-          <div className="sim-bag-head">
+          <div className="sim-head sim-head-sub">
             <b>내 장비</b>
             <small>{bag.length}</small>
           </div>
@@ -697,61 +756,59 @@ function GearShop({ gears, part, job, setJob, slot, setSlot, onBuy, coins, onClo
               const v = g ? valueOf(g, h.lv) : 0;
               return (
                 <li key={`${h.name}-${i}`} className={`sim-bag-${auraOf(h.lv)}`}>
-                  <span className="sim-shop-pic">{g?.icon ? <PicImg pic={g.icon} fit={28} /> : null}</span>
+                  <span className="sim-shop-pic">{g?.icon ? <PicImg pic={g.icon} fit={28} className="sim-pic" /> : null}</span>
                   <span className="sim-shop-name">
                     <b>
-                      +{h.lv} {h.name}
+                      <em>+{h.lv}</em> {h.name}
                     </b>
-                    <small>
-                      {g ? (part === "무기" ? `공격 ${gearStat(g, h.lv)}` : gearStat(g, h.lv)) : ""}
-                      {v ? ` · 시세 ${v.toLocaleString()}` : ""}
-                    </small>
+                    <small>{g ? gearStat(g, h.lv) : ""}</small>
                   </span>
-                  <span className="sim-bag-btns">
-                    <button type="button" className="btn btn-ghost sim-buy" onClick={() => onTake(i)}>
-                      꺼내기
+                  {v > 0 && (
+                    <button type="button" className={"sim-mini sim-sell" + (sellIdx === i ? " sim-sell-sure" : "")} onClick={() => (sellIdx === i ? (setSellIdx(-1), onSell(i, v)) : setSellIdx(i))}>
+                      {sellIdx === i ? "팔기?" : "팔기"} <small>{v.toLocaleString()}</small>
                     </button>
-                    {v > 0 && (
-                      <button type="button" className={"btn btn-ghost sim-buy sim-sell" + (sellIdx === i ? " sim-sell-sure" : "")} onClick={() => (sellIdx === i ? (setSellIdx(-1), onSell(i, v)) : setSellIdx(i))}>
-                        {sellIdx === i ? "정말 팔기" : "팔기"}
-                      </button>
-                    )}
-                  </span>
+                  )}
+                  <button type="button" className="sim-mini sim-take" onClick={() => onTake(i)}>
+                    꺼내기
+                  </button>
                 </li>
               );
             })}
           </ul>
-          <div className="sim-bag-head">
+          <div className="sim-head sim-head-sub">
             <b>상점</b>
           </div>
         </>
       )}
       <ul className="sim-shop-list">
-        {list.map((g, i) => {
-          const open = canBuy(list, i, cleared);
-          return (
-          <li key={g.name} className={open ? "" : "sim-shop-locked"} style={{ animationDelay: `${Math.min(i, 14) * 25}ms` }}>
-            <span className="sim-shop-pic">{g.icon ? <PicImg pic={g.icon} fit={28} /> : null}</span>
+        {openList.map((g) => (
+          <li key={g.name}>
+            <span className="sim-shop-pic">{g.icon ? <PicImg pic={g.icon} fit={28} className="sim-pic" /> : null}</span>
             <span className="sim-shop-name">
               <b>{g.name}</b>
               <small>
-                Lv.{g.lv} · {part === "무기" ? `공격 ${gearStat(g, 0)}` : gearStat(g, 0)}
+                Lv.{g.lv} · {gearStat(g, 0)}
               </small>
             </span>
             {cleared.has(g.name) && <span className="sim-shop-clear">+{CLEAR_LV[part]}</span>}
-            {open ? (
-              <button type="button" className="btn sim-buy" disabled={coins === null || coins < g.price} onClick={() => onBuy(g)}>
-                {g.price}
-                <small>코인</small>
-              </button>
-            ) : (
-              <span className="sim-buy sim-buy-lock">잠김</span>
-            )}
+            <button type="button" className="sim-buy" disabled={coins === null || coins < g.price} onClick={() => onBuy(g)}>
+              <i className="sim-c" aria-hidden />
+              {g.price}
+            </button>
           </li>
-          );
-        })}
-        {!list.length && <li className="sim-muted">이 칸에 강화할 수 있는 장비가 없어요</li>}
+        ))}
+        {!list.length && <li className="sim-muted">없음</li>}
       </ul>
+      {locked.length > 0 && (
+        <ul className="sim-locked" aria-label="잠김">
+          {locked.map((g) => (
+            <li key={g.name} title={`${g.name} Lv.${g.lv}`}>
+              {g.icon ? <PicImg pic={g.icon} fit={24} className="sim-pic" /> : null}
+              <small>{g.lv}</small>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -1038,8 +1095,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
 
   const next = lv + 1;
   const p = rate(next);
-  const failText = p >= 1 ? "반드시 성공" : scroll.keep ? "실패해도 그대로" : "실패하면 파괴";
-  const ladder = Array.from({ length: 15 }, (_, i) => i + 1).filter((k) => rate(k) > 0);
+    const ladder = Array.from({ length: 15 }, (_, i) => i + 1).filter((k) => rate(k) > 0);
   const showShop = !gear || shop;
   // 장비 바꾸기 칸은 폰 뒤로 가기로 닫는다 (들고 있는 장비가 있을 때만 닫을 수 있다, backClose.ts)
   useBackClose(!!gear && shop, () => setShop(false));
@@ -1057,8 +1113,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
               {x === "갑옷" ? "방어구" : x}
             </button>
           ))}
-        </div>
-        <div className="mk-cats" role="tablist">
+          <i className="sim-sep" aria-hidden />
           {all
             .filter((s) => s.part === part)
             .map((s) => (
@@ -1077,7 +1132,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
                 setEv(!ev);
               }}
             >
-              이벤트 확률
+              이벤트
             </button>
           )}
         </div>
@@ -1106,6 +1161,7 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
             className={`panel sim-anvil${broken ? " sim-broken" : ""}${charge ? " sim-charging" : ""}${charge && charge.p < 0.2 ? " sim-risky" : ""}${fx?.big && fx.kind === "ok" ? " sim-anvil-big" : ""}${fx?.kind === "break" ? " sim-anvil-break" : ""}`}
             key={`a${fx?.kind === "break" || fx?.big ? fx.n : 0}`}
           >
+            <span className="sim-rays" aria-hidden />
             <span className="sim-vignette" aria-hidden />
             <div className="sim-gearline">
               <span>
@@ -1118,11 +1174,11 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
               )}
               {value > 0 && (
                 <button type="button" className={"sim-change sim-sell" + (selling ? " sim-sell-sure" : "")} onClick={sellHeld} disabled={!!charge || auto}>
-                  {selling ? "정말 팔기" : "팔기"} <small>{value.toLocaleString()}</small>
+                  {selling ? "팔기?" : "팔기"} <small key={`v${lv}`} className="sim-value">{value.toLocaleString()}</small>
                 </button>
               )}
               <button type="button" className="sim-change" onClick={() => setShop(true)} disabled={!!charge || auto}>
-                장비 바꾸기
+                바꾸기
               </button>
             </div>
             <span className="sim-embers" aria-hidden>
@@ -1151,10 +1207,13 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
                   </b>
                 )}
               </span>
-              {pic && <span className="sim-name">{label}</span>}
-              <b key={`l${lv}${broken}`} className={"sim-lv" + (broken ? " sim-lv-dead" : "")}>
-                +{lv}
-              </b>
+              <i className="sim-floor" aria-hidden />
+              <span className="sim-nameline">
+                <b key={`l${lv}${broken}`} className={"sim-lv" + (broken ? " sim-lv-dead" : "")}>
+                  +{lv}
+                </b>
+                {pic && <span className="sim-name">{label}</span>}
+              </span>
               {fx?.kind === "break" && (
                 <b key={`s${fx.n}`} className="sim-stamp" aria-hidden>
                   파괴
@@ -1167,48 +1226,34 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
               )}
               {fx?.kind === "ok" && fx.big && (
                 <b key={`w${fx.n}`} className="sim-win" aria-hidden>
-                  +{lv} 성공!
+                  +{lv}
                 </b>
               )}
             </div>
             {charge ? (
               <Gauge c={charge} keep={scroll.keep} onDone={landed} />
+            ) : broken ? null : p > 0 ? (
+              <OddsBar
+                parts={[
+                  { p, tone: "ok", label: `+${next}` },
+                  { p: 1 - p, tone: scroll.keep ? "keep" : "bad", label: scroll.keep ? "유지" : "파괴" },
+                ]}
+              />
             ) : (
-              <div className="sim-next">
-                {broken ? (
-                  <span className="sim-bad">{gear!.name}{josa(gear!.name, "이", "가")} 부서졌어요</span>
-                ) : p > 0 ? (
-                  <>
-                    <span>
-                      +{next} 도전 <b className={p < 0.11 ? "sim-bad" : p < 1 ? "sim-warn" : "sim-good"}>{pctText(p)}</b>
-                    </span>
-                    <small>{failText}</small>
-                  </>
-                ) : (
-                  <span className="sim-muted">{lv >= 15 ? "최고 강화예요" : `${scroll.name} 마법서로는 +${next} 를 못 해요`}</span>
-                )}
-                {!broken &&
-                  (gain ? (
-                    <small key={gain.n} className="sim-gain">
-                      {part === "무기" ? "공격 " : ""}
-                      {gain.from} → <b>{gain.to}</b> <em>+{gain.pct}%</em>
-                    </small>
-                  ) : (
-                    <small className="sim-muted">
-                      {part === "무기" ? "공격 " : ""}
-                      {gearStat(gear!, lv)}
-                    </small>
-                  ))}
-                {!broken && value > 0 && (
-                  <small key={`v${lv}`} className="sim-value">
-                    시세 <b>{value.toLocaleString()}</b>
-                    {p > 0 && p < 1 && (
-                      <>
-                        {" "}
-                        · +{next} 되면 <em>{valueOf(gear!, next).toLocaleString()}</em>
-                      </>
-                    )}
-                  </small>
+              <span className="sim-max">{lv >= 15 ? "MAX" : `+${next} 불가`}</span>
+            )}
+            {!broken && (
+              <div className="sim-facts">
+                <span key={gain?.n ?? 0} className={gain ? "sim-gain" : ""}>
+                  <small>{part === "무기" ? "공격" : "방어"}</small>
+                  <b>{gearStat(gear!, lv)}</b>
+                  {gain && <em>+{gain.pct}%</em>}
+                </span>
+                {value > 0 && p > 0 && p < 1 && (
+                  <span>
+                    <small>+{next} 시세</small>
+                    <b className="sim-gold">{valueOf(gear!, next).toLocaleString()}</b>
+                  </span>
                 )}
               </div>
             )}
@@ -1217,7 +1262,11 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
           {broken && !auto ? (
             <div className="sim-actions sim-actions-2">
               <button type="button" className="btn sim-go" disabled={!buyable(gear!) || coins.coins === null || coins.coins < gear!.price} onClick={() => buy(gear!)}>
-                다시 사기 <small>{gear!.price}코인</small>
+                다시 사기
+                <small>
+                  <i className="sim-c" aria-hidden />
+                  {gear!.price}
+                </small>
               </button>
               <button type="button" className="btn btn-ghost" onClick={() => setShop(true)}>
                 다른 장비
@@ -1235,39 +1284,44 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
                   disabled={unlocking || coins.coins === null || coins.coins < unlockCost(gear!, "auto")}
                   onClick={() => doUnlock(autoKey, unlockCost(gear!, "auto"))}
                 >
-                  자동 강화 해금 <small>{unlockCost(gear!, "auto")}코인</small>
+                  자동
+                  <small>
+                    <i className="sim-c" aria-hidden />
+                    {unlockCost(gear!, "auto")}
+                  </small>
                 </button>
               ) : (
-              <span className="sim-goal">
-                <button type="button" className="pill" onClick={() => setGoal(Math.max(lv + 1, autoGoal - 1))} aria-label="목표 내리기">
-                  −
-                </button>
-                <button type="button" className={"btn btn-ghost" + (auto ? " sim-running" : "")} disabled={!!charge || (!auto && lv >= autoGoal)} onClick={() => setAuto(!auto)}>
-                  {auto ? "멈춤" : lv >= expMax ? (expMax ? `자동은 +${expMax} 까지` : "직접 강화 먼저") : `+${autoGoal} 까지 자동`}
-                </button>
-                <button type="button" className="pill" onClick={() => setGoal(Math.min(15, expMax, autoGoal + 1))} aria-label="목표 올리기">
-                  +
-                </button>
-              </span>
+                <span className="sim-goal">
+                  <button type="button" className="pill" onClick={() => setGoal(Math.max(lv + 1, autoGoal - 1))} aria-label="목표 내리기">
+                    −
+                  </button>
+                  <button type="button" className={"btn btn-ghost" + (auto ? " sim-running" : "")} disabled={!!charge || (!auto && lv >= autoGoal)} onClick={() => setAuto(!auto)}>
+                    {auto ? "멈춤" : lv >= expMax ? "직접 먼저" : `+${autoGoal} 자동`}
+                  </button>
+                  <button type="button" className="pill" onClick={() => setGoal(Math.min(15, expMax, autoGoal + 1))} aria-label="목표 올리기">
+                    +
+                  </button>
+                </span>
               )}
-            </div>
-          )}
-          {autoOn && (
-            <div className="sim-autobuy">
-              {buyOn ? (
-                <button type="button" aria-pressed={autoBuy} className={"sub-tab" + (autoBuy ? " sub-tab-on" : "")} onClick={() => setAutoBuy(!autoBuy)}>
-                  자동 구매 {autoBuy ? "켬" : "끔"}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn-ghost sim-unlock"
-                  disabled={unlocking || coins.coins === null || coins.coins < unlockCost(gear!, "buy")}
-                  onClick={() => doUnlock(buyKey, unlockCost(gear!, "buy"))}
-                >
-                  자동 구매 해금 <small>{unlockCost(gear!, "buy")}코인</small>
-                </button>
-              )}
+              {autoOn &&
+                (buyOn ? (
+                  <button type="button" aria-pressed={autoBuy} className={"sim-autobuy sub-tab" + (autoBuy ? " sub-tab-on" : "")} onClick={() => setAutoBuy(!autoBuy)}>
+                    자동 구매
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="sim-autobuy sim-unlock sub-tab"
+                    disabled={unlocking || coins.coins === null || coins.coins < unlockCost(gear!, "buy")}
+                    onClick={() => doUnlock(buyKey, unlockCost(gear!, "buy"))}
+                  >
+                    자동 구매
+                    <small>
+                      <i className="sim-c" aria-hidden />
+                      {unlockCost(gear!, "buy")}
+                    </small>
+                  </button>
+                ))}
             </div>
           )}
         </>
@@ -1275,43 +1329,32 @@ function EnhanceSim({ odds, head, wiki, me }: { odds: Odds; head: React.ReactNod
 
       {sold && (
         <div key={sold.n} className="sim-cheer sim-sold" role="status">
-          <b>+{sold.value.toLocaleString()} 코인</b>
+          <b>+{sold.value.toLocaleString()}</b>
           <span>
-            +{sold.lv} {sold.name} 팔았어요
+            +{sold.lv} {sold.name}
           </span>
         </div>
       )}
-      <div className="sim-stats">
-        <span>
-          <small>시도</small>
-          <b>
-            <Count value={stats.tries} ms={250} />
-          </b>
-        </span>
-        <span>
-          <small>부서진 장비</small>
-          <b className={stats.broke ? "sim-bad" : ""}>
-            <Count value={stats.broke} ms={250} />
-          </b>
-        </span>
-        <span>
-          <small>쓴 코인</small>
-          <b>
-            <Count value={stats.coins} ms={250} />
-          </b>
-        </span>
-      </div>
+      <StatStrip
+        items={[
+          { label: "시도", value: stats.tries },
+          { label: "파괴", value: stats.broke, tone: "sim-bad" },
+          { label: "코인", value: stats.coins },
+        ]}
+      />
       {log.length > 0 && (
         <div className="sim-log" aria-label="최근 결과">
           {log.map((d, i) => (
-            <i key={i} className={d.ok ? "ok" : d.broke ? "bad" : "keep"} title={`+${d.to} ${d.ok ? "성공" : d.broke ? "파괴" : "실패"}`} />
+            <i key={i} className={d.ok ? "ok" : d.broke ? "bad" : "keep"} title={`+${d.to}`} />
           ))}
         </div>
       )}
 
       <RankBox rec={rec} title={`${part === "갑옷" ? "방어구" : part} · ${scroll.name}${ev && scroll.event ? " 이벤트" : ""}`} />
-      <ChanceTable rate={rate} keep={scroll.keep} ladder={ladder} from={broken ? 0 : lv} />
-      <Thousand rate={rate} keep={scroll.keep} goal={goal} />
+      <Fold k="chance" title="확률표">
+        <ChanceTable rate={rate} keep={scroll.keep} ladder={ladder} from={broken ? 0 : lv} />
+        <Thousand rate={rate} keep={scroll.keep} goal={goal} />
+      </Fold>
     </div>
   );
 }
@@ -1324,12 +1367,12 @@ function ChanceTable({ rate, keep, ladder, from }: { rate: (lv: number) => numbe
     .filter((r): r is { k: number; e: NonNullable<ReturnType<typeof expectedTo>> } => !!r.e);
   if (!rows.length) return null;
   return (
-    <section className="panel sim-table">
-      <div className="sim-th">
-        <b>+{from} 에서</b>
+    <div className="sim-table">
+      <div className={"sim-th" + (keep ? " sim-tr-3" : "")}>
+        <b>+{from} →</b>
         <span>한 번에</span>
-        <span>평균 마법서</span>
-        {!keep && <span>부서짐</span>}
+        <span>마법서</span>
+        {!keep && <span>파괴</span>}
       </div>
       {rows.map(({ k, e }) => (
         <div key={k} className={"sim-tr" + (keep ? " sim-tr-3" : "")}>
@@ -1339,7 +1382,7 @@ function ChanceTable({ rate, keep, ladder, from }: { rate: (lv: number) => numbe
           {!keep && <span className="sim-bad">{n0(e.broken)}개</span>}
         </div>
       ))}
-    </section>
+    </div>
   );
 }
 const tierClass = (p: number) => `sim-t-${tierOf(p)}`;
@@ -1375,9 +1418,9 @@ function Thousand({ rate, keep, goal }: { rate: (lv: number) => number; keep: bo
     setRes({ ok, broke, used, at, n: (res?.n ?? 0) + 1 });
   };
   return (
-    <section className="panel sim-thousand">
+    <div className="sim-thousand">
       <button type="button" className="btn btn-ghost" onClick={run}>
-        +0 장비 1000개를 +{goal} 까지
+        1000개 → +{goal}
       </button>
       {res && (
         <div key={res.n} className="sim-thousand-res">
@@ -1389,14 +1432,14 @@ function Thousand({ rate, keep, goal }: { rate: (lv: number) => number; keep: bo
           </span>
           {!keep && (
             <span>
-              <small>부서짐</small>
+              <small>파괴</small>
               <b className="sim-bad">
                 <Count value={res.broke} />개
               </b>
             </span>
           )}
           <span>
-            <small>쓴 마법서</small>
+            <small>마법서</small>
             <b>
               <Count value={res.used} />장
             </b>
@@ -1416,7 +1459,7 @@ function Thousand({ rate, keep, goal }: { rate: (lv: number) => number; keep: bo
           )}
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -1660,47 +1703,44 @@ function StatInner(p: {
 
       {picking ? (
         <section className="panel sim-shop">
-          <div className="sim-shop-head">
-            <b>{pet ? "펫 고르기" : "장신구 고르기"}</b>
-            <small>{picks.length}개</small>
-            <button type="button" className="sim-shop-x" onClick={() => setPicking(false)}>
-              닫기
+          <div className="sim-search-row">
+            <input className="sim-search" value={pq} onChange={(e) => setPq(e.target.value)} placeholder="이름" aria-label={pet ? "펫 찾기" : "장신구 찾기"} />
+            <button type="button" className="sim-shop-x" onClick={() => setPicking(false)} aria-label="닫기">
+              ✕
             </button>
           </div>
-          <input className="sim-search" value={pq} onChange={(e) => setPq(e.target.value)} placeholder="이름" aria-label={pet ? "펫 찾기" : "장신구 찾기"} />
-          <ul className="sim-shop-list sim-pick-list">
+          <div className="sim-items sim-pick-list">
             {found.slice(0, 80).map((x) => (
-              <li key={x.name}>
-                <span className="sim-shop-pic">
+              <button
+                key={x.name}
+                type="button"
+                className={"sim-pick" + (item?.name === x.name ? " sim-pick-on" : "")}
+                onClick={() => {
+                  setItemName(x.name);
+                  setPicking(false);
+                }}
+              >
+                <span className="sim-ib" style={{ width: 36, height: 36 }}>
                   <PicImg pic={x.icon} fit={28} className="sim-pic" />
                 </span>
-                <span className="sim-shop-name">
+                <span className="sim-pick-t">
                   <b>{x.name}</b>
                   <small>{x.sub}</small>
                 </span>
-                <button
-                  type="button"
-                  className={"btn sim-buy" + (item?.name === x.name ? " sim-buy-on" : " btn-ghost")}
-                  onClick={() => {
-                    setItemName(x.name);
-                    setPicking(false);
-                  }}
-                >
-                  {item?.name === x.name ? "고름" : "고르기"}
-                </button>
-              </li>
+              </button>
             ))}
-            {!found.length && <li className="sim-muted">찾는 것이 없어요</li>}
-          </ul>
+            {!found.length && <p className="sim-muted">없음</p>}
+          </div>
         </section>
       ) : (
       <section className="panel sim-anvil sim-anvil-grow">
-        <span className="sim-vignette" aria-hidden />
+        <span className="sim-rays" aria-hidden />
         <div className="sim-gearline">
           <span>{item ? item.sub : pet ? "펫" : "장신구"}</span>
+          {left !== null && stage < st.max && <span className="sim-avg">평균 {n0(left)}번</span>}
           {picks.length > 0 && (
             <button type="button" className="sim-change" onClick={() => setPicking(true)} disabled={auto}>
-              {pet ? "펫 바꾸기" : "장신구 바꾸기"}
+              바꾸기
             </button>
           )}
         </div>
@@ -1713,77 +1753,55 @@ function StatInner(p: {
               <span className="sim-half sim-half-a">{item ? <PicImg pic={item.icon} fit={64} className="sim-pic" /> : pet ? "펫" : "장신구"}</span>
             </span>
           </span>
-          {item && <span className="sim-name">{item.name}</span>}
-          <b key={`s${stage}${p.type ?? ""}`} className="sim-lv sim-lv-sm">{shown}</b>
+          <i className="sim-floor" aria-hidden />
+          <span className="sim-nameline">
+            <b key={`s${stage}${p.type ?? ""}`} className="sim-lv sim-lv-sm">{shown}</b>
+            {item && <span className="sim-name">{item.name}</span>}
+          </span>
         </div>
         <div className="sim-steps" aria-label="단계">
           {Array.from({ length: st.max }, (_, i) => (
-            <i key={i} className={i < stage ? "on" : ""} />
+            <i key={i} className={i < stage ? "on" : i === stage ? "next" : ""} />
           ))}
         </div>
-        <div className="sim-next">
-          {step && stage < st.max ? (
-            <>
-              <span>
-                {stage}단계 · +1 <b className="sim-warn">{pctText(step.a)}</b>
-                {step.b > 0 && (
-                  <>
-                    {" "}
-                    · +2 <b className="sim-gold">{pctText(step.b)}</b>
-                  </>
-                )}
-              </span>
-              <small>실패 {pctText(1 - step.a - step.b)} · 실패하면 그대로</small>
-            </>
-          ) : (
-            <span className="sim-good">끝 단계예요</span>
-          )}
-        </div>
+        {step && stage < st.max ? (
+          <OddsBar
+            parts={[
+              { p: step.a, tone: "ok", label: "+1" },
+              { p: step.b, tone: "gold", label: "+2" },
+              { p: 1 - step.a - step.b, tone: "keep", label: "유지" },
+            ]}
+          />
+        ) : (
+          <span className="sim-max">MAX</span>
+        )}
       </section>
       )}
 
-      <div className="sim-actions">
+      <div className="sim-actions sim-actions-grow">
         <button type="button" className="btn sim-go" disabled={stage >= st.max || auto || coins.coins === 0} onClick={() => tryOnce(true)}>
-          {pet ? "강화" : "스탯 부여"}
+          {pet ? "강화" : "부여"}
         </button>
         <button type="button" className={"btn btn-ghost" + (auto ? " sim-running" : "")} disabled={stage >= cap && !auto} onClick={() => setAuto(!auto)}>
-          {auto ? "멈춤" : stage >= cap ? (expStage ? `자동은 ${expStage}단계까지` : "직접 해 본 만큼 자동") : cap >= st.max ? "끝까지 자동" : `${cap}단계까지 자동`}
+          {auto ? "멈춤" : stage >= cap ? "직접 먼저" : `${cap}단계 자동`}
         </button>
-        <button type="button" className="btn btn-ghost" onClick={reset}>
-          처음부터
+        {pet && p.type && st.types && (
+          <button type="button" className="btn btn-ghost" onClick={resetStat}>
+            스탯 리셋
+          </button>
+        )}
+        <button type="button" className="btn btn-ghost sim-again" onClick={reset} aria-label="처음부터">
+          ↺
         </button>
       </div>
-      {pet && p.type && st.types && (
-        <button type="button" className="btn btn-ghost sim-until" onClick={resetStat}>
-          스탯 리셋 <small>(다른 스탯 넷 중 하나 · 각 25%)</small>
-        </button>
-      )}
-      <div className="sim-stats">
-        <span>
-          <small>시도</small>
-          <b>
-            <Count value={p.stats.tries} ms={200} />
-          </b>
-        </span>
-        <span>
-          <small>성공</small>
-          <b className="sim-good">
-            <Count value={p.stats.ok} ms={200} />
-          </b>
-        </span>
-        <span>
-          <small>+2 성공</small>
-          <b className="sim-gold">
-            <Count value={p.stats.big} ms={200} />
-          </b>
-        </span>
-      </div>
+      <StatStrip
+        items={[
+          { label: "시도", value: p.stats.tries },
+          { label: "성공", value: p.stats.ok, tone: "sim-good" },
+          { label: "+2", value: p.stats.big, tone: "sim-gold" },
+        ]}
+      />
       <RankBox rec={rec} title={st.name} />
-      {left !== null && stage < st.max && (
-        <p className="sim-expect">
-          {stage}단계에서 끝 단계까지 평균 <b>{n0(left)}번</b>
-        </p>
-      )}
     </div>
   );
 }
@@ -1833,17 +1851,18 @@ function OptionSim({ odds }: { odds: Odds }) {
         />
       ) : (
         <>
-          <input className="sim-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="아이템 이름" aria-label="아이템 찾기" />
+          <input className="sim-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="이름" aria-label="아이템 찾기" />
           <div className="sim-items">
             {found.map((x) => (
               <button key={x.name} type="button" className="sim-pick" onClick={() => setName(x.name)}>
+                <IconBox name={x.name} size={28} />
                 <span className="sim-pick-t">
-                  <span>{x.name}</span>
+                  <b>{x.name}</b>
                   <small>{x.opts.map((o) => o.label).join(" · ")}</small>
                 </span>
               </button>
             ))}
-            {!found.length && <p className="empty">찾는 아이템이 없어요</p>}
+            {!found.length && <p className="sim-muted">없음</p>}
           </div>
         </>
       )}
@@ -1931,60 +1950,61 @@ function OptionRoller({ item, onBack, verb, game, cat, reset }: { item: OptItem;
   const P = atLeast(d, aim.min);
   const seen = expOf(save, seenKey(aim.i));
   const canHunt = aim.min <= seen;
+  // 이번 결과가 얼마나 드문지 (모든 옵션이 이만큼 이상 나올 확률)
+  const joint = jointP(item, vals);
+  const step = (dir: number) => setAim({ ...aim, min: nums[Math.min(nums.length - 1, Math.max(0, nums.indexOf(aim.min) + dir))] ?? aim.min });
   return (
     <>
-      <section className="panel sim-opt">
+      <section className={`panel sim-opt sim-opt-${tierOf(joint)}`}>
         <div className="sim-opt-head">
           {onBack && (
-            <button type="button" className="pill" onClick={onBack} aria-label="다른 아이템">
+            <button type="button" className="sim-back" onClick={onBack} aria-label="다른 아이템">
               ◀
             </button>
           )}
-          <NameIcon name={item.name} />
+          <IconBox name={item.name} size={28} />
           <b>{item.name}</b>
-          <small>{n}번째</small>
+          {joint < 1 && (
+            <em key={n} className={`sim-luck ${tierClass(joint)}`}>
+              {luckText(luckOf(joint))}
+            </em>
+          )}
         </div>
         {item.opts.map((o, i) => (
-          <OptLine key={i} d={o} v={vals[i]} n={n} i={i} />
+          <OptLine key={i} d={o} v={vals[i]} n={n} i={i} aim={aim.i === i ? aim.min : null} onAim={(min) => setAim({ i, min })} />
         ))}
       </section>
-      <div className="sim-actions">
-        <button type="button" className="btn sim-go" disabled={coins.coins === 0} onClick={again}>
-          {verb === "굴리기" ? "한 번 더" : verb}
-        </button>
-      </div>
       {fresh && <ResetDialog item={item} cur={vals} next={fresh} onChoose={choose} />}
-      <section className="panel sim-aim">
-        <div className="mk-cats">
-          {item.opts.map((o, i) => (
-            <button key={i} type="button" className={"sub-tab" + (aim.i === i ? " sub-tab-on" : "")} onClick={() => setAim({ i, min: Math.max(...o.vals.map((v) => v.n)) })}>
-              {o.label}
-            </button>
-          ))}
-        </div>
-        <div className="sim-aim-row">
-          <button type="button" className="pill" onClick={() => setAim({ ...aim, min: nums[Math.max(0, nums.indexOf(aim.min) - 1)] ?? aim.min })} aria-label="목표 내리기">
+      <div className="sim-actions sim-actions-opt">
+        <button type="button" className="btn sim-go" disabled={coins.coins === 0} onClick={again}>
+          {verb === "굴리기" ? "굴리기" : verb}
+        </button>
+        <span className="sim-aim">
+          <button type="button" className="pill" onClick={() => step(-1)} aria-label="목표 내리기">
             −
           </button>
-          <span>
-            {d.label} <b>{aim.min}</b> 이상 · <b className={tierClass(P)}>{pctText(P)}</b>
+          <span className="sim-aim-t">
+            <b>
+              {d.label} {aim.min}↑
+            </b>
+            <small className={tierClass(P)}>{pctText(P)}</small>
           </span>
-          <button type="button" className="pill" onClick={() => setAim({ ...aim, min: nums[Math.min(nums.length - 1, nums.indexOf(aim.min) + 1)] ?? aim.min })} aria-label="목표 올리기">
+          <button type="button" className="pill" onClick={() => step(1)} aria-label="목표 올리기">
             +
           </button>
-        </div>
-        <button type="button" className="btn btn-ghost" disabled={!(P > 0) || coins.coins === 0 || !canHunt} onClick={huntGoal}>
-          {canHunt ? `나올 때까지 ${verb}` : seen ? `직접 본 ${seen} 까지만 자동` : "직접 굴려 본 값까지만 자동"}
+        </span>
+        <button type="button" className="btn btn-ghost sim-hunt-go" disabled={!(P > 0) || coins.coins === 0 || !canHunt} onClick={huntGoal}>
+          {canHunt ? "나올 때까지" : "직접 먼저"}
         </button>
-        {hunt && (
-          <p key={hunt.k} className="sim-hunt">
-            <b>
-              <Count value={hunt.tries} ms={700} />번
-            </b>{" "}
-            {hunt.short ? "했는데 코인이 떨어졌어요" : "만에 나왔어요"} <small>(평균 {n0(hunt.expect)}번)</small>
-          </p>
-        )}
-      </section>
+      </div>
+      {hunt && (
+        <p key={hunt.k} className={"sim-hunt" + (hunt.short ? " sim-hunt-short" : "")}>
+          <b>
+            <Count value={hunt.tries} ms={700} />번
+          </b>
+          <small>평균 {n0(hunt.expect)}번</small>
+        </p>
+      )}
       {game && <RankBox rec={rec} title={item.name} luck />}
     </>
   );
@@ -2043,45 +2063,74 @@ const pctOnly = (p: number) => {
   return `${t.replace(/\.?0+$/, "")}%`;
 };
 
-/** 옵션 한 줄: 이름, 굴러가다 멈추는 값, 그 옵션의 값마다 작은 막대(나온 값만 밝게) */
-function OptLine({ d, v, n, i }: { d: Dist; v: Dist["vals"][number]; n: number; i: number }) {
-  const [shown, setShown] = useState(v.v);
+/** 옵션 한 줄 (2026-11-19 개편): 이름 · 큰 값 · 등급, 그 아래 값마다 타일(값, %, 확률만큼 차오른 바탕).
+    굴리면 불빛이 타일을 차례로 돌다가 느려지며 나온 값에 멈춘다. 타일을 누르면 그 값 이상이 목표 */
+function OptLine({ d, v, n, i, aim, onAim }: { d: Dist; v: Dist["vals"][number]; n: number; i: number; aim: number | null; onAim: (min: number) => void }) {
+  const at = Math.max(0, d.vals.indexOf(v));
+  const [hot, setHot] = useState(at);
+  const [rolling, setRolling] = useState(false);
+  const first = useRef(true);
   useEffect(() => {
+    // 처음 그릴 때와 움직임 줄이기에서는 돌리지 않는다
+    if (first.current || d.vals.length < 2 || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      first.current = false;
+      setHot(at);
+      setRolling(false);
+      return;
+    }
+    const len = d.vals.length;
+    const hops = Math.max(len, 9) + i * 5;
     let k = 0;
-    const steps = 7 + i * 3;
-    const t = window.setInterval(() => {
+    let t = 0;
+    setRolling(true);
+    const tick = () => {
       k++;
-      if (k >= steps) {
-        setShown(v.v);
-        window.clearInterval(t);
-      } else setShown(d.vals[Math.floor(Math.random() * d.vals.length)].v);
-    }, 45);
-    return () => window.clearInterval(t);
-  }, [n, v, d, i]);
+      setHot((((at - (hops - k)) % len) + len) % len);
+      if (k >= hops) {
+        setRolling(false);
+        return;
+      }
+      // 끝으로 갈수록 느리게
+      t = window.setTimeout(tick, 26 + (k / hops) ** 3 * 150);
+    };
+    t = window.setTimeout(tick, 26);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [n, at]);
   const top = Math.max(...d.vals.map((x) => x.p)) || 1;
   const total = d.vals.reduce((a, x) => a + x.p, 0) || 1;
   const P = atLeast(d, v.n);
+  const cols = d.vals.length <= 7 ? d.vals.length : Math.ceil(d.vals.length / Math.ceil(d.vals.length / 7));
   return (
-    <div className="sim-oline">
-      <span className="sim-oname">{d.label}</span>
-      <b key={n} className={`sim-oval ${tierClass(P)}`} style={{ animationDelay: `${(7 + i * 3) * 0.045}s` }}>
-        {shown}
-      </b>
-      <span className="sim-dist" aria-hidden>
-        {d.vals.map((x, j) => (
-          <i key={j} className={x === v ? "on" : ""} style={{ height: `${Math.max(8, (x.p / top) * 100)}%` }} />
-        ))}
-      </span>
-      <small className="sim-muted">{P < 1 ? `상위 ${pctText(P)}` : ""}</small>
-      {/* 값마다 골라질 확률 (제작자 2026-11-19 '명중 0 은 몇퍼 1은 몇퍼'), 지금 나온 값은 강조 */}
-      <span className="sim-pv">
-        {d.vals.map((x, j) => (
-          <span key={j} className={"sim-pvc" + (x === v ? " on" : "")}>
-            <i>{x.v}</i>
-            <b>{pctOnly(x.p / total)}</b>
-          </span>
-        ))}
-      </span>
+    <div className={"sim-oline" + (rolling ? " sim-rolling" : "")}>
+      <div className="sim-ohead">
+        <span className="sim-oname">{d.label}</span>
+        <b key={rolling ? "r" : `v${n}`} className={`sim-oval ${rolling ? "" : tierClass(P)}`}>
+          {d.vals[hot]?.v ?? v.v}
+        </b>
+        {!rolling && n > 1 && P <= 0.05 && <Sparks key={n} kind={P <= 0.01 ? "plus2" : "box-r"} n={P <= 0.01 ? 16 : 9} />}
+        {!rolling && P < 1 && <small className={`sim-otop ${tierClass(P)}`}>상위 {pctText(P)}</small>}
+      </div>
+      {d.vals.length > 1 && (
+        <div className="sim-tiles" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+          {d.vals.map((x, j) => {
+            const p = x.p / total;
+            return (
+              <button
+                key={j}
+                type="button"
+                className={`sim-tile sim-tile-${tierOf(p)}` + (j === hot ? (rolling ? " sim-tile-run" : " sim-tile-on") : "") + (aim !== null && x.n >= aim ? " sim-tile-aim" : "")}
+                onClick={() => onAim(x.n)}
+                aria-label={`${d.label} ${x.v} ${pctOnly(p)}`}
+              >
+                <i className="sim-tile-fill" style={{ transform: `scaleY(${Math.max(0.06, Math.sqrt(x.p / top)).toFixed(3)})` }} aria-hidden />
+                <b>{x.v}</b>
+                <small>{pctOnly(p)}</small>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -2156,12 +2205,13 @@ function BoxSim({ odds }: { odds: Odds }) {
             .filter((b) => b.cat === cat)
             .map((b) => (
               <button key={b.key} type="button" className="sim-pick" onClick={() => setKey(b.key)}>
+                <IconBox name={b.name} size={28} />
                 <span className="sim-pick-t">
-                  <span>{b.name}</span>
+                  <b>{b.name}</b>
                   <small>
                     {b.date ? `${b.date} · ` : ""}
                     {b.sections.length > 1 ? `${b.sections.length}종 · ` : ""}
-                    {b.sections.reduce((s, x) => s + x.items.length, 0)}가지
+                    {b.sections.reduce((s, x) => s + x.items.length, 0)}
                   </small>
                 </span>
               </button>
@@ -2295,21 +2345,22 @@ function BoxOpener({
   };
   const best = pulls.reduce((m, x) => Math.min(m, x.p), 1);
   const rows = [...sec.items].sort((a, b) => a.p - b.p);
+  const topP = Math.max(...sec.items.map((x) => x.p)) || 1;
+  const tier = tierOf(best);
   return (
     <>
       <section className="panel sim-box">
         <div className="sim-opt-head">
           {onBack && (
-            <button type="button" className="pill" onClick={onBack} aria-label="다른 상자">
+            <button type="button" className="sim-back" onClick={onBack} aria-label="다른 상자">
               ◀
             </button>
           )}
-          <NameIcon name={box.name} />
           <b>{box.name}</b>
-          <small>{opened ? `${opened.toLocaleString()}번 열었어요` : ""}</small>
+          {opened > 0 && <em className="sim-luck">{opened.toLocaleString()}회</em>}
           {box.post && (
             <a className="sim-post" href={`#/official/${box.post}`}>
-              공식 글 ›
+              공식 ›
             </a>
           )}
         </div>
@@ -2333,12 +2384,12 @@ function BoxOpener({
             ))}
           </div>
         )}
-        <div key={charging ? "c" : shake} className={`sim-chest${charging ? " sim-charging" : shake ? ` sim-chest-open sim-chest-${tierOf(best)}` : ""}`} aria-hidden>
-          <span className={"sim-chest-t" + (chestPic ? " sim-chest-pic" : "")}>
-            {chestPic && <PicImg pic={chestPic} fit={40} className="sim-pic" />}
-            <span>{charging ? "두근…" : shake ? (tierOf(best) === "sr" ? "대박" : tierOf(best) === "r" ? "희귀" : "열림") : chestPic ? "" : "상자"}</span>
-          </span>
-          {shake > 0 && <Sparks kind={`box-${tierOf(best)}`} n={tierOf(best) === "sr" ? 18 : 10} />}
+        <div key={charging ? "c" : shake} className={`sim-chest${charging ? " sim-charging" : shake ? ` sim-chest-open sim-chest-${tier}` : ""}`} aria-hidden>
+          <span className="sim-rays" />
+          <span className="sim-chest-t">{chestPic ? <PicImg pic={chestPic} fit={48} className="sim-pic" /> : <i className="sim-chest-box" />}</span>
+          <i className="sim-floor" />
+          {!charging && shake > 0 && tier !== "n" && tier !== "u" && <b className="sim-chest-tag">{tier === "sr" ? "대박" : "희귀"}</b>}
+          {shake > 0 && !charging && <Sparks kind={`box-${tier}`} n={tier === "sr" ? 18 : 10} />}
         </div>
         <div className="sim-actions sim-actions-3">
           {[1, 10, 100].map((k) => (
@@ -2349,15 +2400,16 @@ function BoxOpener({
         </div>
         {target && (
           <button type="button" className="btn btn-ghost sim-until" disabled={!expOf(save, gotKey(target))} onClick={untilTarget}>
-            {expOf(save, gotKey(target)) ? `${target} 나올 때까지` : `${target} · 직접 뽑아 본 것만 자동`}
+            <NameIcon name={target} size={16} />
+            {target} <small>{expOf(save, gotKey(target)) ? "나올 때까지" : "직접 먼저"}</small>
           </button>
         )}
         {hunt && (
-          <p key={hunt.k} className="sim-hunt">
+          <p key={hunt.k} className={"sim-hunt" + (hunt.short ? " sim-hunt-short" : "")}>
             <b>
               <Count value={hunt.tries} ms={700} />번
-            </b>{" "}
-            {hunt.short ? "열었는데 코인이 떨어졌어요" : "만에 나왔어요"} <small>(평균 {n0(hunt.expect)}번)</small>
+            </b>
+            <small>평균 {n0(hunt.expect)}번</small>
           </p>
         )}
         {pulls.length > 0 && (
@@ -2368,7 +2420,7 @@ function BoxOpener({
               const xp = iconOf(x.name);
               const body = (
                 <>
-                  <span className="sim-card-pic">{xp ? <PicImg pic={xp} fit={34} className="sim-pic" /> : <i className="sim-card-nopic" />}</span>
+                  <span className="sim-card-pic">{xp ? <PicImg pic={xp} fit={30} className="sim-pic" /> : <i className="sim-ib-none" />}</span>
                   <span className="sim-card-name">{x.name}</span>
                   <small>
                     {pctText(x.p)}
@@ -2395,35 +2447,30 @@ function BoxOpener({
       {optItem && <OptionRoller key={optItem.name} item={optItem} verb="굴리기" onBack={() => setOptItem(null)} />}
       <RankBox rec={rec} title={box.sections.length > 1 ? sec.title : box.name} luck />
       <section className="panel sim-tally">
-        <div className="sim-th sim-tally-row">
-          <b>나오는 것</b>
-          <span>공식</span>
-          <span>나온 수</span>
-          <span>실제</span>
-        </div>
         {rows.map((x) => {
           const got = tally.get(x.name) ?? 0;
+          const p = x.p / total;
           return (
             <button
               key={x.name}
               type="button"
               aria-pressed={target === x.name}
-              className={"sim-tr sim-tally-row" + (got ? " sim-got" : "") + (target === x.name ? " sim-target" : "")}
+              className={`sim-trow sim-t-${tierOf(p)}` + (got ? " sim-got" : "") + (target === x.name ? " sim-target" : "")}
               onClick={() => setTarget(target === x.name ? null : x.name)}
             >
-              <span className={`sim-tname sim-t-${tierOf(x.p / total)}`}>
-                <NameIcon name={x.name} size={16} />
+              <i className="sim-trow-bar" style={{ transform: `scaleX(${Math.max(0.02, Math.sqrt(x.p / topP)).toFixed(3)})` }} aria-hidden />
+              <span className="sim-tname">
+                <NameIcon name={x.name} size={18} />
                 {x.name}
               </span>
-              <span>{pctText(x.p / total)}</span>
-              <span>{got ? got.toLocaleString() : "-"}</span>
-              <span>{opened && got ? pctText(got / opened) : "-"}</span>
+              <b>{pctText(p)}</b>
+              <em>{got ? `${got.toLocaleString()}` : ""}</em>
             </button>
           );
         })}
         {opened > 0 && (
-          <button type="button" className="btn btn-ghost sim-clear" onClick={() => clear()}>
-            처음부터
+          <button type="button" className="sim-reset" onClick={() => clear()} aria-label="처음부터">
+            ↺
           </button>
         )}
       </section>
@@ -2554,6 +2601,7 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
     }
     setAvg(sum.map((x) => x / 1000));
   };
+  const TONE = ["keep", "ok", "gold"] as const;
   return (
     <div className="sim">
       <div className="mk-sub sim-strip">
@@ -2561,81 +2609,74 @@ function GemSynth({ odds, head }: { odds: Odds; head: React.ReactNode }) {
         <div className="mk-cats" role="tablist">
           {GEM_STARTS.map((k) => (
             <button key={k} type="button" role="tab" aria-selected={start === k} className={"sub-tab" + (start === k ? " sub-tab-on" : "")} onClick={() => reset(k)}>
-              1단계 {k}개
+              {k}개
             </button>
           ))}
         </div>
       </div>
       <section className="panel sim-gems">
-        {[1, 2, 3, 4].map((st) => (
-          <div key={st} className={`sim-gem sim-gem-${st}` + (fx && fx.to === st ? " sim-gem-hit" : "")}>
-            <span className="sim-gem-pic" aria-hidden>
-              {iconOf(GEM_PIC[st]) ? <NameIcon name={GEM_PIC[st]} size={30} /> : <i className={`sim-gem-dot sim-gem-dot-${st}`} />}
-            </span>
-            <b>
-              {st}단계 <span>{GEM_NAMES[st]}</span>
-            </b>
-            <span key={fx && fx.to === st ? fx.n : 0} className="sim-gem-n">
-              <Count value={inv[st]} ms={300} />개
-            </span>
-            {rules[st] ? (
-              <button type="button" className="pill" disabled={!can(st) || coins.coins === 0} onClick={() => once(st)}>
-                3개 합성
-              </button>
-            ) : (
-              <small className="sim-muted">끝 단계</small>
-            )}
-            {rules[st] && (
-              <small className="sim-gem-odds">
-                {rules[st].map((r) => `${r.to}단계 ${pctText(r.p)}`).join(" · ")}
-              </small>
-            )}
-          </div>
-        ))}
-        {fx && (
-          <p key={fx.n} className={"sim-gem-msg" + (fx.to > fx.from ? " sim-good" : " sim-muted")}>
-            {fx.to > fx.from ? `${fx.to}단계가 나왔어요` : `${fx.from}단계 그대로`}
-          </p>
-        )}
+        {[1, 2, 3, 4].map((st) => {
+          const hit = fx && fx.to === st;
+          return (
+            <div key={st} className={`sim-gem sim-gem-${st}` + (hit ? (fx.to > fx.from ? " sim-gem-hit" : " sim-gem-same") : "") + (inv[st] ? "" : " sim-gem-zero")}>
+              <small className="sim-gem-st">{GEM_NAMES[st]}</small>
+              <span key={hit ? fx.n : 0} className="sim-gem-pic" aria-hidden>
+                {iconOf(GEM_PIC[st]) ? <NameIcon name={GEM_PIC[st]} size={30} /> : <i className={`sim-gem-dot sim-gem-dot-${st}`} />}
+                {hit && fx.to > fx.from && <Sparks kind={fx.to - fx.from > 1 ? "plus2" : "ok"} n={8} />}
+              </span>
+              <b key={`n${hit ? fx.n : 0}`} className="sim-gem-n">
+                <Count value={inv[st]} ms={300} />
+              </b>
+              {rules[st] ? (
+                <>
+                  <span className="sim-gem-odds" aria-label={rules[st].map((r) => `${r.to}단계 ${pctText(r.p)}`).join(" ")}>
+                    {rules[st].map((r) => (
+                      <i key={r.to} className={`sim-odds-${TONE[Math.min(2, r.to - st)]}`} style={{ flexGrow: Math.max(r.p, 0.06) }} />
+                    ))}
+                  </span>
+                  <small className="sim-gem-pct">{rules[st].map((r) => Math.round(r.p * 100)).join("·")}</small>
+                  <button type="button" className="sim-mini sim-gem-go" disabled={!can(st) || coins.coins === 0} onClick={() => once(st)}>
+                    합성
+                  </button>
+                </>
+              ) : (
+                <span className="sim-max">MAX</span>
+              )}
+            </div>
+          );
+        })}
       </section>
-      <div className="sim-actions sim-actions-3">
+      <div className="sim-actions sim-actions-grow">
         <button type="button" className="btn sim-go" disabled={![1, 2, 3].some((k) => tried(k) && can(k)) || coins.coins === 0} onClick={all}>
-          {[1, 2, 3].some(tried) ? "모두 합성" : "직접 합성 먼저"}
+          {[1, 2, 3].some(tried) ? "모두 합성" : "직접 먼저"}
         </button>
         <button type="button" className="btn btn-ghost" onClick={average}>
           1000번 평균
         </button>
-        <button type="button" className="btn btn-ghost" onClick={() => reset(start)}>
-          처음부터
+        <button type="button" className="btn btn-ghost sim-again" onClick={() => reset(start)} aria-label="처음부터">
+          ↺
         </button>
       </div>
-      <div className="sim-stats">
-        <span>
-          <small>합성</small>
-          <b>
-            <Count value={runs} ms={300} />번
-          </b>
-        </span>
-        <span>
-          <small>남은 보석</small>
-          <b>
-            <Count value={inv.reduce((a, b) => a + b, 0)} ms={300} />개
-          </b>
-        </span>
-        <span>
-          <small>최고</small>
-          <b className="sim-good">{[4, 3, 2, 1].find((k) => inv[k] > 0) ?? 0}단계</b>
-        </span>
-      </div>
       {avg && (
-        <p className="sim-expect">
-          1단계 {start}개를 다 합성하면 평균{" "}
-          {[4, 3, 2, 1]
+        <div className="sim-avgs">
+          {[1, 2, 3, 4]
             .filter((k) => avg[k] >= 0.005)
-            .map((k) => `${k}단계 ${avg[k] >= 10 ? avg[k].toFixed(0) : avg[k].toFixed(2)}개`)
-            .join(" · ")}
-        </p>
+            .map((k) => (
+              <span key={k} className={`sim-gem-${k}`}>
+                {iconOf(GEM_PIC[k]) ? <NameIcon name={GEM_PIC[k]} size={18} /> : <i className={`sim-gem-dot sim-gem-dot-${k}`} />}
+                <b>{avg[k] >= 10 ? avg[k].toFixed(0) : avg[k].toFixed(2)}</b>
+              </span>
+            ))}
+        </div>
       )}
+      <StatStrip
+        items={[
+          { label: "합성", value: runs },
+          { label: "보석", value: inv.reduce((a, b) => a + b, 0) },
+          { label: "최고", value: [4, 3, 2, 1].find((k) => inv[k] > 0) ?? 0, tone: "sim-good", unit: "단계" },
+        ]}
+      />
+      <RankBox rec={rec} title="보석 합성" />
     </div>
   );
 }

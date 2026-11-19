@@ -1,0 +1,591 @@
+/* 확률 시뮬레이터 (pages/Simulator.tsx). 2026-11-19 전면 개편 (제작자 '싹 다 개편, 불필요한 설명 싹 빼고 콤팩트하게, 애니메이션 잔뜩, 최대한 이쁘게'):
+   글 대신 숫자·색·막대·그림으로. 끝없이 도는 움직임은 transform · opacity 만, 결과 움직임은 한 번씩. 움직임 줄이기면 맨 아래에서 끈다 */
+.sim { --ok: #7ee2a8; --keep: #6f8fff; --rare: #c79bff; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.sim .panel { margin: 0; }
+.sim-tabs { margin-bottom: 8px; }
+.sim-tabs > .pill { padding-left: 2px; padding-right: 2px; font-size: 12px; }
+.sim-muted { margin: 0; color: var(--muted); font-size: 12px; text-align: center; }
+.sim-good { color: #7ee2a8; }
+.sim-gold { color: var(--gold); }
+.sim-bad { color: var(--red); }
+.sim-t-sr { color: var(--gold); }
+.sim-t-r { color: #c79bff; }
+.sim-t-u { color: #8fb0ff; }
+.sim-t-n { color: var(--text); }
+.sim-pic { image-rendering: pixelated; flex: none; object-fit: contain; }
+.sim-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; padding-bottom: 4px; border-bottom: 1px solid var(--hi); }
+.sim-head b { color: var(--gold); font-size: 13px; white-space: nowrap; }
+.sim-head small { color: var(--muted); font-size: 11px; min-width: 0; }
+.sim-head-sub { margin: 2px 2px 0; padding: 0; border: 0; }
+/* 도트 동전 한 닢 (값 앞에) */
+.sim-c { display: inline-block; width: 9px; height: 9px; margin-right: 3px; vertical-align: -1px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff3c4 0 25%, #ffc35c 30% 100%); box-shadow: 0 0 0 1px #8a5412; }
+/* 그림 칸 */
+.sim-ib { flex: none; display: grid; place-items: center; background: rgba(7, 6, 15, 0.55); border: 1px solid rgba(169, 162, 207, 0.22); }
+.sim-ib-none { display: block; width: 12px; height: 12px; background: linear-gradient(135deg, #8fb0ff, #4a3f86); transform: rotate(45deg); opacity: 0.55; }
+
+/* ---------------------------------------------------------------- 맨 위 한 줄: 동전 · 코인 · 오늘 · 연속 · 칭호 · 도전 점 셋 */
+.sim-hud { display: grid; grid-template-columns: minmax(0, 1fr); margin-bottom: 8px; background: linear-gradient(90deg, rgba(255, 195, 92, 0.16), rgba(11, 10, 26, 0.5) 60%); border: var(--px) solid var(--edge); box-shadow: inset 0 0 0 1px rgba(255, 195, 92, 0.22); }
+.sim-hud-row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 8px; }
+.sim-hud-coin { position: relative; flex: none; display: flex; align-items: center; gap: 7px; padding: 0; color: var(--text); font: inherit; background: none; border: 0; cursor: pointer; }
+.sim-hud-coin > b { font-size: 19px; line-height: 1; color: var(--gold); text-shadow: 2px 2px 0 var(--edge); font-variant-numeric: tabular-nums; animation: sim-settle 0.3s ease-out; }
+.sim-hud-empty .sim-hud-coin > b { color: var(--red); }
+.sim-hud-empty { box-shadow: inset 0 0 0 1px rgba(255, 107, 107, 0.6); }
+.sim-hud-delta { position: absolute; left: 30px; top: -2px; font-style: normal; font-size: 12px; font-weight: 700; color: var(--red); text-shadow: 1px 1px 0 var(--edge); pointer-events: none; opacity: 0; animation: sim-delta 0.9s ease-out; }
+.sim-hud-plus { color: #7ee2a8; }
+@keyframes sim-delta { 0% { opacity: 0; transform: translateY(6px); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-16px); } }
+.sim-hud-chips { flex: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
+.sim-hud-chips i { font-style: normal; font-size: 10px; line-height: 1.5; padding: 0 5px; white-space: nowrap; }
+.sim-hud-today { color: var(--edge); background: #7ee2a8; }
+.sim-hud-streak { color: var(--edge); background: #ffb24a; }
+.sim-title { color: #d9bcff; border: 1px solid rgba(199, 155, 255, 0.55); }
+/* 도는 동전 */
+.sim-coin-pic { position: relative; display: block; width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle at 38% 35%, #fff3c4 0 18%, #ffc35c 20% 60%, #d98b2a 62% 100%);
+  box-shadow: 0 0 0 2px var(--edge), inset 0 0 0 2px rgba(217, 139, 42, 0.9); animation: sim-coin-flip 3.6s ease-in-out infinite; }
+.sim-coin-pic::after { content: ""; position: absolute; left: 50%; top: 50%; width: 6px; height: 10px; margin: -5px 0 0 -3px; background: #b86f1c; clip-path: polygon(0 0, 100% 0, 100% 20%, 66% 20%, 66% 80%, 100% 80%, 100% 100%, 0 100%, 0 80%, 34% 80%, 34% 20%, 0 20%); opacity: 0.8; }
+.sim-coin-pic i { position: absolute; left: 4px; top: 3px; width: 4px; height: 4px; background: #fff; animation: sim-coin-shine 2.4s ease-in-out infinite; }
+@keyframes sim-coin-flip { 0%, 70%, 100% { transform: scaleX(1); } 78% { transform: scaleX(0.12); } 86% { transform: scaleX(1); } 93% { transform: scaleX(0.12); } }
+@keyframes sim-coin-shine { 0%, 100% { opacity: 0.3; transform: scale(0.7); } 50% { opacity: 1; transform: scale(1); } }
+.sim-hud-coin:active .sim-coin-pic { transform: scale(0.88); }
+/* 오늘의 도전: 점 셋, 누르면 펼친다 */
+.sim-hud-q { flex: none; display: flex; align-items: center; gap: 4px; padding: 6px 4px; background: none; border: 0; cursor: pointer; }
+.sim-hud-q i { display: block; width: 9px; height: 9px; transform: rotate(45deg); background: rgba(11, 10, 26, 0.6); box-shadow: 0 0 0 1px var(--muted); }
+.sim-hud-q i.on { background: var(--gold); box-shadow: 0 0 0 1px #fff3c4, 0 0 6px rgba(255, 195, 92, 0.9); animation: sim-pip 0.5s cubic-bezier(0.2, 1.8, 0.4, 1); }
+.sim-hud-q:not([aria-expanded="true"]) i:not(.on) { animation: sim-blink 2.2s ease-in-out infinite; }
+.sim-hud-q:not([aria-expanded="true"]) i:nth-child(2) { animation-delay: 0.3s; }
+.sim-hud-q:not([aria-expanded="true"]) i:nth-child(3) { animation-delay: 0.6s; }
+@keyframes sim-pip { 0% { transform: rotate(45deg) scale(0.2); } 100% { transform: rotate(45deg) scale(1); } }
+.sim-hud-quests { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 4px 8px 6px; border-top: 1px solid rgba(169, 162, 207, 0.18); font-size: 12px; animation: sim-drop 0.2s ease-out; }
+.sim-hud-quests > span { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.sim-hud-quests small { margin-left: auto; flex: none; color: var(--gold); }
+.sim-q-box { flex: none; width: 8px; height: 8px; transform: rotate(45deg); background: rgba(11, 10, 26, 0.6); box-shadow: 0 0 0 1px var(--muted); }
+.sim-q-done { color: var(--muted); text-decoration: line-through; }
+.sim-q-done .sim-q-box { background: var(--gold); box-shadow: 0 0 0 1px #fff3c4; }
+.sim-q-done small { color: #7ee2a8; }
+.sim-ticker { overflow: hidden; padding: 2px 0; background: rgba(255, 195, 92, 0.08); border-top: 1px solid rgba(255, 195, 92, 0.3); }
+.sim-ticker-run { display: flex; width: max-content; gap: 24px; animation: sim-tick linear infinite; }
+.sim-tick { white-space: nowrap; font-size: 11px; }
+.sim-tick b { color: var(--gold); }
+.sim-tick small { color: #c79bff; }
+@keyframes sim-tick { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+/* 알림 한 장 (도전 완료, 판 장비) */
+.sim-cheer { position: fixed; left: 50%; bottom: calc(var(--tab-h) + 24px + env(safe-area-inset-bottom)); z-index: 60; display: grid; justify-items: center; min-width: 160px; margin-left: -80px; padding: 6px 14px 8px; text-align: center;
+  background: var(--night-2); border: 3px solid var(--gold); box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35), 0 0 18px rgba(255, 195, 92, 0.5); animation: sim-cheer 2.6s ease-out forwards; pointer-events: none; }
+.sim-cheer b { color: var(--gold); font-size: 20px; text-shadow: 2px 2px 0 var(--edge); }
+.sim-cheer span { font-size: 12px; }
+@keyframes sim-cheer { 0% { transform: translateY(20px) scale(0.8); opacity: 0; } 12% { transform: translateY(0) scale(1.05); opacity: 1; } 20% { transform: none; } 85% { opacity: 1; } 100% { transform: translateY(-10px); opacity: 0; } }
+
+/* ---------------------------------------------------------------- 고르는 띠 */
+.sim-strip { margin: 0; }
+.sim-strip .mk-cats, .sim-shop-filter .mk-cats { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; }
+.sim-sep { width: 1px; height: 12px; margin: 0 2px; background: rgba(169, 162, 207, 0.35); }
+.sim-ev { margin-left: auto; color: var(--gold); }
+.sim-secs { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
+.sim-secs .sub-tab { max-width: 100%; white-space: normal; text-align: left; }
+
+/* ---------------------------------------------------------------- 무대 (강화 · 성장): 도는 빛살, 떠오르는 불티, 그림 틀과 강화도 빛 */
+.sim-anvil { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 6px; padding: 6px 10px 10px; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 38%, rgba(111, 143, 255, 0.22), transparent 62%), linear-gradient(180deg, #1d1a44, var(--panel)); }
+.sim-anvil > * { position: relative; }
+.sim-anvil > .sim-vignette, .sim-anvil > .sim-embers, .sim-anvil > .sim-rays, .sim-anvil > .sim-burst { position: absolute; }
+.sim-rays { left: 50%; top: 74px; width: 320px; height: 320px; margin: -160px 0 0 -160px; border-radius: 50%; pointer-events: none; opacity: 0.5;
+  background: repeating-conic-gradient(rgba(143, 176, 255, 0.2) 0 7deg, transparent 7deg 20deg);
+  -webkit-mask: radial-gradient(circle, #000 12%, transparent 62%); mask: radial-gradient(circle, #000 12%, transparent 62%); animation: sim-spin 48s linear infinite; }
+.sim-embers { inset: 0; pointer-events: none; overflow: hidden; }
+.sim-embers i { position: absolute; left: var(--x); bottom: 6px; width: var(--s); height: var(--s); background: #ffb24a; box-shadow: 0 0 4px #ff8a3c; opacity: 0; animation: sim-ember var(--t) linear var(--d) infinite; }
+@keyframes sim-ember { 0% { transform: translate3d(0, 0, 0); opacity: 0; } 10% { opacity: 0.9; } 60% { opacity: 0.5; } 100% { transform: translate3d(calc(var(--s) * -3), -150px, 0); opacity: 0; } }
+.sim-gearline { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 22px; font-size: 11px; color: var(--muted); z-index: 2; }
+.sim-gearline > span:first-child { margin-right: auto; }
+.sim-avg { padding: 0 6px; color: var(--text); background: rgba(7, 6, 15, 0.45); border: 1px solid rgba(169, 162, 207, 0.25); }
+.sim-change { flex: none; padding: 2px 8px; font: inherit; font-size: 11px; color: var(--text); background: rgba(7, 6, 15, 0.5); border: 1px solid rgba(169, 162, 207, 0.4); cursor: pointer; }
+.sim-change:active { transform: translateY(1px); }
+.sim-change:disabled { opacity: 0.4; }
+.sim-combo { padding: 0 8px; font-size: 12px; font-weight: 700; color: var(--edge); background: var(--gold); animation: sim-combo 0.45s cubic-bezier(0.2, 1.8, 0.4, 1); }
+@keyframes sim-combo { 0% { transform: scale(0.4) rotate(-12deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
+
+.sim-item { position: relative; display: grid; justify-items: center; gap: 2px; }
+.sim-frame { position: relative; display: grid; padding: 3px; overflow: hidden; }
+.sim-frame > .sim-icon { position: relative; z-index: 1; background: #100e24; }
+.sim-icon { position: relative; display: grid; place-items: center; min-width: 96px; height: 64px; padding: 0 14px; font-size: 22px; line-height: 1; color: var(--text); border: var(--px) solid var(--hi); }
+.sim-icon.sim-icon-pic { min-width: 0; width: 80px; height: 80px; padding: 0; }
+.sim-icon-pic .sim-half { display: grid; place-items: center; }
+.sim-icon-pic .sim-pic { width: 64px; height: 64px; }
+.sim-icon-long { font-size: 16px; min-width: 150px; max-width: 220px; padding: 0 10px; line-height: 1.2; text-align: center; }
+.sim-half { grid-area: 1 / 1; display: block; }
+.sim-half-b { opacity: 0; }
+.sim-aura { position: absolute; left: -50%; top: -150%; width: 200%; height: 400%; opacity: 0; pointer-events: none; }
+.sim-aura-1 .sim-aura, .sim-aura-2 .sim-aura, .sim-aura-3 .sim-aura, .sim-aura-4 .sim-aura { opacity: 1; animation: sim-spin 3.2s linear infinite; }
+.sim-aura-1 .sim-aura { background: conic-gradient(from 0deg, transparent 0 55%, #6f8fff 75%, transparent 90%); }
+.sim-aura-2 .sim-aura { background: conic-gradient(from 0deg, transparent 0 45%, #b478ff 70%, #f0d8ff 78%, transparent 92%); animation-duration: 2.6s; }
+.sim-aura-3 .sim-aura { background: conic-gradient(from 0deg, transparent 0 35%, #ffb24a 60%, #fff3c4 72%, transparent 86%, #ffb24a 96%); animation-duration: 2s; }
+.sim-aura-4 .sim-aura { background: conic-gradient(#ff6b6b, #ffc35c, #7ee2a8, #6f8fff, #c79bff, #ff6b6b); animation-duration: 1.6s; }
+@keyframes sim-spin { to { transform: rotate(360deg); } }
+/* 발밑 빛 */
+.sim-floor { display: block; width: 96px; height: 10px; margin-top: -2px; border-radius: 50%; background: radial-gradient(ellipse, rgba(143, 176, 255, 0.55), transparent 70%); animation: sim-floor 2.8s ease-in-out infinite; }
+@keyframes sim-floor { 0%, 100% { transform: scaleX(0.8); opacity: 0.5; } 50% { transform: scaleX(1.1); opacity: 1; } }
+.sim-nameline { display: flex; align-items: baseline; justify-content: center; flex-wrap: wrap; gap: 0 7px; max-width: 100%; text-align: center; }
+.sim-lv { font-size: 26px; line-height: 1.1; color: var(--gold); text-shadow: 2px 2px 0 var(--edge); letter-spacing: 1px; }
+.sim-anvil .sim-lv { animation: sim-lvup 0.45s ease-out; }
+.sim-lv-sm { font-size: 20px; }
+.sim-lv-dead { color: #8d86b3 !important; text-decoration: line-through; text-decoration-thickness: 3px; }
+.sim-name { font-size: 13px; color: var(--text); }
+.sim-ring { position: absolute; top: 44px; left: 50%; width: 70px; height: 70px; margin: -35px 0 0 -35px; border: 3px solid var(--gold); opacity: 0; pointer-events: none; }
+.sim-crack { position: absolute; inset: 0; pointer-events: none; z-index: 2;
+  background: linear-gradient(115deg, transparent 47%, rgba(255, 107, 107, 0.9) 48%, rgba(255, 107, 107, 0.9) 50%, transparent 51%), linear-gradient(60deg, transparent 58%, rgba(255, 107, 107, 0.7) 59%, rgba(255, 107, 107, 0.7) 60.5%, transparent 61.5%); }
+.sim-broken .sim-icon { opacity: 0.55; }
+.sim-broken .sim-lv { animation: sim-drop 0.5s 0.3s ease-out both; }
+.sim-max { padding: 1px 12px; font-size: 13px; font-weight: 700; letter-spacing: 1px; color: var(--edge); background: var(--gold); }
+
+/* 결과 움직임 */
+.sim-fx-ok .sim-icon { animation: sim-pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1); }
+.sim-fx-ok .sim-ring, .sim-fx-plus2 .sim-ring { animation: sim-ring 0.6s ease-out; }
+.sim-fx-ok .sim-lv, .sim-fx-plus2 .sim-lv { animation: sim-lvup 0.5s ease-out; }
+.sim-fx-plus2 .sim-icon { animation: sim-pop 0.7s cubic-bezier(0.2, 1.8, 0.4, 1); }
+.sim-fx-plus2 .sim-ring { border-color: #fff3c4; }
+.sim-fx-keep .sim-icon { animation: sim-shake 0.42s ease-in-out; }
+.sim-fx-keep .sim-ring { border-color: var(--sapphire); border-radius: 50%; animation: sim-ring 0.5s ease-out; }
+.sim-fx-break .sim-icon { animation: sim-shake 0.3s ease-in-out; }
+.sim-fx-break .sim-half-a { clip-path: inset(0 50% 0 0); animation: sim-split-a 0.9s 0.25s ease-in forwards; }
+.sim-fx-break .sim-half-b { opacity: 1; clip-path: inset(0 0 0 50%); animation: sim-split-b 0.9s 0.25s ease-in forwards; }
+.sim-fx-break .sim-lv { animation: sim-drop 0.5s 0.3s ease-out both; color: var(--red); }
+.sim-fx-buy .sim-frame { animation: sim-buy 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+.sim-fx-buy .sim-lv { animation: sim-drop 0.4s 0.3s ease-out both; }
+@keyframes sim-pop { 0% { transform: scale(1); } 35% { transform: scale(1.28) rotate(-6deg); } 100% { transform: scale(1); } }
+@keyframes sim-ring { 0% { transform: scale(0.4) rotate(45deg); opacity: 0.95; } 100% { transform: scale(1.9) rotate(45deg); opacity: 0; } }
+@keyframes sim-lvup { 0% { transform: translateY(10px) scale(0.6); opacity: 0; } 60% { transform: translateY(-4px) scale(1.15); opacity: 1; } 100% { transform: none; } }
+@keyframes sim-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-7px) rotate(-4deg); } 40% { transform: translateX(6px) rotate(3deg); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
+@keyframes sim-split-a { to { transform: translate(-22px, 36px) rotate(-38deg); opacity: 0.25; } }
+@keyframes sim-split-b { to { transform: translate(22px, 40px) rotate(42deg); opacity: 0.25; } }
+@keyframes sim-drop { from { transform: translateY(-10px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes sim-buy { 0% { transform: translateY(-60px) scale(0.7); opacity: 0; } 60% { transform: translateY(4px) scale(1.04, 0.94); opacity: 1; } 100% { transform: none; } }
+@keyframes sim-settle { 0% { transform: scale(1); } 40% { transform: scale(1.25); } 100% { transform: scale(1); } }
+@keyframes sim-blink { 50% { opacity: 0.45; } }
+/* 튀는 조각 */
+.sim-sparks { position: absolute; top: 44px; left: 50%; width: 0; height: 0; pointer-events: none; z-index: 3; }
+.sim-sparks i { position: absolute; width: 5px; height: 5px; margin: -2px; background: var(--gold); opacity: 0; animation: sim-spark 0.7s ease-out forwards; }
+.sim-sparks-plus2 i, .sim-sparks-box-sr i { background: #fff3c4; width: 6px; height: 6px; }
+.sim-sparks-break i { background: #b9b2d9; animation-duration: 0.9s; animation-delay: 0.25s !important; }
+.sim-sparks-box-r i { background: #c79bff; }
+.sim-sparks-box-u i { background: var(--sapphire); }
+.sim-sparks-box-n i { background: var(--muted); }
+@keyframes sim-spark { 0% { transform: translate(0, 0) scale(1); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(0.4); opacity: 0; } }
+/* 두근두근: 망치 세 번, 위험하면 둘레가 어두워진다 */
+.sim-charging .sim-lv { opacity: 0.7; }
+.sim-anvil.sim-charging .sim-icon { animation: sim-hammer var(--hit, 400ms) cubic-bezier(0.3, 0, 0.2, 1) 3; }
+@keyframes sim-hammer { 0% { transform: none; } 55% { transform: translateY(-6px) scale(1.04); } 70% { transform: translateY(3px) scale(1.08, 0.9); } 85% { transform: translateY(0) scale(0.98, 1.03); } 100% { transform: none; } }
+.sim-tang { position: absolute; right: -6px; top: -12px; z-index: 3; font-size: 15px; color: #fff3c4; text-shadow: 2px 2px 0 var(--edge); opacity: 0; pointer-events: none; animation: sim-tang var(--hit, 400ms) ease-out 3; }
+@keyframes sim-tang { 0%, 60% { opacity: 0; transform: scale(0.5) rotate(-10deg); } 72% { opacity: 1; transform: scale(1.25) rotate(6deg); } 100% { opacity: 0; transform: translateY(-8px) scale(1); } }
+.sim-vignette { inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at 50% 40%, transparent 35%, rgba(0, 0, 0, 0.75) 100%); }
+.sim-risky .sim-vignette { animation: sim-heart 0.9s ease-in-out infinite; }
+@keyframes sim-heart { 0%, 100% { opacity: 0.55; } 15% { opacity: 1; } 30% { opacity: 0.7; } 45% { opacity: 0.95; } }
+/* 확률 게이지 */
+.sim-gauge { display: grid; gap: 3px; width: min(280px, 100%); animation: sim-drop 0.25s ease-out both; }
+.sim-gauge-bar { position: relative; display: flex; height: 14px; border: var(--px) solid var(--edge); background: var(--edge); }
+.sim-gauge-ok { flex: none; height: 100%; background: linear-gradient(180deg, #a8f5c8, #3fbf7a); }
+.sim-gauge-no { flex: 1; height: 100%; background: repeating-linear-gradient(135deg, #8f2e3a 0 6px, #a8394a 6px 12px); }
+.sim-gauge-keep { background: repeating-linear-gradient(135deg, #2c3566 0 6px, #343f78 6px 12px); }
+.sim-gauge-track { position: absolute; inset: -5px 0; pointer-events: none; }
+.sim-needle { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; will-change: transform; }
+.sim-needle::before { content: ""; position: absolute; left: -2px; top: 0; bottom: 0; width: 4px; background: #fff; box-shadow: 0 0 0 1px var(--edge), 0 0 6px rgba(255, 255, 255, 0.9); }
+.sim-gauge-lab { display: flex; justify-content: space-between; font-size: 11px; }
+/* 드문 성공: 금빛 빛살과 큰 '+9', 파괴 도장 */
+.sim-anvil-big { animation: sim-quake 0.45s ease-out; }
+.sim-anvil-break { animation: sim-quake 0.5s 0.15s ease-out; }
+@keyframes sim-quake { 0%, 100% { transform: none; } 15% { transform: translate(-5px, 2px); } 30% { transform: translate(5px, -3px); } 45% { transform: translate(-4px, 1px); } 60% { transform: translate(3px, 2px); } 80% { transform: translate(-1px, -1px); } }
+.sim-burst { left: 50%; top: 74px; width: 0; height: 0; pointer-events: none; z-index: 0; }
+.sim-burst i { position: absolute; left: -170px; top: -170px; width: 340px; height: 340px; border-radius: 50%; background: repeating-conic-gradient(rgba(255, 220, 140, 0.55) 0 8deg, transparent 8deg 22deg);
+  -webkit-mask: radial-gradient(circle, #000 18%, transparent 68%); mask: radial-gradient(circle, #000 18%, transparent 68%); animation: sim-burst 1.5s ease-out forwards; }
+@keyframes sim-burst { 0% { transform: scale(0.2) rotate(0deg); opacity: 0; } 15% { opacity: 1; } 100% { transform: scale(1.15) rotate(70deg); opacity: 0; } }
+.sim-win { position: absolute; left: 50%; top: 22px; z-index: 4; padding: 2px 18px; white-space: nowrap; font-size: 28px; color: var(--edge); background: linear-gradient(180deg, #fff1b8, #f2a93b); border: var(--px) solid var(--edge);
+  box-shadow: 0 0 0 2px rgba(255, 243, 196, 0.5), 0 0 18px rgba(255, 195, 92, 0.85); pointer-events: none; animation: sim-win 1.6s cubic-bezier(0.2, 1.4, 0.4, 1) forwards; }
+@keyframes sim-win { 0% { transform: translateX(-50%) scale(2.6); opacity: 0; } 18% { transform: translateX(-50%) scale(0.92); opacity: 1; } 28% { transform: translateX(-50%) scale(1.05); } 75% { transform: translateX(-50%) scale(1); opacity: 1; } 100% { transform: translateX(-50%) translateY(-14px); opacity: 0; } }
+.sim-stamp { position: absolute; left: 50%; top: 22px; z-index: 4; padding: 2px 14px; white-space: nowrap; font-size: 24px; color: var(--red); border: 3px solid var(--red); background: rgba(20, 6, 12, 0.6); pointer-events: none;
+  animation: sim-stamp 0.5s 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+.sim-stamp-keep { font-size: 17px; color: #b9b2d9; border-color: #b9b2d9; animation: sim-stamp-keep 1.2s both; }
+@keyframes sim-stamp { 0% { transform: translateX(-50%) scale(3) rotate(-14deg); opacity: 0; } 100% { transform: translateX(-50%) scale(1) rotate(-12deg); opacity: 1; } }
+@keyframes sim-stamp-keep { 0% { transform: translateX(-50%) scale(1.8) rotate(8deg); opacity: 0; } 25% { transform: translateX(-50%) scale(1) rotate(6deg); opacity: 1; } 80% { opacity: 1; } 100% { transform: translateX(-50%) scale(1) rotate(6deg); opacity: 0; } }
+
+/* ---------------------------------------------------------------- 확률 막대: 칸마다 색, 아래에 이름과 % */
+.sim-odds { display: grid; gap: 3px; width: min(300px, 100%); }
+.sim-odds-bar, .sim-gem-odds { display: flex; gap: 1px; height: 12px; padding: 1px; background: var(--edge); border: 1px solid #000; overflow: hidden; }
+.sim-odds-bar i, .sim-gem-odds i { position: relative; flex: 1 0 0; min-width: 2px; overflow: hidden; }
+.sim-odds-ok { background: linear-gradient(180deg, #b8f8d2, #3fbf7a); }
+.sim-odds-gold { background: linear-gradient(180deg, #fff1b8, #f2a93b); }
+.sim-odds-bad { background: #7d2733; }
+.sim-odds-keep { background: #2a3263; }
+/* 빗금이 옆으로 흐른다 (가상 요소를 옮긴다) */
+.sim-odds-bad::after, .sim-odds-keep::after { content: ""; position: absolute; top: 0; bottom: 0; left: -24px; right: 0; background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.13) 0 6px, transparent 6px 12px); animation: sim-stripe 1.1s linear infinite; }
+.sim-odds-ok::after, .sim-odds-gold::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent); animation: sim-shine 2.6s ease-in-out infinite; }
+@keyframes sim-stripe { to { transform: translateX(17px); } }
+@keyframes sim-shine { 0%, 55% { transform: translateX(-120%); } 100% { transform: translateX(380%); } }
+.sim-odds-lab { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--muted); }
+.sim-odds-lab b { font-size: 13px; }
+.sim-odds-t-ok b { color: #7ee2a8; }
+.sim-odds-t-gold b { color: var(--gold); }
+.sim-odds-t-bad b { color: var(--red); }
+.sim-odds-t-keep b { color: #9fb4ff; }
+.sim-odds-lab > span:only-child { margin: 0 auto; }
+.sim-facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 14px; font-size: 12px; }
+.sim-facts > span { display: flex; align-items: baseline; gap: 5px; }
+.sim-facts small { color: var(--muted); font-size: 10px; }
+.sim-facts b { font-weight: 400; }
+.sim-facts em, .sim-gain em { font-style: normal; color: #7ee2a8; }
+.sim-gain { animation: sim-settle 0.35s ease-out; }
+.sim-value { font-size: 10px; color: var(--gold); animation: sim-settle 0.3s ease-out; }
+.sim-sell { color: var(--gold); border-color: rgba(255, 195, 92, 0.5); }
+.sim-sell-sure { color: var(--edge); background: var(--gold); border-color: var(--gold); animation: sim-blink 0.6s ease-in-out infinite; }
+.sim-sell-sure small { color: var(--edge); }
+
+/* ---------------------------------------------------------------- 단추 */
+.sim-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; align-items: stretch; }
+.sim-actions-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sim-actions-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+.sim-actions-enh { grid-template-columns: minmax(0, 1fr) auto; }
+.sim-actions-grow { display: flex; }
+.sim-actions-grow > .sim-go { flex: 1.4; }
+.sim-actions-opt { grid-template-columns: minmax(0, 1fr) auto; }
+.sim-actions-opt > .sim-go { grid-column: 1 / -1; }
+.sim-actions .btn { min-width: 0; padding: 9px 8px; white-space: nowrap; }
+.sim-actions .btn small { margin-left: 5px; font-size: 11px; }
+.sim-go { position: relative; overflow: hidden; font-size: 15px; font-weight: 700; color: var(--edge); text-shadow: none; background: linear-gradient(180deg, #ffbf5e, var(--sunset)); }
+.sim-go::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 34%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.55), transparent); animation: sim-shine 3.2s ease-in-out infinite; pointer-events: none; }
+.sim-go:disabled::after { display: none; }
+.sim-go:active { transform: translateY(2px) scale(0.98); }
+.sim-again { flex: 0 0 40px !important; padding-left: 0 !important; padding-right: 0 !important; font-size: 16px; }
+.sim-goal { display: flex; align-items: stretch; gap: 3px; }
+.sim-goal .pill { display: grid; place-items: center; padding: 0 9px; }
+.sim-running { animation: sim-blink 0.8s ease-in-out infinite; }
+.sim-unlock small { color: var(--gold); }
+.sim-autobuy { grid-column: 1 / -1; justify-self: end; padding: 2px 8px; border: 1px solid rgba(169, 162, 207, 0.35); }
+.sim-autobuy small { margin-left: 5px; color: var(--gold); }
+.sim-autobuy:disabled { opacity: 0.45; }
+.sim-mini { flex: none; padding: 3px 7px; font: inherit; font-size: 11px; color: var(--text); white-space: nowrap; background: rgba(7, 6, 15, 0.5); border: 1px solid rgba(169, 162, 207, 0.4); cursor: pointer; }
+.sim-mini small { font-size: 10px; }
+.sim-mini:active { transform: translateY(1px); }
+.sim-mini:disabled { opacity: 0.35; }
+.sim-mini.sim-sell { color: var(--gold); border-color: rgba(255, 195, 92, 0.5); }
+.sim-mini.sim-sell-sure { color: var(--edge); }
+.sim-take { color: var(--edge); background: var(--gold); border-color: var(--edge); }
+
+/* ---------------------------------------------------------------- 숫자 띠, 결과 점 */
+.sim-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: rgba(11, 10, 26, 0.5); }
+.sim-stats > span { display: flex; align-items: baseline; justify-content: center; gap: 6px; padding: 3px 4px; }
+.sim-stats > span + span { box-shadow: -1px 0 0 rgba(169, 162, 207, 0.18); }
+.sim-stats small { color: var(--muted); font-size: 10px; }
+.sim-stats b { font-size: 14px; font-variant-numeric: tabular-nums; }
+.sim-log { display: flex; flex-wrap: wrap; gap: 2px; margin-top: -4px; }
+.sim-log i { width: 6px; height: 6px; background: #7ee2a8; animation: sim-settle 0.25s ease-out; }
+.sim-log i.bad { background: var(--red); }
+.sim-log i.keep { background: var(--sapphire); }
+.sim-log i:last-child { box-shadow: 0 0 0 1px #fff; }
+
+/* ---------------------------------------------------------------- 장비 상점: 살 수 있는 장비는 한 줄씩, 잠긴 장비는 흐린 그림 칸 */
+.sim-shop { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 8px; }
+.sim-shop-filter { margin: 0; }
+.sim-shop-x { flex: none; margin-left: auto; width: 26px; height: 22px; padding: 0; font: inherit; font-size: 12px; color: var(--text); background: rgba(7, 6, 15, 0.5); border: 1px solid rgba(169, 162, 207, 0.4); cursor: pointer; }
+.sim-shop-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; }
+.sim-shop-list > li { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 3px 5px; background: rgba(11, 10, 26, 0.45); }
+.sim-shop-pic { flex: none; display: grid; place-items: center; width: 34px; height: 34px; background: rgba(7, 6, 15, 0.55); border: 1px solid rgba(169, 162, 207, 0.2); }
+.sim-shop-name { flex: 1; display: grid; min-width: 0; }
+.sim-shop-name b { font-weight: 400; font-size: 13px; }
+.sim-shop-name b em { font-style: normal; font-weight: 700; color: var(--gold); }
+.sim-shop-name small { color: var(--muted); font-size: 10px; }
+.sim-shop-clear { flex: none; padding: 0 4px; font-size: 10px; color: var(--edge); background: var(--gold); }
+.sim-buy { position: relative; flex: none; min-width: 56px; padding: 6px 8px; font: inherit; font-size: 13px; font-weight: 700; color: var(--edge); background: linear-gradient(180deg, #ffbf5e, var(--sunset)); border: var(--px) solid var(--edge); cursor: pointer; overflow: hidden; }
+.sim-buy:active { transform: translateY(1px); }
+.sim-buy:disabled { background: rgba(169, 162, 207, 0.2); color: var(--muted); }
+.sim-shop-list > li:first-child .sim-buy:not(:disabled)::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.6), transparent); animation: sim-shine 2.6s ease-in-out infinite; }
+.sim-shop-list > li.sim-bag-1 { box-shadow: inset 3px 0 0 #6f8fff; }
+.sim-shop-list > li.sim-bag-2 { box-shadow: inset 3px 0 0 #b478ff; }
+.sim-shop-list > li.sim-bag-3 { box-shadow: inset 3px 0 0 var(--gold); }
+.sim-shop-list > li.sim-bag-4 { box-shadow: inset 3px 0 0 #ff6b6b; }
+.sim-locked { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); gap: 3px; }
+.sim-locked li { position: relative; display: grid; place-items: center; height: 34px; background: rgba(7, 6, 15, 0.5); border: 1px dashed rgba(169, 162, 207, 0.25); }
+.sim-locked li .sim-pic { opacity: 0.42; filter: grayscale(1); }
+.sim-locked li small { position: absolute; right: 1px; bottom: 0; font-size: 8px; line-height: 1.2; color: var(--muted); }
+
+/* ---------------------------------------------------------------- 순위 */
+.sim-rank, .sim-king, .sim-earn, .sim-dex { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; padding: 7px 9px; }
+.sim-rank-row, .sim-king-row { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 7px; align-items: center; padding: 2px 0; font-size: 12px; }
+.sim-rank-row em, .sim-king-row em { grid-row: 1 / 3; display: grid; place-items: center; width: 18px; height: 18px; font-style: normal; font-size: 11px; color: var(--muted); background: rgba(11, 10, 26, 0.6); }
+.sim-rank-row > small { grid-column: 3; grid-row: 1; text-align: right; color: #c79bff; font-size: 11px; white-space: nowrap; }
+.sim-rank-row > b { grid-column: 2 / 4; grid-row: 2; font-size: 12px; font-weight: 400; color: var(--text); }
+.sim-rank-row > em { grid-column: 1; }
+.sim-rank-row > .sim-rank-who { grid-column: 2; grid-row: 1; }
+.sim-rank-who { min-width: 0; color: var(--muted); }
+.sim-rank-1 em { color: var(--edge); background: var(--gold); box-shadow: 0 0 6px rgba(255, 195, 92, 0.7); animation: sim-blink 2.4s ease-in-out infinite; }
+.sim-rank-2 em { color: var(--edge); background: #d8dbe8; }
+.sim-rank-3 em { color: var(--edge); background: #e0a070; }
+.sim-rank-1 > b { color: var(--gold); }
+.sim-rank-mine { background: rgba(111, 143, 255, 0.12); }
+.sim-king-row > b { font-size: 16px; color: var(--gold); text-align: right; text-shadow: 1px 1px 0 var(--edge); }
+.sim-king-row .sim-rank-who { color: var(--text); font-size: 13px; }
+.sim-king-parts { grid-column: 2 / 4; display: flex; flex-wrap: wrap; gap: 3px; }
+.sim-king-parts i { font-style: normal; font-size: 10px; padding: 0 4px; color: var(--muted); background: rgba(11, 10, 26, 0.5); }
+.sim-king .sim-rank-1 { background: linear-gradient(90deg, rgba(255, 195, 92, 0.16), transparent); }
+.sim-first-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; padding: 2px 0; font-size: 12px; border-bottom: 1px solid rgba(74, 63, 134, 0.3); }
+.sim-first-row small { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }
+.sim-first-row em { font-style: normal; color: #c79bff; }
+/* 강화 도감 */
+.sim-dex-strip { margin: 0; }
+.sim-dex-strip .mk-cats { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
+.sim-dex-strip .sub-tab small { margin-left: 3px; font-size: 10px; color: var(--muted); }
+.sim-dex-strip .sub-tab-on small { color: var(--edge); }
+.sim-dex-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 3px; }
+.sim-dex-grid li { position: relative; display: grid; justify-items: center; padding: 3px 2px 2px; background: rgba(11, 10, 26, 0.45); border: var(--px) solid var(--edge); }
+.sim-dex-grid li b { font-size: 11px; line-height: 1.2; color: var(--gold); }
+.sim-dex-grid li small { font-size: 8px; line-height: 1.2; color: var(--muted); }
+.sim-dex-pic { display: grid; place-items: center; width: 30px; height: 30px; }
+.sim-dex-none .sim-dex-pic { opacity: 0.22; filter: grayscale(1); }
+.sim-dex-none b { color: var(--muted); }
+.sim-dex-got.sim-aura-1 { border-color: #6f8fff; }
+.sim-dex-got.sim-aura-2 { border-color: #b478ff; }
+.sim-dex-got.sim-aura-3 { border-color: var(--gold); box-shadow: 0 0 6px rgba(255, 195, 92, 0.35); }
+.sim-dex-got.sim-aura-4 { border-color: #ff6b6b; box-shadow: 0 0 8px rgba(255, 107, 107, 0.4); }
+/* 코인 벌기: 두 칸씩 */
+.sim-earn-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; }
+.sim-earn-cell > span { line-height: 1.25; }
+.sim-earn-cell { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 6px; align-items: center; padding: 3px 6px; font-size: 11px; color: var(--text); text-decoration: none; background: rgba(11, 10, 26, 0.45); }
+a.sim-earn-cell { box-shadow: inset 2px 0 0 #7ee2a8; }
+a.sim-earn-cell:active { transform: translateY(1px); }
+.sim-earn-cell b { font-size: 12px; color: var(--gold); text-align: right; }
+.sim-earn-cell small { grid-column: 2; grid-row: 2; color: var(--muted); font-size: 9px; text-align: right; }
+.sim-earn-bar { grid-column: 1; grid-row: 2; display: block; height: 3px; background: rgba(169, 162, 207, 0.18); overflow: hidden; }
+.sim-earn-bar > i { display: block; height: 100%; background: #7ee2a8; transform-origin: left; transition: transform 0.3s ease-out; }
+.sim-earn-done { opacity: 0.4; }
+.sim-earn-streak b { color: #ffb24a; }
+.sim-earn-wait b { color: var(--muted); }
+
+/* ---------------------------------------------------------------- 접는 칸, 확률표, 1000개 */
+.sim-fold { padding: 0; }
+.sim-fold-h { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 6px 10px; font: inherit; color: var(--text); background: none; border: 0; cursor: pointer; }
+.sim-fold-h b { font-size: 12px; color: var(--muted); font-weight: 400; }
+.sim-fold-open .sim-fold-h b { color: var(--gold); }
+.sim-chev { width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform 0.18s ease-out; }
+.sim-fold-open .sim-chev { transform: rotate(225deg); }
+.sim-fold-b { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 0 10px 10px; animation: sim-drop 0.2s ease-out; }
+.sim-table { display: grid; grid-template-columns: minmax(0, 1fr); }
+.sim-th, .sim-tr { display: grid; grid-template-columns: 44px repeat(3, minmax(0, 1fr)); gap: 6px; align-items: center; font-size: 12px; }
+.sim-tr-3 { grid-template-columns: 44px repeat(2, minmax(0, 1fr)); }
+.sim-th { color: var(--muted); font-size: 10px; padding-bottom: 3px; border-bottom: 1px solid var(--hi); }
+.sim-th b { font-weight: 400; color: var(--gold); }
+.sim-th > :not(:first-child), .sim-tr > :not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.sim-tr { padding: 2px 0; border-bottom: 1px solid rgba(74, 63, 134, 0.3); }
+.sim-thousand { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.sim-thousand > .btn { padding: 6px; }
+.sim-thousand-res { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; animation: sim-drop 0.3s ease-out; }
+.sim-thousand-res > span { display: flex; align-items: baseline; justify-content: center; gap: 6px; }
+.sim-thousand-res small { color: var(--muted); font-size: 10px; }
+.sim-breakbars { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.sim-breakbars span { display: grid; grid-template-columns: 26px minmax(0, 1fr) 36px; gap: 6px; align-items: center; font-size: 11px; }
+.sim-breakbars em { font-style: normal; color: var(--muted); }
+.sim-breakbars i { display: block; height: 6px; width: var(--w); background: var(--red); transform-origin: left; animation: sim-bar 0.6s ease-out; }
+.sim-breakbars small { text-align: right; color: var(--muted); }
+@keyframes sim-bar { from { transform: scaleX(0); } }
+
+/* ---------------------------------------------------------------- 성장: 단계 칸 */
+.sim-anvil-grow .sim-rays { top: 70px; }
+.sim-steps { display: flex; justify-content: center; gap: 4px; }
+.sim-steps i { width: 20px; height: 7px; background: rgba(11, 10, 26, 0.6); border: 1px solid var(--hi); transform: skewX(-18deg); }
+.sim-steps i.on { background: linear-gradient(180deg, #fff1b8, var(--gold)); border-color: var(--gold); box-shadow: 0 0 6px rgba(255, 195, 92, 0.6); animation: sim-settle 0.3s ease-out; }
+.sim-steps i.next { border-color: var(--gold); animation: sim-blink 1.2s ease-in-out infinite; }
+
+/* ---------------------------------------------------------------- 고르기 목록 (옵션 아이템, 상자, 장신구·펫): 두 칸씩, 그림과 이름 */
+.sim-search { width: 100%; min-width: 0; padding: 6px 10px; font: inherit; font-size: 13px; color: var(--text); background: rgba(11, 10, 26, 0.55); border: var(--px) solid var(--edge); box-shadow: inset 0 0 0 1px rgba(169, 162, 207, 0.25); }
+.sim-search:focus { outline: none; box-shadow: inset 0 0 0 1px var(--gold); }
+.sim-search-row { display: flex; gap: 6px; align-items: center; }
+.sim-search-row .sim-shop-x { height: 30px; }
+.sim-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.sim-items > .sim-muted { grid-column: 1 / -1; padding: 16px 0; }
+.sim-pick { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 4px 5px; font: inherit; text-align: left; color: var(--text); background: var(--panel); border: var(--px) solid var(--edge); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05); cursor: pointer; transition: transform 80ms ease-out; }
+.sim-pick:active { transform: scale(0.96); }
+.sim-pick-on { box-shadow: inset 0 0 0 1px var(--gold); }
+.sim-pick-t { display: grid; min-width: 0; }
+.sim-pick-t b { font-size: 12px; font-weight: 400; line-height: 1.25; }
+.sim-pick-t small { color: var(--muted); font-size: 9px; line-height: 1.3; }
+.sim-pick-list { max-height: 340px; overflow-y: auto; scrollbar-width: thin; }
+
+/* ---------------------------------------------------------------- 옵션: 값 타일 */
+.sim-opt, .sim-box { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; padding: 8px 9px 9px; }
+.sim-opt-sr { box-shadow: inset 0 0 0 1px var(--gold), 0 0 14px rgba(255, 195, 92, 0.35); }
+.sim-opt-r { box-shadow: inset 0 0 0 1px #a877ff; }
+.sim-opt-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.sim-opt-head > b { flex: 1; min-width: 0; font-size: 14px; color: var(--gold); }
+.sim-back { flex: none; width: 26px; height: 26px; padding: 0; font: inherit; font-size: 11px; color: var(--text); background: rgba(7, 6, 15, 0.5); border: 1px solid rgba(169, 162, 207, 0.4); cursor: pointer; }
+.sim-back:active { transform: translateX(-2px); }
+.sim-luck { flex: none; padding: 0 7px; font-style: normal; font-size: 12px; font-weight: 700; background: rgba(7, 6, 15, 0.6); border: 1px solid currentColor; animation: sim-settle 0.4s 0.5s ease-out both; }
+.sim-luck.sim-t-sr { animation: sim-settle 0.4s 0.5s ease-out both, sim-blink 0.9s 1s ease-in-out infinite; }
+.sim-post { flex: none; font-size: 11px; color: #8cc4ff; text-decoration: none; white-space: nowrap; }
+.sim-oline { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; padding-top: 6px; border-top: 1px solid rgba(74, 63, 134, 0.4); }
+.sim-ohead { position: relative; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.sim-ohead .sim-sparks { top: 50%; left: 52px; }
+.sim-oname { font-size: 12px; color: var(--muted); }
+.sim-oval { font-size: 22px; line-height: 1; text-shadow: 2px 2px 0 var(--edge); font-variant-numeric: tabular-nums; animation: sim-land 0.45s cubic-bezier(0.2, 1.8, 0.4, 1); }
+.sim-rolling .sim-oval { color: #fff; animation: none; opacity: 0.75; }
+@keyframes sim-land { 0% { transform: scale(1.7); } 100% { transform: scale(1); } }
+.sim-otop { margin-left: auto; padding: 0 6px; font-size: 10px; border: 1px solid currentColor; animation: sim-drop 0.25s ease-out; }
+.sim-tiles { display: grid; gap: 3px; }
+.sim-tile { position: relative; display: grid; justify-items: center; min-width: 0; padding: 3px 0 2px; font: inherit; color: var(--text); background: rgba(11, 10, 26, 0.6); border: 1px solid rgba(169, 162, 207, 0.28); overflow: hidden; cursor: pointer; }
+.sim-tile > b, .sim-tile > small { position: relative; z-index: 1; }
+.sim-tile > b { font-size: 13px; line-height: 1.15; }
+.sim-tile > small { font-size: 9px; line-height: 1.2; color: var(--muted); letter-spacing: -0.3px; white-space: nowrap; }
+.sim-tile-fill { position: absolute; inset: 0; transform-origin: bottom; background: rgba(169, 162, 207, 0.2); }
+.sim-tile-u { border-color: rgba(111, 143, 255, 0.5); }
+.sim-tile-u .sim-tile-fill { background: rgba(111, 143, 255, 0.3); }
+.sim-tile-r { border-color: rgba(199, 155, 255, 0.6); }
+.sim-tile-r .sim-tile-fill { background: rgba(199, 155, 255, 0.34); }
+.sim-tile-r > b { color: #d9bcff; }
+.sim-tile-sr { border-color: rgba(255, 195, 92, 0.7); }
+.sim-tile-sr .sim-tile-fill { background: rgba(255, 195, 92, 0.4); }
+.sim-tile-sr > b { color: var(--gold); }
+/* 목표 값 이상인 타일: 아래 금색 줄 */
+.sim-tile-aim::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; z-index: 2; background: var(--gold); }
+/* 도는 불빛, 멈춘 자리 */
+.sim-tile-run { border-color: #fff; background: rgba(255, 255, 255, 0.28); }
+.sim-tile-run > b, .sim-tile-run > small { color: #fff; }
+.sim-tile-on { z-index: 1; border-color: #fff3c4; background: var(--gold); box-shadow: 0 0 0 1px var(--edge), 0 0 10px rgba(255, 195, 92, 0.9); animation: sim-tile-land 0.5s cubic-bezier(0.2, 1.8, 0.4, 1); }
+.sim-tile-on .sim-tile-fill { opacity: 0; }
+.sim-tile-on > b, .sim-tile-on > small { color: var(--edge); }
+.sim-tile-on::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 60%; z-index: 1; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.7), transparent); animation: sim-shine 2.4s ease-in-out infinite; }
+@keyframes sim-tile-land { 0% { transform: scale(1.45); } 60% { transform: scale(0.94); } 100% { transform: scale(1); } }
+.sim-tile:active { transform: scale(0.92); }
+/* 목표: − 값 + · 나올 때까지 */
+.sim-aim { display: flex; align-items: stretch; gap: 3px; min-width: 0; }
+.sim-aim .pill { display: grid; place-items: center; padding: 0 10px; }
+.sim-aim-t { flex: 1; display: grid; justify-items: center; align-content: center; min-width: 0; padding: 2px 8px; background: rgba(11, 10, 26, 0.5); }
+.sim-aim-t b { font-size: 12px; white-space: nowrap; }
+.sim-aim-t small { font-size: 10px; line-height: 1.2; }
+.sim-hunt { display: flex; align-items: baseline; justify-content: center; gap: 8px; margin: 0; animation: sim-land 0.4s cubic-bezier(0.2, 1.8, 0.4, 1); }
+.sim-hunt b { font-size: 18px; color: var(--gold); text-shadow: 2px 2px 0 var(--edge); }
+.sim-hunt small { color: var(--muted); font-size: 11px; }
+.sim-hunt-short b { color: var(--red); }
+
+/* ---------------------------------------------------------------- 뽑기: 상자, 카드, 나오는 것 */
+.sim-chest { position: relative; display: grid; justify-items: center; height: 92px; padding-top: 8px; overflow: hidden; }
+.sim-chest .sim-rays { position: absolute; top: 44px; opacity: 0.35; }
+.sim-chest-t { position: relative; display: grid; place-items: center; width: 64px; height: 64px; background: #100e24; border: var(--px) solid var(--hi); animation: sim-bob 2.6s ease-in-out infinite; }
+.sim-chest-t .sim-pic { width: 48px; height: 48px; }
+@keyframes sim-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+/* 그림이 없는 상자: 도트 상자 */
+.sim-chest-box { display: block; width: 38px; height: 30px; background: linear-gradient(180deg, #c9853a 0 34%, #5b2f10 34% 42%, #a8662b 42% 100%); box-shadow: 0 0 0 2px var(--edge), inset 0 0 0 2px rgba(255, 220, 150, 0.3); position: relative; }
+.sim-chest-box::after { content: ""; position: absolute; left: 50%; top: 30%; width: 8px; height: 10px; margin-left: -4px; background: var(--gold); box-shadow: 0 0 0 1px var(--edge); }
+.sim-chest .sim-floor { margin-top: 2px; }
+.sim-chest .sim-sparks { top: 40px; }
+.sim-chest.sim-charging .sim-chest-t { animation: sim-doki 0.3s ease-in-out infinite; border-color: #fff3c4; }
+@keyframes sim-doki { 0%, 100% { transform: scale(1) rotate(0); } 30% { transform: scale(1.1) rotate(-5deg); } 60% { transform: scale(0.97) rotate(5deg); } }
+.sim-chest-open .sim-chest-t { animation: sim-pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1); }
+.sim-chest-sr .sim-chest-t { border-color: var(--gold); box-shadow: 0 0 18px rgba(255, 195, 92, 0.9); }
+.sim-chest-r .sim-chest-t { border-color: #a877ff; box-shadow: 0 0 14px rgba(168, 119, 255, 0.8); }
+.sim-chest-u .sim-chest-t { border-color: var(--sapphire); }
+.sim-chest-sr .sim-rays { opacity: 0.9; background: repeating-conic-gradient(rgba(255, 220, 140, 0.5) 0 7deg, transparent 7deg 20deg); animation-duration: 9s; }
+.sim-chest-r .sim-rays { opacity: 0.7; background: repeating-conic-gradient(rgba(199, 155, 255, 0.4) 0 7deg, transparent 7deg 20deg); animation-duration: 16s; }
+.sim-chest-tag { position: absolute; top: 2px; left: 50%; z-index: 3; padding: 0 10px; font-size: 14px; color: var(--edge); background: var(--gold); border: var(--px) solid var(--edge); animation: sim-win 1.4s cubic-bezier(0.2, 1.4, 0.4, 1) forwards; }
+.sim-chest-r .sim-chest-tag { background: #c79bff; }
+.sim-until { display: flex; align-items: center; gap: 6px; width: 100%; padding: 6px 8px; text-align: left; font-size: 12px; }
+.sim-until small { flex: none; margin-left: auto; color: var(--gold); font-size: 11px; }
+.sim-pulls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.sim-card { position: relative; display: grid; grid-template-columns: 34px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 6px; align-items: center; padding: 4px 6px; font: inherit; font-size: 12px; text-align: left; color: var(--text);
+  background: rgba(11, 10, 26, 0.55); border: var(--px) solid var(--hi); overflow: hidden; opacity: 0; animation: sim-card 0.4s ease-out forwards; }
+button.sim-card { cursor: pointer; }
+.sim-card-on { outline: 2px solid var(--gold); outline-offset: 1px; }
+.sim-card-pic { grid-row: 1 / 3; display: grid; place-items: center; width: 34px; height: 34px; background: rgba(7, 6, 15, 0.5); }
+.sim-card-name { display: block; line-height: 1.25; overflow-wrap: anywhere; }
+.sim-card small { color: var(--muted); font-size: 10px; }
+.sim-card.sim-t-sr { border-color: var(--gold); box-shadow: 0 0 10px rgba(255, 195, 92, 0.5); }
+.sim-card.sim-t-r { border-color: #a877ff; }
+.sim-card.sim-t-u { border-color: var(--sapphire); }
+.sim-card.sim-t-sr::after, .sim-card.sim-t-r::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.35), transparent); animation: sim-shine 2.2s ease-in-out infinite; pointer-events: none; }
+@keyframes sim-card { 0% { opacity: 0; transform: translateY(10px) rotateX(70deg); } 100% { opacity: 1; transform: none; } }
+.sim-new { position: absolute; left: 0; top: 0; z-index: 1; padding: 0 4px; font-size: 9px; font-style: normal; font-weight: 700; color: var(--edge); background: #ff7ab8; animation: sim-blink 1s ease-in-out infinite; }
+.sim-tally { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); padding: 4px 6px; }
+.sim-trow { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto 30px; gap: 8px; align-items: center; width: 100%; padding: 3px 4px; font: inherit; font-size: 12px; text-align: left; color: var(--text); background: none; border: 0; border-bottom: 1px solid rgba(74, 63, 134, 0.3); cursor: pointer; overflow: hidden; }
+.sim-trow > :not(.sim-trow-bar) { position: relative; }
+.sim-trow-bar { position: absolute; inset: 0; transform-origin: left; background: currentColor; opacity: 0.1; }
+.sim-tname { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.sim-trow b { font-weight: 400; color: var(--text); font-variant-numeric: tabular-nums; }
+.sim-trow em { font-style: normal; font-size: 11px; color: var(--gold); text-align: right; font-variant-numeric: tabular-nums; }
+.sim-got { background: rgba(255, 195, 92, 0.07); }
+.sim-target { background: rgba(255, 195, 92, 0.16); box-shadow: inset 3px 0 0 var(--gold); }
+.sim-trow:active { transform: scale(0.98); }
+.sim-reset { justify-self: end; margin-top: 4px; width: 34px; padding: 2px 0; font: inherit; font-size: 14px; color: var(--muted); background: none; border: 1px solid rgba(169, 162, 207, 0.35); cursor: pointer; }
+
+/* ---------------------------------------------------------------- 보석 합성: 네 칸 */
+.sim-gems { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; padding: 8px; }
+.sim-gem { position: relative; display: grid; justify-items: center; align-content: start; gap: 2px; min-width: 0; padding: 4px 3px 5px; background: rgba(11, 10, 26, 0.5); border-top: 3px solid var(--hi); }
+.sim-gem-1 { border-top-color: #8a80ad; }
+.sim-gem-2 { border-top-color: #a877ff; }
+.sim-gem-3 { border-top-color: #4f7dff; }
+.sim-gem-4 { border-top-color: #5fe0e6; }
+.sim-gem:not(:last-child)::after { content: ""; position: absolute; right: -6px; top: 34px; z-index: 1; width: 5px; height: 5px; border-top: 2px solid var(--muted); border-right: 2px solid var(--muted); transform: rotate(45deg); animation: sim-blink 1.6s ease-in-out infinite; }
+.sim-gem-st { font-size: 9px; color: var(--muted); white-space: nowrap; }
+.sim-gem-pic { position: relative; display: grid; place-items: center; width: 36px; height: 36px; animation: sim-bob 2.8s ease-in-out infinite; }
+.sim-gem-2 .sim-gem-pic { animation-delay: 0.35s; }
+.sim-gem-3 .sim-gem-pic { animation-delay: 0.7s; }
+.sim-gem-4 .sim-gem-pic { animation-delay: 1.05s; }
+.sim-gem-pic .sim-sparks { top: 18px; }
+.sim-gem-zero .sim-gem-pic { opacity: 0.3; filter: grayscale(0.8); }
+.sim-gem-n { font-size: 18px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.sim-gem-hit .sim-gem-n { color: var(--gold); animation: sim-land 0.45s cubic-bezier(0.2, 1.8, 0.4, 1); }
+.sim-gem-hit .sim-gem-pic { animation: sim-pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1); }
+.sim-gem-hit { box-shadow: inset 0 0 0 1px var(--gold), 0 0 10px rgba(255, 195, 92, 0.4); }
+.sim-gem-same .sim-gem-pic { animation: sim-shake 0.4s ease-in-out; }
+.sim-gem-odds { width: 100%; height: 6px; }
+.sim-gem-pct { font-size: 9px; line-height: 1.2; color: var(--muted); }
+.sim-gem-go { width: 100%; padding: 4px 0; color: var(--edge); font-weight: 700; background: linear-gradient(180deg, #ffbf5e, var(--sunset)); border: var(--px) solid var(--edge); }
+.sim-gem .sim-max { font-size: 10px; padding: 0 6px; margin-top: 4px; }
+.sim-gem-dot { display: block; width: 22px; height: 22px; clip-path: polygon(30% 0, 70% 0, 100% 35%, 50% 100%, 0 35%); background: linear-gradient(160deg, #e9ffff 0 20%, #5fe0e6 35% 70%, #2a8f9a 100%); }
+.sim-gem-dot-1 { background: linear-gradient(160deg, #d6d0f0 0 20%, #6a6188 35% 70%, #3c3550 100%); }
+.sim-gem-dot-2 { background: linear-gradient(160deg, #f0d8ff 0 20%, #a877ff 35% 70%, #5e3a9e 100%); }
+.sim-gem-dot-3 { background: linear-gradient(160deg, #d8e4ff 0 20%, #4f7dff 35% 70%, #26409a 100%); }
+.sim-avgs { display: flex; justify-content: center; gap: 12px; animation: sim-drop 0.3s ease-out; }
+.sim-avgs > span { display: flex; align-items: center; gap: 4px; font-size: 13px; }
+.sim-avgs .sim-gem-dot { width: 14px; height: 14px; }
+
+/* ---------------------------------------------------------------- 옵션 재설정 창: 게임의 '원하는 옵션을 선택하세요' 화면 그대로 (제작자 2026-11-19 스샷, 자료 이미지/시뮬레이터/옵션_재설정_화면_20261119.webp) */
+.rs-back { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; padding: 24px 12px; background: rgba(6, 5, 18, 0.62); animation: rs-fade 0.15s ease-out; }
+@keyframes rs-fade { from { opacity: 0; } }
+.rs-wrap { position: relative; width: min(100%, 360px); animation: rs-in 0.28s cubic-bezier(0.2, 1.5, 0.4, 1); }
+@keyframes rs-in { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.rs-title { position: absolute; left: 50%; top: 0; z-index: 2; transform: translate(-50%, -50%); min-width: 62%; padding: 7px 18px; text-align: center; font-size: 15px; font-weight: 800; color: #fff;
+  background: linear-gradient(#6c6aa6, #4a477f); border: 3px solid #a9b4d4; border-radius: 14px; box-shadow: 0 0 0 2px #2c2a55; text-shadow: 0 1px 0 #2c2a55; white-space: nowrap; }
+.rs-frame { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 30px 14px 16px; color: #2b3150;
+  background: #e1e8f3; border: 3px solid #b6c2d9; border-radius: 10px; box-shadow: 0 0 0 2px #7d8aa8, inset 0 0 0 4px #eef3fa, inset 0 0 0 5px #b6c2d9; }
+.rs-rv { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #8f9bb9; box-shadow: inset 0 0 0 2px #cfd8ea; }
+.rs-tl { left: 7px; top: 7px; }
+.rs-tr { right: 7px; top: 7px; }
+.rs-bl { left: 7px; bottom: 7px; }
+.rs-br { right: 7px; bottom: 7px; }
+.rs-ask { margin: 0; text-align: center; font-size: 14px; font-weight: 700; }
+.rs-item { display: flex; align-items: center; justify-content: center; gap: 10px; min-width: 0; }
+.rs-icon { display: grid; place-items: center; flex: none; width: 52px; height: 52px; background: #eef3fb; border: 3px solid #8f9bb9; border-radius: 8px; box-shadow: 0 0 10px rgba(255, 255, 255, 0.9); }
+.rs-icon .sim-pic { width: 44px; height: 44px; }
+.rs-name { min-width: 0; font-size: 17px; font-weight: 800; color: #6cf23a;
+  text-shadow: -1.5px 0 #1d4a14, 1.5px 0 #1d4a14, 0 -1.5px #1d4a14, 0 1.5px #1d4a14, 1.5px 1.5px #1d4a14, -1.5px -1.5px #1d4a14, 1.5px -1.5px #1d4a14, -1.5px 1.5px #1d4a14; }
+.rs-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.rs-panel { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; overflow: hidden;
+  background: #e9eff8; border: 2px solid #8f9bb9; border-radius: 8px; box-shadow: 0 0 0 1px #d3dbea; transition: transform 80ms ease-out; }
+.rs-ph { display: block; padding: 6px 4px; text-align: center; font-size: 14px; font-weight: 800; color: #2b3150; background: #9db0c9; border-bottom: 2px solid #8f9bb9; }
+.rs-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; padding: 7px 12px; font-size: 14px; font-weight: 700; }
+.rs-row b { font-size: 15px; font-variant-numeric: tabular-nums; }
+/* 신규 옵션 값은 한 줄씩 톡 떨어진다 */
+.rs-panel:nth-child(2) .rs-row b { animation: sim-land 0.4s cubic-bezier(0.2, 1.8, 0.4, 1) both; }
+.rs-panel:nth-child(2) .rs-row:nth-child(2) b { animation-delay: 0.25s; }
+.rs-panel:nth-child(2) .rs-row:nth-child(3) b { animation-delay: 0.4s; }
+.rs-panel:nth-child(2) .rs-row:nth-child(4) b { animation-delay: 0.55s; }
+.rs-panel:nth-child(2) .rs-row:nth-child(n + 5) b { animation-delay: 0.7s; }
+.rs-panel:active { transform: scale(0.97); }
+.rs-on { border-color: #e0a526; box-shadow: 0 0 0 2px #ffd25c, 0 0 10px rgba(255, 190, 60, 0.7); }
+.rs-on .rs-ph { background: #e8c565; border-bottom-color: #e0a526; }
+.rs-ok { justify-self: center; width: min(62%, 190px); padding: 11px 0; font: inherit; font-size: 15px; font-weight: 800; color: #fff; cursor: pointer; background: #6a7497; border: 3px solid #4a5273; border-radius: 8px; box-shadow: inset 0 3px 0 #8791b3, 0 2px 0 #3a4160; }
+.rs-ok:active { transform: translateY(1px); }
+.rs-ok:disabled { opacity: 0.55; cursor: default; }
+@media (max-width: 360px) { .rs-row { padding: 6px 8px; font-size: 13px; } .rs-name { font-size: 15px; } }
+
+@media (max-width: 340px) {
+  .sim-tile > small { font-size: 8px; }
+  .sim-hud-chips .sim-title { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sim *, .sim *::before, .sim *::after, .sim-hud *, .sim-hud *::after, .sim-cheer, .rs-back, .rs-wrap, .rs-row b { animation: none !important; transition: none !important; }
+  .sim-card { opacity: 1; }
+  .sim-win, .sim-burst, .sim-tang, .sim-rays, .sim-hud-delta, .sim-chest-tag { display: none; }
+}
