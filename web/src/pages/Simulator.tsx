@@ -305,7 +305,6 @@ function Receipt({ log, best, tainted }: { log: LogRow[]; best: (lv: number) => 
   const start = log[0]?.[0] === 0 ? log[0] : undefined;
   const ev = log.map((m, i) => ({ m, p: log[i - 1], i })).filter((x) => x.m[0] > 0);
   const shown = all ? ev : ev.slice(-5);
-  const nth = (i: number) => ev.filter((x) => x.i <= i && x.m[0] === log[i][0]).length;
   return (
     <>
       <Ledger
@@ -318,11 +317,10 @@ function Receipt({ log, best, tainted }: { log: LogRow[]; best: (lv: number) => 
         rows={shown.map(({ m, p, i }) => {
           const b = tainted ? undefined : best(m[0]);
           const top = b !== undefined && m[3] <= b;
-          const k = nth(i);
           const seg = logSeg(p, m);
           return {
             k: i,
-            label: `+${m[0]}${k > 1 ? ` ·${k}` : ""}`,
+            label: `+${m[0]}`,
             seg,
             cum: [m[1], m[2], m[3]],
             best: top,
