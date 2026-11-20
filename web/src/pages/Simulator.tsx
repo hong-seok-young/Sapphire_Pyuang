@@ -1686,9 +1686,10 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
                 </Act>
               ) : (
                 <span className="sim-goal">
-                  <button type="button" className="pill" onClick={() => setGoal(Math.max(lv + 1, autoGoal - 1))} aria-label="목표 내리기">
+                  {/* 부서진 장비는 수리하면 +1 ~ 다시 정해져서 목표를 +1 까지 내린다 (제작자 2026-11-20 '파괴됐을 때 +8 자동에서 - + 버튼이 안 먹혀') */}
+                  <Act className="pill" lock={autoGoal - 1 < (broken ? 1 : lv + 1) && `+${autoGoal} 아래로는 못 내려요`} onClick={() => setGoal(autoGoal - 1)} aria-label="목표 내리기">
                     −
-                  </button>
+                  </Act>
                   <Act
                     className={"btn btn-ghost" + (auto ? " sim-running" : "")}
                     busy={!!charge}
@@ -1698,9 +1699,9 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
                     {auto ? "멈춤" : lv >= expMax ? "자동" : `+${autoGoal} 자동`}
                     {!auto && <Cost n={scrollCost(gear!)} per />}
                   </Act>
-                  <button type="button" className="pill" onClick={() => setGoal(Math.min(15, expMax, autoGoal + 1))} aria-label="목표 올리기">
+                  <Act className="pill" lock={autoGoal >= Math.min(15, expMax) && `자동은 직접 띄워 본 +${expMax} 까지만`} onClick={() => setGoal(autoGoal + 1)} aria-label="목표 올리기">
                     +
-                  </button>
+                  </Act>
                 </span>
               )}
           </div>
