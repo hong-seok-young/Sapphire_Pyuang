@@ -10,7 +10,7 @@ import { useEntryState } from "../router";
 import { BOX_CATS, atLeast, boxFor, boxesOf, expectedTo, gemBox, gemIdOf, gemKinds, gemSynth, optTitle, optionFor, optionSources, pick, repairItems, scrollsOf, stepsExpected, stepsOf, tierOf } from "../sim";
 import type { Box, Dist, OptItem, OptSource, Part, Scroll, Steps } from "../sim";
 import { FitLine, Loading, PicImg, TopBar } from "../ui";
-import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, statPrice, scrollCost, scrollGrade, gearOf, gearPower, gearStat, gearValue, repairCost, spendRun, startRun, beginRun, unlockCost, reachRun, repairSeg, RECEIPT_FROM } from "../simGear";
+import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, statPrice, scrollCost, scrollGrade, gearOf, gearPower, gearStat, gearValue, repairCost, spendRun, startRun, beginRun, unlockCost, reachRun, repairSeg, RECEIPT_FROM, fillRows } from "../simGear";
 import type { ArmorSlot, Gear, GearJob, Held } from "../simGear";
 import type { Wiki } from "../types";
 import { JOB_NAME } from "../auth";
@@ -1341,8 +1341,9 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
     const c = repairCost(g);
     if (!coins.has(c) || coins.take(c) < c) return false;
     const got = pick(repairDist.vals);
-    const fixed: Held = { ...h, lv: got.n, broken: false, ...(h.cost === undefined ? {} : { cost: h.cost + c }) };
-    setHeld({ ...fixed, seg: repairSeg(fixed, got.n) });
+    // 비용 칸이 없는 예전 장비는 수리부터 센다 (+0 부터 = 수리 값부터)
+    const fixed: Held = { ...h, lv: got.n, broken: false, ...(h.cost === undefined ? { cost: c, used: 0, broke: 0, noRank: true, seg: undefined } : { cost: h.cost + c }) };
+    setHeld({ ...fixed, seg: repairSeg(fixed, got.n, c) });
     setStats((s) => ({ ...s, coins: s.coins + c }));
     comboRef.current = 0;
     setCombo(0);
@@ -1419,7 +1420,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
       // 직접 눌러 닿은 강화도: 자동은 여기까지
       if (ok && manual) update((s) => raiseExp(s, `enh:${g.name}`, cur + 1));
       if (ok) {
-        heldRef.current = { ...h, ...run, lv: cur + 1, tries, ...reachRun(h, cur + 1, run, RECEIPT_FROM[scroll.part]) };
+        heldRef.current = { ...h, ...run, lv: cur + 1, tries, ...reachRun(h, cur + 1, run, RECEIPT_FROM[scroll.part], g) };
         setHeld(heldRef.current, scroll.part);
         const big = p < 0.35 || cur + 1 >= (scroll.part === "무기" ? 8 : 6);
         setFx((f) => ({ kind: "ok", n: (f?.n ?? 0) + 1, big }));
@@ -1578,7 +1579,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
               </span>
             )}
             {/* 성공 띠 (제작자 2026-11-20 E안): 직전 구간과 +0 부터의 마법서 · 파괴 · 코인 */}
-            {fx?.kind === "ok" && lv >= RECEIPT_FROM[part] && (held?.log?.[held.log.length - 1]?.length ?? 0) > 4 && held?.log?.[held.log.length - 1]?.[0] === lv && <WinBand key={`w${fx.n}`} log={held.log} />}
+            {fx?.kind === "ok" && lv >= RECEIPT_FROM[part] && (held?.log?.[held.log.length - 1]?.length ?? 0) > 4 && held?.log?.[held.log.length - 1]?.[0] === lv && <WinBand key={`w${fx.n}`} log={gear ? fillRows(held.log, gear) : held.log} />}
             <div key={fx?.n ?? 0} className={`sim-item${fx ? ` sim-fx-${fx.kind}` : ""}`}>
               {fx && fx.kind !== "keep" && fx.kind !== "buy" && <Sparks kind={fx.big ? "plus2" : fx.kind} n={fx.kind === "break" ? 16 : fx.big ? 24 : 10} />}
               <span className="sim-ring" aria-hidden />
@@ -1719,7 +1720,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
         </div>
       )}
       {/* 영수증 (제작자 2026-11-20 E안, 마법서 · 파괴 · 비용 칸과 결과 점 줄을 바꿈): 강화도마다 직전 구간과 +0 부터 */}
-      {held?.log && gear && <Receipt log={held.log.filter((r) => r.length > 4)} />}
+      {held?.log && gear && <Receipt log={fillRows(held.log.filter((r) => r.length > 4), gear)} />}
 
       {gear && (
         <RankBox

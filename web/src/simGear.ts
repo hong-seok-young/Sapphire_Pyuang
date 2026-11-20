@@ -185,21 +185,46 @@ export function startRun(g: Gear, prev: Held | null): Pick<Held, "cost" | "used"
 /** 비용 칸이 없는 예전 장비 (제작자 2026-11-20 '+8 자동강화 하는데 7강 떠도 기록이 안 된다'): 지금부터 센다. +0 부터는 모름 */
 export const beginRun = (h: Held): Held =>
   h.cost !== undefined ? h : { ...h, cost: 0, used: 0, broke: 0, noRank: true, seg: startAt({ st: {}, z: { [h.lv]: null } }, h.lv, [0, 0, 0]) };
-/** 수리로 강화도 lv 에 놓였다 (수리 값은 이미 cost 에) */
-export const repairSeg = (h: Held, lv: number): Seg | undefined => (h.cost === undefined ? h.seg : startAt(h.seg ?? seedSeg(h, lv), lv, tri(h)));
+/** 수리로 강화도 lv 에 놓였다 (수리 값 c 는 이미 cost 에): 여기서 다시 찍는 강화도의 +0 부터는 수리 값부터 새로 센다.
+ *  아직 처음 찍지 못한 더 높은 강화도의 구간(st)은 그대로 두어 그 강화도의 +0 부터에는 파괴·수리가 다 들어간다
+ *  (제작자 2026-11-20 '같은 7강이면 수리부터 새로고 8강이면 7강 파괴는 포함') */
+export const repairSeg = (h: Held, lv: number, c: number): Seg | undefined => {
+  if (h.cost === undefined) return h.seg;
+  const seg = h.seg ?? seedSeg(h, lv);
+  return startAt({ ...seg, z: { ...seg.z, [lv]: [0, 0, c] } }, lv, tri(h));
+};
 /** 이 셈 전에 산 장비: 지금까지 쓴 것을 지금 강화도의 +0 부터 값으로 잡고 이어 센다 */
 const seedSeg = (h: Held, lv: number): Seg => ({ st: {}, z: { [lv]: tri(h) } });
 /** 영수증에 적는 강화도: 늘 성공하는 칸(무기 +6·방어구 +4 까지)은 빼고 (제작자 2026-11-20) */
 export const RECEIPT_FROM: Record<Part, number> = { 무기: 7, 갑옷: 5 };
+/** +0 에서 강화도 k 까지 늘 성공하는 칸만 지나면 드는 비용 [마법서, 파괴, 코인] = 장비 값 + 마법서 k 장 (무기 +6·방어구 +4 까지만, 그 위는 모름).
+ *  비용을 세기 전에 산 장비의 +0 부터를 채운다 (제작자 2026-11-20 '0부터 6까진 비용이 정해져 있잖아, 한 번 파괴된 후부턴 수리 비용부터 세면 되고') */
+export const fixedTo = (g: Gear, k: number): Tri | null => (k >= 0 && k < RECEIPT_FROM[g.part] ? [k, 0, g.price + k * scrollCost(g)] : null);
+/** 구간 시작(st)의 +0 부터를 모를 때: 그 구간이 시작된 줄 = lv 를 마지막으로 찍은 뒤 처음 lv 를 찍은 줄 (lv+1 의 +0 부터에는 그 뒤 파괴·수리가 다 들어간다) */
+function firstZ(log: number[][], lv: number): Tri | null {
+  let i = log.length - 1;
+  while (i >= 0 && log[i][0] <= lv) i--;
+  const r = log.slice(i + 1).find((x) => x[0] === lv);
+  return r && r.length > 4 && r[4] >= 0 ? [r[4], r[5], r[6]] : null;
+}
+/** 예전에 +0 부터를 모른 채(-1) 적은 줄: 그 강화도를 처음 찍은 줄이고 직전 강화도가 늘 성공하는 칸이면 고정 비용 + 그 구간으로 채운다.
+ *  같은 강화도를 다시 찍은 줄은 수리부터 새로 세야 하는데 몇으로 수리됐는지 남아 있지 않아 그대로 둔다 */
+export const fillRows = (log: number[][], g: Gear): number[][] =>
+  log.map((r, i) => {
+    if (r.length <= 4 || r[4] >= 0 || log.slice(0, i).some((x) => x[0] >= r[0])) return r;
+    const f = fixedTo(g, r[0] - 1);
+    return f ? [r[0], r[1], r[2], r[3], f[0] + r[1], f[1] + r[2], f[2] + r[3]] : r;
+  });
 /** 강화도 lv 에 성공했다: 직전 강화도(lv-1)에 처음 닿은 뒤로 쓴 것이 이 구간, +0 부터 = 그때의 +0 부터 + 이 구간.
  *  기록하는 강화도면 한 줄 더한다 (같은 강화도를 다시 찍어도 따로, 40줄까지) */
-export function reachRun(h: Held, lv: number, run: Pick<Held, "cost" | "used" | "broke">, from: number): Pick<Held, "log" | "seg"> {
+export function reachRun(h: Held, lv: number, run: Pick<Held, "cost" | "used" | "broke">, from: number, g?: Gear): Pick<Held, "log" | "seg"> {
   if (run.cost === undefined) return {};
   const t = tri(run);
   const seg0 = h.seg ?? startAt(seedSeg(h, lv - 1), lv - 1, tri(h));
   const s = seg0.st[lv] ?? { t: tri(h), z: null };
   const d = sub(t, s.t);
-  const z = s.z ? add(s.z, d) : null;
+  const base = s.z ?? (g ? fixedTo(g, lv - 1) ?? firstZ(fillRows(newRows(h.log), g), lv - 1) : null);
+  const z = base ? add(base, d) : null;
   const st = { ...seg0.st };
   delete st[lv];
   const seg = startAt({ st, z: { ...seg0.z, [lv]: z } }, lv, t);
