@@ -146,15 +146,34 @@ export interface Held {
   cost?: number;
   used?: number;
   broke?: number;
+  /** 강화도마다 처음 닿은 때의 누적 [마법서, 부서진 수, 코인] (제작자 2026-11-20 '+7 가는 데 얼마, +8 까지 누적 얼마'). 0 은 산 때 */
+  marks?: Record<number, [number, number, number]>;
 }
 /** 부서진 장비 수리 값: 다시 사는 값의 1/4 (제작자 2026-11-19 '가격은 수리가 훨씬 저렴하게'), 적어도 1 */
 export const repairCost = (g: Gear) => Math.max(1, Math.round(g.price / 4));
 /** 속성 부여 장신구·펫 추가 옵션 펫의 구매 값 (제작자 2026-11-20 '속성부여도 다음 거 구매비용', '펫도 구매비용'): 장신구는 요구 레벨로 방어구 값과 같게, 펫은 펫 도감 차례가 뒤일수록 (2 ~ 23) */
 export const statPrice = (pet: boolean, i: number, lv: number) => (pet ? 2 + Math.round(Math.sqrt(i) * 1.2) : 1 + Math.round(lv ** 1.5 / 30));
 /** 새로 산 장비의 비용: 부서진 같은 장비를 다시 사는 것이면 이어서, 아니면 처음부터 */
-export function startRun(g: Gear, prev: Held | null): Pick<Held, "cost" | "used" | "broke"> {
+export function startRun(g: Gear, prev: Held | null): Pick<Held, "cost" | "used" | "broke" | "marks"> {
   const go = prev && prev.broken && prev.name === g.name && prev.cost !== undefined;
-  return go ? { cost: prev.cost! + g.price, used: prev.used ?? 0, broke: prev.broke ?? 0 } : { cost: g.price, used: 0, broke: 0 };
+  return go
+    ? { cost: prev.cost! + g.price, used: prev.used ?? 0, broke: prev.broke ?? 0, marks: prev.marks }
+    : { cost: g.price, used: 0, broke: 0, marks: { 0: [0, 0, g.price] } };
+}
+/** 영수증에 적는 강화도: 늘 성공하는 칸(무기 +6·방어구 +4 까지)은 빼고 (제작자 2026-11-20) */
+export const RECEIPT_FROM: Record<Part, number> = { 무기: 7, 갑옷: 5 };
+/** 처음 닿은 강화도를 적는다 */
+export const markRun = (h: Held, lv: number, run: Pick<Held, "cost" | "used" | "broke">): Held["marks"] =>
+  run.cost === undefined || h.marks?.[lv] ? h.marks : { ...(h.marks ?? {}), [lv]: [run.used ?? 0, run.broke ?? 0, run.cost] };
+/** 강화도 lv 의 직전 구간 [마법서, 파괴, 코인]과 그 앞 강화도 (없으면 null) */
+export function segmentOf(marks: NonNullable<Held["marks"]>, lv: number): { from: number; d: [number, number, number] } | null {
+  const m = marks[lv];
+  if (!m) return null;
+  const prev = Object.keys(marks).map(Number).filter((k) => k < lv);
+  if (!prev.length) return null;
+  const from = Math.max(...prev);
+  const p = marks[from];
+  return { from, d: [m[0] - p[0], m[1] - p[1], m[2] - p[2]] };
 }
 /** 마법서 한 장(값 c 코인)을 쓴 뒤의 비용 (broke 면 부서진 수도) */
 export const spendRun = (h: Held, broke = false, c = 1): Pick<Held, "cost" | "used" | "broke"> =>
