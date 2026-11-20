@@ -10,7 +10,7 @@ import { useEntryState } from "../router";
 import { BOX_CATS, atLeast, boxFor, boxesOf, expectedTo, gemBox, gemIdOf, gemKinds, gemSynth, optTitle, optionFor, optionSources, pick, repairItems, scrollsOf, stepsExpected, stepsOf, tierOf } from "../sim";
 import type { Box, Dist, OptItem, OptSource, Part, Scroll, Steps } from "../sim";
 import { FitLine, Loading, PicImg, TopBar } from "../ui";
-import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, statPrice, scrollCost, scrollGrade, gearOf, gearPower, gearStat, gearValue, repairCost, spendRun, startRun, unlockCost, reachRun, repairSeg, RECEIPT_FROM } from "../simGear";
+import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, statPrice, scrollCost, scrollGrade, gearOf, gearPower, gearStat, gearValue, repairCost, spendRun, startRun, beginRun, unlockCost, reachRun, repairSeg, RECEIPT_FROM } from "../simGear";
 import type { ArmorSlot, Gear, GearJob, Held } from "../simGear";
 import type { Wiki } from "../types";
 import { JOB_NAME } from "../auth";
@@ -1368,7 +1368,8 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
 
   const tryOnce = useCallback(
     (forced?: boolean, manual = false): boolean => {
-      const h = heldRef.current;
+      const h0 = heldRef.current;
+      const h = h0 && !h0.broken ? beginRun(h0) : h0;
       const g = h && gears.find((x) => x.part === scroll.part && x.name === h.name);
       if (!h || !g || h.broken) return false;
       const cur = h.lv;
@@ -1387,7 +1388,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
       }
       // 비용 순위: 위험한 강화에 성공하면 그 강화도까지 쓴 코인을 내 최저 기록과 견주어, 더 적게 썼을 때만 보낸다
       const run = spendRun(h, false, sc);
-      if (ok && p < 1 && !h.tainted && run.cost !== undefined) {
+      if (ok && p < 1 && !h.tainted && !h.noRank && run.cost !== undefined) {
         const key = upGame(g.name, scroll.name, cur + 1, evOn);
         const cost = run.cost;
         const used = run.used ?? tries;

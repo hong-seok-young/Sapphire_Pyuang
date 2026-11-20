@@ -151,6 +151,8 @@ export interface Held {
   log?: number[][];
   /** 구간 셈: st[l] = 강화도 l-1 에 처음 닿았을 때의 누적과 그때의 +0 부터 값 (l 에 닿으면 지운다), z[l] = 마지막으로 l 에 닿았을 때의 +0 부터 값 */
   seg?: Seg;
+  /** 비용을 세기 전에 산 장비를 중간부터 센 것: 비용 순위에는 보내지 않는다 (+0 부터를 모른다) */
+  noRank?: boolean;
 }
 /** 부서진 장비 수리 값: 다시 사는 값의 1/4 (제작자 2026-11-19 '가격은 수리가 훨씬 저렴하게'), 적어도 1 */
 export const repairCost = (g: Gear) => Math.max(1, Math.round(g.price / 4));
@@ -172,14 +174,17 @@ function startAt(seg: Seg, lv: number, t: Tri): Seg {
 /** 예전 판(+0 부터 누적만 적던 줄)은 버린다 */
 const newRows = (log: Held["log"]) => (log ?? []).filter((r) => r.length > 4);
 /** 새로 산 장비의 비용: 부서진 같은 장비를 다시 사는 것이면 이어서, 아니면 처음부터 */
-export function startRun(g: Gear, prev: Held | null): Pick<Held, "cost" | "used" | "broke" | "log" | "seg"> {
+export function startRun(g: Gear, prev: Held | null): Pick<Held, "cost" | "used" | "broke" | "log" | "seg" | "noRank"> {
   const go = prev && prev.broken && prev.name === g.name && prev.cost !== undefined;
   const z0: Tri = [0, 0, g.price];
   if (!go) return { cost: g.price, used: 0, broke: 0, log: [], seg: startAt({ st: {}, z: { 0: z0 } }, 0, z0) };
   const run = { cost: prev.cost! + g.price, used: prev.used ?? 0, broke: prev.broke ?? 0 };
   const seg = prev.seg ? { ...prev.seg, z: { ...prev.seg.z, 0: z0 } } : { st: {}, z: { 0: z0 } };
-  return { ...run, log: newRows(prev.log), seg: startAt(seg, 0, tri(run)) };
+  return { ...run, log: newRows(prev.log), seg: startAt(seg, 0, tri(run)), ...(prev.noRank ? { noRank: true } : {}) };
 }
+/** 비용 칸이 없는 예전 장비 (제작자 2026-11-20 '+8 자동강화 하는데 7강 떠도 기록이 안 된다'): 지금부터 센다. +0 부터는 모름 */
+export const beginRun = (h: Held): Held =>
+  h.cost !== undefined ? h : { ...h, cost: 0, used: 0, broke: 0, noRank: true, seg: startAt({ st: {}, z: { [h.lv]: null } }, h.lv, [0, 0, 0]) };
 /** 수리로 강화도 lv 에 놓였다 (수리 값은 이미 cost 에) */
 export const repairSeg = (h: Held, lv: number): Seg | undefined => (h.cost === undefined ? h.seg : startAt(h.seg ?? seedSeg(h, lv), lv, tri(h)));
 /** 이 셈 전에 산 장비: 지금까지 쓴 것을 지금 강화도의 +0 부터 값으로 잡고 이어 센다 */
