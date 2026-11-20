@@ -10,7 +10,7 @@ import { useEntryState } from "../router";
 import { BOX_CATS, atLeast, boxFor, boxesOf, expectedTo, gemBox, gemIdOf, gemKinds, gemSynth, optTitle, optionFor, optionSources, pick, repairItems, scrollsOf, stepsExpected, stepsOf, tierOf } from "../sim";
 import type { Box, Dist, OptItem, OptSource, Part, Scroll, Steps } from "../sim";
 import { FitLine, Loading, PicImg, TopBar } from "../ui";
-import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, statPrice, scrollCost, scrollGrade, gearOf, gearPower, gearStat, gearValue, repairCost, spendRun, startRun, unlockCost, markRun, segmentOf, RECEIPT_FROM } from "../simGear";
+import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, statPrice, scrollCost, scrollGrade, gearOf, gearPower, gearStat, gearValue, repairCost, spendRun, startRun, unlockCost, markRun, markRepair, segmentOf, RECEIPT_FROM } from "../simGear";
 import type { ArmorSlot, Gear, GearJob, Held } from "../simGear";
 import type { Wiki } from "../types";
 import { JOB_NAME } from "../auth";
@@ -1349,7 +1349,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
     const c = repairCost(g);
     if (!coins.has(c) || coins.take(c) < c) return false;
     const got = pick(repairDist.vals);
-    setHeld({ ...h, lv: got.n, broken: false, ...(h.cost === undefined ? {} : { cost: h.cost + c }) });
+    setHeld({ ...h, lv: got.n, broken: false, ...(h.cost === undefined ? {} : { cost: h.cost + c, marks: markRepair(h, got.n, h.cost + c) }) });
     setStats((s) => ({ ...s, coins: s.coins + c }));
     comboRef.current = 0;
     setCombo(0);

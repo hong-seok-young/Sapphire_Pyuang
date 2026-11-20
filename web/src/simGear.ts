@@ -146,7 +146,7 @@ export interface Held {
   cost?: number;
   used?: number;
   broke?: number;
-  /** 강화도마다 처음 닿은 때의 누적 [마법서, 부서진 수, 코인] (제작자 2026-11-20 '+7 가는 데 얼마, +8 까지 누적 얼마'). 0 은 산 때 */
+  /** 강화도마다 마지막으로 닿은 때의 누적 [마법서, 부서진 수, 코인] (제작자 2026-11-20 '+7 가는 데 얼마, +8 까지 누적 얼마'). 0 은 산 때 */
   marks?: Record<number, [number, number, number]>;
 }
 /** 부서진 장비 수리 값: 다시 사는 값의 1/4 (제작자 2026-11-19 '가격은 수리가 훨씬 저렴하게'), 적어도 1 */
@@ -157,14 +157,20 @@ export const statPrice = (pet: boolean, i: number, lv: number) => (pet ? 2 + Mat
 export function startRun(g: Gear, prev: Held | null): Pick<Held, "cost" | "used" | "broke" | "marks"> {
   const go = prev && prev.broken && prev.name === g.name && prev.cost !== undefined;
   return go
-    ? { cost: prev.cost! + g.price, used: prev.used ?? 0, broke: prev.broke ?? 0, marks: prev.marks }
+    ? { cost: prev.cost! + g.price, used: prev.used ?? 0, broke: prev.broke ?? 0, marks: { 0: [prev.used ?? 0, prev.broke ?? 0, prev.cost! + g.price] } }
     : { cost: g.price, used: 0, broke: 0, marks: { 0: [0, 0, g.price] } };
 }
 /** 영수증에 적는 강화도: 늘 성공하는 칸(무기 +6·방어구 +4 까지)은 빼고 (제작자 2026-11-20) */
 export const RECEIPT_FROM: Record<Part, number> = { 무기: 7, 갑옷: 5 };
-/** 처음 닿은 강화도를 적는다 */
+/** 닿은 강화도를 적는다: 부서져 다시 올라오면 그때 값으로 바꾼다 (제작자 2026-11-20 '파괴된 후에 또 7강 했는데 왜 그 기록으로 계속 뜨지') */
 export const markRun = (h: Held, lv: number, run: Pick<Held, "cost" | "used" | "broke">): Held["marks"] =>
-  run.cost === undefined || h.marks?.[lv] ? h.marks : { ...(h.marks ?? {}), [lv]: [run.used ?? 0, run.broke ?? 0, run.cost] };
+  run.cost === undefined ? h.marks : { ...(h.marks ?? {}), [lv]: [run.used ?? 0, run.broke ?? 0, run.cost] };
+/** 수리로 강화도가 lv 로 내려가면: 그 위 기록은 지우고(다시 닿으면 새로 적는다) 수리한 자리를 적는다 */
+export const markRepair = (h: Held, lv: number, cost: number): Held["marks"] => {
+  if (h.cost === undefined) return h.marks;
+  const m = Object.fromEntries(Object.entries(h.marks ?? {}).filter(([k]) => Number(k) < lv)) as NonNullable<Held["marks"]>;
+  return { ...m, [lv]: [h.used ?? 0, h.broke ?? 0, cost] };
+};
 /** 강화도 lv 의 직전 구간 [마법서, 파괴, 코인]과 그 앞 강화도 (없으면 null) */
 export function segmentOf(marks: NonNullable<Held["marks"]>, lv: number): { from: number; d: [number, number, number] } | null {
   const m = marks[lv];
