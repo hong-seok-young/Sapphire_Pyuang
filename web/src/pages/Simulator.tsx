@@ -1354,37 +1354,38 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
             )}
           </section>
 
-          {broken && !auto ? (
-            // 부서지면 수리만 (제작자 2026-11-20 '수리가 재구매보다 무조건 싸잖아, 재구매를 없애는 게'). 다른 장비는 위 '바꾸기'
-            <div className={"sim-actions " + (repairDist ? "sim-actions-1" : "sim-actions-2")}>
+          {/* 강화 · 수리 · 자동을 한 줄에 (제작자 2026-11-20 '강화 자동수리 자동강화 수리 이런 게 한 행에서'). 다른 장비는 위 '바꾸기' */}
+          <div className="sim-actions sim-actions-enh">
+              <Act
+                className={"btn" + (broken ? " btn-ghost" : " sim-go")}
+                busy={auto || !!charge}
+                lock={broken ? "부서졌어요 · 수리 먼저" : !(p > 0) ? "더 올릴 수 없어요" : (coins.coins ?? 0) < scrollCost(gear!) && NO_COIN}
+                onClick={press}
+              >
+                강화 <small className="sim-grade">{scrollGrade(gear!.lv)}</small>
+                <Cost n={scrollCost(gear!)} />
+              </Act>
               {repairDist ? (
-                <Act className="btn sim-go" busy={coins.coins === null} lock={(coins.coins ?? 0) < repairCost(gear!) && NO_COIN} onClick={repair}>
+                <Act
+                  className={"btn" + (broken ? " sim-go" : " btn-ghost")}
+                  busy={auto || !!charge || coins.coins === null}
+                  lock={!broken ? "부서지면 수리해요" : (coins.coins ?? 0) < repairCost(gear!) && NO_COIN}
+                  onClick={repair}
+                >
                   수리
                   <Cost n={repairCost(gear!)} />
                 </Act>
               ) : (
-                <>
-                  <Act
-                    className="btn sim-go"
-                    busy={coins.coins === null}
-                    lock={!buyable(gear!) ? `앞 장비 +${CLEAR_LV[part]} 먼저` : (coins.coins ?? 0) < gear!.price && NO_COIN}
-                    onClick={() => buy(gear!)}
-                  >
-                    다시 사기
-                    <Cost n={gear!.price} />
-                  </Act>
-                  <button type="button" className="btn btn-ghost" onClick={() => setShop(true)}>
-                    다른 장비
-                  </button>
-                </>
+                <Act
+                  className={"btn" + (broken ? " sim-go" : " btn-ghost")}
+                  busy={auto || !!charge || coins.coins === null}
+                  lock={!broken ? "부서지면 다시 사요" : !buyable(gear!) ? `앞 장비 +${CLEAR_LV[part]} 먼저` : (coins.coins ?? 0) < gear!.price && NO_COIN}
+                  onClick={() => buy(gear!)}
+                >
+                  다시 사기
+                  <Cost n={gear!.price} />
+                </Act>
               )}
-            </div>
-          ) : (
-            <div className="sim-actions sim-actions-enh">
-              <Act className="btn sim-go" busy={auto || !!charge} lock={!(p > 0) ? "더 올릴 수 없어요" : (coins.coins ?? 0) < scrollCost(gear!) && NO_COIN} onClick={press}>
-                강화 <small className="sim-grade">{scrollGrade(gear!.lv)}</small>
-                <Cost n={scrollCost(gear!)} />
-              </Act>
               {!autoOn ? (
                 <Act className="btn btn-ghost sim-unlock" busy={unlocking || coins.coins === null} lock={(coins.coins ?? 0) < unlockCost(gear!, "auto") && `자동 강화 해금 · ${NO_COIN}`} onClick={() => doUnlock(autoKey, unlockCost(gear!, "auto"))}>
                   자동 해금
@@ -1409,8 +1410,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
                   </button>
                 </span>
               )}
-            </div>
-          )}
+          </div>
         </>
       )}
 

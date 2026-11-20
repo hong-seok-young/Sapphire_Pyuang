@@ -232,7 +232,12 @@
 .sim-actions-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .sim-actions-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
 .sim-actions-w { width: 100%; }
-.sim-actions-enh { grid-template-columns: minmax(0, 1fr) auto; }
+.sim-actions-enh { grid-template-columns: minmax(min-content, 1fr) minmax(min-content, 1fr) auto; }
+.sim-actions-enh .btn { padding-left: 3px; padding-right: 3px; }
+.sim-actions-enh .btn small { margin-left: 3px; }
+.sim-actions-enh { gap: 4px; }
+.sim-actions-enh .sim-goal { gap: 2px; }
+.sim-actions-enh .sim-goal .pill { padding: 0 4px; }
 .sim-actions-grow { display: flex; }
 .sim-actions-grow > .sim-go { flex: 1.4; }
 .sim-actions-opt { grid-template-columns: minmax(0, 1fr) auto; }
