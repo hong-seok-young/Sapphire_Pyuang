@@ -809,3 +809,4 @@ button.sim-rcpt-g { padding: 0; border: 0; background: none; color: inherit; fon
 .sim-rcpt-open .sim-rcpt-bestchip { color: #2f8a4f; border-color: #9cc7a8; }
 @media (prefers-reduced-motion: reduce) { .sim-band, .sim-band::after { animation: none; } }
 .sim-rcpt [aria-expanded="true"] .sim-chev { transform: rotate(-135deg); }
+.sim-rcpt-more { display: block; margin: -4px 0 12px auto; padding: 2px 4px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 11px; cursor: pointer; }

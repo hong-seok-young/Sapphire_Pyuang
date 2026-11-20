@@ -10,7 +10,7 @@ import { useEntryState } from "../router";
 import { BOX_CATS, atLeast, boxFor, boxesOf, expectedTo, gemBox, gemIdOf, gemKinds, gemSynth, optTitle, optionFor, optionSources, pick, repairItems, scrollsOf, stepsExpected, stepsOf, tierOf } from "../sim";
 import type { Box, Dist, OptItem, OptSource, Part, Scroll, Steps } from "../sim";
 import { FitLine, Loading, PicImg, TopBar } from "../ui";
-import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, statPrice, scrollCost, scrollGrade, gearOf, gearPower, gearStat, gearValue, repairCost, spendRun, startRun, unlockCost, markRun, markRepair, segmentOf, RECEIPT_FROM } from "../simGear";
+import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, statPrice, scrollCost, scrollGrade, gearOf, gearPower, gearStat, gearValue, repairCost, spendRun, startRun, unlockCost, logRun, RECEIPT_FROM } from "../simGear";
 import type { ArmorSlot, Gear, GearJob, Held } from "../simGear";
 import type { Wiki } from "../types";
 import { JOB_NAME } from "../auth";
@@ -197,22 +197,29 @@ function RunLine({ d }: { d: [number, number, number] }) {
     </span>
   );
 }
-/** 강화 성공 띠: '+8 성공', 직전 구간, +0 부터 */
-function WinBand({ lv, marks }: { lv: number; marks: NonNullable<Held["marks"]> }) {
-  const seg = segmentOf(marks, lv);
-  const m = marks[lv];
+type LogRow = [number, number, number, number];
+/** 기록 한 줄의 앞 기록과의 차이 [마법서, 파괴, 코인] */
+const logSeg = (p: LogRow | undefined, m: LogRow): [number, number, number] => (p ? [m[1] - p[1], m[2] - p[2], m[3] - p[3]] : [m[1], m[2], m[3]]);
+/** 앞 기록 이름: 산 때면 '+0', 같거나 높은 강화도에서 다시 올라온 것이면 '다시' */
+const fromName = (p: LogRow | undefined, lv: number) => (!p || p[0] === 0 ? "+0" : p[0] >= lv ? `지난 +${p[0]}` : `+${p[0]}`);
+/** 강화 성공 띠: '+8 성공', 지난 기록 뒤로 든 것, +0 부터 (제작자 2026-11-20 E안, '찍을 때마다 각각') */
+function WinBand({ log }: { log: LogRow[] }) {
+  const m = log[log.length - 1];
+  const p = log[log.length - 2];
   return (
     <div className="sim-band" role="status">
-      <b>+{lv} 성공</b>
-      {seg && (
+      <b>+{m[0]} 성공</b>
+      {p && p[0] > 0 && (
         <div className="sim-band-ln">
-          <i>+{seg.from} → +{lv}</i>
-          <RunLine d={seg.d} />
+          <i>
+            {fromName(p, m[0])} → +{m[0]}
+          </i>
+          <RunLine d={logSeg(p, m)} />
         </div>
       )}
       <div className="sim-band-ln">
-        <i>+0 → +{lv}</i>
-        <RunLine d={m} />
+        <i>+0 → +{m[0]}</i>
+        <RunLine d={[m[1], m[2], m[3]]} />
       </div>
     </div>
   );
@@ -292,59 +299,60 @@ function SegChip({ from, to, unit, d, cur, bad = -1 }: { from: string; to: strin
     </span>
   );
 }
-/** 강화 영수증: 강화도마다 직전 구간과 +0 부터의 마법서 · 파괴 · 코인. 줄을 누르면 구간별 */
-function Receipt({ marks, from, best, tainted }: { marks: NonNullable<Held["marks"]>; from: number; best: (lv: number) => number | undefined; tainted: boolean }) {
-  const keys = Object.keys(marks).map(Number).sort((a, b) => a - b);
-  const rows = keys.filter((k) => k >= from);
-  // 구간별: 늘 성공하는 칸은 +0 부터 한 덩어리, 그 뒤는 강화도마다
-  const steps = (lv: number) => {
-    const pts = [0, ...keys.filter((k) => k > 0 && k < from).slice(-1), ...rows.filter((k) => k <= lv)].filter((k) => marks[k]);
-    return pts.slice(1).map((k, i) => {
-      const a = marks[pts[i]], m = marks[k];
-      return [pts[i], k, [m[0] - a[0], m[1] - a[1], m[2] - a[2]]] as [number, number, number[]];
-    });
-  };
+/** 강화 영수증: 기록하는 강화도에 닿을 때마다 한 줄 (제작자 2026-11-20 '+7 찍을 때마다 각각 기록'). 줄마다 지난 기록 뒤로 든 것과 +0 부터. 최근 5줄, 더 있으면 '모두' */
+function Receipt({ log, best, tainted }: { log: LogRow[]; best: (lv: number) => number | undefined; tainted: boolean }) {
+  const [all, setAll] = useState(false);
+  const start = log[0]?.[0] === 0 ? log[0] : undefined;
+  const ev = log.map((m, i) => ({ m, p: log[i - 1], i })).filter((x) => x.m[0] > 0);
+  const shown = all ? ev : ev.slice(-5);
+  const nth = (i: number) => ev.filter((x) => x.i <= i && x.m[0] === log[i][0]).length;
   return (
-    <Ledger
-      g1="직전 구간"
-      g2="+0 부터"
-      cols={["마법서", "파괴", "코인"]}
-      coin={2}
-      bad={1}
-      rows={rows.map((lv) => {
-        const seg = segmentOf(marks, lv);
-        const m = marks[lv];
-        const b = tainted ? undefined : best(lv);
-        const top = b !== undefined && m[2] <= b;
-        return {
-          k: lv,
-          label: `+${lv}`,
-          seg: seg ? seg.d : null,
-          cum: m,
-          best: top,
-          chips: (
-            <>
-              {marks[0] && (
-                <span>
-                  장비 <i className="sim-c" aria-hidden />
-                  {marks[0][2].toLocaleString()}
-                </span>
-              )}
-              {steps(lv).map(([f, k, d]) => (
-                <SegChip key={k} from={`+${f}`} to={`+${k}`} unit="장" d={d} bad={1} cur={k === lv} />
-              ))}
-              {b !== undefined && (
-                <span className="sim-rcpt-bestchip">
-                  내 최저 <i className="sim-c" aria-hidden />
-                  {b.toLocaleString()}
-                  {top ? " ✓" : ""}
-                </span>
-              )}
-            </>
-          ),
-        };
-      })}
-    />
+    <>
+      <Ledger
+        g1="지난 기록 뒤"
+        g2="+0 부터"
+        cols={["마법서", "파괴", "코인"]}
+        coin={2}
+        bad={1}
+        lab={44}
+        rows={shown.map(({ m, p, i }) => {
+          const b = tainted ? undefined : best(m[0]);
+          const top = b !== undefined && m[3] <= b;
+          const k = nth(i);
+          const seg = logSeg(p, m);
+          return {
+            k: i,
+            label: `+${m[0]}${k > 1 ? ` ·${k}` : ""}`,
+            seg,
+            cum: [m[1], m[2], m[3]],
+            best: top,
+            chips: (
+              <>
+                {start && (
+                  <span>
+                    장비 <i className="sim-c" aria-hidden />
+                    {start[3].toLocaleString()}
+                  </span>
+                )}
+                <SegChip from={fromName(p, m[0])} to={`+${m[0]}`} unit="장" d={seg} bad={1} cur />
+                {b !== undefined && (
+                  <span className="sim-rcpt-bestchip">
+                    내 최저 <i className="sim-c" aria-hidden />
+                    {b.toLocaleString()}
+                    {top ? " ✓" : ""}
+                  </span>
+                )}
+              </>
+            ),
+          };
+        })}
+      />
+      {ev.length > 5 && (
+        <button type="button" className="sim-rcpt-more" onClick={() => setAll(!all)}>
+          {all ? "최근 5줄만" : `모두 보기 · ${ev.length}줄`}
+        </button>
+      )}
+    </>
   );
 }
 /** 속성 부여·펫: 단계 영수증 (marks: 단계 -> 누적 [시도, 코인], 0 = 시작) */
@@ -1349,7 +1357,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
     const c = repairCost(g);
     if (!coins.has(c) || coins.take(c) < c) return false;
     const got = pick(repairDist.vals);
-    setHeld({ ...h, lv: got.n, broken: false, ...(h.cost === undefined ? {} : { cost: h.cost + c, marks: markRepair(h, got.n, h.cost + c) }) });
+    setHeld({ ...h, lv: got.n, broken: false, ...(h.cost === undefined ? {} : { cost: h.cost + c }) });
     setStats((s) => ({ ...s, coins: s.coins + c }));
     comboRef.current = 0;
     setCombo(0);
@@ -1425,7 +1433,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
       // 직접 눌러 닿은 강화도: 자동은 여기까지
       if (ok && manual) update((s) => raiseExp(s, `enh:${g.name}`, cur + 1));
       if (ok) {
-        heldRef.current = { ...h, ...run, lv: cur + 1, tries, marks: markRun(h, cur + 1, run) };
+        heldRef.current = { ...h, ...run, lv: cur + 1, tries, log: logRun(h, cur + 1, run, RECEIPT_FROM[scroll.part]) };
         setHeld(heldRef.current, scroll.part);
         const big = p < 0.35 || cur + 1 >= (scroll.part === "무기" ? 8 : 6);
         setFx((f) => ({ kind: "ok", n: (f?.n ?? 0) + 1, big }));
@@ -1584,7 +1592,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
               </span>
             )}
             {/* 성공 띠 (제작자 2026-11-20 E안): 직전 구간과 +0 부터의 마법서 · 파괴 · 코인 */}
-            {fx?.kind === "ok" && held?.marks?.[lv] && lv >= RECEIPT_FROM[part] && <WinBand key={`w${fx.n}`} lv={lv} marks={held.marks} />}
+            {fx?.kind === "ok" && lv >= RECEIPT_FROM[part] && held?.log?.[held.log.length - 1]?.[0] === lv && <WinBand key={`w${fx.n}`} log={held.log} />}
             <div key={fx?.n ?? 0} className={`sim-item${fx ? ` sim-fx-${fx.kind}` : ""}`}>
               {fx && fx.kind !== "keep" && fx.kind !== "buy" && <Sparks kind={fx.big ? "plus2" : fx.kind} n={fx.kind === "break" ? 16 : fx.big ? 24 : 10} />}
               <span className="sim-ring" aria-hidden />
@@ -1618,7 +1626,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
                   실패
                 </b>
               )}
-              {fx?.kind === "ok" && fx.big && !(held?.marks?.[lv] && lv >= RECEIPT_FROM[part]) && (
+              {fx?.kind === "ok" && fx.big && !(lv >= RECEIPT_FROM[part] && held?.log?.[held.log.length - 1]?.[0] === lv) && (
                 <b key={`w${fx.n}`} className="sim-win" aria-hidden>
                   +{lv}
                 </b>
@@ -1724,7 +1732,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
         </div>
       )}
       {/* 영수증 (제작자 2026-11-20 E안, 마법서 · 파괴 · 비용 칸과 결과 점 줄을 바꿈): 강화도마다 직전 구간과 +0 부터 */}
-      {held?.marks && gear && <Receipt marks={held.marks} from={RECEIPT_FROM[part]} best={(l) => save.cost?.[upGame(gear.name, scroll.name, l, evOn)]?.[0]} tainted={held.tainted} />}
+      {held?.log && gear && <Receipt log={held.log} best={(l) => save.cost?.[upGame(gear.name, scroll.name, l, evOn)]?.[0]} tainted={held.tainted} />}
 
       {gear && (
         <RankBox

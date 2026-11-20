@@ -146,40 +146,27 @@ export interface Held {
   cost?: number;
   used?: number;
   broke?: number;
-  /** 강화도마다 마지막으로 닿은 때의 누적 [마법서, 부서진 수, 코인] (제작자 2026-11-20 '+7 가는 데 얼마, +8 까지 누적 얼마'). 0 은 산 때 */
-  marks?: Record<number, [number, number, number]>;
+  /** 영수증 기록 (제작자 2026-11-20 '+7 찍을 때마다 각각 기록, 8도 마찬가지'): 기록하는 강화도(무기 +7·방어구 +5 부터)에 닿을 때마다 한 줄 [강화도, 마법서, 파괴, 코인] (모두 +0 부터 누적). 첫 줄 = 산 때 [0, 0, 0, 장비 값] */
+  log?: [number, number, number, number][];
 }
 /** 부서진 장비 수리 값: 다시 사는 값의 1/4 (제작자 2026-11-19 '가격은 수리가 훨씬 저렴하게'), 적어도 1 */
 export const repairCost = (g: Gear) => Math.max(1, Math.round(g.price / 4));
 /** 속성 부여 장신구·펫 추가 옵션 펫의 구매 값 (제작자 2026-11-20 '속성부여도 다음 거 구매비용', '펫도 구매비용'): 장신구는 요구 레벨로 방어구 값과 같게, 펫은 펫 도감 차례가 뒤일수록 (2 ~ 23) */
 export const statPrice = (pet: boolean, i: number, lv: number) => (pet ? 2 + Math.round(Math.sqrt(i) * 1.2) : 1 + Math.round(lv ** 1.5 / 30));
 /** 새로 산 장비의 비용: 부서진 같은 장비를 다시 사는 것이면 이어서, 아니면 처음부터 */
-export function startRun(g: Gear, prev: Held | null): Pick<Held, "cost" | "used" | "broke" | "marks"> {
+export function startRun(g: Gear, prev: Held | null): Pick<Held, "cost" | "used" | "broke" | "log"> {
   const go = prev && prev.broken && prev.name === g.name && prev.cost !== undefined;
   return go
-    ? { cost: prev.cost! + g.price, used: prev.used ?? 0, broke: prev.broke ?? 0, marks: { 0: [prev.used ?? 0, prev.broke ?? 0, prev.cost! + g.price] } }
-    : { cost: g.price, used: 0, broke: 0, marks: { 0: [0, 0, g.price] } };
+    ? { cost: prev.cost! + g.price, used: prev.used ?? 0, broke: prev.broke ?? 0, log: prev.log }
+    : { cost: g.price, used: 0, broke: 0, log: [[0, 0, 0, g.price]] };
 }
 /** 영수증에 적는 강화도: 늘 성공하는 칸(무기 +6·방어구 +4 까지)은 빼고 (제작자 2026-11-20) */
 export const RECEIPT_FROM: Record<Part, number> = { 무기: 7, 갑옷: 5 };
-/** 닿은 강화도를 적는다: 부서져 다시 올라오면 그때 값으로 바꾼다 (제작자 2026-11-20 '파괴된 후에 또 7강 했는데 왜 그 기록으로 계속 뜨지') */
-export const markRun = (h: Held, lv: number, run: Pick<Held, "cost" | "used" | "broke">): Held["marks"] =>
-  run.cost === undefined ? h.marks : { ...(h.marks ?? {}), [lv]: [run.used ?? 0, run.broke ?? 0, run.cost] };
-/** 수리로 강화도가 lv 로 내려가면: 그 위 기록은 지우고(다시 닿으면 새로 적는다) 수리한 자리를 적는다 */
-export const markRepair = (h: Held, lv: number, cost: number): Held["marks"] => {
-  if (h.cost === undefined) return h.marks;
-  const m = Object.fromEntries(Object.entries(h.marks ?? {}).filter(([k]) => Number(k) < lv)) as NonNullable<Held["marks"]>;
-  return { ...m, [lv]: [h.used ?? 0, h.broke ?? 0, cost] };
-};
-/** 강화도 lv 의 직전 구간 [마법서, 파괴, 코인]과 그 앞 강화도 (없으면 null) */
-export function segmentOf(marks: NonNullable<Held["marks"]>, lv: number): { from: number; d: [number, number, number] } | null {
-  const m = marks[lv];
-  if (!m) return null;
-  const prev = Object.keys(marks).map(Number).filter((k) => k < lv);
-  if (!prev.length) return null;
-  const from = Math.max(...prev);
-  const p = marks[from];
-  return { from, d: [m[0] - p[0], m[1] - p[1], m[2] - p[2]] };
+/** 기록하는 강화도에 닿으면 한 줄 더한다 (같은 강화도를 다시 찍어도 따로, 첫 줄(산 때)은 남기고 40줄까지) */
+export function logRun(h: Held, lv: number, run: Pick<Held, "cost" | "used" | "broke">, from: number): Held["log"] {
+  if (run.cost === undefined || lv < from) return h.log;
+  const a = [...(h.log ?? []), [lv, run.used ?? 0, run.broke ?? 0, run.cost] as [number, number, number, number]];
+  return a.length > 40 ? [a[0], ...a.slice(-39)] : a;
 }
 /** 마법서 한 장(값 c 코인)을 쓴 뒤의 비용 (broke 면 부서진 수도) */
 export const spendRun = (h: Held, broke = false, c = 1): Pick<Held, "cost" | "used" | "broke"> =>
