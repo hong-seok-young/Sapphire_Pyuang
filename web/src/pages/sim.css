@@ -253,7 +253,8 @@
 .sim-mini:active { transform: translateY(1px); }
 .sim-mini:disabled { opacity: 0.35; }
 .sim-mini.sim-sell { color: var(--gold); border-color: rgba(255, 195, 92, 0.5); }
-.sim-mini.sim-sell-sure { color: var(--edge); }
+.sim-mini.sim-sell-sure { color: var(--edge); background: var(--gold); border-color: var(--gold); }
+.sim-mini.sim-sell-sure small { color: var(--edge); }
 .sim-take { color: var(--edge); background: var(--gold); border-color: var(--edge); }
 
 /* ---------------------------------------------------------------- 숫자 띠, 결과 점 */
