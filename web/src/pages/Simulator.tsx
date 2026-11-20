@@ -18,7 +18,7 @@ import type { Me } from "../auth";
 import { Nick } from "../kakao";
 import { CoinCtx, SpaceCtx, fetchBoard, luckOf, reachWithin, sendFeed, sendPromo, sendRecord, stepsWithin, upGame, useCoinState, useCoins, useRecord, weekGame } from "../simRank";
 import type { Board, Cat, CoinState, FeedRow, SimRec, Space } from "../simRank";
-import { BAG_MAX, SaveCtx, addGems, addOwned, expOf, gemOf, ownedGear, raiseExp, useKept, useSave, useSaveState } from "../simState";
+import { BAG_MAX, SaveCtx, addGems, addOwned, expOf, gemOf, ownedGear, raiseExp, useKept, useSave, useSaveState, GEM_V } from "../simState";
 import type { SimSave } from "../simState";
 import { QuestCtx, kstDay, todayQuests, useQuest } from "../simQuest";
 import type { SimEvent } from "../simQuest";
@@ -217,90 +217,275 @@ function WinBand({ lv, marks }: { lv: number; marks: NonNullable<Held["marks"]> 
     </div>
   );
 }
-/** 영수증: 강화도마다 직전 구간과 +0 부터의 마법서 · 파괴 · 코인. 줄을 누르면 구간별 */
-function Receipt({ marks, from, best, tainted }: { marks: NonNullable<Held["marks"]>; from: number; best: (lv: number) => number | undefined; tainted: boolean }) {
-  const [open, setOpen] = useState<number | null>(null);
-  const keys = Object.keys(marks).map(Number).sort((a, b) => a - b);
-  const rows = keys.filter((k) => k >= from);
+/** 영수증 한 줄: 직전 구간(seg)과 처음부터(cum), 누르면 chips */
+interface LedgerRow {
+  k: number | string;
+  label: string;
+  seg: number[] | null;
+  cum: number[];
+  best?: boolean;
+  chips?: React.ReactNode;
+}
+/** 영수증 (제작자 2026-11-20 E안): 줄마다 직전 구간과 처음부터. coin 은 코인 칸 번호, bad 는 붉게 셀 칸(파괴) 번호. 줄을 누르면 구간별 */
+function Ledger({ g1, g2, cols, coin, bad = -1, lab = 34, rows }: { g1: string; g2: string; cols: string[]; coin: number; bad?: number; lab?: number; rows: LedgerRow[] }) {
+  const [open, setOpen] = useState<number | string | null>(null);
   if (!rows.length) return null;
   const n = (v: number) => v.toLocaleString();
+  const cell = (v: number | undefined, i: number, cum: boolean, best = false) => (
+    <span key={`${cum ? "c" : "s"}${i}`} className={(cum ? "sim-rcpt-cum" : "") + (i === bad && v ? " sim-bad" : "") + (best && i === coin ? " sim-rcpt-best" : "")}>
+      {v === undefined ? (
+        "-"
+      ) : (
+        <>
+          {i === coin && <i className="sim-c" aria-hidden />}
+          {n(v)}
+        </>
+      )}
+    </span>
+  );
+  return (
+    <div className="sim-rcpt" style={{ ["--n" as string]: cols.length, ["--lab" as string]: `${lab}px` }}>
+      <div className="sim-rcpt-g sim-rcpt-top">
+        <span />
+        <span className="sim-rcpt-grp">{g1}</span>
+        <span />
+        <span className="sim-rcpt-grp">{g2}</span>
+        <span />
+      </div>
+      <div className="sim-rcpt-g sim-rcpt-sub">
+        <span />
+        {cols.map((c) => (
+          <span key={`a${c}`}>{c}</span>
+        ))}
+        <span />
+        {cols.map((c) => (
+          <span key={`b${c}`}>{c}</span>
+        ))}
+        <span />
+      </div>
+      {rows.map((r, i) => {
+        const on = open === r.k;
+        return (
+          <div key={r.k} className={"sim-rcpt-row" + (i === rows.length - 1 ? " sim-rcpt-now" : "")}>
+            <button type="button" className="sim-rcpt-g" aria-expanded={r.chips ? on : undefined} onClick={() => r.chips && setOpen(on ? null : r.k)}>
+              <b>{r.label}</b>
+              {cols.map((_, j) => cell(r.seg?.[j], j, false))}
+              <span />
+              {cols.map((_, j) => cell(r.cum[j], j, true, r.best))}
+              {r.chips ? <i className="sim-chev" aria-hidden /> : <span />}
+            </button>
+            {on && r.chips && <div className="sim-rcpt-open">{r.chips}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+/** 한 구간 칩: '+6→+7 · 7장 · 파괴1 · 11' */
+function SegChip({ from, to, unit, d, cur, bad = -1 }: { from: string; to: string; unit: string; d: number[]; cur?: boolean; bad?: number }) {
+  return (
+    <span className={cur ? "sim-rcpt-cur" : ""}>
+      {from}→{to} · {d[0].toLocaleString()}
+      {unit}
+      {bad >= 0 && d[bad] ? <> · <em className="sim-bad">파괴{d[bad]}</em></> : null} · <i className="sim-c" aria-hidden />
+      {d[d.length - 1].toLocaleString()}
+    </span>
+  );
+}
+/** 강화 영수증: 강화도마다 직전 구간과 +0 부터의 마법서 · 파괴 · 코인. 줄을 누르면 구간별 */
+function Receipt({ marks, from, best, tainted }: { marks: NonNullable<Held["marks"]>; from: number; best: (lv: number) => number | undefined; tainted: boolean }) {
+  const keys = Object.keys(marks).map(Number).sort((a, b) => a - b);
+  const rows = keys.filter((k) => k >= from);
   // 구간별: 늘 성공하는 칸은 +0 부터 한 덩어리, 그 뒤는 강화도마다
   const steps = (lv: number) => {
     const pts = [0, ...keys.filter((k) => k > 0 && k < from).slice(-1), ...rows.filter((k) => k <= lv)].filter((k) => marks[k]);
     return pts.slice(1).map((k, i) => {
       const a = marks[pts[i]], m = marks[k];
-      return [pts[i], k, [m[0] - a[0], m[1] - a[1], m[2] - a[2]]] as [number, number, [number, number, number]];
+      return [pts[i], k, [m[0] - a[0], m[1] - a[1], m[2] - a[2]]] as [number, number, number[]];
     });
   };
   return (
-    <div className="sim-rcpt">
-      <div className="sim-rcpt-g sim-rcpt-top">
-        <span />
-        <span className="sim-rcpt-grp">직전 구간</span>
-        <span />
-        <span className="sim-rcpt-grp">+0 부터</span>
-        <span />
-      </div>
-      <div className="sim-rcpt-g sim-rcpt-sub">
-        <span />
-        <span>마법서</span>
-        <span>파괴</span>
-        <span>코인</span>
-        <span />
-        <span>마법서</span>
-        <span>파괴</span>
-        <span>코인</span>
-        <span />
-      </div>
-      {rows.map((lv, i) => {
+    <Ledger
+      g1="직전 구간"
+      g2="+0 부터"
+      cols={["마법서", "파괴", "코인"]}
+      coin={2}
+      bad={1}
+      rows={rows.map((lv) => {
         const seg = segmentOf(marks, lv);
         const m = marks[lv];
         const b = tainted ? undefined : best(lv);
         const top = b !== undefined && m[2] <= b;
-        const on = open === lv;
-        return (
-          <div key={lv} className={"sim-rcpt-row" + (i === rows.length - 1 ? " sim-rcpt-now" : "")}>
-            <button type="button" className="sim-rcpt-g" aria-expanded={on} onClick={() => setOpen(on ? null : lv)}>
-              <b>+{lv}</b>
-              <span>{seg ? n(seg.d[0]) : "-"}</span>
-              <span className={seg?.d[1] ? "sim-bad" : ""}>{seg ? n(seg.d[1]) : "-"}</span>
-              <span>{seg ? <><i className="sim-c" aria-hidden />{n(seg.d[2])}</> : "-"}</span>
-              <span />
-              <span className="sim-rcpt-cum">{n(m[0])}</span>
-              <span className={m[1] ? "sim-bad" : ""}>{n(m[1])}</span>
-              <span className={"sim-rcpt-cum" + (top ? " sim-rcpt-best" : "")}>
-                <i className="sim-c" aria-hidden />
-                {n(m[2])}
-              </span>
-              <i className="sim-chev" aria-hidden />
-            </button>
-            {on && (
-              <div className="sim-rcpt-open">
-                {marks[0] && (
-                  <span>
-                    장비 <i className="sim-c" aria-hidden />
-                    {n(marks[0][2])}
-                  </span>
-                )}
-                {steps(lv).map(([f, k, d]) => (
-                  <span key={k} className={k === lv ? "sim-rcpt-cur" : ""}>
-                    +{f}→+{k} · {n(d[0])}장{d[1] ? <> · <em className="sim-bad">파괴{d[1]}</em></> : null} · <i className="sim-c" aria-hidden />
-                    {n(d[2])}
-                  </span>
-                ))}
-                {b !== undefined && (
-                  <span className="sim-rcpt-bestchip">
-                    내 최저 <i className="sim-c" aria-hidden />
-                    {n(b)}
-                    {top ? " ✓" : ""}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        );
+        return {
+          k: lv,
+          label: `+${lv}`,
+          seg: seg ? seg.d : null,
+          cum: m,
+          best: top,
+          chips: (
+            <>
+              {marks[0] && (
+                <span>
+                  장비 <i className="sim-c" aria-hidden />
+                  {marks[0][2].toLocaleString()}
+                </span>
+              )}
+              {steps(lv).map(([f, k, d]) => (
+                <SegChip key={k} from={`+${f}`} to={`+${k}`} unit="장" d={d} bad={1} cur={k === lv} />
+              ))}
+              {b !== undefined && (
+                <span className="sim-rcpt-bestchip">
+                  내 최저 <i className="sim-c" aria-hidden />
+                  {b.toLocaleString()}
+                  {top ? " ✓" : ""}
+                </span>
+              )}
+            </>
+          ),
+        };
       })}
+    />
+  );
+}
+/** 속성 부여·펫: 단계 영수증 (marks: 단계 -> 누적 [시도, 코인], 0 = 시작) */
+function statSteps(marks: Record<number, [number, number]>) {
+  const keys = Object.keys(marks).map(Number).sort((a, b) => a - b);
+  return keys.slice(1).map((k, i) => {
+    const a = marks[keys[i]], m = marks[k];
+    return { from: keys[i], to: k, d: [m[0] - a[0], m[1] - a[1]], cum: m };
+  });
+}
+function StatLedger({ marks, unit, best, max }: { marks: Record<number, [number, number]>; unit: (k: number) => string; best?: number; max: number }) {
+  const steps = statSteps(marks);
+  const base = marks[0]?.[1] ?? 0;
+  return (
+    <Ledger
+      g1="직전 단계"
+      g2="처음부터"
+      cols={["시도", "코인"]}
+      coin={1}
+      lab={50}
+      rows={steps.map((x, i) => ({
+        k: x.to,
+        label: unit(x.to),
+        seg: x.d,
+        cum: x.cum,
+        best: x.to >= max && best !== undefined && x.cum[1] <= best,
+        chips: (
+          <>
+            {base > 0 && (
+              <span>
+                구매 <i className="sim-c" aria-hidden />
+                {base}
+              </span>
+            )}
+            {steps.slice(0, i + 1).map((y) => (
+              <SegChip key={y.to} from={y.from ? unit(y.from) : "0"} to={unit(y.to)} unit="번" d={y.d} cur={y.to === x.to} />
+            ))}
+            {x.to >= max && best !== undefined && (
+              <span className="sim-rcpt-bestchip">
+                내 최저 <i className="sim-c" aria-hidden />
+                {best}
+                {x.cum[1] <= best ? " ✓" : ""}
+              </span>
+            )}
+          </>
+        ),
+      }))}
+    />
+  );
+}
+/** 속성 부여·펫 완성 띠 */
+function StatBand({ title, marks, max, unit }: { title: string; marks: Record<number, [number, number]>; max: number; unit: (k: number) => string }) {
+  const st = statSteps(marks);
+  const last = st.find((x) => x.to === max);
+  const m = marks[max];
+  const line = (d: number[]) => (
+    <span>
+      시도 {d[0].toLocaleString()} · <u><i className="sim-c" aria-hidden />{d[1].toLocaleString()}</u>
+    </span>
+  );
+  return (
+    <div className="sim-band" role="status">
+      <b>{title}</b>
+      {last && (
+        <div className="sim-band-ln">
+          <i>
+            {last.from ? unit(last.from) : "0"} → {unit(max)}
+          </i>
+          {line(last.d)}
+        </div>
+      )}
+      <div className="sim-band-ln">
+        <i>0 → {unit(max)}</i>
+        {line(m)}
+      </div>
     </div>
+  );
+}
+/** 보석 합성 영수증: 2 ~ 4단계를 처음 만들 때까지 */
+function GemLedger({ marks }: { marks: Record<number, [number, number]> }) {
+  const steps = statSteps(marks);
+  const unit = (k: number) => (k ? `${k}단계` : "시작");
+  return (
+    <Ledger
+      g1="직전 단계"
+      g2="처음부터"
+      cols={["합성", "코인"]}
+      coin={1}
+      lab={50}
+      rows={steps.map((x, i) => ({
+        k: x.to,
+        label: unit(x.to),
+        seg: x.d,
+        cum: x.cum,
+        chips: (
+          <>
+            {steps.slice(0, i + 1).map((y) => (
+              <SegChip key={y.to} from={unit(y.from)} to={unit(y.to)} unit="번" d={y.d} cur={y.to === x.to} />
+            ))}
+          </>
+        ),
+      }))}
+    />
+  );
+}
+/** 옵션 재설정 영수증: 옵션마다 드문 값이 처음 나올 때까지의 재설정 · 코인 (한 번에 1코인) */
+function OptLedger({ item, led }: { item: OptItem; led: { runs: number; rows: [number, number, number][] } }) {
+  const name = (i: number, n: number) => {
+    const d = item.opts[i];
+    const v = d?.vals.find((x) => x.n === n)?.v ?? String(n);
+    const top = d ? Math.max(...d.vals.map((x) => x.n)) : n;
+    return `${d?.label ?? ""} ${v}${n < top ? "↑" : ""}`;
+  };
+  const rows = led.rows.map((r, idx) => {
+    const prev = [...led.rows.slice(0, idx)].reverse().find((x) => x[0] === r[0]);
+    const seg = r[2] - (prev?.[2] ?? 0);
+    return { r, prev, seg };
+  });
+  return (
+    <Ledger
+      g1="직전 기록"
+      g2="처음부터"
+      cols={["재설정", "코인"]}
+      coin={1}
+      lab={92}
+      rows={rows.map(({ r, seg }, idx) => ({
+        k: idx,
+        label: name(r[0], r[1]),
+        seg: [seg, seg],
+        cum: [r[2], r[2]],
+        chips: (
+          <>
+            {rows
+              .filter((x, j) => j <= idx && x.r[0] === r[0])
+              .map((x, j) => (
+                <SegChip key={j} from={x.prev ? name(x.prev[0], x.prev[1]) : "처음"} to={name(x.r[0], x.r[1])} unit="번" d={[x.seg, x.seg]} cur={x.r === r} />
+              ))}
+          </>
+        ),
+      }))}
+    />
   );
 }
 function Cost({ n, per = false, avg = false }: { n: number; per?: boolean; avg?: boolean }) {
@@ -1791,6 +1976,10 @@ function StatInner(p: {
   const { save, update } = useSave();
   // 처음부터 센 시도 (순위): 단계와 함께 진행 상황에 두어 다시 열어도 이어서 센다
   const since = useRef(save.stat?.[st.key]?.since ?? 0);
+  // 영수증: 이번 물건에 쓴 코인과 단계마다 처음 닿은 때 (제작자 2026-11-20 '속성부여 쪽도 이렇게')
+  const spent = useRef(save.stat?.[st.key]?.spent ?? 0);
+  const marks = useRef<Record<number, [number, number]>>(save.stat?.[st.key]?.marks ?? (since.current ? {} : { 0: [0, 0] }));
+  const [, bump] = useState(0);
   const emit = useQuest();
   const expStage = expOf(save, `stat:${st.key}`);
   const cap = Math.min(st.max, expStage);
@@ -1824,14 +2013,20 @@ function StatInner(p: {
   }, [item?.name, itemOwned]);
   const buyItem = () => {
     if (!item || itemOwned || !coins.has(price) || coins.take(price) < price) return;
+    spent.current = price;
+    marks.current = { 0: [0, price] };
+    since.current = 0;
     update((s) => raiseExp(s, ownKey(item.name), 1));
+    keep(st.key, kept({ stage: 0, type: null, since: 0, item: item.name }));
     if (itemName !== item.name) setItemName(item.name);
     setFx(() => ({ kind: "buy", n: Date.now() % 100000 }));
   };
   const found = pq.trim() ? filterByName(picks, pq, (x) => [x.name]) : picks;
   const tip = useTip();
   useBackClose(picking, () => setPicking(false));
-  const keep = (key: string, v: { stage: number; type: string | null; since: number; item?: string }) => update((s) => ({ ...s, stat: { ...s.stat, [key]: v } }));
+  type StatKeep = NonNullable<SimSave["stat"]>[string];
+  const keep = (key: string, v: StatKeep) => update((s) => ({ ...s, stat: { ...s.stat, [key]: { ...v, best: v.best ?? s.stat?.[key]?.best } } }));
+  const kept = (v: Omit<StatKeep, "marks" | "spent">): StatKeep => ({ ...v, marks: marks.current, spent: spent.current });
   // 단계·펫 옵션이 바뀌거나 한 번 시도할 때마다 적는다 (처음 그릴 때는 그대로)
   const firstKeep = useRef(true);
   useEffect(() => {
@@ -1839,7 +2034,7 @@ function StatInner(p: {
       firstKeep.current = false;
       return;
     }
-    keep(st.key, { stage, type: p.type, since: since.current, item: itemName || undefined });
+    keep(st.key, kept({ stage, type: p.type, since: since.current, item: itemName || undefined }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [st.key, stage, p.type, p.stats.tries, itemName]);
   const reset = () => {
@@ -1849,7 +2044,9 @@ function StatInner(p: {
     setFx(() => null);
     setAuto(false);
     since.current = 0;
-    keep(st.key, { stage: 0, type: null, since: 0, item: itemName || undefined });
+    spent.current = 0;
+    marks.current = { 0: [0, 0] };
+    keep(st.key, kept({ stage: 0, type: null, since: 0, item: itemName || undefined }));
   };
   // 다른 표로 바꾸면 그 표에서 하던 단계로 (예전에는 늘 0 부터)
   const load = (key: string) => {
@@ -1860,6 +2057,8 @@ function StatInner(p: {
     setFx(() => null);
     setAuto(false);
     since.current = k?.since ?? 0;
+    spent.current = k?.spent ?? 0;
+    marks.current = k?.marks ?? (since.current ? {} : { 0: [0, 0] });
     setItemName(k?.item ?? "");
     setPicking(false);
   };
@@ -1871,6 +2070,8 @@ function StatInner(p: {
     setType(null);
     setAuto(false);
     since.current = 0;
+    spent.current = 0;
+    marks.current = { 0: [0, 0] };
   };
   // 끝 단계에 닿으면 끝낸 것으로 적고, 잠깐 보여 준 뒤 다음 차례로 넘어간다
   const nextItem = picks[idx + 1] ?? null;
@@ -1896,6 +2097,7 @@ function StatInner(p: {
       return;
     }
     since.current++;
+    spent.current++;
     const r = Math.random();
     const up = r < s.b ? 2 : r < s.a + s.b ? 1 : 0;
     setStats((x) => ({ tries: x.tries + 1, ok: x.ok + (up ? 1 : 0), big: x.big + (up === 2 ? 1 : 0) }));
@@ -1903,6 +2105,14 @@ function StatInner(p: {
       const to = Math.min(st.max, cur + up);
       stageRef.current = to;
       setStage(to);
+      if (!marks.current[to]) marks.current = { ...marks.current, [to]: [since.current, spent.current] };
+      if (to >= st.max) {
+        const c = spent.current;
+        update((s) => {
+          const o = s.stat?.[st.key];
+          return o && (o.best === undefined || c < o.best) ? { ...s, stat: { ...s.stat, [st.key]: { ...o, best: c } } } : s;
+        });
+      }
       if (manual) update((s) => raiseExp(s, `stat:${st.key}`, to));
       if (to >= st.max) {
         const n = since.current;
@@ -1930,6 +2140,8 @@ function StatInner(p: {
   const resetStat = () => {
     const others = (st.types ?? []).filter((x) => x.name !== p.type).map((x) => ({ ...x, p: 1 }));
     if (!others.length || coins.take(1) < 1) return;
+    spent.current++;
+    bump((x) => x + 1);
     setType(pick(others).name);
     setFx((f) => ({ kind: "ok", n: (f?.n ?? 0) + 1 }));
   };
@@ -2005,6 +2217,9 @@ function StatInner(p: {
             </button>
           )}
         </div>
+        {p.fx && p.fx.kind !== "keep" && p.fx.kind !== "buy" && stage >= st.max && marks.current[st.max] && (
+          <StatBand key={`w${p.fx.n}`} title={pet ? `${st.max}단계 완성` : `${p.stat} +${st.max * per} 완성`} marks={marks.current} max={st.max} unit={(k) => (pet ? `${k}단계` : `+${k * per}`)} />
+        )}
         <div key={p.fx?.n ?? 0} className={`sim-item${p.fx ? ` sim-fx-${p.fx.kind}` : ""}`}>
           {p.fx && p.fx.kind !== "keep" && <Sparks kind={p.fx.kind} n={p.fx.kind === "plus2" ? 16 : 10} />}
           <span className="sim-ring" aria-hidden />
@@ -2069,13 +2284,8 @@ function StatInner(p: {
           ↺
         </button>
       </div>
-      <StatStrip
-        items={[
-          { label: "시도", value: p.stats.tries },
-          { label: "성공", value: p.stats.ok, tone: "sim-good" },
-          { label: `+${per * 2}`, value: p.stats.big, tone: "sim-gold" },
-        ]}
-      />
+      {/* 영수증 (제작자 2026-11-20 '속성부여 쪽도 이렇게'): 단계마다 직전 단계와 처음부터의 시도 · 코인 */}
+      <StatLedger marks={marks.current} unit={(k) => (pet ? `${k}단계` : `+${k * per}`)} best={save.stat?.[st.key]?.best} max={st.max} />
       <RankBox rec={rec} title={st.name} />
     </div>
   );
@@ -2243,9 +2453,27 @@ function OptionRoller({ item, onBack, verb, game, reset }: { item: OptItem; onBa
     } else setCur(got);
     setN((x) => x + 1);
   };
+  // 영수증 (제작자 2026-11-20 '옵션도 이렇게'): 재설정에서 드문 값(그 값 이상 나올 확률 15% 아래)이 옵션마다 더 높게 처음 나온 때의 굴린 수
+  const ledger = (rolls: Val[][]) => {
+    if (!reset) return;
+    update((s) => {
+      const o = s.optLed?.[item.name] ?? { runs: 0, rows: [] };
+      let runs = o.runs;
+      const rows = [...o.rows];
+      for (const got of rolls) {
+        runs++;
+        got.forEach((v, i) => {
+          const top = Math.max(-Infinity, ...rows.filter((r) => r[0] === i).map((r) => r[1]));
+          if (v.n > top && atLeast(item.opts[i], v.n) <= 0.15) rows.push([i, v.n, runs]);
+        });
+      }
+      return { ...s, optLed: { ...s.optLed, [item.name]: { runs, rows } } };
+    });
+  };
   const again = () => {
     if (coins.take(1) < 1) return;
     const got = roll();
+    ledger([got]);
     update((s) => got.reduce((acc, v, i) => raiseExp(acc, seenKey(i), v.n), s));
     setHunt(null);
     report(got);
@@ -2260,9 +2488,11 @@ function OptionRoller({ item, onBack, verb, game, reset }: { item: OptItem; onBa
     let got = cur;
     let best = cur;
     let bestP = 2;
+    const all: Val[][] = [];
     for (;;) {
       tries++;
       got = roll();
+      all.push(got);
       const jp = jointP(item, got);
       if (jp < bestP) {
         bestP = jp;
@@ -2271,6 +2501,7 @@ function OptionRoller({ item, onBack, verb, game, reset }: { item: OptItem; onBa
       if (got[aim.i].n >= aim.min || tries >= can) break;
     }
     coins.take(tries);
+    ledger(all);
     setHunt({ tries, expect: 1 / P, k: (hunt?.k ?? 0) + 1, short: got[aim.i].n < aim.min });
     report(best);
     land(got);
@@ -2397,6 +2628,7 @@ function OptionRoller({ item, onBack, verb, game, reset }: { item: OptItem; onBa
           <small>평균 {n0(hunt.expect)}번</small>
         </p>
       )}
+      {reset && save.optLed?.[item.name] && <OptLedger item={item} led={save.optLed[item.name]} />}
     </>
   );
 }
@@ -2956,7 +3188,7 @@ function GemTab({ odds }: { odds: Odds }) {
   const gemsAt = (k: number) => (kinds[k] ?? []).reduce((t, x) => t + (gems[x.id] ?? 0), 0);
   const owned = gemsAt(st);
   /** 보석결정과 보석을 한꺼번에 고친다 (dInv: 단계마다 더할 수, dGems: 보석마다 더할 수) */
-  const change = (dInv: number[], dGems: Record<string, number>, more: Partial<{ runs: number; cuts: number; pulls: number; best: number }> = {}) =>
+  const change = (dInv: number[], dGems: Record<string, number>, more: Partial<{ runs: number; cuts: number; pulls: number; best: number; coin: number }> = {}) =>
     update((s) => {
       const b = gemOf(s);
       const nextInv = b.inv.map((v, k) => Math.max(0, v + (dInv[k] ?? 0)));
@@ -2966,7 +3198,13 @@ function GemTab({ odds }: { odds: Odds }) {
         if (v > 0) gg[id] = v;
         else delete gg[id];
       }
-      return { ...s, gem: { ...b, inv: nextInv, gems: gg, runs: b.runs + (more.runs ?? 0), cuts: b.cuts + (more.cuts ?? 0), pulls: b.pulls + (more.pulls ?? 0), best: Math.max(b.best, more.best ?? 0) } };
+      // 영수증: 쓴 코인과 합성 수, 2 ~ 4단계를 처음 만든 때
+      const sg = s.gem;
+      const l0 = sg && sg.v === GEM_V && sg.led ? sg.led : { runs: 0, coin: 0, marks: { 0: [0, 0] as [number, number] } };
+      const led = { runs: l0.runs + (more.runs ?? 0), coin: l0.coin + (more.coin ?? 0), marks: { ...l0.marks } };
+      const top = more.best ?? 0;
+      if (top >= 2 && !led.marks[top]) led.marks[top] = [led.runs, led.coin];
+      return { ...s, gem: { ...b, inv: nextInv, gems: gg, runs: b.runs + (more.runs ?? 0), cuts: b.cuts + (more.cuts ?? 0), pulls: b.pulls + (more.pulls ?? 0), best: Math.max(b.best, more.best ?? 0), led } };
     });
 
   // ---- 뽑기: 영웅의 보석상자
@@ -2980,7 +3218,7 @@ function GemTab({ odds }: { odds: Odds }) {
       got[x.id] = (got[x.id] ?? 0) + 1;
       top = Math.max(top, x.st);
     }
-    change([], got, { pulls: n });
+    change([], got, { pulls: n, coin: n });
     flash(got);
     if (top) setSt(top);
     // 4단계 보석(0.5%)은 전광판에
@@ -3006,7 +3244,7 @@ function GemTab({ odds }: { odds: Odds }) {
     const d = [0, 0, 0, 0, 0];
     d[k] -= 3;
     d[r.to] += 1;
-    change(d, {}, { runs: 1, best: r.to });
+    change(d, {}, { runs: 1, best: r.to, coin: 1 });
     setSt(r.to);
     flash({}, [0, 1, 2, 3, 4].map((x) => (x === r.to && r.to > k ? 1 : 0)));
     emit({ kind: "gem", stage: r.to });
@@ -3031,7 +3269,7 @@ function GemTab({ odds }: { odds: Odds }) {
     const { next, n, best } = synthAll(inv, coins.coins ?? 0, tried);
     if (!n) return;
     coins.take(n);
-    change(next.map((v, k) => v - inv[k]), {}, { runs: n, best });
+    change(next.map((v, k) => v - inv[k]), {}, { runs: n, best, coin: n });
     flash({}, next.map((v, k) => Math.max(0, v - inv[k])));
     emit({ kind: "gem", stage: best });
   };
@@ -3057,7 +3295,7 @@ function GemTab({ odds }: { odds: Odds }) {
     }
     const d = [0, 0, 0, 0, 0];
     d[st] = -k;
-    change(d, got, { cuts: k });
+    change(d, got, { cuts: k, coin: k });
     flash(got);
   };
 
@@ -3241,13 +3479,17 @@ function GemTab({ odds }: { odds: Odds }) {
             ))}
         </div>
       )}
+      {/* 합성 영수증 (제작자 2026-11-20): 2 ~ 4단계를 처음 만들 때까지의 합성 · 코인 */}
+      {mode === "synth" && save.gem?.led && <GemLedger marks={save.gem.led.marks} />}
+      {mode !== "synth" && (
       <StatStrip
         items={[
           { label: "보석", value: totalGems },
           { label: "보석결정", value: totalInv },
-          mode === "draw" ? { label: "뽑기", value: g.pulls } : mode === "polish" ? { label: "세공", value: g.cuts } : mode === "synth" ? { label: "합성", value: g.runs } : { label: "최고", value: Math.max(g.best, [4, 3, 2, 1].find((k) => inv[k] > 0 || gemsAt(k) > 0) ?? 0), tone: "sim-good", unit: "단계" },
+          mode === "draw" ? { label: "뽑기", value: g.pulls } : mode === "polish" ? { label: "세공", value: g.cuts } : { label: "최고", value: Math.max(g.best, [4, 3, 2, 1].find((k) => inv[k] > 0 || gemsAt(k) > 0) ?? 0), tone: "sim-good", unit: "단계" },
         ]}
       />
+      )}
     </div>
   );
 }

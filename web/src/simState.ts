@@ -20,7 +20,8 @@ export interface SimSave {
   /** 강화: 시도·부서진 장비·가장 높은 강화도·쓴 코인, 최근 결과 점 40개 */
   enh?: { n?: { tries: number; broke: number; best: number; coins: number }; log?: { to: number; ok: boolean; broke?: boolean; plus?: number }[] };
   /** 성장: 표마다 지금 단계·펫 옵션·처음부터 센 시도(순위용)·고른 장신구나 펫 이름(2026-11-17), 그리고 모든 표의 시도·성공·+2 성공 */
-  stat?: Record<string, { stage: number; type: string | null; since: number; item?: string }>;
+  /** 표마다 지금 단계 · 펫 옵션 · 처음부터 센 시도 · 고른 물건. marks 는 영수증(제작자 2026-11-20): 단계마다 처음 닿은 때의 누적 [시도, 코인], 0 = 시작(구매 값). spent = 이번 물건에 쓴 코인, best = 끝 단계까지 가장 적게 쓴 코인 */
+  stat?: Record<string, { stage: number; type: string | null; since: number; item?: string; marks?: Record<number, [number, number]>; spent?: number; best?: number }>;
   /** 강화 도감 (2026-11-17 고도화): 장비마다 닿은 가장 높은 강화도 (어느 마법서로든, 팔거나 부서져도 남는다) */
   best?: Record<string, number>;
   /** 판 장비 수와 받은 코인 (2026-11-17) */
@@ -31,6 +32,8 @@ export interface SimSave {
   owned?: string[];
   /** 옵션 재설정: 전·후 중 더 좋은 쪽을 저절로 고른다 (2026-11-19) */
   optAuto?: boolean;
+  /** 옵션 재설정 영수증 (제작자 2026-11-20): 아이템마다 굴린 수와 드문 값(그 값 이상 15% 아래)이 처음 나온 때 [옵션 번호, 값, 굴린 수] */
+  optLed?: Record<string, { runs: number; rows: [number, number, number][] }>;
   statN?: { tries: number; ok: number; big: number };
   /** 보석 (gemOf 로 읽는다): 가진 보석결정(단계마다 inv[1~4]), 보석(sim.ts GemKind.id -> 수), 합성·세공·뽑기 수, 닿은 가장 높은 단계.
    *  v 2 (2026-11-19 '보석도 뽑아야'): 그 전에 공짜로 받던 보석결정(start 30 ~ 1000개)은 비우고 뽑은 보석으로만 한다 */
@@ -49,10 +52,12 @@ export interface GemSave {
   cuts?: number;
   pulls?: number;
   v?: number;
+  /** 영수증 (제작자 2026-11-20): 합성 수, 보석 칸에 쓴 코인(뽑기·합성·세공), 단계마다 처음 만든 때의 [합성, 코인] (0 = 시작) */
+  led?: { runs: number; coin: number; marks: Record<number, [number, number]> };
 }
 export const GEM_V = 2;
 /** 보석 진행 상황을 읽는다. 예전 판(공짜 보석결정)이면 빈 것으로 */
-export function gemOf(s: SimSave): Required<Omit<GemSave, "start">> {
+export function gemOf(s: SimSave): Required<Omit<GemSave, "start" | "led">> {
   const g = s.gem;
   if (!g || g.v !== GEM_V) return { inv: [0, 0, 0, 0, 0], runs: 0, best: 0, gems: {}, cuts: 0, pulls: 0, v: GEM_V };
   return { inv: g.inv?.length === 5 ? g.inv : [0, 0, 0, 0, 0], runs: g.runs ?? 0, best: g.best ?? 0, gems: g.gems ?? {}, cuts: g.cuts ?? 0, pulls: g.pulls ?? 0, v: GEM_V };

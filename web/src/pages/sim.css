@@ -787,12 +787,12 @@ button.sim-kind { cursor: pointer; }
 .sim-rcpt { position: relative; margin: 0 0 12px; background: #fff8e8; color: #3a2a10; border-radius: 3px 3px 0 0; box-shadow: 0 2px 0 #c9b98c; font-size: 12px; font-variant-numeric: tabular-nums; }
 .sim-rcpt::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 6px;
   background: linear-gradient(135deg, #fff8e8 33%, transparent 33%) 0 0 / 8px 6px, linear-gradient(225deg, #fff8e8 33%, transparent 33%) 0 0 / 8px 6px; }
-.sim-rcpt-g { display: grid; grid-template-columns: 34px repeat(3, minmax(0, 1fr)) 4px repeat(3, minmax(0, 1fr)) 14px; align-items: center; text-align: center; width: 100%; }
+.sim-rcpt-g { display: grid; grid-template-columns: var(--lab, 34px) repeat(var(--n, 3), minmax(0, 1fr)) 4px repeat(var(--n, 3), minmax(0, 1fr)) 14px; align-items: center; text-align: center; width: 100%; }
 button.sim-rcpt-g { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
 .sim-rcpt-g > * { padding: 5px 0; min-width: 0; }
-.sim-rcpt-g > b { text-align: left; padding-left: 8px; }
+.sim-rcpt-g > b { text-align: left; padding-left: 8px; white-space: nowrap; }
 .sim-rcpt-top > span { padding: 4px 0 0; font-size: 10px; font-weight: 700; color: #8a6d36; }
-.sim-rcpt-grp { grid-column: span 3; }
+.sim-rcpt-grp { grid-column: span var(--n, 3); }
 .sim-rcpt-sub > span { align-self: stretch; padding: 0 0 3px; font-size: 10px; color: #8a6d36; border-bottom: 1px dashed #cdb98a; }
 .sim-rcpt-row { border-top: 1px dashed #e2d3ac; }
 .sim-rcpt-row:first-of-type { border-top: 0; }
