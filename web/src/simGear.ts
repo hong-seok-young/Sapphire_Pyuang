@@ -146,27 +146,59 @@ export interface Held {
   cost?: number;
   used?: number;
   broke?: number;
-  /** 영수증 기록 (제작자 2026-11-20 '+7 찍을 때마다 각각 기록, 8도 마찬가지'): 기록하는 강화도(무기 +7·방어구 +5 부터)에 닿을 때마다 한 줄 [강화도, 마법서, 파괴, 코인] (모두 +0 부터 누적). 첫 줄 = 산 때 [0, 0, 0, 장비 값] */
-  log?: [number, number, number, number][];
+  /** 영수증 기록 (제작자 2026-11-20 '+7 찍을 때마다 각각 기록', '직전 강화도부터 쓴 비용, 0부터는 누적 말고'): 기록하는 강화도(무기 +7·방어구 +5 부터)에 닿을 때마다 한 줄
+   *  [강화도, 직전 강화도부터 마법서·파괴·코인, +0 부터 마법서·파괴·코인] (+0 부터를 모르면 앞 넷만) */
+  log?: number[][];
+  /** 구간 셈: st[l] = 강화도 l-1 에 처음 닿았을 때의 누적과 그때의 +0 부터 값 (l 에 닿으면 지운다), z[l] = 마지막으로 l 에 닿았을 때의 +0 부터 값 */
+  seg?: Seg;
 }
 /** 부서진 장비 수리 값: 다시 사는 값의 1/4 (제작자 2026-11-19 '가격은 수리가 훨씬 저렴하게'), 적어도 1 */
 export const repairCost = (g: Gear) => Math.max(1, Math.round(g.price / 4));
 /** 속성 부여 장신구·펫 추가 옵션 펫의 구매 값 (제작자 2026-11-20 '속성부여도 다음 거 구매비용', '펫도 구매비용'): 장신구는 요구 레벨로 방어구 값과 같게, 펫은 펫 도감 차례가 뒤일수록 (2 ~ 23) */
 export const statPrice = (pet: boolean, i: number, lv: number) => (pet ? 2 + Math.round(Math.sqrt(i) * 1.2) : 1 + Math.round(lv ** 1.5 / 30));
-/** 새로 산 장비의 비용: 부서진 같은 장비를 다시 사는 것이면 이어서, 아니면 처음부터 */
-export function startRun(g: Gear, prev: Held | null): Pick<Held, "cost" | "used" | "broke" | "log"> {
-  const go = prev && prev.broken && prev.name === g.name && prev.cost !== undefined;
-  return go
-    ? { cost: prev.cost! + g.price, used: prev.used ?? 0, broke: prev.broke ?? 0, log: prev.log }
-    : { cost: g.price, used: 0, broke: 0, log: [[0, 0, 0, g.price]] };
+/** [마법서, 파괴, 코인] */
+export type Tri = [number, number, number];
+export interface Seg {
+  st: Record<number, { t: Tri; z: Tri | null }>;
+  z: Record<number, Tri | null>;
 }
+const tri = (h: Pick<Held, "cost" | "used" | "broke">): Tri => [h.used ?? 0, h.broke ?? 0, h.cost ?? 0];
+const sub = (a: Tri, b: Tri): Tri => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const add = (a: Tri, b: Tri): Tri => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+/** 장비가 강화도 lv 에 놓였다 (산 때, 수리, 성공): 다음 강화도 구간이 아직 없으면 여기서 시작한다 */
+function startAt(seg: Seg, lv: number, t: Tri): Seg {
+  return seg.st[lv + 1] ? seg : { ...seg, st: { ...seg.st, [lv + 1]: { t, z: seg.z[lv] ?? null } } };
+}
+/** 예전 판(+0 부터 누적만 적던 줄)은 버린다 */
+const newRows = (log: Held["log"]) => (log ?? []).filter((r) => r.length > 4);
+/** 새로 산 장비의 비용: 부서진 같은 장비를 다시 사는 것이면 이어서, 아니면 처음부터 */
+export function startRun(g: Gear, prev: Held | null): Pick<Held, "cost" | "used" | "broke" | "log" | "seg"> {
+  const go = prev && prev.broken && prev.name === g.name && prev.cost !== undefined;
+  const z0: Tri = [0, 0, g.price];
+  if (!go) return { cost: g.price, used: 0, broke: 0, log: [], seg: startAt({ st: {}, z: { 0: z0 } }, 0, z0) };
+  const run = { cost: prev.cost! + g.price, used: prev.used ?? 0, broke: prev.broke ?? 0 };
+  const seg = prev.seg ? { ...prev.seg, z: { ...prev.seg.z, 0: z0 } } : { st: {}, z: { 0: z0 } };
+  return { ...run, log: newRows(prev.log), seg: startAt(seg, 0, tri(run)) };
+}
+/** 수리로 강화도 lv 에 놓였다 (수리 값은 이미 cost 에) */
+export const repairSeg = (h: Held, lv: number): Seg | undefined => (h.cost === undefined ? h.seg : startAt(h.seg ?? { st: {}, z: {} }, lv, tri(h)));
 /** 영수증에 적는 강화도: 늘 성공하는 칸(무기 +6·방어구 +4 까지)은 빼고 (제작자 2026-11-20) */
 export const RECEIPT_FROM: Record<Part, number> = { 무기: 7, 갑옷: 5 };
-/** 기록하는 강화도에 닿으면 한 줄 더한다 (같은 강화도를 다시 찍어도 따로, 첫 줄(산 때)은 남기고 40줄까지) */
-export function logRun(h: Held, lv: number, run: Pick<Held, "cost" | "used" | "broke">, from: number): Held["log"] {
-  if (run.cost === undefined || lv < from) return h.log;
-  const a = [...(h.log ?? []), [lv, run.used ?? 0, run.broke ?? 0, run.cost] as [number, number, number, number]];
-  return a.length > 40 ? [a[0], ...a.slice(-39)] : a;
+/** 강화도 lv 에 성공했다: 직전 강화도(lv-1)에 처음 닿은 뒤로 쓴 것이 이 구간, +0 부터 = 그때의 +0 부터 + 이 구간.
+ *  기록하는 강화도면 한 줄 더한다 (같은 강화도를 다시 찍어도 따로, 40줄까지) */
+export function reachRun(h: Held, lv: number, run: Pick<Held, "cost" | "used" | "broke">, from: number): Pick<Held, "log" | "seg"> {
+  if (run.cost === undefined) return {};
+  const t = tri(run);
+  const seg0 = h.seg ?? { st: { [lv]: { t: tri(h), z: null } }, z: {} };
+  const s = seg0.st[lv] ?? { t: tri(h), z: null };
+  const d = sub(t, s.t);
+  const z = s.z ? add(s.z, d) : null;
+  const st = { ...seg0.st };
+  delete st[lv];
+  const seg = startAt({ st, z: { ...seg0.z, [lv]: z } }, lv, t);
+  let log = newRows(h.log);
+  if (lv >= from) log = [...log, [lv, ...d, ...(z ?? [])]].slice(-40);
+  return { seg, log };
 }
 /** 마법서 한 장(값 c 코인)을 쓴 뒤의 비용 (broke 면 부서진 수도) */
 export const spendRun = (h: Held, broke = false, c = 1): Pick<Held, "cost" | "used" | "broke"> =>

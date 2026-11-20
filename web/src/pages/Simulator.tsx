@@ -10,7 +10,7 @@ import { useEntryState } from "../router";
 import { BOX_CATS, atLeast, boxFor, boxesOf, expectedTo, gemBox, gemIdOf, gemKinds, gemSynth, optTitle, optionFor, optionSources, pick, repairItems, scrollsOf, stepsExpected, stepsOf, tierOf } from "../sim";
 import type { Box, Dist, OptItem, OptSource, Part, Scroll, Steps } from "../sim";
 import { FitLine, Loading, PicImg, TopBar } from "../ui";
-import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, statPrice, scrollCost, scrollGrade, gearOf, gearPower, gearStat, gearValue, repairCost, spendRun, startRun, unlockCost, logRun, RECEIPT_FROM } from "../simGear";
+import { ARMOR_SLOTS, CLEAR_LV, GEAR_JOBS, canBuy, statPrice, scrollCost, scrollGrade, gearOf, gearPower, gearStat, gearValue, repairCost, spendRun, startRun, unlockCost, reachRun, repairSeg, RECEIPT_FROM } from "../simGear";
 import type { ArmorSlot, Gear, GearJob, Held } from "../simGear";
 import type { Wiki } from "../types";
 import { JOB_NAME } from "../auth";
@@ -197,30 +197,28 @@ function RunLine({ d }: { d: [number, number, number] }) {
     </span>
   );
 }
-type LogRow = [number, number, number, number];
-/** 기록 한 줄의 앞 기록과의 차이 [마법서, 파괴, 코인] */
-const logSeg = (p: LogRow | undefined, m: LogRow): [number, number, number] => (p ? [m[1] - p[1], m[2] - p[2], m[3] - p[3]] : [m[1], m[2], m[3]]);
-/** 앞 기록 이름: 산 때면 '+0', 같거나 높은 강화도에서 다시 올라온 것이면 '다시' */
-const fromName = (p: LogRow | undefined, lv: number) => (!p || p[0] === 0 ? "+0" : p[0] >= lv ? `지난 +${p[0]}` : `+${p[0]}`);
-/** 강화 성공 띠: '+8 성공', 지난 기록 뒤로 든 것, +0 부터 (제작자 2026-11-20 E안, '찍을 때마다 각각') */
+type LogRow = number[];
+const segOf = (m: LogRow): [number, number, number] => [m[1], m[2], m[3]];
+const zeroOf = (m: LogRow): [number, number, number] | null => (m.length > 4 ? [m[4], m[5], m[6]] : null);
+/** 강화 성공 띠: '+8 성공', 직전 강화도부터(+7 → +8)와 +0 부터 (제작자 2026-11-20 '직전 강화도부터 쓴 비용, 0부터는 누적 말고') */
 function WinBand({ log }: { log: LogRow[] }) {
   const m = log[log.length - 1];
-  const p = log[log.length - 2];
+  const z = zeroOf(m);
   return (
     <div className="sim-band" role="status">
       <b>+{m[0]} 성공</b>
-      {p && p[0] > 0 && (
+      <div className="sim-band-ln">
+        <i>
+          +{m[0] - 1} → +{m[0]}
+        </i>
+        <RunLine d={segOf(m)} />
+      </div>
+      {z && (
         <div className="sim-band-ln">
-          <i>
-            {fromName(p, m[0])} → +{m[0]}
-          </i>
-          <RunLine d={logSeg(p, m)} />
+          <i>+0 → +{m[0]}</i>
+          <RunLine d={z} />
         </div>
       )}
-      <div className="sim-band-ln">
-        <i>+0 → +{m[0]}</i>
-        <RunLine d={[m[1], m[2], m[3]]} />
-      </div>
     </div>
   );
 }
@@ -299,55 +297,41 @@ function SegChip({ from, to, unit, d, cur, bad = -1 }: { from: string; to: strin
     </span>
   );
 }
-/** 강화 영수증: 기록하는 강화도에 닿을 때마다 한 줄 (제작자 2026-11-20 '+7 찍을 때마다 각각 기록'). 줄마다 지난 기록 뒤로 든 것과 +0 부터. 최근 5줄, 더 있으면 '모두' */
-function Receipt({ log, best, tainted }: { log: LogRow[]; best: (lv: number) => number | undefined; tainted: boolean }) {
+/** 강화 영수증: 기록하는 강화도에 닿을 때마다 한 줄 (제작자 2026-11-20 '+7 찍을 때마다 각각 기록', '직전 강화도부터 쓴 비용, 0부터는 누적 말고').
+ *  줄마다 직전 강화도에 처음 닿은 뒤로 쓴 것과 +0 부터(그때의 +0 부터 + 이 구간). 최근 5줄, 더 있으면 '모두' */
+function Receipt({ log }: { log: LogRow[] }) {
   const [all, setAll] = useState(false);
-  const start = log[0]?.[0] === 0 ? log[0] : undefined;
-  const ev = log.map((m, i) => ({ m, p: log[i - 1], i })).filter((x) => x.m[0] > 0);
-  const shown = all ? ev : ev.slice(-5);
+  const shown = all ? log : log.slice(-5);
+  const off = log.length - shown.length;
   return (
     <>
       <Ledger
-        g1="지난 기록 뒤"
+        g1="직전 강화도부터"
         g2="+0 부터"
         cols={["마법서", "파괴", "코인"]}
         coin={2}
         bad={1}
         lab={44}
-        rows={shown.map(({ m, p, i }) => {
-          const b = tainted ? undefined : best(m[0]);
-          const top = b !== undefined && m[3] <= b;
-          const seg = logSeg(p, m);
+        rows={shown.map((m, i) => {
+          const d = segOf(m);
+          const z = zeroOf(m);
           return {
-            k: i,
+            k: off + i,
             label: `+${m[0]}`,
-            seg,
-            cum: [m[1], m[2], m[3]],
-            best: top,
-            chips: (
+            seg: d,
+            cum: z ?? [],
+            chips: z ? (
               <>
-                {start && (
-                  <span>
-                    장비 <i className="sim-c" aria-hidden />
-                    {start[3].toLocaleString()}
-                  </span>
-                )}
-                <SegChip from={fromName(p, m[0])} to={`+${m[0]}`} unit="장" d={seg} bad={1} cur />
-                {b !== undefined && (
-                  <span className="sim-rcpt-bestchip">
-                    내 최저 <i className="sim-c" aria-hidden />
-                    {b.toLocaleString()}
-                    {top ? " ✓" : ""}
-                  </span>
-                )}
+                <SegChip from="+0" to={`+${m[0] - 1}`} unit="장" d={[z[0] - d[0], z[1] - d[1], z[2] - d[2]]} bad={1} />
+                <SegChip from={`+${m[0] - 1}`} to={`+${m[0]}`} unit="장" d={d} bad={1} cur />
               </>
-            ),
+            ) : undefined,
           };
         })}
       />
-      {ev.length > 5 && (
+      {log.length > 5 && (
         <button type="button" className="sim-rcpt-more" onClick={() => setAll(!all)}>
-          {all ? "최근 5줄만" : `모두 보기 · ${ev.length}줄`}
+          {all ? "최근 5줄만" : `모두 보기 · ${log.length}줄`}
         </button>
       )}
     </>
@@ -1355,7 +1339,8 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
     const c = repairCost(g);
     if (!coins.has(c) || coins.take(c) < c) return false;
     const got = pick(repairDist.vals);
-    setHeld({ ...h, lv: got.n, broken: false, ...(h.cost === undefined ? {} : { cost: h.cost + c }) });
+    const fixed: Held = { ...h, lv: got.n, broken: false, ...(h.cost === undefined ? {} : { cost: h.cost + c }) };
+    setHeld({ ...fixed, seg: repairSeg(fixed, got.n) });
     setStats((s) => ({ ...s, coins: s.coins + c }));
     comboRef.current = 0;
     setCombo(0);
@@ -1431,7 +1416,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
       // 직접 눌러 닿은 강화도: 자동은 여기까지
       if (ok && manual) update((s) => raiseExp(s, `enh:${g.name}`, cur + 1));
       if (ok) {
-        heldRef.current = { ...h, ...run, lv: cur + 1, tries, log: logRun(h, cur + 1, run, RECEIPT_FROM[scroll.part]) };
+        heldRef.current = { ...h, ...run, lv: cur + 1, tries, ...reachRun(h, cur + 1, run, RECEIPT_FROM[scroll.part]) };
         setHeld(heldRef.current, scroll.part);
         const big = p < 0.35 || cur + 1 >= (scroll.part === "무기" ? 8 : 6);
         setFx((f) => ({ kind: "ok", n: (f?.n ?? 0) + 1, big }));
@@ -1590,7 +1575,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
               </span>
             )}
             {/* 성공 띠 (제작자 2026-11-20 E안): 직전 구간과 +0 부터의 마법서 · 파괴 · 코인 */}
-            {fx?.kind === "ok" && lv >= RECEIPT_FROM[part] && held?.log?.[held.log.length - 1]?.[0] === lv && <WinBand key={`w${fx.n}`} log={held.log} />}
+            {fx?.kind === "ok" && lv >= RECEIPT_FROM[part] && (held?.log?.[held.log.length - 1]?.length ?? 0) > 4 && held?.log?.[held.log.length - 1]?.[0] === lv && <WinBand key={`w${fx.n}`} log={held.log} />}
             <div key={fx?.n ?? 0} className={`sim-item${fx ? ` sim-fx-${fx.kind}` : ""}`}>
               {fx && fx.kind !== "keep" && fx.kind !== "buy" && <Sparks kind={fx.big ? "plus2" : fx.kind} n={fx.kind === "break" ? 16 : fx.big ? 24 : 10} />}
               <span className="sim-ring" aria-hidden />
@@ -1624,7 +1609,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
                   실패
                 </b>
               )}
-              {fx?.kind === "ok" && fx.big && !(lv >= RECEIPT_FROM[part] && held?.log?.[held.log.length - 1]?.[0] === lv) && (
+              {fx?.kind === "ok" && fx.big && !(lv >= RECEIPT_FROM[part] && (held?.log?.[held.log.length - 1]?.length ?? 0) > 4 && held?.log?.[held.log.length - 1]?.[0] === lv) && (
                 <b key={`w${fx.n}`} className="sim-win" aria-hidden>
                   +{lv}
                 </b>
@@ -1730,7 +1715,7 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
         </div>
       )}
       {/* 영수증 (제작자 2026-11-20 E안, 마법서 · 파괴 · 비용 칸과 결과 점 줄을 바꿈): 강화도마다 직전 구간과 +0 부터 */}
-      {held?.log && gear && <Receipt log={held.log} best={(l) => save.cost?.[upGame(gear.name, scroll.name, l, evOn)]?.[0]} tainted={held.tainted} />}
+      {held?.log && gear && <Receipt log={held.log.filter((r) => r.length > 4)} />}
 
       {gear && (
         <RankBox
