@@ -181,7 +181,9 @@ export function startRun(g: Gear, prev: Held | null): Pick<Held, "cost" | "used"
   return { ...run, log: newRows(prev.log), seg: startAt(seg, 0, tri(run)) };
 }
 /** 수리로 강화도 lv 에 놓였다 (수리 값은 이미 cost 에) */
-export const repairSeg = (h: Held, lv: number): Seg | undefined => (h.cost === undefined ? h.seg : startAt(h.seg ?? { st: {}, z: {} }, lv, tri(h)));
+export const repairSeg = (h: Held, lv: number): Seg | undefined => (h.cost === undefined ? h.seg : startAt(h.seg ?? seedSeg(h, lv), lv, tri(h)));
+/** 이 셈 전에 산 장비: 지금까지 쓴 것을 지금 강화도의 +0 부터 값으로 잡고 이어 센다 */
+const seedSeg = (h: Held, lv: number): Seg => ({ st: {}, z: { [lv]: tri(h) } });
 /** 영수증에 적는 강화도: 늘 성공하는 칸(무기 +6·방어구 +4 까지)은 빼고 (제작자 2026-11-20) */
 export const RECEIPT_FROM: Record<Part, number> = { 무기: 7, 갑옷: 5 };
 /** 강화도 lv 에 성공했다: 직전 강화도(lv-1)에 처음 닿은 뒤로 쓴 것이 이 구간, +0 부터 = 그때의 +0 부터 + 이 구간.
@@ -189,7 +191,7 @@ export const RECEIPT_FROM: Record<Part, number> = { 무기: 7, 갑옷: 5 };
 export function reachRun(h: Held, lv: number, run: Pick<Held, "cost" | "used" | "broke">, from: number): Pick<Held, "log" | "seg"> {
   if (run.cost === undefined) return {};
   const t = tri(run);
-  const seg0 = h.seg ?? { st: { [lv]: { t: tri(h), z: null } }, z: {} };
+  const seg0 = h.seg ?? startAt(seedSeg(h, lv - 1), lv - 1, tri(h));
   const s = seg0.st[lv] ?? { t: tri(h), z: null };
   const d = sub(t, s.t);
   const z = s.z ? add(s.z, d) : null;
