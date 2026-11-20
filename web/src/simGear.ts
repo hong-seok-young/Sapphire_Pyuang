@@ -147,7 +147,7 @@ export interface Held {
   used?: number;
   broke?: number;
   /** 영수증 기록 (제작자 2026-11-20 '+7 찍을 때마다 각각 기록', '직전 강화도부터 쓴 비용, 0부터는 누적 말고'): 기록하는 강화도(무기 +7·방어구 +5 부터)에 닿을 때마다 한 줄
-   *  [강화도, 직전 강화도부터 마법서·파괴·코인, +0 부터 마법서·파괴·코인] (+0 부터를 모르면 앞 넷만) */
+   *  [강화도, 직전 강화도부터 마법서·파괴·코인, +0 부터 마법서·파괴·코인] (+0 부터를 모르면 -1 셋. 앞 넷만 있는 줄은 예전 판이라 버린다) */
   log?: number[][];
   /** 구간 셈: st[l] = 강화도 l-1 에 처음 닿았을 때의 누적과 그때의 +0 부터 값 (l 에 닿으면 지운다), z[l] = 마지막으로 l 에 닿았을 때의 +0 부터 값 */
   seg?: Seg;
@@ -204,7 +204,7 @@ export function reachRun(h: Held, lv: number, run: Pick<Held, "cost" | "used" | 
   delete st[lv];
   const seg = startAt({ st, z: { ...seg0.z, [lv]: z } }, lv, t);
   let log = newRows(h.log);
-  if (lv >= from) log = [...log, [lv, ...d, ...(z ?? [])]].slice(-40);
+  if (lv >= from) log = [...log, [lv, ...d, ...(z ?? [-1, -1, -1])]].slice(-40);
   return { seg, log };
 }
 /** 마법서 한 장(값 c 코인)을 쓴 뒤의 비용 (broke 면 부서진 수도) */

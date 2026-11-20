@@ -199,7 +199,7 @@ function RunLine({ d }: { d: [number, number, number] }) {
 }
 type LogRow = number[];
 const segOf = (m: LogRow): [number, number, number] => [m[1], m[2], m[3]];
-const zeroOf = (m: LogRow): [number, number, number] | null => (m.length > 4 ? [m[4], m[5], m[6]] : null);
+const zeroOf = (m: LogRow): [number, number, number] | null => (m.length > 4 && m[4] >= 0 ? [m[4], m[5], m[6]] : null);
 /** 강화 성공 띠: '+8 성공', 직전 강화도부터(+7 → +8)와 +0 부터 (제작자 2026-11-20 '직전 강화도부터 쓴 비용, 0부터는 누적 말고') */
 function WinBand({ log }: { log: LogRow[] }) {
   const m = log[log.length - 1];
@@ -1211,6 +1211,8 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
   const [shop, setShop] = useState(false);
   const lv = held?.lv ?? 0;
   const broken = held?.broken ?? false;
+  // 부서진 장비는 자동이 수리부터 하고 +1 ~ 에서 다시 올라가므로, 자동 단추는 부서지기 전 강화도로 막지 않는다 (제작자 2026-11-20 '7에서 8 가다 파괴됐는데 자동이 안 눌려')
+  const autoFrom = broken ? 0 : lv;
   // 장비 시세 (2026-11-17 고도화, simGear.ts gearValue): 지금 팔면, 다음 강화가 되면
   const valueOf = useCallback((g: Gear, k: number) => gearValue(g, k, all), [all]);
   const value = gear && !broken ? valueOf(gear, lv) : 0;
@@ -1693,10 +1695,10 @@ function EnhanceSim({ odds, head, wiki, me, part }: { odds: Odds; head: React.Re
                   <Act
                     className={"btn btn-ghost" + (auto ? " sim-running" : "")}
                     busy={!!charge}
-                    lock={auto ? null : lv >= expMax ? `자동은 직접 띄워 본 강화까지만 · +${lv + 1} 을 직접 먼저` : lv >= autoGoal ? "목표를 올려요" : coins.coins === 0 && NO_COIN}
+                    lock={auto ? null : autoFrom >= expMax ? `자동은 직접 띄워 본 강화까지만 · +${lv + 1} 을 직접 먼저` : autoFrom >= autoGoal ? "목표를 올려요" : coins.coins === 0 && NO_COIN}
                     onClick={() => setAuto(!auto)}
                   >
-                    {auto ? "멈춤" : lv >= expMax ? "자동" : `+${autoGoal} 자동`}
+                    {auto ? "멈춤" : autoFrom >= expMax ? "자동" : `+${autoGoal} 자동`}
                     {!auto && <Cost n={scrollCost(gear!)} per />}
                   </Act>
                   <Act className="pill" lock={autoGoal >= Math.min(15, expMax) && `자동은 직접 띄워 본 +${expMax} 까지만`} onClick={() => setGoal(autoGoal + 1)} aria-label="목표 올리기">
