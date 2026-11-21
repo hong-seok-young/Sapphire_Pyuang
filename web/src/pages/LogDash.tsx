@@ -856,14 +856,14 @@ export function AiPanel({ dash }: { dash: Dash }) {
       {month && (
         <div className="ld-ai-month">
           <div>
-            <span>{Number(month.month.slice(5))}월 누적</span>
+            <span>{month.month.length > 7 ? `${Number(month.month.slice(5, 7))}/${Number(month.month.slice(8))}부터` : `${Number(month.month.slice(5))}월`} 누적</span>
             <b>
               <Pop v={Math.round(month.usd * 100)}>{usdText(month.usd)}</Pop>
             </b>
-            <small>/ ${month.limit ?? 340}</small>
+            <small>/ ${month.limit ?? 500}</small>
           </div>
           <i>
-            <i style={{ transform: `scaleX(${Math.min(1, month.usd / (month.limit ?? 340))})` }} />
+            <i style={{ transform: `scaleX(${Math.min(1, month.usd / (month.limit ?? 500))})` }} />
           </i>
           <em>
             {month.console && month.refreshedAt

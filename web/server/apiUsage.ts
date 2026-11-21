@@ -121,24 +121,34 @@ export const trackUsage = (env: Env, userId: string, kind: string, res: { usage?
 export const USD_MICRO_SQL = "(input * 4 + cache_write * 5 + cache_read * 0.2 + output * 20 + web * 10000)";
 export const usdOf = (r: { input: number; output: number; cr: number; cw: number; web: number }) =>
   (r.input * 4 + r.cw * 5 + r.cr * 0.2 + r.output * 20 + r.web * 10000) / 1e6;
-/** 2026-11 은 콘솔에서 본 값($216.46, 11/13 제작자)에 그 뒤 앱이 센 만큼을 더한다: 배포(ci-d1 setup AI_USD_SNAP)가 그때까지 센 값을 마이크로 달러로 적어 둔다 */
-export const AI_USD_BASE = { month: "2026-11", usd: 216.46 };
-export const AI_USD_SNAP = "ai_usd_snap_20261113";
 /**
- * 이번 달 AI 비용 (달러). 콘솔과 같게 UTC 달로 센다.
- * 1) 콘솔 값이 있으면 (GitHub Actions ai-cost.yml 이 1시간마다 ai_cost 에 적음, 제작자 2026-11-13 '클로드 콘솔 연결해서 실시간으로'):
+ * 크레딧 주기 (제작자 2026-11-21 '20일마다 500이 차네, 챗봇 한도에 반영'): 팀 플랜 좌석 크레딧 'API credit (Team)' $500 이 매달 20일에 새로 들어온다
+ * (콘솔 프로모션 크레딧: 부여 2026-11-20 · 만료 2026-12-22, 이월 없음). 한도는 그 $500, 주기는 한국 날짜 20일 0시 ~ 다음 달 20일 0시.
+ * 크레딧이 바뀌면 AI_LIMIT·CREDIT_DAY 를 고친다
+ */
+export const AI_LIMIT = 500;
+export const CREDIT_DAY = 20;
+/** 지금 주기의 시작(from)과 다음 초기화(reset) 날짜, 'YYYY-MM-DD' 한국 날짜 */
+export function creditPeriod(now = Date.now()): { from: string; reset: string } {
+  const k = new Date(now + 9 * 3600_000);
+  let y = k.getUTCFullYear();
+  let m = k.getUTCMonth(); // 0~11
+  if (k.getUTCDate() < CREDIT_DAY) m -= 1;
+  if (m < 0) (m = 11), (y -= 1);
+  const day = (yy: number, mm: number) => `${yy + Math.floor(mm / 12)}-${String((mm % 12) + 1).padStart(2, "0")}-${CREDIT_DAY}`;
+  return { from: day(y, m), reset: day(y, m + 1) };
+}
+/**
+ * 이번 주기 AI 비용 (달러). month 는 주기의 시작 날짜('2026-11-20'), reset 은 다음 초기화 날짜.
+ * 1) 콘솔 값이 있으면 (GitHub Actions ai-cost.yml 이 1시간마다 ai_cost 에 주기 시작 날짜로 적음):
  *    콘솔 금액(refreshed_at 까지의 사용, 보통 4시간쯤 늦다) + 그 뒤 앱이 센 만큼(ai_snap 의 refreshed_at 바로 앞 값과 지금의 차이)
- * 2) 없으면 앱 어림: 11월은 콘솔에서 본 $216.46 + 그 뒤 센 만큼, 그 뒤 달은 그 달 api_usage 합
+ * 2) 없으면 앱 어림: 주기 시작 날짜부터의 api_usage 합
  *    (앱 바깥(GitHub Actions 의 번역·정리·시험)에서 쓴 것은 api_usage 에 없어서 콘솔보다 조금 적게 나올 수 있다)
  */
-export async function monthUsd(env: Env): Promise<{ month: string; usd: number; base: number | null; console: boolean; refreshedAt: number | null; limit: number }> {
-  const month = new Date().toISOString().slice(0, 7);
-  return { ...(await monthUsdOf(env, month)), limit: aiLimit(month) };
+export async function monthUsd(env: Env): Promise<{ month: string; reset: string; usd: number; base: number | null; console: boolean; refreshedAt: number | null; limit: number }> {
+  const p = creditPeriod();
+  return { ...(await monthUsdOf(env, p.from)), reset: p.reset, limit: AI_LIMIT };
 }
-
-/** API 월 한도 (제작자 2026-11-13 '맥시멈 340' -> '이번 달은 300 한도'): 달마다 다르면 AI_LIMITS 에 그 달을 적는다, 없으면 340 */
-const AI_LIMITS: Record<string, number> = { "2026-11": 300 };
-export const aiLimit = (month: string) => AI_LIMITS[month] ?? 340;
 
 /** 사람마다 AI 비용을 센 첫날 (api_usage, 한국 날짜). 그 전 질문은 질문 수로 어림한다 */
 const TRACK_DAY = "2026-11-13";
@@ -146,14 +156,13 @@ const TRACK_DAY = "2026-11-13";
 const GUESS_PER_Q = 0.2;
 
 /**
- * 이번 달 이 사람(묶은 캐릭터 모두)이 쓴 AI 비용 (달러).
+ * 이번 크레딧 주기에 이 사람(묶은 캐릭터 모두)이 쓴 AI 비용 (달러).
  * 센 것(api_usage) + 세기 전(2026-11-13 전) 챗봇 질문의 어림값 (제작자 2026-11-13 '추정해서 넣어야지'):
  * 세기 전 질문 수(chat_usage, 센 첫날은 그날 질문 수 - 그날 센 답 수) x 센 뒤 챗봇 답 하나의 평균 값.
  * 그 전 사진 읽기 등 다른 AI 는 질문에 딸린 것이 많아 따로 어림하지 않는다
  */
-export async function personMonthUsd(env: Env, ids: string[], month = new Date().toISOString().slice(0, 7)): Promise<number> {
+export async function personMonthUsd(env: Env, ids: string[], from = creditPeriod().from): Promise<number> {
   const who = JSON.stringify(ids);
-  const from = `${month}-01`;
   const counted = env.DB.prepare(`SELECT COALESCE(SUM(${USD_MICRO_SQL}), 0) AS m FROM api_usage WHERE user_id IN (SELECT value FROM json_each(?1)) AND day >= ?2`).bind(who, from);
   if (from > TRACK_DAY) {
     const row = await counted.first<{ m: number }>();
@@ -191,25 +200,15 @@ async function monthUsdOf(env: Env, month: string): Promise<{ month: string; usd
     const after = s === undefined ? 0 : Math.max(0, a - Number(s)) / 1e6;
     return { month, usd: Number(official.usd) + after, base: null, console: true, refreshedAt: official.r };
   }
-  if (month === AI_USD_BASE.month) {
-    const [all, snap] = await env.DB.batch([
-      env.DB.prepare(`SELECT COALESCE(SUM(${USD_MICRO_SQL}), 0) AS m FROM api_usage`),
-      env.DB.prepare("SELECT done_at AS m FROM setup WHERE key = ?").bind(AI_USD_SNAP),
-    ]);
-    const a = Number((all.results[0] as { m: number } | undefined)?.m ?? 0);
-    const s = (snap.results[0] as { m: number } | undefined)?.m;
-    const after = s === undefined ? 0 : Math.max(0, a - Number(s)) / 1e6;
-    return { month, usd: AI_USD_BASE.usd + after, base: AI_USD_BASE.usd, console: false, refreshedAt: null };
-  }
-  const row = await env.DB.prepare(`SELECT COALESCE(SUM(${USD_MICRO_SQL}), 0) AS m FROM api_usage WHERE day >= ?`).bind(`${month}-01`).first<{ m: number }>();
+  const row = await env.DB.prepare(`SELECT COALESCE(SUM(${USD_MICRO_SQL}), 0) AS m FROM api_usage WHERE day >= ?`).bind(month).first<{ m: number }>();
   return { month, usd: Number(row?.m ?? 0) / 1e6, base: null, console: false, refreshedAt: null };
 }
 
 /**
- * 콘솔의 월 사용 한도에 닿아 API 가 막혔다는 표시 (제작자 2026-11-18 '이미 300달러 다 써서 호출 막혔는데'): 챗봇이 그 오류를 받으면 setup 'ai_over_<UTC 달>' 을 적고,
+ * 콘솔의 월 사용 한도에 닿아 API 가 막혔다는 표시 (제작자 2026-11-18 '이미 300달러 다 써서 호출 막혔는데'): 챗봇이 그 오류를 받으면 setup 'ai_over_<크레딧 주기 시작 날짜>' 을 적고,
  * 챗봇 위 사용량 막대가 '이번 달 한도 다 씀'으로 보인다. 그 뒤 답을 하나라도 받으면(한도를 늘림) 지운다
  */
-const overKey = () => "ai_over_" + new Date().toISOString().slice(0, 7);
+const overKey = () => "ai_over_" + creditPeriod().from;
 export const markOver = (env: Env) =>
   env.DB.prepare("INSERT OR REPLACE INTO setup (key, done_at) VALUES (?, ?)").bind(overKey(), Date.now()).run().catch(() => undefined);
 export const clearOver = (env: Env) => env.DB.prepare("DELETE FROM setup WHERE key = ?").bind(overKey()).run().catch(() => undefined);

@@ -3,7 +3,7 @@
 // 공개 실행 기록이라 금액도 찍지 않는다 ('ok' 와 오류 상태 코드만).
 //
 // 적는 것:
-//  - ai_cost(month, usd, refreshed_at, fetched_at): 콘솔이 센 이번 달(UTC 달) 금액과 그 값이 언제까지의 사용인지(data_refreshed_at, 보통 4시간쯤 늦다)
+//  - ai_cost(month, usd, refreshed_at, fetched_at): 콘솔이 센 이번 크레딧 주기(20일부터) 금액과 그 값이 언제까지의 사용인지(data_refreshed_at, 보통 4시간쯤 늦다)
 //  - ai_snap(at, micro): 지금까지 앱이 센 AI 비용(api_usage, 마이크로 달러) — 사이트가 '콘솔 값 + 그 뒤 앱이 센 만큼'을 더할 때 refreshed_at 바로 앞 값을 쓴다
 // 사이트 쪽은 server/apiUsage.ts monthUsd.
 import { execFileSync } from "node:child_process";
@@ -30,11 +30,18 @@ function d1(sql, json = false) {
   return Array.isArray(j) ? j[0]?.results ?? [] : [];
 }
 
-const now = new Date();
-const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-const month = monthStart.toISOString().slice(0, 7);
+// 크레딧 주기 (server/apiUsage.ts creditPeriod 와 같게): 팀 플랜 크레딧 $500 이 매달 20일(한국 날짜)에 들어온다 (제작자 2026-11-21).
+// ai_cost.month 에는 주기 시작 날짜('2026-11-20')를 적는다. 콘솔 조회는 그날 0시(UTC)부터 (하루 단위로 맞춘다)
+const CREDIT_DAY = 20;
+const k = new Date(Date.now() + 9 * 3600_000);
+let y = k.getUTCFullYear();
+let m = k.getUTCMonth();
+if (k.getUTCDate() < CREDIT_DAY) m -= 1;
+if (m < 0) (m = 11), (y -= 1);
+const monthStart = new Date(Date.UTC(y, m, CREDIT_DAY));
+const month = monthStart.toISOString().slice(0, 10);
 
-// 콘솔: 이번 달 처음부터 지금까지 한 줄 합 (group_by 없음, time bucket 없음)
+// 콘솔: 이번 주기 처음부터 지금까지 한 줄 합 (group_by 없음, time bucket 없음)
 const url = `https://api.anthropic.com/v1/organizations/analytics/cost?starting_at=${encodeURIComponent(monthStart.toISOString().replace(".000", ""))}`;
 const res = await fetch(url, {
   headers: { "x-api-key": KEY, "anthropic-version": "2026-10-21", "anthropic-beta": "analytics-usage-cost-2026-08-24" },

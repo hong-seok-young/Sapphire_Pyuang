@@ -12,7 +12,7 @@ export function errorText(e: unknown): string {
   if (isOverLimit(e)) {
     const m = String((e as Error).message).match(/regain access on (\d{4})-(\d{2})-(\d{2})/);
     const when = m ? `${Number(m[2])}월 ${Number(m[3])}일에 다시 열리거나, ` : "";
-    return `이번 달 챗봇 사용 한도를 다 썼어요. ${when}앱개발자가 한도를 늘리면 다시 쓸 수 있어요`;
+    return `챗봇 사용 한도를 다 썼어요. ${when}앱개발자가 한도를 늘리면 다시 쓸 수 있어요`;
   }
   if (isNoCredit(e)) return "챗봇 이용 요금이 다 떨어졌어요. 앱개발자가 충전하면 다시 쓸 수 있어요";
   if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) {
