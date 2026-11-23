@@ -469,7 +469,7 @@ def load_posts() -> tuple[dict, dict]:
             blocks = drop_chatter(body_blocks(box))
             if aid in GAME_INFO_ONLY:
                 blocks = game_info_only(blocks)
-            blocks = fix_post_text(blocks)
+            blocks = fix_post_cells(aid, fix_post_text(blocks))
             if aid in LINK_POSTS:  # 그림을 못 받은 칸뿐인 열은 뺀다 (명예 등급 표의 (구)·(신)이미지: 해외 위키 그림이라 받지 못했다)
                 blocks = drop_empty_columns(blocks)
             if replaced:  # 다른 글에서 옛 조합책 글로 가던 링크는 새 글로
@@ -796,6 +796,25 @@ ERRATA = {
 
 # 글 화면(#/post)과 챗봇이 읽는 원글 칸에도 같은 고침을 넣는다 (장비 표만 고쳐서 글과 챗봇은 '+100' 으로 보였다, 2026-11-12)
 POST_ERRATA = {"마법 데미지 +100": "숨은 옵션 최종 데미지 +10%"}
+
+
+# 원글 표에서 칸 하나가 통째로 잘못 적힌 것 (글 번호 -> [(블록, 줄, 칸, 바꿀 칸)]). 원글은 그대로 두고 만들 때만 고친다.
+# 343758 길드던전 리에티: '① 오른팔 · ③ 뼈대 / ③ 뼈대 · ④ 관' 으로 뼈대가 두 번 (제작자 2026-11-23 '왼팔 대신 뼈대가 두 개').
+# ② 왼팔 HP 500,000 은 해외 팬 위키(Almightycrown, 크라운의 왼손), 레벨은 어느 자료에도 없어 'Lv.?' (자료 제공/리에티_왼팔.md)
+POST_CELL_FIX = {
+    "343758": [(1, 1, 1, {"l": [[{"t": "(Lv.?)"}], [{"t": "② "}, {"t": "왼팔", "b": 1, "c": "#0078cb"}], [{"t": "HP 500,000"}], [{"t": "비선공 | 고정"}]], "cs": 2})],
+}
+
+
+def fix_post_cells(aid: str, blocks: list) -> list:
+    for bi, ri, ci, cell in POST_CELL_FIX.get(aid, []):
+        try:
+            row = blocks[bi]["rows"][ri]
+            if "뼈대" in json.dumps(row[ci], ensure_ascii=False):  # 원글이 고쳐졌으면 손대지 않는다
+                row[ci] = cell
+        except (IndexError, KeyError, TypeError):
+            pass
+    return blocks
 
 
 def fix_post_text(node):
