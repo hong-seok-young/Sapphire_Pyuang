@@ -464,6 +464,25 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'official_added_backfil
   console.log("아이모 소식 새 글 표시를 맞췄어요");
 }
 
+// 아이모가 대상이 아닌 컴투스 공통 점검 글을 지운다 (제작자 2026-11-23 '아이모 없는데 굳이 띄우지 마'). 받을 때도 거르지만(notImo) 예전에 들어간 것과
+// 한국 PC 파일로 들어온 것을 배포마다 한 번 더. 그 글의 요약·할 일·그림 글자·조회·좋아요·댓글·알림도 같이
+{
+  // server/officialText.ts 의 NOT_IMO_SQL 과 같게 (이 스크립트는 .ts 를 읽지 않는다)
+  const NOT_IMO_SQL =
+    "title LIKE '%점검%' AND (body LIKE '%대상 게임%' OR body LIKE '%대상게임%') AND title NOT LIKE '%아이모%' AND body NOT LIKE '%아이모%' AND upper(body) NOT LIKE '%IMO%'";
+  const ids = `SELECT id FROM official_news WHERE ${NOT_IMO_SQL}`;
+  const n = Number(queryFirst(`SELECT COUNT(*) AS n FROM official_news WHERE ${NOT_IMO_SQL}`)?.n ?? 0);
+  if (n) {
+    runSql([
+      ...["official_summary", "official_todo", "official_rich"].map((t) => `DELETE FROM ${t} WHERE id IN (${ids});`),
+      ...["official_views", "official_likes", "official_comments"].map((t) => `DELETE FROM ${t} WHERE post_id IN (${ids});`),
+      `DELETE FROM alerts WHERE kind = 'imo_news' AND link IN (SELECT '#/official/' || id FROM official_news WHERE ${NOT_IMO_SQL});`,
+      `DELETE FROM official_news WHERE ${NOT_IMO_SQL};`,
+    ]);
+    console.log(`아이모가 대상이 아닌 공식 점검 글 ${n}개를 뺐어요`);
+  }
+}
+
 const count = Number(queryFirst("SELECT COUNT(*) AS n FROM users")?.n ?? 0);
 if (count > 0) {
   console.log(`계정 ${count}개`);

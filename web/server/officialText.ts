@@ -176,6 +176,17 @@ export interface OfficialRow {
   src: string;
 }
 
+/**
+ * 아이모가 대상이 아닌 컴투스 공통 점검 글 (제작자 2026-11-23 '아이모 없는데 굳이 띄우지 마': '컴투스 11월 정기점검'은 대상 게임이 버디크러시·낚시의 신뿐이었다).
+ * 점검 글이고 본문에 '대상 게임'이 있는데 아이모가 어디에도 없으면 받지 않는다. 원스토어 포인트백 글도 '대상 게임'이 있지만 점검 글이 아니라 남는다
+ */
+export const notImo = (title: string, body: string) =>
+  /점검/.test(title) && /대상\s*게임/.test(body) && !/아이모|\bIMO\b/i.test(title + "\n" + body);
+
+/** 같은 규칙의 SQL 조건 (official_news 에 이미 들어간 글을 지울 때, scripts/ci-d1.mjs) */
+export const NOT_IMO_SQL =
+  "title LIKE '%점검%' AND (body LIKE '%대상 게임%' OR body LIKE '%대상게임%') AND title NOT LIKE '%아이모%' AND body NOT LIKE '%아이모%' AND upper(body) NOT LIKE '%IMO%'";
+
 /** 원문의 표시 (제목과 본문이 같으면 같다) */
 export const srcOf = (item: HiveItem) => `${CONVERT}:${hash(String(item.noticeTitle ?? "") + "\n" + String(item.content ?? ""))}`;
 

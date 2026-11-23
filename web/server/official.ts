@@ -3,7 +3,7 @@
 // 공식 홈페이지의 공개 글을 읽을 뿐 게임은 읽지 않는다 (CLAUDE.md 게임 안전 규칙).
 import type { Env } from "./auth";
 import { slangOf, withImages } from "./officialImages";
-import { UPSERT_SQL, rowOf, srcOf, upsertValues } from "./officialText";
+import { UPSERT_SQL, notImo, rowOf, srcOf, upsertValues } from "./officialText";
 import type { HiveItem } from "./officialText";
 
 export type OfficialType = "N" | "C" | "I" | "D" | "E";
@@ -191,8 +191,8 @@ export async function refreshMaint(env: Env, lastAt: number | null, now = Date.n
     .bind(...ids)
     .all<{ id: number; src: string | null }>();
   const known = new Map(results.map((r) => [r.id, r.src]));
-  const changed = items.filter((i) => known.get(Number(i.noticeId)) !== srcOf(i));
-  if (changed.length) await env.DB.batch(changed.map((i) => env.DB.prepare(UPSERT_SQL).bind(...upsertValues(rowOf(i, "notice"), now))));
+  const changed = items.filter((i) => known.get(Number(i.noticeId)) !== srcOf(i)).map((i) => rowOf(i, "notice")).filter((r) => !notImo(r.title, r.body));
+  if (changed.length) await env.DB.batch(changed.map((r) => env.DB.prepare(UPSERT_SQL).bind(...upsertValues(r, now))));
 }
 
 /**
@@ -209,7 +209,7 @@ export async function refreshEvents(env: Env, lastAt: number | null, now = Date.
     .bind(...ids)
     .all<{ id: number }>();
   const known = new Set(results.map((r) => r.id));
-  const fresh = items.filter((i) => !known.has(Number(i.noticeId)));
+  const fresh = items.filter((i) => !known.has(Number(i.noticeId)) && !notImo(String(i.noticeTitle ?? ""), String(i.content ?? "")));
   if (!fresh.length) return;
   await env.DB.batch(
     fresh.map((i) => {

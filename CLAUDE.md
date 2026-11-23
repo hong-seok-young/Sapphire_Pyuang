@@ -276,6 +276,9 @@
   GitHub 서버와 Cloudflare 서울(ICN) 서버 모두 283·304. CORS 가 없어 폰 브라우저에서 바로 읽지도 못한다). 그래서 한국 PC에서
   `node scripts/fetch-official.mjs --save ../자료/공식/소식.json` 으로 받아 비공개 자료 저장소에 올리면 배포가 `--load` 로 넣는다 (공식 확률과 같은 길).
   PC에서 작업할 때 한 번씩 다시 받아 올린다 (한국 전용 새 글은 그때 들어간다).
+- 아이모가 대상이 아닌 컴투스 공통 점검 글은 넣지 않는다 (제작자 2026-11-23 '이거는 아이모 없는데 굳이 띄우지 마': '컴투스 11월 정기점검'의 대상 게임이 버디크러시·낚시의 신뿐이었다).
+  `server/officialText.ts` `notImo`(제목에 '점검', 본문에 '대상 게임', 제목·본문 어디에도 '아이모'·'IMO' 가 없음)로 받기 스크립트·`refreshMaint`·`refreshEvents` 가 거르고,
+  배포(`ci-d1.mjs`)가 이미 들어간 글을 같은 조건(SQL)으로 그 글의 요약·할 일·그림 글자·조회·좋아요·댓글·새 글 알림과 같이 지운다. 원스토어 포인트백 글은 '대상 게임'이 있어도 점검 글이 아니라 남는다.
 - 화면: 게시판의 '🎮 아이모 소식' 버튼 (`#/board?cat=imo&t=all|notice|maint|event`, `web/src/pages/Official.tsx` `OfficialList`, `/api/official`):
   안에 전체 · 공지사항 · 점검 · 이벤트 버튼, 종류 표, 제목, 날짜(이벤트 끝나는 날이 있으면 진행 중/종료), 이틀 안의 글은 NEW.
   누르면 앱 안에서 읽는다 (`#/official/번호`, `OfficialPostPage`, `/api/official/:id`): 맨 위 '📄 컴투스 공식 · 원문 보기 ↗',

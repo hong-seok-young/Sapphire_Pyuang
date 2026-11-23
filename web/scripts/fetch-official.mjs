@@ -16,7 +16,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { UPSERT_SQL, rowOf, upsertValues } from "../server/officialText.ts";
+import { UPSERT_SQL, notImo, rowOf, upsertValues } from "../server/officialText.ts";
 
 const DB = "sapphire-accounts";
 const GAME = 32; // withhive 의 아이모 번호
@@ -153,7 +153,8 @@ if (loadFrom) {
   all = process.argv.includes("--all") || count === 0;
   found = await fetchRows(all);
 }
-const statements = found.filter((r) => Number.isInteger(r?.id) && r.title).map((r) => upsert(r, now));
+// 아이모가 대상이 아닌 컴투스 공통 점검 글은 넣지 않는다 (server/officialText.ts notImo)
+const statements = found.filter((r) => Number.isInteger(r?.id) && r.title && !notImo(r.title, r.body ?? "")).map((r) => upsert(r, now));
 
 // 너무 큰 파일은 나눠 넣는다 (D1 한 번에 넣는 크기)
 let chunk = [];
