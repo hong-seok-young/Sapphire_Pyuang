@@ -1292,6 +1292,7 @@ CREATE TABLE IF NOT EXISTS diary_runs (
   t_to TEXT NOT NULL DEFAULT '',
   settle_id INTEGER,
   won REAL,
+  rate REAL,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );

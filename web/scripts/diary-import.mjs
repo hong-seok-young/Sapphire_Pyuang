@@ -1,7 +1,7 @@
 // 비공개 일지 (server/diary.ts): 비공개 자료 길드/일지_기록.json 의 줄을 diary_runs·diary_shots 에 한 번씩 넣는다.
 // 세션(Claude)이 사용자가 준 스샷을 직접 읽어 적은 기록을 올릴 때 쓴다 (AI API 를 부르지 않는다). 줄마다 key 로 setup 'diary_imp_<key>' 에 적어 두 번 넣지 않는다.
 // 배포(deploy-web.yml 'Private viewers')가 부른다. 실행 기록이 공개라 아무것도 찍지 않는다.
-// 줄 모양: { key, day, author, lv_from, exp_from, t_from, lv_to, exp_to, t_to, from: '이미지/…', to: '이미지/…' }
+// 줄 모양: { key, day, author, lv_from, exp_from, t_from, lv_to, exp_to, t_to, rate?(이 줄만 1%당 원), from: '이미지/…', to: '이미지/…' }
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -31,7 +31,7 @@ if (existsSync(LIST)) {
     const at = Date.parse(`${r.day}T12:00:00+09:00`) || Date.now();
     const id = `(SELECT MAX(id) FROM diary_runs WHERE author = ${q(r.author)} AND created_at = ${at})`;
     const lines = [
-      `INSERT INTO diary_runs (author, day, lv_from, exp_from, t_from, lv_to, exp_to, t_to, created_at, updated_at) VALUES (${q(r.author)}, ${q(r.day)}, ${n(r.lv_from)}, ${n(r.exp_from)}, ${q(r.t_from)}, ${n(r.lv_to)}, ${n(r.exp_to)}, ${q(r.t_to)}, ${at}, ${at});`,
+      `INSERT INTO diary_runs (author, day, lv_from, exp_from, t_from, lv_to, exp_to, t_to, rate, created_at, updated_at) VALUES (${q(r.author)}, ${q(r.day)}, ${n(r.lv_from)}, ${n(r.exp_from)}, ${q(r.t_from)}, ${n(r.lv_to)}, ${n(r.exp_to)}, ${q(r.t_to)}, ${n(r.rate)}, ${at}, ${at});`,
     ];
     for (const side of ["from", "to"]) {
       const p = r[side] && join(DATA, r[side]);

@@ -10,9 +10,9 @@ export const onRequestPut: PagesFunction<Env> = async ({ request, env, params })
   const r = readRun(await readJson<Record<string, unknown>>(request));
   if (typeof r === "string") return json({ error: r }, 400);
   const res = await env.DB.prepare(
-    "UPDATE diary_runs SET day = ?, lv_from = ?, exp_from = ?, t_from = ?, lv_to = ?, exp_to = ?, t_to = ?, updated_at = ? WHERE id = ? AND settle_id IS NULL",
+    "UPDATE diary_runs SET day = ?, lv_from = ?, exp_from = ?, t_from = ?, lv_to = ?, exp_to = ?, t_to = ?, rate = ?, updated_at = ? WHERE id = ? AND settle_id IS NULL",
   )
-    .bind(r.day, r.lv_from, r.exp_from, r.t_from, r.lv_to, r.exp_to, r.t_to, Date.now(), Number(params.id))
+    .bind(r.day, r.lv_from, r.exp_from, r.t_from, r.lv_to, r.exp_to, r.t_to, r.rate, Date.now(), Number(params.id))
     .run();
   return res.meta.changes ? json({ ok: true }) : json({ error: "정산한 기록은 고칠 수 없어요" }, 409);
 };

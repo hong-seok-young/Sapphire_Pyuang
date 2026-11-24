@@ -10,7 +10,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!me) return NEED_LOGIN();
   if (!canUseDiary(env, me)) return NOPE();
   const [open, rates, last] = await Promise.all([
-    env.DB.prepare("SELECT id, lv_from, exp_from, lv_to, exp_to FROM diary_runs WHERE settle_id IS NULL").all<Run>(),
+    env.DB.prepare("SELECT id, lv_from, exp_from, lv_to, exp_to, rate FROM diary_runs WHERE settle_id IS NULL").all<Run>(),
     readRates(env),
     env.DB.prepare("SELECT carry_out FROM diary_settles ORDER BY id DESC LIMIT 1").first<{ carry_out: number }>(),
   ]);

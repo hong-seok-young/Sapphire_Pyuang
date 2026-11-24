@@ -29,6 +29,8 @@ interface Run {
   t_to: string;
   settle_id: number | null;
   won: number | null;
+  /** 이 줄만 따로 정한 1%당 원 */
+  rate: number | null;
   created_at: number;
   shots: { from?: number; to?: number };
 }
@@ -66,11 +68,12 @@ function perPct(rates: Rate[], level: number): number | null {
   if (r.per_hour !== null && r.per_hour > 0 && r.test_pct !== null && r.test_pct > 0) return r.per_hour / r.test_pct;
   return null;
 }
-type Span = Pick<Run, "lv_from" | "exp_from" | "lv_to" | "exp_to">;
+type Span = Pick<Run, "lv_from" | "exp_from" | "lv_to" | "exp_to"> & { rate?: number | null };
 /** 오른 % (레벨 1 = 100%) */
 const gainOf = (r: Span) => (r.lv_to - r.lv_from) * 100 + r.exp_to - r.exp_from;
 /** 금액 (단가를 모르는 레벨이 있으면 null) */
 function valueOf(r: Span, rates: Rate[]): number | null {
+  if (r.rate != null && r.rate > 0) return gainOf(r) * r.rate;
   let sum = 0;
   for (let lv = r.lv_from; lv <= r.lv_to; lv++) {
     const p = (lv === r.lv_to ? r.exp_to : 100) - (lv === r.lv_from ? r.exp_from : 0);
@@ -290,7 +293,10 @@ function RunDetail({ r, editable, onChange }: { r: Run; editable: boolean; onCha
         />
       ) : (
         <div className="dy-detail-foot">
-          <small>{r.author}</small>
+          <small>
+            {r.author}
+            {r.rate ? ` · 1%당 ${won(r.rate)}원 고정` : ""}
+          </small>
           {editable && (
             <>
               <button className="dy-link" onClick={() => setEdit(true)}>
@@ -368,7 +374,7 @@ function EditRun({ r, onCancel, onSaved }: { r: Run; onCancel: () => void; onSav
       setErr("레벨과 경험치를 적어 주세요");
       return;
     }
-    api(`/api/diary/runs/${r.id}`, "PUT", { day: r.day, ...s, t_from: a.time, t_to: b.time })
+    api(`/api/diary/runs/${r.id}`, "PUT", { day: r.day, ...s, t_from: a.time, t_to: b.time, rate: r.rate })
       .then(onSaved)
       .catch((e: Error) => setErr(e.message));
   };

@@ -30,6 +30,8 @@ export interface Run {
   exp_from: number;
   lv_to: number;
   exp_to: number;
+  /** 이 줄만 따로 정한 1%당 원 (있으면 레벨 단가 대신 오른 % 전체에) */
+  rate?: number | null;
 }
 
 /** 그 레벨의 1%당 원 (모르면 null) */
@@ -54,6 +56,7 @@ export function gains(run: Run): { level: number; pct: number }[] {
 
 /** 그 줄의 금액 (단가를 모르는 레벨이 있으면 null) */
 export function valueOf(run: Run, rates: Rate[]): number | null {
+  if (run.rate != null && run.rate > 0) return gains(run).reduce((t, g) => t + g.pct, 0) * run.rate;
   let won = 0;
   for (const g of gains(run)) {
     if (g.pct === 0) continue;
@@ -84,7 +87,9 @@ export function readRun(b: Record<string, unknown>) {
   if (lv_from == null || lv_to == null || exp_from == null || exp_to == null) return "레벨과 경험치를 적어 주세요";
   if (!Number.isInteger(lv_from) || !Number.isInteger(lv_to)) return "레벨은 정수예요";
   if (lv_to < lv_from || lv_to - lv_from > 5) return "끝 레벨이 맞지 않아요";
-  return { day, lv_from, exp_from, lv_to, exp_to, t_from: clock(b.t_from), t_to: clock(b.t_to) };
+  const rate = num(b.rate, 1, 10_000_000);
+  if (rate === undefined) return "단가가 맞지 않아요";
+  return { day, lv_from, exp_from, lv_to, exp_to, t_from: clock(b.t_from), t_to: clock(b.t_to), rate };
 }
 
 export async function readRates(env: Env): Promise<Rate[]> {

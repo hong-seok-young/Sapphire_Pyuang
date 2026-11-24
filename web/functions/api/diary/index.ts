@@ -9,7 +9,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (!canUseDiary(env, me)) return NOPE();
   const [runs, shots, rates, settles] = await Promise.all([
     env.DB.prepare(
-      "SELECT id, author, day, lv_from, exp_from, t_from, lv_to, exp_to, t_to, settle_id, won, created_at FROM diary_runs ORDER BY day DESC, created_at DESC LIMIT 2000",
+      "SELECT id, author, day, lv_from, exp_from, t_from, lv_to, exp_to, t_to, settle_id, won, rate, created_at FROM diary_runs ORDER BY day DESC, created_at DESC LIMIT 2000",
     ).all(),
     env.DB.prepare("SELECT id, run_id, side FROM diary_shots").all<{ id: number; run_id: number; side: string }>(),
     readRates(env),
