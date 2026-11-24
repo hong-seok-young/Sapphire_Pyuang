@@ -295,15 +295,17 @@ function HomeGrid({
   slots.forEach((t, i) => {
     if (shown(t)) last = i;
   });
-  // 비공개 일지 칸 (보는 사람만, server/diary.ts): 배치에 넣지 않고 마지막 칸 바로 뒤에 (배치는 서버에 저장되고 사용 기록에 남아서). 편집 중에는 숨긴다
-  const diary = !!me.diary && !editing && last + 1 < MAX_SLOTS ? last + 1 : -1;
-  const rows = Math.ceil((Math.max(last, diary) + 1) / COLS) + (editing ? 1 : 0);
-  const n = Math.min(rows * COLS, MAX_SLOTS);
+  // 비공개 일지 칸 (보는 사람만, server/diary.ts): 배치에 넣지 않고(배치는 서버에 저장되고 사용 기록에 남아서) 명예의 전당 칸 바로 뒤에 끼워 그린다
+  // (제작자 2026-11-24 '명예 전당 다음에'. 명예의 전당이 홈에 없으면 마지막 칸 뒤). 뒤 칸들은 한 칸씩 밀려 보일 뿐 배치는 그대로. 편집 중에는 숨긴다
+  const hallAt = slots.findIndex((t) => shown(t) && t.key === "hall");
+  const diary = !!me.diary && !editing ? (hallAt >= 0 ? hallAt + 1 : last + 1) : -1;
+  const used = Math.min(last + 1, MAX_SLOTS);
+  const rows = Math.ceil((used + (diary >= 0 ? 1 : 0)) / COLS) + (editing ? 1 : 0);
+  const n = Math.min(rows * COLS, MAX_SLOTS + (diary >= 0 ? 1 : 0));
   return (
     <nav className="tiles home-tiles" data-zone="grid">
-      {Array.from({ length: n }, (_, i) => {
-        const t = slots[i];
-        if (i === diary)
+      {Array.from({ length: n }, (_, j) => {
+        if (j === diary)
           return (
             <a key="diary" className="tile" href="#/diary" draggable={false} data-notap>
               <span className="tile-icon">
@@ -312,6 +314,8 @@ function HomeGrid({
               <FitLine className="tile-title" text={me.diary ?? DIARY_TILE.title} wrap={false} />
             </a>
           );
+        const i = diary >= 0 && j > diary ? j - 1 : j;
+        const t = slots[i];
         return shown(t) ? (
           <TileCell
             key={t.key}

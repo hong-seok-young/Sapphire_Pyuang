@@ -1890,7 +1890,7 @@
 ## 비공개 일지 (제작자 2026-11-24)
 - 보는 사람만 쓰는 일지 (`#/diary`, 서버 `server/diary.ts`, API `functions/api/diary`, 화면 `src/pages/Diary.tsx`, D1 `diary_entries`). **누가 보는지와 이름은 공개 저장소(코드, 이 문서, 커밋 글)에 적지 않는다**:
   비공개 자료 `길드/일지_보기.txt`(닉네임 줄, '이름:' 줄)를 배포(`deploy-web.yml` 'Private viewers')가 Pages 비밀값 `DIARY_VIEWERS`·`DIARY_TITLE` 로 넣는다 (실행 기록에 아무것도 안 찍음). 그 파일은 챗봇 자료에서 뺀다 (`library-sync.mjs` SKIP 의 `길드/일지`).
-- 다른 사람에게는 아무 데도 없다: 홈 칸은 배치(`layouts`, 사용 기록에 남는 PUT)에 넣지 않고 `HomeGrid` 가 `/api/me` 의 `diary`(이름)를 보고 마지막 칸 뒤에 따로 그린다(`data-notap`), API 는 404,
+- 다른 사람에게는 아무 데도 없다: 홈 칸은 배치(`layouts`, 사용 기록에 남는 PUT)에 넣지 않고 `HomeGrid` 가 `/api/me` 의 `diary`(이름)를 보고 명예의 전당 칸 바로 뒤에 끼워 그린다(없으면 마지막 칸 뒤)(`data-notap`), API 는 404,
   사용 기록(`_middleware.ts` 는 `/api/diary` 모두 건너뜀, `/api/activity` 는 `#/diary` 를 버림, 화면 `reportView`·`NO_TAP_PATH` 도 안 보냄), 접수의 직전 화면(`fix.ts`)과 접수 단추(`TopBar`), 알림·챗봇·패치 내역·튜토리얼에 없다.
   일지 기능을 고치거나 새 기록·알림 기능을 만들 때 이 화면이 새어 나가지 않는지 본다.
 - 기록 한 줄 = 시작·끝 스샷 두 장 (D1 `diary_runs`·`diary_shots`, 긴 변 1200px WebP(안 되면 JPEG), 한 장 50~150KB). 사용자가 고른 스샷을 AI(`/api/diary/read`, opus effort high)가
