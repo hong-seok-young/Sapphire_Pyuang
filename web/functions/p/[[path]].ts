@@ -127,7 +127,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
       const img = (side: string, name: string) => {
         const id = pic.get(`${r.id}:${side}`);
         return id
-          ? `<figure><a href="${base}${id}" target="_blank" rel="noopener"><img src="${base}${id}" alt="${name} 사진"></a><figcaption>${name}</figcaption></figure>`
+          ? `<figure><a href="${base}${id}" class="pic" data-cap="${esc(md(r.day))} ${name}"><img src="${base}${id}" alt="${name} 사진"></a><figcaption>${name}</figcaption></figure>`
           : `<figure><span class="none">사진 없음</span><figcaption>${name}</figcaption></figure>`;
       };
       return `${gapRow}<div class="run">
@@ -196,6 +196,19 @@ figcaption{font-size:11px;color:var(--muted);text-align:center}
 .sum div:first-child{border-top:0}
 .sum span:first-child{color:var(--muted)}
 .sum .big{font-size:15px;border-top:var(--px) solid var(--edge)}.sum .big span{color:var(--gold)!important;font-weight:700}
+.lb{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;background:rgba(6,6,18,.94);opacity:0;pointer-events:none;transition:opacity .18s;touch-action:none}
+.lb.on{opacity:1;pointer-events:auto}
+.lb-top{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;color:var(--muted);font-size:13px}
+.lb-top b{color:var(--gold)}
+.lb-x{width:36px;height:36px;font:inherit;font-size:18px;color:var(--text);background:var(--panel);border:var(--px) solid var(--edge);cursor:pointer}
+.lb-stage{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:0 8px}
+.lb-stage img{max-width:100%;max-height:100%;border:var(--px) solid var(--edge);transform-origin:center;transition:transform .15s;image-rendering:auto}
+.lb.on .lb-stage img{animation:lb-pop .2s ease-out}
+@keyframes lb-pop{from{transform:scale(.9);opacity:.4}to{transform:scale(1);opacity:1}}
+.lb-nav{display:flex;justify-content:space-between;gap:8px;padding:10px 12px 18px}
+.lb-nav button{flex:1;height:40px;font:inherit;color:var(--text);background:var(--panel);border:var(--px) solid var(--edge);box-shadow:inset var(--px) var(--px) 0 var(--hi);cursor:pointer}
+.lb-nav button:disabled{opacity:.35}
+@media (prefers-reduced-motion:reduce){.lb,.lb-stage img{transition:none;animation:none!important}}
 .empty{margin:4px 0;padding:12px 6px;text-align:center;font-size:13px;color:var(--muted)}
 </style></head>
 <body><main>
@@ -216,7 +229,32 @@ ${settle.carry_in > 0.5 ? `<div><span>합계</span><span>${won(total)}원</span>
 <div class="big"><span>정산 (1,000원 단위)</span><span>${won(settle.pay)}원</span></div>
 ${total - settle.pay - settle.carry_out > 0.5 ? `<div><span>절삭 (1,000원 미만)</span><span>${won(total - settle.pay - settle.carry_out)}원</span></div>` : ""}${settle.carry_out > 0.5 ? `<div><span>다음으로 이월</span><span>${won(settle.carry_out)}원</span></div>` : ""}
 </div>
-</main></body></html>`;
+</main>
+<div class="lb" id="lb" aria-hidden="true">
+<div class="lb-top"><span><b id="lb-cap"></b> <span id="lb-n"></span></span><button class="lb-x" id="lb-x" aria-label="닫기">✕</button></div>
+<div class="lb-stage" id="lb-stage"><img id="lb-img" alt=""></div>
+<div class="lb-nav"><button id="lb-prev">◀ 이전</button><button id="lb-next">다음 ▶</button></div>
+</div>
+<script>
+(function(){
+var pics=[].slice.call(document.querySelectorAll("a.pic")),lb=document.getElementById("lb"),img=document.getElementById("lb-img"),cap=document.getElementById("lb-cap"),nn=document.getElementById("lb-n"),prev=document.getElementById("lb-prev"),next=document.getElementById("lb-next"),cur=-1,zoom=1,sx=0,sy=0,lastTap=0;
+function show(i){cur=i;var a=pics[i];img.src=a.getAttribute("href");cap.textContent=a.getAttribute("data-cap");nn.textContent=(i+1)+" / "+pics.length;prev.disabled=i<=0;next.disabled=i>=pics.length-1;setZoom(1);img.style.animation="none";void img.offsetWidth;img.style.animation="";}
+function setZoom(z){zoom=z;img.style.transform=z>1?"scale("+z+")":"";}
+function open(i){show(i);lb.classList.add("on");lb.setAttribute("aria-hidden","false");history.pushState({lb:1},"");}
+function close(){if(!lb.classList.contains("on"))return;lb.classList.remove("on");lb.setAttribute("aria-hidden","true");}
+pics.forEach(function(a,i){a.addEventListener("click",function(e){e.preventDefault();open(i);});});
+document.getElementById("lb-x").onclick=function(){history.back();};
+prev.onclick=function(e){e.stopPropagation();if(cur>0)show(cur-1);};
+next.onclick=function(e){e.stopPropagation();if(cur<pics.length-1)show(cur+1);};
+window.addEventListener("popstate",close);
+var st=document.getElementById("lb-stage");
+st.addEventListener("click",function(e){var now=Date.now();if(now-lastTap<300){setZoom(zoom>1?1:2.5);lastTap=0;return;}lastTap=now;if(e.target===st)setTimeout(function(){if(lastTap&&Date.now()-lastTap>=280&&zoom===1)history.back();},300);});
+st.addEventListener("touchstart",function(e){if(e.touches.length===1){sx=e.touches[0].clientX;sy=e.touches[0].clientY;}},{passive:true});
+st.addEventListener("touchend",function(e){if(zoom>1)return;var t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)){if(dx<0&&cur<pics.length-1)show(cur+1);else if(dx>0&&cur>0)show(cur-1);}else if(dy>90&&Math.abs(dy)>Math.abs(dx))history.back();},{passive:true});
+document.addEventListener("keydown",function(e){if(!lb.classList.contains("on"))return;if(e.key==="Escape")history.back();if(e.key==="ArrowLeft")prev.click();if(e.key==="ArrowRight")next.click();});
+})();
+</script>
+</body></html>`;
   return new Response(html, {
     headers: {
       "content-type": "text/html; charset=utf-8",
