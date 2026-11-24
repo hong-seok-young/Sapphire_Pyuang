@@ -15,6 +15,9 @@ export const canUseDiary = (env: Env, me: User) => {
 /** 칸·화면에 보일 이름 (이름도 공개 저장소에 적지 않는다) */
 export const diaryTitle = (env: Env) => (env.DIARY_TITLE ?? "").trim().slice(0, 20) || "일지";
 
+/** 본주 닉네임 (비밀값 DIARY_OWNER, 없으면 빈 글): 기록 사이 비는 구간은 본주가 직접 한 것 */
+export const diaryOwner = (env: Env) => (env.DIARY_OWNER ?? "").trim().slice(0, 20);
+
 /** 다른 사람에게는 없는 주소처럼 */
 export const NOPE = () => new Response("Not found", { status: 404 });
 

@@ -176,10 +176,12 @@ jobs:
           f="../자료/길드/일지_보기.txt"
           if [ -f "$f" ]; then
             lines=$(grep -v '^[[:space:]]*#' "$f" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' || true)
-            v=$(printf '%s\n' "$lines" | grep -v '^이름:' | grep -v '^단가:' | paste -sd, - || true)
+            v=$(printf '%s\n' "$lines" | grep -v '^이름:' | grep -v '^단가:' | grep -v '^본주:' | paste -sd, - || true)
             t=$(printf '%s\n' "$lines" | grep '^이름:' | head -1 | sed 's/^이름:[[:space:]]*//' || true)
             if [ -n "$v" ]; then printf '%s' "$v" | npx wrangler pages secret put DIARY_VIEWERS --project-name sapphire-guild > /dev/null; fi
             if [ -n "$t" ]; then printf '%s' "$t" | npx wrangler pages secret put DIARY_TITLE --project-name sapphire-guild > /dev/null; fi
+            o=$(printf '%s\n' "$lines" | grep '^본주:' | head -1 | sed 's/^본주:[[:space:]]*//' || true)
+            if [ -n "$o" ]; then printf '%s' "$o" | npx wrangler pages secret put DIARY_OWNER --project-name sapphire-guild > /dev/null; fi
             # '단가: 42 = 1000' (1%당 원) · '단가: 43 = 7000/시간' (1시간 금액): 그 레벨 단가가 아직 없을 때만 넣는다 (화면에서 고친 것이 먼저)
             sql=$(printf '%s\n' "$lines" | sed -n 's/^단가:[[:space:]]*\([0-9]\{1,2\}\)[[:space:]]*=[[:space:]]*\([0-9.]\{1,9\}\)[[:space:]]*\(\/시간\)\{0,1\}[[:space:]]*$/\1 \2 \3/p' | while read -r lv v h; do
               if [ -n "$h" ]; then echo "INSERT OR IGNORE INTO diary_rates (level, per_hour, updated_at) VALUES ($lv, $v, 0);"; else echo "INSERT OR IGNORE INTO diary_rates (level, per_pct, updated_at) VALUES ($lv, $v, 0);"; fi

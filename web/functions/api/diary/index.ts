@@ -1,7 +1,7 @@
 // GET /api/diary -> { runs, rates, settles } : 비공개 일지 (server/diary.ts). 보는 사람만, 다른 사람에게는 404. 사용 기록에 남기지 않는다 (_middleware.ts)
 import { NEED_LOGIN, currentUser, json } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { NOPE, canUseDiary, readRates } from "../../../server/diary";
+import { NOPE, canUseDiary, diaryOwner, readRates } from "../../../server/diary";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
@@ -24,7 +24,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     shotOf.set(s.run_id, o);
   }
   return json(
-    { runs: runs.results.map((r) => ({ ...r, shots: shotOf.get((r as { id: number }).id) ?? {} })), rates, settles: settles.results.map((x) => ({ ...x, share: shareOf.get((x as { id: number }).id) ?? null })) },
+    { owner: diaryOwner(env), runs: runs.results.map((r) => ({ ...r, shots: shotOf.get((r as { id: number }).id) ?? {} })), rates, settles: settles.results.map((x) => ({ ...x, share: shareOf.get((x as { id: number }).id) ?? null })) },
     200,
     { "cache-control": "no-store" },
   );

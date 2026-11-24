@@ -2,7 +2,7 @@
 // 링크는 화면의 '정산서 보내기'가 만든다 (api/diary/share.ts, 표 diary_shares). 앱 화면·코드를 받지 않는 글 한 장이라 길드 이름도 없다.
 // 토큰을 모르면 404. 사용 기록에 남지 않는다 (/api 밖이라 사용 기록 미들웨어를 안 거친다).
 import type { Env } from "../../server/auth";
-import { perPct } from "../../server/diary";
+import { diaryOwner, perPct } from "../../server/diary";
 import type { Rate } from "../../server/diary";
 
 interface Row {
@@ -94,8 +94,17 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
       return `<div><span>Lv.${lv}</span><span><b>${priceText(rates, lv, p)}</b><small>1%당 ${won(p)}원</small></span></div>`;
     })
     .join("");
+  const owner = diaryOwner(env);
+  const pos = (lv: number, exp: number) => lv * 100 + exp;
   const rows = runs.results
-    .map((r) => {
+    .map((r, i) => {
+      // 앞 기록 끝과 이 기록 시작 사이가 비면 그 구간은 본주가 직접 한 것
+      const before = runs.results[i - 1];
+      const jump = before ? pos(r.lv_from, r.exp_from) - pos(before.lv_to, before.exp_to) : 0;
+      const gapRow =
+        before && jump > 0.0005
+          ? `<div class="gap"><span>${esc(owner ? owner + "님이 직접" : "본주가 직접")}</span><span>Lv.${before.lv_to} ${pct(before.exp_to)}% → Lv.${r.lv_from} ${pct(r.exp_from)}%</span><span>+${pct(jump)}%</span><span>-</span></div>`
+          : "";
       const g = gain(r);
       const w = r.won ?? 0;
       const per = g > 0 ? w / g : 0;
@@ -105,7 +114,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
           ? `<figure><figcaption>${name}</figcaption><a href="${base}${id}" target="_blank" rel="noopener"><img loading="lazy" src="${base}${id}" alt="${name} 사진"></a></figure>`
           : `<figure class="none"><figcaption>${name}</figcaption><span>사진 없음</span></figure>`;
       };
-      return `<details>
+      return `${gapRow}<details>
 <summary>
 <span class="d">${esc(dayText(r.day))}</span>
 <span class="p"><b>Lv.${r.lv_from}</b> ${pct(r.exp_from)}%${r.t_from ? `<small>${esc(r.t_from)}</small>` : ""}</span>
@@ -153,6 +162,8 @@ details[open] summary{background:#2a2556}
 figure{margin:0}figcaption{font-size:12px;color:var(--dim);margin-bottom:3px}
 figure img{display:block;width:100%;border-radius:8px;border:1px solid var(--line)}
 figure.none span{display:block;padding:20px 0;text-align:center;color:var(--dim);border:1px dashed var(--line);border-radius:8px;font-size:12px}
+.gap{display:grid;grid-template-columns:5.6em minmax(0,1fr) 4.8em 3em;gap:6px;align-items:center;padding:6px 10px;font-size:12px;color:var(--dim);border-bottom:1px solid var(--line);background:repeating-linear-gradient(135deg,rgba(255,255,255,.03) 0 6px,transparent 6px 12px)}
+.gap span:first-child{color:#8fb4ff;font-weight:600}.gap span:nth-child(n+3){text-align:right}
 .hint{font-size:12px;color:var(--dim);margin:6px 2px 16px}
 .price{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:6px 14px;margin-bottom:12px}
 .price h2{margin:4px 0 2px;font-size:13px;color:var(--dim);font-weight:600}

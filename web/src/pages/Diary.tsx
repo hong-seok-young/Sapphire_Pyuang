@@ -4,7 +4,7 @@
 // 기록 = 시작·끝 스샷 두 장. 사용자가 갤러리에서 고른 스샷을 AI 가 읽어(/api/diary/read: 레벨, 경험치 %, 게임 시각) 칸을 채우고 사람이 보고 고쳐 올린다.
 // 표는 한 줄에 날짜 · 시작 · 끝 · 증감 · 금액, 줄을 누르면 증거 사진. 금액 = 오른 % x 그 레벨 1%당 단가 (레벨이 오른 줄은 레벨마다 나눈다, 서버 valueOf 와 같은 셈).
 // 정산: 정산 안 한 줄 합 + 지난 이월, 1000원 아래는 버려 다음 정산으로.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { api, apiHeaders } from "../auth";
 import type { Me } from "../auth";
 import { Loading, TopBar } from "../ui";
@@ -47,6 +47,8 @@ interface Settle {
   share?: string | null;
 }
 interface Data {
+  /** 본주 (기록 사이 비는 구간 = 본주가 직접 한 구간) */
+  owner?: string;
   runs: Run[];
   rates: Rate[];
   settles: Settle[];
@@ -58,6 +60,8 @@ const WEEK = "일월화수목금토";
 const weekOf = (day: string) => WEEK[new Date(Date.parse(day + "T12:00:00+09:00")).getUTCDay()];
 const md = (day: string) => `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))}`;
 const won = (n: number) => Math.round(n).toLocaleString("ko-KR");
+/** 레벨과 경험치를 한 값으로 (Lv.42 93.8% -> 4293.8) */
+const posOf = (lv: number, exp: number) => lv * 100 + exp;
 const pct = (n: number) => (n > 0 ? "+" : "") + n.toFixed(3) + "%";
 const hm = (t: string) => t.split(":").slice(0, 2).join(":");
 const shotUrl = (id: number) => `/api/diary/shots/${id}`;
@@ -139,16 +143,16 @@ export function DiaryPage({ me }: { me: Me }) {
             <small>시작 · 끝 스샷 두 장</small>
           </button>
         )}
-        <OpenRuns runs={open} rates={data.rates} carry={carry} onChange={() => void load()} />
+        <OpenRuns runs={open} rates={data.rates} carry={carry} owner={data.owner} onChange={() => void load()} />
         <Rates rates={data.rates} onChange={() => void load()} />
-        <Settles settles={data.settles} runs={data.runs} rates={data.rates} onChange={() => void load()} />
+        <Settles settles={data.settles} runs={data.runs} rates={data.rates} owner={data.owner} onChange={() => void load()} />
       </div>
     </>
   );
 }
 
 /** 정산 안 한 기록 표와 합계, 정산 단추 */
-function OpenRuns({ runs, rates, carry, onChange }: { runs: Run[]; rates: Rate[]; carry: number; onChange: () => void }) {
+function OpenRuns({ runs, rates, carry, owner, onChange }: { runs: Run[]; rates: Rate[]; carry: number; owner?: string; onChange: () => void }) {
   const [sure, setSure] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -180,7 +184,7 @@ function OpenRuns({ runs, rates, carry, onChange }: { runs: Run[]; rates: Rate[]
         <b>정산 전</b>
         <small>{runs.length}개</small>
       </header>
-      {runs.length ? <RunTable runs={runs} rates={rates} editable onChange={onChange} /> : <p className="dy-empty">정산 전 기록이 없어요</p>}
+      {runs.length ? <RunTable runs={runs} rates={rates} owner={owner} editable onChange={onChange} /> : <p className="dy-empty">정산 전 기록이 없어요</p>}
       <div className="dy-total">
         <span>
           합계 <b>{pct(gain)}</b>
@@ -210,8 +214,10 @@ function OpenRuns({ runs, rates, carry, onChange }: { runs: Run[]; rates: Rate[]
 }
 
 /** 기록 표: 날짜 · 시작 · 끝 · 증감 · 금액, 줄을 누르면 사진 */
-function RunTable({ runs, rates, editable = false, onChange }: { runs: Run[]; rates: Rate[]; editable?: boolean; onChange: () => void }) {
+function RunTable({ runs: list, rates, owner, editable = false, onChange }: { runs: Run[]; rates: Rate[]; owner?: string; editable?: boolean; onChange: () => void }) {
   const [openId, setOpenId] = useState<number | null>(null);
+  // 새 것이 위 (날짜, 같은 날은 시작 경험치 순). 위 줄 시작이 아래 줄 끝보다 높으면 그 사이는 본주가 직접 한 구간
+  const runs = useMemo(() => [...list].sort((a, b) => b.day.localeCompare(a.day) || posOf(b.lv_from, b.exp_from) - posOf(a.lv_from, a.exp_from)), [list]);
   return (
     <div className="dy-table" role="table">
       <div className="dy-tr dy-th" role="row">
@@ -221,11 +227,14 @@ function RunTable({ runs, rates, editable = false, onChange }: { runs: Run[]; ra
         <span>증감</span>
         <span>금액</span>
       </div>
-      {runs.map((r) => {
+      {runs.map((r, i) => {
         const v = runValue(r, rates);
         const on = openId === r.id;
+        const prev = runs[i + 1];
+        const gap = prev ? posOf(r.lv_from, r.exp_from) - posOf(prev.lv_to, prev.exp_to) : 0;
         return (
-          <div key={r.id} className={"dy-run" + (on ? " dy-run-on" : "")}>
+          <Fragment key={r.id}>
+          <div className={"dy-run" + (on ? " dy-run-on" : "")}>
             <button className="dy-tr" role="row" onClick={() => setOpenId(on ? null : r.id)} aria-expanded={on}>
               <span className="dy-td-day">
                 {md(r.day)}
@@ -244,6 +253,17 @@ function RunTable({ runs, rates, editable = false, onChange }: { runs: Run[]; ra
             </button>
             {on && <RunDetail r={r} editable={editable && r.settle_id === null} onChange={onChange} />}
           </div>
+          {gap > 0.0005 && prev && (
+            <div className="dy-gap" role="row">
+              <span>{owner ? `${owner}님이 직접` : "본주가 직접"}</span>
+              <span>
+                {prev.lv_to} · {prev.exp_to.toFixed(3)} → {r.lv_from} · {r.exp_from.toFixed(3)}
+              </span>
+              <span>+{gap.toFixed(3)}</span>
+              <span>-</span>
+            </div>
+          )}
+          </Fragment>
         );
       })}
     </div>
@@ -718,7 +738,7 @@ function RateRow({ r, onChange }: { r: Rate; onChange: () => void }) {
 }
 
 /** 지난 정산: 누르면 그때 기록. 가장 최근 정산은 취소할 수 있다 */
-function Settles({ settles, runs, rates, onChange }: { settles: Settle[]; runs: Run[]; rates: Rate[]; onChange: () => void }) {
+function Settles({ settles, runs, rates, owner, onChange }: { settles: Settle[]; runs: Run[]; rates: Rate[]; owner?: string; onChange: () => void }) {
   const [openId, setOpenId] = useState<number | null>(null);
   const [sure, setSure] = useState(false);
   const bySettle = useMemo(() => {
@@ -760,7 +780,7 @@ function Settles({ settles, runs, rates, onChange }: { settles: Settle[]; runs: 
             </button>
             {on && (
               <div className="dy-settled-body">
-                <RunTable runs={bySettle.get(s.id) ?? []} rates={rates} onChange={onChange} />
+                <RunTable runs={bySettle.get(s.id) ?? []} rates={rates} owner={owner} onChange={onChange} />
                 <div className="dy-carry">
                   <span>
                     기록 합 {won(s.sum)}원{s.carry_in > 0.5 ? ` + 이월 ${won(s.carry_in)}원` : ""}
