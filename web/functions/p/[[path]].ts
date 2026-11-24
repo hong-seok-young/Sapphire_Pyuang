@@ -212,9 +212,9 @@ ${priceRows ? `<div class="box price"><div class="box-head"><b>단가</b></div>$
 <div class="box sum">
 <div><span>기록 합</span><span>${won(settle.sum)}원</span></div>
 ${settle.carry_in > 0.5 ? `<div><span>지난 이월</span><span>+${won(settle.carry_in)}원</span></div>` : ""}
-<div><span>합계</span><span>${won(total)}원</span></div>
+${settle.carry_in > 0.5 ? `<div><span>합계</span><span>${won(total)}원</span></div>` : ""}
 <div class="big"><span>정산 (1,000원 단위)</span><span>${won(settle.pay)}원</span></div>
-<div><span>다음으로 이월</span><span>${won(settle.carry_out)}원</span></div>
+${total - settle.pay - settle.carry_out > 0.5 ? `<div><span>절삭 (1,000원 미만)</span><span>${won(total - settle.pay - settle.carry_out)}원</span></div>` : ""}${settle.carry_out > 0.5 ? `<div><span>다음으로 이월</span><span>${won(settle.carry_out)}원</span></div>` : ""}
 </div>
 </main></body></html>`;
   return new Response(html, {

@@ -125,7 +125,6 @@ export function DiaryPage({ me }: { me: Me }) {
     );
 
   const open = data.runs.filter((r) => r.settle_id === null);
-  const carry = data.settles[0]?.carry_out ?? 0;
   return (
     <>
       <TopBar title={title} />
@@ -145,7 +144,7 @@ export function DiaryPage({ me }: { me: Me }) {
             <small>시작 · 끝 스샷 두 장</small>
           </button>
         )}
-        <OpenRuns runs={open} rates={data.rates} carry={carry} owner={data.owner} onChange={() => void load()} />
+        <OpenRuns runs={open} rates={data.rates} owner={data.owner} onChange={() => void load()} />
         <Rates rates={data.rates} onChange={() => void load()} />
         <Settles settles={data.settles} runs={data.runs} rates={data.rates} owner={data.owner} onChange={() => void load()} />
       </div>
@@ -154,7 +153,7 @@ export function DiaryPage({ me }: { me: Me }) {
 }
 
 /** 정산 안 한 기록 표와 합계, 정산 단추 */
-function OpenRuns({ runs, rates, carry, owner, onChange }: { runs: Run[]; rates: Rate[]; carry: number; owner?: string; onChange: () => void }) {
+function OpenRuns({ runs, rates, owner, onChange }: { runs: Run[]; rates: Rate[]; owner?: string; onChange: () => void }) {
   const [sure, setSure] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -162,7 +161,8 @@ function OpenRuns({ runs, rates, carry, owner, onChange }: { runs: Run[]; rates:
   const missing = vals.some((v) => v === null);
   const sum = vals.reduce<number>((t, v) => t + (v ?? 0), 0);
   const gain = runs.reduce((t, r) => t + gainOf(r), 0);
-  const total = sum + carry;
+  // 1000원 아래는 절삭 (이월 없음)
+  const total = sum;
   const pay = Math.max(0, Math.floor(total / UNIT) * UNIT);
   const settle = () => {
     if (!sure) {
@@ -196,17 +196,11 @@ function OpenRuns({ runs, rates, carry, owner, onChange }: { runs: Run[]; rates:
           {missing && <em className="dy-warn"> + 단가 없음</em>}
         </span>
       </div>
-      {carry > 0.5 && (
-        <div className="dy-carry">
-          <span>지난 이월</span>
-          <span>+{won(carry)}원</span>
-        </div>
-      )}
       {runs.length > 0 && (
         <>
           <button className={"dy-settle" + (sure ? " dy-settle-sure" : "")} onClick={settle} disabled={busy || missing}>
             {missing ? "단가 없는 레벨이 있어요" : sure ? `${won(pay)}원 정산 확인` : `정산 ${won(pay)}원`}
-            {!missing && <small>{total - pay > 0.5 ? `이월 ${won(total - pay)}원` : "이월 없음"}</small>}
+            {!missing && <small>{total - pay > 0.5 ? `절삭 ${won(total - pay)}원` : "절삭 없음"}</small>}
           </button>
           {err && <p className="dy-err">{err}</p>}
         </>
@@ -778,7 +772,7 @@ function Settles({ settles, runs, rates, owner, onChange }: { settles: Settle[];
               </span>
               <b>{won(s.pay)}원</b>
               <small>
-                {s.runs}개{s.carry_out > 0.5 ? ` · 이월 ${won(s.carry_out)}` : ""}
+                {s.runs}개{s.sum + s.carry_in - s.pay - s.carry_out > 0.5 ? ` · 절삭 ${won(s.sum + s.carry_in - s.pay - s.carry_out)}` : ""}
               </small>
             </button>
             {on && (
