@@ -36,6 +36,16 @@ if (existsSync(LIST)) {
       run("--file", file);
       continue;
     }
+    // 정산 고침 줄: { key, settle_at: '2026-11-23T23:00:00+09:00', carry_out } (그 때 정산의 이월을 바꾼다)
+    if (r.settle_at) {
+      const sat = Date.parse(r.settle_at);
+      if (!sat) continue;
+      const sql = `UPDATE diary_settles SET carry_out = ${n(r.carry_out) === "NULL" ? 0 : n(r.carry_out)} WHERE at = ${sat};\nINSERT OR REPLACE INTO setup (key, done_at) VALUES (${q(key)}, ${Date.now()});`;
+      const file = join(dir, key + ".sql");
+      writeFileSync(file, sql);
+      run("--file", file);
+      continue;
+    }
     const at = Date.parse(`${r.day}T12:00:00+09:00`) || Date.now();
     const id = `(SELECT MAX(id) FROM diary_runs WHERE author = ${q(r.author)} AND created_at = ${at})`;
     const lines = [
@@ -56,7 +66,7 @@ if (existsSync(LIST)) {
       const pay = Number(r.settled.pay ?? Math.floor(won / 1000) * 1000);
       const sat = Date.parse(r.settled.at) || at;
       lines.push(
-        `INSERT INTO diary_settles (at, by_user, runs, sum, carry_in, pay, carry_out) VALUES (${sat}, ${q(r.author)}, 1, ${won}, 0, ${pay}, ${won - pay});`,
+        `INSERT INTO diary_settles (at, by_user, runs, sum, carry_in, pay, carry_out) VALUES (${sat}, ${q(r.author)}, 1, ${won}, 0, ${pay}, ${r.settled.carry_out ?? won - pay});`,
         `UPDATE diary_runs SET settle_id = (SELECT MAX(id) FROM diary_settles WHERE at = ${sat}), won = ${won} WHERE id = ${id};`,
       );
     }

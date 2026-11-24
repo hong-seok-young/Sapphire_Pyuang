@@ -50,6 +50,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env }) => {
   await env.DB.batch([
     env.DB.prepare("UPDATE diary_runs SET settle_id = NULL, won = NULL WHERE settle_id = ?").bind(last.id),
     env.DB.prepare("DELETE FROM diary_settles WHERE id = ?").bind(last.id),
+    env.DB.prepare("DELETE FROM diary_shares WHERE settle_id = ?").bind(last.id),
   ]);
   return json({ ok: true });
 };

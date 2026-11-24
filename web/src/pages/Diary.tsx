@@ -43,6 +43,8 @@ interface Settle {
   carry_in: number;
   pay: number;
   carry_out: number;
+  /** 정산서 링크 토큰 (만들었으면) */
+  share?: string | null;
 }
 interface Data {
   runs: Run[];
@@ -762,6 +764,7 @@ function Settles({ settles, runs, rates, onChange }: { settles: Settle[]; runs: 
                   </span>
                   <span>{s.by_user}</span>
                 </div>
+                <SendSheet s={s} onMade={onChange} />
                 {i === 0 && (
                   <button className={"dy-link dy-undo" + (sure ? " dy-sure" : "")} onClick={undo}>
                     {sure ? "정말 정산 취소" : "정산 취소"}
@@ -773,5 +776,46 @@ function Settles({ settles, runs, rates, onChange }: { settles: Settle[]; runs: 
         );
       })}
     </section>
+  );
+}
+
+/** 정산서 보내기: 로그인 없이 보는 정산서 링크(/p/<토큰>)를 복사한다. 처음 누를 때 링크를 만든다 */
+function SendSheet({ s, onMade }: { s: Settle; onMade: () => void }) {
+  const [url, setUrl] = useState(s.share ? location.origin + "/p/" + s.share : "");
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const copy = (u: string) => {
+    const done = () => setMsg("링크를 복사했어요");
+    const fail = () => setMsg("아래 링크를 길게 눌러 복사해 주세요");
+    try {
+      if (navigator.clipboard?.writeText) void navigator.clipboard.writeText(u).then(done, fail);
+      else fail();
+    } catch {
+      fail();
+    }
+  };
+  const send = () => {
+    if (url) return copy(url);
+    setBusy(true);
+    setMsg("");
+    api<{ url: string }>("/api/diary/share", "POST", { settle: s.id })
+      .then((r) => {
+        setUrl(r.url);
+        copy(r.url);
+        onMade();
+      })
+      .catch((e: Error) => setMsg(e.message))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <div className="dy-send">
+      <button className="pill dy-send-btn" onClick={send} disabled={busy}>
+        {busy ? "링크 만드는 중" : "정산서 보내기"}
+      </button>
+      {msg && <small>{msg}</small>}
+      {url && (
+        <input className="mk-input dy-send-url" readOnly value={url} onFocus={(e) => e.currentTarget.select()} aria-label="정산서 링크" />
+      )}
+    </div>
   );
 }

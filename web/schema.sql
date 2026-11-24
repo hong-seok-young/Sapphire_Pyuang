@@ -1328,3 +1328,10 @@ CREATE TABLE IF NOT EXISTS diary_settles (
   pay REAL NOT NULL,
   carry_out REAL NOT NULL
 );
+-- 정산서 링크: 로그인 없이 /p/<token> 으로 그 정산 하나만 본다 (정산을 취소하면 같이 지움)
+CREATE TABLE IF NOT EXISTS diary_shares (
+  token TEXT PRIMARY KEY,
+  settle_id INTEGER NOT NULL UNIQUE,
+  created_by TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
