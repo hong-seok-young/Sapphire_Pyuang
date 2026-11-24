@@ -216,8 +216,8 @@ function OpenRuns({ runs, rates, carry, owner, onChange }: { runs: Run[]; rates:
 /** 기록 표: 날짜 · 시작 · 끝 · 증감 · 금액, 줄을 누르면 사진 */
 function RunTable({ runs: list, rates, owner, editable = false, onChange }: { runs: Run[]; rates: Rate[]; owner?: string; editable?: boolean; onChange: () => void }) {
   const [openId, setOpenId] = useState<number | null>(null);
-  // 새 것이 위 (날짜, 같은 날은 시작 경험치 순). 위 줄 시작이 아래 줄 끝보다 높으면 그 사이는 본주가 직접 한 구간
-  const runs = useMemo(() => [...list].sort((a, b) => b.day.localeCompare(a.day) || posOf(b.lv_from, b.exp_from) - posOf(a.lv_from, a.exp_from)), [list]);
+  // 시간 흐름대로 위에서 아래로 (날짜, 같은 날은 시작 경험치 순). 앞 줄 끝보다 이 줄 시작이 높으면 그 사이는 본주가 직접 한 구간
+  const runs = useMemo(() => [...list].sort((a, b) => a.day.localeCompare(b.day) || posOf(a.lv_from, a.exp_from) - posOf(b.lv_from, b.exp_from)), [list]);
   return (
     <div className="dy-table" role="table">
       <div className="dy-tr dy-th" role="row">
@@ -230,10 +230,20 @@ function RunTable({ runs: list, rates, owner, editable = false, onChange }: { ru
       {runs.map((r, i) => {
         const v = runValue(r, rates);
         const on = openId === r.id;
-        const prev = runs[i + 1];
+        const prev = runs[i - 1];
         const gap = prev ? posOf(r.lv_from, r.exp_from) - posOf(prev.lv_to, prev.exp_to) : 0;
         return (
           <Fragment key={r.id}>
+          {gap > 0.0005 && prev && (
+            <div className="dy-gap" role="row">
+              <span>{owner ? `${owner}님이 직접` : "본주가 직접"}</span>
+              <span>
+                {prev.lv_to} · {prev.exp_to.toFixed(3)} → {r.lv_from} · {r.exp_from.toFixed(3)}
+              </span>
+              <span>+{gap.toFixed(3)}</span>
+              <span>-</span>
+            </div>
+          )}
           <div className={"dy-run" + (on ? " dy-run-on" : "")}>
             <button className="dy-tr" role="row" onClick={() => setOpenId(on ? null : r.id)} aria-expanded={on}>
               <span className="dy-td-day">
@@ -253,16 +263,6 @@ function RunTable({ runs: list, rates, owner, editable = false, onChange }: { ru
             </button>
             {on && <RunDetail r={r} editable={editable && r.settle_id === null} onChange={onChange} />}
           </div>
-          {gap > 0.0005 && prev && (
-            <div className="dy-gap" role="row">
-              <span>{owner ? `${owner}님이 직접` : "본주가 직접"}</span>
-              <span>
-                {prev.lv_to} · {prev.exp_to.toFixed(3)} → {r.lv_from} · {r.exp_from.toFixed(3)}
-              </span>
-              <span>+{gap.toFixed(3)}</span>
-              <span>-</span>
-            </div>
-          )}
           </Fragment>
         );
       })}
