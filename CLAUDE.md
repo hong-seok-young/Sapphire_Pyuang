@@ -1887,6 +1887,13 @@
   -> 정보 수정 옵션 통일 -> 신청·수락·대여 완료(마일리지 보증금) -> 반납(마일리지 돌려받음) -> 기부 지움(마일리지·명예의 전당 같이 줄어듦), 만든 것은 끝에 지운다.
   2026-11-10 29가지 통과. 이 흐름에 칸이나 단계를 더하면 이 스크립트에도 같이 더한다. 건의 결재선은 `web/scripts/test-flow-suggest.mjs`. 새로 연동 기능을 만들면 같은 식으로 `web/scripts/test-flow-<이름>.mjs` 를 만든다.
 
+## 비공개 일지 (제작자 2026-11-24)
+- 보는 사람만 쓰는 일지 (`#/diary`, 서버 `server/diary.ts`, API `functions/api/diary`, 화면 `src/pages/Diary.tsx`, D1 `diary_entries`). **누가 보는지와 이름은 공개 저장소(코드, 이 문서, 커밋 글)에 적지 않는다**:
+  비공개 자료 `길드/일지_보기.txt`(닉네임 줄, '이름:' 줄)를 배포(`deploy-web.yml` 'Private viewers')가 Pages 비밀값 `DIARY_VIEWERS`·`DIARY_TITLE` 로 넣는다 (실행 기록에 아무것도 안 찍음). 그 파일은 챗봇 자료에서 뺀다 (`library-sync.mjs` SKIP 의 `길드/일지`).
+- 다른 사람에게는 아무 데도 없다: 홈 칸은 배치(`layouts`, 사용 기록에 남는 PUT)에 넣지 않고 `HomeGrid` 가 `/api/me` 의 `diary`(이름)를 보고 마지막 칸 뒤에 따로 그린다(`data-notap`), API 는 404,
+  사용 기록(`_middleware.ts` 는 `/api/diary` 모두 건너뜀, `/api/activity` 는 `#/diary` 를 버림, 화면 `reportView`·`NO_TAP_PATH` 도 안 보냄), 접수의 직전 화면(`fix.ts`)과 접수 단추(`TopBar`), 알림·챗봇·패치 내역·튜토리얼에 없다.
+  일지 기능을 고치거나 새 기록·알림 기능을 만들 때 이 화면이 새어 나가지 않는지 본다.
+
 ## 화면 기록 서버 저장 (제작자 2026-11-19 '여기 말고도 다른 메뉴들도 설마 로컬에만 남는 거 아니지? 모든 거를 서버에 기록을 하면 좋을 것 같아, 리스크 검토해 주고 없으면 적용')
 - 화면들이 이 기기(localStorage)에만 두던 사람의 기록을 캐릭터마다 계정 DB 에도 둔다: `src/userSync.ts`(SYNC 표), `functions/api/kv.ts`, D1 `user_kv`(user_id, 열쇠, 값(NULL = 지운 것), 고친 때).
   화면 코드는 그대로 localStorage 를 쓰고, `Storage.prototype.setItem·removeItem` 을 지켜보다 SYNC 표의 열쇠만 3초 모아 PUT (다른 앱으로 가면 바로, keepalive). 늦게 고친 것만 덮는다.

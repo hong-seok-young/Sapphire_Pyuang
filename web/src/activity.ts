@@ -166,7 +166,7 @@ let tapTimer = 0;
 const TAP_MAX = 60;
 const TAP_WAIT = 120_000;
 const TAP_TARGET = "button, a, [role=button], [role=tab], [role=switch], [role=menuitem], summary, label, input[type=checkbox], input[type=radio]";
-const NO_TAP_PATH = /^#\/(log|password)(?:$|[/?])/;
+const NO_TAP_PATH = /^#\/(log|password|diary)(?:$|[/?])/;
 
 /** 단추의 이름: 보이는 글, 없으면 aria-label · title · 그림 설명 */
 function tapLabel(el: HTMLElement): string {
@@ -251,6 +251,8 @@ export function reportView(hash: string) {
   window.clearTimeout(timer);
   timer = window.setTimeout(() => {
     const path = hash.startsWith("#/") ? hash : "#/";
+    // 비공개 일지 화면은 보내지 않는다 (server/diary.ts)
+    if (/^#\/diary(?:$|[/?])/.test(path)) return;
     if (path === lastSent) return;
     lastSent = path;
     fetch("/api/activity", {

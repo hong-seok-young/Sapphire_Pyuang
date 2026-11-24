@@ -5,6 +5,7 @@ import { NEED_LOGIN, currentUser, json, meInfo, renewSession } from "../../serve
 import type { Env } from "../../server/auth";
 import { grantRentDonation } from "../../server/donate";
 import { dexBackupAsk } from "../../server/dexBackup";
+import { canUseDiary, diaryTitle } from "../../server/diary";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil }) => {
   const me = await currentUser(env, request);
@@ -16,5 +17,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, waitUntil
   // 도감 완료 체크 백업을 기다리는 사람 (server/dexBackup.ts, 명단에 있을 때만 읽는다)
   const ids = info.characters?.map((c) => c.id) ?? [me.id];
   const ask = await dexBackupAsk(env, ids).catch(() => false);
-  return json(ask ? { ...info, dexBackupAsk: true } : info, 200, renewed ? { "set-cookie": renewed } : {});
+  // 비공개 일지를 보는 사람에게만 표시를 붙인다 (다른 사람에게는 칸이 있는지도 모르게, server/diary.ts)
+  const extra = { ...(ask ? { dexBackupAsk: true } : {}), ...(canUseDiary(env, me) ? { diary: diaryTitle(env) } : {}) };
+  return json({ ...info, ...extra }, 200, renewed ? { "set-cookie": renewed } : {});
 };

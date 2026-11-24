@@ -210,7 +210,8 @@ export function TopBar({
       )}
       {right ?? (
         <span className="topbar-right">
-          <FixButton />
+          {/* 비공개 일지 화면에는 접수 단추를 두지 않는다 (접수는 운영진이 보고 화면 주소가 붙는다, server/diary.ts) */}
+          {!location.hash.startsWith("#/diary") && <FixButton />}
           {star}
           {!location.hash.startsWith("#/alerts") && (
             <Bell className="topbar-me" size={18} />

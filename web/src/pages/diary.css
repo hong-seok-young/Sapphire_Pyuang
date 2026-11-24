@@ -1,0 +1,36 @@
+/* 비공개 일지 (src/pages/Diary.tsx 가 읽는다: 화면 조각과 같이 받는다). 화면 폭 대원칙: 칸은 minmax(0, 1fr), 320px 에서 확인 */
+.dy { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.dy-sum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.dy-sum > span { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; text-align: center; font-size: 12px; color: var(--muted); background: rgba(11, 10, 26, 0.5); }
+.dy-sum b { font-size: 15px; color: var(--gold); }
+.dy-sum small { font-size: 11px; }
+.dy-new { display: block; width: 100%; padding: 12px 10px; text-align: center; color: var(--gold); cursor: pointer; background: var(--panel); border: var(--px) dashed var(--hi); }
+.dy-new:active { transform: scale(0.98); }
+.dy-empty { margin: 4px 0; padding: 14px 6px; text-align: center; font-size: 13px; color: var(--muted); }
+.dy-card { padding: 10px; background: var(--panel); border: var(--px) solid var(--edge); display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.dy-card p { margin: 0; font-size: 13px; }
+.dy-card-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.dy-card-head b { color: var(--gold); font-size: 14px; }
+.dy-card-head small { margin-left: auto; color: var(--muted); font-size: 11px; }
+.dy-time { font-size: 12px; color: var(--text); opacity: 0.85; }
+.dy-place { color: var(--text); }
+.dy-lv em { font-style: normal; color: #4fd18b; font-weight: bold; }
+.dy-gold { color: #f2c94c; }
+.dy-items { color: #9fd3ff; }
+.dy-note { white-space: pre-wrap; color: var(--muted); }
+.dy-minus, .dy-lv em.dy-minus { color: #ff7a7a; }
+.dy-card-foot { display: flex; justify-content: flex-end; gap: 14px; margin-top: 2px; }
+.dy-link { padding: 2px 0; font-size: 12px; color: var(--muted); background: none; border: 0; cursor: pointer; }
+.dy-sure { color: #ff7a7a; font-weight: bold; }
+.dy-form { padding: 10px; background: var(--panel-2, var(--panel)); border: var(--px) solid var(--gold); display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.dy-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dy-row .btn { min-width: 0; }
+.dy-day b { flex: 1; min-width: 0; text-align: center; color: var(--gold); font-size: 14px; }
+.dy-day .pill { padding: 4px 10px; font-size: 12px; }
+.dy-f { display: grid; grid-template-columns: 74px minmax(0, 1fr); align-items: center; gap: 6px; }
+.dy-f > span { font-size: 12px; color: var(--muted); }
+.dy-f .mk-input { width: 100%; height: 36px; font-size: 15px; }
+.dy-lvin { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.4fr) auto; align-items: center; gap: 4px; }
+.dy-lvin em { font-style: normal; font-size: 12px; color: var(--muted); }
+.dy-text { width: 100%; padding: 8px 10px; font: inherit; font-size: 15px; color: var(--text); background: var(--panel); border: var(--px) solid var(--edge); border-radius: 0; resize: vertical; }
+.dy-err { margin: 0; font-size: 12px; color: #ff7a7a; }

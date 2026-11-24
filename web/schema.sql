@@ -1261,3 +1261,22 @@ CREATE TABLE IF NOT EXISTS user_kv (
   at INTEGER NOT NULL,
   PRIMARY KEY (user_id, k)
 );
+
+-- 비공개 일지 (server/diary.ts): 보는 사람만 읽고 쓴다
+CREATE TABLE IF NOT EXISTS diary_entries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  author TEXT NOT NULL,
+  day TEXT NOT NULL,
+  time TEXT NOT NULL DEFAULT '',
+  place TEXT NOT NULL DEFAULT '',
+  lv_from INTEGER,
+  exp_from REAL,
+  lv_to INTEGER,
+  exp_to REAL,
+  gold REAL,
+  items TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS diary_entries_day ON diary_entries (day);

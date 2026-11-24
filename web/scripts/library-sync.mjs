@@ -25,7 +25,7 @@ const persist = local && process.env.D1_PERSIST ? [`--persist-to=${process.env.D
 const CHUNK = 2000;
 const TEXT = /\.(md|txt|json|csv|tsv)$/i;
 // fandom/: 해외 팬 위키를 긁은 영어 원문·목록(articles.jsonl, index.json, images.json …)은 한국어 질문에 걸리지 않고 조각만 늘린다 -> 한국어 번역(fandom/ko/*.md)과 한국어 가이드(guide_ko.txt)만
-const SKIP = [/^\.git\//, /^scripts\//, /^이미지\//, /^도감\/작업\//, /^드랍표_원본\//, /^공식\/소식\.json$/, /^공식\/확률\//, /^저장할_글_/, /^2차_링크\.json$/, /^길드\/익명_보기\.txt$/, /^fandom\/(?!ko\/[^/]+\.md$|guide_ko\.txt$|그림글\.md$)/, /^링크\/.*\.json$/, /^제공\/초보자톡방_정리\.json$/, /^시세\/(확인필요|톡방_AI)\.(json|md)$/,
+const SKIP = [/^\.git\//, /^scripts\//, /^이미지\//, /^도감\/작업\//, /^드랍표_원본\//, /^공식\/소식\.json$/, /^공식\/확률\//, /^저장할_글_/, /^2차_링크\.json$/, /^길드\/익명_보기\.txt$/, /^길드\/일지/, /^fandom\/(?!ko\/[^/]+\.md$|guide_ko\.txt$|그림글\.md$)/, /^링크\/.*\.json$/, /^제공\/초보자톡방_정리\.json$/, /^시세\/(확인필요|톡방_AI)\.(json|md)$/,
   // 거래소 녹화의 매물 하나하나·그림 목록, 도감 정보 아이템 목록 json 은 같은 내용의 요약 md 가 있다 (2026-11-12): 요약 md 와 시세.json 만
   /^시세\/암거래중개인\/[^/]+\/(매물|아이콘)\.json$/, /^도감\/아이템\/아이템\.json$/,
   // 강화 비교에 없는 무기의 강화 수치(계산값)도 같은 내용의 md 만

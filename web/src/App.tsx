@@ -171,6 +171,8 @@ const OddsTablePage = lazy(() => CHUNKS.Odds().then((m) => ({ default: m.OddsTab
 const TodoPage = lazy(() => CHUNKS.Todo().then((m) => ({ default: m.TodoPage })));
 const RentalPage = lazy(() => CHUNKS.Rental().then((m) => ({ default: m.RentalPage })));
 const GuildDungeonPage = lazy(() => CHUNKS.GuildDungeon().then((m) => ({ default: m.GuildDungeonPage })));
+// 비공개 일지 (보는 사람만, server/diary.ts): 미리 받지 않는다
+const DiaryPage = lazy(() => import("./pages/Diary").then((m) => ({ default: m.DiaryPage })));
 const FitPage = lazy(() => CHUNKS.Fit().then((m) => ({ default: m.FitPage })));
 const GrowthShopPage = lazy(() => CHUNKS.GrowthShop().then((m) => ({ default: m.GrowthShopPage })));
 const DonatePage = lazy(() => CHUNKS.Donate().then((m) => ({ default: m.DonatePage })));
@@ -495,6 +497,8 @@ function Wiki({
   else if (page === "admin")
     body =
       RANK[me.role] >= 1 ? <AdminPage me={me} /> : <NotFound what="페이지" />;
+  else if (page === "diary")
+    body = me.diary ? <DiaryPage me={me} /> : <Home me={me} />;
   else if (page === "me")
     body = <MePage me={me} onMe={onMe} onLogout={onLogout} />;
   else if (page === "as")

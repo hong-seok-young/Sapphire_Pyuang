@@ -72,6 +72,8 @@ export interface Me {
   gcoin1Open?: boolean;
   /** 도감 계산기 완료 체크를 아직 서버에 백업하지 않은 사람 (server/dexBackup.ts) */
   dexBackupAsk?: boolean;
+  /** 비공개 일지를 보는 사람만: 그 이름 (server/diary.ts) */
+  diary?: string;
 }
 
 /** 같은 사람의 캐릭터 하나 (부캐 묶기, 제작자 요청 2026-11-01) */

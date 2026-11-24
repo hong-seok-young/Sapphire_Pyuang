@@ -126,6 +126,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!me) return NEED_LOGIN();
   const { path, open, taps, at } = await readJson<{ path: unknown; open: unknown; taps: unknown; at: unknown }>(request);
   // 한 화면에서 누른 단추를 모은 한 줄 (화면이 화면을 떠날 때, 다른 앱으로 갈 때, 60개가 모이면 보낸다)
+  // 비공개 일지 화면(#/diary, server/diary.ts)은 보기·누른 단추 모두 남기지 않는다 (화면도 안 보내지만 예전 화면이 보내도)
+  if (typeof path === "string" && /^#\/diary(?:$|[/?])/.test(path)) return json({ ok: true });
   if (taps !== undefined) {
     if (typeof path !== "string" || !path.startsWith("#/") || path.length > 200) return json({ error: "화면 주소가 맞지 않아요" }, 400);
     const detail = tapDetail(taps);

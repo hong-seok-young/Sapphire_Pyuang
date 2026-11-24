@@ -168,6 +168,20 @@ jobs:
             fi
           fi
 
+      # 비공개 일지를 보는 사람과 그 이름 (server/diary.ts): 비공개 자료 길드/일지_보기.txt (한 줄에 닉네임 하나, '이름: …' 줄은 이름)에서
+      # Pages 비밀값 DIARY_VIEWERS · DIARY_TITLE 로. 실행 기록이 공개라 아무것도 찍지 않는다. 파일이 없으면 아무도 못 본다
+      - name: Private viewers
+        working-directory: web
+        run: |
+          f="../자료/길드/일지_보기.txt"
+          if [ -f "$f" ]; then
+            lines=$(grep -v '^[[:space:]]*#' "$f" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' || true)
+            v=$(printf '%s\n' "$lines" | grep -v '^이름:' | paste -sd, - || true)
+            t=$(printf '%s\n' "$lines" | grep '^이름:' | head -1 | sed 's/^이름:[[:space:]]*//' || true)
+            if [ -n "$v" ]; then printf '%s' "$v" | npx wrangler pages secret put DIARY_VIEWERS --project-name sapphire-guild > /dev/null; fi
+            if [ -n "$t" ]; then printf '%s' "$t" | npx wrangler pages secret put DIARY_TITLE --project-name sapphire-guild > /dev/null; fi
+          fi
+
       # 챗봇 답 받기 일꾼 (web/runner, server/chatRun.ts): 앱을 닫아도 답을 끝까지 받아 대화에 넣는 Durable Object (Cloudflare 무료 요금제).
       # 사이트는 Durable Object 를 직접 만들 수 없어서 따로 올리고, 됐으면 사이트 wrangler.toml 에 CHATRUN 바인딩을 붙인다.
       # 못 올리면(토큰에 Workers Scripts 권한이 없는 등) 바인딩 없이 예전처럼 배포한다 (챗봇은 화면이 끊긴 뒤 30초까지만 받는다)

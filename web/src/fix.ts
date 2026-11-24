@@ -45,6 +45,8 @@ const trail: string[] = [];
 let tracking = false;
 function track() {
   const h = location.hash || "#/";
+  // 비공개 일지 화면은 접수의 '직전에 본 화면'에 넣지 않는다 (server/diary.ts)
+  if (/^#\/diary(?:$|[/?])/.test(h)) return;
   if (trail[trail.length - 1] !== h) trail.push(h);
   if (trail.length > 8) trail.shift();
 }

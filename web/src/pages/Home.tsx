@@ -274,6 +274,9 @@ function Tiles({ me, tiles }: { me: Me; tiles: LaunchItem[] }) {
  * 빈 자리와 이 사람에게 안 보이는 칸(운영진 칸, 개발 중 칸)의 자리는 빈 칸으로 둔다 (평소에는 안 보이고 편집 중에만 점선 칸).
  * 편집 중에는 아래에 빈 줄을 하나 더 두어 더 아래로도 놓을 수 있다
  */
+/** 비공개 일지 칸 (launcher ITEMS 에 넣지 않는다) */
+const DIARY_TILE: LaunchItem = { key: "diary", title: "일지", to: "#/diary", icon: "📜", match: ["diary"] };
+
 function HomeGrid({
   me,
   layout,
@@ -292,12 +295,23 @@ function HomeGrid({
   slots.forEach((t, i) => {
     if (shown(t)) last = i;
   });
-  const rows = Math.ceil((last + 1) / COLS) + (editing ? 1 : 0);
+  // 비공개 일지 칸 (보는 사람만, server/diary.ts): 배치에 넣지 않고 마지막 칸 바로 뒤에 (배치는 서버에 저장되고 사용 기록에 남아서). 편집 중에는 숨긴다
+  const diary = !!me.diary && !editing && last + 1 < MAX_SLOTS ? last + 1 : -1;
+  const rows = Math.ceil((Math.max(last, diary) + 1) / COLS) + (editing ? 1 : 0);
   const n = Math.min(rows * COLS, MAX_SLOTS);
   return (
     <nav className="tiles home-tiles" data-zone="grid">
       {Array.from({ length: n }, (_, i) => {
         const t = slots[i];
+        if (i === diary)
+          return (
+            <a key="diary" className="tile" href="#/diary" draggable={false} data-notap>
+              <span className="tile-icon">
+                <TileIcon t={DIARY_TILE} />
+              </span>
+              <FitLine className="tile-title" text={me.diary ?? DIARY_TILE.title} wrap={false} />
+            </a>
+          );
         return shown(t) ? (
           <TileCell
             key={t.key}
