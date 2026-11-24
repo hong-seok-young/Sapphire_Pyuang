@@ -1,7 +1,7 @@
 // 비공개 일지 (server/diary.ts): 비공개 자료 길드/일지_기록.json 의 줄을 diary_runs·diary_shots 에 한 번씩 넣는다.
 // 세션(Claude)이 사용자가 준 스샷을 직접 읽어 적은 기록을 올릴 때 쓴다 (AI API 를 부르지 않는다). 줄마다 key 로 setup 'diary_imp_<key>' 에 적어 두 번 넣지 않는다.
 // 배포(deploy-web.yml 'Private viewers')가 부른다. 실행 기록이 공개라 아무것도 찍지 않는다.
-// 줄 모양: { key, day, author, lv_from, exp_from, t_from, lv_to, exp_to, t_to, rate?(이 줄만 1%당 원), from: '이미지/…', to: '이미지/…' }
+// 단가 줄: { key, rate_level, per_pct?, per_hour?, test_pct? }. 기록 줄 모양: { key, day, author, lv_from, exp_from, t_from, lv_to, exp_to, t_to, rate?(이 줄만 1%당 원), from: '이미지/…', to: '이미지/…' }
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -28,6 +28,14 @@ if (existsSync(LIST)) {
   for (const r of rows) {
     const key = "diary_imp_" + String(r.key).replace(/[^\w-]/g, "");
     if (!r.key || done.has(key)) continue;
+    // 단가 줄: { key, rate_level, per_pct?, per_hour?, test_pct? } (한 번만 넣고 그 뒤 앱에서 고친 것이 먼저)
+    if (r.rate_level) {
+      const sql = `INSERT INTO diary_rates (level, per_pct, per_hour, test_pct, updated_at) VALUES (${n(r.rate_level)}, ${n(r.per_pct)}, ${n(r.per_hour)}, ${n(r.test_pct)}, ${Date.now()}) ON CONFLICT (level) DO UPDATE SET per_pct = excluded.per_pct, per_hour = excluded.per_hour, test_pct = excluded.test_pct, updated_at = excluded.updated_at;\nINSERT OR REPLACE INTO setup (key, done_at) VALUES (${q(key)}, ${Date.now()});`;
+      const file = join(dir, key + ".sql");
+      writeFileSync(file, sql);
+      run("--file", file);
+      continue;
+    }
     const at = Date.parse(`${r.day}T12:00:00+09:00`) || Date.now();
     const id = `(SELECT MAX(id) FROM diary_runs WHERE author = ${q(r.author)} AND created_at = ${at})`;
     const lines = [
