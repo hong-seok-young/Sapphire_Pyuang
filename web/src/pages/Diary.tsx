@@ -623,14 +623,17 @@ function NewRun({ rates, onCancel, onSaved }: { rates: Rate[]; onCancel: () => v
 function Rates({ rates, onChange }: { rates: Rate[]; onChange: () => void }) {
   const [open, setOpen] = useState(rates.length === 0);
   const [adding, setAdding] = useState("");
+  // '5%에 5,000원' 처럼 (1시간 시험으로 정한 단가는 '4.499%에 7,000원')
   const summary = rates.map((r) => {
     const p = perPct(rates, r.level);
-    return `Lv.${r.level} ${p === null ? "?" : won(p)}`;
+    if (p === null) return `Lv.${r.level} ?`;
+    if (!(r.per_pct && r.per_pct > 0) && r.per_hour && r.test_pct) return `Lv.${r.level} ${r.test_pct}%에 ${won(r.per_hour)}원`;
+    return `Lv.${r.level} 5%에 ${won(p * 5)}원`;
   });
   return (
     <section className="dy-box">
       <button className="dy-box-head dy-fold" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <b>1% 단가</b>
+        <b>단가</b>
         <small>{summary.length ? summary.join(" · ") : "없음"}</small>
         <i>{open ? "▲" : "▼"}</i>
       </button>

@@ -2,6 +2,8 @@
 // 링크는 화면의 '정산서 보내기'가 만든다 (api/diary/share.ts, 표 diary_shares). 앱 화면·코드를 받지 않는 글 한 장이라 길드 이름도 없다.
 // 토큰을 모르면 404. 사용 기록에 남지 않는다 (/api 밖이라 사용 기록 미들웨어를 안 거친다).
 import type { Env } from "../../server/auth";
+import { perPct } from "../../server/diary";
+import type { Rate } from "../../server/diary";
 
 interface Row {
   id: number;
@@ -13,6 +15,7 @@ interface Row {
   exp_to: number;
   t_to: string;
   won: number | null;
+  rate: number | null;
 }
 interface Settle {
   id: number;
@@ -32,6 +35,13 @@ const dayText = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10)
 const kstDay = (ms: number) => new Date(ms + 9 * 3_600_000).toISOString().slice(0, 10);
 const pct = (n: number) => (Math.round(n * 1000) / 1000).toFixed(3);
 const gain = (r: Row) => (r.lv_to - r.lv_from) * 100 + r.exp_to - r.exp_from;
+const num = (n: number) => String(Math.round(n * 1000) / 1000);
+/** 단가 글: 1시간 시험으로 정한 단가는 '4.499%에 7,000원', 그 밖은 '5%에 5,000원' */
+const priceText = (rates: Rate[], level: number | null, p: number) => {
+  const r = level === null ? undefined : rates.find((x) => x.level === level);
+  if (r && !(r.per_pct && r.per_pct > 0) && r.per_hour && r.test_pct) return `${num(r.test_pct)}%에 ${won(r.per_hour)}원`;
+  return `5%에 ${won(p * 5)}원`;
+};
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env, params }) => {
   const parts = ([] as string[]).concat(params.path ?? []);
@@ -56,10 +66,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
   }
   if (parts.length !== 1) return NOT();
 
-  const [settle, runs, shots] = await Promise.all([
+  const [settle, rateRows, runs, shots] = await Promise.all([
     env.DB.prepare("SELECT id, at, runs, sum, carry_in, pay, carry_out FROM diary_settles WHERE id = ?").bind(share.settle_id).first<Settle>(),
+    env.DB.prepare("SELECT level, per_pct, per_hour, test_pct FROM diary_rates").all<Rate>(),
     env.DB.prepare(
-      "SELECT id, day, lv_from, exp_from, t_from, lv_to, exp_to, t_to, won FROM diary_runs WHERE settle_id = ? ORDER BY day, lv_from, exp_from, id",
+      "SELECT id, day, lv_from, exp_from, t_from, lv_to, exp_to, t_to, won, rate FROM diary_runs WHERE settle_id = ? ORDER BY day, lv_from, exp_from, id",
     )
       .bind(share.settle_id)
       .all<Row>(),
@@ -73,6 +84,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
   const total = settle.sum + settle.carry_in;
   const totalGain = runs.results.reduce((t, r) => t + gain(r), 0);
 
+  const rates = rateRows.results;
+  // 이 정산에 든 레벨의 단가 (줄마다 따로 정한 단가는 그 줄에)
+  const levels = [...new Set(runs.results.filter((r) => !(r.rate && r.rate > 0)).flatMap((r) => Array.from({ length: r.lv_to - r.lv_from + 1 }, (_, k) => r.lv_from + k)))].sort((a, b) => a - b);
+  const priceRows = levels
+    .map((lv) => {
+      const p = perPct(rates, lv);
+      if (p === null) return "";
+      return `<div><span>Lv.${lv}</span><span><b>${priceText(rates, lv, p)}</b><small>1%당 ${won(p)}원</small></span></div>`;
+    })
+    .join("");
   const rows = runs.results
     .map((r) => {
       const g = gain(r);
@@ -92,7 +113,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
 <span class="g">+${pct(g)}%</span>
 <span class="w">${won(w)}</span>
 </summary>
-<div class="more"><p>1%당 ${won(per)}원 · 오른 ${pct(g)}% × ${won(per)} = ${won(w)}원</p><div class="pics">${img("from", "시작")}${img("to", "끝")}</div></div>
+<div class="more"><p>${r.rate && r.rate > 0 ? `단가 ${priceText(rates, null, r.rate)} (이 기록만)` : r.lv_from === r.lv_to ? `Lv.${r.lv_from} 단가 ${priceText(rates, r.lv_from, per)}` : "레벨이 오른 기록이라 레벨마다 단가"} · +${pct(g)}% = ${won(w)}원</p><div class="pics">${img("from", "시작")}${img("to", "끝")}</div></div>
 </details>`;
     })
     .join("\n");
@@ -133,6 +154,11 @@ figure{margin:0}figcaption{font-size:12px;color:var(--dim);margin-bottom:3px}
 figure img{display:block;width:100%;border-radius:8px;border:1px solid var(--line)}
 figure.none span{display:block;padding:20px 0;text-align:center;color:var(--dim);border:1px dashed var(--line);border-radius:8px;font-size:12px}
 .hint{font-size:12px;color:var(--dim);margin:6px 2px 16px}
+.price{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:6px 14px;margin-bottom:12px}
+.price h2{margin:4px 0 2px;font-size:13px;color:var(--dim);font-weight:600}
+.price div{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-top:1px solid var(--line);font-size:14px}
+.price div span:first-child{color:var(--dim)}
+.price b{color:var(--gold)}.price small{color:var(--dim);font-size:12px;margin-left:6px}
 .sum{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:6px 14px}
 .sum div{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
 .sum div:last-child{border-bottom:0}
@@ -147,6 +173,7 @@ figure.none span{display:block;padding:20px 0;text-align:center;color:var(--dim)
 ${rows || '<p class="hint" style="padding:10px">기록이 없어요</p>'}
 </div>
 <p class="hint">줄을 누르면 시작·끝 사진이 보여요</p>
+${priceRows ? `<div class="price"><h2>단가</h2>${priceRows}</div>` : ""}
 <div class="sum">
 <div><span>기록 합</span><span>${won(settle.sum)}원</span></div>
 ${settle.carry_in > 0.5 ? `<div><span>지난 이월</span><span>+${won(settle.carry_in)}원</span></div>` : ""}
