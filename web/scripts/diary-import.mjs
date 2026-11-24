@@ -36,6 +36,14 @@ if (existsSync(LIST)) {
       run("--file", file);
       continue;
     }
+    // 메모 줄: { key, memo_day, memo_lv, memo_exp, memo } (그 날 그 시작 경험치의 기록에 한 줄 메모)
+    if (r.memo_day) {
+      const sql = `UPDATE diary_runs SET memo = ${q(r.memo ?? "")} WHERE day = ${q(r.memo_day)} AND lv_from = ${n(r.memo_lv)} AND ABS(exp_from - ${n(r.memo_exp)}) < 0.0005;\nINSERT OR REPLACE INTO setup (key, done_at) VALUES (${q(key)}, ${Date.now()});`;
+      const file = join(dir, key + ".sql");
+      writeFileSync(file, sql);
+      run("--file", file);
+      continue;
+    }
     // 정산 고침 줄: { key, settle_at: '2026-11-23T23:00:00+09:00', carry_out } (그 때 정산의 이월을 바꾼다)
     if (r.settle_at) {
       const sat = Date.parse(r.settle_at);
@@ -49,7 +57,7 @@ if (existsSync(LIST)) {
     const at = Date.parse(`${r.day}T12:00:00+09:00`) || Date.now();
     const id = `(SELECT MAX(id) FROM diary_runs WHERE author = ${q(r.author)} AND created_at = ${at})`;
     const lines = [
-      `INSERT INTO diary_runs (author, day, lv_from, exp_from, t_from, lv_to, exp_to, t_to, rate, created_at, updated_at) VALUES (${q(r.author)}, ${q(r.day)}, ${n(r.lv_from)}, ${n(r.exp_from)}, ${q(r.t_from)}, ${n(r.lv_to)}, ${n(r.exp_to)}, ${q(r.t_to)}, ${n(r.rate)}, ${at}, ${at});`,
+      `INSERT INTO diary_runs (author, day, lv_from, exp_from, t_from, lv_to, exp_to, t_to, rate, memo, created_at, updated_at) VALUES (${q(r.author)}, ${q(r.day)}, ${n(r.lv_from)}, ${n(r.exp_from)}, ${q(r.t_from)}, ${n(r.lv_to)}, ${n(r.exp_to)}, ${q(r.t_to)}, ${n(r.rate)}, ${r.memo ? q(r.memo) : "NULL"}, ${at}, ${at});`,
     ];
     for (const side of ["from", "to"]) {
       const p = r[side] && join(DATA, r[side]);

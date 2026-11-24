@@ -115,3 +115,4 @@
 .dy-gap { display: grid; grid-template-columns: 4.2em minmax(0, 1fr) 4.2em 4.2em; gap: 4px; align-items: center; padding: 5px 8px; font-size: 11px; color: var(--muted); background: repeating-linear-gradient(135deg, rgba(255,255,255,0.03) 0 6px, transparent 6px 12px); border-top: 1px dashed rgba(255,255,255,0.12); border-bottom: 1px dashed rgba(255,255,255,0.12); }
 .dy-gap > span:first-child { color: #8fb4ff; font-weight: bold; }
 .dy-gap > span:nth-child(n+3) { text-align: right; }
+.dy-memo { margin: 0 4px 4px; padding: 3px 6px; font-size: 11px; color: #8fb4ff; background: rgba(111, 143, 255, 0.1); border-left: var(--px) solid #6f8fff; }

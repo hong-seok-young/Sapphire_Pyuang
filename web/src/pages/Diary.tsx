@@ -31,6 +31,8 @@ interface Run {
   won: number | null;
   /** 이 줄만 따로 정한 1%당 원 */
   rate: number | null;
+  /** 한 줄 메모 (1시간 테스트 등) */
+  memo?: string | null;
   created_at: number;
   shots: { from?: number; to?: number };
 }
@@ -261,6 +263,7 @@ function RunTable({ runs: list, rates, owner, editable = false, onChange }: { ru
               <span className={"dy-td-gain" + (gainOf(r) < 0 ? " dy-minus" : "")}>{pct(gainOf(r))}</span>
               <span className="dy-td-won">{v === null ? <em className="dy-warn">단가?</em> : won(v)}</span>
             </button>
+            {r.memo && <div className="dy-memo">{r.memo}</div>}
             {on && <RunDetail r={r} editable={editable && r.settle_id === null} onChange={onChange} />}
           </div>
           </Fragment>

@@ -17,6 +17,7 @@ interface Row {
   t_to: string;
   won: number | null;
   rate: number | null;
+  memo: string | null;
 }
 interface Settle {
   id: number;
@@ -74,7 +75,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
     env.DB.prepare("SELECT id, at, runs, sum, carry_in, pay, carry_out FROM diary_settles WHERE id = ?").bind(share.settle_id).first<Settle>(),
     env.DB.prepare("SELECT level, per_pct, per_hour, test_pct FROM diary_rates").all<Rate>(),
     env.DB.prepare(
-      "SELECT id, day, lv_from, exp_from, t_from, lv_to, exp_to, t_to, won, rate FROM diary_runs WHERE settle_id = ? ORDER BY day, lv_from, exp_from, id",
+      "SELECT id, day, lv_from, exp_from, t_from, lv_to, exp_to, t_to, won, rate, memo FROM diary_runs WHERE settle_id = ? ORDER BY day, lv_from, exp_from, id",
     )
       .bind(share.settle_id)
       .all<Row>(),
@@ -137,7 +138,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
 <span class="g">+${pct(g)}</span>
 <span class="w">${won(w)}</span>
 </div>
-<div class="u">단가 ${rowPrice(r, per)}</div>
+${r.memo ? `<div class="memo">${esc(r.memo)}</div>` : ""}<div class="u">단가 ${rowPrice(r, per)}</div>
 <div class="shots">${img("from", "시작")}${img("to", "끝")}</div>
 </div>`;
     })
@@ -178,6 +179,7 @@ main{max-width:560px;margin:0 auto;padding:12px 12px 40px;display:grid;grid-temp
 .d{color:var(--gold)}
 .g{color:var(--green);font-weight:700;text-align:right;align-items:flex-end}
 .w{color:var(--won);font-weight:700;text-align:right;align-items:flex-end}
+.memo{margin:0 4px 4px;padding:3px 6px;font-size:11px;color:#8fb4ff;background:rgba(111,143,255,.1);border-left:var(--px) solid #6f8fff}
 .u{padding:0 4px 4px;font-size:11px;color:var(--gold);text-align:right}
 .shots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:0 4px}
 figure{margin:0;display:flex;flex-direction:column;gap:2px;min-width:0}

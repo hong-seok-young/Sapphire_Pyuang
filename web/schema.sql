@@ -1293,6 +1293,7 @@ CREATE TABLE IF NOT EXISTS diary_runs (
   settle_id INTEGER,
   won REAL,
   rate REAL,
+  memo TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
