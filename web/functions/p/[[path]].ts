@@ -94,6 +94,17 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
       return `<div><span>Lv.${lv}</span><span><b>${priceText(rates, lv, p)}</b><small>1%당 ${won(p)}원</small></span></div>`;
     })
     .join("");
+  // 줄마다 단가: 그 줄만 정한 단가, 한 레벨이면 그 레벨 단가, 레벨이 오른 줄은 레벨마다
+  const rowPrice = (r: Row, per: number) => {
+    if (r.rate && r.rate > 0) return esc(priceText(rates, null, r.rate));
+    if (r.lv_from === r.lv_to) return `Lv.${r.lv_from} ${esc(priceText(rates, r.lv_from, perPct(rates, r.lv_from) ?? per))}`;
+    return Array.from({ length: r.lv_to - r.lv_from + 1 }, (_, k) => r.lv_from + k)
+      .map((lv) => {
+        const p = perPct(rates, lv);
+        return p === null ? `Lv.${lv} ?` : `Lv.${lv} ${esc(priceText(rates, lv, p))}`;
+      })
+      .join(" · ");
+  };
   const owner = diaryOwner(env);
   const pos = (lv: number, exp: number) => lv * 100 + exp;
   const rows = runs.results
@@ -121,6 +132,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
 <span class="p"><b>Lv.${r.lv_to}</b> ${pct(r.exp_to)}%${r.t_to ? `<small>${esc(r.t_to)}</small>` : ""}</span>
 <span class="g">+${pct(g)}%</span>
 <span class="w">${won(w)}</span>
+<span class="u">단가 ${rowPrice(r, per)}</span>
 </summary>
 <div class="more"><p>${r.rate && r.rate > 0 ? `단가 ${priceText(rates, null, r.rate)} (이 기록만)` : r.lv_from === r.lv_to ? `Lv.${r.lv_from} 단가 ${priceText(rates, r.lv_from, per)}` : "레벨이 오른 기록이라 레벨마다 단가"} · +${pct(g)}% = ${won(w)}원</p><div class="pics">${img("from", "시작")}${img("to", "끝")}</div></div>
 </details>`;
@@ -155,6 +167,7 @@ summary .p small{display:block;color:var(--dim);font-size:11px}
 summary .p b{font-weight:600;color:var(--dim);font-size:11px;margin-right:2px}
 summary .g{color:var(--green);font-weight:600}
 summary .w{font-weight:700}
+summary .u{grid-column:2/-1;margin-top:-4px;font-size:11px;color:var(--gold);text-align:right;opacity:.85}
 details[open] summary{background:#2a2556}
 .more{padding:10px}
 .more p{margin:0 0 8px;font-size:12px;color:var(--dim)}
