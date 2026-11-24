@@ -36,6 +36,14 @@ if (existsSync(LIST)) {
       run("--file", file);
       continue;
     }
+    // 이월 없앰 줄: { key, carry_reset: true } (그때까지의 정산 이월을 모두 0 으로: 1000원 미만은 절삭)
+    if (r.carry_reset) {
+      const sql = `UPDATE diary_settles SET carry_out = 0 WHERE carry_out <> 0;\nINSERT OR REPLACE INTO setup (key, done_at) VALUES (${q(key)}, ${Date.now()});`;
+      const file = join(dir, key + ".sql");
+      writeFileSync(file, sql);
+      run("--file", file);
+      continue;
+    }
     // 메모 줄: { key, memo_day, memo_lv, memo_exp, memo } (그 날 그 시작 경험치의 기록에 한 줄 메모)
     if (r.memo_day) {
       const sql = `UPDATE diary_runs SET memo = ${q(r.memo ?? "")} WHERE day = ${q(r.memo_day)} AND lv_from = ${n(r.memo_lv)} AND ABS(exp_from - ${n(r.memo_exp)}) < 0.0005;\nINSERT OR REPLACE INTO setup (key, done_at) VALUES (${q(key)}, ${Date.now()});`;
