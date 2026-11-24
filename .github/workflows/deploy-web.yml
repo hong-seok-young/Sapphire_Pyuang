@@ -186,6 +186,8 @@ jobs:
             done)
             if [ -n "$sql" ]; then npx wrangler d1 execute sapphire-accounts --remote --yes --command "$sql" > /dev/null 2>&1 || true; fi
           fi
+          # 세션이 스샷을 읽어 적어 둔 기록 (길드/일지_기록.json, scripts/diary-import.mjs). 실패해도 배포는 이어 간다
+          node scripts/diary-import.mjs > /dev/null 2>&1 || echo "::warning::private step 2 failed"
 
       # 챗봇 답 받기 일꾼 (web/runner, server/chatRun.ts): 앱을 닫아도 답을 끝까지 받아 대화에 넣는 Durable Object (Cloudflare 무료 요금제).
       # 사이트는 Durable Object 를 직접 만들 수 없어서 따로 올리고, 됐으면 사이트 wrangler.toml 에 CHATRUN 바인딩을 붙인다.
