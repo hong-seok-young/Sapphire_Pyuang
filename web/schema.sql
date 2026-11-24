@@ -1262,7 +1262,7 @@ CREATE TABLE IF NOT EXISTS user_kv (
   PRIMARY KEY (user_id, k)
 );
 
--- 비공개 일지 (server/diary.ts): 보는 사람만 읽고 쓴다
+-- 비공개 일지 (server/diary.ts): 보는 사람만 읽고 쓴다. diary_entries 는 처음 판(쓰지 않음)
 CREATE TABLE IF NOT EXISTS diary_entries (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   author TEXT NOT NULL,
@@ -1279,4 +1279,51 @@ CREATE TABLE IF NOT EXISTS diary_entries (
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS diary_entries_day ON diary_entries (day);
+-- 기록 한 줄: 시작·끝 스샷에서 읽은 레벨·경험치 %·게임 시각. 정산하면 settle_id 와 그때 금액 won
+CREATE TABLE IF NOT EXISTS diary_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  author TEXT NOT NULL,
+  day TEXT NOT NULL,
+  lv_from INTEGER NOT NULL,
+  exp_from REAL NOT NULL,
+  t_from TEXT NOT NULL DEFAULT '',
+  lv_to INTEGER NOT NULL,
+  exp_to REAL NOT NULL,
+  t_to TEXT NOT NULL DEFAULT '',
+  settle_id INTEGER,
+  won REAL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS diary_runs_settle ON diary_runs (settle_id);
+-- 증거 스샷 (side from | to, 한 줄에 하나씩)
+CREATE TABLE IF NOT EXISTS diary_shots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id INTEGER NOT NULL,
+  side TEXT NOT NULL,
+  type TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  data BLOB NOT NULL,
+  created_at INTEGER NOT NULL,
+  UNIQUE (run_id, side)
+);
+-- 레벨마다 단가: 1%당 원, 또는 1시간 금액과 1시간 시험에서 오른 %
+CREATE TABLE IF NOT EXISTS diary_rates (
+  level INTEGER PRIMARY KEY,
+  per_pct REAL,
+  per_hour REAL,
+  test_pct REAL,
+  updated_by TEXT,
+  updated_at INTEGER NOT NULL
+);
+-- 정산: 줄 합 + 지난 이월 = total, 1000원 아래 버림 = pay, 나머지는 다음으로 이월
+CREATE TABLE IF NOT EXISTS diary_settles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  at INTEGER NOT NULL,
+  by_user TEXT NOT NULL,
+  runs INTEGER NOT NULL,
+  sum REAL NOT NULL,
+  carry_in REAL NOT NULL,
+  pay REAL NOT NULL,
+  carry_out REAL NOT NULL
+);

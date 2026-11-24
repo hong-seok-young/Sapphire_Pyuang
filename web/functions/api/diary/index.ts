@@ -1,30 +1,29 @@
-// GET /api/diary -> 일지 (최근 날짜부터 500개)  ·  POST /api/diary { day, time, place, lv_from, exp_from, lv_to, exp_to, gold, items, note } -> 한 줄 더함
-// 보는 사람만 (server/diary.ts). 다른 사람에게는 없는 주소처럼 404. 사용 기록에 남기지 않는다 (functions/api/_middleware.ts)
-import { NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
+// GET /api/diary -> { runs, rates, settles } : 비공개 일지 (server/diary.ts). 보는 사람만, 다른 사람에게는 404. 사용 기록에 남기지 않는다 (_middleware.ts)
+import { NEED_LOGIN, currentUser, json } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { canUseDiary, readEntry } from "../../../server/diary";
-
-const NOPE = () => new Response("Not found", { status: 404 });
+import { NOPE, canUseDiary, readRates } from "../../../server/diary";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const me = await currentUser(env, request);
   if (!me) return NEED_LOGIN();
   if (!canUseDiary(env, me)) return NOPE();
-  const { results } = await env.DB.prepare("SELECT * FROM diary_entries ORDER BY day DESC, id DESC LIMIT 500").all();
-  return json({ entries: results }, 200, { "cache-control": "no-store" });
-};
-
-export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
-  const me = await currentUser(env, request);
-  if (!me) return NEED_LOGIN();
-  if (!canUseDiary(env, me)) return NOPE();
-  const e = readEntry(await readJson<Record<string, unknown>>(request));
-  if (typeof e === "string") return json({ error: e }, 400);
-  const now = Date.now();
-  const r = await env.DB.prepare(
-    "INSERT INTO diary_entries (author, day, time, place, lv_from, exp_from, lv_to, exp_to, gold, items, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-  )
-    .bind(me.id, e.day, e.time, e.place, e.lv_from, e.exp_from, e.lv_to, e.exp_to, e.gold, e.items, e.note, now, now)
-    .run();
-  return json({ ok: true, id: r.meta.last_row_id });
+  const [runs, shots, rates, settles] = await Promise.all([
+    env.DB.prepare(
+      "SELECT id, author, day, lv_from, exp_from, t_from, lv_to, exp_to, t_to, settle_id, won, created_at FROM diary_runs ORDER BY day DESC, created_at DESC LIMIT 2000",
+    ).all(),
+    env.DB.prepare("SELECT id, run_id, side FROM diary_shots").all<{ id: number; run_id: number; side: string }>(),
+    readRates(env),
+    env.DB.prepare("SELECT id, at, by_user, runs, sum, carry_in, pay, carry_out FROM diary_settles ORDER BY id DESC LIMIT 400").all(),
+  ]);
+  const shotOf = new Map<number, { from?: number; to?: number }>();
+  for (const s of shots.results) {
+    const o = shotOf.get(s.run_id) ?? {};
+    if (s.side === "from" || s.side === "to") o[s.side] = s.id;
+    shotOf.set(s.run_id, o);
+  }
+  return json(
+    { runs: runs.results.map((r) => ({ ...r, shots: shotOf.get((r as { id: number }).id) ?? {} })), rates, settles: settles.results },
+    200,
+    { "cache-control": "no-store" },
+  );
 };
