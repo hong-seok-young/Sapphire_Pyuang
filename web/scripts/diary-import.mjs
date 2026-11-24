@@ -1,7 +1,7 @@
 // 비공개 일지 (server/diary.ts): 비공개 자료 길드/일지_기록.json 의 줄을 diary_runs·diary_shots 에 한 번씩 넣는다.
 // 세션(Claude)이 사용자가 준 스샷을 직접 읽어 적은 기록을 올릴 때 쓴다 (AI API 를 부르지 않는다). 줄마다 key 로 setup 'diary_imp_<key>' 에 적어 두 번 넣지 않는다.
 // 배포(deploy-web.yml 'Private viewers')가 부른다. 실행 기록이 공개라 아무것도 찍지 않는다.
-// 단가 줄: { key, rate_level, per_pct?, per_hour?, test_pct? }. 기록 줄 모양: { key, day, author, lv_from, exp_from, t_from, lv_to, exp_to, t_to, rate?(이 줄만 1%당 원), from: '이미지/…', to: '이미지/…' }
+// 단가 줄: { key, rate_level, per_pct?, per_hour?, test_pct? }. 기록 줄 모양: { key, day, author, lv_from, exp_from, t_from, lv_to, exp_to, t_to, rate?(이 줄만 1%당 원), from: '이미지/…', to: '이미지/…', settled?: { pay, at } (이미 받은 돈: 이 줄 하나로 정산까지) }
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -49,6 +49,16 @@ if (existsSync(LIST)) {
       lines.push(`INSERT INTO diary_shots (run_id, side, type, size, data, created_at) VALUES (${id}, '${side}', '${type}', ${bytes.length}, X'', ${at});`);
       for (let i = 0; i < bytes.length; i += CHUNK)
         lines.push(`UPDATE diary_shots SET data = CAST(data || X'${bytes.subarray(i, i + CHUNK).toString("hex")}' AS BLOB) WHERE run_id = ${id} AND side = '${side}';`);
+    }
+    // 이미 받은 돈: 이 줄 금액(gain x rate)으로 정산 한 줄, 1000원 아래는 이월 (앱의 정산과 같은 셈)
+    if (r.settled && Number(r.rate) > 0) {
+      const won = Math.round(((r.lv_to - r.lv_from) * 100 + r.exp_to - r.exp_from) * r.rate * 1000) / 1000;
+      const pay = Number(r.settled.pay ?? Math.floor(won / 1000) * 1000);
+      const sat = Date.parse(r.settled.at) || at;
+      lines.push(
+        `INSERT INTO diary_settles (at, by_user, runs, sum, carry_in, pay, carry_out) VALUES (${sat}, ${q(r.author)}, 1, ${won}, 0, ${pay}, ${won - pay});`,
+        `UPDATE diary_runs SET settle_id = (SELECT MAX(id) FROM diary_settles WHERE at = ${sat}), won = ${won} WHERE id = ${id};`,
+      );
     }
     lines.push(`INSERT OR REPLACE INTO setup (key, done_at) VALUES (${q(key)}, ${Date.now()});`);
     const file = join(dir, key + ".sql");
