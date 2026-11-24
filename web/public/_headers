@@ -11,3 +11,6 @@
 # 아래 탭, 🔔 같은 픽셀 그림 (scripts/make_pixel_icons.py)
 /icons/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+# 갈무리 글꼴 (vite.config.ts 가 복사, 정산서 페이지가 쓴다)
+/fonts/*
+  Cache-Control: public, max-age=2592000
