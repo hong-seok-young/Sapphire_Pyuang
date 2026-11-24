@@ -19,6 +19,21 @@ const n = (v) => (v === null || v === undefined || v === "" || !Number.isFinite(
 const run = (...args) => execFileSync("npx", ["wrangler", "d1", "execute", DB, ...where, "--yes", ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 const json = (out) => JSON.parse(out.slice(out.indexOf("[")));
 
+/** 기록 r 의 시작·끝 사진을 run_id(SQL 식) 줄에 넣는 SQL (D1 한 줄 100KB 한도 때문에 조각으로 이어 붙인다) */
+function shotLines(r, id, at) {
+  const out = [];
+  for (const side of ["from", "to"]) {
+    const p = r[side] && join(DATA, r[side]);
+    if (!p || !existsSync(p)) continue;
+    const bytes = readFileSync(p);
+    const type = p.endsWith(".webp") ? "image/webp" : p.endsWith(".png") ? "image/png" : "image/jpeg";
+    out.push(`INSERT INTO diary_shots (run_id, side, type, size, data, created_at) VALUES (${id}, '${side}', '${type}', ${bytes.length}, X'', ${at});`);
+    for (let i = 0; i < bytes.length; i += CHUNK)
+      out.push(`UPDATE diary_shots SET data = CAST(data || X'${bytes.subarray(i, i + CHUNK).toString("hex")}' AS BLOB) WHERE run_id = ${id} AND side = '${side}';`);
+  }
+  return out;
+}
+
 if (existsSync(LIST)) {
   const rows = JSON.parse(readFileSync(LIST, "utf8"));
   const done = new Set(
@@ -39,6 +54,15 @@ if (existsSync(LIST)) {
     // 이월 없앰 줄: { key, carry_reset: true } (그때까지의 정산 이월을 모두 0 으로: 1000원 미만은 절삭)
     if (r.carry_reset) {
       const sql = `UPDATE diary_settles SET carry_out = 0 WHERE carry_out <> 0;\nINSERT OR REPLACE INTO setup (key, done_at) VALUES (${q(key)}, ${Date.now()});`;
+      const file = join(dir, key + ".sql");
+      writeFileSync(file, sql);
+      run("--file", file);
+      continue;
+    }
+    // 사진 다시 넣기 줄: { key, reshot_day, reshot_lv, reshot_exp, from, to } (그 기록의 사진을 지우고 새로 넣는다: 사진이 깨졌을 때)
+    if (r.reshot_day) {
+      const rid = `(SELECT MAX(id) FROM diary_runs WHERE day = ${q(r.reshot_day)} AND lv_from = ${n(r.reshot_lv)} AND ABS(exp_from - ${n(r.reshot_exp)}) < 0.0005)`;
+      const sql = [`DELETE FROM diary_shots WHERE run_id = ${rid};`, ...shotLines(r, rid, Date.now()), `INSERT OR REPLACE INTO setup (key, done_at) VALUES (${q(key)}, ${Date.now()});`].join("\n");
       const file = join(dir, key + ".sql");
       writeFileSync(file, sql);
       run("--file", file);
@@ -67,15 +91,7 @@ if (existsSync(LIST)) {
     const lines = [
       `INSERT INTO diary_runs (author, day, lv_from, exp_from, t_from, lv_to, exp_to, t_to, rate, memo, created_at, updated_at) VALUES (${q(r.author)}, ${q(r.day)}, ${n(r.lv_from)}, ${n(r.exp_from)}, ${q(r.t_from)}, ${n(r.lv_to)}, ${n(r.exp_to)}, ${q(r.t_to)}, ${n(r.rate)}, ${r.memo ? q(r.memo) : "NULL"}, ${at}, ${at});`,
     ];
-    for (const side of ["from", "to"]) {
-      const p = r[side] && join(DATA, r[side]);
-      if (!p || !existsSync(p)) continue;
-      const bytes = readFileSync(p);
-      const type = p.endsWith(".webp") ? "image/webp" : p.endsWith(".png") ? "image/png" : "image/jpeg";
-      lines.push(`INSERT INTO diary_shots (run_id, side, type, size, data, created_at) VALUES (${id}, '${side}', '${type}', ${bytes.length}, X'', ${at});`);
-      for (let i = 0; i < bytes.length; i += CHUNK)
-        lines.push(`UPDATE diary_shots SET data = CAST(data || X'${bytes.subarray(i, i + CHUNK).toString("hex")}' AS BLOB) WHERE run_id = ${id} AND side = '${side}';`);
-    }
+    lines.push(...shotLines(r, id, at));
     // 이미 받은 돈: 이 줄 금액(gain x rate)으로 정산 한 줄, 1000원 아래는 이월 (앱의 정산과 같은 셈)
     if (r.settled && Number(r.rate) > 0) {
       const won = Math.round(((r.lv_to - r.lv_from) * 100 + r.exp_to - r.exp_from) * r.rate * 1000) / 1000;
