@@ -271,10 +271,11 @@ function CharacterMenu({
             role="menuitem"
           >
             <span className="char-name">
-              <b>{c.id}</b>
+              {/* 같이 쓰는 캐릭터는 내 목록에서만 '뼈(부주)' (제작자 2026-11-25) */}
+              <b>{c.shared ? `${c.id}(부주)` : c.id}</b>
               <small>
-                {c.main ? "본캐" : "부캐"}
-                {c.level ? ` · Lv.${c.level}` : ""}
+                {c.shared ? "" : c.main ? "본캐" : "부캐"}
+                {c.level ? `${c.shared ? "" : " · "}Lv.${c.level}` : ""}
                 {c.job ? ` ${JOB_NAME[c.job]}` : ""}
               </small>
             </span>

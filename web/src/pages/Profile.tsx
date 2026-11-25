@@ -275,7 +275,9 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
   const row = (k: MenuKey) => ({ open: open === k, onToggle: () => setOpen((o) => (o === k ? null : k)) });
   // 직책은 지금 캐릭터의 것 (me.role 은 묶은 캐릭터 중 가장 높은 권한)
   const myRole = me.characters?.find((c) => c.id === me.id)?.role ?? me.role;
-  const chars = me.characters?.length ?? 0;
+  const chars = (me.characters?.length ?? 0) + (me.shared?.length ?? 0);
+  // 같이 쓰는 캐릭터로 들어와 있으면 (제작자 2026-11-25 '뼈님은 뼈님대로'): 그 캐릭터 주인의 계정 칸(닉네임·비밀번호·카톡·알림·계정 삭제)은 숨긴다
+  const shared = !!me.via;
   const pending = me.pendingCharacters?.length ?? 0;
   return (
     <>
@@ -344,7 +346,7 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
         </MeRow>
       </MeGroup>
 
-      <MeGroup title="계정">
+      {!shared && <MeGroup title="계정">
         <MeRow label="닉네임 변경" {...row("rename")}>
           <RenameBody me={me} onMe={onMe} />
         </MeRow>
@@ -361,7 +363,7 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
         <MeRow label="알림 설정" value={phone === "on" ? "폰 알림 켜짐" : phone ? "폰 알림 꺼짐" : undefined} {...row("alerts")}>
           <AlertSettings developer={me.role === "developer"} preview={canPreview(me)} />
         </MeRow>
-      </MeGroup>
+      </MeGroup>}
 
       {/* 날씨 반영 (제작자 요청 2026-11-02 '내 정보에서 위치 허용하게, 날씨 반영된다고'). 쓰는 사람에게만 (canUseWeather, 지금은 모두) */}
       {(canUseWeather(me) || canUseBg(me)) && (
@@ -423,7 +425,7 @@ export function MePage({ me, onMe, onLogout }: { me: Me; onMe: (p: Partial<Me>) 
       >
         로그아웃
       </button>
-      {me.role !== "developer" && <DeleteAccountText me={me} />}
+      {me.role !== "developer" && !shared && <DeleteAccountText me={me} />}
     </>
   );
 }
@@ -665,7 +667,7 @@ function AvatarBody({ me, onMe }: { me: Me; onMe: (p: Partial<Me>) => void }) {
  * 추가한 캐릭터는 길드마스터·오피서가 '길드원 관리'에서 승낙해야 생긴다. 로그인은 본캐 아이디와 비밀번호로
  */
 function CharactersBody({ me }: { me: Me }) {
-  const list = me.characters ?? [];
+  const list = [...(me.characters ?? []), ...(me.shared ?? [])];
   const [pending, setPending] = useState(me.pendingCharacters ?? []);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -696,17 +698,17 @@ function CharactersBody({ me }: { me: Me }) {
                 onClick={() => c.id !== me.id && run(() => goCharacter(c.id).catch((x) => (refreshMe(), Promise.reject(x))))}
               >
                 <span className="char-name">
-                  <b>{c.id}</b>
+                  <b>{c.shared ? `${c.id}(부주)` : c.id}</b>
                   <small>
-                    {c.main ? "본캐 (로그인 아이디)" : "부캐"}
-                    {c.level ? ` · Lv.${c.level}` : ""}
+                    {c.shared ? "" : c.main ? "본캐 (로그인 아이디)" : "부캐"}
+                    {c.level ? `${c.shared ? "" : " · "}Lv.${c.level}` : ""}
                     {c.job ? ` ${JOB_NAME[c.job]}` : ""}
                   </small>
                 </span>
                 {c.id === me.id && <span className="char-now">지금</span>}
               </button>
               {/* 주력 캐릭터가 바뀌면 본캐를 바꾼다 (제작자 요청): 비밀번호는 그대로, 로그인 아이디만 이 캐릭터로 */}
-              {!c.main && (
+              {!c.main && !c.shared && !me.via && (
                 <button
                   className="pill"
                   disabled={busy}
@@ -725,7 +727,7 @@ function CharactersBody({ me }: { me: Me }) {
         </div>
       )}
       {pending.length > 0 && <p className="form-note">승낙 대기: {pending.join(", ")}</p>}
-      {adding ? (
+      {me.via ? null : adding ? (
         <div className="me-add">
           <input
             className="mk-input"

@@ -87,6 +87,7 @@ wrangler("d1", "execute", DB, "--remote", "--yes", "--file=schema.sql");
 
 /** schema.sql 은 이미 있는 표를 바꾸지 않는다. 나중에 더한 칸: [표, 칸, 종류] */
 const ADDED_COLUMNS = [
+  ["sessions", "via", "TEXT"],
   ["diary_runs", "rate", "REAL"], ["diary_runs", "memo", "TEXT"],
   ["profiles", "exp", "INTEGER"], ["listings", "options", "TEXT"], ["profiles", "guild", "TEXT"],
   ["listings", "mode", "TEXT NOT NULL DEFAULT 'sale'"], ["listings", "ends_at", "INTEGER"], ["listing_wants", "offer", "INTEGER"],
@@ -481,6 +482,26 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'official_added_backfil
       `DELETE FROM official_news WHERE ${NOT_IMO_SQL};`,
     ]);
     console.log(`아이모가 대상이 아닌 공식 점검 글 ${n}개를 뺐어요`);
+  }
+}
+
+// 같이 쓰는 캐릭터: 퓨앙이 뼈 님 캐릭터의 부주라 퓨앙의 캐릭터 목록에서 뼈로 바꿔 들어간다 (제작자 2026-11-25). 뼈 님은 그대로 자기 아이디로 로그인한다.
+// 한 번만 (setup 'char_share_puang_bone_20261125'). 뼈 계정이 없으면 앱개발자에게 알리고 다음 배포에 다시 본다
+if (!queryFirst("SELECT 1 AS ok FROM setup WHERE key = 'char_share_puang_bone_20261125'")?.ok) {
+  const bone = queryFirst("SELECT id FROM users WHERE id = '뼈'")?.id;
+  const puang = queryFirst("SELECT COALESCE(main_id, id) AS id FROM users WHERE id = '퓨앙'")?.id;
+  if (bone && puang) {
+    runSql([
+      `INSERT OR IGNORE INTO char_shares (owner, char_id, created_at, created_by) VALUES ('${puang.replace(/'/g, "''")}', '뼈', ${Date.now()}, '퓨앙');`,
+      `INSERT OR REPLACE INTO setup (key, done_at) VALUES ('char_share_puang_bone_20261125', ${Date.now()});`,
+    ]);
+    console.log("같이 쓰는 캐릭터를 하나 넣었어요");
+  } else if (puang && !queryFirst("SELECT 1 AS ok FROM setup WHERE key = 'char_share_bone_missing'")?.ok) {
+    runSql([
+      `INSERT INTO alerts (user_id, kind, text, link, created_at) VALUES ('${puang.replace(/'/g, "''")}', 'account', '같이 쓰는 캐릭터: 뼈 계정을 찾지 못했어요 · 닉네임을 알려 주세요', '#/me', ${Date.now()});`,
+      `INSERT OR REPLACE INTO setup (key, done_at) VALUES ('char_share_bone_missing', ${Date.now()});`,
+    ]);
+    console.log("같이 쓰는 캐릭터: 계정을 찾지 못했어요");
   }
 }
 

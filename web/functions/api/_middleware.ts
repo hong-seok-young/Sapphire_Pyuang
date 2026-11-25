@@ -11,6 +11,9 @@ import { anonWrite } from "../../server/board";
 /** 본문이 JSON 이 아닌 곳: 캐릭터 사진, AI 지우기(그림 파일)는 크기만 적는다 */
 const BINARY = /^\/api\/(avatar(\/cutout)?|board\/\d+\/files|fix\/\d+\/shots|talk-upload)$/;
 
+/** 같이 쓰는 캐릭터 세션에서 막는 곳: 비밀번호, 폰 알림, 알림 설정, 계정 삭제 요청, 캐릭터 추가, 카톡 링크, 닉네임·본캐·통합·초기화 */
+const SHARED_BLOCK = /^\/api\/(password|push|alerts\/(device|prefs)|delete-requests|characters$|kakao|users\/[^/]+\/(rename|main|link|reset))/;
+
 /**
  * 처리하다 예외가 나면 빈 500 대신 알 수 있는 글로 (2026-11-02: 장비대여 기부 적립이 '문제가 생겼어요 (500)'만 보여 원인을 몰랐다).
  * 앱개발자에게는 원인을 같이 보인다 (CLAUDE.md 챗봇 errorCause 와 같은 생각)
@@ -33,6 +36,15 @@ const handle: PagesFunction<Env> = async (context) => {
   const { request, env } = context;
   const path = new URL(request.url).pathname;
   const method = request.method;
+  // 같이 쓰는 캐릭터로 들어온 세션은 그 캐릭터 주인의 비밀번호·계정·폰 알림을 건드리지 못한다 (제작자 2026-11-25 '뼈님은 뼈님대로 접속하게')
+  if (method !== "GET" && method !== "HEAD" && SHARED_BLOCK.test(path)) {
+    const u = await currentUser(env, request).catch(() => null);
+    if (u?.via)
+      return new Response(JSON.stringify({ error: "같이 쓰는 캐릭터에서는 못 해요. 내 캐릭터로 바꾼 뒤에 해 주세요" }), {
+        status: 403,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+  }
   // 사진 질문의 사진 먼저 읽기(/api/chat/peek)는 바로 뒤의 챗봇 질문이 남으므로 따로 남기지 않는다 (사진 본문을 두 번 풀지 않게).
   // 캐릭터 사진 AI 검수(/api/avatar/review)도 같은 AI 보정의 둘째 단계라 /api/avatar/cutout 한 줄로 남는다
   // 생일 콤보 실시간 저장(?live=1, 콤보 중 3초마다)은 남기지 않는다 (콤보가 끝날 때 한 번 남는다)

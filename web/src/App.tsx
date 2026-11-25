@@ -444,8 +444,9 @@ function Wiki({
   // 폰이 이미 알림을 허락했으면 폰 알림을 저절로 켠다 (제작자 요청: 기본은 허용)
   // 그 뒤 이 폰의 알림 허용 상태를 알린다 ('길드원 관리'에 보인다)
   useEffect(
-    () => void ensurePush(me.id).then(() => reportPush(me.id)),
-    [me.id],
+    // 같이 쓰는 캐릭터로 들어와 있으면 이 폰의 알림을 그 캐릭터 주인에게 묶지 않는다
+    () => void (me.via ? undefined : ensurePush(me.id).then(() => reportPush(me.id))),
+    [me.id, me.via],
   );
   // 업데이트된 메뉴에 처음 들어간 때 (홈 칸의 'UPDATE' 가 그때 사라진다)
   useEffect(() => markMenuVisit(me.id, location.hash), [route, me.id]);

@@ -13,7 +13,8 @@ let mine: Mine = { current: "", list: [] };
 const subs = new Set<() => void>();
 
 export function setMyCharacters(me: Me) {
-  const list = me.characters ?? [];
+  // 같이 쓰는 캐릭터는 내 캐릭터 아래에 (제작자 2026-11-25 '뼈 부주')
+  const list = [...(me.characters ?? []), ...(me.shared ?? [])];
   if (mine.current === me.id && JSON.stringify(mine.list) === JSON.stringify(list)) return;
   mine = { current: me.id, list };
   for (const s of subs) s();
@@ -67,3 +68,5 @@ export function justSwitched(): boolean {
 
 /** 그 사람(본캐) 아이디: 기기에 사람마다 적는 것('더 이상 보지 않기')은 캐릭터를 바꿔도 같게 */
 export const personOf = (me: Me) => me.characters?.find((c) => c.main)?.id ?? me.id;
+/** 같이 쓰는 캐릭터로 들어와 있는지 (비밀번호·계정·폰 알림 칸을 숨긴다) */
+export const onShared = (me: Me) => !!me.via;

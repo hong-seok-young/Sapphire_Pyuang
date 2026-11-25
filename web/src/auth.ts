@@ -66,6 +66,10 @@ export interface Me {
   characters?: Character[];
   /** 운영진 승낙을 기다리는 캐릭터 추가 요청 (닉네임) */
   pendingCharacters?: string[];
+  /** 같이 쓰는 캐릭터 (다른 사람 계정이지만 나도 들어가는 캐릭터, 제작자 2026-11-25 '뼈 부주'). 목록에 '같이' 로 보인다 */
+  shared?: Character[];
+  /** 같이 쓰는 캐릭터로 들어와 있으면 원래 사람(본캐) 아이디. 비밀번호·계정·폰 알림은 못 건드린다 */
+  via?: string | null;
   /** 플래티넘 할인 상점을 열었는지 (설정의 '오픈'). 열기 전에는 홈 칸이 운영진에게만 보인다 */
   shopOpen?: boolean;
   /** 1군 성장코인샵 오픈 (담당자가 켠다) */
@@ -85,6 +89,8 @@ export interface Character {
   job: Job | null;
   level: number | null;
   guild: Guild | null;
+  /** 같이 쓰는 캐릭터 (내 계정이 아님) */
+  shared?: boolean;
 }
 
 export interface RankEntry {

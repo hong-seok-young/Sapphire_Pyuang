@@ -42,6 +42,8 @@ export interface User {
   owner?: string;
   /** 그 사람의 캐릭터 아이디 모두 (본캐와 부캐). currentUser 가 채운다 (장비대여 담당처럼 사람으로 정하는 권한, server/rental.ts isManager) */
   chars?: string[];
+  /** 같이 쓰는 캐릭터로 들어온 세션이면 원래 사람의 본캐 아이디 (제작자 2026-11-25 '뼈 부주', D1 char_shares·sessions.via). 비밀번호·계정은 못 건드린다 */
+  via?: string;
 }
 
 /** 부캐 묶기 (제작자 요청 2026-11-01): 같은 사람의 캐릭터들. 본캐는 users.main_id 가 비어 있고, 부캐는 본캐 아이디를 갖는다 */
@@ -268,8 +270,10 @@ export function readProfile(body: { job?: unknown; level?: unknown; exp?: unknow
 
 /** 로그인한 사람의 정보 (/api/me, /api/login 이 같은 모양으로 준다). exp, avatar 는 본인 것이라 여기서만 준다 */
 export async function meInfo(env: Env, user: User) {
-  const owner = "(SELECT COALESCE(main_id, id) FROM users WHERE id = ?1)";
-  const [one, group, pending, shop, g1] = await env.DB.batch([
+  // 같이 쓰는 캐릭터로 들어왔으면 캐릭터 목록은 원래 사람(via) 것
+  const owner = "(SELECT COALESCE(main_id, id) FROM users WHERE id = ?2)";
+  const person = user.via ?? user.id;
+  const [one, group, pending, shop, g1, shared] = await env.DB.batch([
     env.DB.prepare(
       "SELECT p.job AS job, p.level AS level, p.exp AS exp, p.guild AS guild, a.updated_at AS avatar, u.created_at AS created_at FROM users u " +
         "LEFT JOIN profiles p ON p.user_id = u.id LEFT JOIN avatars a ON a.user_id = u.id WHERE u.id = ?1",
@@ -278,24 +282,32 @@ export async function meInfo(env: Env, user: User) {
     env.DB.prepare(
       "SELECT u.id AS id, u.role AS role, u.main_id AS main_id, p.job AS job, p.level AS level, p.guild AS guild FROM users u " +
         `LEFT JOIN profiles p ON p.user_id = u.id WHERE u.id = ${owner} OR u.main_id = ${owner} ORDER BY u.main_id IS NOT NULL, u.created_at`,
-    ).bind(user.id),
-    env.DB.prepare(`SELECT id FROM signup_requests WHERE owner = ${owner} ORDER BY created_at`).bind(user.id),
+    ).bind(user.id, person),
+    env.DB.prepare(`SELECT id FROM signup_requests WHERE owner = ${owner} ORDER BY created_at`).bind(user.id, person),
     // 플래티넘 할인 상점을 열었는지 (설정의 '오픈'): 열기 전에는 홈 칸도 운영진만 본다 (제작자 2026-11-10, src/launcher.ts shopGate)
     env.DB.prepare("SELECT open FROM plat_settings WHERE id = 1"),
     // 1군 성장코인샵을 열었는지 (담당자 '오픈'): 열기 전에는 홈 칸이 갈라지지 않고 2군으로만 간다 (src/launcher.ts canGcoin1)
     env.DB.prepare("SELECT value FROM gc_settings WHERE key = 'g1open'"),
+    // 같이 쓰는 캐릭터 (다른 사람 계정이지만 나도 들어가는 캐릭터, 제작자 2026-11-25 '뼈 부주')
+    env.DB.prepare(
+      "SELECT u.id AS id, u.role AS role, p.job AS job, p.level AS level, p.guild AS guild FROM char_shares c JOIN users u ON u.id = c.char_id " +
+        `LEFT JOIN profiles p ON p.user_id = u.id WHERE c.owner = ${owner} ORDER BY c.created_at`,
+    ).bind(user.id, person),
   ]);
   const p = one.results[0] as
     | { job: Job | null; level: number | null; exp: number | null; guild: Guild | null; avatar: number | null; created_at: number | null }
     | undefined;
   const chars = group.results as { id: string; role: Role; main_id: string | null; job: Job | null; level: number | null; guild: Guild | null }[];
   // 권한은 캐릭터 중 가장 높은 역할 (currentUser 와 같다)
-  const role = chars.reduce<Role>((top, c) => (RANK[c.role] > RANK[top] ? c.role : top), user.role);
+  // 같이 쓰는 캐릭터로 들어왔으면 그 캐릭터 쪽 역할 그대로 (내 권한을 들고 가지 않는다)
+  const role = user.via ? user.role : chars.reduce<Role>((top, c) => (RANK[c.role] > RANK[top] ? c.role : top), user.role);
   return {
     id: user.id, role, mustChange: user.must_change === 1,
     // 부캐 묶기: 내 캐릭터들(👤 를 누르면 고른다)과 운영진 승낙을 기다리는 캐릭터 추가 요청
     characters: chars.map((c) => ({ id: c.id, role: c.role, main: c.main_id === null, job: c.job, level: c.level, guild: c.guild })),
     pendingCharacters: (pending.results as { id: string }[]).map((r) => r.id),
+    shared: (shared.results as { id: string; role: Role; job: Job | null; level: number | null; guild: Guild | null }[]).map((c) => ({ ...c, main: false, shared: true })),
+    via: user.via ?? null,
     job: p?.job ?? null, level: p?.level ?? null, exp: p?.exp ?? null, guild: p?.guild ?? null, avatar: p?.avatar ?? null,
     // 계정을 만든 때: 홈 화면 아이콘이 바뀌기 전부터 있던 계정인지 (아이콘 다시 설치 안내, src/App.tsx)
     createdAt: p?.created_at ?? null,
@@ -405,11 +417,12 @@ export async function userOfToken(env: Env, token: string): Promise<User | null>
     "SELECT u.id AS id, u.role AS role, (SELECT m.must_change FROM users m WHERE m.id = COALESCE(u.main_id, u.id)) AS must_change, " +
       "s.expires_at AS expires_at, COALESCE(u.main_id, u.id) AS owner, " +
       `(SELECT ${TOP_ROLE} FROM users r WHERE r.id = COALESCE(u.main_id, u.id) OR r.main_id = COALESCE(u.main_id, u.id)) AS top, ` +
-      "(SELECT GROUP_CONCAT(r.id, char(10)) FROM users r WHERE r.id = COALESCE(u.main_id, u.id) OR r.main_id = COALESCE(u.main_id, u.id)) AS chars " +
+      "(SELECT GROUP_CONCAT(r.id, char(10)) FROM users r WHERE r.id = COALESCE(u.main_id, u.id) OR r.main_id = COALESCE(u.main_id, u.id)) AS chars, " +
+      "(SELECT COALESCE(v.main_id, v.id) FROM users v WHERE v.id = s.via) AS via " +
       "FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?",
   )
     .bind(await sha256(token))
-    .first<Omit<User, "chars"> & { expires_at: number; owner: string; top: number | null; chars: string | null }>();
+    .first<Omit<User, "chars" | "via"> & { expires_at: number; owner: string; top: number | null; chars: string | null; via: string | null }>();
   if (!row || row.expires_at < Date.now()) return null;
   // 부캐를 묶은 사람은 캐릭터 중 가장 높은 역할로 (오피서의 부캐로 바꿔 들어와도 길드원 관리는 그대로)
   return {
@@ -418,6 +431,8 @@ export async function userOfToken(env: Env, token: string): Promise<User | null>
     must_change: row.must_change,
     owner: row.owner,
     chars: row.chars ? row.chars.split("\n") : [row.id],
+    // 같이 쓰는 캐릭터: 비밀번호를 바꾸라는 화면은 그 캐릭터 주인 것이라 띄우지 않는다
+    ...(row.via ? { via: row.via, must_change: 0 } : {}),
   };
 }
 
@@ -438,17 +453,28 @@ export async function canManageUser(env: Env, actor: Role, targetId: string, fal
   return canManage(actor, (await groupRole(env, targetId)) ?? fallback);
 }
 
-/** 지금 로그인을 같은 사람의 다른 캐릭터로 바꾼다 (부캐 묶기). 바꿨으면 true */
+/**
+ * 지금 로그인을 같은 사람의 다른 캐릭터로 바꾼다 (부캐 묶기). 같이 쓰는 캐릭터(char_shares, 제작자 2026-11-25 '뼈 부주')로도 바꾼다:
+ * 그때는 세션의 via 에 원래 캐릭터를 적어 두고, 내 캐릭터로 돌아오면 지운다. 바꿨으면 true
+ */
 export async function switchCharacter(env: Env, request: Request, me: User, to: string): Promise<boolean> {
   const token = sessionToken(request);
   if (!token) return false;
-  const owner = me.owner ?? me.id;
-  const res = await env.DB.prepare(
-    "UPDATE sessions SET user_id = ?1 WHERE token_hash = ?2 AND EXISTS (SELECT 1 FROM users WHERE id = ?1 AND COALESCE(main_id, id) = ?3)",
+  const person = me.via ?? me.owner ?? me.id;
+  const hash = await sha256(token);
+  const own = await env.DB.prepare(
+    "UPDATE sessions SET user_id = ?1, via = NULL WHERE token_hash = ?2 AND EXISTS (SELECT 1 FROM users WHERE id = ?1 AND COALESCE(main_id, id) = ?3)",
   )
-    .bind(to, await sha256(token), owner)
+    .bind(to, hash, person)
     .run();
-  return res.meta.changes > 0;
+  if (own.meta.changes > 0) return true;
+  const shared = await env.DB.prepare(
+    "UPDATE sessions SET via = COALESCE(via, user_id), user_id = ?1 WHERE token_hash = ?2 " +
+      "AND EXISTS (SELECT 1 FROM char_shares c JOIN users u ON u.id = c.char_id WHERE c.owner = ?3 AND c.char_id = ?1)",
+  )
+    .bind(to, hash, person)
+    .run();
+  return shared.meta.changes > 0;
 }
 
 /**

@@ -19,10 +19,21 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT PRIMARY KEY,            -- 로그인 쿠키 토큰의 SHA-256. 토큰 자체는 저장하지 않는다
   user_id TEXT NOT NULL,
-  expires_at INTEGER NOT NULL
+  expires_at INTEGER NOT NULL,
+  via TEXT                                -- 같이 쓰는 캐릭터로 들어왔으면 원래 캐릭터 아이디 (char_shares, 2026-11-25)
 );
 
 CREATE INDEX IF NOT EXISTS sessions_user ON sessions (user_id);
+
+-- 같이 쓰는 캐릭터 (제작자 2026-11-25 '내가 뼈 부주거든, 프로필 누르면 뼈로 전환, 뼈님은 뼈님대로 접속'): owner(본캐) 의 캐릭터 목록에
+-- char_id 가 '같이' 로 보이고 바꿔 들어간다. char_id 의 주인은 자기 아이디·비밀번호로 그대로 로그인한다 (부캐 묶기와 다르다)
+CREATE TABLE IF NOT EXISTS char_shares (
+  owner TEXT NOT NULL,
+  char_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  created_by TEXT,
+  PRIMARY KEY (owner, char_id)
+);
 
 -- 챗봇 하루 질문 수 (functions/api/chat.ts). day 는 한국 날짜 YYYY-MM-DD
 CREATE TABLE IF NOT EXISTS chat_usage (

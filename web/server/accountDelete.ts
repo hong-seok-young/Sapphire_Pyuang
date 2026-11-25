@@ -20,7 +20,8 @@ export async function deleteAccountData(env: Env, user: { id: string; main_id: s
     : [env.DB.prepare("DELETE FROM signup_requests WHERE owner = ?").bind(user.id)];
   await env.DB.batch([
     ...promote,
-    env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM sessions WHERE user_id = ? OR via = ?").bind(user.id, user.id),
+    env.DB.prepare("DELETE FROM char_shares WHERE owner = ? OR char_id = ?").bind(user.id, user.id),
     env.DB.prepare("DELETE FROM profiles WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM level_log WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM level_log_archive WHERE user_id = ?").bind(user.id),
