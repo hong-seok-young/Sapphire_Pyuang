@@ -505,6 +505,27 @@ if (!queryFirst("SELECT 1 AS ok FROM setup WHERE key = 'char_share_puang_bone_20
   }
 }
 
+// 뼈 캐릭터 도감 완료 (제작자 2026-11-25 '뼈 캐릭터 도감 완료된 거 영상 녹화한 거 줄 테니까 뼈 앱 계정에 내 도감에 완료 처리'):
+// 비공개 자료 도감/뼈_완료_20261125.json(영상에서 읽은 완료 481개, dex.json 항목 이름)을 dex_done 에 넣는다. 이미 체크한 것과 합치고 고친 때는 지금.
+// 한 번만 (setup 'dex_done_bone_20261125'). 계정이 없으면 다음 배포에 다시 본다
+if (!queryFirst("SELECT 1 AS ok FROM setup WHERE key = 'dex_done_bone_20261125'")?.ok) {
+  const file = "../자료/도감/뼈_완료_20261125.json";
+  const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+  if (existsSync(file) && queryFirst("SELECT 1 AS x FROM users WHERE id = '뼈'")?.x) {
+    const doc = JSON.parse(readFileSync(file, "utf8"));
+    const names = new Set(Object.values(doc["완료"]).flat());
+    const old = queryFirst("SELECT names FROM dex_done WHERE user_id = '뼈'")?.names;
+    if (old) for (const n of JSON.parse(old)) names.add(n);
+    const list = JSON.stringify([...names]);
+    const now = Date.now();
+    runSql([
+      `INSERT INTO dex_done (user_id, names, n, updated_at) VALUES ('뼈', ${q(list)}, ${names.size}, ${now}) ON CONFLICT(user_id) DO UPDATE SET names = excluded.names, n = excluded.n, updated_at = excluded.updated_at;`,
+      `INSERT OR REPLACE INTO setup (key, done_at) VALUES ('dex_done_bone_20261125', ${now});`,
+    ]);
+    console.log(`도감 완료를 넣었어요 (${names.size})`);
+  }
+}
+
 const count = Number(queryFirst("SELECT COUNT(*) AS n FROM users")?.n ?? 0);
 if (count > 0) {
   console.log(`계정 ${count}개`);
