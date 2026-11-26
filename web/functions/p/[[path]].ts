@@ -101,7 +101,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
     .join("");
   // 줄마다 단가: 그 줄만 정한 단가, 한 레벨이면 그 레벨 단가, 레벨이 오른 줄은 레벨마다
   const rowPrice = (r: Row, per: number) => {
-    if (r.rate && r.rate > 0) return esc(priceText(rates, null, r.rate));
+    if (r.rate && r.rate > 0) return `${won(Math.round(gain(r) * r.rate))}원 고정`;
     if (r.lv_from === r.lv_to) return `Lv.${r.lv_from} ${esc(priceText(rates, r.lv_from, perPct(rates, r.lv_from) ?? per))}`;
     return Array.from({ length: r.lv_to - r.lv_from + 1 }, (_, k) => r.lv_from + k)
       .map((lv) => {

@@ -314,7 +314,7 @@ function RunDetail({ r, editable, onChange }: { r: Run; editable: boolean; onCha
         <div className="dy-detail-foot">
           <small>
             {r.author}
-            {r.rate ? ` · 1%당 ${won(r.rate)}원 고정` : ""}
+            {r.rate ? ` · ${won(Math.round(gainOf(r) * r.rate))}원 고정` : ""}
           </small>
           {editable && (
             <>
