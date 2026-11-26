@@ -13,6 +13,9 @@ export const CAT_NAME: Record<Cat, string> = { notice: "공지사항", event: "�
 export const canWrite = (role: Role, cat: Cat) => cat === "free" || cat === "suggest" || RANK[role] >= 1;
 /** 글 지우기, 고정: 쓴 사람(지우기만) 또는 오피서 이상 */
 export const isStaff = (role: Role) => RANK[role] >= 1;
+/** 배포가 '사파이어' 이름으로 올린 공지(통제 리스트, 플래티넘 가격 …)는 쓴 사람 계정이 없어서 앱개발자가 고친다 (제작자 2026-11-26) */
+export const GUILD_AUTHOR = "사파이어";
+export const canEditPost = (me: { id: string; role: Role }, author: string) => author === me.id || (author === GUILD_AUTHOR && me.role === "developer");
 
 export const TITLE_MAX = 80;
 export const BODY_MAX = 10_000;

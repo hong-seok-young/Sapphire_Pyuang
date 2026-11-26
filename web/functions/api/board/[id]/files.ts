@@ -2,7 +2,7 @@
 // 사진(JPEG, PNG, WebP, GIF)은 글에 그림으로 보이고, 나머지는 내려받기 파일. 글 하나에 10개, 하나 1.9MB 까지 (사진은 화면이 줄여 보낸다)
 import { FORBIDDEN, NEED_LOGIN, currentUser, json } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
-import { FILES_MAX, FILE_MAX_BYTES, IMAGE_TYPES, cleanName, loadPost } from "../../../../server/board";
+import { FILES_MAX, FILE_MAX_BYTES, IMAGE_TYPES, canEditPost, cleanName, loadPost } from "../../../../server/board";
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
   const me = await currentUser(env, request);
@@ -10,7 +10,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }
   const id = Number(params.id);
   const post = await loadPost(env, id);
   if (!post) return json({ error: "없는 글이에요" }, 404);
-  if (post.author !== me.id) return FORBIDDEN();
+  if (!canEditPost(me, post.author)) return FORBIDDEN();
   if (Number(request.headers.get("content-length") ?? 0) > FILE_MAX_BYTES) return json({ error: "파일은 1.9MB 까지예요" }, 413);
   const data = new Uint8Array(await request.arrayBuffer());
   if (!data.length) return json({ error: "빈 파일이에요" }, 400);

@@ -510,7 +510,7 @@ function PostView({ me, id, box, inline, onGone }: { me: Me; id: number; box?: b
               {post.pinned ? "고정 해제" : "고정"}
             </button>
           )}
-          {mine && (
+          {(post.editable ?? mine) && (
             <a className="pill" href={`${base}/${id}/edit`}>
               수정
             </a>

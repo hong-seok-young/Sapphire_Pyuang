@@ -1,9 +1,9 @@
 // GET    /api/board/:id -> 글 하나 (본 사람으로 센다): 글, 사진과 파일 목록, 댓글, 좋아요
-// PATCH  /api/board/:id { title?, body?, pinned? } -> 고치기 (제목, 내용은 쓴 사람만. 고정은 오피서 이상)
+// PATCH  /api/board/:id { title?, body?, pinned? } -> 고치기 (제목, 내용은 쓴 사람만(사파이어 글은 앱개발자). 고정은 오피서 이상)
 // DELETE /api/board/:id -> 지우기 (쓴 사람 또는 오피서 이상)
 import { FORBIDDEN, NEED_LOGIN, currentUser, json, readJson } from "../../../server/auth";
 import type { Env } from "../../../server/auth";
-import { BODY_MAX, TITLE_MAX, canSeePost, deletePostStmts, isStaff, loadPost, shownName } from "../../../server/board";
+import { BODY_MAX, TITLE_MAX, canEditPost, canSeePost, deletePostStmts, isStaff, loadPost, shownName } from "../../../server/board";
 import { sgStatusOf, sgSteps } from "../../../server/suggest";
 
 const postId = (params: Record<string, string | string[]>) => Number(params.id);
@@ -48,7 +48,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
       : undefined;
   return json({
     flow,
-    post: { ...post, author, pinned: post.pinned === 1, anon: post.anon === 1, mine: post.author === me.id },
+    post: { ...post, author, pinned: post.pinned === 1, anon: post.anon === 1, mine: post.author === me.id, editable: canEditPost(me, post.author) },
     files: (files.results as { image: number }[]).map((f) => ({ ...f, image: f.image === 1 })),
     comments: list,
     likes: likers.length,
@@ -70,7 +70,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
     await env.DB.prepare("UPDATE board_posts SET pinned = ? WHERE id = ?").bind(b.pinned ? 1 : 0, id).run();
   }
   if (b.title !== undefined || b.body !== undefined) {
-    if (post.author !== me.id) return FORBIDDEN();
+    if (!canEditPost(me, post.author)) return FORBIDDEN();
     const title = typeof b.title === "string" ? b.title.trim() : post.title;
     const body = typeof b.body === "string" ? b.body.replace(/\r\n/g, "\n").trim() : post.body;
     if (!title || title.length > TITLE_MAX) return json({ error: `제목은 ${TITLE_MAX}자까지 적어 주세요` }, 400);

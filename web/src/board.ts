@@ -78,7 +78,7 @@ export const sgName = (s: SgStatus, agrees: number) =>
 export interface PostDetail {
   /** 건의 결재선 (건의 사항 글만) */
   flow?: { status: SgStatus; steps: SgStep[] };
-  post: { id: number; cat: Cat; author: string; title: string; body: string; pinned: boolean; created_at: number; edited_at: number | null; anon?: boolean; mine?: boolean };
+  post: { id: number; cat: Cat; author: string; title: string; body: string; pinned: boolean; created_at: number; edited_at: number | null; anon?: boolean; mine?: boolean; editable?: boolean };
   files: BoardFile[];
   comments: BoardComment[];
   likes: number;
