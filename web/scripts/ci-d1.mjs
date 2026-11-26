@@ -1072,6 +1072,28 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
   }
 }
 
+// 플래티넘 가격 공지 그림 고침: 원스토어 20% 는 페이백이 아니라 할인 (정가 x 0.8, 제작자 2026-11-26 '20퍼 할인쪽이 잘못됐다'). setup 키로 한 번
+{
+  const KEY = "plat_price_notice_pic_20261126b";
+  const pic = "../자료/이미지/상점/플래티넘_상품별_가격_20261126.webp";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`) && existsSync(pic)) {
+    const bytes = readFileSync(pic);
+    const now = Date.now();
+    // 그림 주소(파일 번호)는 1년 캐시라 같은 줄을 고치지 않고 새 줄로 넣고 예전 줄을 지운다
+    const post = "(SELECT MAX(id) FROM board_posts WHERE cat = 'notice' AND author = '사파이어' AND title = '플래티넘 플랫폼별 가격')";
+    const file = `(SELECT MAX(id) FROM board_files WHERE post_id = ${post} AND created_at = ${now})`;
+    const lines = [
+      `DELETE FROM board_files WHERE post_id = ${post};`,
+      `INSERT INTO board_files (post_id, name, type, size, image, data, created_at) SELECT id, '플래티넘_상품별_가격.webp', 'image/webp', ${bytes.length}, 1, X'', ${now} FROM board_posts WHERE id = ${post};`,
+    ];
+    for (let i = 0; i < bytes.length; i += 40_000) lines.push(`UPDATE board_files SET data = CAST(data || X'${bytes.subarray(i, i + 40_000).toString("hex")}' AS BLOB) WHERE id = ${file};`);
+    lines.push(`INSERT OR REPLACE INTO setup (key, done_at) VALUES ('${KEY}', ${now});`);
+    runSql(lines);
+    const f = queryFirst(`SELECT COUNT(*) AS n, MAX(length(data)) AS b FROM board_files WHERE created_at = ${now}`);
+    console.log(`플래티넘 가격 공지 그림을 바꿨어요 (${f?.n ?? 0}장 ${f?.b ?? 0}바이트)`);
+  }
+}
+
 // 시리온 통제 리스트를 공지사항으로 (제작자 2026-11-10 '우리 길드는 중립길드야, 이 몹들을 잡으면 안 되는 통제 리스트, 길드의 공지사항에 넣어줘, 글쓴이는 사파이어로').
 // 비공개 자료 길드/통제_리스트.json 과 표 그림으로 글(고정)·그림 첨부·모두에게 알림 (scripts/controlNotice.mjs). setup 'control_notice_20261110' 로 한 번만
 {
