@@ -68,6 +68,19 @@ if (existsSync(LIST)) {
       run("--file", file);
       continue;
     }
+    // 이어 붙이기 줄: { key, edit_day, edit_lv, edit_exp, lv_to, exp_to, t_to, to } (정산 전 그 기록의 끝을 새 스샷으로 바꾼다: '합쳐줘')
+    if (r.edit_day) {
+      const rid = `(SELECT MAX(id) FROM diary_runs WHERE day = ${q(r.edit_day)} AND lv_from = ${n(r.edit_lv)} AND ABS(exp_from - ${n(r.edit_exp)}) < 0.0005 AND settle_id IS NULL)`;
+      const sql = [
+        `UPDATE diary_runs SET lv_to = ${n(r.lv_to)}, exp_to = ${n(r.exp_to)}, t_to = ${q(r.t_to)}, updated_at = ${Date.now()} WHERE id = ${rid};`,
+        ...(r.to ? [`DELETE FROM diary_shots WHERE run_id = ${rid} AND side = 'to';`, ...shotLines({ to: r.to }, rid, Date.now())] : []),
+        `INSERT OR REPLACE INTO setup (key, done_at) VALUES (${q(key)}, ${Date.now()});`,
+      ].join("\n");
+      const file = join(dir, key + ".sql");
+      writeFileSync(file, sql);
+      run("--file", file);
+      continue;
+    }
     // 메모 줄: { key, memo_day, memo_lv, memo_exp, memo } (그 날 그 시작 경험치의 기록에 한 줄 메모)
     if (r.memo_day) {
       const sql = `UPDATE diary_runs SET memo = ${q(r.memo ?? "")} WHERE day = ${q(r.memo_day)} AND lv_from = ${n(r.memo_lv)} AND ABS(exp_from - ${n(r.memo_exp)}) < 0.0005;\nINSERT OR REPLACE INTO setup (key, done_at) VALUES (${q(key)}, ${Date.now()});`;
