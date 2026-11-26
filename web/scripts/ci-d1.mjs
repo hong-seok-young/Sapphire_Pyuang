@@ -1038,8 +1038,8 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
   if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`) && existsSync(pic)) {
     const now = Date.now();
     const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
-    const title = "플래티넘 상품별 실제 가격 (11/26)";
-    const body = "웹 상점 · 원스토어 · 플레이스토어 · 앱스토어 상품별 실제 가격이에요. 금색이 가장 싼 곳이에요.";
+    const title = "플래티넘 플랫폼별 가격";
+    const body = "";
     const post = `(SELECT MAX(id) FROM board_posts WHERE cat = 'notice' AND title = ${q(title)} AND author = '사파이어')`;
     const bytes = readFileSync(pic);
     const name = "플래티넘_상품별_가격.webp";
@@ -1058,6 +1058,17 @@ if (!queryFirst("SELECT 1 AS done FROM setup WHERE key = 'sim_split_20261104'"))
     runSql(lines);
     const f = queryFirst(`SELECT COUNT(*) AS n, MAX(length(data)) AS b FROM board_files WHERE created_at = ${now}`);
     console.log(`플래티넘 가격 공지를 올렸어요 (그림 ${f?.n ?? 0}장 ${f?.b ?? 0}바이트)`);
+  }
+}
+// 플래티넘 가격 공지: 제목 '플래티넘 플랫폼별 가격', 설명 문장 빼기 (제작자 2026-11-26, 이미 올라간 글). 사파이어 글은 앱개발자가 고친다 (server/board.ts canEditPost)
+{
+  const KEY = "plat_price_notice_title_20261126";
+  if (!queryFirst(`SELECT 1 AS x FROM setup WHERE key = '${KEY}'`)) {
+    runSql([
+      "UPDATE board_posts SET title = '플래티넘 플랫폼별 가격', body = '' WHERE cat = 'notice' AND author = '사파이어' AND title = '플래티넘 상품별 실제 가격 (11/26)';",
+      "UPDATE alerts SET text = '[공지사항] 플래티넘 플랫폼별 가격 · 사파이어' WHERE kind = 'board_notice' AND text = '[공지사항] 플래티넘 상품별 실제 가격 (11/26) · 사파이어';",
+      `INSERT OR REPLACE INTO setup (key, done_at) VALUES ('${KEY}', ${Date.now()});`,
+    ]);
   }
 }
 

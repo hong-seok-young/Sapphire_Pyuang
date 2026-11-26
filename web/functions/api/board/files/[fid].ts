@@ -2,7 +2,7 @@
 // DELETE /api/board/files/:fid -> 지우기 (글 쓴 사람만)
 import { FORBIDDEN, NEED_LOGIN, blobBytes, currentUser, json } from "../../../../server/auth";
 import type { Env } from "../../../../server/auth";
-import { canSeePost } from "../../../../server/board";
+import { canEditPost, canSeePost } from "../../../../server/board";
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env, params }) => {
   const me = await currentUser(env, request);
@@ -34,7 +34,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
     .bind(Number(params.fid))
     .first<{ author: string }>();
   if (!row) return json({ error: "없는 파일이에요" }, 404);
-  if (row.author !== me.id) return FORBIDDEN();
+  if (!canEditPost(me, row.author)) return FORBIDDEN();
   await env.DB.prepare("DELETE FROM board_files WHERE id = ?").bind(Number(params.fid)).run();
   return json({ ok: true });
 };
