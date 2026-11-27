@@ -185,7 +185,7 @@ const HallPage = lazy(() => CHUNKS.Hall().then((m) => ({ default: m.HallPage }))
 function prefetchPages(staff: boolean, master: boolean, logViewer = master) {
   const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
   if (conn?.saveData || /(^|-)2g$/.test(conn?.effectiveType ?? "")) return () => undefined;
-  const list: (keyof typeof CHUNKS)[] = ["Board", "Ranking", "Market", "Todo", "GuildDungeon", "Requests", "Rental", "Enhance", "DevRequests", "Trend", "Dex", "Simulator", "Chat", "Profile", "Alerts", "PlatShop", "Official"];
+  const list: (keyof typeof CHUNKS)[] = ["Board", "Ranking", "Market", "Todo", "GuildDungeon", "Requests", "Rental", "Enhance", "DevRequests", "Trend", "Dex", "Simulator", "Chat", "Profile", "Alerts", "Official"];
   if (GCOIN_OPEN) list.push("GrowthShop");
   if (DONATE_OPEN) list.push("Hall", "Donate");
   if (staff) list.push("Admin");
